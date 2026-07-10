@@ -1,30 +1,40 @@
 // Supabase Edge Function: generate-invoices
-// Scheduled daily at 1am SGT (17:00 UTC) via pg_cron + pg_net
 //
-// Run logic per daily trigger:
+// One implementation, two ways to trigger it:
 //
-//   1. Determine billing month = previous calendar month (YYYY-MM).
-//   2. Check billing_periods table:
-//        - If the billing month is already marked "complete", exit immediately.
-//          Nothing more to do until next month's date rolls around.
-//   3. For each active class:
-//        a. Find all lesson_sessions in the billing month.
-//        b. Find all currently-active enrollees.
-//        c. GATE: every active enrollee must have an attendance row for every
-//           session. If any are missing → skip this class (still incomplete).
-//        d. For classes that pass the gate, aggregate billable attendance per
-//           parent and create invoice + invoice_items if not yet issued.
-//   4. After processing all classes:
-//        - If ZERO classes were skipped due to incomplete attendance,
-//          the billing month is fully settled → insert into billing_periods.
-//          Future daily runs will exit at step 2.
-//        - If some classes were still incomplete, do nothing extra — the cron
-//          will retry tomorrow.
+//   • AUTO  (cron)   — POST {} (or {"mode":"auto"}). Runs daily via pg_cron.
+//                      Respects the app_settings "auto_invoice_enabled" switch,
+//                      the billing_periods "already sealed" guard, and the
+//                      attendance-completeness gate (only bills a class once
+//                      every active student has an attendance row for every
+//                      session that month). Seals the month when fully done.
+//
+//   • MANUAL (admin) — POST {"mode":"manual","force":true,"billing_month":"YYYY-MM"}.
+//                      On-demand generation for a chosen month. Ignores the
+//                      auto switch, the sealed guard, and the completeness gate:
+//                      it bills whatever billable attendance exists right now.
+//                      Never seals the month, so the cron can still finalise it.
+//
+// Both paths skip parents who already have an invoice for the month (no
+// double-billing) and apply available credit balance FIFO.
+//
+// Request body (all optional):
+//   mode          "auto" | "manual"   (default "auto")
+//   force         boolean             (default false)
+//   billing_month "YYYY-MM"           (default = previous calendar month)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Attendance statuses that result in a charge to the parent
-const BILLABLE = new Set(["present", "absent", "trial_paid"]);
+// Attendance statuses that result in a charge to the parent.
+// Per PRD 5.4: only Present and Paid Trial are billable.
+const BILLABLE = new Set(["present", "trial_paid"]);
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    headers: { "Content-Type": "application/json" },
+    status,
+  });
+}
 
 Deno.serve(async (req: Request) => {
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -39,52 +49,76 @@ Deno.serve(async (req: Request) => {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  // ── Billing month = previous calendar month ───────────────────────────────
-  const now = new Date();
-  const billingDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const billingMonth = `${billingDate.getFullYear()}-${String(
-    billingDate.getMonth() + 1
-  ).padStart(2, "0")}`;
+  // ── Parse options ─────────────────────────────────────────────────────────
+  let opts: { mode?: string; force?: boolean; billing_month?: string } = {};
+  try {
+    opts = await req.json();
+  } catch {
+    // empty body → defaults (auto mode, previous month)
+  }
+  const mode = opts.mode === "manual" ? "manual" : "auto";
+  const force = opts.force === true;
+
+  // Billing month: explicit YYYY-MM, else previous calendar month.
+  let billingMonth: string;
+  if (opts.billing_month && /^\d{4}-\d{2}$/.test(opts.billing_month)) {
+    billingMonth = opts.billing_month;
+  } else {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    billingMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  const [by, bm] = billingMonth.split("-").map(Number);
   const monthStart = `${billingMonth}-01`;
-  const lastDay = new Date(
-    billingDate.getFullYear(),
-    billingDate.getMonth() + 1,
-    0
-  ).getDate();
+  const lastDay = new Date(by, bm, 0).getDate();
   const monthEnd = `${billingMonth}-${String(lastDay).padStart(2, "0")}`;
 
-  // ── Step 2: Early exit if billing month is already complete ───────────────
-  const { data: billingPeriod } = await supabase
-    .from("billing_periods")
-    .select("billing_month")
-    .eq("billing_month", billingMonth)
-    .maybeSingle();
-
-  if (billingPeriod) {
-    return new Response(
-      JSON.stringify({
+  // ── Auto switch (auto mode only) ──────────────────────────────────────────
+  if (mode === "auto") {
+    const { data: setting } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "auto_invoice_enabled")
+      .maybeSingle();
+    const enabled = setting?.value === true || setting?.value === "true";
+    if (!enabled) {
+      return json({
         billing_month: billingMonth,
-        status: "already_complete",
-        message: "Invoices for this billing month were previously finalised. Skipping.",
-      }),
-      { headers: { "Content-Type": "application/json" }, status: 200 }
-    );
+        status: "auto_disabled",
+        message:
+          "Automatic invoice generation is turned off. Use manual generation from the admin panel.",
+      });
+    }
   }
 
-  // ── Step 3: Process each active class ────────────────────────────────────
+  // ── Sealed-month guard (skipped when forced) ──────────────────────────────
+  if (!force) {
+    const { data: billingPeriod } = await supabase
+      .from("billing_periods")
+      .select("billing_month")
+      .eq("billing_month", billingMonth)
+      .maybeSingle();
+
+    if (billingPeriod) {
+      return json({
+        billing_month: billingMonth,
+        status: "already_complete",
+        message:
+          "Invoices for this billing month were previously finalised. Skipping.",
+      });
+    }
+  }
+
+  // ── Process each active class ─────────────────────────────────────────────
   const { data: classes, error: clsErr } = await supabase
     .from("classes")
     .select("id, title, price_per_lesson")
     .eq("is_active", true);
 
-  if (clsErr) {
-    return new Response(JSON.stringify({ error: clsErr.message }), {
-      status: 500,
-    });
-  }
+  if (clsErr) return json({ error: clsErr.message }, 500);
 
   const log: unknown[] = [];
-  let classesIncomplete = 0;  // classes skipped because attendance not fully marked
+  let classesIncomplete = 0; // classes skipped because attendance not fully marked
   let invoicesCreated = 0;
 
   for (const cls of classes ?? []) {
@@ -120,7 +154,9 @@ Deno.serve(async (req: Request) => {
       .select("lesson_session_id, student_id, status")
       .in("lesson_session_id", sessionIds);
 
-    // ── Gate: every active student must have a row for every session ─────
+    // ── Gate: every active student must have a row for every session ────────
+    // Enforced only for automatic runs. Manual/force runs bill whatever
+    // attendance has been marked so far.
     const attSet = new Set(
       (attRows ?? []).map((a) => `${a.lesson_session_id}:${a.student_id}`)
     );
@@ -134,7 +170,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (!complete) {
+    if (!complete && !force) {
       classesIncomplete++;
       log.push({
         class_id: cls.id,
@@ -144,7 +180,7 @@ Deno.serve(async (req: Request) => {
       continue;
     }
 
-    // ── Build parent → invoice items ──────────────────────────────────────
+    // ── Build parent → invoice items ────────────────────────────────────────
     const { data: parentStudents } = await supabase
       .from("parent_students")
       .select("parent_id, student_id")
@@ -187,7 +223,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ── Create invoices per parent ────────────────────────────────────────
+    // ── Create invoices per parent ──────────────────────────────────────────
     for (const [parentId, items] of Object.entries(parentItems)) {
       if (!items.length) continue;
 
@@ -228,7 +264,7 @@ Deno.serve(async (req: Request) => {
           gross_amount: gross,
           credit_applied: credit,
           net_amount: net,
-          status: "outstanding",
+          status: net === 0 ? "paid" : "outstanding",
         })
         .select("id")
         .single();
@@ -287,10 +323,8 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  // ── Step 4: Mark billing month complete if no classes were still pending ──
-  // If classesIncomplete > 0, some classes still have unmarked attendance —
-  // the cron will retry tomorrow. Only seal the month when everything is done.
-  if (classesIncomplete === 0) {
+  // ── Seal the billing month (automatic, non-forced, fully-marked runs only) ─
+  if (mode === "auto" && !force && classesIncomplete === 0) {
     await supabase.from("billing_periods").insert({
       billing_month: billingMonth,
       invoices_issued: invoicesCreated,
@@ -301,17 +335,18 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  return new Response(
-    JSON.stringify({
-      billing_month: billingMonth,
-      invoices_created: invoicesCreated,
-      classes_still_incomplete: classesIncomplete,
-      status:
-        classesIncomplete === 0
-          ? "complete — billing month sealed"
-          : "partial — will retry tomorrow",
-      results: log,
-    }),
-    { headers: { "Content-Type": "application/json" }, status: 200 }
-  );
+  return json({
+    billing_month: billingMonth,
+    mode,
+    forced: force,
+    invoices_created: invoicesCreated,
+    classes_still_incomplete: classesIncomplete,
+    status:
+      mode === "manual"
+        ? "manual run complete"
+        : classesIncomplete === 0
+        ? "complete — billing month sealed"
+        : "partial — will retry tomorrow",
+    results: log,
+  });
 });

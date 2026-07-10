@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -36,9 +36,71 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
+  // Invoice generation controls
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const [genMonth, setGenMonth] = useState(currentMonth);
+  const [generating, setGenerating] = useState(false);
+  const [genResult, setGenResult] = useState<string | null>(null);
+  const [autoEnabled, setAutoEnabled] = useState<boolean | null>(null);
+  const [togglingAuto, setTogglingAuto] = useState(false);
+
   useEffect(() => {
     loadInvoices();
+    loadAutoSetting();
   }, []);
+
+  async function loadAutoSetting() {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "auto_invoice_enabled")
+      .maybeSingle();
+    setAutoEnabled(data ? data.value === true || data.value === "true" : true);
+  }
+
+  async function handleToggleAuto() {
+    if (autoEnabled === null) return;
+    setTogglingAuto(true);
+    const next = !autoEnabled;
+    const { error } = await supabase
+      .from("app_settings")
+      .update({ value: next, updated_at: new Date().toISOString() })
+      .eq("key", "auto_invoice_enabled");
+    if (!error) setAutoEnabled(next);
+    setTogglingAuto(false);
+  }
+
+  async function handleGenerate() {
+    setGenerating(true);
+    setGenResult(null);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    try {
+      const res = await fetch("/api/generate-invoices", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+        },
+        body: JSON.stringify({ billing_month: genMonth }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setGenResult(`Error: ${json.error ?? "generation failed"}`);
+      } else {
+        setGenResult(
+          `Created ${json.invoices_created} invoice(s) for ${formatBillingMonth(
+            genMonth
+          )}.`
+        );
+        await loadInvoices();
+      }
+    } catch (e) {
+      setGenResult(`Error: ${String(e)}`);
+    }
+    setGenerating(false);
+  }
 
   async function loadInvoices() {
     setLoading(true);
@@ -108,6 +170,71 @@ export default function InvoicesPage() {
         title="Invoices"
         subtitle={`Total outstanding: S$${totalOutstanding.toFixed(2)}`}
       />
+
+      {/* Invoice generation panel */}
+      <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">
+              Billing month
+            </label>
+            <input
+              type="month"
+              value={genMonth}
+              onChange={(e) => setGenMonth(e.target.value)}
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+            />
+          </div>
+          <Button onClick={handleGenerate} disabled={generating}>
+            <RefreshCw
+              className={`h-4 w-4 ${generating ? "animate-spin" : ""}`}
+            />
+            {generating ? "Generating…" : "Generate Invoices"}
+          </Button>
+
+          {/* Auto-generation toggle */}
+          <div className="ml-auto flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-xs font-semibold text-gray-700">
+                Automatic monthly generation
+              </div>
+              <div className="text-[11px] text-gray-400">
+                Runs on the 1st for the previous month
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleAuto}
+              disabled={togglingAuto || autoEnabled === null}
+              className={`relative h-6 w-11 rounded-full transition-colors ${
+                autoEnabled ? "bg-sky-500" : "bg-gray-300"
+              } disabled:opacity-50`}
+              aria-pressed={!!autoEnabled}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                  autoEnabled ? "translate-x-5" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        <p className="mt-3 text-xs text-gray-500">
+          Manual generation bills whatever attendance is marked for the chosen
+          month (one invoice per parent, across all their children). It ignores
+          the automatic on/off switch and never blocks the scheduled run.
+        </p>
+        {genResult && (
+          <p
+            className={`mt-2 text-sm font-medium ${
+              genResult.startsWith("Error") ? "text-red-600" : "text-green-600"
+            }`}
+          >
+            {genResult}
+          </p>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-3 mb-4">
         <input

@@ -54,24 +54,13 @@ export async function POST(req: NextRequest) {
 
   const userId = newUser.user.id;
 
-  // Update phone on the auto-created profile (from the auth trigger)
+  // The auth trigger (handle_new_user) already created the profiles row AND
+  // the coaches row from the role metadata, so we only patch the phone here.
   if (phone) {
     await adminClient
       .from("profiles")
       .update({ phone })
       .eq("id", userId);
-  }
-
-  // Insert coaches record
-  const { error: coachError } = await adminClient
-    .from("coaches")
-    .insert({ profile_id: userId });
-
-  if (coachError) {
-    return NextResponse.json(
-      { error: coachError.message },
-      { status: 500 }
-    );
   }
 
   return NextResponse.json({ success: true });
