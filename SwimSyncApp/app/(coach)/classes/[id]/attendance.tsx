@@ -155,7 +155,7 @@ export default function MarkAttendanceScreen() {
       const { data: attData } = await supabase
         .from("attendance")
         .select("id, student_id, status")
-        .eq("session_id", sid);
+        .eq("lesson_session_id", sid);
 
       for (const student of activeStudents) {
         const existing = (attData ?? []).find(
@@ -256,17 +256,17 @@ export default function MarkAttendanceScreen() {
       const dbStatus = toDBStatus(state.top, state.sub)!;
       return {
         ...(state.existingId ? { id: state.existingId } : {}),
-        session_id: finalSessionId,
+        lesson_session_id: finalSessionId,
         student_id: student.id,
         status: dbStatus,
-        marked_by: coach.id,
-        last_edited_by: coach.id,
+        marked_by: session!.id,
+        last_edited_by: session!.id,
       };
     });
 
     const { error: upsertError } = await supabase
       .from("attendance")
-      .upsert(rows, { onConflict: "session_id,student_id" });
+      .upsert(rows, { onConflict: "lesson_session_id,student_id" });
 
     if (upsertError) {
       Alert.alert("Error", "Failed to save attendance. Please try again.");
@@ -276,11 +276,12 @@ export default function MarkAttendanceScreen() {
 
     // Audit log
     await supabase.from("audit_log").insert({
+      actor_id: session!.id,
       action: "attendance_saved",
-      performed_by: session!.id,
-      metadata: {
+      entity_type: "lesson_session",
+      entity_id: finalSessionId,
+      new_value: {
         class_id: id,
-        session_id: finalSessionId,
         date,
         student_count: students.length,
       },
