@@ -66,7 +66,7 @@ cd SwimSyncApp && npx expo start           # press w (web) or i (iOS sim)
 document the shape. `CRON_SECRET=local-dev-cron-secret` is shared between
 `supabase/functions/.env` and `SwimSyncAdmin/.env.local`.
 
-**Seed accounts** (see `Dummy_Credentials.md`): superadmin & coach at
+**Seed accounts** (see `LOCAL_DEV_GUIDE.md`): superadmin & coach at
 `*@swimsync.test` / `password123`, plus one class "Saturday Beginners".
 Parents self-register in the app. Superadmin is **web-only** (mobile shows an
 "unrecognised role" alert).
@@ -172,7 +172,7 @@ After this is solid, **plan the following steps** (see §7) and pick with the us
 | `supabase/seed.sql` | Local seed (superadmin, coach, one class) |
 | `SwimSyncApp/app/` | Expo Router screens: `(auth)/ (parent)/ (coach)/` |
 | `SwimSyncAdmin/app/(admin)/` | Admin pages; `app/api/` server routes |
-| `Dummy_Credentials.md` | Seed logins + local URLs |
+| `LOCAL_DEV_GUIDE.md` | How to run/test locally, seed logins, service URLs |
 | `SwimSync_PRD.md` | Product spec (sections marked *(implemented)* = build decisions) |
 
 Memory files (in the Claude project memory dir) also capture the project state
