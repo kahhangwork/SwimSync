@@ -150,7 +150,11 @@ export default function TodayScreen() {
     setLoading(false);
   }, [session, todayDayOfWeek, todayDate]);
 
-  useFocusEffect(loadData);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const totalStudents = classes.reduce((s, c) => s + c.student_count, 0);
 

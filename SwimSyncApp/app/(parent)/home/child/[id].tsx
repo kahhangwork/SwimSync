@@ -151,7 +151,11 @@ export default function ChildProfileScreen() {
     setLoading(false);
   }, [id]);
 
-  useFocusEffect(loadChild);
+  useFocusEffect(
+    useCallback(() => {
+      loadChild();
+    }, [loadChild])
+  );
 
   if (loading) {
     return (

@@ -91,7 +91,11 @@ export default function ClassesScreen() {
     setLoading(false);
   }, [session]);
 
-  useFocusEffect(loadClasses);
+  useFocusEffect(
+    useCallback(() => {
+      loadClasses();
+    }, [loadClasses])
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-sky-50">

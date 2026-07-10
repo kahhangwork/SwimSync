@@ -115,7 +115,11 @@ export default function AttendanceScreen() {
     setLoadingChildren(false);
   }, [session]);
 
-  useFocusEffect(loadChildren);
+  useFocusEffect(
+    useCallback(() => {
+      loadChildren();
+    }, [loadChildren])
+  );
 
   // Load attendance whenever selected child changes
   const loadAttendance = useCallback(async () => {
@@ -149,7 +153,11 @@ export default function AttendanceScreen() {
     setLoadingRecords(false);
   }, [selectedChildId]);
 
-  useFocusEffect(loadAttendance);
+  useFocusEffect(
+    useCallback(() => {
+      loadAttendance();
+    }, [loadAttendance])
+  );
 
   const filtered = records.filter((r) => matchesFilter(r.status, filter));
 

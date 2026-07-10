@@ -135,7 +135,11 @@ export default function ClassRosterScreen() {
     setLoading(false);
   }, [id, todayDate]);
 
-  useFocusEffect(loadData);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const isComplete = (s: Session) => s.marked_count >= s.total_count && s.total_count > 0;
 

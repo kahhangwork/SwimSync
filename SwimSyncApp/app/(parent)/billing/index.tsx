@@ -102,7 +102,11 @@ export default function BillingScreen() {
     setLoading(false);
   }, [session]);
 
-  useFocusEffect(loadData);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-sky-50">

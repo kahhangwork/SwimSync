@@ -125,7 +125,11 @@ export default function ParentHomeScreen() {
   }, [session]);
 
   // Reload every time the screen comes into focus (e.g. after adding a child)
-  useFocusEffect(loadData);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-sky-50">
