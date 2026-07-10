@@ -9,6 +9,8 @@
 | **Version** | 1.0 |
 | **Date** | March 2026 |
 
+> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). Working end to end: parent self-registration, child creation, superadmin assignment, coach attendance marking, and invoice generation (automatic *and* manual on-demand, with an on/off switch). Not yet verified: the credit-note correction flow, PayNow QR upload, and several billing/detail screens. Not yet done: cloud deployment (project link, function deploy, cron, storage) and automated tests. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
+
 ---
 
 ## Table of Contents
@@ -432,17 +434,25 @@ SwimSync shall allow coach to record attendance per student per lesson session.
 
 ### 7.7 Invoice Generation
 
-SwimSync shall automatically generate invoices monthly.
+SwimSync shall generate invoices monthly, with two trigger modes sharing one billing engine.
 
 - Invoice generation date is the 1st day of the following month
 - Invoice must cover the previous calendar month only
 - Invoice amount must be calculated from attendance records
-- Only billable attendance items must be included
+- Only billable attendance items must be included (Present, Paid Trial)
 - One invoice per parent per month with line items per lesson
 - Invoice status shall include at minimum: Outstanding, Paid
 - Outstanding credit note balance must be deducted from the gross invoice total to determine the net payable amount
+- An invoice fully covered by credit is created directly as **Paid**
 
 > *For internal implementation, additional statuses such as Draft or Issued may be used if helpful.*
+
+#### Automatic vs Manual Generation *(implemented)*
+
+Both modes run the **same** `generate-invoices` function, so billing math is identical either way:
+
+- **Automatic** — a daily scheduled run (cron) that generates invoices for the previous month on/after the 1st. It respects a global **Automatic generation** switch (`app_settings.auto_invoice_enabled`), only bills a class once every active student has an attendance record for every session that month (completeness gate), and seals a month once fully processed so it is never re-billed.
+- **Manual (on-demand)** — a superadmin action in the web admin panel that generates invoices for a chosen billing month immediately. It bills whatever attendance is currently marked (bypasses the completeness gate), ignores the automatic switch, and never seals the month (so the scheduled run can still finalise it). Both modes skip parents who already have an invoice for that month (no double-billing).
 
 ### 7.8 Credit Note Management
 
@@ -586,6 +596,7 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 | **notes** | Text | No | Optional notes from parent |
 | **assignment_status** | Enum | Yes | unassigned \| assigned \| inactive (default unassigned) |
 | **is_active** | Boolean | Yes | Active flag (default true) |
+| **created_by** | UUID (FK) | No | References Profiles.id; defaults to the creating user. Lets a parent read the profile they just created before the ParentStudents link exists (RLS) |
 | **created_at** | Timestamp | Yes | Record creation timestamp |
 | **updated_at** | Timestamp | Yes | Last update timestamp |
 
@@ -741,6 +752,27 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 | **old_value** | JSON | No | Previous state snapshot |
 | **new_value** | JSON | No | New state snapshot |
 | **created_at** | Timestamp | Yes | When action occurred |
+
+### 9.15 BillingPeriods *(implemented)*
+
+*Tracks which billing months have been fully processed so the daily automatic run is idempotent.*
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| **billing_month** | String (YYYY-MM) | Yes | Primary key |
+| **completed_at** | Timestamp | Yes | When the month was sealed |
+| **invoices_issued** | Integer | Yes | Count issued for the month |
+| **notes** | Text | No | Summary note |
+
+### 9.16 AppSettings *(implemented)*
+
+*Key/value store for platform switches.*
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| **key** | String | Yes | Primary key (e.g. `auto_invoice_enabled`) |
+| **value** | JSON | Yes | Setting value |
+| **updated_at** | Timestamp | Yes | Last update timestamp |
 
 ---
 
@@ -1047,7 +1079,7 @@ SwimSync MVP is successful if:
 | **Attendance corrections** | Allowed; triggers credit note if lesson already invoiced |
 | **Pricing** | Class-level rate set at class level |
 | **Billing source** | Actual attendance |
-| **Invoice timing** | 1st day of following month |
+| **Invoice timing** | Automatic on the 1st of the following month, **or** manual on-demand per month (superadmin), toggled via Automatic-generation switch |
 | **Credit notes** | Auto-issued on post-invoice corrections; applied to next invoice |
 | **Invoice status** | Outstanding / Paid |
 | **Payment** | External PayNow via coach QR, manual verification |
