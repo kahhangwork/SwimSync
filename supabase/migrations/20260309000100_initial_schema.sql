@@ -69,6 +69,10 @@ CREATE TABLE students (
   notes             TEXT,
   assignment_status assignment_status NOT NULL DEFAULT 'unassigned',
   is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+  -- Who created this profile. Defaults to the calling user so a parent
+  -- can read/update the row they just inserted before the
+  -- parent_students link exists (needed for insert().select() in the app).
+  created_by        UUID DEFAULT auth.uid() REFERENCES profiles(id),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

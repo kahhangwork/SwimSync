@@ -128,6 +128,7 @@ CREATE POLICY coaches_update ON coaches FOR UPDATE TO authenticated
 CREATE POLICY students_select ON students FOR SELECT TO authenticated
   USING (
     is_superadmin()
+    OR created_by = auth.uid()
     OR parent_owns_student(id)
     OR coach_serves_student(id)
   );
@@ -137,8 +138,8 @@ CREATE POLICY students_insert ON students FOR INSERT TO authenticated
   WITH CHECK (current_parent_id() IS NOT NULL OR is_superadmin());
 
 CREATE POLICY students_update ON students FOR UPDATE TO authenticated
-  USING (is_superadmin() OR parent_owns_student(id))
-  WITH CHECK (is_superadmin() OR parent_owns_student(id));
+  USING (is_superadmin() OR created_by = auth.uid() OR parent_owns_student(id))
+  WITH CHECK (is_superadmin() OR created_by = auth.uid() OR parent_owns_student(id));
 
 -- ------------------------------------------------------------
 -- PARENT_STUDENTS
