@@ -31,12 +31,15 @@ Verified end to end against the **local** Supabase stack:
 - Invoice generation — **automatic** (cron-style) and **manual on-demand**
   (admin button), sharing one `generate-invoices` function, with an on/off
   switch (`app_settings.auto_invoice_enabled`).
-- **Credit-note flow (verified 2026-07-11):** editing an invoiced attendance
-  row billable→non-billable auto-issues a credit note (+adds to the parent's
-  pooled `credit_balance`); the next invoice draws it down FIFO. Verified end
-  to end at the DB/function level across a Jan→Feb→Mar→Apr scenario, including
-  the carry-forward edge case (credit > next invoice) and a single note spent
-  across two months. A ledger-reconciliation bug found here was fixed — see §6.
+- **Credit-note flow (verified end to end incl. UI, 2026-07-11):** editing an
+  invoiced attendance row billable→non-billable auto-issues a credit note (+adds
+  to the parent's pooled `credit_balance`); the next invoice draws it down FIFO.
+  Verified at the DB/function level across a Jan→Feb→Mar→Apr scenario (incl. the
+  carry-forward edge case and a note spent across two months), AND driven through
+  the real UI: coach edits a past invoiced session (Classes→roster→session) →
+  credit note renders in the parent Billing→Credit Notes tab and the admin
+  Credit Notes page → next month's invoice shows "Credit Applied" in the parent
+  app. A ledger-reconciliation bug found here was fixed — see §6.
 - Full RLS: parents see only their data, coaches only their classes,
   superadmin everything. Verified with isolation tests.
 
@@ -157,12 +160,22 @@ two-plus months of attendance) driven through the real served `generate-invoices
 function. Reusable helper kept out-of-repo in the scratchpad
 (`cn-seed.sql`) — ask if you want it committed under `supabase/tests/`.
 
-**Still TODO for this feature — drive it through the UI** (backend only so far):
-coach "edit past attendance" (`(coach)/classes/[id]/attendance.tsx`) → parent
-billing + credit-notes views (`(parent)/billing`) → admin credit-notes page.
-Watch for the usual column-drift / RLS-returning / grant bug classes. The new
-`credit_applications` table has a read-only SELECT policy mirroring
-`credit_notes` if any screen needs to show the per-invoice breakdown.
+**UI verified (2026-07-11).** Drove the flow through Expo web + the Next.js admin
+with Playwright (driving the installed Chrome). Coach path: Classes → class roster
+→ tap a past invoiced session → set Absent → Save issues the credit note (the
+screen's `upsert` with `onConflict` resolves to an UPDATE, firing the trigger).
+Parent Billing→Credit Notes renders it (Available, "Present → Absent", amount);
+admin Credit Notes page renders it with student/parent (nested embeds resolve
+under superadmin RLS); after generating the next month, the parent's invoice
+shows "Credit Applied −S$…" and the note flips to Applied. No column-drift /
+RLS / grant issues surfaced. Screens read only `credit_notes`; none surface the
+new `credit_applications` breakdown yet (its read-only SELECT policy is ready if
+a screen wants it).
+
+**Minor UI bug spotted (not credit-note related):** the coach tab bar renders
+the hidden `classes/[id]/attendance` and `classes/[id]/roster` routes as extra
+tabs (hrefs like `/classes/undefined/roster`). The `(coach)/_layout` Tabs config
+should mark those with `href: null`. Worth a quick fix.
 
 ---
 
