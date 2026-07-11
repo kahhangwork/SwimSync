@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
+  Image,
+  Platform,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { PLACEHOLDER_COACH } from "@/constants/placeholder";
+import * as ImagePicker from "expo-image-picker";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
 import Card from "@/components/Card";
@@ -18,6 +20,91 @@ import PrimaryButton from "@/components/PrimaryButton";
 export default function CoachSettingsScreen() {
   const session = useAppStore((s) => s.session);
   const clearSession = useAppStore((s) => s.clearSession);
+
+  const [coachId, setCoachId] = useState<string | null>(null);
+  const [paynowUrl, setPaynowUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const loadCoach = useCallback(async () => {
+    if (!session) return;
+    const { data } = await supabase
+      .from("coaches")
+      .select("id, paynow_qr_url")
+      .eq("profile_id", session.id)
+      .single();
+    if (data) {
+      setCoachId(data.id);
+      setPaynowUrl(data.paynow_qr_url ?? null);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    loadCoach();
+  }, [loadCoach]);
+
+  async function handleUploadQR() {
+    if (uploading) return;
+    if (!coachId) {
+      Alert.alert("Error", "Could not find your coach account.");
+      return;
+    }
+
+    // Native needs media-library permission; web uses a file picker (no perm).
+    if (Platform.OS !== "web") {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          "Permission needed",
+          "Please allow photo access to upload your QR code."
+        );
+        return;
+      }
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const asset = result.assets[0];
+
+    try {
+      setUploading(true);
+
+      // Read the picked image into bytes (works on web + native).
+      const bytes = await (await fetch(asset.uri)).arrayBuffer();
+      const contentType = asset.mimeType ?? "image/png";
+
+      // Coach-scoped path so the storage RLS policy passes and a replace
+      // overwrites the same object (first path segment = coaches.id).
+      const path = `${coachId}/paynow-qr`;
+
+      const { error: upErr } = await supabase.storage
+        .from("paynow-qr")
+        .upload(path, bytes, { contentType, upsert: true });
+      if (upErr) throw upErr;
+
+      // Public bucket → render without a signed URL. Cache-bust so a
+      // replaced image re-renders instead of showing the cached one.
+      const { data: pub } = supabase.storage
+        .from("paynow-qr")
+        .getPublicUrl(path);
+      const publicUrl = `${pub.publicUrl}?t=${Date.now()}`;
+
+      const { error: updErr } = await supabase
+        .from("coaches")
+        .update({ paynow_qr_url: publicUrl })
+        .eq("id", coachId);
+      if (updErr) throw updErr;
+
+      setPaynowUrl(publicUrl);
+      Alert.alert("Uploaded", "Your PayNow QR code has been updated.");
+    } catch (e: any) {
+      Alert.alert("Upload failed", e?.message ?? "Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -60,14 +147,15 @@ export default function CoachSettingsScreen() {
             </Text>
           </View>
 
-          {PLACEHOLDER_COACH.hasPayNowQR ? (
+          {paynowUrl ? (
             <View className="items-center mb-4">
-              <View className="w-36 h-36 bg-gray-100 rounded-2xl items-center justify-center mb-3">
-                <Ionicons name="qr-code" size={60} color="#6b7280" />
-                <Text className="text-xs text-gray-400 mt-1">Current QR</Text>
-              </View>
+              <Image
+                source={{ uri: paynowUrl }}
+                className="w-36 h-36 rounded-2xl mb-3"
+                resizeMode="contain"
+              />
               <Text className="text-xs text-gray-500">
-                Last updated: 1 Mar 2026
+                Parents see this QR on their invoices.
               </Text>
             </View>
           ) : (
@@ -81,10 +169,14 @@ export default function CoachSettingsScreen() {
 
           <PrimaryButton
             label={
-              PLACEHOLDER_COACH.hasPayNowQR ? "Replace QR Code" : "Upload QR Code"
+              uploading
+                ? "Uploading…"
+                : paynowUrl
+                ? "Replace QR Code"
+                : "Upload QR Code"
             }
             variant="outline"
-            onPress={() => {}}
+            onPress={handleUploadQR}
           />
         </Card>
 

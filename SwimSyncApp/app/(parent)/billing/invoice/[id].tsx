@@ -84,6 +84,7 @@ export default function InvoiceDetailScreen() {
           paid_at,
           invoice_items(
             id,
+            lesson_session_id,
             amount,
             class_title,
             session_date,
@@ -105,14 +106,15 @@ export default function InvoiceDetailScreen() {
         .select("id, reference_number, amount, reason")
         .eq("applied_to_invoice_id", id);
 
-      // Get coach id via first invoice item's lesson session
+      // Get coach id via first invoice item's lesson session.
+      // NB: look up by lesson_session_id (not the invoice_item id).
       let coachId: string | null = null;
       if (inv.invoice_items?.length > 0) {
         const firstItem = inv.invoice_items[0];
         const { data: ls } = await supabase
           .from("lesson_sessions")
           .select("classes(coach_id)")
-          .eq("id", firstItem.id)
+          .eq("id", firstItem.lesson_session_id)
           .single();
         coachId = (ls as any)?.classes?.coach_id ?? null;
       }
