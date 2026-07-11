@@ -195,7 +195,14 @@ should mark those with `href: null`. Worth a quick fix.
 - **Remaining screens** — smoke-test parent billing detail, admin
   attendance/students/dashboard, coach billing (columns audited clean, runtime
   unverified).
-- **Automated tests** — none exist; billing/credit math is the priority target.
+- **Automated tests — billing/credit suite added (2026-07-11).** 23 integration
+  tests against the local stack: **Deno** tests for the `generate-invoices`
+  engine (billing math, no-double-billing, completeness gate, auto switch, credit
+  FIFO, carry-forward regression + ledger invariants — run `functions/generate-invoices/test.sh`)
+  and **pgTAP** tests for the DB (credit-note trigger, RLS isolation, constraints
+  — run `supabase test db`). See LOCAL_DEV_GUIDE §"Running the tests". The engine
+  was refactored into `core.ts` (logic) + a thin `index.ts` handler. Frontend/CI
+  tests still TODO.
 - **Auth polish** — "Forgot password?" link is a no-op; no password reset flow.
 
 ---

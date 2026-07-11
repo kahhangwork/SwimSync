@@ -1,0 +1,8 @@
+{
+  // Integration tests for the billing engine. Requires the local Supabase stack
+  // (`supabase start`) and SERVICE_ROLE_KEY in the env — use ./test.sh, which
+  // exports it from `supabase status` for you.
+  "tasks": {
+    "test": "deno test --allow-net --allow-env core.test.ts"
+  }
+}

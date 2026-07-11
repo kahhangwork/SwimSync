@@ -117,6 +117,23 @@ docker exec -i supabase_db_SwimSync psql -U postgres -d postgres -c \
 ```
 (Or just browse in Studio → http://127.0.0.1:54323.)
 
+### Running the tests
+Integration tests for the billing/credit engine. **Prereq:** the local stack is
+running (`supabase start`). Two suites:
+
+```bash
+# 1. Database tests (pgTAP) — credit-note trigger, RLS isolation, constraints.
+supabase test db
+
+# 2. Function tests (Deno) — the generate-invoices billing math + credit ledger.
+#    test.sh exports SERVICE_ROLE_KEY from `supabase status` and runs deno test.
+supabase/functions/generate-invoices/test.sh
+```
+
+Each test seeds its own data and rolls back / tears down, so they leave the DB as
+they found it. See `supabase/tests/*.test.sql` and
+`supabase/functions/generate-invoices/core.test.ts`.
+
 ---
 
 ## 5. Reset to a clean slate
