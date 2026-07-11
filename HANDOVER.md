@@ -186,9 +186,12 @@ should mark those with `href: null`. Worth a quick fix.
   generate-invoices`, set `CRON_SECRET` secret, run `supabase/cloud/
   cron_schedule.sql`, create the `paynow-qr` bucket (migration handles it on
   push). Re-point both `.env` files to cloud. Makes it demoable on real phones.
-- **PayNow QR upload** — storage bucket + policies exist
-  (`20260309000700`); the coach upload flow (`(coach)/settings`) and parent
-  display (`(parent)/billing/paynow.tsx`) haven't been driven.
+- **PayNow QR upload — DONE + UI-verified (2026-07-11).** Coach uploads their
+  QR in `(coach)/settings` (expo-image-picker → storage `paynow-qr/<coach_id>/…`
+  → `coaches.paynow_qr_url`); parent sees it on the invoice's PayNow screen;
+  admin Coaches page shows it. Also fixed a bug where the parent invoice screen
+  resolved the coach by an invoice_item id instead of a lesson_session_id (QR
+  never loaded). Verified end to end across all three roles.
 - **Remaining screens** — smoke-test parent billing detail, admin
   attendance/students/dashboard, coach billing (columns audited clean, runtime
   unverified).
