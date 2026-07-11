@@ -1,0 +1,9 @@
+{
+  "name": "swimsync-ui-drivers",
+  "private": true,
+  "type": "module",
+  "description": "Playwright driver helpers for running/driving the SwimSync UIs. See ../SKILL.md.",
+  "dependencies": {
+    "playwright-core": "^1.40.0"
+  }
+}
