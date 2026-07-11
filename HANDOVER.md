@@ -1,6 +1,6 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-10_
+_Last updated: 2026-07-11_
 
 This document brings the next session up to speed: current state, how to run
 everything locally, key decisions/gotchas, and the planned next steps. Read
@@ -31,10 +31,18 @@ Verified end to end against the **local** Supabase stack:
 - Invoice generation — **automatic** (cron-style) and **manual on-demand**
   (admin button), sharing one `generate-invoices` function, with an on/off
   switch (`app_settings.auto_invoice_enabled`).
+- **Credit-note flow (verified 2026-07-11):** editing an invoiced attendance
+  row billable→non-billable auto-issues a credit note (+adds to the parent's
+  pooled `credit_balance`); the next invoice draws it down FIFO. Verified end
+  to end at the DB/function level across a Jan→Feb→Mar→Apr scenario, including
+  the carry-forward edge case (credit > next invoice) and a single note spent
+  across two months. A ledger-reconciliation bug found here was fixed — see §6.
 - Full RLS: parents see only their data, coaches only their classes,
   superadmin everything. Verified with isolation tests.
 
-**Not yet verified / done** — see §6 (next steps).
+**Not yet verified / done** — the credit-note flow has NOT yet been driven
+through the mobile/admin UI (coach edit screen → parent billing → admin
+credit-notes page); only the backend was exercised. See §7 for the rest.
 
 ---
 
@@ -109,38 +117,52 @@ log in as coach, mark attendance → admin Invoices, pick the month, Generate.
 
 ---
 
-## 6. NEXT TASK: Credit-note flow (do this first)
+## 6. Credit-note flow — VERIFIED + bug fixed (2026-07-11)
 
-This is the last untested piece of the **core billing logic** and the riskiest.
+The core billing logic (trigger → application) is now proven at the DB/function
+level. What was verified and what changed:
 
-**What should happen (PRD §5.6, §7.8):**
+**Behaviour confirmed (PRD §5.6, §7.8):**
 1. A lesson is invoiced (billable → has an `invoice_items` row).
 2. Coach edits that lesson's attendance from billable (present/trial_paid) to
-   non-billable (absent/cancelled_*/trial_free).
-3. The `handle_attendance_update` trigger (`20260309000500`) auto-issues a
-   `credit_notes` row (ref `CN-YYYY-NNNN`, status `available`) and adds the
-   amount to `parents.credit_balance`.
-4. On the **next** invoice generation, the function applies available credit
-   FIFO: deducts from `credit_balance`, marks credit notes `applied`, and reduces
-   the invoice `net_amount` (invoice becomes `paid` if fully covered).
+   non-billable → the `handle_attendance_update` trigger (`20260309000500`)
+   auto-issues a `credit_notes` row (`CN-YYYY-NNNN`, status `available`) and
+   adds the amount to `parents.credit_balance`. **Precise:** no note is issued
+   for billable→billable edits, nor for edits on not-yet-invoiced lessons.
+3. On the next invoice generation the function applies available credit FIFO,
+   reduces `net_amount` (invoice `paid` if fully covered), and carries any
+   surplus forward.
 
-**Plan:**
-- **Verify the trigger** end to end with SQL against the local DB (edit an
-  invoiced attendance row → confirm credit note + balance). The trigger logic
-  exists but has never been exercised.
-- **Drive it through the UI:** the coach "edit past attendance" path
-  (`SwimSyncApp/app/(coach)/classes/[id]/attendance.tsx` handles edits via
-  upsert) → check the credit note appears for the parent
-  (`(parent)/billing` + `credit-notes` views) and in the admin credit-notes page.
-- **Verify application:** generate a *later* month's invoice and confirm the
-  credit is applied and balance drawn down.
-- **Watch for:** the same column-drift / RLS-returning / grant classes of bugs
-  as before. Check the parent billing screens actually render credit notes
-  (columns were audited clean, but runtime not driven yet).
-- Likely needs test data spanning two months (invoice month N, correct in N,
-  generate N+1). Consider a small SQL helper to set that up.
+**Credit is pooled at the PARENT level** (`credit_notes.parent_id` +
+`parents.credit_balance`); the note's `student_id` is provenance only. Because
+invoices are one-per-parent-per-month aggregating all the parent's kids, a
+credit earned from one child is spendable against any child's charges. No change
+needed for that — confirmed.
 
-After this is solid, **plan the following steps** (see §7) and pick with the user.
+**Bug found + fixed — partial-application ledger drift.** The old FIFO loop
+marked a whole credit note `applied` even when only part of it covered a smaller
+invoice (e.g. a \$30 note vs a \$20 invoice), leaving the residual \$10 only in
+the pooled balance with no backing note. `invoice.credit_applied` then no longer
+reconciled with the note ledger. Fixed by adding a **`credit_applications`
+allocation ledger** (migration `20260711000100`): every draw is one immutable
+row (`credit_note_id`, `invoice_id`, `amount`); a note stays `available` until
+fully consumed (possibly across several months) then flips to `applied`. The
+invoice engine (`generate-invoices`) now draws down by the actual consumed
+amount and writes a ledger row per draw. Invariants now hold:
+`SUM(applications by invoice) = invoice.credit_applied`, and
+`parents.credit_balance = SUM(remaining across the parent's notes)`.
+
+**How it was verified:** a self-contained SQL seed (parent/student/class +
+two-plus months of attendance) driven through the real served `generate-invoices`
+function. Reusable helper kept out-of-repo in the scratchpad
+(`cn-seed.sql`) — ask if you want it committed under `supabase/tests/`.
+
+**Still TODO for this feature — drive it through the UI** (backend only so far):
+coach "edit past attendance" (`(coach)/classes/[id]/attendance.tsx`) → parent
+billing + credit-notes views (`(parent)/billing`) → admin credit-notes page.
+Watch for the usual column-drift / RLS-returning / grant bug classes. The new
+`credit_applications` table has a read-only SELECT policy mirroring
+`credit_notes` if any screen needs to show the per-invoice breakdown.
 
 ---
 
@@ -167,7 +189,9 @@ After this is solid, **plan the following steps** (see §7) and pick with the us
 | Path | What |
 |------|------|
 | `supabase/migrations/` | Schema, RLS, triggers, grants (ordered, source of truth) |
-| `supabase/functions/generate-invoices/` | Invoice engine (auto + manual) |
+| `…/20260309000500_credit_note_trigger.sql` | Auto-issues a credit note on billable→non-billable edit of an invoiced lesson |
+| `…/20260711000100_credit_applications.sql` | Credit-note allocation ledger (fixes partial-application drift) |
+| `supabase/functions/generate-invoices/` | Invoice engine (auto + manual; applies credit FIFO via the ledger) |
 | `supabase/cloud/cron_schedule.sql` | Cloud-only daily cron wiring |
 | `supabase/seed.sql` | Local seed (superadmin, coach, one class) |
 | `SwimSyncApp/app/` | Expo Router screens: `(auth)/ (parent)/ (coach)/` |

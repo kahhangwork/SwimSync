@@ -282,14 +282,16 @@ Deno.serve(async (req: Request) => {
         .from("invoice_items")
         .insert(items.map((i) => ({ invoice_id: invoice.id, ...i })));
 
-      // Apply credit balance: deduct from parent + mark credit notes as applied (FIFO)
+      // Apply credit balance FIFO. Draw down each credit note by the
+      // AMOUNT ACTUALLY CONSUMED and record every draw in the
+      // credit_applications ledger, so the note ledger reconciles with
+      // the invoice (a $30 note covering a $20 invoice consumes $20 and
+      // stays available for the remaining $10). See
+      // 20260711000100_credit_applications.sql.
       if (credit > 0) {
-        await supabase
-          .from("parents")
-          .update({ credit_balance: Number(parent!.credit_balance) - credit })
-          .eq("id", parentId);
+        const nowIso = new Date().toISOString();
 
-        let remaining = credit;
+        // Available notes, oldest first (FIFO).
         const { data: availCNs } = await supabase
           .from("credit_notes")
           .select("id, amount")
@@ -297,18 +299,62 @@ Deno.serve(async (req: Request) => {
           .eq("status", "available")
           .order("issued_at", { ascending: true });
 
+        let remaining = credit; // total credit still to allocate to this invoice
+
         for (const cn of availCNs ?? []) {
           if (remaining <= 0) break;
-          await supabase
-            .from("credit_notes")
-            .update({
-              status: "applied",
-              applied_to_invoice_id: invoice.id,
-              applied_at: new Date().toISOString(),
-            })
-            .eq("id", cn.id);
-          remaining -= Number(cn.amount);
+
+          // Amount of THIS note already spent on earlier invoices.
+          const { data: priorApps } = await supabase
+            .from("credit_applications")
+            .select("amount")
+            .eq("credit_note_id", cn.id);
+          const used = (priorApps ?? []).reduce(
+            (s, a) => s + Number(a.amount),
+            0
+          );
+          const noteRemaining = Number(cn.amount) - used;
+          if (noteRemaining <= 0) {
+            // Shouldn't happen for an 'available' note; self-heal the flag.
+            await supabase
+              .from("credit_notes")
+              .update({ status: "applied" })
+              .eq("id", cn.id);
+            continue;
+          }
+
+          const draw = Math.min(noteRemaining, remaining);
+
+          await supabase.from("credit_applications").insert({
+            credit_note_id: cn.id,
+            invoice_id: invoice.id,
+            amount: draw,
+            applied_at: nowIso,
+          });
+
+          // Flip to 'applied' only once the note is fully consumed.
+          if (draw >= noteRemaining) {
+            await supabase
+              .from("credit_notes")
+              .update({
+                status: "applied",
+                applied_to_invoice_id: invoice.id,
+                applied_at: nowIso,
+              })
+              .eq("id", cn.id);
+          }
+
+          remaining -= draw;
         }
+
+        // Deduct the amount actually allocated from the pooled balance.
+        const allocated = credit - remaining;
+        await supabase
+          .from("parents")
+          .update({
+            credit_balance: Number(parent!.credit_balance) - allocated,
+          })
+          .eq("id", parentId);
       }
 
       invoicesCreated++;

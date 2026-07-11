@@ -9,7 +9,7 @@
 | **Version** | 1.0 |
 | **Date** | March 2026 |
 
-> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). Working end to end: parent self-registration, child creation, superadmin assignment, coach attendance marking, and invoice generation (automatic *and* manual on-demand, with an on/off switch). Not yet verified: the credit-note correction flow, PayNow QR upload, and several billing/detail screens. Not yet done: cloud deployment (project link, function deploy, cron, storage) and automated tests. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
+> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). Working end to end: parent self-registration, child creation, superadmin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), and the **credit-note correction flow** (auto-issue on attendance edit + FIFO application to the next invoice, verified at the DB/function level incl. partial carry-forward — see §5.6). A partial-application ledger bug found during that verification was fixed via a `credit_applications` allocation table (see §9.17). Not yet verified through the UI: the credit-note screens, PayNow QR upload, and several billing/detail screens. Not yet done: cloud deployment (project link, function deploy, cron, storage) and automated tests. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
 
 ---
 
@@ -773,6 +773,27 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 | **key** | String | Yes | Primary key (e.g. `auto_invoice_enabled`) |
 | **value** | JSON | Yes | Setting value |
 | **updated_at** | Timestamp | Yes | Last update timestamp |
+
+### 9.17 CreditApplications *(implemented)*
+
+*Allocation ledger recording each draw of a credit note against an invoice.
+Lets a single credit note be applied partially and across multiple invoices/
+months so the note ledger always reconciles with `invoices.credit_applied`
+(fixes the earlier full-consumption drift). `credit_notes.status` is derived
+from this: `available` until the note is fully drawn, then `applied`.*
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| **id** | UUID | Yes | Primary key |
+| **credit_note_id** | UUID (FK) | Yes | References CreditNotes.id |
+| **invoice_id** | UUID (FK) | Yes | References Invoices.id (the invoice this draw was applied to) |
+| **amount** | Decimal | Yes | Amount of the note consumed by this application (> 0) |
+| **applied_at** | Timestamp | Yes | When this draw occurred |
+
+**Invariants maintained by the invoice engine:**
+- `SUM(credit_applications.amount WHERE invoice_id = X) = invoices.credit_applied` for X
+- `SUM(credit_applications.amount WHERE credit_note_id = N) ≤ credit_notes.amount` for N
+- `parents.credit_balance = SUM of remaining (amount − applied) across the parent's notes`
 
 ---
 
