@@ -95,6 +95,22 @@ Created by `supabase/seed.sql` on every `supabase db reset`.
   page flips `app_settings.auto_invoice_enabled`. When off, the scheduled/auto
   path short-circuits; manual still works.
 
+### Credit-note flow
+1. Run the golden path so a parent has an invoice for month N.
+2. Coach app → **Classes** → open the class → **past sessions** → pick the
+   invoiced session → change the student from **Present** to **Absent** → Save.
+   → a credit note is auto-issued (parent Billing → **Credit Notes** tab shows it;
+   admin → **Credit Notes** lists it).
+3. Generate month N+1's invoice → the parent's invoice shows **Credit Applied**
+   and a reduced net (or **Paid** if fully covered; surplus carries forward).
+
+### PayNow QR flow
+1. Coach app → **Settings** → **Upload QR Code** → pick an image. Stored at
+   `paynow-qr/<coach_id>/…`, saved to `coaches.paynow_qr_url`.
+2. Parent app → **Billing** → open an outstanding invoice → **Pay via PayNow QR**
+   → the coach's QR renders. Admin → **Coaches** → the row shows **Uploaded** + a
+   QR modal.
+
 ### Invoke the function directly (faithful test, no UI)
 ```bash
 # Manual generation for a chosen month
