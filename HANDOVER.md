@@ -1,6 +1,6 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-12_
 
 Read this first to get up to speed, then `SwimSync_PRD.md` for the product spec
 and `LOCAL_DEV_GUIDE.md` for the exact run/test commands and seed logins.
@@ -43,6 +43,12 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 
 - **Auth & onboarding** — parent self-registration (auth trigger creates
   `profiles` + `parents`), add child, superadmin assignment.
+- **Password reset (verified UI + backend)** — the "Forgot password?" link on the
+  mobile login now drives a full recovery flow: `resetPasswordForEmail` → recovery
+  email → in-app **Set New Password** screen → `updateUser`. Works on Expo web
+  (`detectSessionInUrl`) and native (`swimsync://` deep link parsed in the root
+  layout); a recovery session routes to the reset screen instead of the home tab.
+  Login/register errors are mapped to friendly copy (`lib/authErrors.ts`).
 - **Attendance** — coach marks/edits per session; audit-logged.
 - **Invoice generation** — one `generate-invoices` engine, two modes: **automatic**
   (cron-style; respects the `app_settings.auto_invoice_enabled` switch, a
@@ -60,7 +66,7 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 - **Automated tests** — 23 integration tests (Deno + pgTAP); see §5.
 
 **Not done yet** (see §9): cloud deployment; runtime smoke-test of a few
-admin/detail screens; frontend/component tests + CI; auth polish (password reset).
+admin/detail screens; frontend/component tests + CI.
 
 ---
 
@@ -169,7 +175,21 @@ Files: `supabase/tests/*.test.sql` and
 
 ---
 
-## 8. What changed this session (2026-07-11)
+## 8. What changed this session (2026-07-12)
+
+- **Auth polish — password reset** — implemented the mobile recovery flow end to
+  end: new `(auth)/forgot-password.tsx` + `(auth)/reset-password.tsx` screens, wired
+  the previously-dead "Forgot password?" link, added `PASSWORD_RECOVERY` routing +
+  a native `swimsync://` deep-link handler in `app/_layout.tsx`, and switched the
+  client to `detectSessionInUrl` on web only (`lib/supabase.ts`). Allow-listed the
+  reset redirect URLs in `supabase/config.toml` (needs a stack restart to apply).
+- **Auth error hardening** — new `lib/authErrors.ts` maps raw Supabase auth
+  messages to friendly copy, wired into login/register + the two new screens.
+- **Verified** end to end via `run-ui-playwright` + Mailpit (coach account): forgot →
+  email → reset screen (no bounce to home) → new password → re-login. Error mapping
+  checked against live Supabase strings. Coach seed password restored to `password123`.
+
+## 8b. Previous session (2026-07-11)
 
 - **Credit-note ledger fix** — added `credit_applications` (migration `20260711000100`)
   + updated the engine so partial credit reconciles; verified UI + backend.
@@ -194,8 +214,10 @@ Files: `supabase/tests/*.test.sql` and
   billing (columns audited clean, runtime not yet driven). Use `run-ui-playwright`.
 - **Frontend/component tests + CI** — RN/Next component tests, and a GitHub Actions
   workflow that runs `supabase test db` + the Deno tests on push.
-- **Auth polish** — "Forgot password?" is a no-op; add a `resetPasswordForEmail` flow +
-  reset screen, and harden register/login errors before real users self-register.
+- **Auth polish (remaining)** — mobile password reset + friendly login/register errors
+  are **done** (see §8). Still open: the admin panel has no "Forgot password?" flow
+  (superadmin is a fixed provisioned account, so lower priority), and email
+  confirmation copy/templates are Supabase defaults.
 
 ---
 
@@ -213,6 +235,9 @@ Files: `supabase/tests/*.test.sql` and
 | `supabase/cloud/cron_schedule.sql` | Cloud-only daily cron wiring |
 | `supabase/seed.sql` | Local seed (superadmin, coach, one class) |
 | `SwimSyncApp/app/` | Expo Router screens: `(auth)/ (parent)/ (coach)/`, each tab folder has a nested `_layout.tsx` |
+| `…/(auth)/forgot-password.tsx` · `reset-password.tsx` | Password-reset flow (request link + set new password) |
+| `SwimSyncApp/app/_layout.tsx` | Root: session restore + `PASSWORD_RECOVERY` routing + native recovery deep-link handler |
+| `SwimSyncApp/lib/authErrors.ts` | Maps raw Supabase auth errors to friendly copy |
 | `SwimSyncAdmin/app/(admin)/` | Admin pages; `app/api/` server routes |
 | `.claude/skills/run-ui-playwright/` | Skill to launch + drive both UIs (Playwright/Chrome) |
 | `AVAIL_SKILLS.md` | Reference for all available skills |

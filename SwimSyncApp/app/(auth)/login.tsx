@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import { useAppStore } from "@/store/useAppStore";
 import PrimaryButton from "@/components/PrimaryButton";
 import { supabase } from "@/lib/supabase";
+import { friendlyAuthError } from "@/lib/authErrors";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -35,7 +36,7 @@ export default function LoginScreen() {
 
     if (error || !data.user) {
       setLoading(false);
-      Alert.alert("Sign In Failed", error?.message ?? "Unknown error.");
+      Alert.alert("Sign In Failed", friendlyAuthError(error));
       return;
     }
 
@@ -114,7 +115,10 @@ export default function LoginScreen() {
               className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
               placeholderTextColor="#9ca3af"
             />
-            <TouchableOpacity className="mt-2 self-end">
+            <TouchableOpacity
+              className="mt-2 self-end"
+              onPress={() => router.push("/(auth)/forgot-password")}
+            >
               <Text className="text-sm text-sky-500">Forgot password?</Text>
             </TouchableOpacity>
           </View>

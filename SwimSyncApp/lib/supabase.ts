@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
@@ -9,6 +10,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // On web, let supabase-js parse the recovery/OAuth token from the URL hash
+    // (drives the password-reset landing). On native we handle the deep link
+    // ourselves in app/_layout.tsx.
+    detectSessionInUrl: Platform.OS === "web",
   },
 });

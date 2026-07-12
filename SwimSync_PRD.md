@@ -9,7 +9,7 @@
 | **Version** | 1.0 |
 | **Date** | March 2026 |
 
-> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). The **entire MVP core loop works and is verified end to end across the UI + backend**: parent self-registration, child creation, superadmin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), the **credit-note correction flow** (auto-issue on attendance edit + FIFO application incl. partial carry-forward — see §5.6), and **PayNow QR** (coach upload → parent display → admin view). A partial-application ledger bug found during credit-note verification was fixed via a `credit_applications` allocation table (see §9.17). An **automated test suite** now covers the billing/credit engine (Deno) and DB triggers/RLS/constraints (pgTAP). The code lives on GitHub (public, `kahhangwork/SwimSync`). Not yet done: cloud deployment (project link, function deploy, cron, storage); runtime smoke-test of a few admin/detail screens; frontend/component tests + CI; auth polish (password reset). Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
+> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). The **entire MVP core loop works and is verified end to end across the UI + backend**: parent self-registration, child creation, superadmin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), the **credit-note correction flow** (auto-issue on attendance edit + FIFO application incl. partial carry-forward — see §5.6), and **PayNow QR** (coach upload → parent display → admin view). A partial-application ledger bug found during credit-note verification was fixed via a `credit_applications` allocation table (see §9.17). An **automated test suite** now covers the billing/credit engine (Deno) and DB triggers/RLS/constraints (pgTAP). **Password reset** is implemented on the mobile app (self-service recovery flow via `resetPasswordForEmail` → in-app reset screen → `updateUser`, working across Expo web and native deep links), and login/register errors are mapped to friendly copy — see §7.1. The code lives on GitHub (public, `kahhangwork/SwimSync`). Not yet done: cloud deployment (project link, function deploy, cron, storage); runtime smoke-test of a few admin/detail screens; frontend/component tests + CI. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
 
 ---
 
@@ -375,6 +375,17 @@ SwimSync shall support email/password authentication for parent and coach accoun
 - Coach accounts may initially be created manually by superadmin/system owner
 - Superadmin account(s) shall exist
 - Role-based access must be enforced across all SwimSync features
+
+#### Password Reset *(implemented)*
+
+Self-service password reset runs on the mobile app for parent **and** coach
+accounts (they share the login screen): the "Forgot password?" link opens a
+request screen (`resetPasswordForEmail`), Supabase emails a recovery link, and
+opening it lands the user on an in-app **Set New Password** screen that calls
+`updateUser`. The recovery session is delivered via `detectSessionInUrl` on Expo
+web and a `swimsync://` deep link on native. Raw auth errors (invalid credentials,
+duplicate email, unconfirmed email, rate limit) are mapped to friendly messages.
+The admin panel has no reset flow yet (superadmin is a fixed provisioned account).
 
 ### 7.2 Parent Account and Child Linking
 

@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import { useAppStore } from "@/store/useAppStore";
 import PrimaryButton from "@/components/PrimaryButton";
 import { supabase } from "@/lib/supabase";
+import { friendlyAuthError } from "@/lib/authErrors";
 
 export default function RegisterScreen() {
   const [name, setName] = useState("");
@@ -54,7 +55,7 @@ export default function RegisterScreen() {
 
     if (error || !data.user) {
       setLoading(false);
-      Alert.alert("Registration Failed", error?.message ?? "Unknown error.");
+      Alert.alert("Registration Failed", friendlyAuthError(error));
       return;
     }
 
