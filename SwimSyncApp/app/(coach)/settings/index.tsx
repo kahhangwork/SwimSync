@@ -197,14 +197,9 @@ export default function CoachSettingsScreen() {
         {/* Menu */}
         <Card className="mb-4">
           <MenuItem
-            icon="notifications-outline"
-            label="Notification Preferences"
-            onPress={() => {}}
-          />
-          <MenuItem
             icon="lock-closed-outline"
             label="Change Password"
-            onPress={() => {}}
+            onPress={() => router.push("/(coach)/settings/change-password")}
             last
           />
         </Card>

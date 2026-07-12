@@ -70,19 +70,9 @@ export default function ParentProfileScreen() {
             onPress={() => router.push("/(parent)/home/add-child")}
           />
           <MenuItem
-            icon="notifications-outline"
-            label="Notification Preferences"
-            onPress={() => {}}
-          />
-          <MenuItem
             icon="lock-closed-outline"
             label="Change Password"
-            onPress={() => {}}
-          />
-          <MenuItem
-            icon="help-circle-outline"
-            label="Help & Support"
-            onPress={() => {}}
+            onPress={() => router.push("/(parent)/profile/change-password")}
             last
           />
         </Card>
