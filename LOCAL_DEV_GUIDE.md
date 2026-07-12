@@ -169,6 +169,6 @@ accounts and the seed class.
 
 ## 6. Handy references
 - `HANDOVER.md` — current build state, architecture, gotchas, next steps.
-- `SwimSync_PRD.md` — product spec.
+- `PRD.md` — product spec.
 - `supabase/migrations/` — the database (source of truth).
 - `.env.example` files — the shape of each project's env vars.

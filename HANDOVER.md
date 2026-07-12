@@ -2,7 +2,7 @@
 
 _Last updated: 2026-07-12_
 
-Read this first to get up to speed, then `SwimSync_PRD.md` for the product spec
+Read this first to get up to speed, then `PRD.md` for the product spec
 and `LOCAL_DEV_GUIDE.md` for the exact run/test commands and seed logins.
 
 ---
@@ -225,6 +225,14 @@ Files: `supabase/tests/*.test.sql` and
   are **done** (see §8). Still open: the admin panel has no "Forgot password?" flow
   (superadmin is a fixed provisioned account, so lower priority), and email
   confirmation copy/templates are Supabase defaults.
+- **PRD §11 edge cases — not individually verified** (carried over from the old
+  `Steps.md` build plan, now removed in favour of this doc): the core loop and RLS
+  tests cover most of this implicitly, but no test/UI pass has specifically checked
+  11.1 (last-day-of-month lesson lands in that month's invoice), 11.4 (coach must
+  classify a Trial as Paid/Free before it can be invoiced), 11.5 (a student can only
+  have one active class enrolment at a time), 11.7 (credit balance exceeding the next
+  invoice marks it Paid and carries the remainder forward), and 11.8 (unenrolling a
+  student with outstanding credit leaves the balance on record, no auto-refund).
 
 ---
 
@@ -249,7 +257,7 @@ Files: `supabase/tests/*.test.sql` and
 | `.claude/skills/run-ui-playwright/` | Skill to launch + drive both UIs (Playwright/Chrome) |
 | `AVAIL_SKILLS.md` | Reference for all available skills |
 | `LOCAL_DEV_GUIDE.md` | Run/test commands, seed logins, service URLs |
-| `SwimSync_PRD.md` | Product spec (*(implemented)* sections = build decisions) |
+| `PRD.md` | Product spec (*(implemented)* sections = build decisions) |
 
 Memory files (Claude project memory dir) also capture project state + backend
 gotchas: `swimsync-project`, `swimsync-backend-gotchas`.
