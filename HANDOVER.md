@@ -221,11 +221,16 @@ Files: `supabase/tests/*.test.sql` and
   Remaining deployment work: **native builds** (EAS → Android APK / iOS TestFlight)
   once the user decides to invest so parents can download from the stores; cron is
   intentionally **not** wired (invoices are generated manually via the admin button).
-- **Auth polish — latent web bug.** The mobile `register.tsx` "Check your email"
-  step uses `Alert.alert`, which is a **no-op on RN-web** → if email confirmation is
-  ever re-enabled, a web parent gets stuck on the register form (works on native).
-  Cloud currently runs with **email confirmation OFF** to avoid this. Also still open:
-  the admin panel has no "Forgot password?" flow.
+- **`Alert.alert` is a no-op on RN-web (family of bugs).** Fixed for **Sign Out**
+  (coach + parent) via `lib/confirm.ts` `confirmAction` (window.confirm on web).
+  Added an in-app **Change Password** screen (`components/ChangePasswordScreen.tsx`,
+  wired from coach settings + parent profile) using inline error/success, not Alert.
+  **Still latent:** `register.tsx` "Check your email" uses `Alert.alert` → a web parent
+  would get stuck if email confirmation is re-enabled (cloud keeps it **OFF** to avoid
+  this; works on native). Audit other `Alert.alert([...buttons])` calls before native.
+- **Removed dead settings stubs** — Notification Preferences (coach + parent) and
+  Help & Support (parent) had empty handlers; deleted. Still open: admin "Forgot
+  password?" flow.
 - **Smoke-test remaining screens** — admin attendance/students/dashboard and coach
   billing (columns audited clean, runtime not yet driven). Use `run-ui-playwright`.
 - **Frontend/component tests + CI** — RN/Next component tests, and a GitHub Actions
