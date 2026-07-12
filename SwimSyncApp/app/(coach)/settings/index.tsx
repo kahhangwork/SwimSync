@@ -21,6 +21,7 @@ import PrimaryButton from "@/components/PrimaryButton";
 export default function CoachSettingsScreen() {
   const session = useAppStore((s) => s.session);
   const clearSession = useAppStore((s) => s.clearSession);
+  const showToast = useAppStore((s) => s.showToast);
 
   const [coachId, setCoachId] = useState<string | null>(null);
   const [paynowUrl, setPaynowUrl] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export default function CoachSettingsScreen() {
   async function handleUploadQR() {
     if (uploading) return;
     if (!coachId) {
-      Alert.alert("Error", "Could not find your coach account.");
+      showToast("Could not find your coach account.", "error");
       return;
     }
 
@@ -99,9 +100,9 @@ export default function CoachSettingsScreen() {
       if (updErr) throw updErr;
 
       setPaynowUrl(publicUrl);
-      Alert.alert("Uploaded", "Your PayNow QR code has been updated.");
+      showToast("Your PayNow QR code has been updated.", "success");
     } catch (e: any) {
-      Alert.alert("Upload failed", e?.message ?? "Please try again.");
+      showToast(e?.message ?? "Upload failed. Please try again.", "error");
     } finally {
       setUploading(false);
     }

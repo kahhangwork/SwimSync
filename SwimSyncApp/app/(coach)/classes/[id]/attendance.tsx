@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -89,6 +88,7 @@ export default function MarkAttendanceScreen() {
   }>();
 
   const session = useAppStore((s) => s.session);
+  const showToast = useAppStore((s) => s.showToast);
 
   const [classTitle, setClassTitle] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);
@@ -201,16 +201,13 @@ export default function MarkAttendanceScreen() {
     for (const student of students) {
       const state = attendance[student.id];
       if (!state || state.top === "unmarked") {
-        Alert.alert(
-          "Incomplete",
-          `Please mark attendance for ${student.full_name}.`
-        );
+        showToast(`Please mark attendance for ${student.full_name}.`, "error");
         return;
       }
       if (toDBStatus(state.top, state.sub) === null) {
-        Alert.alert(
-          "Incomplete",
-          `Please select a sub-type for ${student.full_name}.`
+        showToast(
+          `Please select a sub-type for ${student.full_name}.`,
+          "error"
         );
         return;
       }
@@ -226,7 +223,7 @@ export default function MarkAttendanceScreen() {
       .single();
 
     if (!coach) {
-      Alert.alert("Error", "Could not find coach record.");
+      showToast("Could not find coach record.", "error");
       setSaving(false);
       return;
     }
@@ -241,7 +238,7 @@ export default function MarkAttendanceScreen() {
         .single();
 
       if (sessionError || !newSession) {
-        Alert.alert("Error", "Could not create session record.");
+        showToast("Could not create session record.", "error");
         setSaving(false);
         return;
       }
@@ -269,7 +266,7 @@ export default function MarkAttendanceScreen() {
       .upsert(rows, { onConflict: "lesson_session_id,student_id" });
 
     if (upsertError) {
-      Alert.alert("Error", "Failed to save attendance. Please try again.");
+      showToast("Failed to save attendance. Please try again.", "error");
       setSaving(false);
       return;
     }
@@ -288,9 +285,8 @@ export default function MarkAttendanceScreen() {
     });
 
     setSaving(false);
-    Alert.alert("Saved", "Attendance saved successfully.", [
-      { text: "OK", onPress: () => router.back() },
-    ]);
+    showToast("Attendance saved.", "success");
+    router.back();
   }
 
   if (loading) {

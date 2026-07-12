@@ -6,29 +6,31 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import PrimaryButton from "@/components/PrimaryButton";
 import { supabase } from "@/lib/supabase";
 import { friendlyAuthError } from "@/lib/authErrors";
+import { useAppStore } from "@/store/useAppStore";
 
 export default function ResetPasswordScreen() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const showToast = useAppStore((s) => s.showToast);
 
   // This screen is only valid inside a recovery session (opened via the email
   // link). If there's no session, the link is invalid or expired.
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
-        Alert.alert(
-          "Link expired",
+        showToast(
           "This reset link is invalid or has expired. Please request a new one.",
-          [{ text: "OK", onPress: () => router.replace("/(auth)/forgot-password") }]
+          "error"
         );
+        router.replace("/(auth)/forgot-password");
         return;
       }
       setChecking(false);
@@ -36,26 +38,27 @@ export default function ResetPasswordScreen() {
   }, []);
 
   async function handleReset() {
+    setError(null);
     if (!password || !confirm) {
-      Alert.alert("Error", "Please enter and confirm your new password.");
+      setError("Please enter and confirm your new password.");
       return;
     }
     if (password !== confirm) {
-      Alert.alert("Error", "Passwords do not match.");
+      setError("Passwords do not match.");
       return;
     }
     if (password.length < 8) {
-      Alert.alert("Error", "Password must be at least 8 characters.");
+      setError("Password must be at least 8 characters.");
       return;
     }
 
     setLoading(true);
 
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error: updErr } = await supabase.auth.updateUser({ password });
 
-    if (error) {
+    if (updErr) {
       setLoading(false);
-      Alert.alert("Error", friendlyAuthError(error));
+      setError(friendlyAuthError(updErr));
       return;
     }
 
@@ -63,11 +66,11 @@ export default function ResetPasswordScreen() {
     await supabase.auth.signOut();
     setLoading(false);
 
-    Alert.alert(
-      "Password updated",
-      "Your password has been reset. Please sign in with your new password.",
-      [{ text: "OK", onPress: () => router.replace("/(auth)/login") }]
+    showToast(
+      "Password updated. Please sign in with your new password.",
+      "success"
     );
+    router.replace("/(auth)/login");
   }
 
   if (checking) {
@@ -128,6 +131,12 @@ export default function ResetPasswordScreen() {
               placeholderTextColor="#9ca3af"
             />
           </View>
+
+          {error && (
+            <Text className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              {error}
+            </Text>
+          )}
 
           <PrimaryButton
             label={loading ? "Updating..." : "Update Password"}

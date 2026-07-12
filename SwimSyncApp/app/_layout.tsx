@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import * as Linking from "expo-linking";
 import { supabase } from "@/lib/supabase";
 import { useAppStore } from "@/store/useAppStore";
+import Toast from "@/components/Toast";
 
 // Pull the recovery tokens out of a Supabase deep link
 // (swimsync://reset-password#access_token=…&refresh_token=…&type=recovery).
@@ -148,6 +149,7 @@ export default function RootLayout() {
         <Stack.Screen name="(parent)" />
         <Stack.Screen name="(coach)" />
       </Stack>
+      <Toast />
     </>
   );
 }

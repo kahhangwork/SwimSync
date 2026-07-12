@@ -7,7 +7,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { useAppStore } from "@/store/useAppStore";
@@ -20,10 +19,11 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const setSession = useAppStore((s) => s.setSession);
+  const showToast = useAppStore((s) => s.showToast);
 
   async function handleLogin() {
     if (!email || !password) {
-      Alert.alert("Error", "Please enter your email and password.");
+      showToast("Please enter your email and password.", "error");
       return;
     }
 
@@ -36,7 +36,7 @@ export default function LoginScreen() {
 
     if (error || !data.user) {
       setLoading(false);
-      Alert.alert("Sign In Failed", friendlyAuthError(error));
+      showToast(friendlyAuthError(error), "error");
       return;
     }
 
@@ -50,7 +50,7 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (profileError || !profile) {
-      Alert.alert("Error", "Could not load your profile. Please try again.");
+      showToast("Could not load your profile. Please try again.", "error");
       return;
     }
 
@@ -66,7 +66,7 @@ export default function LoginScreen() {
     } else if (profile.role === "coach") {
       router.replace("/(coach)/today");
     } else {
-      Alert.alert("Error", "Unrecognised role. Please contact support.");
+      showToast("Unrecognised role. Please contact support.", "error");
     }
   }
 

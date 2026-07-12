@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,21 +25,22 @@ export default function AddChildScreen() {
   const [loading, setLoading] = useState(false);
 
   const session = useAppStore((s) => s.session);
+  const showToast = useAppStore((s) => s.showToast);
 
   async function handleSave() {
     if (!name.trim()) {
-      Alert.alert("Error", "Full name is required.");
+      showToast("Full name is required.", "error");
       return;
     }
     if (!dob.trim()) {
-      Alert.alert("Error", "Date of birth is required.");
+      showToast("Date of birth is required.", "error");
       return;
     }
 
     // Validate date format YYYY-MM-DD
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(dob.trim())) {
-      Alert.alert("Error", "Date of birth must be in YYYY-MM-DD format.");
+      showToast("Date of birth must be in YYYY-MM-DD format.", "error");
       return;
     }
 
@@ -55,7 +55,7 @@ export default function AddChildScreen() {
 
     if (parentError || !parentRecord) {
       setLoading(false);
-      Alert.alert("Error", "Could not find your parent account. Please try again.");
+      showToast("Could not find your parent account. Please try again.", "error");
       return;
     }
 
@@ -76,7 +76,7 @@ export default function AddChildScreen() {
 
     if (studentError || !student) {
       setLoading(false);
-      Alert.alert("Error", "Failed to create child profile. Please try again.");
+      showToast("Failed to create child profile. Please try again.", "error");
       return;
     }
 
@@ -91,15 +91,18 @@ export default function AddChildScreen() {
     setLoading(false);
 
     if (linkError) {
-      Alert.alert("Error", "Child profile created but could not be linked to your account. Please contact support.");
+      showToast(
+        "Child profile created but could not be linked to your account. Please contact support.",
+        "error"
+      );
       return;
     }
 
-    Alert.alert(
-      "Success",
+    showToast(
       `${name.trim()}'s profile has been created. The admin will assign them to a class shortly.`,
-      [{ text: "OK", onPress: () => router.back() }]
+      "success"
     );
+    router.back();
   }
 
   return (

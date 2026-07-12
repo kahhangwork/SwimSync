@@ -7,13 +7,13 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import PrimaryButton from "@/components/PrimaryButton";
 import { supabase } from "@/lib/supabase";
 import { friendlyAuthError } from "@/lib/authErrors";
+import { useAppStore } from "@/store/useAppStore";
 
 // Where Supabase should redirect the recovery link back to. On web this is the
 // running Expo origin; on native it's the app's custom scheme (swimsync://).
@@ -28,10 +28,11 @@ export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const showToast = useAppStore((s) => s.showToast);
 
   async function handleSend() {
     if (!email.trim()) {
-      Alert.alert("Error", "Please enter your email address.");
+      showToast("Please enter your email address.", "error");
       return;
     }
 
@@ -44,7 +45,7 @@ export default function ForgotPasswordScreen() {
     setLoading(false);
 
     if (error) {
-      Alert.alert("Error", friendlyAuthError(error));
+      showToast(friendlyAuthError(error), "error");
       return;
     }
 
