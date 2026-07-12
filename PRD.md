@@ -1092,6 +1092,14 @@ SwimSync MVP is successful if:
 - Implement credit note processing as a database trigger or Edge Function on attendance update
 - Maintain an audit log for all sensitive SwimSync operations
 
+> **Removed UI stubs (July 2026, during deployment):** placeholder buttons that had
+> no implementation were removed so the shipped app has no dead controls —
+> **Notification Preferences** (coach Settings + parent Profile) and **Help & Support**
+> (parent Profile). Notification Preferences is consistent with §3.2 (push notifications
+> are **out of MVP scope**). **Change Password** on those screens was also a stub and is
+> now **implemented** in-app (self-service password change for a logged-in coach/parent).
+> Full list + restore notes: `HANDOVER.md` §12.
+
 ---
 
 ## 18. Final MVP Decisions Summary

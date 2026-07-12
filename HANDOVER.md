@@ -315,3 +315,43 @@ to Storage** (GET 200 image/png) → parent sees the QR.
 
 **Invoicing is manual:** on the 1st, the superadmin opens the admin **Invoices** page →
 pick the month → **Generate Invoices** (no cron; a paused free project wouldn't run it).
+
+---
+
+## 12. Removed / hidden UI stubs (READ before "re-adding" a button)
+
+During the web deployment we found several buttons that were **placeholder stubs**
+— rendered in the UI but with empty `onPress={() => {}}` handlers, so they did
+nothing on **any** platform (not just web). These were **removed** so the shipped
+app has no dead controls. If a future session is asked to "add X back," check here
+first — it was intentionally removed as unbuilt, not lost.
+
+| Screen (file) | Removed button | Why | To restore |
+|---------------|----------------|-----|-----------|
+| Coach Settings `app/(coach)/settings/index.tsx` | **Notification Preferences** | Push notifications are **out of MVP scope** (PRD §3.2). Was an empty stub. | Build a notifications feature first, then re-add a real `MenuItem`. |
+| Parent Profile `app/(parent)/profile/index.tsx` | **Notification Preferences** | Same as above. | Same as above. |
+| Parent Profile `app/(parent)/profile/index.tsx` | **Help & Support** | Empty stub; no support content/flow exists yet. | Add a real target (support email/link/FAQ screen), then re-add the `MenuItem`. |
+
+**Implemented (not removed):** the **Change Password** buttons on both those screens
+were also empty stubs — they are now **wired to a real screen**
+(`components/ChangePasswordScreen.tsx`, routes `…/settings/change-password.tsx` and
+`…/profile/change-password.tsx`). Kept & working: parent **Add Child Profile**.
+
+### 12a. `Alert.alert` is a no-op on the web build (known pattern)
+
+`Alert.alert` has **no `react-native-web` implementation** — on the deployed web app
+it does nothing (no dialog, and none of its button `onPress` handlers fire). It works
+normally on native iOS/Android.
+
+- **Fixed** where it blocked an action: **Sign Out** (coach + parent) now uses
+  `lib/confirm.ts` `confirmAction` (web `window.confirm` / native `Alert.alert` — one
+  helper, both platforms, no rework needed for native). New **Change Password** screen
+  uses inline error/success, not `Alert`.
+- **Still latent (works on native, invisible on web):** `register.tsx` "Check your
+  email" confirmation (only reachable if email confirmation is re-enabled — cloud keeps
+  it **OFF**), plus informational toasts like "Saved" / "Upload failed" across the coach
+  attendance / QR / admin flows. These don't block actions (the DB write happens first);
+  they just show no feedback on web. **Before native launch or a web-polish pass, audit
+  all `Alert.alert(` calls** (`grep -rn "Alert.alert" SwimSyncApp/app`) and route any
+  that gate an action through `confirmAction`, or swap informational ones for an
+  inline/toast component. See also the `run-ui-playwright` skill gotcha #5.
