@@ -165,38 +165,3 @@ export const PLACEHOLDER_ROSTER = [
   { id: "s-3", name: "Mei Lin Koh",  status: "Present",   age: 10 },
   { id: "s-4", name: "Jake Ng",      status: "Not Marked", age: 7 },
 ];
-
-export const PLACEHOLDER_COACH_INVOICES = [
-  {
-    id: "cinv-001",
-    student: "Emma Tan",
-    parent: "Sarah Tan",
-    month: "February 2026",
-    net: 120,
-    status: "Outstanding",
-  },
-  {
-    id: "cinv-002",
-    student: "Ryan Chua",
-    parent: "David Chua",
-    month: "February 2026",
-    net: 160,
-    status: "Paid",
-  },
-  {
-    id: "cinv-003",
-    student: "Mei Lin Koh",
-    parent: "Linda Koh",
-    month: "February 2026",
-    net: 80,
-    status: "Outstanding",
-  },
-  {
-    id: "cinv-004",
-    student: "Jake Ng",
-    parent: "Peter Ng",
-    month: "February 2026",
-    net: 160,
-    status: "Paid",
-  },
-];
