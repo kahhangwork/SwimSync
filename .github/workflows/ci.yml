@@ -1,0 +1,49 @@
+name: CI
+
+# Runs the backend test suites against a real local Supabase stack on every
+# push / PR to main. This is what guards the billing + credit money-path logic.
+#
+# Scope note: frontend typecheck (tsc / next build) is intentionally NOT run
+# yet — the app currently has pre-existing type errors (see HANDOVER); wire it
+# in once those are resolved so CI can start green and stay green.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # `supabase start` boots the Docker stack (Postgres/Auth/REST/Storage),
+      # applies supabase/migrations/*, and seeds supabase/seed.sql.
+      - name: Start Supabase stack
+        run: supabase start
+
+      # pgTAP: triggers, RLS isolation, constraints, §11 edge cases.
+      - name: DB tests (pgTAP)
+        run: supabase test db
+
+      # Deno: generate-invoices billing math + credit ledger. test.sh pulls
+      # SERVICE_ROLE_KEY / API_URL from `supabase status`.
+      - name: Engine tests (Deno)
+        run: supabase/functions/generate-invoices/test.sh
+
+      - name: Stop Supabase stack
+        if: always()
+        run: supabase stop
