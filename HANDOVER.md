@@ -267,10 +267,17 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   the admin reset URL (`https://swimsync-admin.vercel.app/reset-password`) in the
   Supabase redirect allow-list. UI verified on cloud; full email round-trip is a
   real-inbox test (superadmin `+admin@gmail`).
-- **Smoke-test remaining screens** — admin attendance/students/dashboard and coach
-  billing (columns audited clean, runtime not yet driven). Use `run-ui-playwright`.
-- **Frontend/component tests + CI** — RN/Next component tests, and a GitHub Actions
-  workflow that runs `supabase test db` + the Deno tests on push.
+- **Coach Billing screen — DONE (2026-07-12).** Was placeholder mock data with a dead
+  button; now queries live invoices (RLS-scoped) and marks them paid (invoice update +
+  `payment_records` insert), web-safe via Toast/`confirmAction`. Added migration
+  `20260712000100` + `coach_serves_parent_profile()` so a coach can read served-parents'
+  names. UI-verified via `run-ui-playwright`.
+- **Smoke-test remaining screens — DONE (2026-07-12).** Admin attendance/students/dashboard
+  driven at runtime (deep joins resolve, no NaN/empty tables) via
+  `drivers/smoke-admin-screens.mjs`.
+- **Frontend/component tests + CI — DONE (2026-07-12).** GitHub Actions
+  (`.github/workflows/ci.yml`) runs the pgTAP + Deno suites **and** the frontend suites
+  (`SwimSyncAdmin` vitest, `SwimSyncApp` jest-expo) on every push/PR to `main`. See §5.
 - **Auth polish** — mobile password reset, friendly login/register errors, and the
   **admin "Forgot password?" flow** are all **done**. Still open: email confirmation
   copy/templates are Supabase defaults.
