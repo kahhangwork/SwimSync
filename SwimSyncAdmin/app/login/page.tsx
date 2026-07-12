@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -101,6 +102,13 @@ export default function LoginPage() {
             >
               {loading ? "Signing in…" : "Sign In"}
             </button>
+
+            <Link
+              href="/forgot-password"
+              className="block text-center text-sm text-sky-600 hover:text-sky-700"
+            >
+              Forgot password?
+            </Link>
           </form>
         </div>
       </div>
