@@ -127,16 +127,34 @@ Integration tests against the **local** stack (prereq: `supabase start`). Both
 suites are hermetic — each seeds its own data and rolls back / tears down.
 
 ```bash
-# Database tests (pgTAP): credit-note trigger, RLS isolation, constraints
-supabase test db
+# Database tests (pgTAP): triggers, RLS isolation, constraints, §11 edge cases
+supabase test db                                  # 22 tests across 4 files
 
 # Function tests (Deno): generate-invoices billing math + credit ledger
-supabase/functions/generate-invoices/test.sh     # needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 8 tests; needs deno (brew install deno)
 ```
 
-Files: `supabase/tests/*.test.sql` and
-`supabase/functions/generate-invoices/core.test.ts`. See LOCAL_DEV_GUIDE
-§"Running the tests".
+**Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
+
+_pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
+
+| File | Covers |
+|------|--------|
+| `constraints.test.sql` (4) | one-invoice-per-parent-per-month, one active enrolment per student, positive-only credit applications, credit notes immutable to app roles |
+| `credit_note_trigger.test.sql` (7) | the `handle_attendance_update` auto credit-note trigger (billable→non-billable on an invoiced lesson) |
+| `rls_isolation.test.sql` (5) | RLS parent/parent isolation + superadmin sees all |
+| `edge_cases.test.sql` (6) | PRD §11: **11.4** no bare `trial` status, **11.5** re-enrol after unenrol keeps history, **11.8** unenrol leaves `credit_balance` untouched |
+
+_Deno engine tests — `supabase/functions/generate-invoices/core.test.ts` (run by `test.sh`):_
+billable-only summing, paid vs free trial, no double-billing, the auto/manual
+completeness gate, the `auto_invoice_enabled` switch, FIFO credit application,
+**11.1** leap-year last-day / month-boundary billing, and **11.7** credit-exceeds-
+invoice carry-forward (+ ledger invariants via `checkInvariants`).
+
+_Not yet individually tested (PRD §11):_ 11.2/11.3/11.6 are exercised implicitly
+by the core-loop + RLS tests but have no dedicated assertion.
+
+See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
@@ -241,14 +259,10 @@ Files: `supabase/tests/*.test.sql` and
 - **Auth polish** — mobile password reset, friendly login/register errors, and the
   **admin "Forgot password?" flow** are all **done**. Still open: email confirmation
   copy/templates are Supabase defaults.
-- **PRD §11 edge cases — not individually verified** (carried over from the old
-  `Steps.md` build plan, now removed in favour of this doc): the core loop and RLS
-  tests cover most of this implicitly, but no test/UI pass has specifically checked
-  11.1 (last-day-of-month lesson lands in that month's invoice), 11.4 (coach must
-  classify a Trial as Paid/Free before it can be invoiced), 11.5 (a student can only
-  have one active class enrolment at a time), 11.7 (credit balance exceeding the next
-  invoice marks it Paid and carries the remainder forward), and 11.8 (unenrolling a
-  student with outstanding credit leaves the balance on record, no auto-refund).
+- **PRD §11 edge cases — now covered by dedicated tests** (see §5 catalog):
+  11.1, 11.4, 11.5, 11.7, 11.8 each have an explicit pgTAP or Deno test. Only
+  11.2/11.3/11.6 remain implicit (exercised by the core-loop + RLS tests, no
+  dedicated assertion) — add if a regression ever warrants it.
 
 ---
 
