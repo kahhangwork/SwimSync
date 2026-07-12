@@ -221,14 +221,13 @@ Files: `supabase/tests/*.test.sql` and
   Remaining deployment work: **native builds** (EAS → Android APK / iOS TestFlight)
   once the user decides to invest so parents can download from the stores; cron is
   intentionally **not** wired (invoices are generated manually via the admin button).
-- **`Alert.alert` is a no-op on RN-web (family of bugs).** Fixed for **Sign Out**
-  (coach + parent) via `lib/confirm.ts` `confirmAction` (window.confirm on web).
-  Added an in-app **Change Password** screen (`components/ChangePasswordScreen.tsx`,
-  wired from coach settings + parent profile) using inline error/success, not Alert.
-  Also fixed **`register.tsx`** — all five `Alert.alert` calls → inline error + an
-  `emailSent` "check your email" state, so registration (incl. the confirm-email path)
-  no longer strands web users. **Still latent:** informational `Alert.alert` toasts
-  ("Saved" / "Upload failed" etc.) elsewhere; audit before native (see §12a).
+- **`Alert.alert` is a no-op on RN-web — fully swept (see §12a).** Sign Out uses
+  `lib/confirm.ts` `confirmAction`; a global **Toast** (`store` + `components/Toast.tsx`
+  at the root layout, `showToast(msg, type)`) now carries all login/validation/success
+  feedback that was previously invisible on web; and alerts whose OK handler redirected
+  (register, reset-password, add-child, attendance) now navigate directly. The **only**
+  remaining `Alert.alert` is the native-only media-library permission prompt in coach
+  settings (guarded by `Platform.OS !== "web"`).
 - **Removed dead settings stubs** — Notification Preferences (coach + parent) and
   Help & Support (parent) had empty handlers; deleted. Still open: admin "Forgot
   password?" flow.
@@ -342,18 +341,22 @@ were also empty stubs — they are now **wired to a real screen**
 
 `Alert.alert` has **no `react-native-web` implementation** — on the deployed web app
 it does nothing (no dialog, and none of its button `onPress` handlers fire). It works
-normally on native iOS/Android.
+normally on native iOS/Android. **This whole family has been swept** (verified on cloud
+across sign-out, register, reset-password, login errors, add-child, coach QR/attendance).
+The three mechanisms — reuse them for any new user feedback so it works on web too:
 
-- **Fixed** where it blocked an action: **Sign Out** (coach + parent) now uses
-  `lib/confirm.ts` `confirmAction` (web `window.confirm` / native `Alert.alert` — one
-  helper, both platforms, no rework needed for native). New **Change Password** screen
-  uses inline error/success, not `Alert`. **`register.tsx`** — all five `Alert.alert`
-  calls → inline error + `emailSent` state (the "check your email" path no longer
-  strands web users; verified inline error + happy-path on cloud).
-- **Still latent (works on native, invisible on web):** informational toasts like
-  "Saved" / "Upload failed" across the coach attendance / QR / admin flows. These don't
-  block actions (the DB write happens first); they just show no feedback on web.
-  **Before native launch or a web-polish pass, audit all `Alert.alert(` calls**
-  (`grep -rn "Alert.alert" SwimSyncApp/app`) and route any
-  that gate an action through `confirmAction`, or swap informational ones for an
-  inline/toast component. See also the `run-ui-playwright` skill gotcha #5.
+1. **Confirm dialogs** → `confirmAction(title, message, onConfirm, confirmLabel)` from
+   `lib/confirm.ts` (web `window.confirm` / native `Alert.alert`). Used by Sign Out.
+2. **Transient feedback** (errors, "Saved", "Uploaded", …) → the **global Toast**:
+   `useAppStore.showToast(message, "success" | "error" | "info")`, rendered by
+   `components/Toast.tsx` (mounted once in `app/_layout.tsx`). Auto-dismisses in 3s.
+3. **Form validation** on auth screens → inline `error` state under the form
+   (register / reset-password / Change Password), or a toast where there's no form slot.
+
+For alerts that used an `onPress` to redirect, the fix does the navigation **directly**
+(e.g. `showToast(...); router.back()`), since the old `onPress` never fired on web.
+
+**Do NOT reintroduce `Alert.alert` for user feedback.** The only sanctioned use left is
+the **native-only media-library permission prompt** in coach settings, guarded by
+`Platform.OS !== "web"`. Audit with `grep -rn "Alert.alert" SwimSyncApp/app`. See also
+the `run-ui-playwright` skill gotcha #5.
