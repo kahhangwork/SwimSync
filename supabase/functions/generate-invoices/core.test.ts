@@ -147,6 +147,34 @@ Deno.test("credit note is applied FIFO to the next invoice; invariants hold", as
   }
 });
 
+Deno.test("edge 11.1: last-day-of-month lesson is billed in that month; next-month lesson is excluded (leap Feb)", async () => {
+  const s = await newScenario({ price: 40 });
+  try {
+    // Leap-year last day (exercises core.ts lastDay = new Date(y, m, 0)),
+    // plus a lesson on the 1st of the NEXT month that must NOT be swept in.
+    const last = await s.addSession("2028-02-29"); await s.mark(last, "present");
+    const next = await s.addSession("2028-03-01"); await s.mark(next, "present");
+
+    await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2028-02",
+    });
+
+    const inv = await getInvoice(s.db, s.parentId, "2028-02");
+    assertEquals(inv!.gross, 40); // only the Feb 29 lesson, not the Mar 1 one
+
+    const { data: items } = await s.db
+      .from("invoice_items")
+      .select("session_date")
+      .eq("invoice_id", inv!.id);
+    assertEquals(items!.length, 1);
+    assertEquals(items![0].session_date, "2028-02-29");
+  } finally {
+    await s.teardown();
+  }
+});
+
 Deno.test("carry-forward: credit exceeding the invoice leaves a partial note and reconciles", async () => {
   const s = await newScenario({ price: 30 });
   try {
