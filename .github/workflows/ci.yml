@@ -5,7 +5,8 @@ name: CI
 #
 # Scope note: frontend typecheck (tsc / next build) is intentionally NOT run
 # yet — the app currently has pre-existing type errors (see HANDOVER); wire it
-# in once those are resolved so CI can start green and stay green.
+# in once those are resolved so CI can start green and stay green. The
+# frontend-tests job below runs the component/unit suites (vitest / jest-expo).
 
 on:
   push:
@@ -47,3 +48,28 @@ jobs:
       - name: Stop Supabase stack
         if: always()
         run: supabase stop
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [SwimSyncAdmin, SwimSyncApp]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+        working-directory: ${{ matrix.app }}
+
+      - name: Component / unit tests
+        run: npm test
+        working-directory: ${{ matrix.app }}

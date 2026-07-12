@@ -123,15 +123,23 @@ it to verify UI changes or reproduce the credit-note / PayNow flows. See
 
 ## 5. Running the tests
 
-Integration tests against the **local** stack (prereq: `supabase start`). Both
-suites are hermetic — each seeds its own data and rolls back / tears down.
+Backend integration tests run against the **local** stack (prereq:
+`supabase start`) and are hermetic (self-seed + roll back / tear down). Frontend
+tests are plain unit/component tests (no stack needed). All four run in CI on
+push/PR to `main` (`.github/workflows/ci.yml`).
 
 ```bash
-# Database tests (pgTAP): triggers, RLS isolation, constraints, §11 edge cases
+# Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
 supabase test db                                  # 22 tests across 4 files
 
-# Function tests (Deno): generate-invoices billing math + credit ledger
+# Backend — Function tests (Deno): generate-invoices billing math + credit ledger
 supabase/functions/generate-invoices/test.sh      # 8 tests; needs deno (brew install deno)
+
+# Frontend — Admin (Next/React) component tests (vitest)
+cd SwimSyncAdmin && npm test                       # 3 tests
+
+# Frontend — Mobile (Expo/RN) unit tests (jest-expo)
+cd SwimSyncApp && npm test                         # 6 tests
 ```
 
 **Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
@@ -153,6 +161,13 @@ invoice carry-forward (+ ledger invariants via `checkInvariants`).
 
 _Not yet individually tested (PRD §11):_ 11.2/11.3/11.6 are exercised implicitly
 by the core-loop + RLS tests but have no dedicated assertion.
+
+_Frontend tests (first suites — greenfield tooling):_
+`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`,
+`components/StatusBadge.test.tsx`); `SwimSyncApp` uses **jest-expo**
+(`jest.config.js`, `lib/authErrors.test.ts`, scoped to `lib/**` unit tests for
+now). Deeper component-render tests (RN screens with mocked Supabase, admin
+tables) are the natural next additions.
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
