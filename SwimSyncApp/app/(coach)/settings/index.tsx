@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
+import { confirmAction } from "@/lib/confirm";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 
@@ -113,10 +114,12 @@ export default function CoachSettingsScreen() {
   }
 
   function confirmLogout() {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: handleLogout },
-    ]);
+    confirmAction(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      handleLogout,
+      "Sign Out"
+    );
   }
 
   return (

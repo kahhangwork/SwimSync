@@ -5,12 +5,12 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
-  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
+import { confirmAction } from "@/lib/confirm";
 import Card from "@/components/Card";
 
 export default function ParentProfileScreen() {
@@ -24,10 +24,12 @@ export default function ParentProfileScreen() {
   }
 
   function confirmLogout() {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: handleLogout },
-    ]);
+    confirmAction(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      handleLogout,
+      "Sign Out"
+    );
   }
 
   const initials = session?.fullName?.charAt(0) ?? "?";
