@@ -3,7 +3,7 @@
 A reference to the **skills** available when working on SwimSync with Claude Code:
 what each one does, how to invoke it, and when it's useful here.
 
-_Last updated: 2026-07-11_
+_Last updated: 2026-07-12_
 
 ## What a skill is & how to run it
 
@@ -46,6 +46,37 @@ the **real UI** across parent / coach / superadmin roles — not just tests.
   credit-note-flow template, plus the Expo/RN-web quirks baked in (login
   selectors, session rehydration, force-click, etc.).
 - **Details:** [.claude/skills/run-ui-playwright/SKILL.md](.claude/skills/run-ui-playwright/SKILL.md)
+
+### Workflow skills — plan → build → commit
+
+Three prompt-driven skills that enforce a disciplined workflow. All three are
+**explicit-invocation only** (type the slash command); they don't auto-fire.
+Chain them: `/plan-with-confidence` → `/plan-review` → build → `/commit-review`.
+
+#### `plan-with-confidence` — don't plan until you're sure
+
+Holds off on any plan until confidence is **>96%**, asking batched follow-up
+questions until it clears that bar — then plans.
+
+- **Invoke:** `/plan-with-confidence` (only fires when typed explicitly).
+- **Details:** [.claude/skills/plan-with-confidence/SKILL.md](.claude/skills/plan-with-confidence/SKILL.md)
+
+#### `plan-review` — harden a plan against product risk
+
+Ranks the current plan's areas by **product risk** (most → least, each with a
+why), then folds concrete risk-reduction steps into the plan for each item.
+
+- **Invoke:** `/plan-review` (only fires when typed explicitly).
+- **Details:** [.claude/skills/plan-review/SKILL.md](.claude/skills/plan-review/SKILL.md)
+
+#### `commit-review` — Senior-Engineer review, then commit
+
+Gates a commit behind a thorough self-review: finds errors / inconsistent
+logic / inefficiencies / bug risks, lists them most-critical-first, fixes them,
+then commits.
+
+- **Invoke:** `/commit-review`, or ask to "review and commit".
+- **Details:** [.claude/skills/commit-review/SKILL.md](.claude/skills/commit-review/SKILL.md)
 
 ---
 
@@ -100,6 +131,11 @@ the **real UI** across parent / coach / superadmin roles — not just tests.
 ## Quick reference
 
 ```
+# Workflow (project skills, explicit-invocation only)
+/plan-with-confidence     don't plan until >96% sure (asks questions first)
+/plan-review              rank a plan's product risk + add mitigations
+/commit-review            Senior-Engineer review, then commit
+
 # Run & verify
 /run-ui-playwright        drive both SwimSync UIs in Chrome (project skill)
 /run                      launch/drive the app (defers to the project skill)
