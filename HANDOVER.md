@@ -65,8 +65,13 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   superadmin everything. Covered by automated isolation tests.
 - **Automated tests** — 23 integration tests (Deno + pgTAP); see §5.
 
-**Not done yet** (see §9): cloud deployment; runtime smoke-test of a few
-admin/detail screens; frontend/component tests + CI.
+**Deployed to free cloud infra (2026-07-12, web-first)** — see §11 for the live
+URLs and setup. The full loop above is **verified end to end on the live cloud
+stack** (parent register → assign → attendance → Edge-Function invoice → PayNow QR).
+
+**Not done yet** (see §9): native App Store / Play Store builds (deferred — using
+the web app on iPhone for now); frontend/component tests + CI; the admin "Forgot
+password?" flow.
 
 ---
 
@@ -212,11 +217,15 @@ Files: `supabase/tests/*.test.sql` and
 
 ## 9. Next steps (pick with the user)
 
-- **Cloud deployment** — create the real Supabase project, `supabase link
-  --project-ref …`, `supabase db push`, `supabase functions deploy generate-invoices`,
-  set the `CRON_SECRET` secret, run `supabase/cloud/cron_schedule.sql`, (the `paynow-qr`
-  bucket is created by migration on push). Re-point both `.env` files to cloud, host the
-  admin (Vercel) + build the mobile app (EAS). Makes it demoable on real phones.
+- **Cloud deployment — DONE (2026-07-12).** Live on free infra, web-first. See §11.
+  Remaining deployment work: **native builds** (EAS → Android APK / iOS TestFlight)
+  once the user decides to invest so parents can download from the stores; cron is
+  intentionally **not** wired (invoices are generated manually via the admin button).
+- **Auth polish — latent web bug.** The mobile `register.tsx` "Check your email"
+  step uses `Alert.alert`, which is a **no-op on RN-web** → if email confirmation is
+  ever re-enabled, a web parent gets stuck on the register form (works on native).
+  Cloud currently runs with **email confirmation OFF** to avoid this. Also still open:
+  the admin panel has no "Forgot password?" flow.
 - **Smoke-test remaining screens** — admin attendance/students/dashboard and coach
   billing (columns audited clean, runtime not yet driven). Use `run-ui-playwright`.
 - **Frontend/component tests + CI** — RN/Next component tests, and a GitHub Actions
@@ -261,3 +270,43 @@ Files: `supabase/tests/*.test.sql` and
 
 Memory files (Claude project memory dir) also capture project state + backend
 gotchas: `swimsync-project`, `swimsync-backend-gotchas`.
+
+---
+
+## 11. Cloud deployment (live, free tier — 2026-07-12)
+
+**Web-first, $0.** The user is on iPhone; rather than pay $99/yr for an iOS native
+build, the Expo app is exported as a **static web app** and used in Safari. Native
+store builds are deferred until the app "sticks."
+
+| Piece | Where | Notes |
+|-------|-------|-------|
+| **Backend** | Supabase project `cdmjeyauhxcgulhbxmsb` (region ap-southeast-1) | Free tier. Linked via `supabase link`; schema via `supabase db push`. |
+| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. |
+| **Admin panel** | Vercel `swimsync-admin` → https://swimsync-admin.vercel.app | Root `SwimSyncAdmin`, **framework preset = Next.js**. |
+| **Mobile app (web)** | Vercel `swimsync-app` → https://swimsync-app-psi.vercel.app | Root `SwimSyncApp`, **preset = Other** (build driven by `SwimSyncApp/vercel.json`: `expo export --platform web` → `dist`, SPA rewrite). |
+
+**Secrets/keys** live only in the dashboards (never committed): Supabase project keys
+(new-format `sb_publishable_…` / `sb_secret_…`) + `CRON_SECRET` are set as Vercel env
+vars on each project (see each `.env.example` for the var names). Local `.env` files
+still point at the local stack for dev.
+
+**Config gotchas hit during deploy (don't re-trip):**
+1. **Next.js `15.2.0` is CVE-blocked by Vercel** — the build compiles then "Deployment
+   failed". Bumped to `^15.5.20` (commit on `main`).
+2. **Admin "No Output Directory named public"** = the Vercel **Framework Preset was
+   "Other"**, not Next.js. Set it to Next.js.
+3. **Cloud email confirmation defaults ON**; local had it off. A self-registering
+   parent got stuck (see the `register.tsx` RN-web `Alert` bug in §9). Turned **Confirm
+   email OFF** in Auth → Sign In/Providers → Email to match local.
+4. **Auth redirect allow-list is dashboard-only on cloud** (not `config.toml`): Site URL
+   = the mobile-web URL, plus `<mobile-web-url>/reset-password` (+ `/**`) in the redirect
+   allow-list, for the password-reset flow.
+
+**Verified live** end to end via `run-ui-playwright` against the cloud URLs (all three
+roles): parent register → add child → superadmin assign → coach attendance → **manual
+invoice via the Edge Function** ($25) → parent sees invoice → **coach PayNow QR upload
+to Storage** (GET 200 image/png) → parent sees the QR.
+
+**Invoicing is manual:** on the 1st, the superadmin opens the admin **Invoices** page →
+pick the month → **Generate Invoices** (no cron; a paused free project wouldn't run it).
