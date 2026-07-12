@@ -7,7 +7,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { useAppStore } from "@/store/useAppStore";
@@ -22,27 +21,31 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
   const setSession = useAppStore((s) => s.setSession);
 
   async function handleRegister() {
+    setError(null);
+
     if (!name || !email || !phone || !password || !confirm) {
-      Alert.alert("Error", "Please fill in all required fields.");
+      setError("Please fill in all required fields.");
       return;
     }
 
     if (password !== confirm) {
-      Alert.alert("Error", "Passwords do not match.");
+      setError("Passwords do not match.");
       return;
     }
 
     if (password.length < 8) {
-      Alert.alert("Error", "Password must be at least 8 characters.");
+      setError("Password must be at least 8 characters.");
       return;
     }
 
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
@@ -53,9 +56,9 @@ export default function RegisterScreen() {
       },
     });
 
-    if (error || !data.user) {
+    if (signUpError || !data.user) {
       setLoading(false);
-      Alert.alert("Registration Failed", friendlyAuthError(error));
+      setError(friendlyAuthError(signUpError));
       return;
     }
 
@@ -67,17 +70,15 @@ export default function RegisterScreen() {
 
     setLoading(false);
 
-    // If email confirmation is enabled, prompt the user to verify
+    // If email confirmation is enabled, no session is returned. Show an inline
+    // "check your email" state — Alert.alert is a no-op on the web build, which
+    // would otherwise strand the user on the form with no feedback or redirect.
     if (!data.session) {
-      Alert.alert(
-        "Check your email",
-        "We've sent a confirmation link to " + email.trim() + ". Please verify your email before signing in.",
-        [{ text: "OK", onPress: () => router.replace("/(auth)/login") }]
-      );
+      setEmailSent(true);
       return;
     }
 
-    // If email confirmation is disabled, session is returned immediately
+    // Email confirmation disabled → session returned immediately
     setSession({
       id: data.user.id,
       email: data.user.email!,
@@ -114,6 +115,22 @@ export default function RegisterScreen() {
 
         {/* Form card */}
         <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 gap-4">
+          {emailSent ? (
+            <View>
+              <Text className="text-base font-semibold text-gray-900 mb-2">
+                Check your email
+              </Text>
+              <Text className="text-sm text-gray-500 mb-6">
+                We've sent a confirmation link to {email.trim()}. Please verify
+                your email, then sign in.
+              </Text>
+              <PrimaryButton
+                label="Back to Sign In"
+                onPress={() => router.replace("/(auth)/login")}
+              />
+            </View>
+          ) : (
+          <>
           <View>
             <Text className="text-sm font-medium text-gray-700 mb-1.5">Full Name</Text>
             <TextInput
@@ -178,11 +195,19 @@ export default function RegisterScreen() {
             />
           </View>
 
+          {error && (
+            <Text className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              {error}
+            </Text>
+          )}
+
           <PrimaryButton
             label={loading ? "Creating account..." : "Create Account"}
             onPress={handleRegister}
             className="mt-2"
           />
+          </>
+          )}
         </View>
 
         <View className="flex-row justify-center mt-6">
