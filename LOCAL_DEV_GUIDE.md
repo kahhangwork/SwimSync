@@ -20,6 +20,10 @@ supabase start
 ```
 Make sure **Docker Desktop is running** first. Check status any time with
 `supabase status`. Stop everything with `supabase stop`.
+> **Edited `supabase/config.toml`?** Restart the stack
+> (`supabase stop && supabase start`) — auth settings such as
+> `[auth].additional_redirect_urls` (the password-reset redirect allow-list) are
+> only read at boot, so the mobile reset link is rejected until you restart.
 
 ### Terminal 2 — Invoice Edge Function (needed for the Generate Invoices button)
 ```bash

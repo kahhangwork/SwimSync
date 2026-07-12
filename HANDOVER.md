@@ -97,6 +97,13 @@ cd SwimSyncApp && npx expo start           # press w (web) or i (iOS sim)
 shape. `CRON_SECRET=local-dev-cron-secret` is shared between
 `supabase/functions/.env` and `SwimSyncAdmin/.env.local`.
 
+> **`config.toml` changes need a stack restart.** Auth settings like
+> `[auth].additional_redirect_urls` (the password-reset redirect allow-list) are
+> only read when the stack boots. After editing `supabase/config.toml`, run
+> `supabase stop && supabase start` (or `supabase db reset`) or the recovery link
+> will be rejected. A `supabase start` on a fresh clone already reads it, so this
+> only bites when you edit the file against an already-running stack.
+
 **Seed accounts** (see `LOCAL_DEV_GUIDE.md`): superadmin & coach at
 `*@swimsync.test` / `password123`, plus one class "Saturday Beginners". Parents
 self-register in the app. Superadmin is **web-only** (mobile shows an
