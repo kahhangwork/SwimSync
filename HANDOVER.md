@@ -225,9 +225,10 @@ Files: `supabase/tests/*.test.sql` and
   (coach + parent) via `lib/confirm.ts` `confirmAction` (window.confirm on web).
   Added an in-app **Change Password** screen (`components/ChangePasswordScreen.tsx`,
   wired from coach settings + parent profile) using inline error/success, not Alert.
-  **Still latent:** `register.tsx` "Check your email" uses `Alert.alert` → a web parent
-  would get stuck if email confirmation is re-enabled (cloud keeps it **OFF** to avoid
-  this; works on native). Audit other `Alert.alert([...buttons])` calls before native.
+  Also fixed **`register.tsx`** — all five `Alert.alert` calls → inline error + an
+  `emailSent` "check your email" state, so registration (incl. the confirm-email path)
+  no longer strands web users. **Still latent:** informational `Alert.alert` toasts
+  ("Saved" / "Upload failed" etc.) elsewhere; audit before native (see §12a).
 - **Removed dead settings stubs** — Notification Preferences (coach + parent) and
   Help & Support (parent) had empty handlers; deleted. Still open: admin "Forgot
   password?" flow.
@@ -346,12 +347,13 @@ normally on native iOS/Android.
 - **Fixed** where it blocked an action: **Sign Out** (coach + parent) now uses
   `lib/confirm.ts` `confirmAction` (web `window.confirm` / native `Alert.alert` — one
   helper, both platforms, no rework needed for native). New **Change Password** screen
-  uses inline error/success, not `Alert`.
-- **Still latent (works on native, invisible on web):** `register.tsx` "Check your
-  email" confirmation (only reachable if email confirmation is re-enabled — cloud keeps
-  it **OFF**), plus informational toasts like "Saved" / "Upload failed" across the coach
-  attendance / QR / admin flows. These don't block actions (the DB write happens first);
-  they just show no feedback on web. **Before native launch or a web-polish pass, audit
-  all `Alert.alert(` calls** (`grep -rn "Alert.alert" SwimSyncApp/app`) and route any
+  uses inline error/success, not `Alert`. **`register.tsx`** — all five `Alert.alert`
+  calls → inline error + `emailSent` state (the "check your email" path no longer
+  strands web users; verified inline error + happy-path on cloud).
+- **Still latent (works on native, invisible on web):** informational toasts like
+  "Saved" / "Upload failed" across the coach attendance / QR / admin flows. These don't
+  block actions (the DB write happens first); they just show no feedback on web.
+  **Before native launch or a web-polish pass, audit all `Alert.alert(` calls**
+  (`grep -rn "Alert.alert" SwimSyncApp/app`) and route any
   that gate an action through `confirmAction`, or swap informational ones for an
   inline/toast component. See also the `run-ui-playwright` skill gotcha #5.
