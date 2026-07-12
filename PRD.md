@@ -385,7 +385,8 @@ opening it lands the user on an in-app **Set New Password** screen that calls
 `updateUser`. The recovery session is delivered via `detectSessionInUrl` on Expo
 web and a `swimsync://` deep link on native. Raw auth errors (invalid credentials,
 duplicate email, unconfirmed email, rate limit) are mapped to friendly messages.
-The admin panel has no reset flow yet (superadmin is a fixed provisioned account).
+The **admin panel** now has the same self-service reset (`/forgot-password` →
+`/reset-password`), so a superadmin can recover their own password.
 
 ### 7.2 Parent Account and Child Linking
 

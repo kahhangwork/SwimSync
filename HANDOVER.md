@@ -70,8 +70,7 @@ URLs and setup. The full loop above is **verified end to end on the live cloud
 stack** (parent register → assign → attendance → Edge-Function invoice → PayNow QR).
 
 **Not done yet** (see §9): native App Store / Play Store builds (deferred — using
-the web app on iPhone for now); frontend/component tests + CI; the admin "Forgot
-password?" flow.
+the web app on iPhone for now); frontend/component tests + CI.
 
 ---
 
@@ -229,16 +228,19 @@ Files: `supabase/tests/*.test.sql` and
   remaining `Alert.alert` is the native-only media-library permission prompt in coach
   settings (guarded by `Platform.OS !== "web"`).
 - **Removed dead settings stubs** — Notification Preferences (coach + parent) and
-  Help & Support (parent) had empty handlers; deleted. Still open: admin "Forgot
-  password?" flow.
+  Help & Support (parent) had empty handlers; deleted.
+- **Admin "Forgot password?" flow — DONE.** New `SwimSyncAdmin/app/forgot-password`
+  + `app/reset-password` pages + a link on the login (mirrors the mobile reset). Needs
+  the admin reset URL (`https://swimsync-admin.vercel.app/reset-password`) in the
+  Supabase redirect allow-list. UI verified on cloud; full email round-trip is a
+  real-inbox test (superadmin `+admin@gmail`).
 - **Smoke-test remaining screens** — admin attendance/students/dashboard and coach
   billing (columns audited clean, runtime not yet driven). Use `run-ui-playwright`.
 - **Frontend/component tests + CI** — RN/Next component tests, and a GitHub Actions
   workflow that runs `supabase test db` + the Deno tests on push.
-- **Auth polish (remaining)** — mobile password reset + friendly login/register errors
-  are **done** (see §8). Still open: the admin panel has no "Forgot password?" flow
-  (superadmin is a fixed provisioned account, so lower priority), and email
-  confirmation copy/templates are Supabase defaults.
+- **Auth polish** — mobile password reset, friendly login/register errors, and the
+  **admin "Forgot password?" flow** are all **done**. Still open: email confirmation
+  copy/templates are Supabase defaults.
 - **PRD §11 edge cases — not individually verified** (carried over from the old
   `Steps.md` build plan, now removed in favour of this doc): the core loop and RLS
   tests cover most of this implicitly, but no test/UI pass has specifically checked
