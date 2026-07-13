@@ -5,7 +5,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(7);
+SELECT plan(11);
 
 -- ── Seed (fixed UUIDs) ──────────────────────────────────────────────────────
 -- Coach + parent auth users; the handle_new_user trigger creates their
@@ -85,6 +85,23 @@ SELECT is(
 SELECT is(
   (SELECT credit_balance FROM parents WHERE profile_id = 'a0000000-0000-0000-0000-0000000000b2'),
   30.00, 'parent credit_balance incremented by the credit amount');
+
+-- ── 11.6  The correction must NOT modify or delete the original invoice ──────
+-- The invoice stays a historical record; only a credit note is issued (applied
+-- to the next cycle). Assert the original invoice is intact and the note links back.
+SELECT is(
+  (SELECT count(*)::int FROM invoices WHERE id = 'e0000000-0000-0000-0000-000000000001'),
+  1, '11.6: the original invoice still exists (the correction did not delete it)');
+SELECT is(
+  (SELECT gross_amount FROM invoices WHERE id = 'e0000000-0000-0000-0000-000000000001'),
+  30.00, '11.6: the original invoice gross_amount is unchanged (historical record)');
+SELECT is(
+  (SELECT status::text FROM invoices WHERE id = 'e0000000-0000-0000-0000-000000000001'),
+  'outstanding', '11.6: the original invoice status is unchanged (not re-computed)');
+SELECT is(
+  (SELECT invoice_id FROM credit_notes WHERE lesson_session_id = 'd0000000-0000-0000-0000-000000000001'),
+  'e0000000-0000-0000-0000-000000000001'::uuid,
+  '11.6: the credit note links back to the original invoice');
 
 -- ── Negative: a no-op update (status unchanged) issues no further note ───────
 UPDATE attendance SET edit_reason = 'noop'

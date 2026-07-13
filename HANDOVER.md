@@ -130,7 +130,7 @@ push/PR to `main` (`.github/workflows/ci.yml`).
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 22 tests across 4 files
+supabase test db                                  # 34 tests across 4 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
 supabase/functions/generate-invoices/test.sh      # 8 tests; needs deno (brew install deno)
@@ -149,9 +149,9 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | File | Covers |
 |------|--------|
 | `constraints.test.sql` (4) | one-invoice-per-parent-per-month, one active enrolment per student, positive-only credit applications, credit notes immutable to app roles |
-| `credit_note_trigger.test.sql` (7) | the `handle_attendance_update` auto credit-note trigger (billable→non-billable on an invoiced lesson) |
-| `rls_isolation.test.sql` (5) | RLS parent/parent isolation + superadmin sees all |
-| `edge_cases.test.sql` (6) | PRD §11: **11.4** no bare `trial` status, **11.5** re-enrol after unenrol keeps history, **11.8** unenrol leaves `credit_balance` untouched |
+| `credit_note_trigger.test.sql` (11) | the `handle_attendance_update` auto credit-note trigger (billable→non-billable on an invoiced lesson); **11.6** the correction leaves the original invoice intact (not modified/deleted) and the note links back to it |
+| `rls_isolation.test.sql` (10) | RLS parent/parent isolation + superadmin sees all; **11.3** a parent sees all their children across coaches while each coach sees only students in their own classes |
+| `edge_cases.test.sql` (9) | PRD §11: **11.2** a child created before assignment defaults to unassigned with an empty (not error) class view, **11.4** no bare `trial` status, **11.5** re-enrol after unenrol keeps history, **11.8** unenrol leaves `credit_balance` untouched |
 
 _Deno engine tests — `supabase/functions/generate-invoices/core.test.ts` (run by `test.sh`):_
 billable-only summing, paid vs free trial, no double-billing, the auto/manual
@@ -159,8 +159,8 @@ completeness gate, the `auto_invoice_enabled` switch, FIFO credit application,
 **11.1** leap-year last-day / month-boundary billing, and **11.7** credit-exceeds-
 invoice carry-forward (+ ledger invariants via `checkInvariants`).
 
-_Not yet individually tested (PRD §11):_ 11.2/11.3/11.6 are exercised implicitly
-by the core-loop + RLS tests but have no dedicated assertion.
+_PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
+11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
 _Frontend tests (first suites — greenfield tooling):_
 `SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`,
@@ -291,10 +291,9 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 - **Auth polish** — mobile password reset, friendly login/register errors, and the
   **admin "Forgot password?" flow** are all **done**. Still open: email confirmation
   copy/templates are Supabase defaults.
-- **PRD §11 edge cases — now covered by dedicated tests** (see §5 catalog):
-  11.1, 11.4, 11.5, 11.7, 11.8 each have an explicit pgTAP or Deno test. Only
-  11.2/11.3/11.6 remain implicit (exercised by the core-loop + RLS tests, no
-  dedicated assertion) — add if a regression ever warrants it.
+- **PRD §11 edge cases — ALL covered by dedicated tests (done)** (see §5 catalog):
+  11.1 & 11.7 (Deno); 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`),
+  11.6 (`credit_note_trigger`). pgTAP suite is now 34 tests across 4 files.
 
 ---
 

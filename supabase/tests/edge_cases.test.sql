@@ -6,10 +6,13 @@
 --          basic "two active enrolments" rejection lives in constraints.test.sql).
 --   11.8 — a student leaves with outstanding credit: unenrolling does NOT touch
 --          the parent's credit_balance and issues no auto-refund/application.
+--   11.2 — a parent may create a child BEFORE any assignment: the child defaults
+--          to 'unassigned', has no active enrolment, and its class view is empty
+--          (a "not assigned yet" state, not an error).
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(6);
+SELECT plan(9);
 
 -- ── Seed: coach + parent (with credit) + child, enrolled in class 1 ──────────
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
@@ -44,6 +47,33 @@ VALUES ('d0000000-0000-0000-0000-0000000000e1','b0000000-0000-0000-0000-00000000
 
 -- Parent has an outstanding credit balance (e.g. from an earlier correction).
 UPDATE parents SET credit_balance = 25.00 WHERE profile_id='a0000000-0000-0000-0000-0000000000e2';
+
+-- ── 11.2  Parent creates a child BEFORE any assignment ──────────────────────
+-- No coach/class is needed to add a child; it lands in an 'unassigned' state and
+-- its class/attendance view comes back empty rather than erroring.
+INSERT INTO students (id, full_name)                        -- note: no assignment_status given
+VALUES ('c0000000-0000-0000-0000-0000000000e9','Unassigned Kid');
+INSERT INTO parent_students (parent_id, student_id)
+SELECT p.id, 'c0000000-0000-0000-0000-0000000000e9'
+FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000e2';
+
+SELECT is(
+  (SELECT assignment_status::text FROM students WHERE id='c0000000-0000-0000-0000-0000000000e9'),
+  'unassigned',
+  '11.2: a newly created child defaults to unassigned (no coach/class needed to add it)');
+
+SELECT is(
+  (SELECT count(*)::int FROM student_class_enrolments
+    WHERE student_id='c0000000-0000-0000-0000-0000000000e9' AND is_active),
+  0,
+  '11.2: an unassigned child has no active enrolment (the "not assigned yet" state)');
+
+SELECT lives_ok($$
+  SELECT s.full_name, e.class_id
+  FROM students s
+  LEFT JOIN student_class_enrolments e ON e.student_id = s.id AND e.is_active
+  WHERE s.id='c0000000-0000-0000-0000-0000000000e9'
+$$, '11.2: reading an unassigned child''s class returns empty cleanly, not an error');
 
 -- ── 11.4  No bare 'trial' status — an unclassified trial can't be stored ─────
 SELECT throws_ok($$
