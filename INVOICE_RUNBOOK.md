@@ -1,0 +1,97 @@
+# SwimSync — Monthly Invoice Runbook
+
+How to generate and collect invoices each month. Invoicing on SwimSync is
+**manual** (the free-tier cloud project has no cron), so the superadmin runs it
+by hand on the 1st. Keep this handy — it's a recurring task and easy to slip on
+the "bill the *previous* month" detail.
+
+---
+
+## TL;DR
+
+> On/after the **1st**: finish marking last month's attendance → **admin.swimsync.sg → Invoices** →
+> set **Billing month = LAST month** (change it — it defaults to *this* month) →
+> **Generate Invoices** → eyeball the results → tell parents to pay → mark **Paid** as money lands.
+
+---
+
+## Why it's manual
+
+The app runs on a free Supabase/Vercel tier with no scheduled job (a paused free
+project wouldn't fire one). So nothing generates invoices automatically — **you
+click the button**. The "Automatic monthly generation" toggle on the Invoices
+page is wired for a cron that isn't running on this plan, so treat it as inert:
+you still generate manually every month.
+
+---
+
+## When
+
+- Run on or **after the 1st of the month**, and always bill the **previous
+  calendar month**.
+  - On **1 Aug** → bill **July**. On **1 Sep** → bill **August**.
+- Billing the previous month (not the current one) is deliberate: it guarantees
+  lessons on the last day of the month are included.
+
+---
+
+## Before you generate — checklist
+
+Billing is based on **actual attendance**, so make sure last month is complete:
+
+- [ ] Every Saturday session last month has attendance marked for every student.
+- [ ] Any trials are classified **Paid Trial** or **Free Trial** (not left as a bare trial).
+- [ ] Any needed attendance corrections are done. (Correcting a billable → non-billable
+      status *after* an invoice exists auto-issues a **credit note** applied to the next
+      month — that's expected, not something to avoid.)
+
+> **Finalize attendance first.** Once you generate, re-running for the same month
+> **skips** parents who already have an invoice (no double-billing), so extra
+> attendance marked *after* generating won't top up an existing invoice.
+
+---
+
+## Step-by-step
+
+1. Log in to **https://admin.swimsync.sg** as the superadmin.
+2. Open **Invoices** (left sidebar).
+3. In the **Billing month** picker, select the **previous month**.
+   ⚠️ It defaults to the *current* month — **you must change it** (e.g. on 1 Aug, set it to **Jul**).
+4. Click **Generate Invoices**. Give it ~5–8 seconds (the billing function can cold-start).
+   You'll see a toast like **"Created N invoice(s) for <month>."**
+5. **Verify** in the list below: one row per parent for that month, each with
+   **Gross / Credit / Net** and an **Outstanding** badge. Spot-check a couple
+   against what you marked (billable lessons × class rate).
+
+---
+
+## After generating
+
+- **Parents pay externally** via your PayNow QR — they see the invoice + QR in
+  the app (`swimsync.sg`). No action needed from you to notify beyond your usual
+  reminder.
+- **As payments arrive in your bank**, mark each invoice **Paid**:
+  Invoices → find the row → **Mark Paid**. This stamps the paid time.
+
+---
+
+## Good to know / gotchas
+
+- **Bill the previous month** — the picker defaults to the current month; always change it.
+- **One invoice per parent per month**, covering *all* their children together.
+- **Only billable statuses count:** **Present** and **Paid Trial**. Absent,
+  Cancelled (rain/coach), and Free Trial are excluded.
+- **Credit auto-applies** (oldest first). An invoice fully covered by credit is
+  created already marked **Paid**; the leftover credit carries to next month.
+- **No double-billing:** re-running the same month skips parents who already have
+  an invoice — so finalize attendance *before* generating. To *reduce* a bill
+  after the fact, use an attendance edit (billable → non-billable), which issues
+  a credit note; there's no "top-up" for adding lessons after invoicing.
+- **No billable attendance = no invoice** for that parent that month (expected).
+- If **Generate** errors (cold start / transient), just click it again — it's safe
+  to retry (won't double-bill).
+
+---
+
+_Related: PRD §5.5–5.6 (billing & credit rules), §7.7 (invoice generation),
+§10 (calculation logic); HANDOVER §11 (cloud setup)._

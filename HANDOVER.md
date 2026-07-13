@@ -319,6 +319,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 | `.claude/skills/run-ui-playwright/` | Skill to launch + drive both UIs (Playwright/Chrome) |
 | `AVAIL_SKILLS.md` | Reference for all available skills |
 | `LOCAL_DEV_GUIDE.md` | Run/test commands, seed logins, service URLs |
+| `INVOICE_RUNBOOK.md` | Monthly manual invoice-generation procedure (superadmin) |
 | `PRD.md` | Product spec (*(implemented)* sections = build decisions) |
 
 Memory files (Claude project memory dir) also capture project state + backend
