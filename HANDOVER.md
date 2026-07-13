@@ -1,6 +1,6 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-12_
+_Last updated: 2026-07-14_
 
 Read this first to get up to speed, then `PRD.md` for the product spec
 and `LOCAL_DEV_GUIDE.md` for the exact run/test commands and seed logins.
@@ -63,14 +63,20 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   it on the invoice's PayNow screen; the admin Coaches page shows it.
 - **Full RLS** — parents see only their data, coaches only their classes,
   superadmin everything. Covered by automated isolation tests.
-- **Automated tests** — 23 integration tests (Deno + pgTAP); see §5.
+- **Automated tests** — backend **34 pgTAP + 8 Deno**, plus frontend suites
+  (`SwimSyncAdmin` vitest, `SwimSyncApp` jest-expo); all run in CI on push to `main`. See §5.
 
-**Deployed to free cloud infra (2026-07-12, web-first)** — see §11 for the live
-URLs and setup. The full loop above is **verified end to end on the live cloud
-stack** (parent register → assign → attendance → Edge-Function invoice → PayNow QR).
+**Live in production on its own domain (web-first, $0 free tier)** — app at
+**https://swimsync.sg**, admin at **https://admin.swimsync.sg**, real email via
+**Resend** (`noreply@swimsync.sg`). The full loop is verified end to end on cloud
+(incl. a live password-reset round-trip on `swimsync.sg`). A **real coach + 4 real
+classes** are onboarded and the production DB is a **clean slate** (only the
+superadmin + the real coach/classes). See §11.
 
-**Not done yet** (see §9): native App Store / Play Store builds (deferred — using
-the web app on iPhone for now); frontend/component tests + CI.
+**Not done yet** (see §9): real **parent onboarding** — parents self-register + add
+their kids via **`swimsync.sg/welcome`**, then the superadmin assigns each to a class;
+this is the last gate before real billing. Native App Store / Play Store builds remain
+deferred (web app on iPhone for now).
 
 ---
 
@@ -229,7 +235,35 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
-## 8. What changed this session (2026-07-12)
+## 8. What changed this session (2026-07-13 → 07-14)
+
+- **Production email via Resend on `swimsync.sg`** — cloud custom SMTP
+  (`smtp.resend.com:465`, sender `noreply@swimsync.sg`); branded reset template
+  `supabase/templates/recovery.html` wired in `config.toml` + pasted into the
+  dashboard. Full reset round-trip verified live on `swimsync.sg`. See §11.
+- **Custom domains live** — app **`swimsync.sg`** (apex, canonical) + `www` 308-redirect;
+  admin **`admin.swimsync.sg`**. DNS on **Cloudflare**, all Vercel records **DNS-only**
+  (orange proxy breaks Vercel SSL); had to delete Cloudflare's imported parking A records
+  first (an A `@` blocks a CNAME `@`). Supabase Site URL + redirect allow-list moved to
+  the new domain. No code change (no hard-coded URLs; reset uses `window.location.origin`).
+- **Clean-slate production DB + real coach onboarded** — wiped all demo data
+  (TRUNCATE business tables + delete non-superadmin `auth.users`, run in the dashboard
+  SQL editor — no service key locally). Real coach **Kah Hang** (`kahhangg+coach@gmail.com`)
+  + 4 Saturday classes @ Tanglin View (Beginner $40 / SwimSafer L5 $35 / L6 $35 /
+  Graduated $40) + PayNow QR. **FK note:** `classes.coach_id → coaches(id)` has NO cascade,
+  so a coach can't be deleted while a class references them.
+- **Parent onboarding page** `swimsync.sg/welcome` (`app/welcome.tsx`) — public 4-step
+  guide; a `PUBLIC_PATHS` guard in the root layout keeps it from bouncing to /login.
+  Plus a WhatsApp copy for broadcast.
+- **Swimming ability removed as a parent field** (see §6) — parents no longer set it;
+  `students.swimming_ability` stays NULL; column kept for future coach-defined levels.
+- **Attendance-confirmation modal** before invoice generation (admin Invoices page).
+- **`INVOICE_RUNBOOK.md`** — monthly manual invoice-generation procedure.
+- **All PRD §11 edge cases now individually tested** — added 11.2/11.3/11.6 pgTAP
+  (suite 22 → 34). CI green across backend + both frontend jobs.
+- All merged to `main`, pushed, CI-verified.
+
+## 8b. Session (2026-07-12)
 
 - **Auth polish — password reset** — implemented the mobile recovery flow end to
   end: new `(auth)/forgot-password.tsx` + `(auth)/reset-password.tsx` screens, wired
@@ -243,7 +277,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   email → reset screen (no bounce to home) → new password → re-login. Error mapping
   checked against live Supabase strings. Coach seed password restored to `password123`.
 
-## 8b. Previous session (2026-07-11)
+## 8c. Session (2026-07-11)
 
 - **Credit-note ledger fix** — added `credit_applications` (migration `20260711000100`)
   + updated the engine so partial credit reconciles; verified UI + backend.
@@ -259,6 +293,25 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ## 9. Next steps (pick with the user)
 
+**The "finish MVP loose ends" plan is complete** (email, custom domain, coach
+onboarding, welcome page, swimming-ability removal, invoice runbook, edge-case tests).
+Genuinely open now:
+
+- **Real parent onboarding — the gate to real billing.** Send parents
+  **`swimsync.sg/welcome`** → they self-register + add their children → the superadmin
+  assigns each to a class (admin **Unassigned Children**). ~17 real students are expected
+  across the 4 classes. Students are **parent-created** in this model (coaches/admin can't
+  create them), so this is a real onboarding push.
+- **First real invoice run** — once a Saturday's attendance is marked, follow
+  **`INVOICE_RUNBOOK.md`** on the 1st (manual; no cron on the free tier).
+- **Native store builds** — EAS → Android APK / iOS TestFlight, deferred until the user
+  invests (staying web-only for now).
+- **If asked:** a delete-coach action in the admin UI (currently dashboard-only SQL); a
+  coach-defined swimming-levels feature (the `students.swimming_ability` column is retained
+  for this). Email confirmation is intentionally **OFF**.
+
+The bullets below are a **record of already-DONE work** (kept for reference):
+
 - **Cloud deployment — DONE (2026-07-12).** Live on free infra, web-first. See §11.
   Remaining deployment work: **native builds** (EAS → Android APK / iOS TestFlight)
   once the user decides to invest so parents can download from the stores; cron is
@@ -273,10 +326,9 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 - **Removed dead settings stubs** — Notification Preferences (coach + parent) and
   Help & Support (parent) had empty handlers; deleted.
 - **Admin "Forgot password?" flow — DONE.** New `SwimSyncAdmin/app/forgot-password`
-  + `app/reset-password` pages + a link on the login (mirrors the mobile reset). Needs
-  the admin reset URL (`https://swimsync-admin.vercel.app/reset-password`) in the
-  Supabase redirect allow-list. UI verified on cloud; full email round-trip is a
-  real-inbox test (superadmin `+admin@gmail`).
+  + `app/reset-password` pages + a link on the login (mirrors the mobile reset). The
+  admin reset URL is now `https://admin.swimsync.sg/reset-password` (in the Supabase
+  redirect allow-list — see §11). UI verified on cloud.
 - **Coach Billing screen — DONE (2026-07-12).** Was placeholder mock data with a dead
   button; now queries live invoices (RLS-scoped) and marks them paid (invoice update +
   `payment_records` insert), web-safe via Toast/`confirmAction`. Added migration
@@ -326,7 +378,7 @@ gotchas: `swimsync-project`, `swimsync-backend-gotchas`.
 
 ---
 
-## 11. Cloud deployment (live, free tier — 2026-07-12)
+## 11. Cloud deployment (live, free tier — 2026-07-12; custom domain + email 2026-07-14)
 
 **Web-first, $0.** The user is on iPhone; rather than pay $99/yr for an iOS native
 build, the Expo app is exported as a **static web app** and used in Safari. Native
@@ -336,8 +388,10 @@ store builds are deferred until the app "sticks."
 |-------|-------|-------|
 | **Backend** | Supabase project `cdmjeyauhxcgulhbxmsb` (region ap-southeast-1) | Free tier. Linked via `supabase link`; schema via `supabase db push`. |
 | **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. |
-| **Admin panel** | Vercel `swimsync-admin` → https://swimsync-admin.vercel.app | Root `SwimSyncAdmin`, **framework preset = Next.js**. |
-| **Mobile app (web)** | Vercel `swimsync-app` → https://swimsync-app-psi.vercel.app | Root `SwimSyncApp`, **preset = Other** (build driven by `SwimSyncApp/vercel.json`: `expo export --platform web` → `dist`, SPA rewrite). |
+| **Admin panel** | Vercel `swimsync-admin` → **https://admin.swimsync.sg** (also `swimsync-admin.vercel.app`) | Root `SwimSyncAdmin`, **framework preset = Next.js**. |
+| **Mobile app (web)** | Vercel `swimsync-app` → **https://swimsync.sg** (apex, canonical; `www` 308-redirects; also `swimsync-app-psi.vercel.app`) | Root `SwimSyncApp`, **preset = Other** (`SwimSyncApp/vercel.json`: `expo export --platform web` → `dist`, SPA rewrite). |
+| **Email** | **Resend** → sender `noreply@swimsync.sg` | Cloud custom SMTP `smtp.resend.com:465` (user `resend`, pass = Resend API key, dashboard-only). Branded reset template (dashboard + `supabase/templates/recovery.html`). Auth email rate limit raised 2→~30/hr. Confirmation stays **OFF**. |
+| **Domain / DNS** | `swimsync.sg` registered at **Exabytes**, DNS on **Cloudflare** | Vercel web records (`@`, `www`, `admin`) are **DNS-only** (grey — orange breaks Vercel SSL); apex uses Vercel's per-domain CNAME (`<hash>.vercel-dns-017.com`, Cloudflare-flattened). Resend records (`send` MX/SPF, `resend._domainkey`, `_dmarc`) coexist. **Supabase Site URL = `https://swimsync.sg`**; allow-list includes `swimsync.sg/**`, `www.swimsync.sg/**`, `admin.swimsync.sg/**`. |
 
 **Secrets/keys** live only in the dashboards (never committed): Supabase project keys
 (new-format `sb_publishable_…` / `sb_secret_…`) + `CRON_SECRET` are set as Vercel env
