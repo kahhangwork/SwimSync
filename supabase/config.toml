@@ -233,20 +233,27 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
+# Production SMTP (Resend) — configured on the CLOUD project via the Supabase
+# dashboard (Authentication → Emails → SMTP Settings), NOT here: the API key must
+# stay out of git. Values for reference / reproducibility:
+#   host = "smtp.resend.com"  port = 465  user = "resend"
+#   pass = <Resend API key>   admin_email = "noreply@swimsync.sg"  sender_name = "SwimSync"
+# Local dev intentionally keeps using Mailpit (see [local_smtp] above) — do NOT
+# enable this block locally or auth emails bypass the local mail catcher.
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# host = "smtp.resend.com"
+# port = 465
+# user = "resend"
+# pass = "env(RESEND_API_KEY)"
+# admin_email = "noreply@swimsync.sg"
+# sender_name = "SwimSync"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Branded password-reset email (SwimSync). On cloud, the same HTML is pasted into
+# Authentication → Email Templates → "Reset Password". Applies locally via Mailpit.
+[auth.email.template.recovery]
+subject = "Reset your SwimSync password"
+content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

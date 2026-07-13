@@ -1,0 +1,53 @@
+<!--
+  SwimSync — password recovery email
+  Cloud: paste this into Supabase dashboard → Authentication → Email Templates → "Reset Password".
+  Local/CLI: referenced from supabase/config.toml [auth.email.template.recovery].
+  Supabase template vars available here: {{ .ConfirmationURL }} {{ .SiteURL }} {{ .Email }} {{ .Token }}
+  Keep it inline-CSS + no external assets (email clients strip <style>/remote resources).
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="440" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <tr>
+          <td style="background:#0ea5e9;padding:24px 32px;">
+            <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.3px;">SwimSync</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px;">
+            <h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">Reset your password</h1>
+            <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">
+              We received a request to reset the password for <strong>{{ .Email }}</strong>.
+              Tap the button below to choose a new one. This link expires shortly for your security.
+            </p>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+              <tr>
+                <td style="border-radius:8px;background:#0ea5e9;">
+                  <a href="{{ .ConfirmationURL }}"
+                     style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">
+                    Reset password
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#94a3b8;">
+              If the button doesn't work, copy and paste this link into your browser:
+            </p>
+            <p style="margin:0 0 24px;font-size:13px;line-height:1.6;word-break:break-all;">
+              <a href="{{ .ConfirmationURL }}" style="color:#0ea5e9;">{{ .ConfirmationURL }}</a>
+            </p>
+            <p style="margin:0;font-size:13px;line-height:1.6;color:#94a3b8;">
+              Didn't request this? You can safely ignore this email — your password won't change.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid #eef2f6;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">SwimSync · Swim attendance &amp; billing</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
