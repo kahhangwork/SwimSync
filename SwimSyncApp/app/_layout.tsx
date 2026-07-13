@@ -33,6 +33,17 @@ function parseRecoveryTokens(
   return null;
 }
 
+// Public routes that must render without a session. The session-restore below
+// otherwise bounces every session-less load to /login, which would hide the
+// parent-facing /welcome onboarding page.
+const PUBLIC_PATHS = ["/welcome"];
+function onPublicRoute(): boolean {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    return PUBLIC_PATHS.some((p) => window.location.pathname.startsWith(p));
+  }
+  return false;
+}
+
 export default function RootLayout() {
   const setSession = useAppStore((s) => s.setSession);
   const clearSession = useAppStore((s) => s.clearSession);
@@ -57,7 +68,7 @@ export default function RootLayout() {
     >["data"]["session"]) {
       if (!session) {
         clearSession();
-        router.replace("/(auth)/login");
+        if (!onPublicRoute()) router.replace("/(auth)/login");
         return;
       }
 
@@ -108,7 +119,7 @@ export default function RootLayout() {
         }
         if (event === "SIGNED_OUT" || !session) {
           clearSession();
-          router.replace("/(auth)/login");
+          if (!onPublicRoute()) router.replace("/(auth)/login");
         }
       }
     );
@@ -145,6 +156,7 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="welcome" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(parent)" />
         <Stack.Screen name="(coach)" />
