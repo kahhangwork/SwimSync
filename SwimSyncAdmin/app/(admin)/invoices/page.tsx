@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
 import { Button } from "@/components/Button";
+import { Modal } from "@/components/Modal";
 
 type InvoiceRow = {
   id: string;
@@ -43,6 +44,7 @@ export default function InvoicesPage() {
   const [genResult, setGenResult] = useState<string | null>(null);
   const [autoEnabled, setAutoEnabled] = useState<boolean | null>(null);
   const [togglingAuto, setTogglingAuto] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     loadInvoices();
@@ -185,7 +187,13 @@ export default function InvoicesPage() {
               className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
             />
           </div>
-          <Button onClick={handleGenerate} disabled={generating}>
+          <Button
+            onClick={() => {
+              setGenResult(null);
+              setShowConfirm(true);
+            }}
+            disabled={generating}
+          >
             <RefreshCw
               className={`h-4 w-4 ${generating ? "animate-spin" : ""}`}
             />
@@ -235,6 +243,44 @@ export default function InvoicesPage() {
           </p>
         )}
       </div>
+
+      {/* Confirm attendance before generating */}
+      <Modal
+        title={`Generate invoices for ${formatBillingMonth(genMonth)}?`}
+        open={showConfirm}
+        onClose={() => setShowConfirm(false)}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Before generating, please confirm that attendance has been marked{" "}
+            <strong>correctly for all students</strong> for{" "}
+            <strong>{formatBillingMonth(genMonth)}</strong>.
+          </p>
+          <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-gray-600">
+            Invoices are based on the attendance recorded now. Parents who already
+            have an invoice for this month are skipped, and lessons marked{" "}
+            <em>after</em> generating won&apos;t be added to an existing invoice.
+          </p>
+          <div className="flex gap-3 pt-1">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                setShowConfirm(false);
+                handleGenerate();
+              }}
+            >
+              Yes, generate
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <div className="flex flex-wrap gap-3 mb-4">
         <input
