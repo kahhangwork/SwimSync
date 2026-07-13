@@ -212,7 +212,6 @@ export default function ChildProfileScreen() {
           <View className="gap-2">
             <Row label="Date of Birth" value={formatDate(child.date_of_birth)} />
             <Row label="Gender"        value={capitalize(child.gender)} />
-            <Row label="Ability Level" value={capitalize(child.swimming_ability)} />
             {child.notes ? <Row label="Notes" value={child.notes} /> : null}
           </View>
         </Card>

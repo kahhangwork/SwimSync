@@ -195,19 +195,18 @@ export default function DashboardPage() {
               <tr>
                 <Th>Student</Th>
                 <Th>Parent</Th>
-                <Th>Ability</Th>
               </tr>
             </Thead>
             <Tbody>
               {loading ? (
                 <Tr>
-                  <Td className="text-center text-gray-400 py-6" colSpan={3}>
+                  <Td className="text-center text-gray-400 py-6" colSpan={2}>
                     Loading…
                   </Td>
                 </Tr>
               ) : unassigned.length === 0 ? (
                 <Tr>
-                  <Td className="text-center text-gray-400 py-6" colSpan={3}>
+                  <Td className="text-center text-gray-400 py-6" colSpan={2}>
                     No unassigned children
                   </Td>
                 </Tr>
@@ -216,7 +215,6 @@ export default function DashboardPage() {
                   <Tr key={s.id}>
                     <Td className="font-medium">{s.full_name}</Td>
                     <Td className="text-gray-500">{s.parent_name}</Td>
-                    <Td>{s.swimming_ability ?? "—"}</Td>
                   </Tr>
                 ))
               )}

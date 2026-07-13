@@ -18,10 +18,6 @@ type StudentRow = {
 
 const STATUS_FILTERS = ["All", "Assigned", "Unassigned", "Inactive"];
 
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 export default function StudentsPage() {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,7 +114,6 @@ export default function StudentsPage() {
           <tr>
             <Th>Student</Th>
             <Th>Parent</Th>
-            <Th>Ability</Th>
             <Th>Status</Th>
             <Th>Class</Th>
             <Th>Coach</Th>
@@ -127,13 +122,13 @@ export default function StudentsPage() {
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={6}>
+              <Td className="text-center text-gray-400 py-8" colSpan={5}>
                 Loading…
               </Td>
             </Tr>
           ) : filtered.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={6}>
+              <Td className="text-center text-gray-400 py-8" colSpan={5}>
                 No students found.
               </Td>
             </Tr>
@@ -142,7 +137,6 @@ export default function StudentsPage() {
               <Tr key={s.id}>
                 <Td className="font-medium text-gray-900">{s.full_name}</Td>
                 <Td className="text-gray-500">{s.parent_name}</Td>
-                <Td>{capitalize(s.swimming_ability ?? "—")}</Td>
                 <Td>
                   <StatusBadge status={statusLabel(s)} />
                 </Td>

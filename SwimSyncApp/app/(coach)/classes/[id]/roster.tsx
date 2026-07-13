@@ -208,9 +208,6 @@ export default function ClassRosterScreen() {
                   <Text className="text-sm font-semibold text-gray-800">
                     {student.full_name}
                   </Text>
-                  <Text className="text-xs text-gray-400">
-                    {capitalize(student.swimming_ability ?? "—")}
-                  </Text>
                 </View>
               </Card>
             ))

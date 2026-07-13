@@ -13,14 +13,12 @@ import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
 import PrimaryButton from "@/components/PrimaryButton";
 
-const ABILITY_OPTIONS = ["Beginner", "Intermediate", "Advanced"];
 const GENDER_OPTIONS = ["Male", "Female"];
 
 export default function AddChildScreen() {
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
   const [gender, setGender] = useState("Male");
-  const [ability, setAbility] = useState("Beginner");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -66,7 +64,6 @@ export default function AddChildScreen() {
         full_name: name.trim(),
         date_of_birth: dob.trim(),
         gender: gender.toLowerCase(),
-        swimming_ability: ability.toLowerCase(),
         notes: notes.trim() || null,
         assignment_status: "unassigned",
         is_active: true,
@@ -171,34 +168,6 @@ export default function AddChildScreen() {
                     }`}
                   >
                     {g}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Swimming Ability */}
-          <View>
-            <Text className="text-sm font-medium text-gray-700 mb-2">
-              Swimming Ability <Text className="text-red-500">*</Text>
-            </Text>
-            <View className="flex-row gap-2">
-              {ABILITY_OPTIONS.map((a) => (
-                <TouchableOpacity
-                  key={a}
-                  onPress={() => setAbility(a)}
-                  className={`flex-1 py-2.5 rounded-xl border items-center ${
-                    ability === a
-                      ? "bg-sky-500 border-sky-500"
-                      : "bg-gray-50 border-gray-200"
-                  }`}
-                >
-                  <Text
-                    className={`font-medium text-xs ${
-                      ability === a ? "text-white" : "text-gray-600"
-                    }`}
-                  >
-                    {a}
                   </Text>
                 </TouchableOpacity>
               ))}

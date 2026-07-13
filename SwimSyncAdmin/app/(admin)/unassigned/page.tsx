@@ -174,20 +174,19 @@ export default function UnassignedPage() {
           <tr>
             <Th>Student</Th>
             <Th>Parent</Th>
-            <Th>Ability</Th>
             <Th>Action</Th>
           </tr>
         </Thead>
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={4}>
+              <Td className="text-center text-gray-400 py-8" colSpan={3}>
                 Loading…
               </Td>
             </Tr>
           ) : filtered.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={4}>
+              <Td className="text-center text-gray-400 py-8" colSpan={3}>
                 No unassigned children found.
               </Td>
             </Tr>
@@ -196,7 +195,6 @@ export default function UnassignedPage() {
               <Tr key={student.id}>
                 <Td className="font-medium text-gray-900">{student.full_name}</Td>
                 <Td className="text-gray-500">{student.parent_name}</Td>
-                <Td>{student.swimming_ability ?? "—"}</Td>
                 <Td>
                   <Button
                     size="sm"
@@ -227,10 +225,7 @@ export default function UnassignedPage() {
           {assignModal && (
             <div className="rounded-xl bg-gray-50 p-3 text-sm">
               <p className="font-medium text-gray-900">{assignModal.full_name}</p>
-              <p className="text-gray-500">
-                Parent: {assignModal.parent_name} · Ability:{" "}
-                {assignModal.swimming_ability ?? "—"}
-              </p>
+              <p className="text-gray-500">Parent: {assignModal.parent_name}</p>
             </div>
           )}
 

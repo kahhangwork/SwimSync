@@ -208,7 +208,7 @@ The superadmin manages operational setup and assignment across the SwimSync plat
 - Parents can self-register on SwimSync using email/password
 - Parent account may exist before any child is created
 - A newly registered parent may create one or more child/student profiles
-- **Student profile includes:** child name, age/date of birth, gender, swimming ability, optional notes
+- **Student profile includes:** child name, age/date of birth, gender, optional notes. *(implemented: parents do **not** set a swimming ability/level — the **class** a child is assigned to indicates their level. A per-child level field is reserved for a future "coach-defined levels" feature and is not populated today.)*
 - A child remains unassigned until superadmin assigns that child to a coach/class
 - Until assignment, parent can view the child profile but class/attendance/invoice sections show a *"not assigned yet"* state
 
@@ -414,7 +414,7 @@ SwimSync shall allow superadmin to manage classes.
 SwimSync shall allow **parents to create student profiles** and **superadmin to manage assignment** of those students.
 
 - Parent can create and edit student profiles
-- Profile includes: full name, age/DOB, gender, swimming ability, optional notes
+- Profile includes: full name, age/DOB, gender, optional notes *(swimming ability is **not** parent-entered — see §5.1)*
 - Student can be marked active/inactive by superadmin
 - Newly created profiles default to **Unassigned**
 - Superadmin can view all unassigned profiles in the **Unassigned Children** section
@@ -604,7 +604,7 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 | **date_of_birth** | Date | No | Date of birth |
 | **age** | Integer | No | Age (if DOB not provided) |
 | **gender** | Enum | No | male \| female \| other |
-| **swimming_ability** | String | No | Free text or enum: beginner \| intermediate \| advanced |
+| **swimming_ability** | Enum | No | *(implemented)* Reserved for a future coach-defined levels feature; **not set by parents** and currently always NULL. The child's assigned **class name** indicates their level instead. |
 | **notes** | Text | No | Optional notes from parent |
 | **assignment_status** | Enum | Yes | unassigned \| assigned \| inactive (default unassigned) |
 | **is_active** | Boolean | Yes | Active flag (default true) |
@@ -964,7 +964,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 |--------|-------------|-------|
 | **Login / Register** | Email, password fields; Register / Login toggle | Simple form; forgot password link |
 | **Home Dashboard** | List of children with status badges; outstanding amount summary | Tap child card to drill down; show "Not Assigned Yet" if applicable |
-| **Add / Edit Child** | Name, DOB, gender, swimming ability, notes fields | Form with save/cancel; validation on required fields |
+| **Add / Edit Child** | Name, DOB, gender, notes fields | Form with save/cancel; validation on required fields (no swimming-ability field — see §5.1) |
 | **Child Profile** | Child details card; assignment status; class info if assigned | Show coach name, class day/time/location when assigned |
 | **Attendance History** | Chronological list of lessons with status badges | Color-coded: green = present, grey = absent, blue = trial |
 | **Invoices** | Monthly invoice list with status; tap for detail | Show gross, credit applied, net amount; red = outstanding |

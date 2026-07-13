@@ -9,7 +9,7 @@ const STEPS: { title: string; body: string }[] = [
   },
   {
     title: "Add your child",
-    body: "Enter their name, date of birth, gender and swimming level. Add all your children under one account.",
+    body: "Enter their name, date of birth and gender. Add all your children under one account.",
   },
   {
     title: "Get assigned",

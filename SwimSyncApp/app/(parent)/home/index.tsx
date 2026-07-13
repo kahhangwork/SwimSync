@@ -237,9 +237,6 @@ export default function ParentHomeScreen() {
                         <Text className="text-base font-bold text-gray-900">
                           {child.full_name}
                         </Text>
-                        <Text className="text-xs text-gray-500">
-                          {capitalize(child.swimming_ability)}
-                        </Text>
                       </View>
                     </View>
                     <StatusBadge

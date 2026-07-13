@@ -199,6 +199,16 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 - **Grants matter:** tables created by the `postgres` migration role don't auto-grant
   DML to `authenticated`/`service_role`; `20260309000800_grants.sql` does it (and sets
   default privileges that cover later tables).
+- **Swimming ability/level is NOT a parent-set field.** Parents no longer choose a
+  swimming ability when adding a child, and nothing writes `students.swimming_ability`
+  (it stays NULL — no hard-coded value). A child's **class name** is what indicates their
+  level. The `swimming_ability` column (nullable enum) is intentionally **kept** for a
+  future "coach-defined levels" feature but is unused/unshown today — the field was
+  removed from the Add-Child form and from all displays (parent home + child detail, coach
+  roster, admin students/dashboard/unassigned). Don't re-add a parent-facing level picker;
+  when levels return, they should be coach-defined (likely free-text or a new table, not
+  the current fixed beginner/intermediate/advanced enum). Verified end-to-end on the local
+  stack (add child → DB NULL → parent + detail render with no level, no crash).
 
 ---
 
