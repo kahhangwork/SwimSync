@@ -10,6 +10,14 @@ import {
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import {
+  todayInSg,
+  expectedLessonDates,
+  backlogWindowStart,
+  toSgDate,
+  formatSgDate,
+  type DayOfWeek,
+} from "@/lib/lessonDates";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 
@@ -20,9 +28,8 @@ type Student = {
 };
 
 type Session = {
-  id: string;
+  id: string | null; // null = the lesson should have happened but was never marked
   session_date: string;
-  status: string;
   marked_count: number;
   total_count: number;
 };
@@ -44,7 +51,7 @@ function formatTime(time: string): string {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-SG", {
+  return formatSgDate(dateStr, {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -63,7 +70,7 @@ export default function ClassRosterScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const todayDate = new Date().toISOString().split("T")[0];
+  const todayDate = todayInSg();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -79,6 +86,7 @@ export default function ClassRosterScreen() {
         location_name,
         student_class_enrolments(
           is_active,
+          enrolled_at,
           students(id, full_name, swimming_ability)
         )
       `)
@@ -114,7 +122,6 @@ export default function ClassRosterScreen() {
       .select(`
         id,
         session_date,
-        status,
         attendance(id, student_id)
       `)
       .eq("class_id", id)
@@ -122,16 +129,49 @@ export default function ClassRosterScreen() {
       .order("session_date", { ascending: false });
 
     const totalStudents = activeStudents.length;
+    const activeStudentIds = activeStudents.map((s) => s.id);
 
-    const mappedSessions: Session[] = (sessionData ?? []).map((s: any) => ({
-      id: s.id,
-      session_date: s.session_date,
-      status: s.status,
-      marked_count: (s.attendance ?? []).length,
-      total_count: totalStudents,
-    }));
+    const rows: Session[] = (sessionData ?? []).map((s: any) => {
+      const markedIds = new Set((s.attendance ?? []).map((a: any) => a.student_id));
+      return {
+        id: s.id,
+        session_date: s.session_date,
+        // Count only students still enrolled, matching the invoice engine's
+        // completeness rule rather than the raw attendance row count.
+        marked_count: activeStudentIds.filter((sid) => markedIds.has(sid)).length,
+        total_count: totalStudents,
+      };
+    });
 
-    setSessions(mappedSessions);
+    // Merge in lessons that should have happened but were never marked — those
+    // have no session row, so querying lesson_sessions alone renders nothing and
+    // the screen would imply the class is fully up to date.
+    const enrolments = (cls.student_class_enrolments ?? []) as any[];
+    if (activeStudentIds.length > 0) {
+      const earliest = enrolments.map((e) => toSgDate(e.enrolled_at)).sort()[0];
+      const from = backlogWindowStart(todayDate, earliest ?? null);
+      const seen = new Set(rows.map((r) => r.session_date));
+
+      for (const date of expectedLessonDates(
+        cls.day_of_week as DayOfWeek,
+        from,
+        todayDate
+      )) {
+        if (seen.has(date)) continue;
+        rows.push({
+          id: null,
+          session_date: date,
+          marked_count: 0,
+          total_count: totalStudents,
+        });
+      }
+    }
+
+    // Descending. Sessions outside the expected window are kept — never hide
+    // real data; the window only bounds which dates get synthesised.
+    rows.sort((a, b) => b.session_date.localeCompare(a.session_date));
+
+    setSessions(rows);
     setLoading(false);
   }, [id, todayDate]);
 
@@ -230,17 +270,23 @@ export default function ClassRosterScreen() {
           <View className="gap-2">
             {sessions.map((session) => {
               const complete = isComplete(session);
+              const unmarked = session.id === null;
               return (
                 <TouchableOpacity
-                  key={session.id}
+                  key={session.session_date}
                   onPress={() =>
                     router.push(
-                      `/(coach)/classes/${id}/attendance?date=${session.session_date}&sessionId=${session.id}`
+                      `/(coach)/classes/${id}/attendance?date=${session.session_date}` +
+                        (session.id ? `&sessionId=${session.id}` : "")
                     )
                   }
                   activeOpacity={0.8}
                 >
-                  <Card className="flex-row items-center gap-3">
+                  <Card
+                    className={`flex-row items-center gap-3 ${
+                      unmarked ? "border-orange-200 bg-orange-50" : ""
+                    }`}
+                  >
                     <View
                       className={`w-9 h-9 rounded-full items-center justify-center ${
                         complete ? "bg-green-100" : "bg-orange-100"
@@ -263,6 +309,8 @@ export default function ClassRosterScreen() {
                       >
                         {complete
                           ? "All attendance marked"
+                          : unmarked
+                          ? "Not marked"
                           : `${session.marked_count}/${session.total_count} marked`}
                       </Text>
                     </View>

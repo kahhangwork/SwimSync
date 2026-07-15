@@ -1,6 +1,6 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-14_
+_Last updated: 2026-07-15_
 
 Read this first to get up to speed, then `PRD.md` for the product spec
 and `LOCAL_DEV_GUIDE.md` for the exact run/test commands and seed logins.
@@ -141,11 +141,11 @@ supabase test db                                  # 34 tests across 4 files
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
 supabase/functions/generate-invoices/test.sh      # 8 tests; needs deno (brew install deno)
 
-# Frontend — Admin (Next/React) component tests (vitest)
-cd SwimSyncAdmin && npm test                       # 3 tests
+# Frontend — Admin (Next/React) component + logic tests (vitest)
+cd SwimSyncAdmin && npm test                       # 35 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
-cd SwimSyncApp && npm test                         # 6 tests
+cd SwimSyncApp && npm test                         # 29 tests
 ```
 
 **Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
@@ -168,12 +168,23 @@ invoice carry-forward (+ ledger invariants via `checkInvariants`).
 _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
-_Frontend tests (first suites — greenfield tooling):_
+_Frontend tests:_
 `SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`,
-`components/StatusBadge.test.tsx`); `SwimSyncApp` uses **jest-expo**
-(`jest.config.js`, `lib/authErrors.test.ts`, scoped to `lib/**` unit tests for
-now). Deeper component-render tests (RN screens with mocked Supabase, admin
-tables) are the natural next additions.
+`components/StatusBadge.test.tsx`, `lib/lessonDates.test.ts`,
+`lib/classCoverage.test.ts`); `SwimSyncApp` uses **jest-expo**
+(`jest.config.js`, `lib/authErrors.test.ts`, `lib/lessonDates.test.ts`, scoped to
+`lib/**` unit tests for now). Deeper component-render tests (RN screens with mocked
+Supabase, admin tables) are the natural next additions.
+
+_Note:_ `SwimSyncApp` does **not** typecheck clean on `main` — 5 pre-existing
+`tsc` errors in `app/(parent)/home/child/[id].tsx` (Supabase join typing). CI runs
+jest, not `tsc`, for the app. Don't mistake them for your own breakage.
+
+_UI drivers (`.claude/skills/run-ui-playwright/drivers/`, run by hand, not CI):_
+`verify-unmarked-lessons.mjs` + `fixtures-unmarked-lessons.sql` drive the whole
+unmarked-lesson loop (admin gap report → coach backlog → mark → both go green);
+`verify-tz-saturday.mjs` pins the SGT-vs-UTC regression using Playwright's clock
+API — it **fails on the pre-fix code**, which is the point.
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
@@ -205,6 +216,39 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 - **Grants matter:** tables created by the `postgres` migration role don't auto-grant
   DML to `authenticated`/`service_role`; `20260309000800_grants.sql` does it (and sets
   default privileges that cover later tables).
+- **There is no lesson-session generator, and that's deliberate** (PRD §7.5 is
+  knowingly unimplemented). `lesson_sessions` rows are created **lazily** by the coach's
+  attendance save — the only writer in the codebase. Sessions are keyed
+  `UNIQUE (class_id, session_date)`, and the attendance screen is fully **date-driven**
+  (takes any `date`, resolves-or-creates that date's session, pre-fills existing rows),
+  so back-dating Just Works and nothing is ever overwritten. What was missing was not
+  the rows but a **reckoning**: which lessons *should* have happened. That is derived at
+  read time from `classes.day_of_week` (`lib/lessonDates.ts`) — see §8. Don't "fix" this
+  by pre-generating sessions unless you have a reason the read-time derivation can't
+  serve; pre-generation adds a job, a schedule, and edge cases when classes change.
+  - A class that legitimately didn't run needs **no new concept**: the coach marks
+    everyone `cancelled_rain`/`cancelled_coach` (non-billable), which creates the
+    session and drops the date out of the backlog permanently.
+  - **Completeness rule, hand-written in four places** — a lesson counts as marked only
+    when its session exists **and every actively-enrolled student has an attendance row
+    on it**: `core.ts:141-152` (engine gate), `SwimSyncAdmin/lib/classCoverage.ts`
+    (admin dialog), `(coach)/today/index.tsx` (`fullyMarked`), and
+    `(coach)/classes/[id]/roster.tsx` (`marked_count` + `isComplete`). The engine copy is
+    unavoidable (Deno, no npm resolution), but the rest is duplication waiting to drift —
+    **if you touch the rule, touch all four**, and consider extracting a shared helper
+    while you're there.
+- **Dates are Singapore-local; never derive a date string from `toISOString()`.** That
+  yields the **UTC** date, which is the *previous day* in SGT (UTC+8) before 08:00 —
+  this shipped a real double-billing bug (§7.7). Use `todayInSg()` / `toSgDate()` from
+  `lib/lessonDates.ts`, and derive a weekday from that same string via `dayOfWeekOf()`
+  rather than a separate `new Date().getDay()`. Full ISO **instants** (`paid_at`,
+  `updated_at`) are fine as-is — only date-*string* derivations are affected.
+- **`lib/lessonDates.ts` is duplicated byte-identical in both apps** — deliberate. There
+  is no shared package: separate npm projects, no workspaces, different React majors,
+  different bundlers/test runners. Sharing ~120 lines of pure date maths would need
+  workspace + Metro `watchFolders` + `transpilePackages` surgery. The file has **zero
+  imports** so drift is cheap to spot (`diff` the two); each has its own test file
+  (identical but for jest-globals vs a vitest import). **Edit both.**
 - **Swimming ability/level is NOT a parent-set field.** Parents no longer choose a
   swimming ability when adding a child, and nothing writes `students.swimming_ability`
   (it stays NULL — no hard-coded value). A child's **class name** is what indicates their
@@ -232,10 +276,78 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 6. When applying credit, draw down notes by the **actual consumed amount** and write a
    `credit_applications` row; only flip a note to `applied` once fully consumed
    (regression-tested in `core.test.ts`).
+7. **`new Date().toISOString().split("T")[0]` is a bug in SGT** — it's the UTC date, a
+   day behind before 08:00 local. Worse, pairing it with a **local** `getDay()` lets the
+   weekday and the date disagree: the Today screen listed Saturday's classes while
+   writing attendance to Friday's date, and re-marking later created a second session
+   that **double-billed everyone**. Use `todayInSg()` + `dayOfWeekOf()` (§6). Pinned by
+   `verify-tz-saturday.mjs`; audit with
+   `grep -rn --include="*.ts" --include="*.tsx" -e "toISOString()\.split" -e "toISOString()\.slice" SwimSyncApp SwimSyncAdmin`.
+8. **The engine's completeness gate never fires on the admin path.**
+   `SwimSyncAdmin/app/api/generate-invoices/route.ts` hardcodes `force: true`, which
+   bypasses the gate, the auto switch, and the month seal — and cron isn't wired on the
+   free tier, so the auto path never runs at all. The **admin confirm modal's gap report
+   is therefore the only thing standing between a forgotten lesson and an underbill.**
+   It warns rather than blocks, by design. Don't assume the server will catch it.
 
 ---
 
-## 8. What changed this session (2026-07-13 → 07-14)
+## 8. What changed this session (2026-07-15)
+
+**Closed the silent-underbilling hole before the first real invoice run.**
+
+- **The gap that was found:** `lesson_sessions` has exactly one writer — the coach's
+  attendance save (`attendance.tsx`). There is no session generator (PRD §7.5 is
+  unimplemented), so **a lesson nobody marked is indistinguishable from a lesson that
+  never happened**. The coach had no way to reach a past date (roster only offered
+  "Mark Attendance — Today"; Past Sessions queried `lesson_sessions`, so an unmarked
+  Saturday rendered *nothing*). Nothing warned anyone: the engine's completeness gate
+  only iterates over sessions that *exist*, and is unreachable anyway because the admin
+  route hardcodes `force: true`. A forgotten Saturday ≈ **$600 silently unbilled**.
+- **Fix — read-time expected-vs-marked.** No schema change, no cron, no pre-generated
+  sessions. Expected lesson dates are derived from `classes.day_of_week`:
+  - **Coach Today tab** — an **Unmarked Lessons** card (only when non-empty) listing
+    past lessons that aren't fully marked; tap → the existing date-driven attendance
+    screen → mark → it clears.
+  - **Coach roster** — "Past Sessions" now merges in expected-but-missing dates as a
+    third **"Not marked"** state, instead of silently omitting them.
+  - **Admin Invoices** — the pre-generation modal now *queries*: per class
+    `N of M lessons marked` + the **missing dates named**, or a green all-clear. It
+    warns, it doesn't block (button becomes **Generate anyway**) — a class that
+    genuinely didn't run is a legitimate reason to proceed.
+- **Timezone bug fixed (was live, could double-bill).** `today/index.tsx` mixed two
+  clocks: `getDay()` (**local**) picked the weekday while `toISOString()` (**UTC**)
+  picked the date. Before 08:00 SGT these disagree — the screen listed Saturday's
+  classes while writing attendance to **Friday's date**; re-marking later created a
+  second session and **double-billed everyone**. Reproduced in a real browser at 07:30
+  SGT (header read "Saturday, 18 July" while the app targeted `date=2026-07-17`), then
+  fixed. All date strings now come from `todayInSg()`, and the weekday is *derived from
+  that same string* (`dayOfWeekOf`) so the two can never diverge again.
+- **New pure helpers** (unit-tested, zero imports): `lib/lessonDates.ts` — duplicated
+  **byte-identical** in both apps (no shared package exists; see §6) — plus
+  `SwimSyncAdmin/lib/classCoverage.ts` for the coverage maths. All date *display* now
+  goes through `formatSgDate()`, which forces `timeZone: "UTC"` internally so a caller
+  physically cannot reintroduce the day-drift bug.
+- **Incidental fix — the coach's "Outstanding" stat card changed meaning.** Widening the
+  class query for the backlog also widened `classIds`, which that card's query reuses. It
+  counted outstanding invoices only among parents of students in *today's* classes — so
+  on any non-Saturday it read **"0 Outstanding"**, implying everyone had paid. It now
+  counts across all the coach's students, matching its own comment and its label. Called
+  out here because it rode along in a backlog commit rather than arriving on its own.
+- **Tests:** +23 `lessonDates` in each app, +9 `classCoverage` (admin). Frontend suites
+  now 29 (app) / 35 (admin). A `run-ui-playwright` driver
+  (`verify-unmarked-lessons.mjs` + `fixtures-unmarked-lessons.sql`) drives the whole
+  loop; `verify-tz-saturday.mjs` pins the timezone regression and **fails on the
+  pre-fix code** (verified).
+- **`INVOICE_RUNBOOK.md`** — read the gap report before generating; plus a warning that
+  the engine's default billing month is UTC-derived and would bill the wrong month if
+  cron were ever switched on.
+
+**Not done (deliberate):** no bulk "set all to…" on the attendance screen — cancelling
+a rained-out class is 17 × 2 taps, which is where a coach abandons the task, and an
+abandoned cancellation looks exactly like a forgotten lesson. Additive; ships separately.
+
+## 8b. What changed (2026-07-13 → 07-14)
 
 - **Production email via Resend on `swimsync.sg`** — cloud custom SMTP
   (`smtp.resend.com:465`, sender `noreply@swimsync.sg`); branded reset template
@@ -263,7 +375,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   (suite 22 → 34). CI green across backend + both frontend jobs.
 - All merged to `main`, pushed, CI-verified.
 
-## 8b. Session (2026-07-12)
+## 8c. Session (2026-07-12)
 
 - **Auth polish — password reset** — implemented the mobile recovery flow end to
   end: new `(auth)/forgot-password.tsx` + `(auth)/reset-password.tsx` screens, wired
@@ -277,7 +389,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   email → reset screen (no bounce to home) → new password → re-login. Error mapping
   checked against live Supabase strings. Coach seed password restored to `password123`.
 
-## 8c. Session (2026-07-11)
+## 8d. Session (2026-07-11)
 
 - **Credit-note ledger fix** — added `credit_applications` (migration `20260711000100`)
   + updated the engine so partial credit reconciles; verified UI + backend.
@@ -294,8 +406,8 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 ## 9. Next steps (pick with the user)
 
 **The "finish MVP loose ends" plan is complete** (email, custom domain, coach
-onboarding, welcome page, swimming-ability removal, invoice runbook, edge-case tests).
-Genuinely open now:
+onboarding, welcome page, swimming-ability removal, invoice runbook, edge-case tests),
+and the **silent-underbilling hole is closed** (§8). Genuinely open now:
 
 - **Real parent onboarding — the gate to real billing.** Send parents
   **`swimsync.sg/welcome`** → they self-register + add their children → the superadmin
@@ -303,7 +415,13 @@ Genuinely open now:
   across the 4 classes. Students are **parent-created** in this model (coaches/admin can't
   create them), so this is a real onboarding push.
 - **First real invoice run** — once a Saturday's attendance is marked, follow
-  **`INVOICE_RUNBOOK.md`** on the 1st (manual; no cron on the free tier).
+  **`INVOICE_RUNBOOK.md`** on the 1st (manual; no cron on the free tier). The confirm
+  dialog now reports any lesson with no attendance marked — **read it**; it's the only
+  backstop (§7.8).
+- **Bulk "set all to…" on the attendance screen** — cancelling a rained-out class is
+  currently 17 × 2 taps, one student at a time. That's where a coach abandons the task,
+  and an abandoned cancellation is indistinguishable from a forgotten lesson. Purely
+  client-side (populate the existing state map); the highest-value small follow-up.
 - **Native store builds** — EAS → Android APK / iOS TestFlight, deferred until the user
   invests (staying web-only for now).
 - **If asked:** a delete-coach action in the admin UI (currently dashboard-only SQL); a
@@ -366,6 +484,8 @@ The bullets below are a **record of already-DONE work** (kept for reference):
 | `…/(auth)/forgot-password.tsx` · `reset-password.tsx` | Password-reset flow (request link + set new password) |
 | `SwimSyncApp/app/_layout.tsx` | Root: session restore + `PASSWORD_RECOVERY` routing + native recovery deep-link handler |
 | `SwimSyncApp/lib/authErrors.ts` | Maps raw Supabase auth errors to friendly copy |
+| `SwimSyncApp/lib/lessonDates.ts` · `SwimSyncAdmin/lib/lessonDates.ts` | **Byte-identical twins** — SG-safe date strings + expected lesson dates. Edit both (§6) |
+| `SwimSyncAdmin/lib/classCoverage.ts` | Expected-vs-marked coverage maths for the admin pre-generation check |
 | `SwimSyncAdmin/app/(admin)/` | Admin pages; `app/api/` server routes |
 | `.claude/skills/run-ui-playwright/` | Skill to launch + drive both UIs (Playwright/Chrome) |
 | `AVAIL_SKILLS.md` | Reference for all available skills |

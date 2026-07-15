@@ -9,7 +9,7 @@
 | **Version** | 1.0 |
 | **Date** | March 2026 |
 
-> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). The **entire MVP core loop works and is verified end to end across the UI + backend**: parent self-registration, child creation, superadmin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), the **credit-note correction flow** (auto-issue on attendance edit + FIFO application incl. partial carry-forward — see §5.6), and **PayNow QR** (coach upload → parent display → admin view). A partial-application ledger bug found during credit-note verification was fixed via a `credit_applications` allocation table (see §9.17). An **automated test suite** now covers the billing/credit engine (Deno) and DB triggers/RLS/constraints (pgTAP). **Password reset** is implemented on the mobile app (self-service recovery flow via `resetPasswordForEmail` → in-app reset screen → `updateUser`, working across Expo web and native deep links), and login/register errors are mapped to friendly copy — see §7.1. The code lives on GitHub (public, `kahhangwork/SwimSync`). **Now live in production on its own domain (web-first, free tier):** the mobile app at **https://swimsync.sg** and the admin at **https://admin.swimsync.sg** (Vercel), backend on Supabase, real transactional email via **Resend** (`noreply@swimsync.sg`, e.g. password-reset). A real coach + 4 classes are onboarded on a clean-slate production DB. Automated tests (34 pgTAP + 8 Deno + frontend vitest/jest-expo suites) run in CI on every push. Swimming ability is no longer a parent-entered field (see §5.1). Invoice generation is **manual** (no cron on the free tier) — see `INVOICE_RUNBOOK.md`. The only remaining gate to real billing is **parent onboarding** (parents self-register + add children via `swimsync.sg/welcome`, then the superadmin assigns classes); native App/Play Store builds are deferred. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
+> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). The **entire MVP core loop works and is verified end to end across the UI + backend**: parent self-registration, child creation, superadmin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), the **credit-note correction flow** (auto-issue on attendance edit + FIFO application incl. partial carry-forward — see §5.6), and **PayNow QR** (coach upload → parent display → admin view). A partial-application ledger bug found during credit-note verification was fixed via a `credit_applications` allocation table (see §9.17). An **automated test suite** now covers the billing/credit engine (Deno) and DB triggers/RLS/constraints (pgTAP). **Password reset** is implemented on the mobile app (self-service recovery flow via `resetPasswordForEmail` → in-app reset screen → `updateUser`, working across Expo web and native deep links), and login/register errors are mapped to friendly copy — see §7.1. The code lives on GitHub (public, `kahhangwork/SwimSync`). **Now live in production on its own domain (web-first, free tier):** the mobile app at **https://swimsync.sg** and the admin at **https://admin.swimsync.sg** (Vercel), backend on Supabase, real transactional email via **Resend** (`noreply@swimsync.sg`, e.g. password-reset). A real coach + 4 classes are onboarded on a clean-slate production DB. Automated tests (34 pgTAP + 8 Deno + frontend vitest/jest-expo suites) run in CI on every push. Swimming ability is no longer a parent-entered field (see §5.1). Invoice generation is **manual** (no cron on the free tier) — see `INVOICE_RUNBOOK.md`. **Lesson sessions are created lazily, not pre-generated, and the lessons that *should* have happened are derived from each class's weekday at read time** — surfacing unmarked lessons to the coach and reporting attendance gaps to the admin before invoices are generated (see §7.5 and §7.7), which closes a hole where a forgotten lesson was silently unbillable and invisible to everyone. The only remaining gate to real billing is **parent onboarding** (parents self-register + add children via `swimsync.sg/welcome`, then the superadmin assigns classes); native App/Play Store builds are deferred. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
 
 ---
 
@@ -432,6 +432,32 @@ SwimSync shall generate lesson session records from class schedule.
 
 > *Note: exact implementation may be hidden from end user.*
 
+#### Sessions are created lazily, and expectation is derived *(implemented)*
+
+There is **no scheduled session generator**, deliberately. A `lesson_sessions` row is
+created on demand when a coach saves attendance for a date (times are inherited from the
+class by a `BEFORE INSERT` trigger, satisfying "inherit class details"). Sessions are
+unique per `(class, date)` and the attendance screen accepts **any** date, so marking a
+past lesson late works and never disturbs another date.
+
+The requirement that actually mattered — knowing a lesson *should* have happened — is met
+by **deriving expected lesson dates from the class's `day_of_week` at read time** rather
+than materialising rows ahead of time. This is what makes a forgotten lesson visible:
+
+- The **coach's Today tab** lists **Unmarked Lessons** (past lessons not fully marked)
+  and links straight to marking them; the class roster shows expected-but-missing dates
+  as a distinct *"Not marked"* state.
+- The **admin's invoice-generation dialog** reports, per class, `N of M lessons marked`
+  and names any missing dates before invoices are created (see §7.7).
+- A lesson that legitimately didn't run is recorded with the existing non-billable
+  statuses (*Cancelled — rain/coach*), which clears it from both views.
+
+A lesson counts as marked only when every actively-enrolled student has an attendance
+record on it — the same rule the invoice engine applies.
+
+**Not provided:** parents see no "upcoming lessons" list (only marked history), and no
+future-dated sessions exist. Both would follow from pre-generation if ever wanted.
+
 ### 7.6 Attendance Management
 
 SwimSync shall allow coach to record attendance per student per lesson session.
@@ -458,6 +484,19 @@ SwimSync shall generate invoices monthly, with two trigger modes sharing one bil
 - An invoice fully covered by credit is created directly as **Paid**
 
 > *For internal implementation, additional statuses such as Draft or Issued may be used if helpful.*
+
+#### Attendance-gap check before generating *(implemented)*
+
+Because billing is derived from attendance, a lesson nobody marked has no record and is
+therefore **unbillable and invisible**. Before invoices are generated, SwimSync compares
+each class's weekly schedule against what is actually marked for the billing month and
+reports any gaps — per class, `N of M lessons marked`, naming the missing dates (see
+§7.5). Future-dated lessons in the current month are not counted as gaps.
+
+The check **warns rather than blocks**: a class that genuinely did not run is a valid
+reason to proceed, so the confirm button becomes *"Generate anyway"*. This is the only
+safeguard against underbilling — the engine cannot detect a lesson that was never
+recorded.
 
 #### Automatic vs Manual Generation *(implemented)*
 

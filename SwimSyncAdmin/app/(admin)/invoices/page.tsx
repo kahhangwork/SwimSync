@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { todayInSg, monthBounds, formatSgDate } from "@/lib/lessonDates";
+import { computeClassCoverage, type ClassCoverage } from "@/lib/classCoverage";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
@@ -38,13 +40,17 @@ export default function InvoicesPage() {
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
   // Invoice generation controls
-  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const currentMonth = todayInSg().slice(0, 7); // YYYY-MM
   const [genMonth, setGenMonth] = useState(currentMonth);
   const [generating, setGenerating] = useState(false);
   const [genResult, setGenResult] = useState<string | null>(null);
   const [autoEnabled, setAutoEnabled] = useState<boolean | null>(null);
   const [togglingAuto, setTogglingAuto] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [coverage, setCoverage] = useState<ClassCoverage[] | null>(null);
+  const [checkingCoverage, setCheckingCoverage] = useState(false);
+  const [coverageError, setCoverageError] = useState<string | null>(null);
+  const coverageRequest = useRef(0);
 
   useEffect(() => {
     loadInvoices();
@@ -70,6 +76,91 @@ export default function InvoicesPage() {
       .eq("key", "auto_invoice_enabled");
     if (!error) setAutoEnabled(next);
     setTogglingAuto(false);
+  }
+
+  /**
+   * Which lessons should have been marked for `genMonth`, and which weren't.
+   * Runs as superadmin on the browser client — RLS lets is_superadmin() read
+   * all four tables, so no service-role route is needed.
+   *
+   * Row ceiling: `max_rows = 1000` in supabase/config.toml. At ~4 classes ×
+   * ~5 sessions × ~17 students this is a few hundred attendance rows; around
+   * 20 classes it will need paginating or moving server-side.
+   */
+  async function loadCoverage(billingMonth: string) {
+    // Guard against a slow earlier request landing after a newer one and
+    // reporting the wrong month's gaps.
+    const requestId = ++coverageRequest.current;
+    const isStale = () => requestId !== coverageRequest.current;
+
+    setCheckingCoverage(true);
+    setCoverage(null);
+    setCoverageError(null);
+
+    try {
+      const bounds = monthBounds(billingMonth);
+
+      // Every query's error is checked: an unchecked failure would leave the
+      // row set empty, which reads as "nothing missing" — the exact false
+      // reassurance this dialog exists to prevent.
+      const classesRes = await supabase
+        .from("classes")
+        .select("id, title, day_of_week")
+        .eq("is_active", true);
+      if (classesRes.error) throw classesRes.error;
+
+      const classIds = (classesRes.data ?? []).map((c) => c.id);
+      if (classIds.length === 0) {
+        if (!isStale()) {
+          setCoverage([]);
+          setCheckingCoverage(false);
+        }
+        return;
+      }
+
+      const [enrolmentsRes, sessionsRes] = await Promise.all([
+        supabase
+          .from("student_class_enrolments")
+          .select("class_id, student_id, is_active, enrolled_at")
+          .in("class_id", classIds),
+        supabase
+          .from("lesson_sessions")
+          .select("id, class_id, session_date")
+          .in("class_id", classIds)
+          .gte("session_date", bounds.start)
+          .lte("session_date", bounds.end),
+      ]);
+      if (enrolmentsRes.error) throw enrolmentsRes.error;
+      if (sessionsRes.error) throw sessionsRes.error;
+
+      const sessionIds = (sessionsRes.data ?? []).map((s) => s.id);
+      const attendanceRes = sessionIds.length
+        ? await supabase
+            .from("attendance")
+            .select("lesson_session_id, student_id")
+            .in("lesson_session_id", sessionIds)
+        : { data: [], error: null };
+      if (attendanceRes.error) throw attendanceRes.error;
+
+      if (isStale()) return;
+      setCoverage(
+        computeClassCoverage(
+          classesRes.data ?? [],
+          enrolmentsRes.data ?? [],
+          sessionsRes.data ?? [],
+          attendanceRes.data ?? [],
+          billingMonth,
+          todayInSg()
+        )
+      );
+    } catch (e) {
+      if (isStale()) return;
+      setCoverageError(
+        e instanceof Error ? e.message : "could not read attendance"
+      );
+    } finally {
+      if (!isStale()) setCheckingCoverage(false);
+    }
   }
 
   async function handleGenerate() {
@@ -166,6 +257,8 @@ export default function InvoicesPage() {
     .filter((i) => i.status === "outstanding")
     .reduce((sum, i) => sum + i.net_amount, 0);
 
+  const hasGaps = (coverage ?? []).some((c) => c.missingDates.length > 0);
+
   return (
     <div>
       <PageHeader
@@ -191,6 +284,7 @@ export default function InvoicesPage() {
             onClick={() => {
               setGenResult(null);
               setShowConfirm(true);
+              loadCoverage(genMonth);
             }}
             disabled={generating}
           >
@@ -251,16 +345,68 @@ export default function InvoicesPage() {
         onClose={() => setShowConfirm(false)}
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Before generating, please confirm that attendance has been marked{" "}
-            <strong>correctly for all students</strong> for{" "}
-            <strong>{formatBillingMonth(genMonth)}</strong>.
-          </p>
+          {checkingCoverage && (
+            <p className="text-sm text-gray-500">Checking attendance…</p>
+          )}
+
+          {coverageError && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
+              <p className="text-sm font-semibold text-amber-800">
+                Couldn&apos;t check attendance.
+              </p>
+              <p className="mt-1 text-xs text-gray-600">
+                {coverageError}. Generating now is still possible, but nothing has
+                verified that every lesson is marked — check the coach&apos;s app,
+                or retry.
+              </p>
+            </div>
+          )}
+
+          {coverage && hasGaps && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+              <p className="text-sm font-semibold text-red-700">
+                Some lessons have no attendance marked.
+              </p>
+              <p className="mt-1 text-xs text-gray-600">
+                Generating now will bill only the marked lessons, and lessons
+                marked <em>after</em> generating won&apos;t be added to an
+                existing invoice.
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {coverage
+                  .filter((c) => c.missingDates.length > 0)
+                  .map((c) => (
+                    <li key={c.classId} className="text-xs text-gray-700">
+                      <span className="font-semibold">{c.title}</span> —{" "}
+                      {c.marked} of {c.expected} lessons marked
+                      <span className="block text-red-700">
+                        Missing: {c.missingDates.map((d) => formatSgDate(d)).join(", ")}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
+          {coverage && !hasGaps && coverage.length > 0 && (
+            <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700">
+              All {coverage.length} class{coverage.length === 1 ? "" : "es"} fully
+              marked for {formatBillingMonth(genMonth)}.
+            </p>
+          )}
+
+          {coverage && coverage.length === 0 && (
+            <p className="text-sm text-gray-600">
+              No classes with enrolled students to check for{" "}
+              {formatBillingMonth(genMonth)}.
+            </p>
+          )}
+
           <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-gray-600">
             Invoices are based on the attendance recorded now. Parents who already
-            have an invoice for this month are skipped, and lessons marked{" "}
-            <em>after</em> generating won&apos;t be added to an existing invoice.
+            have an invoice for this month are skipped.
           </p>
+
           <div className="flex gap-3 pt-1">
             <Button
               variant="outline"
@@ -271,12 +417,13 @@ export default function InvoicesPage() {
             </Button>
             <Button
               className="flex-1"
+              disabled={checkingCoverage}
               onClick={() => {
                 setShowConfirm(false);
                 handleGenerate();
               }}
             >
-              Yes, generate
+              {hasGaps ? "Generate anyway" : "Yes, generate"}
             </Button>
           </div>
         </div>

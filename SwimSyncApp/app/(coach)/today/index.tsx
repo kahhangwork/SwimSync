@@ -5,11 +5,21 @@ import {
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
+import {
+  todayInSg,
+  dayOfWeekOf,
+  expectedLessonDates,
+  backlogWindowStart,
+  toSgDate,
+  formatSgDate,
+  type DayOfWeek,
+} from "@/lib/lessonDates";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 
@@ -23,14 +33,12 @@ type TodayClass = {
   session_id: string | null; // null if no lesson session generated for today yet
 };
 
-const DAY_MAP: Record<number, string> = {
-  0: "sunday",
-  1: "monday",
-  2: "tuesday",
-  3: "wednesday",
-  4: "thursday",
-  5: "friday",
-  6: "saturday",
+/** A past lesson that should have happened but has no complete attendance. */
+type BacklogItem = {
+  class_id: string;
+  class_title: string;
+  date: string;
+  session_id: string | null; // non-null when the session exists but is partial
 };
 
 function formatTime(time: string): string {
@@ -52,18 +60,20 @@ function isNowInRange(start: string, end: string): boolean {
 export default function TodayScreen() {
   const session = useAppStore((s) => s.session);
   const [classes, setClasses] = useState<TodayClass[]>([]);
+  const [backlog, setBacklog] = useState<BacklogItem[]>([]);
   const [outstandingCount, setOutstandingCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const today = new Date();
-  const todayStr = today.toLocaleDateString("en-SG", {
+  // Everything below derives from this one date string, so the weekday we query
+  // by can never disagree with the date we write attendance to.
+  const todayDate = todayInSg();
+  const todayDayOfWeek = dayOfWeekOf(todayDate);
+  const todayStr = formatSgDate(todayDate, {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-  const todayDayOfWeek = DAY_MAP[today.getDay()];
-  const todayDate = today.toISOString().split("T")[0]; // YYYY-MM-DD
 
   const loadData = useCallback(async () => {
     if (!session) return;
@@ -81,50 +91,116 @@ export default function TodayScreen() {
       return;
     }
 
-    // Get today's classes for this coach
-    const { data: todayClasses } = await supabase
+    // All of the coach's active classes — today's cards and the unmarked-lesson
+    // backlog are derived from this one set so they can't disagree.
+    const { data: allClasses } = await supabase
       .from("classes")
       .select(`
         id,
         title,
+        day_of_week,
         start_time,
         end_time,
         location_name,
-        student_class_enrolments(id, is_active)
+        student_class_enrolments(student_id, is_active, enrolled_at)
       `)
       .eq("coach_id", coach.id)
       .eq("is_active", true)
-      .eq("day_of_week", todayDayOfWeek)
       .order("start_time", { ascending: true });
 
-    // For each class, check if a lesson session exists for today
-    const classIds = (todayClasses ?? []).map((c: any) => c.id);
-    const { data: sessions } = classIds.length > 0
+    const coachClasses = allClasses ?? [];
+    const classIds = coachClasses.map((c: any) => c.id);
+
+    // Sessions (with who's been marked) across the backlog window up to today.
+    // The window floor ignores enrolment here so one query covers every class;
+    // each class narrows it further below.
+    //
+    // Refetched on every focus of the coach's landing tab. At ~4 classes × ~9
+    // sessions × ~17 students that's a few hundred joined rows — fine, but it
+    // grows with classes × students, and PostgREST's `max_rows = 1000`
+    // (supabase/config.toml) is a silent ceiling: past it the backlog would
+    // under-report rather than error. Paginate or move server-side before then.
+    const windowStart = backlogWindowStart(todayDate, null);
+    const { data: windowSessions } = classIds.length > 0
       ? await supabase
           .from("lesson_sessions")
-          .select("id, class_id")
+          .select("id, class_id, session_date, attendance(student_id)")
           .in("class_id", classIds)
-          .eq("session_date", todayDate)
+          .gte("session_date", windowStart)
+          .lte("session_date", todayDate)
       : { data: [] };
 
-    const sessionMap: Record<string, string> = {};
-    (sessions ?? []).forEach((s: any) => {
-      sessionMap[s.class_id] = s.id;
+    // key: "<class_id>:<session_date>"
+    const sessionByClassDate = new Map<
+      string,
+      { id: string; markedStudentIds: Set<string> }
+    >();
+    (windowSessions ?? []).forEach((s: any) => {
+      sessionByClassDate.set(`${s.class_id}:${s.session_date}`, {
+        id: s.id,
+        markedStudentIds: new Set(
+          (s.attendance ?? []).map((a: any) => a.student_id)
+        ),
+      });
     });
 
-    const mapped: TodayClass[] = (todayClasses ?? []).map((cls: any) => ({
-      id: cls.id,
-      title: cls.title,
-      start_time: cls.start_time,
-      end_time: cls.end_time,
-      location_name: cls.location_name,
-      student_count: (cls.student_class_enrolments ?? []).filter(
-        (e: any) => e.is_active
-      ).length,
-      session_id: sessionMap[cls.id] ?? null,
-    }));
+    const mapped: TodayClass[] = coachClasses
+      .filter((cls: any) => cls.day_of_week === todayDayOfWeek)
+      .map((cls: any) => ({
+        id: cls.id,
+        title: cls.title,
+        start_time: cls.start_time,
+        end_time: cls.end_time,
+        location_name: cls.location_name,
+        student_count: (cls.student_class_enrolments ?? []).filter(
+          (e: any) => e.is_active
+        ).length,
+        session_id:
+          sessionByClassDate.get(`${cls.id}:${todayDate}`)?.id ?? null,
+      }));
 
     setClasses(mapped);
+
+    // Lessons that should have happened but aren't fully marked. A lesson is
+    // only "marked" once every active student has an attendance row — the same
+    // rule the invoice engine's completeness gate uses.
+    const items: BacklogItem[] = [];
+    for (const cls of coachClasses as any[]) {
+      const enrolments = cls.student_class_enrolments ?? [];
+      const activeStudentIds = enrolments
+        .filter((e: any) => e.is_active)
+        .map((e: any) => e.student_id);
+      if (activeStudentIds.length === 0) continue;
+
+      // Bound by the earliest enrolment (active or not) so we never ask about
+      // lessons from before the class had anyone in it.
+      const earliest = enrolments
+        .map((e: any) => toSgDate(e.enrolled_at))
+        .sort()[0];
+      const from = backlogWindowStart(todayDate, earliest ?? null);
+
+      for (const date of expectedLessonDates(
+        cls.day_of_week as DayOfWeek,
+        from,
+        todayDate
+      )) {
+        if (date === todayDate) continue; // today already has its own card
+        const sess = sessionByClassDate.get(`${cls.id}:${date}`);
+        const fullyMarked =
+          !!sess &&
+          activeStudentIds.every((id: string) => sess.markedStudentIds.has(id));
+        if (!fullyMarked) {
+          items.push({
+            class_id: cls.id,
+            class_title: cls.title,
+            date,
+            session_id: sess?.id ?? null,
+          });
+        }
+      }
+    }
+    items.sort((a, b) => b.date.localeCompare(a.date)); // most recent first
+    setBacklog(items);
 
     // Count outstanding invoices for students in this coach's classes
     const { count } = await supabase
@@ -200,6 +276,54 @@ export default function TodayScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Unmarked past lessons — only rendered when there are any, so a coach
+            who is up to date never sees a nag. */}
+        {!loading && backlog.length > 0 && (
+          <View className="mb-6">
+            <Text className="text-lg font-bold text-gray-900 mb-1">
+              Unmarked Lessons ({backlog.length})
+            </Text>
+            <Text className="text-xs text-gray-500 mb-3">
+              These lessons have no attendance yet and won&apos;t be billed until
+              they do.
+            </Text>
+            <View className="gap-2">
+              {backlog.map((item) => (
+                <TouchableOpacity
+                  key={`${item.class_id}:${item.date}`}
+                  onPress={() =>
+                    router.push(
+                      `/(coach)/classes/${item.class_id}/attendance?date=${item.date}` +
+                        (item.session_id ? `&sessionId=${item.session_id}` : "")
+                    )
+                  }
+                  activeOpacity={0.8}
+                >
+                  <Card className="flex-row items-center gap-3 border-orange-200 bg-orange-50">
+                    <View className="w-9 h-9 rounded-full bg-orange-100 items-center justify-center">
+                      <Ionicons name="alert" size={18} color="#ea580c" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-gray-800">
+                        {item.class_title}
+                      </Text>
+                      <Text className="text-xs text-orange-600">
+                        {formatSgDate(item.date)}
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center gap-1">
+                      <Text className="text-xs font-semibold text-orange-600">
+                        Mark
+                      </Text>
+                      <Ionicons name="chevron-forward" size={13} color="#ea580c" />
+                    </View>
+                  </Card>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Today's classes */}
         <Text className="text-lg font-bold text-gray-900 mb-3">
