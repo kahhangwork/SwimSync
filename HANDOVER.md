@@ -1,9 +1,16 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-15_
+_Last updated: 2026-07-16_
 
-Read this first to get up to speed, then `PRD.md` for the product spec
-and `LOCAL_DEV_GUIDE.md` for the exact run/test commands and seed logins.
+Read this first to get up to speed, then `PRD.md` for the product spec,
+`BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
+run/test commands and seed logins.
+
+> **This file is one of three living documents, split by how often each changes**
+> (see `README.md`): **PRD.md** = what exists · **BACKLOG.md** = what doesn't yet ·
+> **HANDOVER.md** (this file) = the state you're inheriting. Keep them in their lanes —
+> a feature idea belongs in `BACKLOG.md`, not §9 and not the PRD. The `/session-close`
+> skill walks all three at the end of a session and updates each by its own rule.
 
 ---
 
@@ -61,6 +68,9 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 - **PayNow QR (verified UI + backend)** — coach uploads their QR in `(coach)/settings`
   (→ `paynow-qr/<coach_id>/…` storage → `coaches.paynow_qr_url`); the parent sees
   it on the invoice's PayNow screen; the admin Coaches page shows it.
+- **Coach Billing screen (verified UI)** — queries live invoices (RLS-scoped) and marks
+  them paid (invoice update + `payment_records` insert), web-safe via Toast /
+  `confirmAction`. Needs `coach_serves_parent_profile()` to show parent names (§6).
 - **Full RLS** — parents see only their data, coaches only their classes,
   superadmin everything. Covered by automated isolation tests.
 - **Automated tests** — backend **34 pgTAP + 8 Deno**, plus frontend suites
@@ -184,7 +194,9 @@ _UI drivers (`.claude/skills/run-ui-playwright/drivers/`, run by hand, not CI):_
 `verify-unmarked-lessons.mjs` + `fixtures-unmarked-lessons.sql` drive the whole
 unmarked-lesson loop (admin gap report → coach backlog → mark → both go green);
 `verify-tz-saturday.mjs` pins the SGT-vs-UTC regression using Playwright's clock
-API — it **fails on the pre-fix code**, which is the point.
+API — it **fails on the pre-fix code**, which is the point;
+`smoke-admin-screens.mjs` drives the admin attendance/students/dashboard pages at
+runtime (checks the deep joins resolve — no NaN, no empty tables).
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
@@ -207,7 +219,9 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   `SUM(applications by invoice) = credit_applied`; `credit_balance = SUM(remaining across notes)`.
 - **RLS** uses `SECURITY DEFINER` helpers (`is_superadmin()`, `current_parent_id()`,
   `current_coach_id()`, `coach_serves_parent()`) to avoid policy recursion — see
-  `20260309000600_rls_policies.sql`.
+  `20260309000600_rls_policies.sql`. Plus `coach_serves_parent_profile()` (migration
+  `20260712000100`), added because `profiles_select` otherwise hid served-parents' names
+  from their own coach — the coach Billing screen needs them to label an invoice.
 - **Tab navigation:** every tab folder in `(coach)/` and `(parent)/` has its own
   nested `_layout.tsx` (a `Stack`), so detail screens push within the tab instead of
   leaking as extra tab buttons. Add a nested `_layout` for any new tab section.
@@ -223,7 +237,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   (takes any `date`, resolves-or-creates that date's session, pre-fills existing rows),
   so back-dating Just Works and nothing is ever overwritten. What was missing was not
   the rows but a **reckoning**: which lessons *should* have happened. That is derived at
-  read time from `classes.day_of_week` (`lib/lessonDates.ts`) — see §8. Don't "fix" this
+  read time from `classes.day_of_week` (`lib/lessonDates.ts`) — see §8b. Don't "fix" this
   by pre-generating sessions unless you have a reason the read-time derivation can't
   serve; pre-generation adds a job, a schedule, and edge cases when classes change.
   - A class that legitimately didn't run needs **no new concept**: the coach marks
@@ -292,7 +306,69 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
-## 8. What changed this session (2026-07-15)
+## 8. What changed this session (2026-07-16)
+
+**Split the docs into three, so each one can be trusted for a different question.**
+
+No product code changed — this session was documentation and tooling only. The PRD is
+deliberately **untouched**: nothing shipped a behaviour change, which is the only thing
+that earns a PRD edit now.
+
+- **The problem:** three documents were all half-doing the same job. `PRD.md` had drifted
+  from "spec" to "spec + as-built record" (a 40-line build-status blockquote, *(implemented)*
+  annotations throughout), and **§9 of this file was serving as the backlog** — it held
+  the queue, mixed with a growing "record of already-DONE work" tail. §9 is rewritten every
+  session by design, so ideas parked there had no owner and would quietly fall out.
+- **The split** (documented in the new `README.md`, which the repo didn't have at all —
+  it doubles as the public front door):
+
+  | Document | Answers | Changes when |
+  |---|---|---|
+  | `PRD.md` | How does SwimSync behave? | A **shipped** behaviour changes |
+  | `BACKLOG.md` | What could we build, and why does it matter? | An idea arrives, or ships |
+  | `HANDOVER.md` | What's the state now, what's next? | Every session |
+
+- **`BACKLOG.md` — new.** 33 items across seven themes. **Every item carries a `Why`** —
+  that's the rule that stops it becoming a wishlist, and the bar for adding one. The
+  **Notes** field on each item is where prior decisions and rejected approaches live;
+  it's worth more than the item title. Includes a **Deliberately not doing** table so
+  settled questions (pre-generating sessions, parent-facing ability picker, `Alert.alert`)
+  don't get re-litigated.
+  - All **14** items from PRD **§3.2** (Out of Scope for MVP) are mirrored in as live
+    options, tagged `[MVP-excluded]` — the user's call, on the reasoning that SwimSync is
+    moving past pure MVP-building. **§3.2 itself stays in the PRD as-written**: it's the
+    historical record of the scope decision, not a to-do list.
+- **`/session-close` skill — new** (`.claude/skills/session-close/`). Walks all three docs
+  and updates each by its own rule. It **gates** each one rather than writing to all three —
+  the failure mode of an auto-updater is bloat, which would collapse the split back into
+  three copies of the same thing. A session touching only this file is the *correct*
+  outcome, not a skipped step. Hands off to `/commit-review` to commit.
+- **Writing the `Why` fields surfaced two items worth ranking above most of the feature
+  list**, both now in `BACKLOG.md`:
+  - **Email invoice notifications** — likely the best effort-to-value item in the repo.
+    Resend is already live and paid for on `noreply@swimsync.sg` with a branded template
+    pattern; today an invoice appears silently, so the coach chases payment for a bill the
+    parent never knew existed.
+  - **The UTC-derived default billing month** — a live latent bug, harmless *only* because
+    invoicing is manual and cron is off. Switching cron on bills the wrong month. Same
+    UTC-vs-SGT class of error that already shipped a real double-billing bug (§7.7).
+    **Fix it before enabling cron, not after.**
+
+**Not done (deliberate):**
+- **§9's DONE tail was pruned, not preserved.** Entries whose reasoning already lives in
+  the PRD or a §8x log were dropped — git history is the record of what shipped. §9 is for
+  what's *next*.
+- **Nothing was migrated out of the PRD into the backlog.** The PRD's §3.2 and §15 release
+  plan stay as-written; the backlog mirrors them rather than moving them, so the original
+  reasoning stays reachable via the provenance tags.
+- **The parent attendance screen has uncommitted changes that are NOT part of this
+  session** (unassigned empty state, "no lessons marked yet" state, an RN-web
+  `flex-grow-0` ScrollView fix). Left untouched at the user's instruction — work in
+  progress, and another session was active concurrently. Needs no PRD change when it
+  lands: **§5.1 already specifies** the "not assigned yet" state, so it makes the code
+  match the spec rather than departing from it.
+
+## 8b. What changed (2026-07-15)
 
 **Closed the silent-underbilling hole before the first real invoice run.**
 
@@ -347,7 +423,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 a rained-out class is 17 × 2 taps, which is where a coach abandons the task, and an
 abandoned cancellation looks exactly like a forgotten lesson. Additive; ships separately.
 
-## 8b. What changed (2026-07-13 → 07-14)
+## 8c. What changed (2026-07-13 → 07-14)
 
 - **Production email via Resend on `swimsync.sg`** — cloud custom SMTP
   (`smtp.resend.com:465`, sender `noreply@swimsync.sg`); branded reset template
@@ -375,7 +451,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
   (suite 22 → 34). CI green across backend + both frontend jobs.
 - All merged to `main`, pushed, CI-verified.
 
-## 8c. Session (2026-07-12)
+## 8d. Session (2026-07-12)
 
 - **Auth polish — password reset** — implemented the mobile recovery flow end to
   end: new `(auth)/forgot-password.tsx` + `(auth)/reset-password.tsx` screens, wired
@@ -389,7 +465,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
   email → reset screen (no bounce to home) → new password → re-login. Error mapping
   checked against live Supabase strings. Coach seed password restored to `password123`.
 
-## 8d. Session (2026-07-11)
+## 8e. Session (2026-07-11)
 
 - **Credit-note ledger fix** — added `credit_applications` (migration `20260711000100`)
   + updated the engine so partial credit reconciles; verified UI + backend.
@@ -405,65 +481,36 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 
 ## 9. Next steps (pick with the user)
 
-**The "finish MVP loose ends" plan is complete** (email, custom domain, coach
-onboarding, welcome page, swimming-ability removal, invoice runbook, edge-case tests),
-and the **silent-underbilling hole is closed** (§8). Genuinely open now:
+> **This is the current shift, not the queue.** The full list of unbuilt ideas — with
+> the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
+> will drift. Keep this section to what's genuinely next.
 
-- **Real parent onboarding — the gate to real billing.** Send parents
-  **`swimsync.sg/welcome`** → they self-register + add their children → the superadmin
-  assigns each to a class (admin **Unassigned Children**). ~17 real students are expected
-  across the 4 classes. Students are **parent-created** in this model (coaches/admin can't
-  create them), so this is a real onboarding push.
-- **First real invoice run** — once a Saturday's attendance is marked, follow
-  **`INVOICE_RUNBOOK.md`** on the 1st (manual; no cron on the free tier). The confirm
-  dialog now reports any lesson with no attendance marked — **read it**; it's the only
-  backstop (§7.8).
-- **Bulk "set all to…" on the attendance screen** — cancelling a rained-out class is
-  currently 17 × 2 taps, one student at a time. That's where a coach abandons the task,
-  and an abandoned cancellation is indistinguishable from a forgotten lesson. Purely
-  client-side (populate the existing state map); the highest-value small follow-up.
-- **Native store builds** — EAS → Android APK / iOS TestFlight, deferred until the user
-  invests (staying web-only for now).
-- **If asked:** a delete-coach action in the admin UI (currently dashboard-only SQL); a
-  coach-defined swimming-levels feature (the `students.swimming_ability` column is retained
-  for this). Email confirmation is intentionally **OFF**.
+The MVP loop is built and live; the silent-underbilling hole is closed (§8b). **The
+product is no longer the blocker — real usage is.** In order:
 
-The bullets below are a **record of already-DONE work** (kept for reference):
+1. **Real parent onboarding — the gate to real billing.** Send parents
+   **`swimsync.sg/welcome`** → they self-register + add their children → the superadmin
+   assigns each to a class (admin **Unassigned Children**). ~17 real students expected
+   across the 4 classes. Students are **parent-created** in this model (coaches/admin
+   can't create them), so this is an onboarding push, not a build task. Everything below
+   is downstream of it.
+2. **First real invoice run.** Once a Saturday's attendance is marked, follow
+   **`INVOICE_RUNBOOK.md`** on the 1st (manual — no cron on the free tier). The confirm
+   dialog reports any lesson with no attendance marked: **read it.** It is the only
+   backstop against an underbill (§7.8).
+3. **Bulk "set all to…" on the attendance screen** — the top build item, and the one
+   that most protects (2). An afternoon, purely client-side. Full reasoning:
+   `BACKLOG.md` → Coach workflow.
 
-- **Cloud deployment — DONE (2026-07-12).** Live on free infra, web-first. See §11.
-  Remaining deployment work: **native builds** (EAS → Android APK / iOS TestFlight)
-  once the user decides to invest so parents can download from the stores; cron is
-  intentionally **not** wired (invoices are generated manually via the admin button).
-- **`Alert.alert` is a no-op on RN-web — fully swept (see §12a).** Sign Out uses
-  `lib/confirm.ts` `confirmAction`; a global **Toast** (`store` + `components/Toast.tsx`
-  at the root layout, `showToast(msg, type)`) now carries all login/validation/success
-  feedback that was previously invisible on web; and alerts whose OK handler redirected
-  (register, reset-password, add-child, attendance) now navigate directly. The **only**
-  remaining `Alert.alert` is the native-only media-library permission prompt in coach
-  settings (guarded by `Platform.OS !== "web"`).
-- **Removed dead settings stubs** — Notification Preferences (coach + parent) and
-  Help & Support (parent) had empty handlers; deleted.
-- **Admin "Forgot password?" flow — DONE.** New `SwimSyncAdmin/app/forgot-password`
-  + `app/reset-password` pages + a link on the login (mirrors the mobile reset). The
-  admin reset URL is now `https://admin.swimsync.sg/reset-password` (in the Supabase
-  redirect allow-list — see §11). UI verified on cloud.
-- **Coach Billing screen — DONE (2026-07-12).** Was placeholder mock data with a dead
-  button; now queries live invoices (RLS-scoped) and marks them paid (invoice update +
-  `payment_records` insert), web-safe via Toast/`confirmAction`. Added migration
-  `20260712000100` + `coach_serves_parent_profile()` so a coach can read served-parents'
-  names. UI-verified via `run-ui-playwright`.
-- **Smoke-test remaining screens — DONE (2026-07-12).** Admin attendance/students/dashboard
-  driven at runtime (deep joins resolve, no NaN/empty tables) via
-  `drivers/smoke-admin-screens.mjs`.
-- **Frontend/component tests + CI — DONE (2026-07-12).** GitHub Actions
-  (`.github/workflows/ci.yml`) runs the pgTAP + Deno suites **and** the frontend suites
-  (`SwimSyncAdmin` vitest, `SwimSyncApp` jest-expo) on every push/PR to `main`. See §5.
-- **Auth polish** — mobile password reset, friendly login/register errors, and the
-  **admin "Forgot password?" flow** are all **done**. Still open: email confirmation
-  copy/templates are Supabase defaults.
-- **PRD §11 edge cases — ALL covered by dedicated tests (done)** (see §5 catalog):
-  11.1 & 11.7 (Deno); 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`),
-  11.6 (`credit_note_trigger`). pgTAP suite is now 34 tests across 4 files.
+**Two items in `BACKLOG.md` punch above their size** if you want value between the
+milestones above — email invoice notifications (Resend is already live and paid for;
+today invoices arrive silently) and fixing the UTC-derived billing month (a live latent
+bug that mis-bills the month cron is switched on).
+
+_Prior "already-DONE" bullets were pruned on 2026-07-16 — that record is git history,
+the PRD, and the §8x session logs. Durable facts that lived only here were relocated
+first: the coach Billing screen → §3, `coach_serves_parent_profile()` → §6,
+`smoke-admin-screens.mjs` → §5._
 
 ---
 
@@ -488,10 +535,13 @@ The bullets below are a **record of already-DONE work** (kept for reference):
 | `SwimSyncAdmin/lib/classCoverage.ts` | Expected-vs-marked coverage maths for the admin pre-generation check |
 | `SwimSyncAdmin/app/(admin)/` | Admin pages; `app/api/` server routes |
 | `.claude/skills/run-ui-playwright/` | Skill to launch + drive both UIs (Playwright/Chrome) |
+| `.claude/skills/session-close/` | Skill: update PRD/BACKLOG/HANDOVER by their own rules at session end |
 | `AVAIL_SKILLS.md` | Reference for all available skills |
 | `LOCAL_DEV_GUIDE.md` | Run/test commands, seed logins, service URLs |
 | `INVOICE_RUNBOOK.md` | Monthly manual invoice-generation procedure (superadmin) |
-| `PRD.md` | Product spec (*(implemented)* sections = build decisions) |
+| `README.md` | Front door + **the rule for which document to write in** |
+| `PRD.md` | Product spec — **what exists** (*(implemented)* sections = build decisions) |
+| `BACKLOG.md` | **What doesn't exist yet** — every item carries a `Why` |
 
 Memory files (Claude project memory dir) also capture project state + backend
 gotchas: `swimsync-project`, `swimsync-backend-gotchas`.

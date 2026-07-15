@@ -3,7 +3,7 @@
 A reference to the **skills** available when working on SwimSync with Claude Code:
 what each one does, how to invoke it, and when it's useful here.
 
-_Last updated: 2026-07-12_
+_Last updated: 2026-07-16_
 
 ## What a skill is & how to run it
 
@@ -47,11 +47,12 @@ the **real UI** across parent / coach / superadmin roles — not just tests.
   selectors, session rehydration, force-click, etc.).
 - **Details:** [.claude/skills/run-ui-playwright/SKILL.md](.claude/skills/run-ui-playwright/SKILL.md)
 
-### Workflow skills — plan → build → commit
+### Workflow skills — plan → build → commit → close
 
-Three prompt-driven skills that enforce a disciplined workflow. All three are
+Four prompt-driven skills that enforce a disciplined workflow. All four are
 **explicit-invocation only** (type the slash command); they don't auto-fire.
-Chain them: `/plan-with-confidence` → `/plan-review` → build → `/commit-review`.
+Chain them: `/plan-with-confidence` → `/plan-review` → build → `/commit-review`,
+then `/session-close` when the session ends.
 
 #### `plan-with-confidence` — don't plan until you're sure
 
@@ -77,6 +78,23 @@ then commits.
 
 - **Invoke:** `/commit-review`, or ask to "review and commit".
 - **Details:** [.claude/skills/commit-review/SKILL.md](.claude/skills/commit-review/SKILL.md)
+
+### `session-close` — update the three living documents, then commit
+
+SwimSync splits its knowledge across three documents by how often each changes:
+**PRD.md** (what exists), **BACKLOG.md** (what doesn't yet), **HANDOVER.md**
+(the state the next session inherits) — see [README.md](README.md). This skill
+walks all three at the end of a session and updates each **by its own rule**,
+so the split doesn't quietly collapse back into three copies of the same thing.
+
+It gates each document rather than writing to all of them: the PRD is touched
+only if a **shipped** behaviour changed, the backlog only if an idea arrived or
+shipped, and the handover every time. Most sessions won't pass all three gates —
+that's the intended outcome.
+
+- **Invoke:** `/session-close`, or say you're wrapping up / "update the docs".
+- **Pairs with:** `/commit-review`, which it hands off to at the end.
+- **Details:** [.claude/skills/session-close/SKILL.md](.claude/skills/session-close/SKILL.md)
 
 ---
 
@@ -135,6 +153,7 @@ then commits.
 /plan-with-confidence     don't plan until >96% sure (asks questions first)
 /plan-review              rank a plan's product risk + add mitigations
 /commit-review            Senior-Engineer review, then commit
+/session-close            update PRD/BACKLOG/HANDOVER by their own rules, then commit
 
 # Run & verify
 /run-ui-playwright        drive both SwimSync UIs in Chrome (project skill)
