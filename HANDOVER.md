@@ -71,6 +71,15 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 - **Coach Billing screen (verified UI)** — queries live invoices (RLS-scoped) and marks
   them paid (invoice update + `payment_records` insert), web-safe via Toast /
   `confirmAction`. Needs `coach_serves_parent_profile()` to show parent names (§6).
+- **Unmarked-lesson safety net (verified UI + backend)** — expected lesson dates are
+  derived from `classes.day_of_week` at read time (there is no session generator — §6):
+  the coach's Today tab lists **Unmarked Lessons** and links straight to marking a past
+  date, and the admin's invoice-generation dialog reports `N of M lessons marked` per
+  class with the missing dates named. Closes the hole where a forgotten lesson was
+  silently unbillable and invisible to everyone (§8c).
+- **Parent Attendance states (verified UI)** — an unassigned child gets the
+  "not assigned yet" state PRD §5.1 requires, distinct from "no lessons marked yet"
+  (waiting on the coach) and an empty filter result (§8).
 - **Full RLS** — parents see only their data, coaches only their classes,
   superadmin everything. Covered by automated isolation tests.
 - **Automated tests** — backend **34 pgTAP + 8 Deno**, plus frontend suites
@@ -82,6 +91,14 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 (incl. a live password-reset round-trip on `swimsync.sg`). A **real coach + 4 real
 classes** are onboarded and the production DB is a **clean slate** (only the
 superadmin + the real coach/classes). See §11.
+
+> **`main` = what's live.** Vercel builds both sites from `main`, so a **push deploys** —
+> there is no separate release step. `git log origin/main` is the honest answer to
+> "what's in production"; don't trust a SHA written into prose here, including this one.
+> As of 2026-07-16 that includes the unmarked-lesson safety net and the parent Attendance
+> fixes (§8). **Caveat worth keeping:** every check on that work ran against **local
+> fixtures** — none of it has been driven against the real production DB. No schema or
+> migration is involved, so failure looks wrong rather than destroying data.
 
 **Not done yet** (see §9): real **parent onboarding** — parents self-register + add
 their kids via **`swimsync.sg/welcome`**, then the superadmin assigns each to a class;
@@ -152,10 +169,10 @@ supabase test db                                  # 34 tests across 4 files
 supabase/functions/generate-invoices/test.sh      # 8 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
-cd SwimSyncAdmin && npm test                       # 35 tests
+cd SwimSyncAdmin && npm test                       # 38 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
-cd SwimSyncApp && npm test                         # 29 tests
+cd SwimSyncApp && npm test                         # 32 tests
 ```
 
 **Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
@@ -193,6 +210,8 @@ jest, not `tsc`, for the app. Don't mistake them for your own breakage.
 _UI drivers (`.claude/skills/run-ui-playwright/drivers/`, run by hand, not CI):_
 `verify-unmarked-lessons.mjs` + `fixtures-unmarked-lessons.sql` drive the whole
 unmarked-lesson loop (admin gap report → coach backlog → mark → both go green);
+`verify-parent-attendance.mjs` covers the parent Attendance screen — chip geometry read
+from the DOM, plus all three empty states (unassigned / nothing marked / filtered out);
 `verify-tz-saturday.mjs` pins the SGT-vs-UTC regression using Playwright's clock
 API — it **fails on the pre-fix code**, which is the point;
 `smoke-admin-screens.mjs` drives the admin attendance/students/dashboard pages at
@@ -237,7 +256,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   (takes any `date`, resolves-or-creates that date's session, pre-fills existing rows),
   so back-dating Just Works and nothing is ever overwritten. What was missing was not
   the rows but a **reckoning**: which lessons *should* have happened. That is derived at
-  read time from `classes.day_of_week` (`lib/lessonDates.ts`) — see §8b. Don't "fix" this
+  read time from `classes.day_of_week` (`lib/lessonDates.ts`) — see §8c. Don't "fix" this
   by pre-generating sessions unless you have a reason the read-time derivation can't
   serve; pre-generation adds a job, a schedule, and edge cases when classes change.
   - A class that legitimately didn't run needs **no new concept**: the coach marks
@@ -303,10 +322,82 @@ See LOCAL_DEV_GUIDE §"Running the tests".
    free tier, so the auto path never runs at all. The **admin confirm modal's gap report
    is therefore the only thing standing between a forgotten lesson and an underbill.**
    It warns rather than blocks, by design. Don't assume the server will catch it.
+9. **`react-native-web` gives EVERY ScrollView `flexGrow: 1`** — horizontal ones
+   included (`commonStyle` in its `ScrollView/index.js`). So a horizontal ScrollView in
+   a column layout **expands to fill the leftover vertical height**, and its row content
+   container then stretches every child to that height (RN's default `alignItems` is
+   `stretch`). The parent Attendance chips shipped as ~180px tall capsules on web while
+   looking perfect on native — same "works on native, broken on web" family as §12a.
+   **Any horizontal ScrollView needs both:** `className="flex-grow-0"` on the ScrollView
+   *and* `items-start` on `contentContainerClassName`. Audit:
+   `grep -rn --include="*.tsx" "horizontal" SwimSyncApp/app`. Pinned by
+   `verify-parent-attendance.mjs`, which measures chip height from the DOM rather than
+   trusting a screenshot.
+10. **A screen you navigate *away* from stays mounted underneath.** The native stack
+    keeps the previous screen in the DOM, so `document.body.innerText` contains both.
+    This produced a **false-passing test**: an assertion for "admin will assign your
+    child soon" passed against the *home* screen's identical copy while the Attendance
+    screen was showing something else entirely. Assert only on strings unique to the
+    target screen. (Also `run-ui-playwright` gotcha #6.)
 
 ---
 
 ## 8. What changed this session (2026-07-16)
+
+**Fixed the parent Attendance screen — and shipped everything on this branch to
+production.**
+
+- **Merged to `main` and pushed: `2f746ca` → `8c1d5ad` (4 commits). CI green** across
+  backend + both frontends. Vercel builds `swimsync.sg` / `admin.swimsync.sg` from
+  `main`, so the unmarked-lessons work (§8c), the docs split (§8b), and the fixes below
+  are **now live**. Note what that means: everything before this was verified against
+  **local fixtures only** — this is the first time any of it runs against the real
+  production DB (clean slate, real coach, 4 real classes). Nothing here touches schema
+  or migrations, so a bad outcome looks wrong rather than corrupting data;
+  `git revert` + push redeploys.
+- **Chips rendered as ~180px tall capsules** on the parent Attendance screen (spotted on
+  the live site, not by any test). Cause: `react-native-web` applies `flexGrow: 1` to
+  **every** ScrollView — horizontal ones included — so both chip rows expanded to fill
+  the column's leftover height, and their row content container stretched each chip to
+  match. Native was never affected. Fixed with `flex-grow-0` + `items-start`; chips are
+  now 30px, measured from the DOM. Full mechanism + audit command: **§7.9**.
+- **Added the "not assigned yet" state that PRD §5.1 already required.** An unassigned
+  child showed *"No records found"*, which reads as broken when the real answer is that
+  the admin hasn't assigned them yet — **the exact state every parent being onboarded
+  right now lands in**. Three empty states are now distinguished:
+
+  | Situation | What the parent sees |
+  |---|---|
+  | Child `unassigned` | "*&lt;first name&gt;* isn't in a class yet" + the admin will assign soon |
+  | Assigned, nothing marked | "No lessons marked yet" — waiting on the coach |
+  | Filter excludes everything | "No absent lessons" — names the active filter |
+
+  Only `unassigned` gets the new state, so an `inactive` child still renders their
+  history (PRD §11.5 — re-enrol keeps history). Deliberate: treating them as
+  "not assigned yet" would hide real records.
+- **`verify-parent-attendance.mjs`** — new driver (§10). Measures chip **geometry from
+  the DOM**, so the capsule regression cannot silently return; drives all three empty
+  states. Needed an unassigned child in the shared fixture, so
+  `verify-unmarked-lessons.mjs` was re-run afterwards to prove the fixture change didn't
+  break it (still 12/12).
+
+**Not done (deliberate):**
+- **PRD untouched — the gate genuinely wasn't met.** §5.1 *already* specified the
+  "not assigned yet" state, so this fix makes the code match the spec rather than
+  departing from it. Nothing to correct. (§8b reached the same conclusion independently
+  before the work landed.)
+- **`BACKLOG.md` left alone** — it was being written by a **concurrent session** while
+  this one ran, and has since landed on its own as `3e1270c` (six items: coach wage
+  tracking, address/postal at signup, NRIC-last-4 identification, tenanted admin
+  accounts, coach type private-vs-school, active/inactive status). Not this session's to
+  commit. Nothing shipped here was a backlog item, so no pruning was owed either.
+  **Two sessions ran against this repo today** — check `git log` before assuming an
+  uncommitted file is yours.
+- **§5 test counts were stale and are now corrected** (app 29→**32**, admin 35→**38**).
+  They were wrong by my own hand in §8c: three `formatSgDate`/`dayOfWeekOf` tests were
+  added to each app *after* the counts were written. Verified by running both suites.
+
+## 8b. What changed (2026-07-16 — docs split)
 
 **Split the docs into three, so each one can be trusted for a different question.**
 
@@ -367,8 +458,10 @@ that earns a PRD edit now.
   progress, and another session was active concurrently. Needs no PRD change when it
   lands: **§5.1 already specifies** the "not assigned yet" state, so it makes the code
   match the spec rather than departing from it.
+  - _Update: that work **landed** later the same day as `8c1d5ad` — see §8. The PRD call
+    above held._
 
-## 8b. What changed (2026-07-15)
+## 8c. What changed (2026-07-15)
 
 **Closed the silent-underbilling hole before the first real invoice run.**
 
@@ -423,7 +516,7 @@ that earns a PRD edit now.
 a rained-out class is 17 × 2 taps, which is where a coach abandons the task, and an
 abandoned cancellation looks exactly like a forgotten lesson. Additive; ships separately.
 
-## 8c. What changed (2026-07-13 → 07-14)
+## 8d. What changed (2026-07-13 → 07-14)
 
 - **Production email via Resend on `swimsync.sg`** — cloud custom SMTP
   (`smtp.resend.com:465`, sender `noreply@swimsync.sg`); branded reset template
@@ -451,7 +544,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
   (suite 22 → 34). CI green across backend + both frontend jobs.
 - All merged to `main`, pushed, CI-verified.
 
-## 8d. Session (2026-07-12)
+## 8e. Session (2026-07-12)
 
 - **Auth polish — password reset** — implemented the mobile recovery flow end to
   end: new `(auth)/forgot-password.tsx` + `(auth)/reset-password.tsx` screens, wired
@@ -465,7 +558,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
   email → reset screen (no bounce to home) → new password → re-login. Error mapping
   checked against live Supabase strings. Coach seed password restored to `password123`.
 
-## 8e. Session (2026-07-11)
+## 8f. Session (2026-07-11)
 
 - **Credit-note ledger fix** — added `credit_applications` (migration `20260711000100`)
   + updated the engine so partial credit reconciles; verified UI + backend.
@@ -485,8 +578,19 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift. Keep this section to what's genuinely next.
 
-The MVP loop is built and live; the silent-underbilling hole is closed (§8b). **The
-product is no longer the blocker — real usage is.** In order:
+The MVP loop is built and live; the silent-underbilling hole is closed (§8c). **The
+product is no longer the blocker — real usage is.**
+
+**Do this first (one-off):** `main` was merged + pushed on 2026-07-16, so
+`swimsync.sg` now serves the unmarked-lesson safety net and the Attendance fixes — code
+that has **only ever run against local fixtures** (§3). Click through the three screens
+it touches on the live site before pointing parents at it: parent **Attendance** (chips
+are pills, not tall capsules; an unassigned child says "isn't in a class yet"), coach
+**Today** (no "Unmarked Lessons" card on a clean slate is *correct*), admin
+**Invoices → Generate** (the dialog reports expected-vs-marked). Hard-refresh — it's a
+static SPA and the browser caches the bundle.
+
+Then, in order:
 
 1. **Real parent onboarding — the gate to real billing.** Send parents
    **`swimsync.sg/welcome`** → they self-register + add their children → the superadmin
