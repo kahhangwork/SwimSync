@@ -33,6 +33,7 @@ type AttendanceRecord = {
 type Child = {
   id: string;
   full_name: string;
+  assignment_status: "unassigned" | "assigned" | "inactive";
 };
 
 const FILTER_OPTIONS: FilterOption[] = ["All", "Present", "Absent", "Cancelled", "Trial"];
@@ -100,12 +101,13 @@ export default function AttendanceScreen() {
 
     const { data: links } = await supabase
       .from("parent_students")
-      .select("students(id, full_name)")
+      .select("students(id, full_name, assignment_status)")
       .eq("parent_id", parent.id);
 
     const childList: Child[] = (links ?? []).map((l: any) => ({
       id: l.students.id,
       full_name: l.students.full_name,
+      assignment_status: l.students.assignment_status,
     }));
 
     setChildren(childList);
@@ -159,6 +161,7 @@ export default function AttendanceScreen() {
     }, [loadAttendance])
   );
 
+  const selectedChild = children.find((c) => c.id === selectedChildId) ?? null;
   const filtered = records.filter((r) => matchesFilter(r.status, filter));
 
   return (
@@ -180,7 +183,13 @@ export default function AttendanceScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerClassName="px-5 gap-2 mb-3"
+          // flex-grow-0: react-native-web gives every ScrollView flexGrow:1, so a
+          // horizontal one expands to fill the column's leftover height. items-start:
+          // the row content container would otherwise stretch each chip to that
+          // height (RN's default alignItems is stretch). Together they keep the
+          // chips their natural size on web; native was never affected.
+          className="flex-grow-0"
+          contentContainerClassName="px-5 gap-2 mb-3 items-start"
         >
           {children.map((child) => (
             <TouchableOpacity
@@ -208,7 +217,8 @@ export default function AttendanceScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerClassName="px-5 gap-2 mb-4"
+        className="flex-grow-0"
+        contentContainerClassName="px-5 gap-2 mb-4 items-start"
       >
         {FILTER_OPTIONS.map((opt) => (
           <TouchableOpacity
@@ -245,10 +255,35 @@ export default function AttendanceScreen() {
             <Ionicons name="people-outline" size={40} color="#d1d5db" />
             <Text className="text-gray-400 mt-3">No children added yet</Text>
           </View>
+        ) : selectedChild?.assignment_status === "unassigned" ? (
+          // PRD §5.1: before assignment the attendance section shows a
+          // "not assigned yet" state — not an empty list, which reads as broken.
+          <View className="items-center py-16 px-4">
+            <Ionicons name="hourglass-outline" size={40} color="#fcd34d" />
+            <Text className="text-gray-500 font-semibold mt-3">
+              {selectedChild.full_name.split(" ")[0]} isn&apos;t in a class yet
+            </Text>
+            <Text className="text-sm text-gray-400 mt-1 text-center">
+              Not yet assigned to a class. The admin will assign your child soon.
+              Lessons will show up here once that&apos;s done.
+            </Text>
+          </View>
+        ) : records.length === 0 ? (
+          <View className="items-center py-16 px-4">
+            <Ionicons name="calendar-outline" size={40} color="#d1d5db" />
+            <Text className="text-gray-400 mt-3 text-center">
+              No lessons marked yet
+            </Text>
+            <Text className="text-xs text-gray-400 mt-1 text-center">
+              Lessons appear here once the coach marks attendance.
+            </Text>
+          </View>
         ) : filtered.length === 0 ? (
           <View className="items-center py-16">
-            <Ionicons name="calendar-outline" size={40} color="#d1d5db" />
-            <Text className="text-gray-400 mt-3">No records found</Text>
+            <Ionicons name="funnel-outline" size={40} color="#d1d5db" />
+            <Text className="text-gray-400 mt-3">
+              No {filter.toLowerCase()} lessons
+            </Text>
           </View>
         ) : (
           filtered.map((item) => {

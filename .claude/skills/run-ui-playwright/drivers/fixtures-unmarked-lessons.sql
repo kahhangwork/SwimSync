@@ -49,5 +49,19 @@ FROM sess CROSS JOIN students st;
 -- Saturday 11 July: DELIBERATELY ABSENT. No lesson_sessions row, no attendance.
 -- This is the lesson the coach forgot, and the whole point of the feature.
 
+-- A third child who is NOT assigned to any class — the state a parent lands in
+-- during onboarding (PRD §5.1). No enrolment, so she contributes no expected
+-- lessons and is invisible to the coach/admin coverage checks; she exists so the
+-- parent Attendance screen's "not assigned yet" state is reachable.
+WITH p AS (
+  SELECT id FROM parents WHERE profile_id = 'b0000000-0000-0000-0000-000000000001'
+), s AS (
+  INSERT INTO students (full_name, assignment_status, is_active)
+  VALUES ('Julia Tan', 'unassigned', true)
+  RETURNING id
+)
+INSERT INTO parent_students (parent_id, student_id)
+SELECT p.id, s.id FROM p CROSS JOIN s;
+
 SELECT session_date, (SELECT count(*) FROM attendance a WHERE a.lesson_session_id = ls.id) AS marked
 FROM lesson_sessions ls ORDER BY session_date;
