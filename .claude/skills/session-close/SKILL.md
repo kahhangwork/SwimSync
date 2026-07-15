@@ -44,6 +44,14 @@ as this session's work. Then write yourself a short list — **behaviour changes
 raised but not built**, and **everything else** (refactors, tests, docs). The third
 bucket usually only reaches `HANDOVER.md`.
 
+**Watch for changes you didn't make.** The user edits in their IDE while you work, and
+other Claude sessions may be running against the same repo. If `git status` shows a file
+you don't recognise, **check its mtime** (`ls -l <file>`) against your own edits before
+assuming it's yours — then **ask**. Don't document it, don't commit it, don't "tidy" it.
+Also check whether the branch is actually merged (`git branch --contains <sha>`,
+`git log --oneline -1 main`): a `HANDOVER.md` that calls unmerged work "done" is a lie
+the next session will believe.
+
 Ask the user about anything ambiguous **before** writing. A wrong entry in the PRD is
 worse than a missing one, because the PRD is what the next session trusts.
 
@@ -175,11 +183,25 @@ Quick pass, only if relevant:
 
 ## Step 6 — Commit
 
-Use `/commit-review` (the project's review-then-commit skill) rather than committing
-directly, so the doc changes get the same read as code.
+**Stage explicitly — never `git add -A` or `git add .`.** List the paths you actually
+touched. If Step 1 turned up work in progress that isn't yours, `git add -A` sweeps it
+into your commit, which is how someone's half-finished screen ships without review.
+Verify before committing:
+
+```bash
+git add <the paths you touched>
+git diff --cached --name-only   # must contain only your files
+git diff --name-only            # what you're leaving behind — check it's intentional
+```
+
+Then commit. **Use `/commit-review`** so the doc changes get the same read as code —
+**unless the working tree holds changes that aren't yours**, in which case commit the
+staged set directly: `/commit-review` reads the whole working diff and will review, and
+possibly "fix", someone else's unfinished work.
 
 The repo's workflow (HANDOVER §2): feature branch → merge to `main` → push → delete the
-branch. No PRs unless the user asks.
+branch. No PRs unless the user asks. **Confirm the merge with the user** rather than
+assuming — another session may own the branch.
 
 ---
 
