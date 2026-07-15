@@ -143,8 +143,27 @@ cut.
 the first, and it inverts the core rule that billing derives from attendance (§5.5).
 Packages need a balance to draw down, an expiry policy, and a completely different
 answer to "what happens when a lesson is cancelled." Expect it to touch the invoice
-engine, the credit ledger, and every billing screen. Don't start this without deciding
-whether it *replaces* per-lesson billing or coexists with it.
+engine, the credit ledger, and every billing screen.
+
+Decisions already made:
+
+- **Coexists with pay-per-use, doesn't replace it.** Today's model is entirely
+  pay-per-use — the student attends, and the parent settles the month's attended lessons
+  at month end. Package means the parent pays for e.g. 10 lessons up front and each
+  attendance draws the balance down 10 → 9. Both models must be live at once, so
+  **the payment model is a property of the enrolment, not of the system** — and the
+  invoice engine has to skip package-covered attendance rather than bill it twice.
+- **A package belongs to the parent, not the child.** A parent with 3 kids buys one
+  package and all 3 draw from the same balance. This has precedent worth following:
+  `parents.credit_balance` is already pooled per parent (HANDOVER §6), so a package
+  balance hanging off `parents` matches the ledger people already have a mental model
+  for. It also means concurrent draw-down is real — two kids in Saturday classes marked
+  from two screens hit one balance, so the decrement belongs in the database, not the
+  client.
+
+Still open before starting: expiry, what happens when a balance hits zero mid-month
+(fall back to pay-per-use, or block?), and whether a refund of unused lessons lands in
+`credit_balance` or back on the card.
 
 ### Household-level split billing — **M** `[MVP-excluded]`
 Let two parents (e.g. separated households) each receive a share of the invoice.
@@ -158,6 +177,34 @@ already **many-to-many**, so a student can have two parents. What's missing is a
 rule and a decision about which parent's credit balance a correction lands in. Credit is
 pooled **per parent** (HANDOVER §6), so splitting invoices without splitting credit
 would produce a ledger nobody can explain.
+
+### Coach wage tracking — **M**
+Track what each coach is owed, from their rate and the classes or hours they actually
+taught.
+
+**Why:** SwimSync tracks every dollar coming *in* from parents and nothing going *out*
+to coaches — so the moment a coach isn't also the business owner, payroll is a
+spreadsheet rebuilt by hand each month from the same attendance data the app already
+holds. It's the other half of the billing loop, and it's the natural companion to
+tenanted admins above: an admin with three coaches under them has three people to pay.
+
+**This applies to school coaches only.** A **private coach has no wage** — the parents'
+invoices *are* their income and there's nobody upstream to pay them, so a rate on their
+record would be meaningless at best and double-counted revenue at worst. That makes
+**coach type** (Admin and operations) a hard prerequisite: without it there's no way to
+know which coaches this feature is even about. Build that first.
+
+**Notes:** the inputs are mostly here — `classes.start_time`/`end_time` give hours,
+`classes.coach_id` gives the attribution, and `lesson_sessions` records what actually
+ran. What's missing is a **rate on `coaches`** (the table has only
+`paynow_qr_url`/`bio` today) and a decision about which of two rate models it is:
+**per-class** or **per-hour**, since they diverge the moment a coach teaches a 90-minute
+lane. Rates change over time, so store them with an effective date rather than a single
+mutable column — otherwise recalculating an old month silently reprices history, which
+is the same class of bug as the UTC billing month below. Decide what a **cancelled**
+class means for pay before building: parents aren't billed for it, but a coach who
+showed up to an empty pool may still expect to be, and that's a policy question, not an
+engineering one.
 
 ### Fix the UTC-derived default billing month — **S** `[handover]`
 The invoice engine's default billing month is derived in UTC.
@@ -187,6 +234,50 @@ already exists — expected lesson dates are derived at read time from
 `classes.day_of_week` via `lib/lessonDates.ts`, which is exactly what the coach's
 unmarked-lessons backlog uses. Point it at the future instead of the past. **This does
 not require pre-generating sessions** — resist that; see HANDOVER §6.
+
+### Collect address and postal code at parent signup — **S**
+Add address and postal code to the registration form.
+
+**Why:** the coach has no way to reach a family off-platform beyond a phone number, and
+postal code is the one field that answers "is this family near a pool I teach at?" —
+which is the question behind every enquiry the coach currently answers from memory.
+
+**Notes:** smaller than it looks — **email and phone are already collected** at signup
+(`profiles.email`, `profiles.phone`, set via the auth trigger; the form is
+`SwimSyncApp/app/(auth)/register.tsx`), so this is address + postal code only. Put them
+on `parents`, not `profiles`: `profiles` is shared with coaches and superadmins, and a
+home address is a parent-shaped fact. **Existing parents won't have them**, so the
+columns are nullable and any screen showing them needs an empty state — or the profile
+screen needs a prompt to fill them in. Postal code is 6 digits in Singapore and worth
+validating as such; the address itself should stay free text. Related: Maps integration
+above, if a parent address ever needs to be more than a string.
+
+### Child identification: NRIC last 4 and derived age — **S**
+Capture the last 4 characters of a child's NRIC at registration, and show age as
+something derived from date of birth rather than stored.
+
+**Why:** **name alone isn't a unique identifier** — a coach with two students called
+"Ethan Tan" on the same roster has no way to tell them apart, and picks wrong on the
+attendance screen. Name + NRIC last 4 is how Singapore actually disambiguates people,
+and it's what the parent will already have to hand. (Last 4 = the last 3 digits and the
+letter, e.g. `S9012345A` → `345A`.)
+
+**Notes:** the DOB half is **mostly already done** — `students.date_of_birth` exists and
+`add-child.tsx` already requires it in `YYYY-MM-DD` form. The real gap is that
+`students.age` is a **stored integer**, described in the PRD's Students field table as
+"age (if DOB not provided)" — a second source of truth that silently goes stale the day
+after it's written. Derive age from `date_of_birth` at read time and **retire the stored
+column** — check `child/[id].tsx` and the admin student tables before dropping it.
+
+For the NRIC field: store the **last 4 only, never the full number**, and be deliberate
+that this is still PII — it goes on `students`, which coaches can already read for any
+student enrolled in their class via `coach_serves_student()`
+(`supabase/migrations/20260309000600_rls_policies.sql:133`), so it will be visible on
+rosters. Uniqueness should be a
+**warning, not a constraint** (two siblings can't share it, but a parent typo shouldn't
+block registration, and existing students have no value at all). That last point makes
+it nullable, so anything treating name + NRIC as *the* identifier needs a fallback for
+the rows that predate it.
 
 ### Parent self-enrolment into classes — **M** `[MVP-excluded]`
 Let parents pick and join a class themselves rather than waiting for the superadmin.
@@ -273,6 +364,110 @@ constraint is the real gate here, not the feature.
 ---
 
 ## Admin and operations
+
+### Tenanted admin accounts — **L**
+Each admin owns a set of coaches and sees only what happens under them. Admin 1 has
+Coaches 1–3 and sees everything beneath them; Admin 2 has Coaches A–C and sees
+everything beneath *them*; neither can see the other's students, classes, attendance,
+or invoices.
+
+**Why:** `superadmin` is currently a **single global role that sees everything** — fine
+while the superadmin and the only coach are the same person, which is the assumption the
+whole authorisation model is built on. It's the thing that has to change before SwimSync
+can ever be run for a second business, and it can't be retrofitted quietly: the day a
+second admin exists without this, they see the first one's families.
+
+**Notes:** the biggest item in this document, and the one most likely to be
+underestimated. `is_superadmin()`
+(`supabase/migrations/20260309000600_rls_policies.sql:20`) is a bare
+`role = 'superadmin'` check with **no tenant dimension at all**, and it appears in
+roughly every policy in the file — every one becomes "…and in my tenant." Decide the
+tenant's shape first: a `tenants` table with `profiles.tenant_id`, scoped by a
+`current_tenant_id()` helper alongside the existing `coach_serves_parent()`, is the
+obvious shape. The subtleties are where the tenant boundary actually falls — a **parent
+is reachable only through their coach**, so a family that ever moves between coaches (or
+one child per coach) needs an answer before the schema is set. Also: existing rows all
+need a tenant on migration, and `classes` is readable by *any signed-in user* today —
+`classes_select` is a bare `USING (TRUE)`
+(`supabase/migrations/20260309000600_rls_policies.sql:161`) — which is a leak the moment
+tenants exist.
+Do this before onboarding a second admin, not after — backfilling a tenant boundary
+across live billing data is a different and worse project.
+
+### Coach type: private vs school — **M**
+A type on each coach that decides who they answer to. A **school coach** belongs to a
+tenanted admin (above) and is managed, paid, and seen by that admin. A **private coach**
+runs their own business and falls under the overall SwimSync platform admin instead.
+
+**Why:** these two coaches are not the same object wearing different labels — they have
+different owners, different money, and different privacy expectations, and almost every
+rule that follows branches on which one you're looking at. The clearest case is wages
+below: a school coach is *paid* by their admin, while a private coach **has no wage at
+all** — the parents' invoices are already their income, and there's nobody upstream to
+pay them. Building either feature without this distinction means building it twice.
+
+**Notes:** should be settled **as part of** tenanted admins above, not after it — it's
+the same schema decision, and getting it wrong is the expensive kind of wrong. Two
+things to get right:
+
+- **A private coach should be their own tenant, not a resident of one big "platform"
+  tenant.** "Falls under the SwimSync admin" is about *who administers them*, not about
+  who they sit beside. If every private coach shares one platform tenant, they can see
+  each other's families — which is the exact failure tenanting exists to prevent, just
+  moved somewhere less obvious. Give each private coach a tenant of one, and make the
+  platform admin a **cross-tenant operator role** rather than a tenant.
+- **That means `superadmin` is really two roles today**, and this is where they split:
+  the *platform* admin (SwimSync itself, sees everything, for support and billing) and a
+  *tenant* admin (a school, sees only their own). The `user_role` enum
+  (`parent`/`coach`/`superadmin`) can't express that, so it needs a new value — and
+  every current `is_superadmin()` call site has to be read as one or the other. Assume
+  the answer is "tenant admin" unless it's genuinely platform operations; defaulting the
+  other way hands schools each other's data.
+
+Also decide whether a coach can **change type** — a private coach joining a school is an
+ordinary career move, and it means moving them *and their families* between tenants,
+which is the same hard case the tenanting item already flags.
+
+### Active / inactive status for parents and children — **M**
+An explicit active/inactive state on each child and each parent, with the two kept in
+step: deactivating a child deactivates only that child; deactivating the **last** active
+child deactivates the parent; deactivating a parent deactivates all their children.
+Record the date each child went inactive.
+
+**Why:** families leave, and today the only way to express that is deleting them — which
+destroys the billing history you need at tax time — or leaving them in place, where they
+pad every roster and every unmarked-lesson report forever. The inactive date is the part
+that earns its keep: "when did they stop?" is the question behind every end-of-year
+reconciliation and every "why is this invoice short?"
+
+**Notes:** the columns half-exist, and that's the trap. **Start by reconciling what's
+already there rather than adding to it** — a student can currently be called inactive in
+*two* ways: `students.is_active` (boolean, defaults TRUE) and
+`students.assignment_status`, an enum whose values are `unassigned | assigned | inactive`
+(`supabase/migrations/20260309000100_initial_schema.sql:14`). The enum is **live in the
+parent UI** — it renders as the status chip on `(parent)/home/index.tsx:243`. Adding a
+third notion of "inactive" beside those two would produce exactly the stale-second-source
+problem the NRIC item above describes for `age`. Decide first whether
+`assignment_status = 'inactive'` *is* this feature (and `is_active` is the redundant one),
+or whether assignment and activity are genuinely different axes — a child can plausibly
+be active but unassigned, which is an argument for keeping both, but that argument should
+be made on purpose and written down here.
+
+What's genuinely missing is the **date** (add `students.inactivated_at DATE`; note
+`parents` has no active flag at all today — the parent's lives on `profiles.is_active`)
+and the **cascade**, which is the real design work. Note the asymmetry: parent→children
+is a plain cascade, but children→parent fires only when the *last* child goes inactive,
+and neither direction says what happens on **re**-activation — decide that explicitly
+rather than discovering it. Prefer a trigger over app-side logic so the invariant can't
+be bypassed by the admin panel, the app, or dashboard SQL taking different paths.
+
+Check the interaction with `student_class_enrolments.is_active` before starting: the
+invoice engine's completeness gate builds its student list from **active enrolments
+only** and never consults `students.is_active`
+(`supabase/functions/generate-invoices/core.ts:122-130`), so an inactive child with a
+live enrolment still counts — and shows up as an unmarked lesson, the false alarm that
+teaches a coach to ignore the report (PRD §7.5). Deactivating a child almost certainly
+has to close their enrolment too.
 
 ### Delete-coach action in the admin UI — **S** `[handover]`
 A real delete/deactivate control for coaches.
