@@ -47,7 +47,7 @@ follow-up on the list: it's purely client-side, it protects the billing loop, an
 takes an afternoon.
 
 **Notes:** no schema change — populate the existing attendance state map before save.
-HANDOVER §8 flagged it as deliberately deferred so it could ship on its own.
+HANDOVER §8d flagged it as deliberately deferred so it could ship on its own.
 
 ### Makeup lessons — **L** `[MVP-excluded]` `[Phase 3]`
 A student misses a lesson and attends a different session to make it up, without being

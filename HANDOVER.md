@@ -76,10 +76,10 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   the coach's Today tab lists **Unmarked Lessons** and links straight to marking a past
   date, and the admin's invoice-generation dialog reports `N of M lessons marked` per
   class with the missing dates named. Closes the hole where a forgotten lesson was
-  silently unbillable and invisible to everyone (§8c).
+  silently unbillable and invisible to everyone (§8d).
 - **Parent Attendance states (verified UI)** — an unassigned child gets the
   "not assigned yet" state PRD §5.1 requires, distinct from "no lessons marked yet"
-  (waiting on the coach) and an empty filter result (§8).
+  (waiting on the coach) and an empty filter result (§8b).
 - **Full RLS** — parents see only their data, coaches only their classes,
   superadmin everything. Covered by automated isolation tests.
 - **Automated tests** — backend **34 pgTAP + 8 Deno**, plus frontend suites
@@ -96,7 +96,7 @@ superadmin + the real coach/classes). See §11.
 > there is no separate release step. `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
 > As of 2026-07-16 that includes the unmarked-lesson safety net and the parent Attendance
-> fixes (§8). **Caveat worth keeping:** every check on that work ran against **local
+> fixes (§8b). **Caveat worth keeping:** every check on that work ran against **local
 > fixtures** — none of it has been driven against the real production DB. No schema or
 > migration is involved, so failure looks wrong rather than destroying data.
 
@@ -256,7 +256,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   (takes any `date`, resolves-or-creates that date's session, pre-fills existing rows),
   so back-dating Just Works and nothing is ever overwritten. What was missing was not
   the rows but a **reckoning**: which lessons *should* have happened. That is derived at
-  read time from `classes.day_of_week` (`lib/lessonDates.ts`) — see §8c. Don't "fix" this
+  read time from `classes.day_of_week` (`lib/lessonDates.ts`) — see §8d. Don't "fix" this
   by pre-generating sessions unless you have a reason the read-time derivation can't
   serve; pre-generation adds a job, a schedule, and edge cases when classes change.
   - A class that legitimately didn't run needs **no new concept**: the coach marks
@@ -342,14 +342,69 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
-## 8. What changed this session (2026-07-16)
+## 8. What changed this session (2026-07-16 — backlog)
+
+**Recorded six future features in `BACKLOG.md`. No code changed; nothing shipped.**
+
+Requested by the user as a queue for future work. Written against the current schema
+rather than from memory, which changed what three of them are:
+
+- **Tenanted admin accounts — L.** Each admin sees only their own coaches' families.
+  Now the biggest item in the document. `is_superadmin()` is a bare `role = 'superadmin'`
+  with no tenant dimension, and it appears in nearly every policy.
+- **Coach type: private vs school — M.** Decides who a coach answers to, and gates the
+  wage item below.
+- **Active / inactive for parents and children — M**, with the cascade rules and an
+  inactivated date.
+- **Coach wage tracking — M.** School coaches only — a private coach has no wage.
+- **Address + postal code at parent signup — S.** Smaller than asked: email and phone
+  are already collected.
+- **NRIC last 4 + derived age — S.** Also smaller: child DOB is already required today.
+
+**Package pricing was already a backlog item**, so the two new decisions were folded
+into it rather than duplicated — it coexists with pay-per-use (the model belongs to the
+enrolment), and a package balance **pools per parent** across their children, matching
+the `parents.credit_balance` precedent.
+
+**Found while writing — worth knowing before the active/inactive item is picked up:**
+`students.assignment_status` is an enum whose values are `unassigned | assigned |
+inactive` (`20260309000100_initial_schema.sql:14`), and it renders as the status chip on
+`(parent)/home/index.tsx:243`. So "this child is inactive" is **already sayable two
+ways** — that enum and `students.is_active`. Reconcile them before adding a third; the
+item says so. Related: the invoice engine's completeness gate reads **active enrolments
+only** and never consults `students.is_active`
+(`generate-invoices/core.ts:122-130`), so deactivating a child without closing their
+enrolment would still raise unmarked-lesson alarms.
+
+**Not done (deliberate):**
+
+- **PRD untouched** — nothing shipped a behaviour change. Six ideas is exactly what
+  `BACKLOG.md` is for; putting any of it in the PRD would make the PRD describe things
+  that don't exist.
+- **§9 untouched** — it already points at `BACKLOG.md` for the queue, and none of these
+  six displace the current shift (onboarding → first invoice run → bulk set-all).
+- **No item tagged with a provenance tag.** The tags map to PRD §3.2 / §15 / handover
+  origins; these came from the user directly and inventing a tag would fake a lineage.
+
+**Process note:** the six items were committed as `3e1270c` **directly to `main`** —
+unintentionally. The branch `docs/backlog-future-features` had been created for them,
+but a concurrent merge to `main` (§8b) moved `HEAD` between the branch checkout and the
+commit, so the commit landed on `main` and the branch was left an empty pointer at
+`8c1d5ad`. Deleted it. No harm done — the change was docs-only — but note `3e1270c`
+**has no CI run of its own**: it was pushed between two other commits and the green run
+is on `b89ca52`, which contains it. **Two sessions in one repo means `git status` before
+`git commit`, not after.**
+
+---
+
+## 8b. What changed this session (2026-07-16)
 
 **Fixed the parent Attendance screen — and shipped everything on this branch to
 production.**
 
 - **Merged to `main` and pushed: `2f746ca` → `8c1d5ad` (4 commits). CI green** across
   backend + both frontends. Vercel builds `swimsync.sg` / `admin.swimsync.sg` from
-  `main`, so the unmarked-lessons work (§8c), the docs split (§8b), and the fixes below
+  `main`, so the unmarked-lessons work (§8d), the docs split (§8c), and the fixes below
   are **now live**. Note what that means: everything before this was verified against
   **local fixtures only** — this is the first time any of it runs against the real
   production DB (clean slate, real coach, 4 real classes). Nothing here touches schema
@@ -384,7 +439,7 @@ production.**
 **Not done (deliberate):**
 - **PRD untouched — the gate genuinely wasn't met.** §5.1 *already* specified the
   "not assigned yet" state, so this fix makes the code match the spec rather than
-  departing from it. Nothing to correct. (§8b reached the same conclusion independently
+  departing from it. Nothing to correct. (§8c reached the same conclusion independently
   before the work landed.)
 - **`BACKLOG.md` left alone** — it was being written by a **concurrent session** while
   this one ran, and has since landed on its own as `3e1270c` (six items: coach wage
@@ -394,10 +449,10 @@ production.**
   **Two sessions ran against this repo today** — check `git log` before assuming an
   uncommitted file is yours.
 - **§5 test counts were stale and are now corrected** (app 29→**32**, admin 35→**38**).
-  They were wrong by my own hand in §8c: three `formatSgDate`/`dayOfWeekOf` tests were
+  They were wrong by my own hand in §8d: three `formatSgDate`/`dayOfWeekOf` tests were
   added to each app *after* the counts were written. Verified by running both suites.
 
-## 8b. What changed (2026-07-16 — docs split)
+## 8c. What changed (2026-07-16 — docs split)
 
 **Split the docs into three, so each one can be trusted for a different question.**
 
@@ -458,10 +513,10 @@ that earns a PRD edit now.
   progress, and another session was active concurrently. Needs no PRD change when it
   lands: **§5.1 already specifies** the "not assigned yet" state, so it makes the code
   match the spec rather than departing from it.
-  - _Update: that work **landed** later the same day as `8c1d5ad` — see §8. The PRD call
+  - _Update: that work **landed** later the same day as `8c1d5ad` — see §8b. The PRD call
     above held._
 
-## 8c. What changed (2026-07-15)
+## 8d. What changed (2026-07-15)
 
 **Closed the silent-underbilling hole before the first real invoice run.**
 
@@ -516,7 +571,7 @@ that earns a PRD edit now.
 a rained-out class is 17 × 2 taps, which is where a coach abandons the task, and an
 abandoned cancellation looks exactly like a forgotten lesson. Additive; ships separately.
 
-## 8d. What changed (2026-07-13 → 07-14)
+## 8e. What changed (2026-07-13 → 07-14)
 
 - **Production email via Resend on `swimsync.sg`** — cloud custom SMTP
   (`smtp.resend.com:465`, sender `noreply@swimsync.sg`); branded reset template
@@ -544,7 +599,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
   (suite 22 → 34). CI green across backend + both frontend jobs.
 - All merged to `main`, pushed, CI-verified.
 
-## 8e. Session (2026-07-12)
+## 8f. Session (2026-07-12)
 
 - **Auth polish — password reset** — implemented the mobile recovery flow end to
   end: new `(auth)/forgot-password.tsx` + `(auth)/reset-password.tsx` screens, wired
@@ -558,7 +613,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
   email → reset screen (no bounce to home) → new password → re-login. Error mapping
   checked against live Supabase strings. Coach seed password restored to `password123`.
 
-## 8f. Session (2026-07-11)
+## 8g. Session (2026-07-11)
 
 - **Credit-note ledger fix** — added `credit_applications` (migration `20260711000100`)
   + updated the engine so partial credit reconciles; verified UI + backend.
@@ -578,7 +633,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift. Keep this section to what's genuinely next.
 
-The MVP loop is built and live; the silent-underbilling hole is closed (§8c). **The
+The MVP loop is built and live; the silent-underbilling hole is closed (§8d). **The
 product is no longer the blocker — real usage is.**
 
 **Do this first (one-off):** `main` was merged + pushed on 2026-07-16, so
