@@ -48,35 +48,34 @@ theme.
 
 ### The near-term plan — build roughly in this order
 
-_(The original #1, bulk "set all" on the attendance screen, **shipped 2026-07-16** — see
-PRD §7.6. The list below is renumbered from what remains.)_
+_(Two items have shipped and been removed from this list: the original #1, bulk "set all"
+on the attendance screen (**shipped 2026-07-16** — PRD §7.6), and the `tsc`-baseline +
+CI-typecheck item (**shipped 2026-07-16** — HANDOVER §8). The list below is renumbered from
+what remains.)_
 
 1. **Fix the UTC-derived default billing month** (S, _Billing_) — cheap, and it must land
    **before** cron is ever switched on. Cron is the gate for automated reminders further
    down; fixing this *after* enabling cron means a mis-billed month first.
-2. **Fix the 5 `tsc` errors + add `tsc --noEmit` to CI** (S, _Foundations_) — get a clean
-   typecheck baseline **before** building more app features, so a new type error can't
-   hide in the known-broken noise and no future session re-establishes "these aren't mine."
-3. **Email invoice / credit-note notifications** (S, _Notifications_) — best
+2. **Email invoice / credit-note notifications** (S, _Notifications_) — best
    effort-to-value (Resend is already live and paid for) and the **root of the reminder
    chain**: WhatsApp reminders and automated reminders both sequence after it.
-4. **Extract the completeness-rule shared helper** (S, _Foundations_) — do **before** #5.
+3. **Extract the completeness-rule shared helper** (S, _Foundations_) — do **before** #4.
    Active/inactive will edit that rule; extract it into one helper first so the change
-   lands in one place, not the four hand-written copies. Doing #5 first means editing four
+   lands in one place, not the four hand-written copies. Doing #4 first means editing four
    copies and then re-touching them at extraction time.
-5. **Active / inactive status for parents and children** (M, _Admin_) — the anchor for the
+4. **Active / inactive status for parents and children** (M, _Admin_) — the anchor for the
    students table. Reconcile the two existing "inactive" notions (`is_active` vs
    `assignment_status`) and settle the status model **before** more fields are piled onto
-   students. Needs #4.
-6. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
-   the stored `age` column (the same stale-second-source problem #5 fixes for status) and
-   add NRIC. Rides the same students-schema + parent-home + admin-table edits as #5, so do
+   students. Needs #3.
+5. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
+   the stored `age` column (the same stale-second-source problem #4 fixes for status) and
+   add NRIC. Rides the same students-schema + parent-home + admin-table edits as #4, so do
    it right after — otherwise those screens get touched twice.
-7. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
-   `parents`-table addition touching the registration form; group with #6's
+6. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
+   `parents`-table addition touching the registration form; group with #5's
    onboarding-form work so those screens are opened once.
-8. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field; do it
-   **after** the #5/#6 reconciliations so it respects the settled status/level model
+7. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field; do it
+   **after** the #4/#5 reconciliations so it respects the settled status/level model
    rather than adding churn to a table still being reconciled.
 
 ### Later — clusters with a fixed internal order
@@ -637,17 +636,6 @@ notices.
 **Notes:** the engine copy is **unavoidable** (Deno, no npm resolution), so the target is
 three-into-one, not four. Until then: **if you touch the rule, touch all four.**
 
-### Fix the 5 pre-existing `tsc` errors in the app — **S** `[handover]`
-`SwimSyncApp/app/(parent)/home/child/[id].tsx` doesn't typecheck (Supabase join typing).
-
-**Why:** CI runs jest, not `tsc`, for the app — so these are invisible and permanent.
-Worse, a known-broken baseline means a *new* type error hides in the noise, and every
-future session wastes time re-establishing that these aren't their fault (HANDOVER §5
-has to warn about it explicitly).
-
-**Notes:** fix, then add `tsc --noEmit` to CI so the baseline stays clean. The second
-half is the point.
-
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`
 → `createClient<Database>(...)`) so query results are typed from the real schema instead
@@ -666,8 +654,8 @@ migration, or they silently go stale and start lying, which is worse than no typ
 an **M**, not an **S**: it touches every query site, and even with the generic in place
 supabase-js still infers to-one embeds as arrays without `!inner`/`!hint` annotations, so
 a few casts remain. This **supersedes and absorbs** the `any`-cast fix already applied in
-`(parent)/home/child/[id].tsx` (the tsc-errors item above) — that cast was the pragmatic
-`S`-sized fix to clear the baseline now; this is the thorough version for later. Do **not**
+`(parent)/home/child/[id].tsx` (shipped 2026-07-16, HANDOVER §8) — that cast was the
+pragmatic `S`-sized fix to clear the baseline now; this is the thorough version for later. Do **not**
 start this while migrations are still landing (active/inactive, NRIC, coach wage, tenanting
 are all schema-touching backlog items ahead of it). The natural trigger is "the schema is
 frozen and we want compiler-enforced safety before a big build."
