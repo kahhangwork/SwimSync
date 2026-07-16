@@ -96,7 +96,7 @@ export default function ChildProfileScreen() {
     const activeEnrolment = (student.student_class_enrolments ?? []).find(
       (e: any) => e.is_active
     );
-    const cls = activeEnrolment?.classes ?? null;
+    const cls: any = activeEnrolment?.classes ?? null;
     const coachProfile = cls?.coaches?.profiles ?? null;
 
     // Fetch outstanding invoices for the parent linked to this student

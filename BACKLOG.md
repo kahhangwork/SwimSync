@@ -107,7 +107,8 @@ Email-confirmation copy/templates (S).
 Package pricing (L), Makeup lessons (L), Multiple classes per child (M), Parent
 self-enrolment (M), Coach-assisted assignment (M), Household split billing (M), Auto PayNow
 detection (L), In-app payment gateway (L), Multiple coaches per class (S), Multi-language
-(M), Shared `lessonDates` package (M — *not recommended*, see the item).
+(M), Shared `lessonDates` package (M — *not recommended*, see the item), Generate real
+Supabase `Database` types (M — *do last*, needs a frozen schema; see the item).
 
 ---
 
@@ -646,6 +647,30 @@ has to warn about it explicitly).
 
 **Notes:** fix, then add `tsc --noEmit` to CI so the baseline stays clean. The second
 half is the point.
+
+### Generate real Supabase `Database` types — **M** — _low priority, do last_
+Give the supabase-js client a generated `Database` type (`supabase gen types typescript`
+→ `createClient<Database>(...)`) so query results are typed from the real schema instead
+of guessed from the select string, retiring the `any` casts scattered across every
+screen that reads a nested join.
+
+**Why:** today there is no `Database` generic anywhere, so supabase-js infers response
+shapes from the select string alone and every nested embed is treated as an `any` — real
+type safety across the app's ~11+ query sites is simply absent. With generated types, a
+misspelled column, a dropped field, or a wrong status value is caught by the compiler
+before it ships, everywhere, not just where someone remembered to be careful.
+
+**Notes:** **deliberately ranked last, and only worth doing once the schema has stopped
+changing** — the generated types are a *snapshot* that must be regenerated on every
+migration, or they silently go stale and start lying, which is worse than no types. It's
+an **M**, not an **S**: it touches every query site, and even with the generic in place
+supabase-js still infers to-one embeds as arrays without `!inner`/`!hint` annotations, so
+a few casts remain. This **supersedes and absorbs** the `any`-cast fix already applied in
+`(parent)/home/child/[id].tsx` (the tsc-errors item above) — that cast was the pragmatic
+`S`-sized fix to clear the baseline now; this is the thorough version for later. Do **not**
+start this while migrations are still landing (active/inactive, NRIC, coach wage, tenanting
+are all schema-touching backlog items ahead of it). The natural trigger is "the schema is
+frozen and we want compiler-enforced safety before a big build."
 
 ### Deeper component-render tests — **M** `[handover]`
 RN screens with a mocked Supabase; admin table components.

@@ -3,10 +3,10 @@ name: CI
 # Runs the backend test suites against a real local Supabase stack on every
 # push / PR to main. This is what guards the billing + credit money-path logic.
 #
-# Scope note: frontend typecheck (tsc / next build) is intentionally NOT run
-# yet — the app currently has pre-existing type errors (see HANDOVER); wire it
-# in once those are resolved so CI can start green and stay green. The
-# frontend-tests job below runs the component/unit suites (vitest / jest-expo).
+# The frontend-tests job below typechecks (tsc --noEmit) and runs the
+# component/unit suites (vitest / jest-expo) for both apps. The typecheck guard
+# keeps the baseline green — a new type error fails CI instead of hiding in
+# known-broken noise.
 
 on:
   push:
@@ -68,6 +68,10 @@ jobs:
 
       - name: Install deps
         run: npm ci
+        working-directory: ${{ matrix.app }}
+
+      - name: Typecheck (tsc)
+        run: npm run typecheck
         working-directory: ${{ matrix.app }}
 
       - name: Component / unit tests
