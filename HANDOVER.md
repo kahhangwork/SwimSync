@@ -402,13 +402,13 @@ can never affect invoice generation. Was Build-order item #2 (the invoice half).
   end-to-end — recipients resolved from the DB and sent via a stubbed Resend, plus a
   no-op-without-key path proving invoice generation is untouched.
 
-**TWO cloud actions remain before parents actually get emails (neither is done by a git
-push — the Edge Function is NOT deployed by Vercel):**
-1. **Deploy the function:** `supabase functions deploy generate-invoices`.
-2. **Set the secret:** `supabase secrets set RESEND_API_KEY=<the Resend key>` (the same key
-   that is the SMTP password on the dashboard). Optionally `APP_URL` (defaults
-   `https://swimsync.sg`).
-Until both are done, cloud generation behaves exactly as before (no emails).
+**LIVE in production as of 2026-07-16** — both cloud actions are done: the function was
+deployed (`supabase functions deploy generate-invoices`) and the `RESEND_API_KEY` secret
+set. So the **next real invoice generation (the 1 Aug run) will email each parent.** No live
+send has been exercised on prod yet (it fires on the first real generation). **Note for any
+future function change:** the Edge Function is deployed by `supabase functions deploy`, NOT
+by a git push (Vercel only builds the two web apps) — a merged-but-not-deployed change won't
+be live.
 
 **Found while reviewing (NOT introduced here) — a pre-existing engine bug, now in BACKLOG:**
 `core.ts` loops per class and creates a parent's invoice in the *first* class they appear in,
@@ -840,11 +840,11 @@ report expects the right weekday.
 across the 4 Sunday classes); the **first real invoice run is 1 Aug 2026** (July's billing,
 manual — no cron on the free tier). Everything below sequences around those two facts.
 
-**⚠ Two cloud actions before 1 Aug, if invoice emails should go out.** The email feature
-shipped this session (§8) but is **NOT yet live** — a git push does not deploy the Edge
-Function. Run `supabase functions deploy generate-invoices` **and**
-`supabase secrets set RESEND_API_KEY=<key>` (the same key that is the SMTP password on the
-dashboard). Without them, generation still works but emails nothing.
+**Invoice emails are LIVE** — the function was deployed and `RESEND_API_KEY` set on
+2026-07-16 (§8), so the 1 Aug run will email each parent their invoice. No live send has run
+on prod yet (it fires on the first real generation), so **watch the first run**: the
+response includes `emails_sent`, and Resend → Emails shows delivery. (Reminder: the Edge
+Function is deployed by `supabase functions deploy`, not a git push.)
 
 In order:
 

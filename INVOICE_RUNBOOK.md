@@ -94,10 +94,10 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 
 - **Parents are emailed automatically** when their invoice is created — a branded,
   itemized "your invoice is ready" email (best-effort; it never blocks or fails
-  generation). This needs the Edge Function **deployed** and a `RESEND_API_KEY` secret
-  set on the cloud project (`supabase functions deploy generate-invoices` +
-  `supabase secrets set RESEND_API_KEY=<key>`); until those are done, generation still
-  works but sends nothing, so fall back to your usual reminder.
+  generation). **Active in production since 2026-07-16** (function deployed + `RESEND_API_KEY`
+  set). Watch `emails_sent` in the generate response and Resend → Emails on the first run.
+  _(If a future function change is ever deployed without the secret, generation still works
+  but sends nothing — fall back to your usual reminder.)_
 - **Parents pay externally** via your PayNow QR — they see the invoice + QR in
   the app (`swimsync.sg`).
 - **As payments arrive in your bank**, mark each invoice **Paid**:
