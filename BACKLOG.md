@@ -48,35 +48,37 @@ theme.
 
 ### The near-term plan — build roughly in this order
 
-_(Two items have shipped and been removed from this list: the original #1, bulk "set all"
-on the attendance screen (**shipped 2026-07-16** — PRD §7.6), and the `tsc`-baseline +
-CI-typecheck item (**shipped 2026-07-16** — HANDOVER §8). The list below is renumbered from
-what remains.)_
+_(Three items have shipped and been removed from this list: the original #1, bulk "set all"
+on the attendance screen (**shipped 2026-07-16** — PRD §7.6); the `tsc`-baseline +
+CI-typecheck item (**shipped 2026-07-16** — HANDOVER §8b); and the **invoice half of email
+notifications** (**shipped 2026-07-16** — PRD §7.7, HANDOVER §8; credit-note emails remain,
+now in _Notifications_). The list below is renumbered from what remains.)_
 
 1. **Fix the UTC-derived default billing month** (S, _Billing_) — cheap, and it must land
    **before** cron is ever switched on. Cron is the gate for automated reminders further
    down; fixing this *after* enabling cron means a mis-billed month first.
-2. **Email invoice / credit-note notifications** (S, _Notifications_) — best
-   effort-to-value (Resend is already live and paid for) and the **root of the reminder
-   chain**: WhatsApp reminders and automated reminders both sequence after it.
-3. **Extract the completeness-rule shared helper** (S, _Foundations_) — do **before** #4.
+2. **Extract the completeness-rule shared helper** (S, _Foundations_) — do **before** #3.
    Active/inactive will edit that rule; extract it into one helper first so the change
-   lands in one place, not the four hand-written copies. Doing #4 first means editing four
+   lands in one place, not the four hand-written copies. Doing #3 first means editing four
    copies and then re-touching them at extraction time.
-4. **Active / inactive status for parents and children** (M, _Admin_) — the anchor for the
+3. **Active / inactive status for parents and children** (M, _Admin_) — the anchor for the
    students table. Reconcile the two existing "inactive" notions (`is_active` vs
    `assignment_status`) and settle the status model **before** more fields are piled onto
-   students. Needs #3.
-5. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
-   the stored `age` column (the same stale-second-source problem #4 fixes for status) and
-   add NRIC. Rides the same students-schema + parent-home + admin-table edits as #4, so do
+   students. Needs #2.
+4. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
+   the stored `age` column (the same stale-second-source problem #3 fixes for status) and
+   add NRIC. Rides the same students-schema + parent-home + admin-table edits as #3, so do
    it right after — otherwise those screens get touched twice.
-6. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
-   `parents`-table addition touching the registration form; group with #5's
+5. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
+   `parents`-table addition touching the registration form; group with #4's
    onboarding-form work so those screens are opened once.
-7. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field; do it
-   **after** the #4/#5 reconciliations so it respects the settled status/level model
+6. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field; do it
+   **after** the #3/#4 reconciliations so it respects the settled status/level model
    rather than adding churn to a table still being reconciled.
+
+_Not ranked here but flagged for near-term attention:_ a **pre-existing multi-class-parent
+under-billing bug** (see _Billing_) — worth fixing before 1 Aug if any family has siblings
+in different classes.
 
 ### Later — clusters with a fixed internal order
 
@@ -91,8 +93,9 @@ what remains.)_
   parent-link + RLS surface that tenanting rewrites.
 - **The platform chain.** Native store builds (M) → Push notifications (M) — push can't
   work on the current static web app, so it can't precede native builds.
-- **The reminder chain (continues from #3).** Email (#3) → WhatsApp reminders (M) →
-  Automated reminder workflows (M — needs a scheduler, i.e. cron, so it needs #1 too).
+- **The reminder chain.** Invoice emails **shipped** (HANDOVER §8); the rest sequences after
+  them: credit-note emails (M) → WhatsApp reminders (M) → Automated reminder workflows
+  (M — needs a scheduler, i.e. cron, so it needs #1 too).
 
 ### Unordered — no dependencies, pick by value
 
@@ -282,6 +285,25 @@ error that already shipped a real double-billing bug (HANDOVER §7.7).
 the earlier bug. Currently documented as a warning in `INVOICE_RUNBOOK.md`, which is not
 the same as fixed. **Do this before enabling cron, not after.**
 
+### Multi-class parent is under-billed — **S**
+A parent with children in **two different classes** is billed for only one of them. Found
+while reviewing the invoice-email work (HANDOVER §8); **pre-existing, not introduced by it.**
+
+**Why:** the invoice engine (`generate-invoices/core.ts`) loops **per class** and creates a
+parent's invoice during the *first* class they appear in; when it reaches the parent's other
+class, the "already has an invoice for the month" guard (`core.ts:212-226`) skips them — so
+the second class's billable lessons are **silently dropped**. This contradicts PRD §5.5
+("all eligible lessons for a parent's children are included in the same invoice") and, unlike
+a forgotten lesson, isn't surfaced by the gap report. Real money, and it could bite on the
+**1 Aug** run if any family has siblings in different classes (plausible with 4 classes).
+
+**Notes:** the fix is to aggregate a parent's billable items **across all classes first**,
+then create one invoice — i.e. restructure the per-class loop so invoice creation happens
+once per parent after all classes are tallied, not inside the class loop. Add a Deno test
+(two classes, one parent, children in both → one invoice with both classes' items) — the
+engine's `core.test.ts` scenario helper currently seeds a single class, so it needs
+extending. Check the `credit`/FIFO path still reconciles once items span classes.
+
 ---
 
 ## Parent experience
@@ -378,17 +400,35 @@ pool. `classes.location_address` is already captured and currently just renders 
 
 ## Notifications and reminders
 
-### Email invoice and credit-note notifications — **S** `[Phase 2]`
-Email the parent when an invoice is generated or a credit note is issued.
+### Credit-note email notifications — **M** `[Phase 2]`
+Email the parent when a credit note is auto-issued (attendance edited billable→non-billable
+on an already-invoiced lesson). _(Invoice-generation emails **shipped 2026-07-16** — PRD
+§7.7, HANDOVER §8; this is the other half.)_
 
-**Why:** today an invoice appears silently and the parent only finds out by opening the
-app — so the coach chases payment manually for a bill the parent never knew existed.
-This is the cheapest possible improvement to getting paid on time.
+**Why:** the parent has no idea an adjustment happened until they open the app, so the coach
+fields "why is my bill different?" by hand — the same silent-notification gap the invoice
+email closes, for the other side of the ledger.
 
-**Notes:** the infrastructure is **already live and paid for** — Resend on
-`noreply@swimsync.sg`, with a branded template pattern established at
-`supabase/templates/recovery.html` (HANDOVER §11). This is likely the best
-effort-to-value item in the whole document.
+**Notes:** deliberately split from the invoice email because it's a **harder path** — credit
+notes are issued by the `handle_attendance_update` **Postgres trigger** (`20260309000500`),
+not the Edge Function, so there's no server-side send point. Needs `pg_net` (cloud-only)
+firing from the trigger, or a Supabase DB webhook → a small endpoint that sends via Resend.
+**Reuse `email.ts`** (builders + `sendInvoiceEmail`, HANDOVER §8) once building. Guard
+idempotency — the trigger can fire per edit.
+
+### Track invoice-email delivery + retry — **S**
+Record when each invoice was emailed and only email not-yet-sent invoices, so a failed send
+retries on the next generation run.
+
+**Why:** the shipped invoice email (HANDOVER §8) is **best-effort** — a Resend hiccup
+silently drops that parent's notification, and the coach chases a bill they never heard
+about. Fine at ~17 parents; worth hardening once send volume or an observed failure makes
+silent drops a real cost.
+
+**Notes:** add a nullable `invoices.invoice_email_sent_at timestamptz` (migration) and an
+`IS NULL` filter on the send set in `emailCreatedInvoices` (`email.ts`), so a re-run retries
+misses without re-emailing successes. Deliberately deferred from the first cut to keep it an
+'S'. Pairs with watching Resend delivery in the dashboard.
 
 ### WhatsApp payment reminders — **M** `[Phase 2]`
 Nudge parents about outstanding invoices over WhatsApp.

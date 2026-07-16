@@ -92,9 +92,14 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 
 ## After generating
 
+- **Parents are emailed automatically** when their invoice is created — a branded,
+  itemized "your invoice is ready" email (best-effort; it never blocks or fails
+  generation). This needs the Edge Function **deployed** and a `RESEND_API_KEY` secret
+  set on the cloud project (`supabase functions deploy generate-invoices` +
+  `supabase secrets set RESEND_API_KEY=<key>`); until those are done, generation still
+  works but sends nothing, so fall back to your usual reminder.
 - **Parents pay externally** via your PayNow QR — they see the invoice + QR in
-  the app (`swimsync.sg`). No action needed from you to notify beyond your usual
-  reminder.
+  the app (`swimsync.sg`).
 - **As payments arrive in your bank**, mark each invoice **Paid**:
   Invoices → find the row → **Mark Paid**. This stamps the paid time.
 
@@ -104,6 +109,10 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 
 - **Bill the previous month** — the picker defaults to the current month; always change it.
 - **One invoice per parent per month**, covering *all* their children together.
+  ⚠️ **Known bug (until fixed):** a parent with children in **two different classes** is
+  currently billed for only **one** class — the other is silently dropped (BACKLOG →
+  Billing). If any family has siblings in different classes, **verify that invoice by hand**
+  before telling them to pay.
 - **Only billable statuses count:** **Present** and **Paid Trial**. Absent,
   Cancelled (rain/coach), and Free Trial are excluded.
 - **Credit auto-applies** (oldest first). An invoice fully covered by credit is

@@ -145,8 +145,10 @@ running (`supabase start`). Two suites:
 # 1. Database tests (pgTAP) — credit-note trigger, RLS isolation, constraints.
 supabase test db
 
-# 2. Function tests (Deno) — the generate-invoices billing math + credit ledger.
-#    test.sh exports SERVICE_ROLE_KEY from `supabase status` and runs deno test.
+# 2. Function tests (Deno) — generate-invoices billing math + credit ledger, plus the
+#    invoice-email builders/sender + orchestration. test.sh exports SERVICE_ROLE_KEY from
+#    `supabase status` and runs deno test. (Local generation sends no emails unless
+#    RESEND_API_KEY is set in supabase/functions/.env — leaving it blank is expected.)
 supabase/functions/generate-invoices/test.sh
 ```
 
