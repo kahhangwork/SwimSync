@@ -79,6 +79,21 @@ then commits.
 - **Invoke:** `/commit-review`, or ask to "review and commit".
 - **Details:** [.claude/skills/commit-review/SKILL.md](.claude/skills/commit-review/SKILL.md)
 
+### `session-start` — get up to speed before touching code
+
+The mirror of `session-close`. Reads the four orientation documents **in order** —
+`HANDOVER.md` (state you're inheriting) → `PRD.md` (what exists) → `BACKLOG.md`
+(what doesn't yet, and why) → `LOCAL_DEV_GUIDE.md` (exact run/test commands + seed
+logins) — then reports where things stand, what's next per HANDOVER §9, and any
+drift it spotted across the docs. The order is the fastest path from cold to
+productive.
+
+- **Invoke:** `/session-start`, or say "get up to speed" / "catch up" / "where were
+  we" at the start of a session.
+- **Pairs with:** `/session-close` (writes these same documents back at session end)
+  and `/run-ui-playwright` (uses the seed logins to drive the UI).
+- **Details:** [.claude/skills/session-start/SKILL.md](.claude/skills/session-start/SKILL.md)
+
 ### `session-close` — update the three living documents, then commit
 
 SwimSync splits its knowledge across three documents by how often each changes:
@@ -150,6 +165,7 @@ that's the intended outcome.
 
 ```
 # Workflow (project skills, explicit-invocation only)
+/session-start            read HANDOVER→PRD→BACKLOG→LOCAL_DEV_GUIDE, get oriented
 /plan-with-confidence     don't plan until >96% sure (asks questions first)
 /plan-review              rank a plan's product risk + add mitigations
 /commit-review            Senior-Engineer review, then commit
