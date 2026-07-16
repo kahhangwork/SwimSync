@@ -409,6 +409,14 @@ SwimSync shall allow superadmin to manage classes.
 - Set class active/inactive status
 - Assign a coach to a class
 
+*(implemented)* The admin **Classes** page supports both create and edit: each class row has
+an **Edit** action that opens the same form pre-filled and saves via an `UPDATE`, so day,
+time, coach, location, and rate can be changed in-panel (no dashboard SQL). The **day of
+week is a required, explicit choice** — the form no longer defaults it, so a class cannot be
+created on the wrong weekday by leaving the picker untouched. (A class is a *recurring
+weekly* definition keyed by `day_of_week`; there is no single class date — dated
+`lesson_sessions` are created lazily when attendance is marked, per §7.5.)
+
 ### 7.4 Student Management
 
 SwimSync shall allow **parents to create student profiles** and **superadmin to manage assignment** of those students.

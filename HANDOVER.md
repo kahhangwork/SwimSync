@@ -221,7 +221,9 @@ API — it **fails on the pre-fix code**, which is the point;
 runtime (checks the deep joins resolve — no NaN, no empty tables);
 `verify-bulk-setall.mjs` (+ reuses `fixtures-unmarked-lessons.sql`) drives the bulk
 "Set all" menu — the RN-web dropdown renders, the confirm guard fires only when a student
-is already marked, and a bulk save persists `cancelled_rain` to the DB.
+is already marked, and a bulk save persists `cancelled_rain` to the DB;
+`verify-class-edit.mjs` drives the admin Classes page — the create form no longer defaults
+the day (required choice) and an existing class edits Saturday→Sunday and persists.
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
@@ -348,11 +350,11 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
-## 8. What changed this session (2026-07-16 — bulk attendance + backlog ranking)
+## 8. What changed this session (2026-07-16 — bulk attendance + admin class management + backlog ranking)
 
 **Shipped the bulk "Set all to…" control on the coach attendance screen (was the
-backlog's #1), ranked the backlog into a re-work-ordered build plan, and advised moving
-the real classes Saturday→Sunday.**
+backlog's #1), added admin class-editing + a required day-of-week (root-causing the
+Saturday classes), and ranked the backlog into a re-work-ordered build plan.**
 
 - **Bulk "Set all to…" (shipped, verified UI + DB).** The Mark Attendance header now has a
   **"Set all ▾"** menu that sets every enrolled student to one status at once — **Present,
@@ -384,16 +386,27 @@ the real classes Saturday→Sunday.**
   coach/admin money feature. The ranking lives **only there** (one source of truth, not
   stamped on every heading). With bulk set-all shipped, the near-term list is renumbered
   1–8, led by the **UTC-billing-month fix**.
-- **Class day Saturday→Sunday — advised, NOT yet applied (production action for the user).**
-  The 4 real classes were created on **Saturday**; the coach actually teaches **Sunday**
-  (attendance to be marked 12/19/26 Jul — all Sundays; confirmed). The fix is one statement
-  in the Supabase **dashboard SQL editor** (no service key locally, and **there is no
-  edit-class UI** in the admin panel — it's create-only):
-  `UPDATE classes SET day_of_week = 'sunday' WHERE day_of_week = 'saturday';`
-  No `lesson_sessions` exist yet, so nothing else needs touching; expected-lesson dates are
-  derived from `day_of_week` at read time, so the coach/admin views follow automatically.
-  **Confirm this was run before the first Sunday is marked** — otherwise the gap report
-  expects the wrong weekday.
+- **Admin class management — edit-in-UI + required day (shipped, verified).** Root-caused
+  why the 4 real classes were on Saturday: the admin **New Class** form
+  (`SwimSyncAdmin/app/(admin)/classes/page.tsx`) **silently defaulted the day to Saturday**
+  (`useState("saturday")`) and — unlike every other field — **never validated it**, so a
+  class created without touching the dropdown became Saturday. Two fixes: (1) the day now
+  defaults to a blank *"— Choose a day —"* and is required (`!day` in the submit check), so
+  a class can't be created on the wrong weekday by inaction; (2) the page is **no longer
+  create-only** — an **Edit** action per row opens the same modal pre-filled (`openEdit` +
+  an `UPDATE` path in `handleSubmit`), so day/time/coach/rate/location can be changed
+  in-app instead of dashboard SQL. RLS already allowed it (`classes_write` is
+  `FOR ALL … USING (is_superadmin())`). Verified 5/5 via `verify-class-edit.mjs` (day
+  defaults empty, create-without-day blocked, edit Saturday→Sunday persists).
+- **Class day Saturday→Sunday — still a pending PRODUCTION action for the user.** The coach
+  actually teaches **Sunday** (attendance marked 12/19/26 Jul — all Sundays; confirmed), but
+  the real classes are still Saturday in the **production** DB. Two ways to fix it now: once
+  this branch is deployed, **admin → Classes → Edit → set day to Sunday** (the feature
+  above); or immediately, one statement in the Supabase **dashboard SQL editor**:
+  `UPDATE classes SET day_of_week = 'sunday' WHERE day_of_week = 'saturday';` No
+  `lesson_sessions` exist yet, so nothing else needs touching — expected-lesson dates derive
+  from `day_of_week` at read time. **Confirm it's done before the first Sunday is marked**,
+  or the gap report expects the wrong weekday.
 
 **Not done (deliberate):**
 - **No reusable dropdown/menu component.** One use didn't justify a shared component; the
@@ -704,13 +717,13 @@ The MVP loop is built and live; the silent-underbilling hole is closed (§8e). *
 product is no longer the blocker — real usage is.**
 
 **Do this first (one-off, before the first Sunday is marked):**
-- **Move the real classes Saturday→Sunday.** They were created on Saturday but the coach
-  teaches **Sunday** (attendance marked 12/19/26 Jul — all Sundays). There is **no
-  edit-class UI** (the admin Classes page is create-only), so run this once in the Supabase
-  **dashboard SQL editor**:
-  `UPDATE classes SET day_of_week = 'sunday' WHERE day_of_week = 'saturday';` (§8). Nothing
-  else needs touching — expected-lesson dates derive from `day_of_week` at read time. **If
-  this isn't done, the gap report expects the wrong weekday.**
+- **Move the real classes Saturday→Sunday** (production). They were created on Saturday but
+  the coach teaches **Sunday** (attendance marked 12/19/26 Jul — all Sundays). Once this
+  branch is deployed, do it in **admin → Classes → Edit → Sunday** (new this session, §8);
+  or immediately via the Supabase **dashboard SQL editor**:
+  `UPDATE classes SET day_of_week = 'sunday' WHERE day_of_week = 'saturday';` Nothing else
+  needs touching — expected-lesson dates derive from `day_of_week` at read time. **If this
+  isn't done, the gap report expects the wrong weekday.**
 - **Click through the live screens** merged on 2026-07-16 — code that has **only ever run
   against local fixtures** (§3): parent **Attendance** (chips are pills, not tall capsules;
   an unassigned child says "isn't in a class yet"), coach **Today** (no "Unmarked Lessons"

@@ -11,6 +11,7 @@ import { Modal } from "@/components/Modal";
 type ClassRow = {
   id: string;
   title: string;
+  coach_id: string;
   coach_name: string;
   day_of_week: string;
   start_time: string;
@@ -73,11 +74,12 @@ export default function ClassesPage() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form state
   const [title, setTitle] = useState("");
   const [coachId, setCoachId] = useState("");
-  const [day, setDay] = useState("saturday");
+  const [day, setDay] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
@@ -93,7 +95,7 @@ export default function ClassesPage() {
     const { data } = await supabase
       .from("classes")
       .select(
-        "id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, coaches(profiles(full_name)), student_class_enrolments(id, is_active)"
+        "id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, coaches(profiles(full_name)), student_class_enrolments(id, is_active)"
       )
       .eq("is_active", true)
       .order("day_of_week")
@@ -102,6 +104,7 @@ export default function ClassesPage() {
     setClasses(
       (data ?? []).map((c: any) => ({
         id: c.id,
+        coach_id: c.coach_id,
         title: c.title,
         coach_name: c.coaches?.profiles?.full_name ?? "—",
         day_of_week: c.day_of_week,
@@ -132,23 +135,37 @@ export default function ClassesPage() {
   function resetForm() {
     setTitle("");
     setCoachId("");
-    setDay("saturday");
+    setDay("");
     setStartTime("");
     setEndTime("");
     setLocation("");
     setRate("");
     setSaveError(null);
+    setEditingId(null);
   }
 
-  async function handleCreate() {
-    if (!title || !coachId || !startTime || !endTime || !location || !rate) {
+  function openEdit(cls: ClassRow) {
+    setTitle(cls.title);
+    setCoachId(cls.coach_id);
+    setDay(cls.day_of_week);
+    setStartTime(cls.start_time.slice(0, 5)); // "HH:MM:SS" → "HH:MM" for <input type="time">
+    setEndTime(cls.end_time.slice(0, 5));
+    setLocation(cls.location_name);
+    setRate(String(cls.price_per_lesson));
+    setSaveError(null);
+    setEditingId(cls.id);
+    setShowModal(true);
+  }
+
+  async function handleSubmit() {
+    if (!title || !coachId || !day || !startTime || !endTime || !location || !rate) {
       setSaveError("Please fill in all fields.");
       return;
     }
     setSaving(true);
     setSaveError(null);
 
-    const { error } = await supabase.from("classes").insert({
+    const payload = {
       title,
       coach_id: coachId,
       day_of_week: day,
@@ -156,8 +173,11 @@ export default function ClassesPage() {
       end_time: endTime,
       location_name: location,
       price_per_lesson: parseFloat(rate),
-      is_active: true,
-    });
+    };
+
+    const { error } = editingId
+      ? await supabase.from("classes").update(payload).eq("id", editingId)
+      : await supabase.from("classes").insert({ ...payload, is_active: true });
 
     if (error) {
       setSaveError(error.message);
@@ -215,18 +235,19 @@ export default function ClassesPage() {
             <Th>Location</Th>
             <Th>Rate</Th>
             <Th>Students</Th>
+            <Th>Actions</Th>
           </tr>
         </Thead>
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={7}>
+              <Td className="text-center text-gray-400 py-8" colSpan={8}>
                 Loading…
               </Td>
             </Tr>
           ) : filtered.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={7}>
+              <Td className="text-center text-gray-400 py-8" colSpan={8}>
                 No classes found.
               </Td>
             </Tr>
@@ -248,15 +269,24 @@ export default function ClassesPage() {
                     {cls.student_count}
                   </span>
                 </Td>
+                <Td>
+                  <button
+                    onClick={() => openEdit(cls)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                </Td>
               </Tr>
             ))
           )}
         </Tbody>
       </Table>
 
-      {/* Create Class Modal */}
+      {/* Create / Edit Class Modal */}
       <Modal
-        title="Create New Class"
+        title={editingId ? "Edit Class" : "Create New Class"}
         open={showModal}
         onClose={() => setShowModal(false)}
       >
@@ -295,6 +325,7 @@ export default function ClassesPage() {
               onChange={(e) => setDay(e.target.value)}
               className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
             >
+              <option value="">— Choose a day —</option>
               {DAYS.map((d) => (
                 <option key={d} value={d}>
                   {capitalize(d)}
@@ -351,9 +382,9 @@ export default function ClassesPage() {
             <Button
               className="flex-1"
               disabled={saving}
-              onClick={handleCreate}
+              onClick={handleSubmit}
             >
-              {saving ? "Creating…" : "Create Class"}
+              {saving ? "Saving…" : editingId ? "Save Changes" : "Create Class"}
             </Button>
           </div>
         </div>
