@@ -68,6 +68,11 @@ export default function ClassRosterScreen() {
   const [classInfo, setClassInfo] = useState<ClassInfo | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [markTarget, setMarkTarget] = useState<{
+    date: string;
+    sessionId: string | null;
+  } | null>(null);
+  const [windowStart, setWindowStart] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const todayDate = todayInSg();
@@ -146,17 +151,37 @@ export default function ClassRosterScreen() {
     // Merge in lessons that should have happened but were never marked — those
     // have no session row, so querying lesson_sessions alone renders nothing and
     // the screen would imply the class is fully up to date.
+    //
+    // The window floor is max(start of last month, earliest enrolment): the coach
+    // can mark back to there but no further — older lessons sit behind a generated
+    // invoice and need a credit note, not a late mark. The same window bounds the
+    // "Mark Attendance" target below.
     const enrolments = (cls.student_class_enrolments ?? []) as any[];
+    let winStart: string | null = null;
+    let target: { date: string; sessionId: string | null } | null = null;
+
     if (activeStudentIds.length > 0) {
       const earliest = enrolments.map((e) => toSgDate(e.enrolled_at)).sort()[0];
-      const from = backlogWindowStart(todayDate, earliest ?? null);
-      const seen = new Set(rows.map((r) => r.session_date));
+      winStart = backlogWindowStart(todayDate, earliest ?? null);
 
-      for (const date of expectedLessonDates(
+      const expected = expectedLessonDates(
         cls.day_of_week as DayOfWeek,
-        from,
+        winStart,
         todayDate
-      )) {
+      );
+
+      // Primary action targets the most recent expected lesson in the window:
+      // today if today is a class day, else the last class day that has passed.
+      // No expected lesson yet = nothing has fallen due since the class started.
+      if (expected.length > 0) {
+        const date = expected[expected.length - 1];
+        const sessId =
+          (sessionData ?? []).find((s: any) => s.session_date === date)?.id ?? null;
+        target = { date, sessionId: sessId };
+      }
+
+      const seen = new Set(rows.map((r) => r.session_date));
+      for (const date of expected) {
         if (seen.has(date)) continue;
         rows.push({
           id: null,
@@ -166,6 +191,9 @@ export default function ClassRosterScreen() {
         });
       }
     }
+
+    setMarkTarget(target);
+    setWindowStart(winStart);
 
     // Descending. Sessions outside the expected window are kept — never hide
     // real data; the window only bounds which dates get synthesised.
@@ -214,14 +242,45 @@ export default function ClassRosterScreen() {
         contentContainerClassName="px-5 pb-10"
         showsVerticalScrollIndicator={false}
       >
-        {/* Mark attendance for today */}
+        {/* Mark attendance — the most recent expected lesson within the window.
+            No target = no lesson has fallen due yet (e.g. a brand-new class). */}
         <View className="mb-5">
-          <PrimaryButton
-            label={`Mark Attendance — Today (${formatDate(todayDate)})`}
-            onPress={() =>
-              router.push(`/(coach)/classes/${id}/attendance?date=${todayDate}`)
-            }
-          />
+          {markTarget ? (
+            <>
+              <PrimaryButton
+                label={`Mark Attendance — ${formatDate(markTarget.date)}${
+                  markTarget.date === todayDate ? " (Today)" : ""
+                }`}
+                onPress={() =>
+                  router.push(
+                    `/(coach)/classes/${id}/attendance?date=${markTarget.date}` +
+                      (markTarget.sessionId
+                        ? `&sessionId=${markTarget.sessionId}`
+                        : "")
+                  )
+                }
+              />
+              {windowStart && (
+                <Text className="text-xs text-gray-400 mt-2 text-center">
+                  You can mark lessons back to {formatDate(windowStart)}. Earlier
+                  lessons are closed — a correction to an already-invoiced lesson
+                  uses a credit note instead.
+                </Text>
+              )}
+            </>
+          ) : (
+            <Card className="items-center py-6 border-sky-100 bg-sky-50">
+              <Ionicons name="calendar-outline" size={28} color="#7dd3fc" />
+              <Text className="text-gray-600 font-semibold mt-2">
+                No lessons to mark yet
+              </Text>
+              <Text className="text-xs text-gray-500 mt-1 text-center">
+                {students.length === 0
+                  ? "Assign students to this class first."
+                  : "This class's first lesson hasn't taken place yet — nothing to mark."}
+              </Text>
+            </Card>
+          )}
         </View>
 
         {/* Enrolled Students */}

@@ -11,6 +11,12 @@ import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
+import {
+  todayInSg,
+  toSgDate,
+  expectedLessonDates,
+  type DayOfWeek,
+} from "@/lib/lessonDates";
 import Card from "@/components/Card";
 
 type DbStatus =
@@ -82,6 +88,10 @@ export default function AttendanceScreen() {
   const [filter, setFilter] = useState<FilterOption>("All");
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [loadingRecords, setLoadingRecords] = useState(false);
+  // Whether any lesson should have happened since this child joined — lets us
+  // tell "no lessons have taken place yet" (child just joined) apart from
+  // "lessons happened but the coach hasn't marked them" (waiting on the coach).
+  const [hasExpectedLesson, setHasExpectedLesson] = useState(false);
 
   // Load the parent's children once on focus
   const loadChildren = useCallback(async () => {
@@ -152,6 +162,28 @@ export default function AttendanceScreen() {
       );
 
     setRecords(mapped);
+
+    // Has any lesson fallen due since this child joined? Derived from the class's
+    // weekday + the enrolment date (the same read-time logic the coach screens
+    // use), so an empty history can distinguish "no lessons yet" from "unmarked".
+    const { data: enr } = await supabase
+      .from("student_class_enrolments")
+      .select("enrolled_at, classes(day_of_week)")
+      .eq("student_id", selectedChildId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    const cls: any = enr
+      ? Array.isArray((enr as any).classes)
+        ? (enr as any).classes[0]
+        : (enr as any).classes
+      : null;
+    const day = cls?.day_of_week as DayOfWeek | undefined;
+    setHasExpectedLesson(
+      !!day && !!enr?.enrolled_at &&
+        expectedLessonDates(day, toSgDate(enr.enrolled_at), todayInSg()).length > 0
+    );
+
     setLoadingRecords(false);
   }, [selectedChildId]);
 
@@ -269,15 +301,32 @@ export default function AttendanceScreen() {
             </Text>
           </View>
         ) : records.length === 0 ? (
-          <View className="items-center py-16 px-4">
-            <Ionicons name="calendar-outline" size={40} color="#d1d5db" />
-            <Text className="text-gray-400 mt-3 text-center">
-              No lessons marked yet
-            </Text>
-            <Text className="text-xs text-gray-400 mt-1 text-center">
-              Lessons appear here once the coach marks attendance.
-            </Text>
-          </View>
+          hasExpectedLesson ? (
+            // A lesson has already fallen due but nothing is recorded — the ball
+            // is in the coach's court.
+            <View className="items-center py-16 px-4">
+              <Ionicons name="calendar-outline" size={40} color="#d1d5db" />
+              <Text className="text-gray-400 mt-3 text-center">
+                No lessons marked yet
+              </Text>
+              <Text className="text-xs text-gray-400 mt-1 text-center">
+                Lessons appear here once the coach marks attendance.
+              </Text>
+            </View>
+          ) : (
+            // No lesson has happened since this child joined — nothing is late,
+            // so don't imply the coach is behind.
+            <View className="items-center py-16 px-4">
+              <Ionicons name="hourglass-outline" size={40} color="#7dd3fc" />
+              <Text className="text-gray-500 font-semibold mt-3 text-center">
+                No lessons have taken place yet
+              </Text>
+              <Text className="text-sm text-gray-400 mt-1 text-center">
+                {selectedChild?.full_name.split(" ")[0]} is in a class, but the first
+                lesson hasn&apos;t happened yet. Attendance will appear here after it does.
+              </Text>
+            </View>
+          )
         ) : filtered.length === 0 ? (
           <View className="items-center py-16">
             <Ionicons name="funnel-outline" size={40} color="#d1d5db" />
