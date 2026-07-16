@@ -56,7 +56,9 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   (`detectSessionInUrl`) and native (`swimsync://` deep link parsed in the root
   layout); a recovery session routes to the reset screen instead of the home tab.
   Login/register errors are mapped to friendly copy (`lib/authErrors.ts`).
-- **Attendance** — coach marks/edits per session; audit-logged.
+- **Attendance** — coach marks/edits per session; audit-logged. A **"Set all ▾"** header
+  menu bulk-sets every student to one status (Present/Absent/Cancelled-rain/coach) in one
+  tap, with a confirm guard when some are already marked (§8, PRD §7.6).
 - **Invoice generation** — one `generate-invoices` engine, two modes: **automatic**
   (cron-style; respects the `app_settings.auto_invoice_enabled` switch, a
   completeness gate, and seals the month) and **manual on-demand** (admin button).
@@ -76,10 +78,10 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   the coach's Today tab lists **Unmarked Lessons** and links straight to marking a past
   date, and the admin's invoice-generation dialog reports `N of M lessons marked` per
   class with the missing dates named. Closes the hole where a forgotten lesson was
-  silently unbillable and invisible to everyone (§8d).
+  silently unbillable and invisible to everyone (§8e).
 - **Parent Attendance states (verified UI)** — an unassigned child gets the
   "not assigned yet" state PRD §5.1 requires, distinct from "no lessons marked yet"
-  (waiting on the coach) and an empty filter result (§8b).
+  (waiting on the coach) and an empty filter result (§8c).
 - **Full RLS** — parents see only their data, coaches only their classes,
   superadmin everything. Covered by automated isolation tests.
 - **Automated tests** — backend **34 pgTAP + 8 Deno**, plus frontend suites
@@ -96,7 +98,7 @@ superadmin + the real coach/classes). See §11.
 > there is no separate release step. `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
 > As of 2026-07-16 that includes the unmarked-lesson safety net and the parent Attendance
-> fixes (§8b). **Caveat worth keeping:** every check on that work ran against **local
+> fixes (§8c). **Caveat worth keeping:** every check on that work ran against **local
 > fixtures** — none of it has been driven against the real production DB. No schema or
 > migration is involved, so failure looks wrong rather than destroying data.
 
@@ -172,7 +174,7 @@ supabase/functions/generate-invoices/test.sh      # 8 tests; needs deno (brew in
 cd SwimSyncAdmin && npm test                       # 38 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
-cd SwimSyncApp && npm test                         # 32 tests
+cd SwimSyncApp && npm test                         # 38 tests
 ```
 
 **Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
@@ -199,9 +201,10 @@ _Frontend tests:_
 `SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`,
 `components/StatusBadge.test.tsx`, `lib/lessonDates.test.ts`,
 `lib/classCoverage.test.ts`); `SwimSyncApp` uses **jest-expo**
-(`jest.config.js`, `lib/authErrors.test.ts`, `lib/lessonDates.test.ts`, scoped to
-`lib/**` unit tests for now). Deeper component-render tests (RN screens with mocked
-Supabase, admin tables) are the natural next additions.
+(`jest.config.js`, `lib/authErrors.test.ts`, `lib/lessonDates.test.ts`,
+`lib/attendanceBulk.test.ts`, scoped to `lib/**` unit tests for now). Deeper
+component-render tests (RN screens with mocked Supabase, admin tables) are the natural
+next additions.
 
 _Note:_ `SwimSyncApp` does **not** typecheck clean on `main` — 5 pre-existing
 `tsc` errors in `app/(parent)/home/child/[id].tsx` (Supabase join typing). CI runs
@@ -215,7 +218,10 @@ from the DOM, plus all three empty states (unassigned / nothing marked / filtere
 `verify-tz-saturday.mjs` pins the SGT-vs-UTC regression using Playwright's clock
 API — it **fails on the pre-fix code**, which is the point;
 `smoke-admin-screens.mjs` drives the admin attendance/students/dashboard pages at
-runtime (checks the deep joins resolve — no NaN, no empty tables).
+runtime (checks the deep joins resolve — no NaN, no empty tables);
+`verify-bulk-setall.mjs` (+ reuses `fixtures-unmarked-lessons.sql`) drives the bulk
+"Set all" menu — the RN-web dropdown renders, the confirm guard fires only when a student
+is already marked, and a bulk save persists `cancelled_rain` to the DB.
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
@@ -256,7 +262,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   (takes any `date`, resolves-or-creates that date's session, pre-fills existing rows),
   so back-dating Just Works and nothing is ever overwritten. What was missing was not
   the rows but a **reckoning**: which lessons *should* have happened. That is derived at
-  read time from `classes.day_of_week` (`lib/lessonDates.ts`) — see §8d. Don't "fix" this
+  read time from `classes.day_of_week` (`lib/lessonDates.ts`) — see §8e. Don't "fix" this
   by pre-generating sessions unless you have a reason the read-time derivation can't
   serve; pre-generation adds a job, a schedule, and edge cases when classes change.
   - A class that legitimately didn't run needs **no new concept**: the coach marks
@@ -342,7 +348,68 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
-## 8. What changed this session (2026-07-16 — backlog)
+## 8. What changed this session (2026-07-16 — bulk attendance + backlog ranking)
+
+**Shipped the bulk "Set all to…" control on the coach attendance screen (was the
+backlog's #1), ranked the backlog into a re-work-ordered build plan, and advised moving
+the real classes Saturday→Sunday.**
+
+- **Bulk "Set all to…" (shipped, verified UI + DB).** The Mark Attendance header now has a
+  **"Set all ▾"** menu that sets every enrolled student to one status at once — **Present,
+  Absent, Cancelled — Rain, Cancelled — Coach** — which the coach then adjusts
+  individually. It **overwrites all** students; a `confirmAction` guard fires only when
+  some are already marked (fresh screen = one tap, no prompt). **Trial is deliberately
+  excluded** from the bulk menu — a whole class of trials doesn't happen and its Paid/Free
+  split needs a per-student choice. Closes the friction where cancelling a rained-out class
+  was 17×2 taps, the point at which a coach abandons the task and an abandoned cancellation
+  looks exactly like a forgotten (unbilled) lesson. PRD §7.6 updated.
+- **How it's built.** Pure logic in **`SwimSyncApp/lib/attendanceBulk.ts`**
+  (`applyBulkStatus` + `SET_ALL_OPTIONS`) with a colocated test — extracted because jest
+  only runs `lib/**`. The screen (`(coach)/classes/[id]/attendance.tsx`) gained the header
+  button, an `onSetAll` handler, and an **inline dropdown overlay** (a `Pressable` backdrop
+  + absolute-positioned menu card — there is **no menu/dropdown component in the app**, so
+  it's built inline). **No change to `handleSave`, schema, or billing** — it only populates
+  the existing per-student state map, which `handleSave` already upserts wholesale.
+  `existingId` is preserved so a bulk edit of an already-saved session updates in place.
+- **Verified.** App jest 32→**38** (6 new); no *new* `tsc` errors; a new
+  `run-ui-playwright` driver **`verify-bulk-setall.mjs`** drives it **10/10** — the
+  dropdown renders correctly on RN-web (the real risk: absolute overlay + z-index, the
+  "works on native, breaks on web" family), the confirm guard fires only when a student is
+  already marked, one tap sets everyone on a fresh screen, and a bulk save **persisted
+  `cancelled_rain` for both students** (checked in the DB) and cleared the unmarked backlog.
+- **Backlog ranked into a `## Build order` section** (top of `BACKLOG.md`), ordered to
+  **prevent re-work** — e.g. extract the completeness helper *before* active/inactive edits
+  it; reconcile the students table's status model *before* piling NRIC/address/levels onto
+  it; and the tenant/coach-type/wage cluster is one schema decision that gates any
+  coach/admin money feature. The ranking lives **only there** (one source of truth, not
+  stamped on every heading). With bulk set-all shipped, the near-term list is renumbered
+  1–8, led by the **UTC-billing-month fix**.
+- **Class day Saturday→Sunday — advised, NOT yet applied (production action for the user).**
+  The 4 real classes were created on **Saturday**; the coach actually teaches **Sunday**
+  (attendance to be marked 12/19/26 Jul — all Sundays; confirmed). The fix is one statement
+  in the Supabase **dashboard SQL editor** (no service key locally, and **there is no
+  edit-class UI** in the admin panel — it's create-only):
+  `UPDATE classes SET day_of_week = 'sunday' WHERE day_of_week = 'saturday';`
+  No `lesson_sessions` exist yet, so nothing else needs touching; expected-lesson dates are
+  derived from `day_of_week` at read time, so the coach/admin views follow automatically.
+  **Confirm this was run before the first Sunday is marked** — otherwise the gap report
+  expects the wrong weekday.
+
+**Not done (deliberate):**
+- **No reusable dropdown/menu component.** One use didn't justify a shared component; the
+  inline overlay is enough. If a second menu appears, that's the trigger to extract one.
+- **Didn't extract shared attendance-status types** (the enum↔label/colour maps are
+  duplicated across three screens). Real, but a separate cleanup — the bulk helper stayed
+  self-contained rather than dragging that refactor in.
+- **Local seed left as "Saturday Beginners"/`'saturday'`** — it's a dev fixture and
+  "Saturday" is load-bearing in several test suites (`classCoverage.test.ts`,
+  `lessonDates.test.ts`, `verify-tz-saturday.mjs`). Only the *production* classes move.
+- **Didn't run the production class-day SQL** — no service key locally and it's the user's
+  live DB; provided the statement for the dashboard instead.
+
+---
+
+## 8b. What changed this session (2026-07-16 — backlog)
 
 **Recorded six future features in `BACKLOG.md`. No code changed; nothing shipped.**
 
@@ -388,7 +455,7 @@ enrolment would still raise unmarked-lesson alarms.
 
 **Process note:** the six items were committed as `3e1270c` **directly to `main`** —
 unintentionally. The branch `docs/backlog-future-features` had been created for them,
-but a concurrent merge to `main` (§8b) moved `HEAD` between the branch checkout and the
+but a concurrent merge to `main` (§8c) moved `HEAD` between the branch checkout and the
 commit, so the commit landed on `main` and the branch was left an empty pointer at
 `8c1d5ad`. Deleted it. No harm done — the change was docs-only — but note `3e1270c`
 **has no CI run of its own**: it was pushed between two other commits and the green run
@@ -397,14 +464,14 @@ is on `b89ca52`, which contains it. **Two sessions in one repo means `git status
 
 ---
 
-## 8b. What changed this session (2026-07-16)
+## 8c. What changed this session (2026-07-16)
 
 **Fixed the parent Attendance screen — and shipped everything on this branch to
 production.**
 
 - **Merged to `main` and pushed: `2f746ca` → `8c1d5ad` (4 commits). CI green** across
   backend + both frontends. Vercel builds `swimsync.sg` / `admin.swimsync.sg` from
-  `main`, so the unmarked-lessons work (§8d), the docs split (§8c), and the fixes below
+  `main`, so the unmarked-lessons work (§8e), the docs split (§8d), and the fixes below
   are **now live**. Note what that means: everything before this was verified against
   **local fixtures only** — this is the first time any of it runs against the real
   production DB (clean slate, real coach, 4 real classes). Nothing here touches schema
@@ -439,7 +506,7 @@ production.**
 **Not done (deliberate):**
 - **PRD untouched — the gate genuinely wasn't met.** §5.1 *already* specified the
   "not assigned yet" state, so this fix makes the code match the spec rather than
-  departing from it. Nothing to correct. (§8c reached the same conclusion independently
+  departing from it. Nothing to correct. (§8d reached the same conclusion independently
   before the work landed.)
 - **`BACKLOG.md` left alone** — it was being written by a **concurrent session** while
   this one ran, and has since landed on its own as `3e1270c` (six items: coach wage
@@ -449,10 +516,10 @@ production.**
   **Two sessions ran against this repo today** — check `git log` before assuming an
   uncommitted file is yours.
 - **§5 test counts were stale and are now corrected** (app 29→**32**, admin 35→**38**).
-  They were wrong by my own hand in §8d: three `formatSgDate`/`dayOfWeekOf` tests were
+  They were wrong by my own hand in §8e: three `formatSgDate`/`dayOfWeekOf` tests were
   added to each app *after* the counts were written. Verified by running both suites.
 
-## 8c. What changed (2026-07-16 — docs split)
+## 8d. What changed (2026-07-16 — docs split)
 
 **Split the docs into three, so each one can be trusted for a different question.**
 
@@ -513,10 +580,10 @@ that earns a PRD edit now.
   progress, and another session was active concurrently. Needs no PRD change when it
   lands: **§5.1 already specifies** the "not assigned yet" state, so it makes the code
   match the spec rather than departing from it.
-  - _Update: that work **landed** later the same day as `8c1d5ad` — see §8b. The PRD call
+  - _Update: that work **landed** later the same day as `8c1d5ad` — see §8c. The PRD call
     above held._
 
-## 8d. What changed (2026-07-15)
+## 8e. What changed (2026-07-15)
 
 **Closed the silent-underbilling hole before the first real invoice run.**
 
@@ -571,7 +638,7 @@ that earns a PRD edit now.
 a rained-out class is 17 × 2 taps, which is where a coach abandons the task, and an
 abandoned cancellation looks exactly like a forgotten lesson. Additive; ships separately.
 
-## 8e. What changed (2026-07-13 → 07-14)
+## 8f. What changed (2026-07-13 → 07-14)
 
 - **Production email via Resend on `swimsync.sg`** — cloud custom SMTP
   (`smtp.resend.com:465`, sender `noreply@swimsync.sg`); branded reset template
@@ -599,7 +666,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
   (suite 22 → 34). CI green across backend + both frontend jobs.
 - All merged to `main`, pushed, CI-verified.
 
-## 8f. Session (2026-07-12)
+## 8g. Session (2026-07-12)
 
 - **Auth polish — password reset** — implemented the mobile recovery flow end to
   end: new `(auth)/forgot-password.tsx` + `(auth)/reset-password.tsx` screens, wired
@@ -613,7 +680,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
   email → reset screen (no bounce to home) → new password → re-login. Error mapping
   checked against live Supabase strings. Coach seed password restored to `password123`.
 
-## 8g. Session (2026-07-11)
+## 8h. Session (2026-07-11)
 
 - **Credit-note ledger fix** — added `credit_applications` (migration `20260711000100`)
   + updated the engine so partial credit reconciles; verified UI + backend.
@@ -633,17 +700,22 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift. Keep this section to what's genuinely next.
 
-The MVP loop is built and live; the silent-underbilling hole is closed (§8d). **The
+The MVP loop is built and live; the silent-underbilling hole is closed (§8e). **The
 product is no longer the blocker — real usage is.**
 
-**Do this first (one-off):** `main` was merged + pushed on 2026-07-16, so
-`swimsync.sg` now serves the unmarked-lesson safety net and the Attendance fixes — code
-that has **only ever run against local fixtures** (§3). Click through the three screens
-it touches on the live site before pointing parents at it: parent **Attendance** (chips
-are pills, not tall capsules; an unassigned child says "isn't in a class yet"), coach
-**Today** (no "Unmarked Lessons" card on a clean slate is *correct*), admin
-**Invoices → Generate** (the dialog reports expected-vs-marked). Hard-refresh — it's a
-static SPA and the browser caches the bundle.
+**Do this first (one-off, before the first Sunday is marked):**
+- **Move the real classes Saturday→Sunday.** They were created on Saturday but the coach
+  teaches **Sunday** (attendance marked 12/19/26 Jul — all Sundays). There is **no
+  edit-class UI** (the admin Classes page is create-only), so run this once in the Supabase
+  **dashboard SQL editor**:
+  `UPDATE classes SET day_of_week = 'sunday' WHERE day_of_week = 'saturday';` (§8). Nothing
+  else needs touching — expected-lesson dates derive from `day_of_week` at read time. **If
+  this isn't done, the gap report expects the wrong weekday.**
+- **Click through the live screens** merged on 2026-07-16 — code that has **only ever run
+  against local fixtures** (§3): parent **Attendance** (chips are pills, not tall capsules;
+  an unassigned child says "isn't in a class yet"), coach **Today** (no "Unmarked Lessons"
+  card on a clean slate is *correct*), admin **Invoices → Generate** (the dialog reports
+  expected-vs-marked). Hard-refresh — static SPA, cached bundle.
 
 Then, in order:
 
@@ -653,18 +725,15 @@ Then, in order:
    across the 4 classes. Students are **parent-created** in this model (coaches/admin
    can't create them), so this is an onboarding push, not a build task. Everything below
    is downstream of it.
-2. **First real invoice run.** Once a Saturday's attendance is marked, follow
+2. **First real invoice run.** Once a Sunday's attendance is marked, follow
    **`INVOICE_RUNBOOK.md`** on the 1st (manual — no cron on the free tier). The confirm
    dialog reports any lesson with no attendance marked: **read it.** It is the only
    backstop against an underbill (§7.8).
-3. **Bulk "set all to…" on the attendance screen** — the top build item, and the one
-   that most protects (2). An afternoon, purely client-side. Full reasoning:
-   `BACKLOG.md` → Coach workflow.
-
-**Two items in `BACKLOG.md` punch above their size** if you want value between the
-milestones above — email invoice notifications (Resend is already live and paid for;
-today invoices arrive silently) and fixing the UTC-derived billing month (a live latent
-bug that mis-bills the month cron is switched on).
+3. **Pick the next build item from `BACKLOG.md` → `## Build order`.** The queue is ranked
+   there to prevent re-work; bulk "set all" (the old top item) **shipped this session**
+   (§8). The list is now led by the **UTC-billing-month fix** and **email invoice
+   notifications** — both small, both high-value (Resend is already live; the UTC bug
+   mis-bills the month cron is switched on, so fix it *before* enabling cron).
 
 _Prior "already-DONE" bullets were pruned on 2026-07-16 — that record is git history,
 the PRD, and the §8x session logs. Durable facts that lived only here were relocated
@@ -690,6 +759,7 @@ first: the coach Billing screen → §3, `coach_serves_parent_profile()` → §6
 | `…/(auth)/forgot-password.tsx` · `reset-password.tsx` | Password-reset flow (request link + set new password) |
 | `SwimSyncApp/app/_layout.tsx` | Root: session restore + `PASSWORD_RECOVERY` routing + native recovery deep-link handler |
 | `SwimSyncApp/lib/authErrors.ts` | Maps raw Supabase auth errors to friendly copy |
+| `SwimSyncApp/lib/attendanceBulk.ts` · `.test.ts` | Bulk "Set all to…" helper (`applyBulkStatus` + options) for the coach attendance screen (§8) |
 | `SwimSyncApp/lib/lessonDates.ts` · `SwimSyncAdmin/lib/lessonDates.ts` | **Byte-identical twins** — SG-safe date strings + expected lesson dates. Edit both (§6) |
 | `SwimSyncAdmin/lib/classCoverage.ts` | Expected-vs-marked coverage maths for the admin pre-generation check |
 | `SwimSyncAdmin/app/(admin)/` | Admin pages; `app/api/` server routes |

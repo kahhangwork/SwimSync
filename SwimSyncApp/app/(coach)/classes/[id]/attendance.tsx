@@ -4,6 +4,7 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   SafeAreaView,
   ActivityIndicator,
 } from "react-native";
@@ -11,6 +12,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { useAppStore } from "@/store/useAppStore";
+import { confirmAction } from "@/lib/confirm";
+import { applyBulkStatus, SET_ALL_OPTIONS, BulkOption } from "@/lib/attendanceBulk";
 import PrimaryButton from "@/components/PrimaryButton";
 
 type TopStatus = "unmarked" | "present" | "absent" | "cancelled" | "trial";
@@ -98,6 +101,7 @@ export default function MarkAttendanceScreen() {
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     load();
@@ -194,6 +198,33 @@ export default function MarkAttendanceScreen() {
       ...prev,
       [studentId]: { ...prev[studentId], sub },
     }));
+  }
+
+  function onSetAll(opt: BulkOption) {
+    setMenuOpen(false);
+    const apply = () => {
+      setAttendance((prev) =>
+        applyBulkStatus(
+          students.map((s) => s.id),
+          prev,
+          { top: opt.top, sub: opt.sub }
+        )
+      );
+      showToast(`All ${students.length} set to ${opt.label}.`, "info");
+    };
+    const anyMarked = students.some(
+      (s) => (attendance[s.id]?.top ?? "unmarked") !== "unmarked"
+    );
+    if (anyMarked) {
+      confirmAction(
+        `Set all to ${opt.label}?`,
+        `This will change all ${students.length} students to ${opt.label}.`,
+        apply,
+        "Set all"
+      );
+    } else {
+      apply();
+    }
   }
 
   async function handleSave() {
@@ -310,6 +341,19 @@ export default function MarkAttendanceScreen() {
             {classTitle} · {formatDate(date)}
           </Text>
         </View>
+        {students.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setMenuOpen((v) => !v)}
+            className="flex-row items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-1.5"
+          >
+            <Text className="text-xs font-semibold text-sky-600">Set all</Text>
+            <Ionicons
+              name={menuOpen ? "chevron-up" : "chevron-down"}
+              size={14}
+              color="#0ea5e9"
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -452,6 +496,30 @@ export default function MarkAttendanceScreen() {
           className="mt-2"
         />
       </ScrollView>
+
+      {/* Set-all dropdown (rendered last so it stacks above the list) */}
+      {menuOpen && (
+        <>
+          <Pressable
+            onPress={() => setMenuOpen(false)}
+            className="absolute left-0 right-0 top-0 bottom-0 z-40"
+          />
+          <View className="absolute right-5 top-14 z-50 w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
+            {SET_ALL_OPTIONS.map((opt, i) => (
+              <TouchableOpacity
+                key={opt.label}
+                onPress={() => onSetAll(opt)}
+                className={`flex-row items-center gap-2.5 px-4 py-3 ${
+                  i > 0 ? "border-t border-gray-100" : ""
+                }`}
+              >
+                <View className={`h-2.5 w-2.5 rounded-full ${opt.dot}`} />
+                <Text className="text-sm text-gray-800">{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
     </SafeAreaView>
   );
 }

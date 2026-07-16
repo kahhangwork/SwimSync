@@ -17,7 +17,8 @@ yet. Where a decision has already been made about *how* a thing should work if i
 built, it's recorded under **Notes** — those are hard-won and worth more than the item
 itself.
 
-Items are grouped by theme, not by priority. Rough sizes: **S** = an afternoon,
+Items below are grouped by **theme**, not priority — the **[Build order](#build-order)**
+section right below ranks them for the current stretch. Rough sizes: **S** = an afternoon,
 **M** = a few days, **L** = a genuine project.
 
 **Provenance tags** point back to where an idea came from, so the original reasoning
@@ -33,21 +34,84 @@ stays reachable:
 
 ---
 
+## Build order
+
+The ranking for the "billing is untested, so build other things" stretch (set 2026-07-16,
+while parents onboard and before the first real invoice run on 1 Aug). **Ordered to
+prevent re-work:** each item is placed so that finishing it never forces you back into an
+earlier one — if building A then B then C would send you back to rethink A while doing C,
+C is moved ahead of A. Sizes as above (**S**/**M**/**L**).
+
+This ranking lives **only here** (one source of truth — deliberately not duplicated as a
+number on every heading, which would just drift). The item bodies below stay grouped by
+theme.
+
+### The near-term plan — build roughly in this order
+
+_(The original #1, bulk "set all" on the attendance screen, **shipped 2026-07-16** — see
+PRD §7.6. The list below is renumbered from what remains.)_
+
+1. **Fix the UTC-derived default billing month** (S, _Billing_) — cheap, and it must land
+   **before** cron is ever switched on. Cron is the gate for automated reminders further
+   down; fixing this *after* enabling cron means a mis-billed month first.
+2. **Fix the 5 `tsc` errors + add `tsc --noEmit` to CI** (S, _Foundations_) — get a clean
+   typecheck baseline **before** building more app features, so a new type error can't
+   hide in the known-broken noise and no future session re-establishes "these aren't mine."
+3. **Email invoice / credit-note notifications** (S, _Notifications_) — best
+   effort-to-value (Resend is already live and paid for) and the **root of the reminder
+   chain**: WhatsApp reminders and automated reminders both sequence after it.
+4. **Extract the completeness-rule shared helper** (S, _Foundations_) — do **before** #5.
+   Active/inactive will edit that rule; extract it into one helper first so the change
+   lands in one place, not the four hand-written copies. Doing #5 first means editing four
+   copies and then re-touching them at extraction time.
+5. **Active / inactive status for parents and children** (M, _Admin_) — the anchor for the
+   students table. Reconcile the two existing "inactive" notions (`is_active` vs
+   `assignment_status`) and settle the status model **before** more fields are piled onto
+   students. Needs #4.
+6. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
+   the stored `age` column (the same stale-second-source problem #5 fixes for status) and
+   add NRIC. Rides the same students-schema + parent-home + admin-table edits as #5, so do
+   it right after — otherwise those screens get touched twice.
+7. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
+   `parents`-table addition touching the registration form; group with #6's
+   onboarding-form work so those screens are opened once.
+8. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field; do it
+   **after** the #5/#6 reconciliations so it respects the settled status/level model
+   rather than adding churn to a table still being reconciled.
+
+### Later — clusters with a fixed internal order
+
+- **The tenant/coach money cluster (the biggest re-work trap).** **Tenanted admin
+  accounts** (L) and **Coach type: private vs school** (M) are the *same schema decision* —
+  settle them **together**. **Coach wage tracking** (M) must come **after** coach type (a
+  private coach has no wage). None of this is needed until a second admin or coach exists —
+  but **do not build any coach/admin money feature before this schema lands**, or it gets
+  built twice (every `is_superadmin()` call site is rewritten when tenants arrive). When
+  wage tracking is actually wanted, *that* is the trigger to do tenanting + coach type
+  first. **Coach-created student profiles** (M) also belongs behind this — it reshapes the
+  parent-link + RLS surface that tenanting rewrites.
+- **The platform chain.** Native store builds (M) → Push notifications (M) — push can't
+  work on the current static web app, so it can't precede native builds.
+- **The reminder chain (continues from #3).** Email (#3) → WhatsApp reminders (M) →
+  Automated reminder workflows (M — needs a scheduler, i.e. cron, so it needs #1 too).
+
+### Unordered — no dependencies, pick by value
+
+Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-history view
+(S), Export to CSV (S), Delete-coach action (S), Better filtering/search (S), More polished
+dashboards (S), Deeper component-render tests (M), Production data cleanup (S),
+Email-confirmation copy/templates (S).
+
+### Later — big features carrying their own dependencies
+
+Package pricing (L), Makeup lessons (L), Multiple classes per child (M), Parent
+self-enrolment (M), Coach-assisted assignment (M), Household split billing (M), Auto PayNow
+detection (L), In-app payment gateway (L), Multiple coaches per class (S), Multi-language
+(M), Shared `lessonDates` package (M — *not recommended*, see the item).
+
+---
+
 ## Coach workflow
-
-### Bulk "set all to…" on the attendance screen — **S** `[handover]`
-One control at the top of the attendance screen that sets every student to the same
-status at once, then lets the coach adjust individuals.
-
-**Why:** cancelling a rained-out class is currently 17 students × 2 taps, one at a time.
-That's exactly where a coach abandons the task — and an abandoned cancellation is
-**indistinguishable from a forgotten lesson**, which is the failure mode that silently
-costs money (see the unmarked-lessons work, PRD §7.5). This is the highest-value small
-follow-up on the list: it's purely client-side, it protects the billing loop, and it
-takes an afternoon.
-
-**Notes:** no schema change — populate the existing attendance state map before save.
-HANDOVER §8d flagged it as deliberately deferred so it could ship on its own.
 
 ### Makeup lessons — **L** `[MVP-excluded]` `[Phase 3]`
 A student misses a lesson and attends a different session to make it up, without being

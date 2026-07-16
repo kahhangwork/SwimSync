@@ -470,6 +470,19 @@ SwimSync shall allow coach to record attendance per student per lesson session.
 - If an attendance edit changes a billable status to non-billable on an already-invoiced lesson, SwimSync shall **automatically generate a credit note**
 - An audit log entry must be created for every attendance edit
 
+#### Bulk "Set all to…" *(implemented)*
+
+The most common whole-class case — a lesson rained off, or everyone present — is a one-tap
+**"Set all ▾"** menu in the Mark Attendance header. It sets every enrolled student to a
+single status at once (Present, Absent, Cancelled — Rain, or Cancelled — Coach), which the
+coach then adjusts individually. It **overwrites** all students; if any student is already
+marked it asks for confirmation first, so a stray tap can't wipe individual edits. **Trial
+is deliberately not offered in bulk** — a whole class of trials doesn't happen, and its
+Paid/Free split needs a per-student choice. This is a client-side shortcut layered over the
+existing per-student marking and the single upsert-all save (§7.6 above); it changes no
+billing or storage behaviour, and matters because an abandoned cancellation is
+indistinguishable from a forgotten lesson (§7.5), which is what silently underbills.
+
 ### 7.7 Invoice Generation
 
 SwimSync shall generate invoices monthly, with two trigger modes sharing one billing engine.
@@ -1020,7 +1033,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | **Login** | Email/password | Coach accounts created by superadmin |
 | **Today's Classes** | List of today's classes with student count; quick-action buttons | Default landing screen; highlight current/next class |
 | **Class Roster** | Student list for selected class; attendance status per student | Tap student row to mark/edit attendance |
-| **Mark Attendance** | Status picker per student: Present, Absent, Cancelled, Trial | Minimal taps; if Trial, sub-prompt for Paid/Free; batch save |
+| **Mark Attendance** | Status picker per student: Present, Absent, Cancelled, Trial | Minimal taps; if Trial, sub-prompt for Paid/Free; **"Set all ▾"** header shortcut to set every student at once (§7.6); batch save |
 | **Edit Past Attendance** | Calendar/date picker; select lesson; edit status | Warning shown if lesson already invoiced; confirm triggers credit note |
 | **Invoices** | Monthly invoice list for coach's students; filter by status | Mark as Paid button; show outstanding vs paid counts |
 | **Credit Notes** | List of credit notes related to coach's students | Read-only view; linked to original invoices |
