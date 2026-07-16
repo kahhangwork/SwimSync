@@ -97,8 +97,9 @@ superadmin + the real coach/classes). See §11.
 > **`main` = what's live.** Vercel builds both sites from `main`, so a **push deploys** —
 > there is no separate release step. `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> As of 2026-07-16 that includes the unmarked-lesson safety net and the parent Attendance
-> fixes (§8c). **Caveat worth keeping:** every check on that work ran against **local
+> As of 2026-07-16 that includes the bulk attendance **"Set all"** control, **admin class
+> editing + a required day-of-week** (§8), the unmarked-lesson safety net, and the parent
+> Attendance fixes (§8c). **Caveat worth keeping:** every check on that work ran against **local
 > fixtures** — none of it has been driven against the real production DB. No schema or
 > migration is involved, so failure looks wrong rather than destroying data.
 
@@ -400,13 +401,20 @@ Saturday classes), and ranked the backlog into a re-work-ordered build plan.**
   defaults empty, create-without-day blocked, edit Saturday→Sunday persists).
 - **Class day Saturday→Sunday — still a pending PRODUCTION action for the user.** The coach
   actually teaches **Sunday** (attendance marked 12/19/26 Jul — all Sundays; confirmed), but
-  the real classes are still Saturday in the **production** DB. Two ways to fix it now: once
-  this branch is deployed, **admin → Classes → Edit → set day to Sunday** (the feature
-  above); or immediately, one statement in the Supabase **dashboard SQL editor**:
+  the real classes are still Saturday in the **production** DB. Two ways to fix it (the
+  edit-class UI is **now live** — the feature above): **admin → Classes → Edit → set day to
+  Sunday**; or one statement in the Supabase **dashboard SQL editor**:
   `UPDATE classes SET day_of_week = 'sunday' WHERE day_of_week = 'saturday';` No
   `lesson_sessions` exist yet, so nothing else needs touching — expected-lesson dates derive
   from `day_of_week` at read time. **Confirm it's done before the first Sunday is marked**,
-  or the gap report expects the wrong weekday.
+  or the gap report expects the wrong weekday. _(The user said they'll do this via the UI.)_
+- **All merged to `main` and live; CI green.** Both features shipped through `6fca53d`
+  (fast-forward, no PR), then a follow-up bumped the CI actions to Node 24 runtimes
+  (`02764c1`): `actions/checkout` + `actions/setup-node` v4→**v7** (both `node24`) and
+  `supabase/setup-cli` v1→**v3** (now a **composite** action, so no Node runtime to
+  deprecate) — clearing GitHub's "Node.js 20 is deprecated" warnings. Verified each
+  target's runtime before pinning; `version: latest` on setup-cli is unchanged. CI is green
+  across all three jobs and Vercel is deploying both sites from `main`.
 
 **Not done (deliberate):**
 - **No reusable dropdown/menu component.** One use didn't justify a shared component; the
@@ -718,9 +726,9 @@ product is no longer the blocker — real usage is.**
 
 **Do this first (one-off, before the first Sunday is marked):**
 - **Move the real classes Saturday→Sunday** (production). They were created on Saturday but
-  the coach teaches **Sunday** (attendance marked 12/19/26 Jul — all Sundays). Once this
-  branch is deployed, do it in **admin → Classes → Edit → Sunday** (new this session, §8);
-  or immediately via the Supabase **dashboard SQL editor**:
+  the coach teaches **Sunday** (attendance marked 12/19/26 Jul — all Sundays). Do it in
+  **admin → Classes → Edit → Sunday** (now live, new this session — §8); or via the Supabase
+  **dashboard SQL editor**:
   `UPDATE classes SET day_of_week = 'sunday' WHERE day_of_week = 'saturday';` Nothing else
   needs touching — expected-lesson dates derive from `day_of_week` at read time. **If this
   isn't done, the gap report expects the wrong weekday.**
