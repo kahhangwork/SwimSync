@@ -22,6 +22,29 @@ export type GenerateOptions = {
   billing_month?: string;
 };
 
+// One billed lesson on a created invoice — enough for an itemized email.
+export type CreatedInvoiceItem = {
+  student_id: string;
+  session_date: string;
+  class_title: string;
+  amount: number;
+};
+
+// A newly-created invoice, surfaced so the caller (index.ts) can email the
+// parent. The engine itself sends nothing — it stays pure and testable; the
+// handler orchestrates delivery from this list. Only genuinely-new invoices
+// appear here (parents with an existing invoice for the month are skipped),
+// so emailing this list can never double-send.
+export type CreatedInvoice = {
+  invoice_id: string;
+  parent_id: string;
+  billing_month: string;
+  gross: number;
+  credit: number;
+  net: number;
+  items: CreatedInvoiceItem[];
+};
+
 export type GenerateResult = {
   billing_month: string;
   status: string;
@@ -31,6 +54,7 @@ export type GenerateResult = {
   classes_still_incomplete?: number;
   message?: string;
   results?: unknown[];
+  created?: CreatedInvoice[];
 };
 
 export async function generateInvoices(
@@ -99,6 +123,7 @@ export async function generateInvoices(
   if (clsErr) throw new Error(clsErr.message);
 
   const log: unknown[] = [];
+  const created: CreatedInvoice[] = []; // newly-created invoices, for emailing
   let classesIncomplete = 0; // classes skipped because attendance not fully marked
   let invoicesCreated = 0;
 
@@ -339,6 +364,20 @@ export async function generateInvoices(
       }
 
       invoicesCreated++;
+      created.push({
+        invoice_id: invoice.id,
+        parent_id: parentId,
+        billing_month: billingMonth,
+        gross,
+        credit,
+        net,
+        items: items.map((i) => ({
+          student_id: i.student_id,
+          session_date: i.session_date,
+          class_title: i.class_title,
+          amount: i.amount,
+        })),
+      });
       log.push({
         parent_id: parentId,
         invoice_id: invoice.id,
@@ -375,5 +414,6 @@ export async function generateInvoices(
         ? "complete — billing month sealed"
         : "partial — will retry tomorrow",
     results: log,
+    created,
   };
 }

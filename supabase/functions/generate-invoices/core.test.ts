@@ -2,8 +2,9 @@
 // Supabase stack. Run with ./test.sh (or export SERVICE_ROLE_KEY first, then
 // `deno test --allow-net --allow-env core.test.ts`). Requires `supabase start`.
 
-import { assert, assertEquals } from "jsr:@std/assert@1";
+import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import { generateInvoices } from "./core.ts";
+import { emailCreatedInvoices } from "./email.ts";
 import {
   newScenario,
   getInvoice,
@@ -210,6 +211,102 @@ Deno.test("carry-forward: credit exceeding the invoice leaves a partial note and
     const chk = await checkInvariants(s.db, s.parentId);
     assert(chk.ok, chk.problems.join("; "));
   } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("result.created surfaces new invoices with line items (for emailing)", async () => {
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2026-03-07"); await s.mark(a, "present");
+    const b = await s.addSession("2026-03-14"); await s.mark(b, "present");
+    const c = await s.addSession("2026-03-21"); await s.mark(c, "absent");
+
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2026-03",
+    });
+    assertEquals(res.invoices_created, 1);
+    assert(res.created, "created list should be present");
+    assertEquals(res.created!.length, 1);
+
+    const c0 = res.created![0];
+    assertEquals(c0.parent_id, s.parentId);
+    assertEquals(c0.billing_month, "2026-03");
+    assertEquals(c0.net, 60);
+    assertEquals(c0.items.length, 2); // 2 present; absent excluded
+    assert(c0.items.every((i) => i.amount === 30));
+    assert(
+      c0.items.every(
+        (i) => typeof i.session_date === "string" && i.class_title.length > 0
+      )
+    );
+
+    // A re-run must NOT re-surface the same invoice (no double-email).
+    const res2 = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2026-03",
+    });
+    assertEquals(res2.invoices_created, 0);
+    assertEquals((res2.created ?? []).length, 0);
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("emailCreatedInvoices: resolves recipients against the DB, no-ops without a key", async () => {
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2026-04-04"); await s.mark(a, "present");
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2026-04",
+    });
+    assertEquals(res.invoices_created, 1);
+
+    // No key → sends nothing, and must not throw even though it queries the DB
+    // for parent/student names. This is the money-path-isolation guarantee.
+    const out = await emailCreatedInvoices(s.db, res.created ?? [], { apiKey: undefined });
+    assertEquals(out.emailsSent, 0);
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("emailCreatedInvoices: with a key, emails each invoice to the resolved parent", async () => {
+  const s = await newScenario({ price: 30 });
+  const orig = globalThis.fetch;
+  const resendCalls: Array<Record<string, string>> = [];
+  // Intercept only the Resend call; delegate all Supabase traffic to real fetch.
+  globalThis.fetch = ((url: string | URL | Request, init?: RequestInit) => {
+    if (String(url).includes("api.resend.com")) {
+      resendCalls.push(JSON.parse((init?.body as string) ?? "{}"));
+      return Promise.resolve(new Response(JSON.stringify({ id: "e1" }), { status: 200 }));
+    }
+    return orig(url as string | URL | Request, init);
+  }) as typeof fetch;
+  try {
+    const a = await s.addSession("2026-05-02"); await s.mark(a, "present");
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2026-05",
+    });
+    assertEquals(res.invoices_created, 1);
+
+    const out = await emailCreatedInvoices(s.db, res.created ?? [], { apiKey: "re_test" });
+    assertEquals(out.emailsSent, 1);
+    assertEquals(resendCalls.length, 1);
+    // Recipient, parent name, student name and month all resolved from the DB.
+    assertEquals(resendCalls[0].to, `parent-${s.tag}@test.local`);
+    assertStringIncludes(resendCalls[0].subject, "May 2026");
+    assertStringIncludes(resendCalls[0].html, `Parent ${s.tag}`);
+    assertStringIncludes(resendCalls[0].html, `Kid ${s.tag}`);
+  } finally {
+    globalThis.fetch = orig;
     await s.teardown();
   }
 });

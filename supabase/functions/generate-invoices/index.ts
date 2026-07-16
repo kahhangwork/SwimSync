@@ -14,6 +14,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateInvoices, type GenerateOptions } from "./core.ts";
+import { emailCreatedInvoices } from "./email.ts";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -45,7 +46,16 @@ Deno.serve(async (req: Request) => {
 
   try {
     const result = await generateInvoices(supabase, opts);
-    return json(result);
+
+    // Email each newly-created invoice (best-effort, after generation has
+    // committed — see emailCreatedInvoices). Never throws; logged no-op when
+    // RESEND_API_KEY is unset (local dev / tests).
+    const { emailsSent } = await emailCreatedInvoices(supabase, result.created ?? [], {
+      apiKey: Deno.env.get("RESEND_API_KEY"),
+      appUrl: Deno.env.get("APP_URL"),
+    });
+
+    return json({ ...result, emails_sent: emailsSent });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
   }
