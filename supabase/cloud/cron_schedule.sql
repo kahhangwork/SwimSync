@@ -17,7 +17,11 @@
 --        <your-cron-secret> → same value you set with `supabase secrets set`
 -- ============================================================
 
--- 1am SGT = UTC+8, so 1am SGT = 17:00 UTC previous day
+-- 1am SGT = UTC+8, so 1am SGT = 17:00 UTC previous day.
+-- The empty body ('{}') runs auto mode with the DEFAULT billing month, which the
+-- function resolves as the previous calendar month in APP_TIMEZONE (SGT by
+-- default) — not the UTC month — so this fires correctly at the SGT boundary.
+-- See supabase/functions/generate-invoices/dates.ts.
 SELECT cron.schedule(
   'generate-invoices-daily',   -- job name (must be unique)
   '0 17 * * *',                -- cron: every day at 17:00 UTC (= 1:00 SGT)

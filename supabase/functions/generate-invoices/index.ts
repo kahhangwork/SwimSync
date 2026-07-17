@@ -10,7 +10,8 @@
 // Request body (all optional):
 //   mode          "auto" | "manual"   (default "auto")
 //   force         boolean             (default false)
-//   billing_month "YYYY-MM"           (default = previous calendar month)
+//   billing_month "YYYY-MM"           (default = previous calendar month in the
+//                                      app timezone / SGT — see dates.ts)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateInvoices, type GenerateOptions } from "./core.ts";

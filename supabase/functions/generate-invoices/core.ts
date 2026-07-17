@@ -11,6 +11,7 @@
 // available credit FIFO via the credit_applications ledger.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { previousBillingMonth } from "./dates.ts";
 
 // Attendance statuses that result in a charge to the parent.
 // Per PRD 5.4: only Present and Paid Trial are billable.
@@ -64,14 +65,16 @@ export async function generateInvoices(
   const mode = opts.mode === "manual" ? "manual" : "auto";
   const force = opts.force === true;
 
-  // Billing month: explicit YYYY-MM, else previous calendar month.
+  // Billing month: explicit YYYY-MM, else the previous calendar month in the
+  // app timezone (SGT by default). Derived via previousBillingMonth() rather
+  // than new Date()'s local fields — Edge Functions run in UTC, which bills the
+  // wrong month at the SGT day boundary (the 1am SGT cron is 17:00 UTC the day
+  // before). See dates.ts.
   let billingMonth: string;
   if (opts.billing_month && /^\d{4}-\d{2}$/.test(opts.billing_month)) {
     billingMonth = opts.billing_month;
   } else {
-    const now = new Date();
-    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    billingMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    billingMonth = previousBillingMonth();
   }
   const [by, bm] = billingMonth.split("-").map(Number);
   const monthStart = `${billingMonth}-01`;

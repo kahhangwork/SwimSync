@@ -24,11 +24,13 @@ click the button**. The "Automatic monthly generation" toggle on the Invoices
 page is wired for a cron that isn't running on this plan, so treat it as inert:
 you still generate manually every month.
 
-> **If cron is ever switched on, read this first.** The billing function defaults
-> its billing month from the server clock, which is **UTC** — 8 hours behind us.
-> A job firing at 00:00 SGT on 1 Aug is still 31 Jul in UTC, so it would bill
-> **June**, not July. The manual button is unaffected (it always sends an explicit
-> month). Whoever wires the cron must pass `billing_month` explicitly.
+> **Cron-default billing month is now timezone-correct.** The billing function
+> derives its default month from the calendar date in the **app timezone**
+> (`APP_TIMEZONE`, default `Asia/Singapore` — see
+> `supabase/functions/generate-invoices/dates.ts`), not the UTC server clock. A
+> job firing at 1am SGT on 1 Aug now correctly bills **July**. (This previously
+> defaulted to the UTC month and would have billed June under cron — fixed.) The
+> manual button is unaffected either way — it always sends an explicit month.
 
 ---
 
