@@ -459,6 +459,15 @@ than materialising rows ahead of time. This is what makes a forgotten lesson vis
   and names any missing dates before invoices are created (see §7.7).
 - A lesson that legitimately didn't run is recorded with the existing non-billable
   statuses (*Cancelled — rain/coach*), which clears it from both views.
+- The **coach's roster bounds marking to that same window.** Its primary action targets the
+  *most recent expected lesson* (today if today is a class day, else the last one that
+  passed), floored at `max(start of last month, earliest enrolment)`; earlier lessons are
+  closed (a correction to an already-invoiced lesson uses a credit note). A class with nothing
+  due yet shows a placeholder instead of a markable button — so a coach cannot create/bill a
+  session on a non-lesson day by mistake.
+- The **parent's Attendance screen uses the same derivation to tell its empty states apart:** a
+  child whose first lesson hasn't happened yet reads *"No lessons have taken place yet"*, versus
+  *"No lessons marked yet"* when a lesson has fallen due but the coach hasn't recorded it.
 
 A lesson counts as marked only when every actively-enrolled student has an attendance
 record on it — the same rule the invoice engine applies.

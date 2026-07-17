@@ -287,7 +287,7 @@ the same as fixed. **Do this before enabling cron, not after.**
 
 ### Multi-class parent is under-billed — **S**
 A parent with children in **two different classes** is billed for only one of them. Found
-while reviewing the invoice-email work (HANDOVER §8); **pre-existing, not introduced by it.**
+while reviewing the invoice-email work (HANDOVER §8b); **pre-existing, not introduced by it.**
 
 **Why:** the invoice engine (`generate-invoices/core.ts`) loops **per class** and creates a
 parent's invoice during the *first* class they appear in; when it reaches the parent's other
@@ -303,6 +303,21 @@ once per parent after all classes are tallied, not inside the class loop. Add a 
 (two classes, one parent, children in both → one invoice with both classes' items) — the
 engine's `core.test.ts` scenario helper currently seeds a single class, so it needs
 extending. Check the `credit`/FIFO path still reconciles once items span classes.
+
+### Tie the attendance-marking window to un-invoiced months — **S**
+The coach's marking window floor is a **calendar proxy** — `max(start of last month, earliest
+enrolment)` (`lib/lessonDates.ts:backlogWindowStart`) — not "the earliest month not yet
+invoiced."
+
+**Why:** the moment a month is invoiced (say July, on 1 Aug), its lessons stay *in-window*
+until the calendar rolls over, but a lesson marked there now would **not** be added to the
+existing invoice — so it's markable yet unbillable, a small silent gap. The calendar rule is a
+fine default for the manual monthly cadence; this closes the seam if it ever matters.
+
+**Notes:** would make `backlogWindowStart` consult `billing_periods`/existing invoices rather
+than a pure date rule. Minor; recorded so the limitation (noted in HANDOVER §8) isn't
+re-derived. Related to the credit-note flow, which is the *correct* tool for changing an
+already-invoiced lesson.
 
 ---
 
@@ -675,6 +690,20 @@ notices.
 
 **Notes:** the engine copy is **unavoidable** (Deno, no npm resolution), so the target is
 three-into-one, not four. Until then: **if you touch the rule, touch all four.**
+
+### Enforce the attendance window at save time — **S** `[handover]`
+The coach attendance screen (`(coach)/classes/[id]/attendance.tsx`) writes whatever `date` it
+is handed, with no validation.
+
+**Why:** as of HANDOVER §8 every *entry point* (the roster button, Unmarked Lessons, Past
+Sessions) is bounded to the lesson window, so the UX no longer offers a bad date. But the
+screen itself has no guard — a hand-typed URL, or a future new entry point that forgets the
+window, could still create/bill a session **outside the window or on a non-lesson day**. That's
+the exact phantom-lesson billing risk the UX fix closed, just via a different door.
+
+**Notes:** defense-in-depth — reject a `date` outside `[backlogWindowStart(today, enrolment),
+today]` or whose weekday ≠ the class's `day_of_week`, in the save handler (and ideally mirror
+it in a DB check). Cheap, and it makes the window a real invariant rather than a UI convention.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`
