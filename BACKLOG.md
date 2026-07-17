@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-16_
+_Last updated: 2026-07-17_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -48,32 +48,30 @@ theme.
 
 ### The near-term plan — build roughly in this order
 
-_(Three items have shipped and been removed from this list: the original #1, bulk "set all"
-on the attendance screen (**shipped 2026-07-16** — PRD §7.6); the `tsc`-baseline +
-CI-typecheck item (**shipped 2026-07-16** — HANDOVER §8b); and the **invoice half of email
-notifications** (**shipped 2026-07-16** — PRD §7.7, HANDOVER §8; credit-note emails remain,
-now in _Notifications_). The list below is renumbered from what remains.)_
+_(Shipped and removed from this list: bulk "set all" on the attendance screen
+(**2026-07-16** — PRD §7.6); the `tsc`-baseline + CI-typecheck item (**2026-07-16** —
+HANDOVER §8c); the **invoice half of email notifications** (**2026-07-16** — PRD §7.7;
+credit-note emails remain, now in _Notifications_); and the **UTC-derived default billing
+month fix** (**2026-07-17** — PRD §7.7, HANDOVER §8). The list below is renumbered from what
+remains.)_
 
-1. **Fix the UTC-derived default billing month** (S, _Billing_) — cheap, and it must land
-   **before** cron is ever switched on. Cron is the gate for automated reminders further
-   down; fixing this *after* enabling cron means a mis-billed month first.
-2. **Extract the completeness-rule shared helper** (S, _Foundations_) — do **before** #3.
+1. **Extract the completeness-rule shared helper** (S, _Foundations_) — do **before** #2.
    Active/inactive will edit that rule; extract it into one helper first so the change
-   lands in one place, not the four hand-written copies. Doing #3 first means editing four
+   lands in one place, not the four hand-written copies. Doing #2 first means editing four
    copies and then re-touching them at extraction time.
-3. **Active / inactive status for parents and children** (M, _Admin_) — the anchor for the
+2. **Active / inactive status for parents and children** (M, _Admin_) — the anchor for the
    students table. Reconcile the two existing "inactive" notions (`is_active` vs
    `assignment_status`) and settle the status model **before** more fields are piled onto
-   students. Needs #2.
-4. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
-   the stored `age` column (the same stale-second-source problem #3 fixes for status) and
-   add NRIC. Rides the same students-schema + parent-home + admin-table edits as #3, so do
+   students. Needs #1.
+3. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
+   the stored `age` column (the same stale-second-source problem #2 fixes for status) and
+   add NRIC. Rides the same students-schema + parent-home + admin-table edits as #2, so do
    it right after — otherwise those screens get touched twice.
-5. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
-   `parents`-table addition touching the registration form; group with #4's
+4. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
+   `parents`-table addition touching the registration form; group with #3's
    onboarding-form work so those screens are opened once.
-6. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field; do it
-   **after** the #3/#4 reconciliations so it respects the settled status/level model
+5. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field; do it
+   **after** the #2/#3 reconciliations so it respects the settled status/level model
    rather than adding churn to a table still being reconciled.
 
 _Not ranked here but flagged for near-term attention:_ a **pre-existing multi-class-parent
@@ -93,9 +91,10 @@ in different classes.
   parent-link + RLS surface that tenanting rewrites.
 - **The platform chain.** Native store builds (M) → Push notifications (M) — push can't
   work on the current static web app, so it can't precede native builds.
-- **The reminder chain.** Invoice emails **shipped** (HANDOVER §8); the rest sequences after
+- **The reminder chain.** Invoice emails **shipped** (HANDOVER §8b); the rest sequences after
   them: credit-note emails (M) → WhatsApp reminders (M) → Automated reminder workflows
-  (M — needs a scheduler, i.e. cron, so it needs #1 too).
+  (M — needs a scheduler, i.e. cron; the UTC-billing-month fix that had to precede enabling
+  cron is now **shipped**, so that prerequisite is cleared).
 
 ### Unordered — no dependencies, pick by value
 
@@ -272,18 +271,6 @@ is the same class of bug as the UTC billing month below. Decide what a **cancell
 class means for pay before building: parents aren't billed for it, but a coach who
 showed up to an empty pool may still expect to be, and that's a policy question, not an
 engineering one.
-
-### Fix the UTC-derived default billing month — **S** `[handover]`
-The invoice engine's default billing month is derived in UTC.
-
-**Why:** it's a live latent bug. It's harmless today only because invoices are generated
-manually with the month picked explicitly, and cron isn't wired on the free tier. **The
-day anyone switches cron on, it bills the wrong month** — the same class of UTC-vs-SGT
-error that already shipped a real double-billing bug (HANDOVER §7.7).
-
-**Notes:** fix with `todayInSg()` from `lib/lessonDates.ts`, the same helper that pinned
-the earlier bug. Currently documented as a warning in `INVOICE_RUNBOOK.md`, which is not
-the same as fixed. **Do this before enabling cron, not after.**
 
 ### Multi-class parent is under-billed — **S**
 A parent with children in **two different classes** is billed for only one of them. Found
@@ -785,3 +772,4 @@ Kept so the reasoning doesn't get re-litigated.
 | **A parent-facing swimming-ability picker** | Removed on purpose (PRD §5.1). Parents self-reporting ability isn't information anyone trusted; the class a child is in is the real signal. If levels return they should be **coach-defined** — see the backlog item above. |
 | **Re-adding Notification Preferences / Help & Support buttons** | Removed as dead stubs with empty handlers, not lost (HANDOVER §12). Build the feature first, then the button. |
 | **`Alert.alert` for user feedback** | A **no-op on RN-web**, so it silently does nothing on the deployed app. Use `confirmAction` / the global Toast / inline form errors instead (HANDOVER §12a). The only sanctioned use left is the native-only media-library permission prompt. |
+| **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8.) |

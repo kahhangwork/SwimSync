@@ -1,6 +1,6 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-16_
+_Last updated: 2026-07-17_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -84,7 +84,7 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   (waiting on the coach) and an empty filter result (§8f).
 - **Full RLS** — parents see only their data, coaches only their classes,
   superadmin everything. Covered by automated isolation tests.
-- **Automated tests** — backend **34 pgTAP + 24 Deno**, plus frontend suites
+- **Automated tests** — backend **34 pgTAP + 29 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest, `SwimSyncApp` jest-expo); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
@@ -170,7 +170,7 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 supabase test db                                  # 34 tests across 4 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
-supabase/functions/generate-invoices/test.sh      # 24 tests; needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 29 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
 cd SwimSyncAdmin && npm test                       # 38 tests
@@ -190,14 +190,17 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `rls_isolation.test.sql` (10) | RLS parent/parent isolation + superadmin sees all; **11.3** a parent sees all their children across coaches while each coach sees only students in their own classes |
 | `edge_cases.test.sql` (9) | PRD §11: **11.2** a child created before assignment defaults to unassigned with an empty (not error) class view, **11.4** no bare `trial` status, **11.5** re-enrol after unenrol keeps history, **11.8** unenrol leaves `credit_balance` untouched |
 
-_Deno tests — `core.test.ts` + `email.test.ts` (run by `test.sh`):_ **Engine**
+_Deno tests — `core.test.ts` + `email.test.ts` + `dates.test.ts` (run by `test.sh`):_ **Engine**
 (`core.test.ts`): billable-only summing, paid vs free trial, no double-billing, the
 auto/manual completeness gate, the `auto_invoice_enabled` switch, FIFO credit application,
 **11.1** leap-year last-day / month-boundary billing, **11.7** credit-exceeds-invoice
 carry-forward (+ ledger invariants via `checkInvariants`), plus `result.created` shape and
 two **stack-backed invoice-email orchestration** tests (recipients resolved from the DB;
 no-op without a key). **Email** (`email.test.ts`): pure HTML builder + `sendInvoiceEmail`
-(no-op without key, mocked-fetch success/failure, HTML escaping).
+(no-op without key, mocked-fetch success/failure, HTML escaping). **Dates**
+(`dates.test.ts`, 5): `previousBillingMonth`/`dateInTimeZone` — the SGT day-boundary
+regression (1 Aug 00:30 SGT bills July, **fails on the old UTC path**), year rollover, and
+the `APP_TIMEZONE` seam (UTC vs SGT diverge at the boundary).
 
 _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
@@ -233,7 +236,7 @@ is already marked, and a bulk save persists `cancelled_rain` to the DB;
 `verify-class-edit.mjs` drives the admin Classes page — the create form no longer defaults
 the day (required choice) and an existing class edits Saturday→Sunday and persists;
 `verify-attendance-window.mjs` (+ `fixtures-attendance-window.sql`) drives the attendance
-window (§8) across coach + parent — the roster button targets the most recent expected
+window (§8a) across coach + parent — the roster button targets the most recent expected
 lesson (not raw "today"), the "no lessons to mark yet" placeholder shows for a class with
 nothing due, and the parent screen distinguishes "no lessons have taken place yet" from
 "no lessons marked yet".
@@ -303,7 +306,13 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   this shipped a real double-billing bug (§7.7). Use `todayInSg()` / `toSgDate()` from
   `lib/lessonDates.ts`, and derive a weekday from that same string via `dayOfWeekOf()`
   rather than a separate `new Date().getDay()`. Full ISO **instants** (`paid_at`,
-  `updated_at`) are fine as-is — only date-*string* derivations are affected.
+  `updated_at`) are fine as-is — only date-*string* derivations are affected. The same
+  rule now covers the **invoice engine's default billing month**: it is derived in the app
+  timezone via `generate-invoices/dates.ts` (`previousBillingMonth()`), **not** `new
+  Date()`'s local/UTC fields — see §8 and gotcha §7.12. The timezone is a single seam
+  (`APP_TIMEZONE`, default `Asia/Singapore`), **deliberately not per-tenant** — one
+  configured zone is enough while all usage is SGT, and true multi-timezone folds into the
+  tenanting work when that lands.
 - **`lib/lessonDates.ts` is duplicated byte-identical in both apps** — deliberate. There
   is no shared package: separate npm projects, no workspaces, different React majors,
   different bundlers/test runners. Sharing ~120 lines of pure date maths would need
@@ -377,10 +386,64 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     (`mv .next .next__x; mv next-env.d.ts next-env.d.ts__x`) and re-run. This is why the CI
     typecheck guard (§8c) was validated against a stubbed-out fresh checkout, not just a local
     pass.
+12. **The invoice engine's DEFAULT billing month was UTC-derived** — same family as #7,
+    different door. `core.ts` computed the previous month from `new Date().getMonth()`,
+    which is the **UTC** month on Edge Functions. The daily cron POSTs an empty body, so it
+    used this default: at the 1am SGT run (17:00 UTC the day before) it would bill a month
+    early (1 Aug → June, not July). Latent because invoicing is manual (the admin always
+    sends an explicit month) and cron is off. **Fixed** (§8) — the default now derives the
+    calendar date in `APP_TIMEZONE` via `generate-invoices/dates.ts`. Don't reintroduce a
+    `new Date()`-field month derivation in the engine. Audit:
+    `grep -rn "getMonth\|getFullYear\|new Date()" supabase/functions/generate-invoices/core.ts`.
 
 ---
 
-## 8. What changed this session (2026-07-17 — attendance marking window + clearer empty states)
+## 8. What changed this session (2026-07-17 — UTC-derived default billing month fix)
+
+**Fixed a latent billing bug: the invoice engine's default billing month was derived in
+UTC, so the daily cron would bill a month early.** Shipped to `main` (`745b3ea`,
+fast-forward, no PR) **and deployed to production** (`supabase functions deploy
+generate-invoices`). **No schema change; no user-facing behaviour change today** — the fix
+only affects the auto/cron default path, which isn't running yet.
+
+- **The bug (§7.12):** `core.ts` computed the previous month from `new Date().getMonth()`.
+  Edge Functions run in **UTC**, so at the documented 1am SGT cron run (17:00 UTC the day
+  before) the month was a day behind — 1 Aug would bill **June**, not July. The cron POSTs
+  an empty body, so it relied on exactly this default. Latent only because invoicing is
+  **manual** (the admin route always sends an explicit `billing_month`) and cron is off on
+  the free tier. Same UTC-vs-SGT class as the shipped double-billing bug (§7.7).
+- **The fix — a timezone seam, not a hardcode.** New pure helper
+  **`generate-invoices/dates.ts`**: `previousBillingMonth(now, timeZone)` resolves the
+  calendar date via `Intl.DateTimeFormat` (mirroring `todayInSg`, DST-safe) and takes the
+  month *before* it. Timezone is `APP_TIMEZONE` (env-overridable, **default
+  `Asia/Singapore`**). `core.ts` now calls `previousBillingMonth()` instead of `new Date()`
+  fields. Duplicated Deno-side rather than importing the app twin (Deno, no npm resolution —
+  same rationale as the completeness rule, §6).
+- **Why a seam and not per-tenant** (the user's explicit call): multi-timezone is a
+  "don't-paint-into-a-corner" concern, **not near-term**. One configured zone is enough
+  while all usage is SGT; a future deployment re-homes by setting `APP_TIMEZONE`, and true
+  per-tenant timezone folds into the tenanting work (BACKLOG) when it lands. Frontend
+  `lessonDates.ts` stays SG-hardcoded — making the whole app multi-TZ is a tenanting-era
+  project, deliberately out of scope.
+- **Verified.** `deno check` clean; full Deno suite **24 → 29** (5 new `dates.test.ts`,
+  incl. the boundary regression that fails on the pre-fix path); and the **live empty-body
+  auto call** on the local stack returned the SGT-correct default month. Manual generation
+  is untouched (always explicit month). Docs: `INVOICE_RUNBOOK.md`'s "cron bills UTC month"
+  warning retired; `index.ts` + `cron_schedule.sql` comments updated.
+
+**Live in production:** the Edge Function was **redeployed** with the fix (a git push does
+**not** deploy functions — Vercel only builds the web apps). `APP_TIMEZONE` is intentionally
+**unset** in prod, so it defaults to `Asia/Singapore`. The next time cron is enabled it will
+bill the correct month.
+
+**Not done (deliberate):**
+- **No per-tenant timezone, no frontend multi-TZ** — see "Why a seam" above.
+- **No save-time DB guard on `billing_month`** — out of scope; unrelated to this default-path
+  fix. (The separate attendance-window save guard is still in BACKLOG → Foundations.)
+- **Didn't touch the related multi-class-parent under-billing bug** (BACKLOG → Billing) —
+  separate defect, still open and worth fixing before 1 Aug.
+
+## 8a. What changed (2026-07-17 — attendance marking window + clearer empty states)
 
 **Bounded how far back a coach can mark attendance, and made the parent's empty states
 truthful.** Shipped to `main` (`16d3db3`, fast-forward, no PR). **No schema or billing
@@ -884,9 +947,10 @@ report expects the right weekday.
 across the 4 Sunday classes); the **first real invoice run is 1 Aug 2026** (July's billing,
 manual — no cron on the free tier). **Invoice emails are LIVE** (deployed + `RESEND_API_KEY`
 set 2026-07-16 — §8b), so the 1 Aug run will email each parent; **watch the first run**
-(`emails_sent` in the response + Resend → Emails) — no live send has fired on prod yet. This
-session also shipped the **attendance marking window + truthful parent empty states** (§8),
-so the coach mark-flow is now bounded to real lesson dates.
+(`emails_sent` in the response + Resend → Emails) — no live send has fired on prod yet.
+Recently shipped: the **attendance marking window + truthful parent empty states** (§8a) and
+the **UTC-billing-month fix** (§8, deployed to prod — the cron default now bills the SGT
+month).
 
 In order:
 
@@ -897,15 +961,13 @@ In order:
 2. **First real invoice run — 1 Aug 2026.** Once the Sundays are marked, follow
    **`INVOICE_RUNBOOK.md`** on the 1st (manual). The confirm dialog reports any lesson with
    no attendance marked: **read it** — it is the only backstop against an underbill (§7.8).
-   Pick July explicitly in the month picker, which also sidesteps the UTC-billing-month
-   warning in the runbook.
-3. **Pick the next build item from `BACKLOG.md` → `## Build order`.** Recently shipped and
-   removed from the near-term ranking: bulk "set all" (§8d), the **`tsc` baseline + CI
-   typecheck guard** (§8c), and **invoice email notifications** (§8b — the invoice half;
-   credit-note emails remain, deferred). The list is now led by the **UTC-billing-month fix**
-   (do *before* enabling cron — it mis-bills the month otherwise). **Also open: a pre-existing
-   multi-class-parent under-billing bug** (§8b, BACKLOG → Billing) — worth fixing before 1 Aug
-   if any family has siblings in different classes.
+   Pick July explicitly in the month picker. **Before that run**, the pre-existing
+   **multi-class-parent under-billing bug** (BACKLOG → Billing) is worth fixing — a family
+   with siblings in two different classes is billed for only one; plausible with 4 classes.
+3. **Pick the next build item from `BACKLOG.md` → `## Build order`.** The UTC-billing-month
+   fix just shipped (§8) and is removed from the ranking; the near-term list is now led by
+   **extract the completeness-rule shared helper** (S) → **active/inactive status** (M). The
+   multi-class-parent bug in item 2 is the other near-term correctness item.
 
 _Optional, low-cost:_ click through the live screens merged 2026-07-16 that have only ever
 run against local fixtures (§3) — parent **Attendance** (chips are pills, not tall
@@ -923,7 +985,8 @@ capsules), coach **Today**, admin **Invoices → Generate**. Hard-refresh (stati
 | `supabase/functions/generate-invoices/core.ts` | Billing engine logic (exported, tested) |
 | `supabase/functions/generate-invoices/index.ts` | Thin HTTP handler (auth + client + call core) |
 | `supabase/functions/generate-invoices/email.ts` | Invoice-email builders + Resend sender + `emailCreatedInvoices()` orchestration (§8b) |
-| `supabase/functions/generate-invoices/core.test.ts` · `email.test.ts` · `test.sh` | Deno integration + email tests + runner |
+| `supabase/functions/generate-invoices/dates.ts` | Timezone seam: `APP_TIMEZONE` + `previousBillingMonth()` — SGT-correct default billing month (§8) |
+| `supabase/functions/generate-invoices/core.test.ts` · `email.test.ts` · `dates.test.ts` · `test.sh` | Deno integration + email + billing-month tests + runner |
 | `supabase/tests/*.test.sql` | pgTAP DB tests (trigger, RLS, constraints) |
 | `supabase/cloud/cron_schedule.sql` | Cloud-only daily cron wiring |
 | `supabase/seed.sql` | Local seed (superadmin, coach, one class) |
@@ -958,7 +1021,7 @@ store builds are deferred until the app "sticks."
 | Piece | Where | Notes |
 |-------|-------|-------|
 | **Backend** | Supabase project `cdmjeyauhxcgulhbxmsb` (region ap-southeast-1) | Free tier. Linked via `supabase link`; schema via `supabase db push`. |
-| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8b); needs `RESEND_API_KEY` secret set, else it's a no-op. |
+| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8b); needs `RESEND_API_KEY` secret set, else it's a no-op. Redeployed 2026-07-17 with the timezone-correct default billing month (§8); `APP_TIMEZONE` unset → defaults to `Asia/Singapore`. |
 | **Admin panel** | Vercel `swimsync-admin` → **https://admin.swimsync.sg** (also `swimsync-admin.vercel.app`) | Root `SwimSyncAdmin`, **framework preset = Next.js**. |
 | **Mobile app (web)** | Vercel `swimsync-app` → **https://swimsync.sg** (apex, canonical; `www` 308-redirects; also `swimsync-app-psi.vercel.app`) | Root `SwimSyncApp`, **preset = Other** (`SwimSyncApp/vercel.json`: `expo export --platform web` → `dist`, SPA rewrite). |
 | **Email** | **Resend** → sender `noreply@swimsync.sg` | Two paths: **(1) Auth emails** (password reset) via cloud custom SMTP `smtp.resend.com:465` (user `resend`, pass = Resend API key, dashboard-only); branded reset template (dashboard + `supabase/templates/recovery.html`); auth rate limit 2→~30/hr; confirmation **OFF**. **(2) Invoice emails** (§8b) via the **Resend HTTP API** from the Edge Function, keyed by the `RESEND_API_KEY` secret (same key) — set with `supabase secrets set`. |
