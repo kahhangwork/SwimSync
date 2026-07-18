@@ -29,8 +29,13 @@ cd SwimSyncApp && npx expo start --web
 ```
 
 Readiness: admin returns 307 (redirect to /login) once ready; Expo returns 200
-on `/`. The Expo log may print a **favicon `readFileSync` error — ignore it**,
-it's non-fatal. Poll with `curl -s -o /dev/null -w "%{http_code}" <url>`.
+on `/`. Poll with `curl -s -o /dev/null -w "%{http_code}" <url>`.
+
+> The Expo log used to print a **favicon `readFileSync` error** here. That was
+> `app.json` pointing at `./assets/favicon.png` when `SwimSyncApp/assets/` did not
+> exist at all; the assets landed with the logo (HANDOVER §8.2) and the error is
+> gone. If it comes back, an asset the Expo config names has gone missing —
+> don't ignore it this time.
 
 ## 2. Install the driver (once)
 

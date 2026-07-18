@@ -48,7 +48,10 @@ The distinction that does the real work:
 Two more, narrower: **[INVOICE_RUNBOOK.md](INVOICE_RUNBOOK.md)** is the monthly
 invoice-generation procedure for the superadmin, and
 **[AVAIL_SKILLS.md](AVAIL_SKILLS.md)** lists the Claude Code skills set up for this
-repo. The `Database_*` files at the root are historical artefacts from the original
+repo. **[brand/](brand/)** holds the logo — `mark.svg` is the source of truth, and
+every icon under `SwimSyncApp/assets/` and `SwimSyncAdmin/public/` is rasterised from
+it; `brand/README.md` covers regeneration and the places the mark deliberately does
+*not* go. The `Database_*` files at the root are historical artefacts from the original
 build — **the migrations in `supabase/migrations/` are the schema's source of truth**,
 and the `Database_*` files should not be edited.
 

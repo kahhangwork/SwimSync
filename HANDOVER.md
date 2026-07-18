@@ -432,6 +432,16 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   the current fixed beginner/intermediate/advanced enum). Verified end-to-end on the local
   stack (add child → DB NULL → parent + detail render with no level, no crash).
 
+- **The mark renders two different ways on purpose, and is absent from the invoice email
+  on purpose.** `SwimSyncAdmin/components/Logo.tsx` inlines the SVG paths (recolourable via
+  `currentColor`, no request); `SwimSyncApp/components/Logo.tsx` uses a white-knockout
+  **PNG** at @1x/@2x/@3x with `tintColor`, because the app has **no `react-native-svg`** and
+  adding a native module to a project that has not cut a native build is a risk branding
+  does not justify. The geometry therefore lives in two places — `brand/mark.svg` (source of
+  truth) and the admin component — the same duplicate-and-document arrangement used for
+  `lessonDates.ts`, and `brand/README.md` says so. **Don't add the mark to the invoice email
+  header**: that slot belongs to the *tenant's* logo (PRD §7.10).
+
 ---
 
 ## 7. Gotchas already hit (don't re-introduce)
@@ -582,6 +592,18 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     bundle had already changed. Compare a known-good route against a known-bad one to tell
     "not deployed yet" from "broken build", and wait on the surface you actually changed.
 
+24. **A deleted Next.js route leaves a stale generated type behind, so the admin typecheck
+    fails *after* you clean up.** A throwaway `app/logocheck/page.tsx`, added to render a
+    component in isolation and then deleted, left `.next/types/app/logocheck/page.ts`
+    behind — and `SwimSyncAdmin/tsconfig.json` `include`s `.next/types/**`, so
+    `tsc --noEmit` failed with `TS2307: Cannot find module '…/app/logocheck/page.js'`,
+    naming a file that no longer exists. Same family as §7.11 from the opposite direction:
+    there the git-ignored type stubs were *missing* in CI, here a *stale* one lingered
+    locally. It never reaches a commit or CI (`.next` is git-ignored) — it only breaks the
+    local check, confusingly, and looks like your own change broke something. Fix:
+    `rm -rf SwimSyncAdmin/.next/types/app/<route>`. Related: Next treats `_`-prefixed
+    folders as **private**, so a scratch route named `_logocheck` silently 404s.
+
 ---
 
 ## 8. What changed this session (2026-07-19 — MULTI-TENANCY, phases 0–5, live in production)
@@ -671,6 +693,58 @@ matter: phase 4 **dropped** columns so the app had to deploy *first*; phase 5 on
   be met: **production has zero attendance records**. See §9.
 - **`HANDOVER.md` §9 was left stale for most of the session** and is rewritten below —
   it claimed "phase 2 is next" long after phase 5 shipped.
+
+## 8.2 Second session, same day (2026-07-19) — the SwimSync logo
+
+**The placeholder "S" tile is gone; both apps now carry a real mark — a poolside pace
+clock.** Picked over two other finalists because it reads as *recurring time*, which is
+what this product is: a weekly class, a monthly billing month, a run day. **This is on an
+unmerged branch — see Status below. Nothing has deployed.**
+
+- **`brand/` is the source of truth** — `mark.svg` plus white/ink recolours, an app-icon
+  tile, and an Android adaptive foreground. Every PNG under `SwimSyncApp/assets/` and
+  `SwimSyncAdmin/public/` is rasterised from those. `brand/README.md` carries the geometry,
+  the regeneration table, and the two places the mark is deliberately absent.
+- **Two `Logo` components, one per app idiom** (§6 for why they differ).
+- **Nine call sites**: 5 Expo screens (welcome + the 4 auth screens), 3 admin auth pages,
+  and the **Sidebar — which covers all 10 admin pages in one edit**. An `md` size was added
+  to match the `w-14` tiles some screens already used, so **no layout shifted**.
+
+**A latent bug found on the way in: `app.json` referenced four asset files that did not
+exist.** `icon.png`, `splash.png`, `adaptive-icon.png` and `favicon.png` were all named in
+the Expo config while `SwimSyncApp/assets/` was **missing entirely** — the app had no icon,
+no splash and no favicon, and never had. This is why `run-ui-playwright`'s SKILL.md tells
+you to expect a favicon `readFileSync` error on startup; that error is now gone.
+
+**Not done (deliberate):**
+- **The mark is NOT in the invoice email, and must not be added.** That header carries the
+  **tenant's** logo and business name — a parent pays their coach or school, and an email
+  headed "SwimSync" reads as a platform bill (PRD §7.10; `email.ts` says so in a comment at
+  the point of use). SwimSync appears in the footer only.
+- **The recovery email keeps its plain text wordmark.** SVG does not render in most mail
+  clients, and a hosted PNG adds a broken-image and blocked-image failure mode to the one
+  message a locked-out user actually needs.
+- **No `react-native-svg`.** Adding a native module to an app that has not yet cut a native
+  build is a risk branding does not justify; PNG + `tintColor` has no native surface. If
+  that dependency ever arrives for another reason, switching the component is contained.
+- **No brand-collision check** against existing swim-school or fitness marks — that is a
+  search job, not a drawing job. Filed in `BACKLOG.md` → Platform and reach.
+
+**Verified.** Both apps typecheck clean and **105 tests pass** (49 admin + 56 app; this
+session added no tests). The marks were rendered in the **running** UIs rather than
+asserted — admin login and the Sidebar under `next dev`, and login / register / welcome /
+forgot-password under Expo web — and the generated icons were inspected at true pixel
+sizes (the iOS app icon correctly carries **no alpha**; the Android adaptive foreground
+correctly does).
+
+**Status — NOT merged, nothing deployed.** Branch
+`worktree-logo-generation-and-replacement` (the logo itself is `18d486d`; this doc update
+sits on top of it), pushed to origin and rebased onto `e81109c`, so it is **0 behind**
+`origin/main` — a clean fast-forward whenever you want it. The rebase landed with **zero conflicts** even though the other 2026-07-19
+session touched the same two files (`Sidebar.tsx`, `(auth)/login.tsx`); both sides were
+checked to have survived rather than trusted. `main` and production are untouched.
+
+---
 
 ## 8a. What changed (2026-07-18 — the underbilling cluster: multi-class fix, run day, sealing, hard block, + the §8.1 empty-month seal fix)
 
@@ -1372,6 +1446,9 @@ the new model"* is impossible while there is nothing to bill.
   global setting. Automatic generation will not run until it is turned on.
 - **Set a coach rate** if you want payroll to compute anything (Admin → Coach Wages).
   A coach with no rate is deliberately not on payroll.
+- **Merge the logo branch.** `worktree-logo-generation-and-replacement` is pushed,
+  rebased onto `e81109c`, and a clean fast-forward (0 behind `main`). Small and entirely
+  independent of everything above — see §8.2.
 
 ### Worth deciding, not urgent
 
@@ -1429,6 +1506,10 @@ next now that the tenant cluster is gone.
 | `BACKLOG.md` | **What doesn't exist yet** — every item carries a `Why` |
 
 Memory files (Claude project memory dir) also capture project state + backend
+| `brand/` | **The mark's source of truth** (`mark.svg`) + recolours, app-icon tile, adaptive foreground. `README.md` there has the regeneration table and where the mark must NOT go |
+| `SwimSyncApp/components/Logo.tsx` | The mark in the app: white-knockout **PNG** + `tintColor`. Deliberately not SVG — no `react-native-svg` (§6) |
+| `SwimSyncAdmin/components/Logo.tsx` | The mark in the admin: **inline SVG**, `currentColor`. Hand-kept copy of `brand/mark.svg` — edit both |
+
 gotchas: `swimsync-project`, `swimsync-backend-gotchas`.
 
 ---

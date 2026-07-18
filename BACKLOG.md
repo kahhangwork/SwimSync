@@ -589,6 +589,24 @@ between "a link the coach sends parents" and "an app."
 whole stack is $0 today. **Blocks push notifications.** Decision point is willingness to
 spend, not engineering.
 
+### Check the logo for brand collisions — **S**
+Search existing swim-school, swim-club and fitness marks for anything close to the pace
+clock, before it is on a storefront.
+
+**Why:** the mark now ships in both apps and on `swimsync.sg`, and it has **never been
+checked against anything that already exists**. A collision is cheap to fix now and
+expensive after a store listing, printed flyers, or a coach's shirts — and a store
+submission is exactly where a trademark complaint surfaces. Blocks nothing today; it
+just gets more expensive the longer it waits.
+
+**Notes:** this is a search job, not a drawing job — no design work unless it turns
+something up. Circle-with-a-hand shapes are common in timer and stopwatch iconography,
+so check *swim/fitness* brands specifically rather than generic icon sets. Do it before
+**Native store builds** above, since that is the moment it bites. Related loose end: the
+wordmark in the lockup is a **placeholder system font stack**, not a chosen typeface —
+worth settling in the same pass. Geometry and rationale are in `brand/README.md`;
+HANDOVER §8.2.
+
 ### Multiple coaches per class — **S** `[MVP-excluded]`
 Allow more than one coach on a single class.
 
@@ -736,5 +754,6 @@ Kept so the reasoning doesn't get re-litigated.
 | **A "view as tenant" impersonation mode for the platform admin** | Rejected 2026-07-19 while building the platform page. It means scoping *every* admin screen to a chosen tenant rather than the caller's own — far larger than the support need, which is answered by a cross-tenant business list plus the ability to **move a student** between businesses (PRD §4.4). Revisit only if support actually gets stuck without it. |
 | **Cross-tenant students** (one child taking lessons at two businesses) | Out of scope 2026-07-19. A student belongs to one business, and `one_active_enrolment_per_student` already enforces one active class. Note this **is** a real thing in Singapore, so this is a "not yet" rather than a "never" — but it touches enrolment, billing and the tenant boundary at once. Revisit on actual demand, not in anticipation. |
 | **Platform billing (SwimSync charging the schools)** | Deliberately unbuilt 2026-07-19: the pilot is free. `tenants` is the natural billing subject when it arrives, so nothing in the current schema blocks it — but building it now would be a second money model with no payer. |
+| **Putting the SwimSync mark on the invoice email** | Rejected 2026-07-19 while adding the logo. That header is the **tenant's** logo and business name by design (PRD §7.10): a parent pays their coach or school, and an invoice headed "SwimSync" reads as a platform bill — actively confusing for a family with children at two businesses. SwimSync is named in the footer as sender of record, and that is the whole of its billing there. The *recovery* email is a separate case and also stays wordmark-only: SVG does not render in most mail clients, and a hosted PNG adds a broken-image failure mode to the one message a locked-out user needs. (HANDOVER §8.2, `brand/README.md`.) |
 | **A non-calendar wage cycle** (e.g. 16th–15th) | Wages assume **calendar months**, with only the *pay day* configurable (PRD §7.13). A different period boundary is a new period concept rather than a setting, and would need its own sealing and adjustment rules. Nobody has asked for it. |
 | **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8a.) |
