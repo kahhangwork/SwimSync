@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="SwimSync">
+  <title>SwimSync</title>
+  <g fill="none" stroke="#ffffff" stroke-width="7.5" stroke-linecap="round">
+    <path d="M36.57 10.48A22 22 0 1 1 27.43 10.48"/>
+    <path d="M32 32 40.5 17.3"/>
+  </g>
+  <circle cx="32" cy="32" r="4.5" fill="#ffffff"/>
+</svg>

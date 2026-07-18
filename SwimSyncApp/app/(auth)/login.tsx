@@ -11,6 +11,7 @@ import {
 import { router } from "expo-router";
 import { useAppStore } from "@/store/useAppStore";
 import PrimaryButton from "@/components/PrimaryButton";
+import Logo from "@/components/Logo";
 import { supabase } from "@/lib/supabase";
 import { landingFor } from "@/lib/landing";
 import { friendlyAuthError } from "@/lib/authErrors";
@@ -90,9 +91,7 @@ export default function LoginScreen() {
       >
         {/* Logo / brand */}
         <View className="items-center mb-10">
-          <View className="w-16 h-16 rounded-2xl bg-sky-500 items-center justify-center mb-3">
-            <Text className="text-white text-3xl font-bold">S</Text>
-          </View>
+          <Logo size="lg" className="mb-3" />
           <Text className="text-3xl font-bold text-gray-900">SwimSync</Text>
           <Text className="text-gray-500 mt-1">Swim Coach Attendance & Billing</Text>
         </View>

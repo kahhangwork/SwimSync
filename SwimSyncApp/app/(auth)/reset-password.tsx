@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import PrimaryButton from "@/components/PrimaryButton";
+import Logo from "@/components/Logo";
 import { supabase } from "@/lib/supabase";
 import { friendlyAuthError } from "@/lib/authErrors";
 import { useAppStore } from "@/store/useAppStore";
@@ -91,9 +92,7 @@ export default function ResetPasswordScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="items-center mb-8">
-          <View className="w-14 h-14 rounded-2xl bg-sky-500 items-center justify-center mb-3">
-            <Text className="text-white text-2xl font-bold">S</Text>
-          </View>
+          <Logo size="md" className="mb-3" />
           <Text className="text-2xl font-bold text-gray-900">
             Set New Password
           </Text>

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { Logo } from "@/components/Logo";
 
 const NAV = [
   { href: "/dashboard",    label: "Dashboard",           icon: LayoutDashboard },
@@ -67,9 +68,7 @@ export function Sidebar() {
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
       {/* Brand */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500">
-          <span className="text-lg font-bold text-white">S</span>
-        </div>
+        <Logo size="sm" />
         <div>
           <p className="text-base font-bold text-gray-900">SwimSync</p>
           <p className="text-xs text-gray-400">Admin Panel</p>

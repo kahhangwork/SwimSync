@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { Logo } from "@/components/Logo";
 
 export default function ResetPasswordPage() {
   const [status, setStatus] = useState<"checking" | "valid" | "invalid">(
@@ -84,9 +85,7 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-sm">
         {/* Brand */}
         <div className="flex flex-col items-center mb-8">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500 mb-3">
-            <span className="text-2xl font-bold text-white">S</span>
-          </div>
+          <Logo size="lg" className="mb-3" />
           <h1 className="text-2xl font-bold text-gray-900">Set New Password</h1>
           <p className="text-sm text-gray-500 mt-1 text-center">
             Choose a new password for your admin account

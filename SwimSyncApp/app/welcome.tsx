@@ -1,6 +1,7 @@
 import { View, Text, ScrollView } from "react-native";
 import { router } from "expo-router";
 import PrimaryButton from "@/components/PrimaryButton";
+import Logo from "@/components/Logo";
 
 const STEPS: { title: string; body: string }[] = [
   {
@@ -43,9 +44,7 @@ export default function Welcome() {
     >
       {/* Header */}
       <View className="items-center mb-8">
-        <View className="w-16 h-16 rounded-2xl bg-sky-500 items-center justify-center mb-4">
-          <Text className="text-white text-3xl font-bold">S</Text>
-        </View>
+        <Logo size="lg" className="mb-4" />
         <Text className="text-3xl font-bold text-gray-900">Welcome to SwimSync</Text>
         <Text className="text-gray-500 mt-2 text-base text-center leading-6">
           Swim class attendance & billing, all in one place. Set up your account
