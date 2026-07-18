@@ -15,7 +15,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateInvoices, type GenerateOptions } from "./core.ts";
-import { emailCreatedInvoices } from "./email.ts";
+import { emailCreatedInvoices, notifyGenerationBlocked } from "./email.ts";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -47,6 +47,23 @@ Deno.serve(async (req: Request) => {
 
   try {
     const result = await generateInvoices(supabase, opts);
+
+    // Generation refused: unmarked attendance. Nobody would otherwise find out
+    // an unattended run did nothing, so tell the coaches what to mark. Throttled
+    // to one alert per distinct set of blocking lessons — the cron runs daily.
+    if (result.status === "incomplete_attendance") {
+      const { notified } = await notifyGenerationBlocked(
+        supabase,
+        result.billing_month,
+        (result.blocking ?? []).map((b) => ({
+          class_title: b.class_title,
+          session_date: b.session_date,
+          unmarked_student_count: b.unmarked_student_count,
+        })),
+        { apiKey: Deno.env.get("RESEND_API_KEY") }
+      );
+      return json({ ...result, emails_sent: 0, blocked_alerts_sent: notified });
+    }
 
     // Email each newly-created invoice (best-effort, after generation has
     // committed — see emailCreatedInvoices). Never throws; logged no-op when

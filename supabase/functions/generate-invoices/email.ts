@@ -304,3 +304,131 @@ export async function emailCreatedInvoices(
 
   return { emailsSent };
 }
+
+// ── Blocked-generation alert ───────────────────────────────────────────────
+// When an automatic run refuses because attendance is unmarked, nobody finds
+// out unless someone opens the admin panel — the run is silent by design. This
+// tells the coach (and the superadmin) what to mark.
+//
+// THROTTLED: the cron runs daily, so a naive send would email every day until
+// it is fixed, which trains the recipient to filter it. State lives in
+// app_settings under a per-month key, so no schema change is needed.
+
+const BLOCKED_NOTICE_KEY = "invoice_block_notified";
+
+export type BlockingLessonSummary = {
+  class_title: string;
+  session_date: string;
+  unmarked_student_count: number;
+};
+
+export function buildBlockedEmailHtml(
+  billingMonth: string,
+  blocking: BlockingLessonSummary[]
+): string {
+  const rows = blocking
+    .map(
+      (b) =>
+        `<li style="margin:0 0 6px"><strong>${escapeHtml(b.class_title)}</strong> — ${escapeHtml(
+          formatSessionDate(b.session_date)
+        )} <span style="color:#b91c1c">(${b.unmarked_student_count} student${
+          b.unmarked_student_count === 1 ? "" : "s"
+        })</span></li>`
+    )
+    .join("");
+
+  return `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f8fafc;padding:24px">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
+    <h2 style="margin:0 0 12px;font-size:18px;color:#0f172a">Invoices for ${escapeHtml(
+      formatBillingMonth(billingMonth)
+    )} could not be generated</h2>
+    <p style="margin:0 0 16px;font-size:14px;color:#475569">
+      Some lessons still have no attendance marked. Nothing has been billed.
+      Mark these in the app — or mark them <strong>cancelled</strong> if the
+      lesson did not run — and invoicing will continue automatically.
+    </p>
+    <ul style="margin:0 0 16px;padding-left:18px;font-size:14px;color:#334155">${rows}</ul>
+    <p style="margin:0;font-size:12px;color:#94a3b8">
+      You will not get this reminder again until the outstanding lessons change.
+    </p>
+  </div></body></html>`;
+}
+
+/**
+ * Email the coaches/superadmin that generation is blocked, at most once per
+ * distinct set of blocking lessons per month. Never throws; a failure here
+ * must not affect the run that produced it.
+ */
+export async function notifyGenerationBlocked(
+  supabase: SupabaseClient,
+  billingMonth: string,
+  blocking: BlockingLessonSummary[],
+  opts: { apiKey?: string } = {}
+): Promise<{ notified: number }> {
+  if (!opts.apiKey || blocking.length === 0) return { notified: 0 };
+
+  try {
+    // Fingerprint the blocking set: re-alert only when it actually changes,
+    // so a daily cron does not send a daily identical nag.
+    const fingerprint = blocking
+      .map((b) => `${b.class_title}|${b.session_date}|${b.unmarked_student_count}`)
+      .sort()
+      .join(";");
+
+    const { data: prior } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", BLOCKED_NOTICE_KEY)
+      .maybeSingle();
+
+    const seen = (prior?.value ?? {}) as Record<string, string>;
+    if (seen[billingMonth] === fingerprint) return { notified: 0 };
+
+    // Coaches who own a blocked class, plus every superadmin.
+    const { data: recipients } = await supabase
+      .from("profiles")
+      .select("email, role")
+      .in("role", ["coach", "superadmin"]);
+
+    const html = buildBlockedEmailHtml(billingMonth, blocking);
+    const subject = `Action needed: ${formatBillingMonth(
+      billingMonth
+    )} invoices are blocked by unmarked attendance`;
+
+    let notified = 0;
+    for (const r of recipients ?? []) {
+      if (!r.email) continue;
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${opts.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: DEFAULT_FROM,
+          to: r.email,
+          subject,
+          html,
+        }),
+      });
+      if (res.ok) notified++;
+    }
+
+    // Only record the fingerprint once something actually went out, so a
+    // total delivery failure retries tomorrow instead of going quiet.
+    if (notified > 0) {
+      await supabase
+        .from("app_settings")
+        .update({
+          value: { ...seen, [billingMonth]: fingerprint },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("key", BLOCKED_NOTICE_KEY);
+    }
+
+    return { notified };
+  } catch (e) {
+    console.error("notifyGenerationBlocked failed (ignored):", e);
+    return { notified: 0 };
+  }
+}

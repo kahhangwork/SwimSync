@@ -75,6 +75,15 @@ export type CreatedInvoice = {
   items: CreatedInvoiceItem[];
 };
 
+// A lesson standing between the admin and generation: which class, which date,
+// and how many enrolled students still have no attendance row on it.
+export type BlockingLesson = {
+  class_id: string;
+  class_title: string;
+  session_date: string;
+  unmarked_student_count: number;
+};
+
 export type GenerateResult = {
   billing_month: string;
   status: string;
@@ -86,6 +95,9 @@ export type GenerateResult = {
   /** True when this run left the month finished and closed — no further run
    *  will process it (they short-circuit on the sealed-month guard). */
   sealed?: boolean;
+  /** Present when status is "incomplete_attendance": the lessons to mark
+   *  before generation can proceed. Empty/absent otherwise. */
+  blocking?: BlockingLesson[];
   message?: string;
   results?: unknown[];
   created?: CreatedInvoice[];
@@ -212,6 +224,8 @@ export async function generateInvoices(
   // Tracked from ENROLMENTS, not from billable items: a class may contribute
   // zero items precisely because nobody marked it.
   const deferredParents = new Set<string>();
+  // Lessons with unmarked attendance. Any entry here stops the whole run.
+  const blocking: BlockingLesson[] = [];
   let classesIncomplete = 0; // classes skipped because attendance not fully marked
   let invoicesCreated = 0;
   // A month with a failed write must never be sealed — sealing would lock out
@@ -235,22 +249,36 @@ export async function generateInvoices(
       sessions.map((s) => [s.id, s.session_date])
     );
 
-    // Active enrolments
+    // Active enrolments — who is EXPECTED to be marked. Drives the
+    // completeness gate only.
     const { data: enrolments } = await supabase
       .from("student_class_enrolments")
       .select("student_id")
       .eq("class_id", cls.id)
       .eq("is_active", true);
 
-    if (!enrolments?.length) continue;
-
-    const activeStudentIds = enrolments.map((e) => e.student_id);
+    const activeStudentIds = (enrolments ?? []).map((e) => e.student_id);
 
     // All attendance rows for these sessions
     const { data: attRows } = await supabase
       .from("attendance")
       .select("lesson_session_id, student_id, status")
       .in("lesson_session_id", sessionIds);
+
+    // Who gets BILLED is a different question from who must be marked. Billing
+    // follows the attendance rows that actually exist, NOT the current
+    // enrolment: a child unenrolled part-way through the month still attended
+    // the lessons they attended, and must still be billed for them. Deriving
+    // the billable set from active enrolments alone silently dropped those
+    // lessons — one tap of "remove from class" would have cost a month's
+    // revenue for that child.
+    const attendedStudentIds = (attRows ?? []).map((a) => a.student_id);
+    const billableStudentIds = [
+      ...new Set([...activeStudentIds, ...attendedStudentIds]),
+    ];
+
+    // Nobody enrolled and nobody marked — nothing to bill or check.
+    if (!billableStudentIds.length) continue;
 
     // ── Gate: every active student must have a row for every session ────────
     // Enforced only for automatic runs. Manual/force runs bill whatever
@@ -269,45 +297,55 @@ export async function generateInvoices(
     }
 
     // Parents of this class's students. Queried BEFORE the gate check because
-    // the incomplete branch needs it to record who must be deferred.
+    // the incomplete branch needs it to record who must be deferred. Covers
+    // the billable set, which is wider than the enrolled set (see above).
     const { data: parentStudents } = await supabase
       .from("parent_students")
       .select("parent_id, student_id")
-      .in("student_id", activeStudentIds);
+      .in("student_id", billableStudentIds);
 
-    // MEASURE completeness always; ENFORCE it only when not forced. The split
-    // matters: classesIncomplete used to be incremented inside the !force
-    // branch, so a forced run always ended with 0 and the engine had no way to
-    // know whether the month it just billed was actually finished. Sealing
-    // depends on that answer, so measuring must not be conditional.
+    // Deferral applies only to parents of ACTIVELY enrolled children: a parent
+    // whose child has left is not waiting on anyone to mark that child, so an
+    // unmarked lesson for someone else's child shouldn't hold their invoice.
+    const activeSet = new Set(activeStudentIds);
+    const deferrableParentIds = new Set(
+      (parentStudents ?? [])
+        .filter((ps) => activeSet.has(ps.student_id))
+        .map((ps) => ps.parent_id)
+    );
+
+    // Unmarked attendance BLOCKS generation, in every mode. An unmarked lesson
+    // is unbillable and invisible, and once the parent has an invoice it can
+    // never be added to it — so billing around it converts a fixable gap into
+    // a permanent underbill. A lesson that genuinely did not run is recorded
+    // with cancelled_rain/cancelled_coach (non-billable), which satisfies the
+    // gate; there is no case that needs a bypass.
+    //
+    // `force` keeps its other meaning (skipping the sealed-month guard, the
+    // documented reopen path) but no longer overrides this.
     if (!complete) {
       classesIncomplete++;
-
-      if (!force) {
-        // Every parent with a child in this class is deferred — including
-        // those whose billable items all came from other, fully-marked
-        // classes. A partial invoice now is permanent: tomorrow's retry hits
-        // the already-exists guard and the missing lessons are never billed.
-        for (const ps of parentStudents ?? []) deferredParents.add(ps.parent_id);
-        log.push({
-          class_id: cls.id,
-          title: cls.title,
-          skipped: "incomplete_attendance",
-          parents_deferred: new Set(
-            (parentStudents ?? []).map((p) => p.parent_id)
-          ).size,
-        });
-        continue;
+      for (const pid of deferrableParentIds) deferredParents.add(pid);
+      for (const sessId of sessionIds) {
+        const unmarked = activeStudentIds.filter(
+          (stuId) => !attSet.has(`${sessId}:${stuId}`)
+        );
+        if (unmarked.length) {
+          blocking.push({
+            class_id: cls.id,
+            class_title: cls.title,
+            session_date: sessionDateMap[sessId],
+            unmarked_student_count: unmarked.length,
+          });
+        }
       }
-
-      // Forced: bill whatever is marked, but the month is now known to be
-      // incomplete and must NOT be sealed — the unmarked lessons still need a
-      // later run.
       log.push({
         class_id: cls.id,
         title: cls.title,
-        note: "incomplete_attendance_billed_anyway",
+        skipped: "incomplete_attendance",
+        parents_deferred: deferrableParentIds.size,
       });
+      continue;
     }
 
     // ── Tally this class's billable items into the cross-class map ──────────
@@ -340,7 +378,39 @@ export async function generateInvoices(
     }
   }
 
+  // ── Hard stop: nothing generates while any lesson is unmarked ─────────────
+  // All-or-nothing on purpose. Billing the classes that happen to be complete
+  // would give those parents an invoice, and the already-exists guard would
+  // then permanently block the unmarked lessons from ever reaching one — so a
+  // partial run converts a fixable gap into lost money. Returning before phase
+  // 2 means no invoice, no credit drawn, no email, nothing to unwind.
+  if (blocking.length) {
+    blocking.sort(
+      (a, b) =>
+        a.session_date.localeCompare(b.session_date) ||
+        a.class_title.localeCompare(b.class_title)
+    );
+    return {
+      billing_month: billingMonth,
+      mode,
+      forced: force,
+      status: "incomplete_attendance",
+      invoices_created: 0,
+      classes_still_incomplete: classesIncomplete,
+      parents_deferred: deferredParents.size,
+      sealed: false,
+      blocking,
+      message:
+        `Cannot generate invoices for ${billingMonth}: ${blocking.length} lesson(s) still have unmarked attendance. Mark them — or mark them cancelled if the lesson did not run — then generate again.`,
+      results: log,
+    };
+  }
+
   // ── Phase 2: create ONE invoice per parent, across all their classes ──────
+  // Note: deferredParents can no longer be populated on a run that reaches
+  // here (the hard stop above returns first). The check below is kept as an
+  // inner guard — it is correct, it costs nothing, and it is the right
+  // behaviour if the block is ever relaxed to per-parent.
   // Sorted for deterministic ordering across runs.
   for (const parentId of [...parentItems.keys()].sort()) {
     const items = parentItems.get(parentId)!;

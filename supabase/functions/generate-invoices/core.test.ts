@@ -81,20 +81,35 @@ Deno.test("no double-billing: second run skips the existing invoice", async () =
   }
 });
 
-Deno.test("completeness gate: auto skips a class with a missing mark, manual bills it", async () => {
+Deno.test("completeness gate: an unmarked lesson blocks BOTH auto and manual", async () => {
+  // Was "auto skips it, manual bills it". Manual no longer bypasses the gate:
+  // billing around an unmarked lesson gives the parent an invoice that the
+  // already-exists guard then stops the missing lesson from ever joining, so
+  // the gap becomes a permanent underbill instead of a fixable one.
   const s = await newScenario({ price: 30 });
   try {
     const a = await s.addSession("2026-04-04"); await s.mark(a, "present");
-    await s.addSession("2026-04-11"); // no attendance -> class incomplete
+    const b = await s.addSession("2026-04-11"); // no attendance -> incomplete
 
     const auto = await generateInvoices(s.db, { mode: "auto", billing_month: "2026-04" });
+    assertEquals(auto.status, "incomplete_attendance");
     assertEquals(auto.invoices_created, 0);
-    assert((auto.classes_still_incomplete ?? 0) >= 1);
 
     const man = await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-04" });
-    assertEquals(man.invoices_created, 1);
+    assertEquals(man.status, "incomplete_attendance");
+    assertEquals(man.invoices_created, 0);
+    assertEquals(man.blocking!.length, 1);
+    assertEquals(man.blocking![0].session_date, "2026-04-11");
+    assertEquals(man.blocking![0].unmarked_student_count, 1);
+    assertEquals(await getInvoice(s.db, s.parentId, "2026-04"), null);
+
+    // Marking it — here as "the lesson was rained off" — clears the block and
+    // billing proceeds. This is the escape hatch: no override is needed.
+    await s.mark(b, "cancelled_rain");
+    const ok = await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-04" });
+    assertEquals(ok.invoices_created, 1);
     const inv = await getInvoice(s.db, s.parentId, "2026-04");
-    assertEquals(inv!.gross, 30); // just the one present lesson
+    assertEquals(inv!.gross, 30); // the cancelled lesson is non-billable
   } finally {
     await s.teardown();
   }
@@ -452,28 +467,39 @@ Deno.test("multi-class parent: credit draws against the COMBINED gross", async (
   }
 });
 
-Deno.test("multi-class parent: a FORCED run still bills (deferral is auto-only)", async () => {
-  // This is the path the admin panel actually uses on the 1st of the month
-  // (the route sends force: true). Deferral must NOT fire here — a forced run
-  // is an explicit human instruction and bills whatever is marked, exactly as
-  // it did before deferral existed.
+Deno.test("multi-class parent: force does NOT bypass the block; marking clears it", async () => {
+  // The admin panel's path (force: true). One class marked, the other not:
+  // nothing may be billed, because invoicing the complete class would strand
+  // the other class's lessons behind the already-exists guard forever.
   const s = await newScenario({ price: 30, secondClass: { price: 20 } });
   try {
     const a = await s.addSession("2027-01-09");
     await s.mark(a, "present");
-    await s.addSession("2027-01-16", s.classId2); // deliberately left unmarked
+    const b = await s.addSession("2027-01-16", s.classId2); // unmarked
 
-    const res = await generateInvoices(s.db, {
+    const blocked = await generateInvoices(s.db, {
       mode: "manual",
       force: true,
       billing_month: "2027-01",
     });
+    assertEquals(blocked.status, "incomplete_attendance");
+    assertEquals(blocked.invoices_created, 0);
+    assertEquals(await getInvoice(s.db, s.parentId, "2027-01"), null);
+    assertEquals(blocked.blocking![0].session_date, "2027-01-16");
 
-    assertEquals(res.invoices_created, 1);
-    assertEquals(res.parents_deferred, 0);
+    // Mark the outstanding lesson: the same run now bills BOTH classes on one
+    // invoice.
+    await s.mark(b, "present", s.studentId2);
+    const ok = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-01",
+    });
+    assertEquals(ok.invoices_created, 1);
+    assertEquals(ok.parents_deferred, 0);
 
     const inv = await getInvoice(s.db, s.parentId, "2027-01");
-    assertEquals(inv!.gross, 30); // only the marked lesson is billable
+    assertEquals(inv!.gross, 50);
     assertEquals(inv!.status, "outstanding");
   } finally {
     await s.teardown();
@@ -494,9 +520,13 @@ Deno.test("deferral is reported even when NO class was tallied", async () => {
       billing_month: "2027-02",
     });
 
+    assertEquals(res.status, "incomplete_attendance");
     assertEquals(res.invoices_created, 0);
+    // Counted from the deferred SET, not the phase-2 loop — that loop only
+    // visits parents with billable items, and here nothing was tallied at all.
     assertEquals(res.parents_deferred, 1);
-    assertStringIncludes(res.status, "1 parent(s) deferred");
+    assertEquals(res.blocking!.length, 1);
+    assertEquals(res.blocking![0].unmarked_student_count, 1);
   } finally {
     await s.teardown();
   }
@@ -648,11 +678,11 @@ Deno.test("seal: a MANUAL run that finishes the month seals it; cron then no-ops
   }
 });
 
-Deno.test("seal: a forced run on an INCOMPLETE month bills but does NOT seal", async () => {
+Deno.test("seal: a forced run on an INCOMPLETE month bills nothing and seals nothing", async () => {
   // The safety property. Sealing here would lock the unmarked lesson out
-  // permanently. Requires completeness to be MEASURED even under force —
-  // this test fails if that split is skipped and classesIncomplete is only
-  // counted on the non-forced path.
+  // permanently. Since the block landed, a forced run on an incomplete month
+  // bills nothing at all — but it must still MEASURE the incompleteness, or a
+  // later change to the block would silently make sealing unsafe.
   const s = await newScenario({ price: 30 });
   try {
     const a = await s.addSession("2027-08-07"); await s.mark(a, "present");
@@ -664,7 +694,8 @@ Deno.test("seal: a forced run on an INCOMPLETE month bills but does NOT seal", a
       billing_month: "2027-08",
     });
 
-    assertEquals(res.invoices_created, 1); // still bills what IS marked
+    assertEquals(res.status, "incomplete_attendance");
+    assertEquals(res.invoices_created, 0);
     assertEquals(res.sealed, false);
     assert(
       res.classes_still_incomplete! >= 1,
@@ -713,6 +744,78 @@ Deno.test("seal: sealing twice is a no-op, not a duplicate-key error", async () 
     assertEquals(count, 1);
   } finally {
     await s.db.from("billing_periods").delete().eq("billing_month", "2027-09");
+    await s.teardown();
+  }
+});
+
+// ── Billing follows attendance, not current enrolment ──────────────────────
+
+Deno.test("a child unenrolled mid-month is still billed for lessons they attended", async () => {
+  // The trap behind the new "remove from class" action. Billing used to build
+  // its student list from ACTIVE enrolments, so closing an enrolment silently
+  // dropped that child's already-attended lessons from the invoice — one tap
+  // would have cost a month's revenue for them. Who must be MARKED still comes
+  // from enrolments; who gets BILLED now comes from the attendance rows.
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2027-10-02"); await s.mark(a, "present");
+    const b = await s.addSession("2027-10-09"); await s.mark(b, "present");
+
+    // The family leaves mid-month: enrolment closed, history kept.
+    await s.db
+      .from("student_class_enrolments")
+      .update({ is_active: false, unenrolled_at: new Date().toISOString() })
+      .eq("student_id", s.studentId);
+
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-10",
+    });
+
+    assertEquals(res.invoices_created, 1);
+    const inv = await getInvoice(s.db, s.parentId, "2027-10");
+    assertEquals(inv!.gross, 60); // both attended lessons, not 0
+    const chk = await checkInvariants(s.db, s.parentId);
+    assert(chk.ok, chk.problems.join("; "));
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("unenrolling a child clears the block their unmarked lesson caused", async () => {
+  // The recovery path that makes "no override" survivable: a child who has
+  // left with an open enrolment keeps their class permanently incomplete, so
+  // without this, billing would be blocked forever with no in-app remedy.
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2027-11-06"); await s.mark(a, "present");
+    const b = await s.addSession("2027-11-13"); // never marked -> blocked
+    void b;
+
+    const blocked = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-11",
+    });
+    assertEquals(blocked.status, "incomplete_attendance");
+
+    // Close the enrolment: nobody is expected to be marked any more.
+    await s.db
+      .from("student_class_enrolments")
+      .update({ is_active: false, unenrolled_at: new Date().toISOString() })
+      .eq("student_id", s.studentId);
+
+    const ok = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-11",
+    });
+    assertEquals(ok.status, "complete — billing month sealed");
+    assertEquals(ok.invoices_created, 1);
+    // Still billed for the lesson they DID attend.
+    assertEquals((await getInvoice(s.db, s.parentId, "2027-11"))!.gross, 30);
+  } finally {
     await s.teardown();
   }
 });

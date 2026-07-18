@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,6 +21,9 @@ import {
 } from "@/lib/lessonDates";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
+import { confirmAction } from "@/lib/confirm";
+import { useAppStore } from "@/store/useAppStore";
+import { removeFromClass } from "@/lib/studentStatus";
 
 type Student = {
   id: string;
@@ -74,6 +78,8 @@ export default function ClassRosterScreen() {
   } | null>(null);
   const [windowStart, setWindowStart] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const showToast = useAppStore((s) => s.showToast);
 
   const todayDate = todayInSg();
 
@@ -211,6 +217,30 @@ export default function ClassRosterScreen() {
 
   const isComplete = (s: Session) => s.marked_count >= s.total_count && s.total_count > 0;
 
+  // Removing a student closes their enrolment; it never deletes anything.
+  // Their past attendance still bills (the invoice engine reads attendance
+  // rows, not current enrolment), and they drop out of the completeness check
+  // so a child who has stopped coming can no longer block invoicing.
+  // confirmAction, not Alert.alert — Alert is a no-op on the web build.
+  const handleRemove = (student: Student) => {
+    confirmAction(
+      "Remove from class?",
+      `${student.full_name} will be removed from this class and returned to the admin's unassigned list. Lessons they have already attended are still billed, and their history is kept.`,
+      async () => {
+        setRemovingId(student.id);
+        const { error } = await removeFromClass(supabase, student.id);
+        setRemovingId(null);
+        if (error) {
+          showToast(`Could not remove ${student.full_name}.`, "error");
+          return;
+        }
+        showToast(`${student.full_name} removed from this class.`, "success");
+        loadData();
+      },
+      "Remove"
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-sky-50 items-center justify-center">
@@ -308,6 +338,19 @@ export default function ClassRosterScreen() {
                     {student.full_name}
                   </Text>
                 </View>
+                {/* A child who has stopped coming keeps this class permanently
+                    "incomplete" — every lesson expects a mark for them — and
+                    that now blocks invoicing outright. This is the in-app way
+                    out. */}
+                <Pressable
+                  onPress={() => handleRemove(student)}
+                  disabled={removingId === student.id}
+                  className="px-2.5 py-1.5 rounded-lg border border-gray-200"
+                >
+                  <Text className="text-xs font-semibold text-gray-500">
+                    {removingId === student.id ? "Removing…" : "Remove"}
+                  </Text>
+                </Pressable>
               </Card>
             ))
           )}

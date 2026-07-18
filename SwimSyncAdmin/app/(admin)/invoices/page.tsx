@@ -48,6 +48,15 @@ export default function InvoicesPage() {
   const [togglingAuto, setTogglingAuto] = useState(false);
   const [runDay, setRunDay] = useState<number | null>(null);
   const [savingRunDay, setSavingRunDay] = useState(false);
+  // Lessons the server refused to generate around. Non-empty = blocked.
+  const [blockedLessons, setBlockedLessons] = useState<
+    {
+      class_id: string;
+      class_title: string;
+      session_date: string;
+      unmarked_student_count: number;
+    }[]
+  >([]);
   const [showConfirm, setShowConfirm] = useState(false);
   const [coverage, setCoverage] = useState<ClassCoverage[] | null>(null);
   const [checkingCoverage, setCheckingCoverage] = useState(false);
@@ -208,13 +217,24 @@ export default function InvoicesPage() {
       const json = await res.json();
       if (!res.ok) {
         setGenResult(`Error: ${json.error ?? "generation failed"}`);
+      } else if (json.status === "incomplete_attendance") {
+        // The server refused: lessons are still unmarked. Authoritative — the
+        // client-side coverage check runs its own copy of the rule, so if the
+        // two ever disagree this is the one to believe.
+        setBlockedLessons(json.blocking ?? []);
+        setGenResult(null);
+      } else if (json.status === "already_complete") {
+        setGenResult(
+          `${formatBillingMonth(genMonth)} is already complete and closed — ` +
+            `no invoices were generated. Nothing further is needed.`
+        );
       } else {
         // A deferred parent is billed NOTHING this run (a child of theirs sits
         // in a class with unmarked attendance). Surfaced explicitly — silently
         // reporting "Created 0 invoice(s)" would read as "nothing to bill".
         const deferred = Number(json.parents_deferred ?? 0);
         setGenResult(
-          `Created ${json.invoices_created} invoice(s) for ${formatBillingMonth(
+          `Created ${json.invoices_created ?? 0} invoice(s) for ${formatBillingMonth(
             genMonth
           )}.` +
             (deferred > 0
@@ -410,6 +430,50 @@ export default function InvoicesPage() {
         )}
       </div>
 
+      {/* Server refused: attendance is incomplete. Distinct from the pre-flight
+          dialog above — the client-side coverage check and the engine compute
+          the rule separately, so this fires when they disagree (and is the
+          authoritative answer). */}
+      <Modal
+        title="Cannot generate invoices"
+        open={blockedLessons.length > 0}
+        onClose={() => setBlockedLessons([])}
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+            <p className="text-sm font-semibold text-red-700">
+              {blockedLessons.length} lesson
+              {blockedLessons.length === 1 ? "" : "s"} still need attendance
+              marked.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {blockedLessons.map((b) => (
+                <li
+                  key={`${b.class_id}-${b.session_date}`}
+                  className="text-xs text-gray-700"
+                >
+                  <span className="font-semibold">{b.class_title}</span> ·{" "}
+                  {formatSgDate(b.session_date)}
+                  <span className="text-red-700">
+                    {" "}
+                    ({b.unmarked_student_count} student
+                    {b.unmarked_student_count === 1 ? "" : "s"})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="text-xs text-gray-600">
+            Mark these in the coach&apos;s app — or mark them{" "}
+            <strong>cancelled</strong> if the lesson didn&apos;t run — then
+            generate again. Nothing was billed, so there is nothing to undo.
+          </p>
+          <Button className="w-full" onClick={() => setBlockedLessons([])}>
+            Close
+          </Button>
+        </div>
+      </Modal>
+
       {/* Confirm attendance before generating */}
       <Modal
         title={`Generate invoices for ${formatBillingMonth(genMonth)}?`}
@@ -437,12 +501,14 @@ export default function InvoicesPage() {
           {coverage && hasGaps && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
               <p className="text-sm font-semibold text-red-700">
-                Some lessons have no attendance marked.
+                Cannot generate — some lessons have no attendance marked.
               </p>
               <p className="mt-1 text-xs text-gray-600">
-                Generating now will bill only the marked lessons, and lessons
-                marked <em>after</em> generating won&apos;t be added to an
-                existing invoice.
+                Mark these lessons in the coach&apos;s app — or mark them
+                cancelled if the lesson didn&apos;t run — then try again. A
+                lesson marked <em>after</em> an invoice exists can never be
+                added to it, so billing around it would lose that money for
+                good.
               </p>
               <ul className="mt-2 space-y-1.5">
                 {coverage
@@ -487,15 +553,19 @@ export default function InvoicesPage() {
             >
               Cancel
             </Button>
+            {/* No "Generate anyway". A lesson that genuinely didn't run is
+                marked cancelled (non-billable), which clears the gap — so
+                there is no legitimate case that needs a bypass, and the
+                server refuses regardless. */}
             <Button
               className="flex-1"
-              disabled={checkingCoverage}
+              disabled={checkingCoverage || hasGaps}
               onClick={() => {
                 setShowConfirm(false);
                 handleGenerate();
               }}
             >
-              {hasGaps ? "Generate anyway" : "Yes, generate"}
+              Yes, generate
             </Button>
           </div>
         </div>

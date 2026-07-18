@@ -11,6 +11,8 @@ import {
   money,
   sendInvoiceEmail,
   type InvoiceEmailData,
+  buildBlockedEmailHtml,
+  notifyGenerationBlocked,
 } from "./email.ts";
 
 const sample: InvoiceEmailData = {
@@ -162,4 +164,32 @@ Deno.test("sendInvoiceEmail: fetch throws → caught, not sent", async () => {
   } finally {
     globalThis.fetch = orig;
   }
+});
+
+// ── Blocked-generation alert ───────────────────────────────────────────────
+
+Deno.test("buildBlockedEmailHtml: names each lesson, escapes class titles", () => {
+  const html = buildBlockedEmailHtml("2026-07", [
+    { class_title: "Sat <b>Beginners</b>", session_date: "2026-07-11", unmarked_student_count: 2 },
+    { class_title: "Sun Advanced", session_date: "2026-07-12", unmarked_student_count: 1 },
+  ]);
+  assertStringIncludes(html, "July 2026");
+  assertStringIncludes(html, "Sun Advanced");
+  assertStringIncludes(html, "(2 students)");
+  assertStringIncludes(html, "(1 student)"); // singular
+  assert(!html.includes("<b>Beginners</b>"), "class title must be escaped");
+});
+
+Deno.test("notifyGenerationBlocked: no key or nothing blocking = no send", async () => {
+  const fake = {} as never;
+  assertEquals(
+    (await notifyGenerationBlocked(fake, "2026-07", [
+      { class_title: "A", session_date: "2026-07-04", unmarked_student_count: 1 },
+    ], {})).notified,
+    0
+  );
+  assertEquals(
+    (await notifyGenerationBlocked(fake, "2026-07", [], { apiKey: "re_x" })).notified,
+    0
+  );
 });

@@ -5,7 +5,14 @@ import { createClient } from "@supabase/supabase-js";
 // Manual, on-demand invoice generation triggered from the admin panel.
 // Verifies the caller is a superadmin, then invokes the generate-invoices
 // Edge Function server-side (so the CRON_SECRET is never exposed to the
-// browser). Runs the function in "manual" + force mode for a chosen month.
+// browser). Runs the function in "manual" mode for a chosen month.
+//
+// `force` is deliberately NOT sent. It used to be hardcoded true, which meant
+// the engine's attendance-completeness gate never fired on the only path that
+// actually runs — so a forgotten lesson was billed around silently. The gate
+// now blocks generation until every lesson is marked (or marked cancelled).
+// `force` retains its other meaning, skipping the sealed-month guard, which is
+// the documented reopen path and not something this button should do.
 export async function POST(req: NextRequest) {
   // ── Verify caller is an authenticated superadmin ──────────────────────────
   const token = req.headers.get("authorization")?.replace("Bearer ", "") ?? "";
@@ -56,7 +63,7 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${cronSecret}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ mode: "manual", force: true, billing_month }),
+      body: JSON.stringify({ mode: "manual", billing_month }),
     });
   } catch (e) {
     return NextResponse.json(

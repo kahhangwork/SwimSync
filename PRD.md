@@ -424,6 +424,15 @@ SwimSync shall allow **parents to create student profiles** and **superadmin to 
 - Parent can create and edit student profiles
 - Profile includes: full name, age/DOB, gender, optional notes *(swimming ability is **not** parent-entered — see §5.1)*
 - Student can be marked active/inactive by superadmin
+- *(implemented)* **Remove from class** and **Set inactive** are available to the
+  **superadmin and to the coach whose class the child is in**. Removing returns the child to
+  **Unassigned** for reassignment; setting inactive marks them as departed. Both **close** the
+  class enrolment rather than deleting it, so attendance and billing history survive (§11.5)
+  and any credit balance is untouched (§11.8) — and lessons already attended that month are
+  still invoiced. Both are audit-logged. This matters beyond tidiness: an open enrolment for a
+  child who no longer attends keeps their class permanently incomplete, which **blocks invoice
+  generation** (§7.7), so closing it is the in-app remedy. *(Interim permission model: when
+  coach type lands, a private coach keeps this and a school coach's admin takes it over.)*
 - Newly created profiles default to **Unassigned**
 - Superadmin can view all unassigned profiles in the **Unassigned Children** section
 - Superadmin can assign or reassign student to one class
@@ -523,10 +532,30 @@ each class's weekly schedule against what is actually marked for the billing mon
 reports any gaps — per class, `N of M lessons marked`, naming the missing dates (see
 §7.5). Future-dated lessons in the current month are not counted as gaps.
 
-The check **warns rather than blocks**: a class that genuinely did not run is a valid
-reason to proceed, so the confirm button becomes *"Generate anyway"*. This is the only
-safeguard against underbilling — the engine cannot detect a lesson that was never
-recorded.
+*(implemented — updated)* The check **blocks rather than warns**, in **every** mode. If any
+lesson in the billing month has unmarked attendance, **no invoices are generated at all**
+and the admin is shown which lessons to fix. There is **no override**.
+
+This reverses the earlier "warns, with a *Generate anyway* button" behaviour. The original
+justification — that a class which genuinely did not run is a valid reason to proceed — is
+already served *inside* the completeness rule: such a lesson is recorded with the existing
+non-billable statuses (*Cancelled — rain/coach*), which satisfies the check. So the bypass
+was not covering a legitimate case; it was letting an unmarked lesson through unrecorded,
+and once the parent has an invoice that lesson can never be added to it (§11.6 — the
+original invoice is never modified). Billing around a gap therefore converts a fixable
+problem into a permanent underbill.
+
+All-or-nothing, not per-class, for the same reason: invoicing the complete classes would
+give those parents an invoice and strand the rest behind the same guard.
+
+The **escape hatch for an unfixable class** is to remove the student from it (§7.4): a child
+who has stopped attending but whose enrolment is still open would otherwise keep their class
+permanently incomplete and block billing indefinitely. Their already-attended lessons are
+still billed — billing follows the **attendance records that exist**, not current enrolment.
+
+When an **automatic** run is blocked it emails the coach and superadmin naming the lessons,
+throttled to one alert per distinct set of outstanding lessons so a daily job does not send a
+daily reminder.
 
 #### Automatic vs Manual Generation *(implemented)*
 
