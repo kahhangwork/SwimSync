@@ -6,7 +6,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(21);
+SELECT plan(24);
 
 INSERT INTO tenants (id, slug, display_name, join_code, rain_pays_coach)
 VALUES ('88888888-0000-0000-0000-000000000001','wages','Wages Swim','SWIM-WAGE', FALSE);
@@ -182,6 +182,28 @@ SELECT is(
   -45.00,
   'the difference carries forward as an adjustment on the next payout'
 );
+
+-- ── MULTIPLE raises over time ──────────────────────────────────────────────
+-- One raise is easy to get right by accident; the real question is whether the
+-- rule holds across a series. Each lesson looks up the rate in force ON ITS OWN
+-- DATE, so there is no accumulated state to drift and no number of raises
+-- changes the answer for an earlier month.
+RESET ROLE;
+INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from)
+SELECT c.id, 90.00, 60, '2026-10-01' FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000002';
+
+INSERT INTO lesson_sessions (id, class_id, session_date, status)
+VALUES ('44000000-0000-0000-0000-00000000000f','66000000-0000-0000-0000-000000000001','2026-11-07','completed');
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
+VALUES ('44000000-0000-0000-0000-00000000000f','55000000-0000-0000-0000-000000000001','present','77000000-0000-0000-0000-000000000002');
+
+-- The class is 90 minutes, so each is 1.5x the hourly rate.
+SELECT is((SELECT amount FROM session_pay_amount('44000000-0000-0000-0000-00000000000a')),
+          45.00, 'after a THIRD raise, the March lesson still prices at the Jan rate');
+SELECT is((SELECT amount FROM session_pay_amount('44000000-0000-0000-0000-00000000000e')),
+          90.00, 'and the July lesson still prices at the June rate, not October''s');
+SELECT is((SELECT amount FROM session_pay_amount('44000000-0000-0000-0000-00000000000f')),
+          135.00, 'only a November lesson gets the October rate');
 
 SELECT * FROM finish();
 ROLLBACK;
