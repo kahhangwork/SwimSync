@@ -385,38 +385,106 @@ export async function newScenario(
     return Number(data?.credit_balance ?? 0);
   }
 
+  /**
+   * Remove everything this scenario created, in dependency order.
+   *
+   * ORDER IS LOAD-BEARING and was wrong once: billing rows were swept AFTER
+   * lesson_sessions and classes, so an invoice_item still referencing a session
+   * blocked the session delete, which blocked the class delete, which blocked
+   * the coach, which blocked the auth user — and the tenant was left behind.
+   * All of it failed SILENTLY because no error was checked.
+   *
+   * A leaked tenant is not a local mess: generateInvoices with no tenant_id
+   * loops EVERY tenant, so leftovers become rows a later run processes.
+   *
+   * Sweeps are BY TENANT wherever possible, not by the ids this scenario
+   * tracked — the cross-tenant fixtures deliberately create rows owned by
+   * another scenario's parent inside this tenant.
+   */
   async function teardown(): Promise<void> {
-    // Children first, then the auth users (cascades profiles → parents/coaches).
-    const { data: noteRows } = await db
-      .from("credit_notes")
-      .select("id")
-      .eq("parent_id", parentId);
-    const noteIds = (noteRows ?? []).map((r) => r.id);
+    // 1. Billing first — invoice_items reference lesson_sessions.
+    const { data: tNotes } = await db
+      .from("credit_notes").select("id").eq("tenant_id", tenantId);
+    const noteIds = (tNotes ?? []).map((r) => r.id as string);
     if (noteIds.length) {
       await db.from("credit_applications").delete().in("credit_note_id", noteIds);
       await db.from("credit_notes").delete().in("id", noteIds);
     }
-    await db.from("invoices").delete().eq("parent_id", parentId); // cascades items + apps
-    if (sessionIds.length) {
-      await db.from("attendance").delete().in("lesson_session_id", sessionIds);
-      await db.from("lesson_sessions").delete().in("id", sessionIds);
+
+    const { data: tInvoices } = await db
+      .from("invoices").select("id").eq("tenant_id", tenantId);
+    const invoiceIds = (tInvoices ?? []).map((r) => r.id as string);
+    if (invoiceIds.length) {
+      await db.from("credit_applications").delete().in("invoice_id", invoiceIds);
+      await db.from("payment_records").delete().in("invoice_id", invoiceIds);
+      await db.from("invoice_items").delete().in("invoice_id", invoiceIds);
+      await db.from("invoices").delete().in("id", invoiceIds);
     }
-    await db.from("student_class_enrolments").delete().in("class_id", classIds);
-    await db.from("parent_students").delete().in("student_id", studentIds);
-    await db.from("students").delete().in("id", studentIds);
-    await db.from("classes").delete().in("id", classIds);
-    if (billingMonths.size) {
-      await db
-        .from("billing_periods")
-        .delete()
-        .in("billing_month", [...billingMonths]);
+    // Any invoice of this parent that somehow escaped the tenant sweep.
+    await db.from("invoices").delete().eq("parent_id", parentId);
+
+    // 2. Students of this tenant (tracked + strays added by a test).
+    const { data: tStudents } = await db
+      .from("students").select("id").eq("tenant_id", tenantId);
+    const studentSweep = [
+      ...new Set([...(tStudents ?? []).map((r) => r.id as string), ...studentIds]),
+    ];
+
+    // 3. Attendance + sessions, by class so untracked sessions go too.
+    const { data: tClasses } = await db
+      .from("classes").select("id").eq("tenant_id", tenantId);
+    const classSweep = [
+      ...new Set([...(tClasses ?? []).map((r) => r.id as string), ...classIds]),
+    ];
+
+    if (classSweep.length) {
+      const { data: tSessions } = await db
+        .from("lesson_sessions").select("id").in("class_id", classSweep);
+      const sessionSweep = [
+        ...new Set([...(tSessions ?? []).map((r) => r.id as string), ...sessionIds]),
+      ];
+      if (sessionSweep.length) {
+        await db.from("attendance").delete().in("lesson_session_id", sessionSweep);
+        await db.from("lesson_sessions").delete().in("id", sessionSweep);
+      }
+      await db.from("student_class_enrolments").delete().in("class_id", classSweep);
     }
+
+    if (studentSweep.length) {
+      await db.from("student_class_enrolments").delete().in("student_id", studentSweep);
+      await db.from("parent_students").delete().in("student_id", studentSweep);
+      await db.from("students").delete().in("id", studentSweep);
+    }
+
+    if (classSweep.length) {
+      await db.from("classes").delete().in("id", classSweep);
+    }
+
+    // 4. Tenant-scoped bookkeeping.
     await db.from("parent_tenant_balances").delete().eq("tenant_id", tenantId);
     await db.from("parent_tenants").delete().eq("tenant_id", tenantId);
-    await db.auth.admin.deleteUser(parentProfileId);
-    await db.auth.admin.deleteUser(coachProfileId);
-    // Last: everything above references it.
-    await db.from("tenants").delete().eq("id", tenantId);
+    await db.from("audit_log").delete().eq("tenant_id", tenantId);
+    await db.from("billing_periods").delete().eq("tenant_id", tenantId);
+    if (billingMonths.size) {
+      await db.from("billing_periods").delete().in("billing_month", [...billingMonths]);
+    }
+
+    // 5. Users, then the tenant. BOTH errors are checked — silence here is how
+    //    the leak went unnoticed in the first place.
+    const { error: pErr } = await db.auth.admin.deleteUser(parentProfileId);
+    const { error: cErr } = await db.auth.admin.deleteUser(coachProfileId);
+    if (pErr || cErr) {
+      throw new Error(
+        `teardown could not remove users for tenant ${tenantId}: ${pErr?.message ?? ""} ${cErr?.message ?? ""}`
+      );
+    }
+
+    const { error: tErr } = await db.from("tenants").delete().eq("id", tenantId);
+    if (tErr) {
+      throw new Error(
+        `teardown left tenant ${tenantId} behind: ${tErr.message}. Something still references it.`
+      );
+    }
   }
 
   return {

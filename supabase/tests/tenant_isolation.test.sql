@@ -19,7 +19,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(18);
+SELECT plan(24);
 
 -- ── Two tenants ─────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -153,6 +153,46 @@ SELECT is((SELECT COUNT(*) FROM tenants WHERE id IN
             ('11111111-0000-0000-0000-000000000001','11111111-0000-0000-0000-000000000002'))::int,
           2, 'platform admin sees both tenants');
 SELECT is((SELECT COUNT(*) FROM invoices)::int, 2, 'platform admin sees both tenants'' invoices');
+
+-- ============================================================
+-- JOIN CODES (phase 3). A parent joins a business they cannot see, and the
+-- redemption path must not become a way to enumerate tenants.
+-- ============================================================
+SET LOCAL "request.jwt.claims" TO '{"sub":"20000000-0000-0000-0000-0000000000a3","role":"authenticated"}';
+
+-- Parent A already belongs to tenant A and cannot see tenant B at all.
+SELECT is((SELECT COUNT(*) FROM tenants WHERE id='11111111-0000-0000-0000-000000000002')::int, 0,
+          'a parent cannot see a tenant they have not joined');
+
+-- Redeeming tenant B's code joins them, and returns which business it was.
+SELECT is((SELECT display_name FROM join_tenant_by_code('SWIM-BBBB')), 'Tenant B Private',
+          'a valid join code links the parent and names the business');
+
+SELECT is((SELECT COUNT(*) FROM parent_tenants pt
+             WHERE pt.tenant_id='11111111-0000-0000-0000-000000000002'
+               AND pt.parent_id = current_parent_id())::int, 1,
+          'the link row is created for the CALLING parent');
+
+-- Idempotent: a parent who taps twice must not see an error.
+SELECT lives_ok(
+  $$ SELECT join_tenant_by_code('swim-bbbb') $$,
+  'redeeming the same code again is a no-op, and the code is case/space tolerant'
+);
+
+-- A wrong code must not reveal whether it exists.
+SELECT throws_ok(
+  $$ SELECT join_tenant_by_code('SWIM-ZZZZ') $$,
+  'that join code was not recognised',
+  'an unknown code is refused without disclosing anything'
+);
+
+-- Only the owning admin may rotate a code — not another tenant's admin.
+SET LOCAL "request.jwt.claims" TO '{"sub":"20000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
+SELECT throws_ok(
+  $$ SELECT regenerate_join_code('11111111-0000-0000-0000-000000000002') $$,
+  'not permitted to change this business''s join code',
+  'admin A cannot rotate tenant B''s join code'
+);
 
 SELECT * FROM finish();
 ROLLBACK;
