@@ -5,6 +5,7 @@ import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Linking from "expo-linking";
 import { supabase } from "@/lib/supabase";
+import { landingFor } from "@/lib/landing";
 import { useAppStore } from "@/store/useAppStore";
 import Toast from "@/components/Toast";
 
@@ -97,11 +98,16 @@ export default function RootLayout() {
         return;
       }
 
-      if (profile.role === "parent") {
-        router.replace("/(parent)/home");
-      } else if (profile.role === "coach") {
-        router.replace("/(coach)/today");
-      }
+      // Same rule as login: a private coach holds tenant_admin AND a coaches
+      // row, so route on the row, not the enum.
+      const { data: coachRow } = await supabase
+        .from("coaches")
+        .select("id")
+        .eq("profile_id", session.user.id)
+        .maybeSingle();
+
+      const landing = landingFor(profile.role, !!coachRow);
+      if (landing.route) router.replace(landing.route);
     }
 
     // Restore session on app launch

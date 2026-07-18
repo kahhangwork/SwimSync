@@ -12,6 +12,7 @@ import { router } from "expo-router";
 import { useAppStore } from "@/store/useAppStore";
 import PrimaryButton from "@/components/PrimaryButton";
 import { supabase } from "@/lib/supabase";
+import { landingFor } from "@/lib/landing";
 import { friendlyAuthError } from "@/lib/authErrors";
 
 export default function LoginScreen() {
@@ -40,12 +41,21 @@ export default function LoginScreen() {
       return;
     }
 
-    // Fetch the user's profile to get their role and name
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role, full_name")
-      .eq("id", data.user.id)
-      .single();
+    // Profile + whether they actually teach. A PRIVATE COACH is a tenant_admin
+    // with a coaches row, so the role alone cannot decide where they land.
+    const [{ data: profile, error: profileError }, { data: coachRow }] =
+      await Promise.all([
+        supabase
+          .from("profiles")
+          .select("role, full_name")
+          .eq("id", data.user.id)
+          .single(),
+        supabase
+          .from("coaches")
+          .select("id")
+          .eq("profile_id", data.user.id)
+          .maybeSingle(),
+      ]);
 
     setLoading(false);
 
@@ -61,12 +71,11 @@ export default function LoginScreen() {
       fullName: profile.full_name,
     });
 
-    if (profile.role === "parent") {
-      router.replace("/(parent)/home");
-    } else if (profile.role === "coach") {
-      router.replace("/(coach)/today");
+    const landing = landingFor(profile.role, !!coachRow);
+    if (landing.route) {
+      router.replace(landing.route);
     } else {
-      showToast("Unrecognised role. Please contact support.", "error");
+      showToast(landing.reason, "error");
     }
   }
 
