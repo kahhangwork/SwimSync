@@ -1229,3 +1229,40 @@ Deno.test("a parent with children in TWO tenants gets TWO invoices that month", 
     await b.teardown(); await a.teardown();
   }
 });
+
+Deno.test("credit note references are numbered PER TENANT, both from 0001", async () => {
+  // A global sequence made a school's third note read CN-2026-0047, and the
+  // gaps told them exactly how many notes every other business had issued in
+  // between. Each tenant now numbers its own.
+  const a = await newScenario({ price: 30 });
+  const b = await newScenario({ price: 30 });
+  try {
+    for (const s of [a, b]) {
+      const sess = await s.addSession("2027-02-06");
+      await s.mark(sess, "present");
+      await s.completeMonth("2027-02");
+      await generateInvoices(s.db, {
+        tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2027-02" });
+      await s.mark(sess, "absent"); // -> credit note
+    }
+
+    const refFor = async (s: typeof a) => {
+      const { data } = await s.db
+        .from("credit_notes")
+        .select("reference_number")
+        .eq("tenant_id", s.tenantId)
+        .single();
+      return data!.reference_number as string;
+    };
+
+    const refA = await refFor(a);
+    const refB = await refFor(b);
+
+    // Both are their tenant's FIRST note, so both end 0001 — which a global
+    // UNIQUE on reference_number would have rejected outright.
+    assert(refA.endsWith("-0001"), `tenant A got ${refA}`);
+    assert(refB.endsWith("-0001"), `tenant B got ${refB}`);
+  } finally {
+    await a.teardown(); await b.teardown();
+  }
+});

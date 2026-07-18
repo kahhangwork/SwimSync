@@ -44,6 +44,12 @@ export default function InvoicesPage() {
   const [genMonth, setGenMonth] = useState(currentMonth);
   const [generating, setGenerating] = useState(false);
   const [genResult, setGenResult] = useState<string | null>(null);
+  // The tenant this admin bills for. A tenant_admin has exactly one; a
+  // platform_admin has none and must pick one (phase 3's tenant switcher),
+  // so the generation controls stay disabled for them rather than silently
+  // acting on somebody's business.
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [autoEnabled, setAutoEnabled] = useState<boolean | null>(null);
   const [togglingAuto, setTogglingAuto] = useState(false);
   const [runDay, setRunDay] = useState<number | null>(null);
@@ -65,26 +71,41 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     loadInvoices();
-    loadAutoSetting();
-    loadRunDay();
+    loadTenant();
   }, []);
 
-  async function loadAutoSetting() {
-    const { data } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "auto_invoice_enabled")
-      .maybeSingle();
-    setAutoEnabled(data ? data.value === true || data.value === "true" : true);
-  }
+  /**
+   * Resolve who is signed in and which business they bill for, then read that
+   * tenant's billing schedule.
+   *
+   * The schedule moved from the GLOBAL app_settings rows onto `tenants` when
+   * the engine became tenant-scoped. Left on app_settings these controls would
+   * still save happily and the engine would ignore them — a switch that looks
+   * like it works and does nothing.
+   */
+  async function loadTenant() {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return;
 
-  async function loadRunDay() {
-    const { data } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "invoice_run_day")
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, tenant_id")
+      .eq("id", auth.user.id)
       .maybeSingle();
-    const n = Number(data?.value);
+
+    setIsPlatformAdmin(profile?.role === "platform_admin");
+    const tid = (profile?.tenant_id as string | null) ?? null;
+    setTenantId(tid);
+    if (!tid) return;
+
+    const { data: tenant } = await supabase
+      .from("tenants")
+      .select("auto_invoice_enabled, invoice_run_day")
+      .eq("id", tid)
+      .maybeSingle();
+
+    setAutoEnabled(tenant?.auto_invoice_enabled ?? true);
+    const n = Number(tenant?.invoice_run_day);
     setRunDay(Number.isFinite(n) && n >= 1 ? Math.min(28, n) : 7);
   }
 
@@ -92,38 +113,43 @@ export default function InvoicesPage() {
   // The row is seeded by migration — app_settings has no INSERT policy, so
   // this can only ever UPDATE.
   async function handleSaveRunDay(next: number) {
+    if (!tenantId) return;
     const clamped = Math.min(28, Math.max(1, Math.trunc(next)));
     setSavingRunDay(true);
     const { error } = await supabase
-      .from("app_settings")
-      .update({ value: clamped, updated_at: new Date().toISOString() })
-      .eq("key", "invoice_run_day");
+      .from("tenants")
+      .update({ invoice_run_day: clamped, updated_at: new Date().toISOString() })
+      .eq("id", tenantId);
     if (!error) setRunDay(clamped);
     setSavingRunDay(false);
   }
 
   async function handleToggleAuto() {
-    if (autoEnabled === null) return;
+    if (autoEnabled === null || !tenantId) return;
     setTogglingAuto(true);
     const next = !autoEnabled;
     const { error } = await supabase
-      .from("app_settings")
-      .update({ value: next, updated_at: new Date().toISOString() })
-      .eq("key", "auto_invoice_enabled");
+      .from("tenants")
+      .update({ auto_invoice_enabled: next, updated_at: new Date().toISOString() })
+      .eq("id", tenantId!);
     if (!error) setAutoEnabled(next);
     setTogglingAuto(false);
   }
 
   /**
    * Which lessons should have been marked for `genMonth`, and which weren't.
-   * Runs as superadmin on the browser client — RLS lets is_superadmin() read
-   * all four tables, so no service-role route is needed.
+   *
+   * Runs on the browser client under RLS, which already scopes a tenant_admin
+   * to their own classes. The explicit tenant filter below is for the PLATFORM
+   * admin, whose RLS reach is every tenant — without it this dialog would
+   * report another business's gaps and gate this button on their attendance.
    *
    * Row ceiling: `max_rows = 1000` in supabase/config.toml. At ~4 classes ×
    * ~5 sessions × ~17 students this is a few hundred attendance rows; around
    * 20 classes it will need paginating or moving server-side.
    */
   async function loadCoverage(billingMonth: string) {
+    if (!tenantId) return;
     // Guard against a slow earlier request landing after a newer one and
     // reporting the wrong month's gaps.
     const requestId = ++coverageRequest.current;
@@ -142,7 +168,8 @@ export default function InvoicesPage() {
       const classesRes = await supabase
         .from("classes")
         .select("id, title, day_of_week")
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("tenant_id", tenantId!);
       if (classesRes.error) throw classesRes.error;
 
       const classIds = (classesRes.data ?? []).map((c) => c.id);
@@ -335,6 +362,17 @@ export default function InvoicesPage() {
         title="Invoices"
         subtitle={`Total outstanding: S$${totalOutstanding.toFixed(2)}`}
       />
+
+      {/* A platform admin belongs to no tenant, so there is no business for
+          these controls to act on. Said plainly rather than leaving a button
+          that looks live and 400s — the tenant switcher arrives in phase 3. */}
+      {isPlatformAdmin && !tenantId && (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong>Platform admin.</strong> Invoice generation runs for one
+          business at a time, and your account is not attached to one. Sign in
+          as that business&rsquo;s admin to generate their invoices.
+        </div>
+      )}
 
       {/* Invoice generation panel */}
       <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-4">

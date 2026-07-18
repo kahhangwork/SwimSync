@@ -1,6 +1,6 @@
 # SwimSync — Multi-Tenancy Implementation Plan
 
-_Drafted: 2026-07-18 · Status: **phases 0–1 complete, phase 2 next**_
+_Drafted: 2026-07-18 · Status: **phases 0–2 complete, phase 3 next**_
 
 How to build what `TENANCY_DESIGN.md` specifies. Design questions are settled there
 (§10); this document is order, files, verification and risk.
@@ -208,7 +208,35 @@ including the ones that must not. Existing 34 pgTAP must stay green.
 
 ---
 
-## Phase 2 — Money model + engine
+## Phase 2 — Money model + engine — ✅ **COMPLETE 2026-07-18**
+
+> **Shipped.** The engine runs one tenant at a time — scoped via `opts.tenant_id`
+> (the admin button) or looping every tenant independently (the cron, returning a
+> `per_tenant` breakdown). Sealing, the completeness block, `auto_invoice_enabled`,
+> `invoice_run_day`, credit and the blocked-generation alert are all per-tenant.
+> Constraints tightened: `invoices`/`credit_notes`/`billing_periods` `tenant_id` NOT NULL,
+> the `billing_periods` PK swap, and `invoices` UNIQUE → `(parent_id, tenant_id,
+> billing_month)`. Credit-note references are numbered per tenant with
+> `UNIQUE (tenant_id, reference_number)`.
+>
+> **Beyond the plan, because they would have shipped broken:**
+> - **The role split had to reach the apps.** `superadmin` no longer exists, so the admin
+>   login rejected *every* account — the panel was unreachable. Also fixed:
+>   `create-coach` (now passes the caller's tenant, since the auth trigger refuses to
+>   guess), the mobile `Role` union, and the blocked-alert recipients.
+> - **The admin's billing controls still wrote `app_settings`**, which the engine no longer
+>   reads — a switch that saved happily and did nothing. Moved onto `tenants`.
+> - **The alert throttle was keyed by month alone**, so the first tenant blocked in a month
+>   would have silenced every other business's alert. Now keyed by tenant *and* month.
+>
+> **Verified:** Deno 55 → **61**, green twice, incl. six cross-tenant billing tests. The
+> credit-isolation test was **mutation-checked** — reverting the balance lookup to the
+> pooled column fails it, so it pins the real control rather than a redundant one.
+> pgTAP 52 · admin 49 · app 49 · both typecheck · and a new
+> `verify-tenant-admin.mjs` drives the **real admin panel 10/10** (tenant admin logs in,
+> run day persists to `tenants`, platform admin gets the notice rather than a dead button).
+
+### Original plan for reference
 
 The highest-risk phase: it rewrites the most-tested, most safety-critical code in the
 product. **`TENANCY_DESIGN.md` §3.6 is the thing to keep in mind throughout — the engine
