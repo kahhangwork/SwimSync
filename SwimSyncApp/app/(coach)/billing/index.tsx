@@ -17,6 +17,15 @@ import Card from "@/components/Card";
 
 type Filter = "All" | "Outstanding" | "Paid";
 
+/** What this coach is owed. Read-only, and only ever their OWN — a colleague's
+ *  earnings must not be inferable. RLS scopes it to their coaches.id. */
+type MyPayout = {
+  id: string;
+  period_month: string;
+  gross_amount: number;
+  status: "draft" | "paid";
+};
+
 type Invoice = {
   id: string;
   billing_month: string;
@@ -37,6 +46,7 @@ export default function CoachBillingScreen() {
   const showToast = useAppStore((s) => s.showToast);
   const [filter, setFilter] = useState<Filter>("All");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [myPayouts, setMyPayouts] = useState<MyPayout[]>([]);
   const [loading, setLoading] = useState(true);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
@@ -55,6 +65,23 @@ export default function CoachBillingScreen() {
       setLoading(false);
       return;
     }
+
+    // RLS returns only THIS coach's payouts (coach_payouts_select scopes to
+    // current_coach_id()), so no filter is needed here — and a colleague's pay
+    // is not reachable even by asking for it.
+    const { data: payoutRows } = await supabase
+      .from("coach_payouts")
+      .select("id, period_month, gross_amount, status")
+      .order("period_month", { ascending: false })
+      .limit(6);
+    setMyPayouts(
+      (payoutRows ?? []).map((p: any) => ({
+        id: p.id,
+        period_month: p.period_month,
+        gross_amount: Number(p.gross_amount),
+        status: p.status,
+      }))
+    );
 
     setInvoices(
       (data ?? []).map((inv: any) => {
@@ -155,6 +182,40 @@ export default function CoachBillingScreen() {
             Invoices for your students
           </Text>
         </View>
+
+        {/* What YOU are paid. Only rendered when a payout exists — a private
+            coach has no rate and no payouts, and showing them an empty "your
+            pay" card would imply their own invoices are somehow incomplete. */}
+        {myPayouts.length > 0 && (
+          <View className="mb-5">
+            <Text className="text-sm font-semibold text-gray-900 mb-2">
+              Your pay
+            </Text>
+            {myPayouts.map((p) => (
+              <Card key={p.id}>
+                <View className="flex-row items-center justify-between">
+                  <View>
+                    <Text className="text-base font-bold text-gray-900">
+                      {formatBillingMonth(p.period_month)}
+                    </Text>
+                    <Text className="text-xs text-gray-500 mt-0.5">
+                      {p.status === "paid"
+                        ? "Paid"
+                        : "Draft — may still change until it's paid"}
+                    </Text>
+                  </View>
+                  <Text
+                    className={`text-lg font-bold ${
+                      p.status === "paid" ? "text-green-600" : "text-gray-900"
+                    }`}
+                  >
+                    S${p.gross_amount.toFixed(2)}
+                  </Text>
+                </View>
+              </Card>
+            ))}
+          </View>
+        )}
 
         {/* Summary */}
         <View className="flex-row gap-3 mb-5">

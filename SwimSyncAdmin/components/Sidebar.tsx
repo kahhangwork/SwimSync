@@ -12,6 +12,7 @@ import {
   Receipt,
   FileText,
   UserCog,
+  Wallet,
   Globe,
   LogOut,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const NAV = [
   { href: "/invoices",     label: "Invoices",             icon: Receipt         },
   { href: "/credit-notes", label: "Credit Notes",         icon: FileText        },
   { href: "/coaches",      label: "Coaches",              icon: UserCog         },
+  { href: "/wages",        label: "Coach Wages",          icon: Wallet          },
   // Platform admin only — hidden for a tenant admin, who has one business and
   // nothing cross-tenant to do. The page enforces this itself too; hiding it
   // is the affordance, not the boundary.

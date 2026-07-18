@@ -1,6 +1,6 @@
 # SwimSync — Multi-Tenancy Implementation Plan
 
-_Drafted: 2026-07-18 · Status: **phases 0–4 complete; only phase 5 (wages, droppable) remains**_
+_Drafted: 2026-07-18 · Status: **ALL PHASES COMPLETE (0–5)**_
 
 How to build what `TENANCY_DESIGN.md` specifies. Design questions are settled there
 (§10); this document is order, files, verification and risk.
@@ -361,7 +361,30 @@ with the right logo and the right QR on each.
 
 ---
 
-## Phase 5 — Coach wages *(droppable)*
+## Phase 5 — Coach wages — ✅ **COMPLETE 2026-07-19**
+
+> **Shipped.** Computation lives in Postgres rather than a second Edge Function: every
+> input is already there, there is no billing-style external side effect to isolate, and
+> the coach app reads STORED payout rows instead of re-deriving pay on a phone.
+>
+> **No private-vs-school branch anywhere** — a wage exists when a coach *has a rate*, so a
+> private coach falls out of payroll on data rather than a rule. That is §1 paying off.
+>
+> **Rates are effective-dated and inserted, never updated.** Pinned by a test that gives a
+> raise in June and asserts a March lesson still prices at the old rate.
+>
+> **Two bugs found by driving it, not by review:**
+> - A blank rate amount saved as **$0** (`Number("")` is 0, finite and ≥ 0) — a coach then
+>   reads as "on payroll" and earns nothing, which is worse than having no rate at all.
+> - The driver's own `input[type=number]` selector hit the policy card's `wage_run_day`
+>   field instead of the rate; the bug above is what that mistake exposed.
+>
+> **Verified:** pgTAP 58 → **79** (21 new: the full pay-decision table, pro-rata, the flat
+> override, effective dating, draft→freeze, adjustments, and coach/rate RLS) plus
+> `verify-coach-wages.mjs` **10/10** across both real UIs, asserting the frozen payout in
+> the database rather than trusting the toast.
+
+### Original plan for reference
 
 Fully specified in `TENANCY_DESIGN.md` §7b. Not needed to run the pilot; if August tightens,
 this slips without touching phases 1–4.
