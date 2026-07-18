@@ -501,3 +501,110 @@ Deno.test("deferral is reported even when NO class was tallied", async () => {
     await s.teardown();
   }
 });
+
+// ── Configurable run day ───────────────────────────────────────────────────
+// The automatic path waits until app_settings.invoice_run_day. Manual runs
+// ignore it entirely. `now` is injected so these do not depend on the actual
+// day of the month.
+
+Deno.test("run day: auto run before the configured day generates nothing", async () => {
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2027-03-06"); await s.mark(a, "present");
+
+    // 3 April, run day 7 -> too early.
+    const res = await generateInvoices(s.db, {
+      mode: "auto",
+      billing_month: "2027-03",
+      now: new Date("2027-04-03T02:00:00Z"),
+    });
+
+    assertEquals(res.status, "before_run_day");
+    assertEquals(await getInvoice(s.db, s.parentId, "2027-03"), null);
+
+    const { data: sealed } = await s.db
+      .from("billing_periods")
+      .select("billing_month")
+      .eq("billing_month", "2027-03")
+      .maybeSingle();
+    assertEquals(sealed, null); // must not seal a month it declined to bill
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("run day: auto run on the configured day generates normally", async () => {
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2027-04-03"); await s.mark(a, "present");
+
+    // 7 May, run day 7 -> due today (boundary: >= not >).
+    const res = await generateInvoices(s.db, {
+      mode: "auto",
+      billing_month: "2027-04",
+      now: new Date("2027-05-07T02:00:00Z"),
+    });
+
+    assertEquals(res.invoices_created, 1);
+    assertEquals((await getInvoice(s.db, s.parentId, "2027-04"))!.gross, 30);
+  } finally {
+    await s.db.from("billing_periods").delete().eq("billing_month", "2027-04");
+    await s.teardown();
+  }
+});
+
+Deno.test("run day: a MANUAL run before the day generates anyway", async () => {
+  // The admin pressing Generate is an explicit instruction — a schedule meant
+  // for the unattended cron must never block it.
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2027-05-01"); await s.mark(a, "present");
+
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-05",
+      now: new Date("2027-06-01T02:00:00Z"), // day 1, well before day 7
+    });
+
+    assertEquals(res.invoices_created, 1);
+    assertEquals((await getInvoice(s.db, s.parentId, "2027-05"))!.gross, 30);
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("run day: honours a changed setting, and SGT decides the day", async () => {
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2027-06-05"); await s.mark(a, "present");
+    await s.db
+      .from("app_settings")
+      .update({ value: 15 })
+      .eq("key", "invoice_run_day");
+
+    // Day 14 in SGT -> still too early for a run day of 15.
+    const early = await generateInvoices(s.db, {
+      mode: "auto",
+      billing_month: "2027-06",
+      now: new Date("2027-07-14T02:00:00Z"),
+    });
+    assertEquals(early.status, "before_run_day");
+
+    // 14 Jul 17:00 UTC is already the 15th in Singapore — the guard must read
+    // the SGT day, not the UTC one, or it fires a day late every month.
+    const due = await generateInvoices(s.db, {
+      mode: "auto",
+      billing_month: "2027-06",
+      now: new Date("2027-07-14T17:00:00Z"),
+    });
+    assertEquals(due.invoices_created, 1);
+  } finally {
+    await s.db
+      .from("app_settings")
+      .update({ value: 7 })
+      .eq("key", "invoice_run_day");
+    await s.db.from("billing_periods").delete().eq("billing_month", "2027-06");
+    await s.teardown();
+  }
+});

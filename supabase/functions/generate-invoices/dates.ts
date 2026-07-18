@@ -33,6 +33,41 @@ export function dateInTimeZone(now: Date, timeZone: string): string {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
+/** Day of the month (1..31) at `now` in `timeZone`. */
+export function dayOfMonthInTimeZone(
+  now: Date = new Date(),
+  timeZone: string = APP_TIMEZONE
+): number {
+  return Number(dateInTimeZone(now, timeZone).split("-")[2]);
+}
+
+/** Fallback when app_settings has no usable invoice_run_day. */
+export const DEFAULT_INVOICE_RUN_DAY = 7;
+
+/**
+ * Normalise a configured invoice_run_day into a usable day-of-month.
+ *
+ * Two different kinds of bad input, handled differently on purpose:
+ *   • Missing or unparseable (null, "", junk) → the DEFAULT. Note Number(null)
+ *     is 0, so coercing first would silently yield day 1 — the earliest
+ *     possible run, i.e. exactly the too-early billing this setting exists to
+ *     avoid. Same for a value below 1: intent is unclear, so prefer the safe
+ *     default over the earliest day.
+ *   • Above the range (29–31) → 28. Here intent IS clear ("late in the
+ *     month"), so honour it as closely as February allows; 29–31 would
+ *     silently never fire that month, which looks like "cron is broken".
+ */
+export function clampRunDay(raw: unknown): number {
+  if (raw === null || raw === undefined || raw === "") {
+    return DEFAULT_INVOICE_RUN_DAY;
+  }
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return DEFAULT_INVOICE_RUN_DAY;
+  const day = Math.trunc(n);
+  if (day < 1) return DEFAULT_INVOICE_RUN_DAY;
+  return Math.min(28, day);
+}
+
 /**
  * The billing month "YYYY-MM" = the calendar month before `now` in `timeZone`.
  * Month arithmetic is done on the extracted numbers, so it's offset- and

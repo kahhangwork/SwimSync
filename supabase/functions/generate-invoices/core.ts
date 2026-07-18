@@ -25,7 +25,12 @@
 // Both modes apply available credit FIFO via the credit_applications ledger.
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { previousBillingMonth } from "./dates.ts";
+import {
+  clampRunDay,
+  dayOfMonthInTimeZone,
+  DEFAULT_INVOICE_RUN_DAY,
+  previousBillingMonth,
+} from "./dates.ts";
 
 // Attendance statuses that result in a charge to the parent.
 // Per PRD 5.4: only Present and Paid Trial are billable.
@@ -35,6 +40,12 @@ export type GenerateOptions = {
   mode?: string;
   force?: boolean;
   billing_month?: string;
+  /** Clock injection — TESTS ONLY. Production callers omit it and get the real
+   *  time. Exists so the run-day guard and the default billing month can be
+   *  exercised deterministically rather than only on the right day of the
+   *  month. Never sent over the wire (index.ts passes the parsed body through,
+   *  and a JSON string here would be ignored by the Date checks below). */
+  now?: Date;
 };
 
 // One billed lesson on a created invoice — enough for an itemized email.
@@ -83,6 +94,8 @@ export async function generateInvoices(
 ): Promise<GenerateResult> {
   const mode = opts.mode === "manual" ? "manual" : "auto";
   const force = opts.force === true;
+  // Guarded so a stray `now` in a JSON body can never shift billing.
+  const now = opts.now instanceof Date ? opts.now : new Date();
 
   // Billing month: explicit YYYY-MM, else the previous calendar month in the
   // app timezone (SGT by default). Derived via previousBillingMonth() rather
@@ -93,7 +106,7 @@ export async function generateInvoices(
   if (opts.billing_month && /^\d{4}-\d{2}$/.test(opts.billing_month)) {
     billingMonth = opts.billing_month;
   } else {
-    billingMonth = previousBillingMonth();
+    billingMonth = previousBillingMonth(now);
   }
   const [by, bm] = billingMonth.split("-").map(Number);
   const monthStart = `${billingMonth}-01`;
@@ -132,6 +145,37 @@ export async function generateInvoices(
         status: "already_complete",
         message:
           "Invoices for this billing month were previously finalised. Skipping.",
+      };
+    }
+  }
+
+  // ── Run-day guard (automatic, non-forced runs only) ───────────────────────
+  // Billing on the 1st is too early — the month's last lesson may not be
+  // marked yet, and a lesson marked after the invoice exists is never added to
+  // it. The automatic path therefore waits until a configured day of the
+  // following month. Checked AFTER the sealed guard so a finished month
+  // reports "already_complete" rather than "before_run_day".
+  //
+  // Manual/forced runs ignore this entirely: the admin generating on demand is
+  // an explicit instruction and must never be blocked by a schedule.
+  if (mode === "auto" && !force) {
+    const { data: runDaySetting } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "invoice_run_day")
+      .maybeSingle();
+
+    const runDay = clampRunDay(runDaySetting?.value ?? DEFAULT_INVOICE_RUN_DAY);
+    // Day-of-month in the APP timezone, never new Date().getDate() — that is
+    // the UTC day and is a day behind in SGT before 08:00 (see dates.ts).
+    const today = dayOfMonthInTimeZone(now);
+
+    if (today < runDay) {
+      return {
+        billing_month: billingMonth,
+        status: "before_run_day",
+        message:
+          `Automatic invoices for ${billingMonth} are generated from day ${runDay} of the month. Today is day ${today}. Use manual generation to run now.`,
       };
     }
   }

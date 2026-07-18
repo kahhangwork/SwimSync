@@ -46,6 +46,8 @@ export default function InvoicesPage() {
   const [genResult, setGenResult] = useState<string | null>(null);
   const [autoEnabled, setAutoEnabled] = useState<boolean | null>(null);
   const [togglingAuto, setTogglingAuto] = useState(false);
+  const [runDay, setRunDay] = useState<number | null>(null);
+  const [savingRunDay, setSavingRunDay] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [coverage, setCoverage] = useState<ClassCoverage[] | null>(null);
   const [checkingCoverage, setCheckingCoverage] = useState(false);
@@ -55,6 +57,7 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadInvoices();
     loadAutoSetting();
+    loadRunDay();
   }, []);
 
   async function loadAutoSetting() {
@@ -64,6 +67,30 @@ export default function InvoicesPage() {
       .eq("key", "auto_invoice_enabled")
       .maybeSingle();
     setAutoEnabled(data ? data.value === true || data.value === "true" : true);
+  }
+
+  async function loadRunDay() {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "invoice_run_day")
+      .maybeSingle();
+    const n = Number(data?.value);
+    setRunDay(Number.isFinite(n) && n >= 1 ? Math.min(28, n) : 7);
+  }
+
+  // Capped at 28 to match the engine: 29-31 would never fire in February.
+  // The row is seeded by migration — app_settings has no INSERT policy, so
+  // this can only ever UPDATE.
+  async function handleSaveRunDay(next: number) {
+    const clamped = Math.min(28, Math.max(1, Math.trunc(next)));
+    setSavingRunDay(true);
+    const { error } = await supabase
+      .from("app_settings")
+      .update({ value: clamped, updated_at: new Date().toISOString() })
+      .eq("key", "invoice_run_day");
+    if (!error) setRunDay(clamped);
+    setSavingRunDay(false);
   }
 
   async function handleToggleAuto() {
@@ -308,7 +335,7 @@ export default function InvoicesPage() {
                 Automatic monthly generation
               </div>
               <div className="text-[11px] text-gray-400">
-                Runs on the 1st for the previous month
+                Runs from day {runDay ?? 7} for the previous month
               </div>
             </div>
             <button
@@ -327,6 +354,38 @@ export default function InvoicesPage() {
               />
             </button>
           </div>
+        </div>
+
+        {/* Run day. Only affects the automatic path, so it is greyed out (but
+            still editable) when automatic generation is switched off. */}
+        <div className="mt-3 flex items-center gap-2">
+          <label
+            htmlFor="run-day"
+            className={`text-xs font-medium ${
+              autoEnabled ? "text-gray-700" : "text-gray-400"
+            }`}
+          >
+            Generate automatic invoices from day
+          </label>
+          <input
+            id="run-day"
+            type="number"
+            min={1}
+            max={28}
+            value={runDay ?? 7}
+            disabled={savingRunDay || runDay === null}
+            onChange={(e) => setRunDay(Number(e.target.value))}
+            onBlur={(e) => handleSaveRunDay(Number(e.target.value))}
+            className="w-16 rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-50"
+          />
+          <span
+            className={`text-xs ${
+              autoEnabled ? "text-gray-500" : "text-gray-400"
+            }`}
+          >
+            of the following month
+            {!autoEnabled && " — no effect while automatic generation is off"}
+          </span>
         </div>
 
         <p className="mt-3 text-xs text-gray-500">
