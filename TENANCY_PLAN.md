@@ -1,6 +1,6 @@
 # SwimSync — Multi-Tenancy Implementation Plan
 
-_Drafted: 2026-07-18 · Status: **phase 0 complete, phase 1 next**_
+_Drafted: 2026-07-18 · Status: **phases 0–1 complete, phase 2 next**_
 
 How to build what `TENANCY_DESIGN.md` specifies. Design questions are settled there
 (§10); this document is order, files, verification and risk.
@@ -76,9 +76,48 @@ turns that class of bug from "discovered next week" into "discovered on the PR".
 
 ---
 
-## Phase 1 — Schema, backfill, RLS
+## Phase 1 — Schema, backfill, RLS — ✅ **COMPLETE 2026-07-18**
 
 The foundation. Largest single phase; nothing user-visible except 1.5.
+
+> **Built as EXPAND/CONTRACT, changed from the original plan.** The plan said to
+> drop `parents.credit_balance` and `coaches.paynow_qr_url` here. That was wrong: both
+> have live readers across the two apps and the engine, so phase 1 would have shipped a
+> broken deploy — and a `git push` auto-deploys the web apps while migrations need a
+> separate manual `supabase db push`, so they can never land atomically. Worse, it would
+> have left every suite red across the gap into phase 2, which is the money model, i.e.
+> exactly when the regression signal matters most.
+>
+> **The columns therefore stay, deprecated and dual-written**, and are dropped by a
+> CONTRACT migration once their readers move. The same discipline applies to constraints:
+> `tenant_id` is only NOT NULL where a trigger already guarantees it (`coaches`,
+> `classes`). `students`, `invoices`, `credit_notes` and `billing_periods` stay nullable
+> until phases 2–3 update their writers, and the `invoices` UNIQUE swap and the
+> `billing_periods` PK swap wait with them. **Dropping the old UNIQUE early would have
+> been double billing** — two NULL-tenant invoices for one parent-month do not conflict,
+> because NULLs never conflict in a UNIQUE index.
+>
+> **Five real bugs surfaced, four of them found by tests rather than review:**
+> 1. **`tenants`, `parent_tenants` and `parent_tenant_balances` had policies but RLS was
+>    never ENABLED** — so the policies were inert and every join code was readable by any
+>    signed-in user, defeating the whole reason codes exist instead of a tenant picker.
+> 2. **Mutual policy recursion** — `classes_select` consults enrolments and
+>    `enrolments_select` consults classes. It could not happen before *because*
+>    `classes_select` was `USING (TRUE)`: the leak was also what kept the graph acyclic.
+>    Fixed with SECURITY DEFINER lookups (`class_tenant`, `session_tenant`,
+>    `parent_has_child_in_class`).
+> 3. **The credit-note trigger wrote `parents.credit_balance`** and inserted `credit_notes`
+>    without a tenant — it would have thrown on the next attendance correction.
+> 4. **`close_student_enrolment()` called the dropped `is_superadmin()`.** A function body
+>    is not a tracked dependency, so this would have failed at RUNTIME, not at migration.
+> 5. **Storage policies** also called `is_superadmin()` — caught by the DROP, which is
+>    precisely why dropping beats redefining.
+>
+> **Verified:** pgTAP 34 → **52** (incl. 18 new cross-tenant isolation assertions) ·
+> Deno **55**, green twice · admin 49 · app 49 · both apps typecheck. The backfill was
+> **rehearsed against a realistic pre-migration dataset** — old schema, a parent with an
+> enrolled child and an unassigned one, an invoice, a credit note and a non-zero credit
+> balance — not just against an empty database. Credit reconciled exactly.
 
 ### 1.1 New tables
 

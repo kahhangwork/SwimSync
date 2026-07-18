@@ -33,6 +33,7 @@ export type Scenario = {
   tag: string;
   coachId: string;
   coachProfileId: string;
+  tenantId: string;
   classId: string;
   parentId: string;
   parentProfileId: string;
@@ -66,13 +67,14 @@ async function createRoleUser(
   db: SupabaseClient,
   email: string,
   role: "coach" | "parent",
-  fullName: string
+  fullName: string,
+  extra?: Record<string, unknown>
 ): Promise<string> {
   const { data, error } = await db.auth.admin.createUser({
     email,
     password: "password123",
     email_confirm: true,
-    user_metadata: { full_name: fullName, role },
+    user_metadata: { full_name: fullName, role, ...(extra ?? {}) },
   });
   if (error || !data.user) {
     throw new Error(`createUser(${role}) failed: ${error?.message}`);
@@ -107,12 +109,30 @@ export async function newScenario(
   const dayOfWeek = opts.dayOfWeek ?? "saturday";
   const enrolExtra = opts.enrolledAt ? { enrolled_at: opts.enrolledAt } : {};
 
+  // Each scenario gets its OWN tenant. Coaches now require one (the auth
+  // trigger refuses to guess), and a shared tenant would let scenarios see each
+  // other once the engine becomes tenant-scoped in phase 2.
+  const { data: tenantRow, error: tenantErr } = await db
+    .from("tenants")
+    .insert({
+      slug: `test-${tag}`,
+      display_name: `Test Tenant ${tag}`,
+      join_code: `SWIM-${tag.slice(0, 4).toUpperCase()}`,
+    })
+    .select("id")
+    .single();
+  if (tenantErr || !tenantRow) {
+    throw new Error(`tenant insert failed: ${tenantErr?.message}`);
+  }
+  const tenantId = tenantRow.id as string;
+
   // Coach (trigger creates profiles + coaches row)
   const coachProfileId = await createRoleUser(
     db,
     `coach-${tag}@test.local`,
     "coach",
-    `Coach ${tag}`
+    `Coach ${tag}`,
+    { tenant_id: tenantId }
   );
   const { data: coachRow } = await db
     .from("coaches")
@@ -157,6 +177,7 @@ export async function newScenario(
       full_name: `Kid ${tag}`,
       assignment_status: "assigned",
       is_active: true,
+      tenant_id: tenantId,
     })
     .select("id")
     .single();
@@ -205,6 +226,7 @@ export async function newScenario(
         full_name: `Kid2 ${tag}`,
         assignment_status: "assigned",
         is_active: true,
+        tenant_id: tenantId,
       })
       .select("id")
       .single();
@@ -364,8 +386,12 @@ export async function newScenario(
         .delete()
         .in("billing_month", [...billingMonths]);
     }
+    await db.from("parent_tenant_balances").delete().eq("tenant_id", tenantId);
+    await db.from("parent_tenants").delete().eq("tenant_id", tenantId);
     await db.auth.admin.deleteUser(parentProfileId);
     await db.auth.admin.deleteUser(coachProfileId);
+    // Last: everything above references it.
+    await db.from("tenants").delete().eq("id", tenantId);
   }
 
   return {
@@ -373,6 +399,7 @@ export async function newScenario(
     tag,
     coachId,
     coachProfileId,
+    tenantId,
     classId,
     parentId,
     parentProfileId,

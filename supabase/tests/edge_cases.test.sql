@@ -14,6 +14,13 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT plan(9);
 
+-- Multi-tenancy scaffolding: coaches and students now require a tenant. This
+-- fixture creates its own so the test stays independent of the seed. The rule
+-- under test is unchanged — cross-tenant isolation has its own file
+-- (tenant_isolation.test.sql).
+INSERT INTO tenants (id, slug, display_name, join_code)
+VALUES ('99999999-0000-0000-0000-000000000003', 'tap-edgecases', 'TAP EdgeCases', 'SWIM-TC03');
+
 -- ── Seed: coach + parent (with credit) + child, enrolled in class 1 ──────────
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
@@ -21,7 +28,7 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e1',
    'authenticated','authenticated','edge-coach@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Edge Coach","role":"coach"}', now(), now(), '', '', '', ''),
+   now(), '{"provider":"email"}','{"full_name":"Edge Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000003"}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000e2',
    'authenticated','authenticated','edge-parent@test.local', crypt('x', gen_salt('bf')),
    now(), '{"provider":"email"}','{"full_name":"Edge Parent","role":"parent"}', now(), now(), '', '', '', '');
@@ -33,8 +40,8 @@ INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, loc
 SELECT 'b0000000-0000-0000-0000-0000000000e2', co.id, 'Edge Class 2', 'sunday','10:00','11:00','Pool', 30
 FROM coaches co WHERE co.profile_id='a0000000-0000-0000-0000-0000000000e1';
 
-INSERT INTO students (id, full_name, assignment_status)
-VALUES ('c0000000-0000-0000-0000-0000000000e1','Edge Kid','assigned');
+INSERT INTO students (id, full_name, assignment_status, tenant_id)
+VALUES ('c0000000-0000-0000-0000-0000000000e1','Edge Kid','assigned','99999999-0000-0000-0000-000000000003');
 
 INSERT INTO parent_students (parent_id, student_id)
 SELECT p.id, 'c0000000-0000-0000-0000-0000000000e1' FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000e2';
@@ -51,8 +58,8 @@ UPDATE parents SET credit_balance = 25.00 WHERE profile_id='a0000000-0000-0000-0
 -- ── 11.2  Parent creates a child BEFORE any assignment ──────────────────────
 -- No coach/class is needed to add a child; it lands in an 'unassigned' state and
 -- its class/attendance view comes back empty rather than erroring.
-INSERT INTO students (id, full_name)                        -- note: no assignment_status given
-VALUES ('c0000000-0000-0000-0000-0000000000e9','Unassigned Kid');
+INSERT INTO students (id, full_name, tenant_id)                        -- note: no assignment_status given
+VALUES ('c0000000-0000-0000-0000-0000000000e9','Unassigned Kid','99999999-0000-0000-0000-000000000003');
 INSERT INTO parent_students (parent_id, student_id)
 SELECT p.id, 'c0000000-0000-0000-0000-0000000000e9'
 FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000e2';

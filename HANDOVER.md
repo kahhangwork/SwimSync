@@ -1205,14 +1205,24 @@ onboarding a second business onto the current schema would show each other's fam
 
 ### The immediate next step
 
-**Phase 0 of `TENANCY_PLAN.md`** — prerequisites, no schema change:
+**Phases 0 and 1 are DONE (2026-07-18). Phase 2 — the money model + engine — is next.**
 
-1. **Extract the completeness-rule shared helper** (was `BACKLOG.md` build-order #1, now a
-   hard prerequisite). The rule is hand-written in **four** places and phase 2 makes it
-   per-tenant. It already carries risk today: the admin's pre-flight check and the engine
-   compute it separately, so if they drift the button enables and the server refuses.
-2. ~~Settle the sealed July row~~ — **done**, the user unsealed July on production (§8.1).
-3. **Run the Deno suite twice in CI** (gotcha §7.15) — phase 2 rewrites sealing entirely.
+Phase 2 rewrites `generate-invoices/core.ts` to loop, gate, block and seal **per tenant**,
+swaps `invoices` to `UNIQUE (parent_id, tenant_id, billing_month)`, moves credit draws to
+`parent_tenant_balances`, and changes `billing_periods` to a `(tenant_id, billing_month)`
+primary key. **Keep in mind the engine runs as `service_role` and therefore bypasses every
+policy phase 1 wrote — tenant isolation in billing must be enforced in engine code.**
+
+**Two things phase 2 must also do, because phase 1 deliberately deferred them:**
+
+- **Tighten the constraints it takes ownership of.** `invoices.tenant_id` and
+  `billing_periods.tenant_id` are still NULLABLE, and `invoices` still carries the OLD
+  `UNIQUE (parent_id, billing_month)`. That is not an oversight — see the expand/contract
+  note in `TENANCY_PLAN.md` phase 1. Swapping the UNIQUE before the engine writes a tenant
+  would allow **double billing**, since NULLs never conflict in a UNIQUE index.
+- **Remove the credit dual-write.** `handle_attendance_update` currently writes BOTH
+  `parent_tenant_balances` and the deprecated `parents.credit_balance`. When the last
+  reader moves, drop the dual-write **in the same change** — leaving it would double-count.
 
 ### What this defers
 

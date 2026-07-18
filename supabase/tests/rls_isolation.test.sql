@@ -8,6 +8,13 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT plan(10);
 
+-- Multi-tenancy scaffolding: coaches and students now require a tenant. This
+-- fixture creates its own so the test stays independent of the seed. The rule
+-- under test is unchanged — cross-tenant isolation has its own file
+-- (tenant_isolation.test.sql).
+INSERT INTO tenants (id, slug, display_name, join_code)
+VALUES ('99999999-0000-0000-0000-000000000004', 'tap-rls', 'TAP RLS', 'SWIM-TC04');
+
 -- ── Seed two parents, each with a student + an invoice (as the superuser) ────
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
@@ -20,19 +27,19 @@ VALUES
    'authenticated','authenticated','rls-parentB@test.local', crypt('x', gen_salt('bf')),
    now(), '{"provider":"email"}','{"full_name":"Parent B","role":"parent"}', now(), now(), '', '', '', '');
 
-INSERT INTO students (id, full_name, assignment_status) VALUES
-  ('c0000000-0000-0000-0000-0000000000a1','Kid A','assigned'),
-  ('c0000000-0000-0000-0000-0000000000b1','Kid B','assigned');
+INSERT INTO students (id, full_name, assignment_status, tenant_id) VALUES
+  ('c0000000-0000-0000-0000-0000000000a1','Kid A','assigned','99999999-0000-0000-0000-000000000004'),
+  ('c0000000-0000-0000-0000-0000000000b1','Kid B','assigned','99999999-0000-0000-0000-000000000004');
 
 INSERT INTO parent_students (parent_id, student_id)
 SELECT p.id, 'c0000000-0000-0000-0000-0000000000a1' FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000a1';
 INSERT INTO parent_students (parent_id, student_id)
 SELECT p.id, 'c0000000-0000-0000-0000-0000000000b1' FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000b1';
 
-INSERT INTO invoices (id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status)
-SELECT 'e0000000-0000-0000-0000-0000000000a1', p.id, '2026-01', 30, 0, 30, 'outstanding' FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000a1';
-INSERT INTO invoices (id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status)
-SELECT 'e0000000-0000-0000-0000-0000000000b1', p.id, '2026-01', 30, 0, 30, 'outstanding' FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000b1';
+INSERT INTO invoices (tenant_id, id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status)
+SELECT '99999999-0000-0000-0000-000000000004', 'e0000000-0000-0000-0000-0000000000a1', p.id, '2026-01', 30, 0, 30, 'outstanding' FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000a1';
+INSERT INTO invoices (tenant_id, id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status)
+SELECT '99999999-0000-0000-0000-000000000004', 'e0000000-0000-0000-0000-0000000000b1', p.id, '2026-01', 30, 0, 30, 'outstanding' FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000b1';
 
 -- ── 11.3 seed: one parent (C) with two children under two DIFFERENT coaches ──
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
@@ -44,10 +51,10 @@ VALUES
    now(), '{"provider":"email"}','{"full_name":"Parent C","role":"parent"}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000d8',
    'authenticated','authenticated','rls-coachX@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Coach X","role":"coach"}', now(), now(), '', '', '', ''),
+   now(), '{"provider":"email"}','{"full_name":"Coach X","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000004"}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000d9',
    'authenticated','authenticated','rls-coachY@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"Coach Y","role":"coach"}', now(), now(), '', '', '', '');
+   now(), '{"provider":"email"}','{"full_name":"Coach Y","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000004"}', now(), now(), '', '', '', '');
 
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson)
 SELECT 'b0000000-0000-0000-0000-0000000000d8', co.id, 'Coach X Class', 'saturday','10:00','11:00','Pool', 30
@@ -56,9 +63,9 @@ INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, loc
 SELECT 'b0000000-0000-0000-0000-0000000000d9', co.id, 'Coach Y Class', 'sunday','10:00','11:00','Pool', 30
 FROM coaches co WHERE co.profile_id='a0000000-0000-0000-0000-0000000000d9';
 
-INSERT INTO students (id, full_name, assignment_status) VALUES
-  ('c0000000-0000-0000-0000-0000000000c9','Kid C1','assigned'),
-  ('c0000000-0000-0000-0000-0000000000ca','Kid C2','assigned');
+INSERT INTO students (id, full_name, assignment_status, tenant_id) VALUES
+  ('c0000000-0000-0000-0000-0000000000c9','Kid C1','assigned','99999999-0000-0000-0000-000000000004'),
+  ('c0000000-0000-0000-0000-0000000000ca','Kid C2','assigned','99999999-0000-0000-0000-000000000004');
 
 INSERT INTO parent_students (parent_id, student_id)
 SELECT p.id, 'c0000000-0000-0000-0000-0000000000c9' FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000c9';

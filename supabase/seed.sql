@@ -5,9 +5,27 @@
 --   coach@swimsync.test      / password123   (coach app)
 -- ...plus one class owned by the coach, ready for assignment.
 --
--- Register a PARENT yourself in the mobile app to test onboarding.
+-- Register a PARENT yourself in the mobile app to test onboarding, then join
+-- the tenant with the join code printed at the end of this file.
 -- The handle_new_user trigger creates the profiles + coaches rows.
+--
+-- MULTI-TENANT SHAPE: the coach is a PRIVATE COACH — a tenant of one, holding
+-- both tenant_admin and coach roles (TENANCY_DESIGN.md §1). That mirrors what
+-- the production backfill produces, so local testing exercises the real shape
+-- rather than a simplified one. The superadmin is the PLATFORM admin: no
+-- tenant, sees everything, for support.
 -- ============================================================
+
+-- ---- The tenant (one business) ----
+INSERT INTO tenants (id, slug, display_name, kind, join_code, paynow_qr_url)
+VALUES (
+  '70000000-0000-0000-0000-000000000001',
+  'marcus-swim',
+  'Coach Marcus Swim School',
+  'private',
+  'SWIM-TEST',
+  NULL
+);
 
 -- ---- Superadmin auth user ----
 INSERT INTO auth.users (
@@ -22,7 +40,7 @@ INSERT INTO auth.users (
   crypt('password123', gen_salt('bf')),
   NOW(),
   '{"provider":"email","providers":["email"]}',
-  '{"full_name":"Site Admin","role":"superadmin"}',
+  '{"full_name":"Site Admin","role":"platform_admin"}',
   NOW(), NOW(), '', '', '', ''
 );
 
@@ -39,11 +57,12 @@ INSERT INTO auth.users (
   crypt('password123', gen_salt('bf')),
   NOW(),
   '{"provider":"email","providers":["email"]}',
-  '{"full_name":"Coach Marcus","role":"coach"}',
+  '{"full_name":"Coach Marcus","role":"tenant_admin","is_coach":true,"tenant_id":"70000000-0000-0000-0000-000000000001"}',
   NOW(), NOW(), '', '', '', ''
 );
 
 -- ---- A class owned by the coach (Saturday 10-11am) ----
+-- tenant_id is filled by the class_tenant_fill trigger from the coach.
 INSERT INTO classes (
   coach_id, title, day_of_week, start_time, end_time,
   location_name, location_address, price_per_lesson

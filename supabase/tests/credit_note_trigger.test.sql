@@ -7,6 +7,13 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT plan(11);
 
+-- Multi-tenancy scaffolding: coaches and students now require a tenant. This
+-- fixture creates its own so the test stays independent of the seed. The rule
+-- under test is unchanged — cross-tenant isolation has its own file
+-- (tenant_isolation.test.sql).
+INSERT INTO tenants (id, slug, display_name, join_code)
+VALUES ('99999999-0000-0000-0000-000000000002', 'tap-creditnote', 'TAP CreditNote', 'SWIM-TC02');
+
 -- ── Seed (fixed UUIDs) ──────────────────────────────────────────────────────
 -- Coach + parent auth users; the handle_new_user trigger creates their
 -- profiles + coaches/parents rows.
@@ -16,7 +23,7 @@ INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
 VALUES
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000c1',
    'authenticated','authenticated','tap-coach@test.local', crypt('x', gen_salt('bf')),
-   now(), '{"provider":"email"}','{"full_name":"TAP Coach","role":"coach"}',
+   now(), '{"provider":"email"}','{"full_name":"TAP Coach","role":"coach","tenant_id":"99999999-0000-0000-0000-000000000002"}',
    now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','a0000000-0000-0000-0000-0000000000b2',
    'authenticated','authenticated','tap-parent@test.local', crypt('x', gen_salt('bf')),
@@ -28,8 +35,8 @@ SELECT 'b0000000-0000-0000-0000-000000000001', co.id, 'TAP Class', 'saturday',
        '10:00','11:00','Pool', 30.00
 FROM coaches co WHERE co.profile_id = 'a0000000-0000-0000-0000-0000000000c1';
 
-INSERT INTO students (id, full_name, assignment_status, is_active)
-VALUES ('c0000000-0000-0000-0000-000000000001', 'TAP Kid', 'assigned', TRUE);
+INSERT INTO students (id, full_name, assignment_status, is_active, tenant_id)
+VALUES ('c0000000-0000-0000-0000-000000000001', 'TAP Kid', 'assigned', TRUE,'99999999-0000-0000-0000-000000000002');
 
 INSERT INTO parent_students (parent_id, student_id)
 SELECT p.id, 'c0000000-0000-0000-0000-000000000001'
@@ -48,8 +55,8 @@ INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
   ('d0000000-0000-0000-0000-000000000002','c0000000-0000-0000-0000-000000000001','present','a0000000-0000-0000-0000-0000000000c1');
 
 -- Invoice + item making ONLY session1 "already invoiced"
-INSERT INTO invoices (id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status)
-SELECT 'e0000000-0000-0000-0000-000000000001', p.id, '2026-01', 30.00, 0.00, 30.00, 'outstanding'
+INSERT INTO invoices (tenant_id, id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status)
+SELECT '99999999-0000-0000-0000-000000000002', 'e0000000-0000-0000-0000-000000000001', p.id, '2026-01', 30.00, 0.00, 30.00, 'outstanding'
 FROM parents p WHERE p.profile_id = 'a0000000-0000-0000-0000-0000000000b2';
 
 INSERT INTO invoice_items (invoice_id, student_id, lesson_session_id, attendance_status, amount, class_title, session_date)
