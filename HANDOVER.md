@@ -64,7 +64,9 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   `invoice_run_day`, default the **7th**) and **manual on-demand** (admin button). **One
   invoice per parent covering every class their children are in** (§8), and **unmarked
   attendance blocks generation entirely in both modes — there is no override** (§8). A
-  month that finishes is **sealed**, by either mode, so later runs no-op.
+  month that finishes is **sealed**, by either mode, so later runs no-op — but a month with
+  **nothing recorded** is never sealed and reports `nothing_to_bill` instead (§8.1; this
+  one bit production).
 - **Closing an enrolment (verified UI + DB)** — **"Remove from class"** and **"Set
   inactive"** on the admin Students page *and* the coach roster, via the
   `close_student_enrolment()` RPC. This is what unblocks billing when a child has stopped
@@ -91,7 +93,7 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   (waiting on the coach) and an empty filter result (§8g).
 - **Full RLS** — parents see only their data, coaches only their classes,
   superadmin everything. Covered by automated isolation tests.
-- **Automated tests** — backend **34 pgTAP + 49 Deno**, plus frontend suites
+- **Automated tests** — backend **34 pgTAP + 51 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest, `SwimSyncApp` jest-expo); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
@@ -111,7 +113,9 @@ superadmin + the real coach/classes). See §11.
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
 > As of 2026-07-18 that includes the whole §8 underbilling cluster (multi-class invoices, the
-> configurable run day, month sealing, and the hard attendance block), plus the earlier bulk
+> configurable run day, month sealing, and the hard attendance block) **and the same-day
+> empty-month seal fix (§8.1) — `supabase functions list` shows `generate-invoices` at
+> version 7, deployed 2026-07-18 19:45 SGT, ~1 min after commit `0363757`**, plus the earlier bulk
 > attendance **"Set all"** control, **admin class
 > editing + a required day-of-week** (§8e), the unmarked-lesson safety net, and the parent
 > Attendance fixes (§8g). **Caveat worth keeping:** every check on that work ran against **local
@@ -185,7 +189,7 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 supabase test db                                  # 34 tests across 4 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
-supabase/functions/generate-invoices/test.sh      # 49 tests; needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 51 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
 cd SwimSyncAdmin && npm test                       # 38 tests
@@ -473,9 +477,18 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     entirely** — so every case "passes", including the ones that should be denied. Wrap
     RLS probes in an explicit transaction, and make sure at least one case is expected to
     FAIL, so a silently-superuser session is visible.
+17. **A guard made of "nothing went wrong" conditions fires hardest when nothing happened.**
+    The month seal required no-incomplete-class AND no-deferred-parent AND no-failed-write —
+    every one of which is **vacuously true on an empty run**, so a month where nobody had
+    marked any attendance sealed itself and was locked out of billing (§8.1). It reached
+    production. **When a terminal/irreversible action is gated on a conjunction of negatives,
+    add a positive: require that the work actually occurred** (here: at least one class
+    genuinely reckoned with). Same shape as §7.14 (`Number(null)` → 0 → the most aggressive
+    value): in both, an *absence* of input silently satisfied a rule written to police
+    *presence* of input. Ask what your guard does on empty input, not just on bad input.
 ---
 
-## 8. What changed this session (2026-07-18 — the underbilling cluster: multi-class fix, run day, sealing, hard block)
+## 8. What changed this session (2026-07-18 — the underbilling cluster: multi-class fix, run day, sealing, hard block, + the §8.1 empty-month seal fix)
 
 **Four changes that together close underbilling from both ends — A fixes billing that was
 *wrong*, D prevents billing that is *incomplete*.** All merged to `main` (`b3bb2c5` →
@@ -559,6 +572,45 @@ boundary tested directly in psql. Docs: PRD §7.4/§7.7, `INVOICE_RUNBOOK.md`.
 - **`is_active` vs `assignment_status` still not reconciled.** This session *writes* the
   enum but did not settle the two-sources-of-truth question; that stays the M-sized backlog
   item, now overdue.
+
+### 8.1 Follow-up, same day — a month with NOTHING to bill was sealing itself (`0363757`)
+
+**Found in production, not in review.** Generating July 2026 on prod to check on it reported
+*"Created 0 invoice(s) … now closed"* and **sealed the month** — after which every later run
+short-circuits on `already_complete`. C (above) had just made *manual* runs seal, so the
+lightest possible action — looking — permanently locked a month out of billing.
+
+**The mechanism is worth remembering: the three seal conditions were all _vacuously_ true.**
+"No class left incomplete", "no parent deferred", "no write failed" are each trivially
+satisfied when the run found nothing at all, so **"nothing happened" was indistinguishable
+from "everything is finished"**. Sealing now additionally requires that **at least one class
+was genuinely reckoned with** (had lessons and students, and passed the completeness gate).
+
+**Not just an empty-database case** — this is the part that made it a live hazard. Because
+`lesson_sessions` rows are created **lazily** by attendance marking (§6), *any* month whose
+attendance nobody has marked yet has no sessions, real classes and students included. Any
+early "let me just check" run would have sealed the month.
+
+A month that is fully marked but yields **no billable lesson** (e.g. every lesson rained off)
+is genuinely finished and **still seals** — the distinction is "nothing recorded" vs "nothing
+billable".
+
+- **New `nothing_to_bill` status** returned by the engine, with a `message`; the admin
+  invoices page renders it as *"No lessons are recorded … the month is still open — generate
+  again once attendance has been marked"* instead of the old success-shaped copy.
+- **Deployed** — `supabase functions deploy generate-invoices` ran ~1 min after the commit
+  (version 7, 2026-07-18 19:45 SGT). Verified via `supabase functions list`, not assumed.
+- **Verified.** Deno **49 → 51**; the empty-month test fails on the pre-fix engine.
+- Also corrected two PRD claims that had drifted from shipped behaviour: invoice **timing**
+  (still said the 1st; the run day has been configurable, default the 7th, since §8B) and the
+  **manual-mode** description (manual is subject to the completeness gate and *does* seal a
+  finished month — both changed when the hard block landed).
+
+**Left open — check before the 1 Aug run (§9).** The fix prevents *future* vacuous seals; it
+does **not** remove the `billing_periods` row the incident already wrote. If `2026-07` is
+still sealed on prod, the 1 Aug run will short-circuit on `already_complete` and bill nothing.
+Reopen path is in `INVOICE_RUNBOOK.md` (`DELETE FROM billing_periods WHERE billing_month =
+'2026-07';`).
 
 ## 8a. What changed (2026-07-17 — UTC-derived default billing month fix)
 
@@ -1117,11 +1169,17 @@ on prod** — the 1 Aug run is the first.
    panel before the 1st**, so the dialog isn't a surprise on the day.
    - If a class can't be completed because a child stopped attending, **remove them from
      the class** (admin Students, or the coach's roster). Their attended lessons still bill.
-2. **First real invoice run — 1 Aug 2026.** Follow `INVOICE_RUNBOOK.md`; pick **July**
+2. **Before anything else on 1 Aug: confirm July 2026 is not still sealed on prod.** The
+   §8.1 incident wrote a `billing_periods` row for `2026-07`, and the fix stops *new* vacuous
+   seals but does **not** delete that row. If it is still there the run will short-circuit on
+   `already_complete` and bill nothing — quietly. Check, and if present reopen with
+   `DELETE FROM billing_periods WHERE billing_month = '2026-07';` (runbook). **This is the
+   single most likely way the first real run fails.**
+3. **First real invoice run — 1 Aug 2026.** Follow `INVOICE_RUNBOOK.md`; pick **July**
    explicitly. Afterwards check `emails_sent` in the response and Resend → Emails, and spot-
    check one invoice for a family with **siblings in two different classes** — that path was
    broken until §8 and 1 Aug is its first real exercise.
-3. **Finish parent onboarding.** Parents self-register + add children via
+4. **Finish parent onboarding.** Parents self-register + add children via
    **`swimsync.sg/welcome`**, then the superadmin assigns each to a class (admin
    **Unassigned Children**). Students are parent-created, so this is an onboarding push, not
    a build task.
