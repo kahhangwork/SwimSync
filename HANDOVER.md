@@ -606,11 +606,11 @@ billable".
   **manual-mode** description (manual is subject to the completeness gate and *does* seal a
   finished month — both changed when the hard block landed).
 
-**Left open — check before the 1 Aug run (§9).** The fix prevents *future* vacuous seals; it
-does **not** remove the `billing_periods` row the incident already wrote. If `2026-07` is
-still sealed on prod, the 1 Aug run will short-circuit on `already_complete` and bill nothing.
-Reopen path is in `INVOICE_RUNBOOK.md` (`DELETE FROM billing_periods WHERE billing_month =
-'2026-07';`).
+**✅ Resolved 2026-07-18 — July has been unsealed on production by the user.** The fix
+prevented *future* vacuous seals but did not remove the `billing_periods` row the incident
+already wrote; that row is now gone, so July is billable again. (Reopen path, if ever needed
+again, is in `INVOICE_RUNBOOK.md`.) **Note the July run itself is now deferred behind
+tenanting** — see §9.
 
 ## 8a. What changed (2026-07-17 — UTC-derived default billing month fix)
 
@@ -1153,42 +1153,58 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift. Keep this section to what's genuinely next.
 
-The MVP loop is built and live, and as of §8 the **billing engine is the most-tested part
-of the product**. **The product is not the blocker — real usage is.**
+**The shift changed on 2026-07-18. The work is now MULTI-TENANCY**, not billing operations.
 
-**Current status (2026-07-18):** parent onboarding is **ongoing** (~17 students expected
-across the 4 Sunday classes); the **first real invoice run is 1 Aug 2026** (July's billing,
-**manual** — cron is still off). Invoice emails are live but **no live send has ever fired
-on prod** — the 1 Aug run is the first.
+A **swim school pilots the platform in August 2026** (a few coaches and students, not the
+whole school). That makes tenanting the immediate build — SwimSync today has a **single
+global `superadmin` role** and three policies that leak across any business boundary, so
+onboarding a second business onto the current schema would show each other's families.
 
-**Read this before 1 Aug — invoicing behaves differently now (§8).**
+**Read these two documents before touching anything:**
 
-1. **Generation is BLOCKED until every July lesson is marked.** No "Generate anyway". If
-   the button refuses, it names the class and date; the coach marks them — or marks them
-   **cancelled** if the lesson didn't run — and it proceeds. **Rehearse this in the admin
-   panel before the 1st**, so the dialog isn't a surprise on the day.
-   - If a class can't be completed because a child stopped attending, **remove them from
-     the class** (admin Students, or the coach's roster). Their attended lessons still bill.
-2. **Before anything else on 1 Aug: confirm July 2026 is not still sealed on prod.** The
-   §8.1 incident wrote a `billing_periods` row for `2026-07`, and the fix stops *new* vacuous
-   seals but does **not** delete that row. If it is still there the run will short-circuit on
-   `already_complete` and bill nothing — quietly. Check, and if present reopen with
-   `DELETE FROM billing_periods WHERE billing_month = '2026-07';` (runbook). **This is the
-   single most likely way the first real run fails.**
-3. **First real invoice run — 1 Aug 2026.** Follow `INVOICE_RUNBOOK.md`; pick **July**
-   explicitly. Afterwards check `emails_sent` in the response and Resend → Emails, and spot-
-   check one invoice for a family with **siblings in two different classes** — that path was
-   broken until §8 and 1 Aug is its first real exercise.
-4. **Finish parent onboarding.** Parents self-register + add children via
-   **`swimsync.sg/welcome`**, then the superadmin assigns each to a class (admin
-   **Unassigned Children**). Students are parent-created, so this is an onboarding push, not
-   a build task.
+| Document | What |
+|---|---|
+| **`TENANCY_DESIGN.md`** | The agreed design. 10 decisions recorded in §10, all settled with the user. |
+| **`TENANCY_PLAN.md`** | The 6-phase build, with risks and definition of done. |
 
-**Then pick from `BACKLOG.md` → `## Build order`.** Near-term list is now led by **extract
-the completeness-rule shared helper** (S — it carries real weight after §8: the admin's
-pre-flight check and the engine compute the rule separately, and if they disagree the button
-enables and the server refuses) → **active/inactive status** (M — §8 writes
-`assignment_status` but did **not** reconcile it with `is_active`; that's overdue).
+**The headline decisions** (full reasoning in the design doc — don't re-litigate these):
+
+- **A private coach is a school of one** — one tenant, where admin and coach are the same
+  person. There is **no private-vs-school branch in any rule**; coach type is not an
+  authorization concept. This collapses most of what `BACKLOG.md` warned would be built twice.
+- **Parents are global, students are tenanted.** `students.tenant_id` is a real NOT NULL
+  column, not derived from enrolment — "Remove from class" depends on a child surviving
+  outside a class but inside the business.
+- **Credit never crosses tenants** (pools freely within one). This **explicitly reverses**
+  §6's "credit is pooled per parent", with the user's go-ahead.
+- **Join codes, no invite links.** Parent registers, enters a per-tenant code, picks per child.
+- **The money model is the big work**, not the RLS rewrite: per-tenant invoices, credit,
+  sealing and completeness blocking — and the engine runs as `service_role`, so **RLS does
+  not protect it at all**; isolation must be enforced in engine code.
+
+### The immediate next step
+
+**Phase 0 of `TENANCY_PLAN.md`** — prerequisites, no schema change:
+
+1. **Extract the completeness-rule shared helper** (was `BACKLOG.md` build-order #1, now a
+   hard prerequisite). The rule is hand-written in **four** places and phase 2 makes it
+   per-tenant. It already carries risk today: the admin's pre-flight check and the engine
+   compute it separately, so if they drift the button enables and the server refuses.
+2. ~~Settle the sealed July row~~ — **done**, the user unsealed July on production (§8.1).
+3. **Run the Deno suite twice in CI** (gotcha §7.15) — phase 2 rewrites sealing entirely.
+
+### What this defers
+
+- **The first real invoice run is POSTPONED behind tenanting** — the user's explicit call,
+  reversing the earlier "bill first, then tenant" recommendation. July's attendance is not
+  going anywhere, and billing it *after* the migration means billing it once, on the schema it
+  will live on. **This is a real deferral of real revenue** — it is in the plan's definition
+  of done (bill July under the new model) so it cannot be quietly forgotten.
+- **Parent onboarding continues** via `swimsync.sg/welcome`. Note phase 3 changes this flow
+  (join codes), and phase 1.4 step 5 must backfill `parent_tenants` for every existing parent
+  or they lose the ability to add a child.
+- **Active/inactive reconciliation** (`is_active` vs `assignment_status`) stays open and is
+  now further overdue.
 
 **Worth deciding, not urgent:** whether to **enable cron**. The two things that blocked it
 are done — the billing month is timezone-correct (§8a) and the run day is configurable

@@ -89,6 +89,14 @@ attendance block** — see PRD §7.7 and HANDOVER §8.
   wage tracking is actually wanted, *that* is the trigger to do tenanting + coach type
   first. **Coach-created student profiles** (M) also belongs behind this — it reshapes the
   parent-link + RLS surface that tenanting rewrites.
+  - **ACTIVE as of 2026-07-18 — this cluster is no longer "later".** A swim school pilots in
+    **August 2026**, which makes tenanting the immediate next build. `TENANCY_DESIGN.md` is
+    the design; its §9 sequences the work **after the 1 Aug invoice run** so the first real
+    billing cycle stays on the known-good single-tenant model. **Extract the
+    completeness-rule helper** (near-term #1) is now a hard prerequisite rather than a
+    nice-to-have — the completeness block becomes per-tenant, which edits all four
+    hand-written copies of that rule. **Multiple admin accounts per tenant** (M, below) is
+    explicitly *not* in the first cut.
 - **The platform chain.** Native store builds (M) → Push notifications (M) — push can't
   work on the current static web app, so it can't precede native builds.
 - **The reminder chain.** Invoice emails **shipped** (HANDOVER §8c); the rest sequences after
@@ -509,7 +517,50 @@ tenants exist.
 Do this before onboarding a second admin, not after — backfilling a tenant boundary
 across live billing data is a different and worse project.
 
+> **A full design now exists: `TENANCY_DESIGN.md` (2026-07-18).** Read it before touching
+> this item — it supersedes the sketch above on several points. In particular: the tenant
+> boundary does **not** run through `parents` (they stay global, or PRD §11.3 breaks);
+> `students` gets a real `tenant_id` column rather than deriving it from enrolment; and the
+> largest piece of work is **not** the RLS rewrite but the **money model** — invoices become
+> unique per `(parent, tenant, month)`, credit balance becomes per-`(parent, tenant)`, month
+> sealing and the completeness block become per-tenant, and the invoice engine runs as
+> `service_role` so RLS does not protect it at all. Two further cross-tenant leaks are
+> recorded there that are not noted above: `coaches_select` is also `USING (TRUE)`, and
+> `profiles_select` exposes **every coach's name, email and phone** platform-wide.
+
+### Multiple admin accounts per tenant — **M**
+More than one person can administer the same business — e.g. a school owner plus an
+operations manager, both seeing that school's coaches, classes, students and billing, and
+neither seeing any other tenant.
+
+**Why:** a school is not one person. The owner who signs up is rarely the person doing
+daily attendance chasing and invoice runs, and today the only way to share that work is to
+share one login — which destroys the audit trail (`audit_log.actor_id` becomes
+meaningless) and means offboarding a staff member requires a password change for everyone.
+Not needed for the August pilot, where a single school admin is sufficient.
+
+**Notes:** deliberately excluded from `TENANCY_DESIGN.md` §8 so the first cut stays small,
+but the design leaves room for it and names the exact seam. That design puts the role on
+`profiles` (one `tenant_admin` per tenant); **this item is the point at which that shortcut
+is replaced by a `tenant_members (tenant_id, profile_id, role)` join table**. Doing it that
+way round is cheap — the join table is additive and the role-on-profile check becomes a
+lookup — whereas building the join table up front would add a table and a migration for a
+capability nobody has asked for yet. Worth settling at the same time: whether a second admin
+is a *full* admin or a restricted one (e.g. can mark attendance and chase payment but cannot
+change class pricing), since that decides whether `role` on the join table is a real enum or
+a placeholder.
+
 ### Coach type: private vs school — **M**
+
+> **Substantially reframed by `TENANCY_DESIGN.md` §1 (2026-07-18) — read that first.** The
+> conclusion there is that a **private coach is a tenant of one**, where the same person
+> holds the admin and coach roles. If that holds, coach type is **not an authorization
+> concept at all**: no rule branches on private-vs-school, they branch on tenant + role, and
+> `tenants.kind` survives only as onboarding copy. That deletes most of the "build every
+> money feature twice" risk this item warns about below — including for wages, where the
+> real question is "is this coach the tenant owner", not "what type are they". The item is
+> kept for its reasoning and its `close_student_enrolment()` note.
+
 A type on each coach that decides who they answer to. A **school coach** belongs to a
 tenanted admin (above) and is managed, paid, and seen by that admin. A **private coach**
 runs their own business and falls under the overall SwimSync platform admin instead.
