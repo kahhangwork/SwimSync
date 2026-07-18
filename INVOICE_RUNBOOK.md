@@ -149,6 +149,11 @@ Billing is based on **actual attendance**, so make sure last month is complete:
   `billing_periods` and later runs skip it with *"already_complete"*. The
   result message says **"This month is complete and now closed."** A month with
   unmarked attendance is deliberately **left open** so a later run can finish it.
+  - **A month with nothing recorded is never closed.** Running generation before
+    any attendance is marked reports *"No lessons are recorded … the month is
+    still open"* and seals nothing. (Until 2026-07-18 it sealed such a month and
+    reported "0 invoices — now closed", which locked the month out of billing
+    entirely; that is what the empty-month guard now prevents.)
   - **If a month is closed by mistake** (e.g. a lesson surfaced afterwards),
     reopen it by deleting its row in the Supabase dashboard SQL editor:
     `DELETE FROM billing_periods WHERE billing_month = '2026-07';`

@@ -9,7 +9,7 @@
 | **Version** | 1.0 |
 | **Date** | March 2026 |
 
-> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). The **entire MVP core loop works and is verified end to end across the UI + backend**: parent self-registration, child creation, superadmin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), the **credit-note correction flow** (auto-issue on attendance edit + FIFO application incl. partial carry-forward — see §5.6), and **PayNow QR** (coach upload → parent display → admin view). A partial-application ledger bug found during credit-note verification was fixed via a `credit_applications` allocation table (see §9.17). An **automated test suite** now covers the billing/credit engine (Deno) and DB triggers/RLS/constraints (pgTAP). **Password reset** is implemented on the mobile app (self-service recovery flow via `resetPasswordForEmail` → in-app reset screen → `updateUser`, working across Expo web and native deep links), and login/register errors are mapped to friendly copy — see §7.1. The code lives on GitHub (public, `kahhangwork/SwimSync`). **Now live in production on its own domain (web-first, free tier):** the mobile app at **https://swimsync.sg** and the admin at **https://admin.swimsync.sg** (Vercel), backend on Supabase, real transactional email via **Resend** (`noreply@swimsync.sg`, e.g. password-reset). A real coach + 4 classes are onboarded on a clean-slate production DB. Automated tests (34 pgTAP + 49 Deno + frontend vitest/jest-expo suites) run in CI on every push. Swimming ability is no longer a parent-entered field (see §5.1). Invoice generation is **manual** (no cron on the free tier) — see `INVOICE_RUNBOOK.md`. **Each parent gets one invoice covering every class their children attend**, generation is **blocked until all of the month's attendance is marked** (no override — a lesson that didn't run is marked *cancelled*), a finished month is **sealed** so it is never reprocessed, and the automatic path waits until a **configurable day of the month** (default the 7th) — see §7.7. Removing a child from a class, or marking them inactive, is available to the **superadmin and their coach** (§7.4). Generation also **emails the parent** a branded, itemized invoice on creation (best-effort, isolated from billing; live in production since 2026-07-16 — see §7.7). **Lesson sessions are created lazily, not pre-generated, and the lessons that *should* have happened are derived from each class's weekday at read time** — surfacing unmarked lessons to the coach and reporting attendance gaps to the admin before invoices are generated (see §7.5 and §7.7), which closes a hole where a forgotten lesson was silently unbillable and invisible to everyone. The only remaining gate to real billing is **parent onboarding** (parents self-register + add children via `swimsync.sg/welcome`, then the superadmin assigns classes); native App/Play Store builds are deferred. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
+> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). The **entire MVP core loop works and is verified end to end across the UI + backend**: parent self-registration, child creation, superadmin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), the **credit-note correction flow** (auto-issue on attendance edit + FIFO application incl. partial carry-forward — see §5.6), and **PayNow QR** (coach upload → parent display → admin view). A partial-application ledger bug found during credit-note verification was fixed via a `credit_applications` allocation table (see §9.17). An **automated test suite** now covers the billing/credit engine (Deno) and DB triggers/RLS/constraints (pgTAP). **Password reset** is implemented on the mobile app (self-service recovery flow via `resetPasswordForEmail` → in-app reset screen → `updateUser`, working across Expo web and native deep links), and login/register errors are mapped to friendly copy — see §7.1. The code lives on GitHub (public, `kahhangwork/SwimSync`). **Now live in production on its own domain (web-first, free tier):** the mobile app at **https://swimsync.sg** and the admin at **https://admin.swimsync.sg** (Vercel), backend on Supabase, real transactional email via **Resend** (`noreply@swimsync.sg`, e.g. password-reset). A real coach + 4 classes are onboarded on a clean-slate production DB. Automated tests (34 pgTAP + 49 Deno + frontend vitest/jest-expo suites) run in CI on every push. Swimming ability is no longer a parent-entered field (see §5.1). Invoice generation is **manual** (no cron on the free tier) — see `INVOICE_RUNBOOK.md`. **Each parent gets one invoice covering every class their children attend**, generation is **blocked until all of the month's attendance is marked** (no override — a lesson that didn't run is marked *cancelled*), a finished month is **sealed** so it is never reprocessed (but a month with **nothing recorded** is never sealed — that vacuous seal locked a month out of billing entirely until it was fixed 2026-07-18), and the automatic path waits until a **configurable day of the month** (default the 7th) — see §7.7. Removing a child from a class, or marking them inactive, is available to the **superadmin and their coach** (§7.4). Generation also **emails the parent** a branded, itemized invoice on creation (best-effort, isolated from billing; live in production since 2026-07-16 — see §7.7). **Lesson sessions are created lazily, not pre-generated, and the lessons that *should* have happened are derived from each class's weekday at read time** — surfacing unmarked lessons to the coach and reporting attendance gaps to the admin before invoices are generated (see §7.5 and §7.7), which closes a hole where a forgotten lesson was silently unbillable and invisible to everyone. The only remaining gate to real billing is **parent onboarding** (parents self-register + add children via `swimsync.sg/welcome`, then the superadmin assigns classes); native App/Play Store builds are deferred. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
 
 ---
 
@@ -119,7 +119,7 @@ SwimSync supports three main user types:
 #### Billing Features
 
 - Billing based on actual attendance
-- Monthly invoice generation on the **1st day of the following month**
+- Monthly invoice generation after the billing month ends — automatically from a **configurable day of the following month** (default the **7th**), or manually on demand (§5.5)
 - Separate invoice per parent account
 - Manual payment verification by coach
 - Credit note issuance for post-invoice attendance corrections
@@ -248,11 +248,19 @@ Billing is based on actual attendance records, not scheduled lesson count.
 
 #### Invoice Generation Timing
 
-SwimSync generates invoices on the **1st day of the following month**. This avoids billing issues for lessons conducted on the last day of the month.
+SwimSync generates invoices for a month only **after that month has ended**, so a lesson conducted on its last day is still included (§11.1).
 
-Examples:
-- On **1 Feb 2026**, generate invoices for **January 2026**
-- On **1 Mar 2026**, generate invoices for **February 2026**
+*(implemented)* The original spec said the **1st** of the following month. The automatic
+run now waits until a **configurable day** of the following month — `app_settings.invoice_run_day`,
+**default the 7th**. The 1st proved too early in practice: the month's final lessons are
+often still unmarked, and a lesson marked *after* the invoice exists can never be added to
+it (§11.6), so billing on the 1st converts a fixable gap into a permanent underbill. A
+**manual** run ignores the run day entirely — the superadmin generating on demand is an
+explicit instruction. See §7.7.
+
+Examples (at the default run day):
+- On **7 Feb 2026**, generate invoices for **January 2026**
+- On **7 Mar 2026**, generate invoices for **February 2026**
 
 #### Invoice Grouping
 
@@ -513,7 +521,7 @@ indistinguishable from a forgotten lesson (§7.5), which is what silently underb
 
 SwimSync shall generate invoices monthly, with two trigger modes sharing one billing engine.
 
-- Invoice generation date is the 1st day of the following month
+- Invoice generation runs after the billing month has ended — automatically from a **configurable day of the following month** (default the **7th**), or manually on demand (§5.5)
 - Invoice must cover the previous calendar month only
 - Invoice amount must be calculated from attendance records
 - Only billable attendance items must be included (Present, Paid Trial)
@@ -561,8 +569,37 @@ daily reminder.
 
 Both modes run the **same** `generate-invoices` function, so billing math is identical either way:
 
-- **Automatic** — a daily scheduled run (cron) that generates invoices for the previous month on/after the 1st. It respects a global **Automatic generation** switch (`app_settings.auto_invoice_enabled`), only bills a class once every active student has an attendance record for every session that month (completeness gate), and seals a month once fully processed so it is never re-billed.
-- **Manual (on-demand)** — a superadmin action in the web admin panel that generates invoices for a chosen billing month immediately. It bills whatever attendance is currently marked (bypasses the completeness gate), ignores the automatic switch, and never seals the month (so the scheduled run can still finalise it). Both modes skip parents who already have an invoice for that month (no double-billing).
+The **completeness gate applies to both** — neither mode can bill around an unmarked
+lesson, and there is no override (see the blocking rule above). What differs is only
+*when* each fires and what it consults:
+
+- **Automatic** — a daily scheduled run (cron) that generates invoices for the previous month from the configured **run day** onward (`app_settings.invoice_run_day`, default the **7th**). It respects a global **Automatic generation** switch (`app_settings.auto_invoice_enabled`), and **defers** any parent whose child sits in a class with incomplete attendance rather than writing a partial invoice a later retry could never top up.
+- **Manual (on-demand)** — a superadmin action in the web admin panel that generates invoices for a chosen billing month immediately. It **ignores the automatic switch and the run day** — an explicit instruction must not be held back by a schedule — but is **subject to the same completeness gate**.
+
+**Either mode seals a month once it is genuinely finished**, so no later run reprocesses it.
+A month is finished only when at least one class was actually reckoned with, none was left
+unmarked, no parent was deferred, and no invoice write failed. Both modes also skip parents
+who already have an invoice for that month (no double-billing).
+
+> *Earlier behaviour, corrected 2026-07-18:* manual runs used to bypass the completeness
+> gate and never seal. Both were changed — the bypass was letting unmarked lessons through
+> into permanent underbills (see the blocking rule above), and a month finished by hand
+> stayed open and was needlessly reprocessed.
+
+##### A month with nothing recorded is never sealed *(implemented)*
+
+Sealing requires that the run had something to finish. Generation on a month with **no
+lessons recorded** — no classes or students yet, or, far more commonly, a month whose
+attendance nobody has marked (`lesson_sessions` rows are created *lazily* by attendance
+marking, per §7.5, so an unmarked month has none) — reports **nothing to bill** and leaves
+the month **open**.
+
+Without this, the three remaining seal conditions were all vacuously true and an empty
+month sealed itself: the run reported "0 invoices generated" and then closed the month, so
+every later run short-circuited and the month could never be billed at all. "Nothing
+happened" is not the same as "everything is finished", and only the latter may close a
+month. A month that *is* fully marked but yields no billable lesson (e.g. every lesson
+rained off) is genuinely finished and **does** seal.
 
 *(implemented)* When no billing month is passed (the automatic/cron path — the daily job POSTs an empty body), the engine defaults to **the previous calendar month in the app timezone**, derived via `Intl` in `generate-invoices/dates.ts` (`APP_TIMEZONE`, default `Asia/Singapore`) — **not** the runtime's UTC clock. Deriving it from UTC billed a month early at the SGT day boundary (a 1am SGT run is the prior day in UTC), which would matter the moment cron is enabled; the manual path is unaffected as it always sends an explicit month. The timezone is a single configurable seam, deliberately **not** per-coach/per-tenant — one zone suffices while all usage is SGT, and true multi-timezone belongs with future tenanting.
 
@@ -649,7 +686,7 @@ SwimSync shall provide a simple web panel for superadmin operations.
 ### 8.3 Performance
 
 - Attendance screen should load quickly enough for real-time use before or after class
-- Invoice and credit note generation should complete reliably on the 1st day of each month
+- Invoice and credit note generation should complete reliably on the month's scheduled run day (§5.5)
 - Parent app should show current attendance and invoice status without noticeable delay under MVP scale
 
 ### 8.4 Reliability
@@ -942,7 +979,7 @@ For each parent account, SwimSync performs the following:
 
 ### 11.1 Last Day of Month Lesson
 
-A lesson conducted on the last day of the month must still be included in that month's invoice. Therefore, SwimSync generates invoices on the 1st day of the next month.
+A lesson conducted on the last day of the month must still be included in that month's invoice. Therefore, SwimSync never generates a month's invoices until that month has ended — automatically from the configured run day of the following month (default the 7th), which also allows time for the final lessons to be marked (§5.5).
 
 ### 11.2 Parent Self-Registers Before Assignment
 
@@ -1048,7 +1085,7 @@ The following technology stack is recommended for SwimSync based on the requirem
 | **Mobile Builds** | EAS Build (Expo) | Cloud builds for iOS and Android |
 | **OTA Updates** | EAS Update | Push JS-level updates without app store review |
 | **Web Hosting** | Vercel | Native Next.js hosting, global CDN |
-| **Scheduling** | Supabase pg_cron / Edge Functions | Monthly invoice generation on 1st of month |
+| **Scheduling** | Supabase pg_cron / Edge Functions | Daily run; the engine decides which month is due and whether the run day has arrived (§5.5) |
 | **Language** | TypeScript | Shared types across mobile, web, and backend |
 
 #### Why Supabase for SwimSync?
@@ -1149,7 +1186,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 - Superadmin assignment of children to classes/coaches
 - One-class enrolment per student
 - Attendance tracking and parent attendance visibility
-- Invoice generation on 1st of following month
+- Invoice generation after the billing month ends (run day configurable, default the 7th)
 - Credit note generation for post-invoice attendance corrections
 - Manual paid marking and PayNow QR display
 - Basic SwimSync web admin panel

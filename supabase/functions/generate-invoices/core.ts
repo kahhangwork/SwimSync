@@ -227,6 +227,10 @@ export async function generateInvoices(
   // Lessons with unmarked attendance. Any entry here stops the whole run.
   const blocking: BlockingLesson[] = [];
   let classesIncomplete = 0; // classes skipped because attendance not fully marked
+  // Classes this run actually reckoned with: had lessons recorded AND students
+  // to bill, and passed the completeness gate. A month can only be SEALED if
+  // this is > 0 — see the sealing block for why zero must never seal.
+  let classesComplete = 0;
   let invoicesCreated = 0;
   // A month with a failed write must never be sealed — sealing would lock out
   // the very retry that would have fixed it.
@@ -347,6 +351,10 @@ export async function generateInvoices(
       });
       continue;
     }
+
+    // Past the gate with real lessons and real students: this class has been
+    // genuinely reckoned with, whether or not it yields a billable item.
+    classesComplete++;
 
     // ── Tally this class's billable items into the cross-class map ──────────
     const attByKey: Record<string, string> = Object.fromEntries(
@@ -620,13 +628,26 @@ export async function generateInvoices(
   // Safe only because completeness is now measured even under force — without
   // that, a forced run would report 0 incomplete classes unconditionally and
   // seal every month regardless of reality, locking out unmarked lessons for
-  // good. The three conditions are the whole safety property:
+  // good. The four conditions are the whole safety property:
+  //   • at least one class actually reckoned with (there WAS work to finish)
   //   • no class left unmarked          (nothing still to bill)
   //   • no parent deferred              (nobody skipped this run)
   //   • no failed invoice write         (nothing to retry)
+  //
+  // The first condition is what stops a VACUOUS seal. The other three are all
+  // trivially true when the run found nothing at all — no classes yet, no
+  // students yet, or (the common one) no lesson_sessions in the month, since
+  // sessions are created lazily by attendance marking and therefore do not
+  // exist for a month nobody has marked. Without this guard, running
+  // generation on an empty or not-yet-marked month reported "0 invoices" and
+  // then sealed it, locking out every real invoice that month would later
+  // have produced. "Nothing happened" is not the same as "everything is
+  // finished", and only the latter may close a month.
+  //
   // If a month is ever sealed wrongly, delete its billing_periods row — see
   // INVOICE_RUNBOOK.md.
   const monthFinished =
+    classesComplete > 0 &&
     classesIncomplete === 0 &&
     deferredParents.size === 0 &&
     !invoiceWriteFailed;
@@ -663,11 +684,24 @@ export async function generateInvoices(
     sealed: monthFinished,
     status: monthFinished
       ? "complete — billing month sealed"
+      : // Nothing to reckon with at all. Called out as its own status because
+      // it is NOT "attendance still incomplete" (there is no attendance to be
+      // incomplete) and NOT a finished month — it usually means no lesson has
+      // been marked for this month yet, or there are no classes/students.
+      classesComplete === 0 && classesIncomplete === 0
+      ? "nothing_to_bill"
       : mode === "manual"
       ? "manual run complete — month left open, attendance still incomplete"
       : deferredParents.size > 0
       ? `partial — ${deferredParents.size} parent(s) deferred, will retry tomorrow`
       : "partial — will retry tomorrow",
+    ...(classesComplete === 0 && classesIncomplete === 0
+      ? {
+          message:
+            `No lessons are recorded for ${billingMonth}, so there is nothing to invoice. ` +
+            `The month has been left OPEN — generate again once attendance is marked.`,
+        }
+      : {}),
     results: log,
     created,
   };

@@ -223,6 +223,16 @@ export default function InvoicesPage() {
         // two ever disagree this is the one to believe.
         setBlockedLessons(json.blocking ?? []);
         setGenResult(null);
+      } else if (json.status === "nothing_to_bill") {
+        // Distinct from a finished month: nothing was found to bill, so the
+        // month stays OPEN. Saying so explicitly matters — the previous copy
+        // ("Created 0 invoice(s) … now closed") read as a successful, final
+        // run when in fact no attendance had been marked yet.
+        setGenResult(
+          `No lessons are recorded for ${formatBillingMonth(genMonth)}, so ` +
+            `there is nothing to invoice. The month is still open — generate ` +
+            `again once attendance has been marked.`
+        );
       } else if (json.status === "already_complete") {
         setGenResult(
           `${formatBillingMonth(genMonth)} is already complete and closed — ` +

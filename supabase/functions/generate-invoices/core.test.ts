@@ -714,6 +714,77 @@ Deno.test("seal: a forced run on an INCOMPLETE month bills nothing and seals not
   }
 });
 
+Deno.test("seal: a month with NOTHING recorded is never sealed", async () => {
+  // The vacuous-seal bug, hit in production 2026-07-18: generation was run on a
+  // month with nothing marked, reported "0 invoices", and SEALED it — after
+  // which every later run short-circuited on already_complete and the month
+  // could never be billed. The three original seal conditions (no incomplete
+  // class, no deferred parent, no failed write) are all trivially true when the
+  // run found nothing, so "nothing happened" was indistinguishable from
+  // "everything is finished".
+  //
+  // Note this is the ORDINARY state of a month nobody has marked yet: sessions
+  // are created lazily by attendance marking, so an unmarked month has no
+  // lesson_sessions at all — not merely no classes.
+  const s = await newScenario({ price: 30 });
+  try {
+    // A class and an enrolled student exist, but no session in the month.
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-11",
+    });
+
+    assertEquals(res.invoices_created, 0);
+    assertEquals(res.sealed, false);
+    assertEquals(res.status, "nothing_to_bill");
+    assertStringIncludes(res.message ?? "", "left OPEN");
+
+    const { data: period } = await s.db
+      .from("billing_periods")
+      .select("billing_month")
+      .eq("billing_month", "2027-11")
+      .maybeSingle();
+    assertEquals(period, null, "an empty month must not be sealed");
+
+    // The property that actually matters: the month is still billable. Mark a
+    // lesson and the ordinary run works — which the seal would have prevented.
+    const a = await s.addSession("2027-11-06");
+    await s.mark(a, "present");
+    const after = await generateInvoices(s.db, {
+      mode: "manual",
+      billing_month: "2027-11",
+    });
+    assertEquals(after.invoices_created, 1);
+    assertEquals(after.sealed, true);
+  } finally {
+    await s.db.from("billing_periods").delete().eq("billing_month", "2027-11");
+    await s.teardown();
+  }
+});
+
+Deno.test("seal: a fully-marked month with NO billable lesson still seals", async () => {
+  // The other side of the guard above: a month where every lesson was rained
+  // off is genuinely finished and yields no invoice. It must still seal, or the
+  // fix would trade a stuck-closed month for a never-closing one.
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2027-12-04");
+    await s.mark(a, "cancelled_rain");
+
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      billing_month: "2027-12",
+    });
+
+    assertEquals(res.invoices_created, 0);
+    assertEquals(res.sealed, true, "a complete month with no billable lesson is still finished");
+  } finally {
+    await s.db.from("billing_periods").delete().eq("billing_month", "2027-12");
+    await s.teardown();
+  }
+});
+
 Deno.test("seal: sealing twice is a no-op, not a duplicate-key error", async () => {
   // A forced run bypasses the sealed-month guard, so the seal can be reached
   // a second time for the same month.
