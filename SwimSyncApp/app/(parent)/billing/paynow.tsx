@@ -31,23 +31,17 @@ export default function PayNowScreen() {
     async function load() {
       setLoading(true);
 
-      const [invoiceRes, coachRes] = await Promise.all([
-        invoiceId
-          ? supabase
-              .from("invoices")
-              .select("net_amount, billing_month")
-              .eq("id", invoiceId)
-              .single()
-          : Promise.resolve({ data: null }),
-
-        coachId
-          ? supabase
-              .from("coaches")
-              .select("paynow_qr_url, profiles(full_name)")
-              .eq("id", coachId)
-              .single()
-          : Promise.resolve({ data: null }),
-      ]);
+      // The QR comes from the invoice's BUSINESS, not the coach who taught the
+      // lesson. A school with three coaches has one bank account; showing an
+      // individual coach's QR would send a parent's money to the wrong person.
+      // For a private coach the tenant is theirs, so nothing changes for them.
+      const invoiceRes = invoiceId
+        ? await supabase
+            .from("invoices")
+            .select("net_amount, billing_month, tenants(display_name, paynow_qr_url)")
+            .eq("id", invoiceId)
+            .single()
+        : { data: null as any };
 
       if (invoiceRes.data) {
         setNetAmount(Number(invoiceRes.data.net_amount));
@@ -56,20 +50,26 @@ export default function PayNowScreen() {
         setBillingMonth(
           date.toLocaleDateString("en-SG", { month: "long", year: "numeric" })
         );
-      }
 
-      if (coachRes.data) {
-        setCoachQR({
-          coach_name: (coachRes.data as any).profiles?.full_name ?? "Coach",
-          paynow_qr_url: coachRes.data.paynow_qr_url ?? null,
-        });
+        const t: any = Array.isArray((invoiceRes.data as any).tenants)
+          ? (invoiceRes.data as any).tenants[0]
+          : (invoiceRes.data as any).tenants;
+        if (t) {
+          setCoachQR({
+            coach_name: t.display_name ?? "Your coach",
+            paynow_qr_url: t.paynow_qr_url ?? null,
+          });
+        }
       }
 
       setLoading(false);
     }
 
     load();
-  }, [invoiceId, coachId]);
+    // coachId is still accepted in the route params for backwards
+    // compatibility with existing links, but is no longer used to resolve the
+    // payee — the invoice's tenant is authoritative.
+  }, [invoiceId]);
 
   return (
     <SafeAreaView className="flex-1 bg-sky-50">

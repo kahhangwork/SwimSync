@@ -39,6 +39,11 @@ export type InvoiceEmailItem = {
 
 export type InvoiceEmailData = {
   parentName: string;
+  /** The BUSINESS the invoice is from. A parent pays their coach or school, not
+   *  SwimSync — an email headed "SwimSync" reads as a platform bill and is
+   *  actively confusing for a family with children at two businesses. */
+  businessName?: string;
+  logoUrl?: string | null;
   billingMonth: string; // YYYY-MM
   gross: number;
   credit: number;
@@ -79,7 +84,10 @@ function escapeHtml(s: string): string {
 }
 
 export function buildInvoiceEmailSubject(data: InvoiceEmailData): string {
-  return `Your SwimSync invoice for ${formatBillingMonth(data.billingMonth)}`;
+  const from = data.businessName?.trim();
+  return from
+    ? `Your ${from} invoice for ${formatBillingMonth(data.billingMonth)}`
+    : `Your SwimSync invoice for ${formatBillingMonth(data.billingMonth)}`;
 }
 
 // Branded HTML matching supabase/templates/recovery.html (sky header, white
@@ -134,7 +142,15 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
       <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
         <tr>
           <td style="background:#0ea5e9;padding:24px 32px;">
-            <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.3px;">SwimSync</span>
+            ${
+              data.logoUrl
+                ? `<img src="${escapeHtml(data.logoUrl)}" alt="${escapeHtml(
+                    data.businessName ?? "Logo"
+                  )}" height="28" style="height:28px;vertical-align:middle;border:0;" />`
+                : `<span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.3px;">${escapeHtml(
+                    data.businessName ?? "SwimSync"
+                  )}</span>`
+            }
           </td>
         </tr>
         <tr>
@@ -145,7 +161,9 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
             <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">
               Hi ${escapeHtml(
                 data.parentName
-              )}, here's your SwimSync invoice for <strong>${escapeHtml(
+              )}, here's your ${escapeHtml(
+                data.businessName ?? "SwimSync"
+              )} invoice for <strong>${escapeHtml(
     monthLabel
   )}</strong>.
             </p>
@@ -183,7 +201,11 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
         </tr>
         <tr>
           <td style="padding:20px 32px;border-top:1px solid #eef2f6;">
-            <p style="margin:0;font-size:12px;color:#94a3b8;">SwimSync · Swim attendance &amp; billing</p>
+            <!-- SwimSync stays in the FOOTER only: the platform is the sender
+                 of record, but the bill is the business's. -->
+            <p style="margin:0;font-size:12px;color:#94a3b8;">${escapeHtml(
+              data.businessName ?? "SwimSync"
+            )} · sent via SwimSync</p>
           </td>
         </tr>
       </table>
@@ -266,6 +288,19 @@ export async function emailCreatedInvoices(
       };
     }
 
+    // tenant_id → branding. One query for the whole run, not one per invoice.
+    const tenantIds = [...new Set(created.map((c) => c.tenant_id).filter(Boolean))];
+    const { data: tenantRows } = tenantIds.length
+      ? await supabase
+          .from("tenants")
+          .select("id, display_name, logo_url")
+          .in("id", tenantIds)
+      : { data: [] as { id: string; display_name: string; logo_url: string | null }[] };
+    const tenantInfo: Record<string, { name: string; logo: string | null }> = {};
+    for (const row of (tenantRows ?? []) as any[]) {
+      tenantInfo[row.id] = { name: row.display_name, logo: row.logo_url ?? null };
+    }
+
     // student_id → full_name (for itemised lines)
     const { data: studentRows } = await supabase
       .from("students")
@@ -278,10 +313,13 @@ export async function emailCreatedInvoices(
 
     for (const inv of created) {
       const info = parentInfo[inv.parent_id];
+      const brand = tenantInfo[inv.tenant_id];
       const r = await sendInvoiceEmail({
         apiKey: opts.apiKey,
         to: info?.email,
         parentName: info?.name ?? "there",
+        businessName: brand?.name,
+        logoUrl: brand?.logo ?? null,
         billingMonth: inv.billing_month,
         gross: inv.gross,
         credit: inv.credit,

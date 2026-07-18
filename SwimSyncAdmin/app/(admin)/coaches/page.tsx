@@ -69,8 +69,11 @@ export default function CoachesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("coaches")
+      // The PayNow QR is the BUSINESS's, not each coach's — a school has one
+      // bank account. Read through the coach's tenant so every coach in a
+      // school shows the same, correct payee.
       .select(
-        "id, profile_id, paynow_qr_url, profiles(full_name, email, phone), classes(title, is_active)"
+        "id, profile_id, tenants(paynow_qr_url), profiles(full_name, email, phone), classes(title, is_active)"
       )
       .order("id");
 
@@ -81,7 +84,8 @@ export default function CoachesPage() {
         full_name: c.profiles?.full_name ?? "—",
         email: c.profiles?.email ?? "—",
         phone: c.profiles?.phone ?? null,
-        paynow_qr_url: c.paynow_qr_url ?? null,
+        paynow_qr_url:
+          (Array.isArray(c.tenants) ? c.tenants[0] : c.tenants)?.paynow_qr_url ?? null,
         class_titles: (c.classes ?? [])
           .filter((cls: any) => cls.is_active)
           .map((cls: any) => cls.title),

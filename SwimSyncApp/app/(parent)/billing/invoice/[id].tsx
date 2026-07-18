@@ -42,6 +42,9 @@ type InvoiceDetail = {
   items: InvoiceItem[];
   credit_notes: CreditNoteApplied[];
   coach_id: string | null;
+  /** The business that issued this invoice — a parent may hold two for the
+   *  same month, one per business, and the totals alone don't say which. */
+  business_name: string;
 };
 
 function formatBillingMonth(ym: string): string {
@@ -82,6 +85,7 @@ export default function InvoiceDetailScreen() {
           status,
           generated_at,
           paid_at,
+          tenants(display_name),
           invoice_items(
             id,
             lesson_session_id,
@@ -122,6 +126,10 @@ export default function InvoiceDetailScreen() {
       setInvoice({
         id: inv.id,
         billing_month: inv.billing_month,
+        business_name:
+          (Array.isArray((inv as any).tenants)
+            ? (inv as any).tenants[0]
+            : (inv as any).tenants)?.display_name ?? "Your coach",
         gross_amount: Number(inv.gross_amount),
         credit_applied: Number(inv.credit_applied),
         net_amount: Number(inv.net_amount),
@@ -196,6 +204,9 @@ export default function InvoiceDetailScreen() {
         <Card>
           <Text className="text-base font-bold text-gray-900 mb-1">
             {formatBillingMonth(invoice.billing_month)}
+          </Text>
+          <Text className="text-xs font-medium text-sky-600 mb-1">
+            From {invoice.business_name}
           </Text>
           <Text className="text-xs text-gray-500 mb-1">
             Generated {formatDate(invoice.generated_at)}

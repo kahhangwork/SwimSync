@@ -55,7 +55,7 @@ export default function ParentHomeScreen() {
       .from("parents")
       .select(`
         id,
-        credit_balance,
+        parent_tenant_balances(credit_balance),
         parent_students(
           students(
             id,
@@ -81,7 +81,14 @@ export default function ParentHomeScreen() {
       .single();
 
     if (parent) {
-      setCreditBalance(Number(parent.credit_balance) ?? 0);
+      // Credit is held PER BUSINESS and is only spendable there, so there is
+      // no single balance any more. The summary card shows the total the family
+      // holds; the Billing tab is where each business's invoice shows what its
+      // own credit actually covered.
+      const balances = (parent as any).parent_tenant_balances ?? [];
+      setCreditBalance(
+        balances.reduce((sum: number, b: any) => sum + Number(b.credit_balance ?? 0), 0)
+      );
 
       const mapped: Child[] = (parent.parent_students ?? []).map((ps: any) => {
         const s = ps.students;

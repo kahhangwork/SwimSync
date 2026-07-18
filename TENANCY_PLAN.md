@@ -1,6 +1,6 @@
 # SwimSync — Multi-Tenancy Implementation Plan
 
-_Drafted: 2026-07-18 · Status: **phases 0–2 complete, phase 3 next**_
+_Drafted: 2026-07-18 · Status: **phases 0–4 complete; only phase 5 (wages, droppable) remains**_
 
 How to build what `TENANCY_DESIGN.md` specifies. Design questions are settled there
 (§10); this document is order, files, verification and risk.
@@ -320,7 +320,32 @@ strings unique to the target screen, since a navigated-away screen stays in the 
 
 ---
 
-## Phase 4 — Branding and parent-facing billing
+## Phase 4 — Branding and parent-facing billing — ✅ **COMPLETE 2026-07-19**
+
+> **Shipped**, including the CONTRACT migration that finally drops
+> `parents.credit_balance` and `coaches.paynow_qr_url` — the expand/contract cycle begun
+> in phase 1 is now closed, and the dual-writes are gone from both the engine and the
+> credit-note trigger.
+>
+> **⚠️ DEPLOY ORDER IS THE MIRROR OF THE EXPAND STEP.** The phase-4 *app* deploy must go
+> out BEFORE `20260719000300_contract_legacy_columns.sql` is pushed. Run the migration
+> first and the currently-deployed apps start querying columns that no longer exist. The
+> migration carries this warning in its own header too.
+>
+> **Verified 6/6 in the real app** (`verify-tenant-branding.mjs` + fixture): a parent with
+> children at TWO businesses sees both invoices for the same month, each labelled with the
+> business that issued it, the correct summed credit on Home, and — the money-critical one
+> — a PayNow payee resolved from the **invoice's business**, not the coach who taught the
+> lesson. That last check was **mutation-tested**: reverting to coach-based resolution
+> fails it.
+>
+> Also: a school coach can no longer set the PayNow QR (it is the business's, and a school
+> has one bank account) — they see it read-only with a note to ask their admin. A private
+> coach, being their own tenant admin, is unaffected.
+>
+> pgTAP 58 · Deno 61 → **64** · admin 49 · app 49 · both typecheck.
+
+### Original plan for reference
 
 - `tenants.display_name` / `logo_url` on invoices and invoice emails (`email.ts`). Keep
   sending isolated from billing (`HANDOVER.md` §6) — no engine changes here.

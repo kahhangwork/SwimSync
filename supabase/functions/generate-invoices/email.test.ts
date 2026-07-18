@@ -193,3 +193,61 @@ Deno.test("notifyGenerationBlocked: no key or nothing blocking = no send", async
     0
   );
 });
+
+Deno.test("invoice email is branded as the BUSINESS, not SwimSync", () => {
+  // A parent pays their coach or school. An email headed "SwimSync" reads as a
+  // platform bill, and for a family with children at two businesses it is
+  // genuinely ambiguous which one is asking for money.
+  const data = {
+    parentName: "Alice",
+    businessName: "Rivervale Swim Academy",
+    billingMonth: "2026-09",
+    gross: 60,
+    credit: 0,
+    net: 60,
+    items: [
+      { studentName: "Kid", sessionDate: "2026-09-05", classTitle: "Sat Beg", amount: 60 },
+    ],
+  };
+
+  assertStringIncludes(
+    buildInvoiceEmailSubject(data),
+    "Your Rivervale Swim Academy invoice"
+  );
+
+  const html = buildInvoiceEmailHtml(data);
+  assertStringIncludes(html, "Rivervale Swim Academy");
+  // SwimSync survives only as the sending platform, in the footer.
+  assertStringIncludes(html, "sent via SwimSync");
+});
+
+Deno.test("invoice email falls back to SwimSync when no business is known", () => {
+  // Defensive: a missing tenant must not render "undefined invoice".
+  const data = {
+    parentName: "Alice",
+    billingMonth: "2026-09",
+    gross: 10,
+    credit: 0,
+    net: 10,
+    items: [
+      { studentName: "Kid", sessionDate: "2026-09-05", classTitle: "C", amount: 10 },
+    ],
+  };
+  assertStringIncludes(buildInvoiceEmailSubject(data), "Your SwimSync invoice");
+  const html = buildInvoiceEmailHtml(data);
+  assert(!html.includes("undefined"), "no undefined leaked into the email");
+});
+
+Deno.test("a business logo renders as an image, and its URL is escaped", () => {
+  const html = buildInvoiceEmailHtml({
+    parentName: "A",
+    businessName: 'Evil "Swim"',
+    logoUrl: 'https://x.test/l.png?a="b',
+    billingMonth: "2026-09",
+    gross: 10, credit: 0, net: 10,
+    items: [{ studentName: "K", sessionDate: "2026-09-05", classTitle: "C", amount: 10 }],
+  });
+  assertStringIncludes(html, "<img src=");
+  assert(!html.includes('?a="b'), "logo URL must be escaped, not raw");
+  assert(!html.includes('Evil "Swim"'), "business name must be escaped");
+});

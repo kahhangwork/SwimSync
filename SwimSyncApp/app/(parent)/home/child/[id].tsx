@@ -123,11 +123,15 @@ export default function ChildProfileScreen() {
 
       const { data: parentRecord } = await supabase
         .from("parents")
-        .select("credit_balance")
+        .select("parent_tenant_balances(credit_balance)")
         .eq("id", parentStudentLink.parent_id)
         .single();
 
-      creditBalance = Number(parentRecord?.credit_balance ?? 0);
+      // Summed across businesses — see the note in home/index.tsx.
+      creditBalance = ((parentRecord as any)?.parent_tenant_balances ?? []).reduce(
+        (sum: number, b: any) => sum + Number(b.credit_balance ?? 0),
+        0
+      );
     }
 
     setChild({

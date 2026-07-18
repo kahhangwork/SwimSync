@@ -23,6 +23,10 @@ type Invoice = {
   credit_applied: number;
   net_amount: number;
   status: "outstanding" | "paid";
+  /** Which business issued it. A parent may deal with several, and an
+   *  ungrouped list gives no way to tell whose bill is whose. */
+  tenant_id: string;
+  business_name: string;
 };
 
 type CreditNote = {
@@ -79,7 +83,7 @@ export default function BillingScreen() {
     const [invoicesRes, creditNotesRes] = await Promise.all([
       supabase
         .from("invoices")
-        .select("id, billing_month, gross_amount, credit_applied, net_amount, status")
+        .select("id, billing_month, gross_amount, credit_applied, net_amount, status, tenant_id, tenants(display_name)")
         .eq("parent_id", parent.id)
         .order("billing_month", { ascending: false }),
 
@@ -91,12 +95,16 @@ export default function BillingScreen() {
     ]);
 
     setInvoices(
-      (invoicesRes.data ?? []).map((inv: any) => ({
-        ...inv,
-        gross_amount: Number(inv.gross_amount),
-        credit_applied: Number(inv.credit_applied),
-        net_amount: Number(inv.net_amount),
-      }))
+      (invoicesRes.data ?? []).map((inv: any) => {
+        const t = Array.isArray(inv.tenants) ? inv.tenants[0] : inv.tenants;
+        return {
+          ...inv,
+          gross_amount: Number(inv.gross_amount),
+          credit_applied: Number(inv.credit_applied),
+          net_amount: Number(inv.net_amount),
+          business_name: t?.display_name ?? "Your coach",
+        };
+      })
     );
     setCreditNotes(creditNotesRes.data ?? []);
     setLoading(false);
@@ -166,6 +174,12 @@ export default function BillingScreen() {
                       <View>
                         <Text className="text-base font-bold text-gray-900">
                           {formatBillingMonth(inv.billing_month)}
+                        </Text>
+                        {/* WHO is asking for money. With children at two
+                            businesses a parent gets two invoices in the same
+                            month, and without this they are indistinguishable. */}
+                        <Text className="text-xs font-medium text-sky-600 mt-0.5">
+                          {inv.business_name}
                         </Text>
                         <Text className="text-xs text-gray-500 mt-0.5">
                           Invoice #{inv.id.slice(0, 8).toUpperCase()}

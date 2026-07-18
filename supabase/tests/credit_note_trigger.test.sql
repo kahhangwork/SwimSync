@@ -90,8 +90,13 @@ SELECT is(
   (SELECT status FROM credit_notes WHERE lesson_session_id = 'd0000000-0000-0000-0000-000000000001'),
   'available', 'new credit note is available');
 SELECT is(
-  (SELECT credit_balance FROM parents WHERE profile_id = 'a0000000-0000-0000-0000-0000000000b2'),
-  30.00, 'parent credit_balance incremented by the credit amount');
+  -- Credit is held per (parent, tenant) now: parents.credit_balance is gone,
+  -- because a note earned at one business must not be spendable at another.
+  (SELECT b.credit_balance FROM parent_tenant_balances b
+     JOIN parents p ON p.id = b.parent_id
+    WHERE p.profile_id = 'a0000000-0000-0000-0000-0000000000b2'
+      AND b.tenant_id = '99999999-0000-0000-0000-000000000002'),
+  30.00, 'the ISSUING tenant''s balance is incremented by the credit amount');
 
 -- ── 11.6  The correction must NOT modify or delete the original invoice ──────
 -- The invoice stays a historical record; only a credit note is issued (applied

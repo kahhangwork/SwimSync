@@ -26,18 +26,40 @@ export default function CoachSettingsScreen() {
   const [coachId, setCoachId] = useState<string | null>(null);
   const [paynowUrl, setPaynowUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  // The QR belongs to the BUSINESS now, not the coach: a school with three
+  // coaches has one bank account. So only the business's admin may set it —
+  // which a private coach is, for their own tenant of one. A school coach sees
+  // the QR but cannot change it.
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [canEditQr, setCanEditQr] = useState(false);
 
   const loadCoach = useCallback(async () => {
     if (!session) return;
     const { data } = await supabase
       .from("coaches")
-      .select("id, paynow_qr_url")
+      .select("id, tenant_id")
       .eq("profile_id", session.id)
       .single();
-    if (data) {
-      setCoachId(data.id);
-      setPaynowUrl(data.paynow_qr_url ?? null);
-    }
+    if (!data) return;
+
+    setCoachId(data.id);
+    setTenantId(data.tenant_id);
+
+    const [{ data: tenant }, { data: profile }] = await Promise.all([
+      supabase
+        .from("tenants")
+        .select("paynow_qr_url")
+        .eq("id", data.tenant_id)
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.id)
+        .maybeSingle(),
+    ]);
+
+    setPaynowUrl(tenant?.paynow_qr_url ?? null);
+    setCanEditQr(profile?.role === "tenant_admin");
   }, [session]);
 
   useEffect(() => {
@@ -46,8 +68,15 @@ export default function CoachSettingsScreen() {
 
   async function handleUploadQR() {
     if (uploading) return;
-    if (!coachId) {
-      showToast("Could not find your coach account.", "error");
+    if (!canEditQr) {
+      showToast(
+        "Your school manages the payment QR code. Ask your admin to update it.",
+        "error"
+      );
+      return;
+    }
+    if (!tenantId) {
+      showToast("Could not find your business account.", "error");
       return;
     }
 
@@ -77,9 +106,9 @@ export default function CoachSettingsScreen() {
       const bytes = await (await fetch(asset.uri)).arrayBuffer();
       const contentType = asset.mimeType ?? "image/png";
 
-      // Coach-scoped path so the storage RLS policy passes and a replace
-      // overwrites the same object (first path segment = coaches.id).
-      const path = `${coachId}/paynow-qr`;
+      // TENANT-scoped path: the storage policy checks the first path segment
+      // against the caller's tenant (it used to be the coach's id).
+      const path = `${tenantId}/paynow-qr`;
 
       const { error: upErr } = await supabase.storage
         .from("paynow-qr")
@@ -94,9 +123,9 @@ export default function CoachSettingsScreen() {
       const publicUrl = `${pub.publicUrl}?t=${Date.now()}`;
 
       const { error: updErr } = await supabase
-        .from("coaches")
+        .from("tenants")
         .update({ paynow_qr_url: publicUrl })
-        .eq("id", coachId);
+        .eq("id", tenantId);
       if (updErr) throw updErr;
 
       setPaynowUrl(publicUrl);

@@ -75,6 +75,8 @@ export type CreatedInvoiceItem = {
 export type CreatedInvoice = {
   invoice_id: string;
   parent_id: string;
+  /** The business that issued it — the email is branded as THEM, not SwimSync. */
+  tenant_id: string;
   billing_month: string;
   gross: number;
   credit: number;
@@ -726,30 +728,16 @@ async function generateForTenant(
         .eq("parent_id", parentId)
         .eq("tenant_id", tenantId);
 
-      // DUAL-WRITE the deprecated pooled column (expand/contract — see
-      // 20260718000600). The parent app still reads parents.credit_balance, so
-      // leaving it un-decremented here would show families MORE credit than
-      // they have until phase 4 moves those screens.
-      //
-      // REMOVE THIS, and the matching write in handle_attendance_update, in the
-      // same change that moves the last reader.
-      const { data: legacy } = await supabase
-        .from("parents")
-        .select("credit_balance")
-        .eq("id", parentId)
-        .maybeSingle();
-      if (legacy) {
-        await supabase
-          .from("parents")
-          .update({ credit_balance: Number(legacy.credit_balance) - allocated })
-          .eq("id", parentId);
-      }
+      // (The dual-write to the deprecated parents.credit_balance was removed
+      // here in phase 4, together with the last reader of it. Keeping it would
+      // now double-count: the column no longer exists.)
     }
 
     invoicesCreated++;
     created.push({
       invoice_id: invoice.id,
       parent_id: parentId,
+      tenant_id: tenantId,
       billing_month: billingMonth,
       gross,
       credit,

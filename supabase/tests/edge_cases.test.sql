@@ -5,7 +5,7 @@
 --          enrolment is allowed and the historical row stays intact (the
 --          basic "two active enrolments" rejection lives in constraints.test.sql).
 --   11.8 — a student leaves with outstanding credit: unenrolling does NOT touch
---          the parent's credit_balance and issues no auto-refund/application.
+--          the parent's credit balance and issues no auto-refund/application.
 --   11.2 — a parent may create a child BEFORE any assignment: the child defaults
 --          to 'unassigned', has no active enrolment, and its class view is empty
 --          (a "not assigned yet" state, not an error).
@@ -53,7 +53,10 @@ INSERT INTO lesson_sessions (id, class_id, session_date, status)
 VALUES ('d0000000-0000-0000-0000-0000000000e1','b0000000-0000-0000-0000-0000000000e1','2026-01-03','completed');
 
 -- Parent has an outstanding credit balance (e.g. from an earlier correction).
-UPDATE parents SET credit_balance = 25.00 WHERE profile_id='a0000000-0000-0000-0000-0000000000e2';
+-- Credit lives in parent_tenant_balances, scoped to the business that owes it.
+INSERT INTO parent_tenant_balances (parent_id, tenant_id, credit_balance)
+SELECT p.id, '99999999-0000-0000-0000-000000000003', 25.00
+  FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000e2';
 
 -- ── 11.2  Parent creates a child BEFORE any assignment ──────────────────────
 -- No coach/class is needed to add a child; it lands in an 'unassigned' state and
@@ -95,9 +98,11 @@ UPDATE student_class_enrolments
   WHERE student_id='c0000000-0000-0000-0000-0000000000e1' AND is_active;
 
 SELECT is(
-  (SELECT credit_balance FROM parents WHERE profile_id='a0000000-0000-0000-0000-0000000000e2'),
+  (SELECT b.credit_balance FROM parent_tenant_balances b
+     JOIN parents p ON p.id = b.parent_id
+    WHERE p.profile_id='a0000000-0000-0000-0000-0000000000e2'),
   25.00::numeric,
-  '11.8: unenrolling a student does not change the parent''s credit_balance');
+  '11.8: unenrolling a student does not change the parent''s credit balance');
 
 SELECT is(
   (SELECT count(*)::int FROM credit_applications ca

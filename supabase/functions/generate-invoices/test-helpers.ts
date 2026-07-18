@@ -374,15 +374,10 @@ export async function newScenario(
     return Number(data?.credit_balance ?? 0);
   }
 
-  /** The DEPRECATED pooled column. Still read by the parent app, so it is
-   *  dual-written; asserting on it is how we know the dual-write holds. */
+  /** Alias kept so existing tests read naturally. Credit is per (parent,
+   *  tenant) now — the pooled parents.credit_balance column is gone. */
   async function creditBalance(): Promise<number> {
-    const { data } = await db
-      .from("parents")
-      .select("credit_balance")
-      .eq("id", parentId)
-      .single();
-    return Number(data?.credit_balance ?? 0);
+    return await tenantCreditBalance();
   }
 
   /**
@@ -544,7 +539,7 @@ export async function getInvoice(
  * Ledger invariants that must always hold after credit is applied:
  *   • each invoice's gross_amount == SUM(its invoice_items)
  *   • each invoice's credit_applied == SUM(credit_applications for it)
- *   • parent's credit_balance == SUM(note.amount − applied) across their notes
+ *   • SUM(parent_tenant_balances) == SUM(note.amount − applied) across notes
  * Returns { ok, details } so tests can assert and print on failure.
  */
 export async function checkInvariants(db: SupabaseClient, parentId: string) {
@@ -594,15 +589,21 @@ export async function checkInvariants(db: SupabaseClient, parentId: string) {
     const used = (apps ?? []).reduce((s, a) => s + Number(a.amount), 0);
     sumRemaining += Number(n.amount) - used;
   }
-  const { data: parent } = await db
-    .from("parents")
+  // Credit balances are per (parent, tenant). Summing them across the parent's
+  // tenants is the right comparison against SUM(remaining across notes), which
+  // is also across all their notes — the per-tenant split is asserted directly
+  // by the cross-tenant credit test in core.test.ts.
+  const { data: balances } = await db
+    .from("parent_tenant_balances")
     .select("credit_balance")
-    .eq("id", parentId)
-    .single();
-  const balance = Number(parent?.credit_balance ?? 0);
+    .eq("parent_id", parentId);
+  const balance = (balances ?? []).reduce(
+    (s, b) => s + Number(b.credit_balance),
+    0
+  );
   if (Math.abs(balance - sumRemaining) > 0.001) {
     problems.push(
-      `credit_balance=${balance} but SUM(remaining across notes)=${sumRemaining}`
+      `SUM(parent_tenant_balances)=${balance} but SUM(remaining across notes)=${sumRemaining}`
     );
   }
 
