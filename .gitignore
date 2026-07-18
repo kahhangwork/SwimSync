@@ -30,3 +30,6 @@ supabase/.env
 .DS_Store
 **/.DS_Store
 *.log
+
+# Agent worktrees — local scratch checkouts, never part of the repo.
+.claude/worktrees/
