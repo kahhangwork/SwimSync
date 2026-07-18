@@ -35,7 +35,9 @@ export default function LoginPage() {
       .eq("id", data.session.user.id)
       .single();
 
-    if (profile?.role !== "superadmin") {
+    // `superadmin` split into tenant_admin (one business) and platform_admin
+    // (SwimSync itself, cross-tenant support). Both belong in this panel.
+    if (profile?.role !== "tenant_admin" && profile?.role !== "platform_admin") {
       await supabase.auth.signOut();
       setError("Access denied. Superadmin accounts only.");
       setLoading(false);

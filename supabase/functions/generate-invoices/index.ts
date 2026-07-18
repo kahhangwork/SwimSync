@@ -45,24 +45,43 @@ Deno.serve(async (req: Request) => {
     // empty body → defaults (auto mode, previous month)
   }
 
+  let blockedAlerts = 0;
   try {
     const result = await generateInvoices(supabase, opts);
 
     // Generation refused: unmarked attendance. Nobody would otherwise find out
     // an unattended run did nothing, so tell the coaches what to mark. Throttled
     // to one alert per distinct set of blocking lessons — the cron runs daily.
-    if (result.status === "incomplete_attendance") {
-      const { notified } = await notifyGenerationBlocked(
-        supabase,
-        result.billing_month,
-        (result.blocking ?? []).map((b) => ({
-          class_title: b.class_title,
-          session_date: b.session_date,
-          unmarked_student_count: b.unmarked_student_count,
-        })),
-        { apiKey: Deno.env.get("RESEND_API_KEY") }
-      );
-      return json({ ...result, emails_sent: 0, blocked_alerts_sent: notified });
+    // A run may cover ONE tenant (the admin button) or EVERY tenant (the cron),
+    // so check both shapes. Each blocked tenant is alerted separately: a
+    // combined email would tell one business about another's unmarked lessons.
+    const blockedRuns = (result.per_tenant ?? [result]).filter(
+      (r) => r.status === "incomplete_attendance"
+    );
+
+    if (blockedRuns.length) {
+      let alerts = 0;
+      for (const r of blockedRuns) {
+        const { notified } = await notifyGenerationBlocked(
+          supabase,
+          r.billing_month,
+          (r.blocking ?? []).map((b) => ({
+            class_title: b.class_title,
+            session_date: b.session_date,
+            unmarked_student_count: b.unmarked_student_count,
+          })),
+          { apiKey: Deno.env.get("RESEND_API_KEY"), tenantId: r.tenant_id }
+        );
+        alerts += notified;
+      }
+
+      // A single-tenant run that is blocked produced no invoices at all, so
+      // there is nothing to email; a multi-tenant run may still have billed
+      // other tenants successfully and falls through to the email step below.
+      if (!result.per_tenant) {
+        return json({ ...result, emails_sent: 0, blocked_alerts_sent: alerts });
+      }
+      blockedAlerts = alerts;
     }
 
     // Email each newly-created invoice (best-effort, after generation has
@@ -73,7 +92,7 @@ Deno.serve(async (req: Request) => {
       appUrl: Deno.env.get("APP_URL"),
     });
 
-    return json({ ...result, emails_sent: emailsSent });
+    return json({ ...result, emails_sent: emailsSent, blocked_alerts_sent: blockedAlerts });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
   }

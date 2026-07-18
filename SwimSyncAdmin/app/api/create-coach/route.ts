@@ -19,11 +19,11 @@ export async function POST(req: NextRequest) {
   const adminClient = createAdminClient();
   const { data: profile } = await adminClient
     .from("profiles")
-    .select("role")
+    .select("role, tenant_id")
     .eq("id", userData.user.id)
     .single();
 
-  if (profile?.role !== "superadmin") {
+  if (profile?.role !== "tenant_admin" && profile?.role !== "platform_admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -42,7 +42,10 @@ export async function POST(req: NextRequest) {
       email,
       password,
       email_confirm: true,
-      user_metadata: { role: "coach", full_name: name },
+      // The auth trigger REFUSES to create a coach without a tenant rather than
+      // guessing — with one business on the platform a wrong guess would look
+      // like it worked. A tenant admin's coaches join their own business.
+      user_metadata: { role: "coach", full_name: name, tenant_id: profile!.tenant_id },
     });
 
   if (createError || !newUser.user) {

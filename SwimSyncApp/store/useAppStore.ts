@@ -1,6 +1,9 @@
 import { create } from "zustand";
 
-type Role = "parent" | "coach" | "superadmin" | null;
+// `tenant_admin` appears here because a PRIVATE COACH holds it: they administer
+// their own tenant AND teach in it. The app routes on the `coaches` row
+// existing, not on this value alone.
+type Role = "parent" | "coach" | "tenant_admin" | "platform_admin" | null;
 
 interface UserSession {
   id: string;

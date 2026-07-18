@@ -20,6 +20,7 @@ Deno.test("bills only billable attendance; gross = sum of billable rates", async
     const d = await s.addSession("2026-01-24"); await s.mark(d, "trial_free");
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2026-01",
@@ -51,6 +52,7 @@ Deno.test("paid trial is billable, free trial is not", async () => {
     const b = await s.addSession("2026-02-14"); await s.mark(b, "trial_free");
 
     await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2026-02",
@@ -66,8 +68,10 @@ Deno.test("no double-billing: second run skips the existing invoice", async () =
   const s = await newScenario();
   try {
     const a = await s.addSession("2026-03-07"); await s.mark(a, "present");
-    await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-03" });
-    const res2 = await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-03" });
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-03" });
+    const res2 = await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-03" });
     assertEquals(res2.invoices_created, 0);
 
     const { data: invs } = await s.db
@@ -91,11 +95,13 @@ Deno.test("completeness gate: an unmarked lesson blocks BOTH auto and manual", a
     const a = await s.addSession("2026-04-04"); await s.mark(a, "present");
     const b = await s.addSession("2026-04-11"); // no attendance -> incomplete
 
-    const auto = await generateInvoices(s.db, { mode: "auto", billing_month: "2026-04" });
+    const auto = await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "auto", billing_month: "2026-04" });
     assertEquals(auto.status, "incomplete_attendance");
     assertEquals(auto.invoices_created, 0);
 
-    const man = await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-04" });
+    const man = await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-04" });
     assertEquals(man.status, "incomplete_attendance");
     assertEquals(man.invoices_created, 0);
     assertEquals(man.blocking!.length, 1);
@@ -106,7 +112,8 @@ Deno.test("completeness gate: an unmarked lesson blocks BOTH auto and manual", a
     // Marking it — here as "the lesson was rained off" — clears the block and
     // billing proceeds. This is the escape hatch: no override is needed.
     await s.mark(b, "cancelled_rain");
-    const ok = await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-04" });
+    const ok = await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-04" });
     assertEquals(ok.invoices_created, 1);
     const inv = await getInvoice(s.db, s.parentId, "2026-04");
     assertEquals(inv!.gross, 30); // the cancelled lesson is non-billable
@@ -119,17 +126,23 @@ Deno.test("auto mode honours the auto_invoice_enabled switch", async () => {
   const s = await newScenario();
   try {
     const a = await s.addSession("2026-04-18"); await s.mark(a, "present");
-    await s.db.from("app_settings").update({ value: false }).eq("key", "auto_invoice_enabled");
+    // The switch is PER TENANT now (was a global app_settings row): one school
+    // turning automatic billing off must not turn it off for every other
+    // business on the platform.
+    await s.db
+      .from("tenants")
+      .update({ auto_invoice_enabled: false })
+      .eq("id", s.tenantId);
 
-    const res = await generateInvoices(s.db, { mode: "auto", billing_month: "2026-04" });
+    const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "auto", billing_month: "2026-04" });
     assertEquals(res.status, "auto_disabled");
     // early return before any processing
     assertEquals(res.invoices_created, undefined);
     const inv = await getInvoice(s.db, s.parentId, "2026-04");
     assertEquals(inv, null);
   } finally {
-    await s.db.from("app_settings").update({ value: true }).eq("key", "auto_invoice_enabled");
-    await s.teardown();
+    await s.teardown();   // the tenant row goes with it
   }
 });
 
@@ -139,7 +152,8 @@ Deno.test("credit note is applied FIFO to the next invoice; invariants hold", as
     // Month 1: two present -> invoice $60
     const j1 = await s.addSession("2026-05-02"); await s.mark(j1, "present");
     const j2 = await s.addSession("2026-05-09"); await s.mark(j2, "present");
-    await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-05" });
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-05" });
 
     // Correct an invoiced lesson to absent -> trigger issues a $30 credit note
     await s.mark(j1, "absent");
@@ -148,7 +162,8 @@ Deno.test("credit note is applied FIFO to the next invoice; invariants hold", as
     // Month 2: two present -> gross $60, $30 credit applied, net $30
     const f1 = await s.addSession("2026-06-06"); await s.mark(f1, "present");
     const f2 = await s.addSession("2026-06-13"); await s.mark(f2, "present");
-    await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-06" });
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-06" });
 
     const inv = await getInvoice(s.db, s.parentId, "2026-06");
     assertEquals(inv!.gross, 60);
@@ -172,6 +187,7 @@ Deno.test("edge 11.1: last-day-of-month lesson is billed in that month; next-mon
     const next = await s.addSession("2028-03-01"); await s.mark(next, "present");
 
     await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2028-02",
@@ -197,7 +213,8 @@ Deno.test("carry-forward: credit exceeding the invoice leaves a partial note and
     // Month 1: one present @ $30 -> invoice $30
     const m1 = await s.addSession("2026-07-04"); await s.mark(m1, "present");
     await s.completeMonth("2026-07"); // rest of July rained off — keeps gross at $30
-    await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-07" });
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-07" });
 
     // Correct -> $30 credit note
     await s.mark(m1, "absent");
@@ -206,7 +223,8 @@ Deno.test("carry-forward: credit exceeding the invoice leaves a partial note and
     // Month 2: cheaper lesson so gross ($20) < available credit ($30)
     await s.db.from("classes").update({ price_per_lesson: 20 }).eq("id", s.classId);
     const n1 = await s.addSession("2026-08-01"); await s.mark(n1, "present");
-    await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-08" });
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-08" });
 
     const inv = await getInvoice(s.db, s.parentId, "2026-08");
     assertEquals(inv!.gross, 20);
@@ -239,6 +257,7 @@ Deno.test("result.created surfaces new invoices with line items (for emailing)",
     const c = await s.addSession("2026-03-21"); await s.mark(c, "absent");
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2026-03",
@@ -261,6 +280,7 @@ Deno.test("result.created surfaces new invoices with line items (for emailing)",
 
     // A re-run must NOT re-surface the same invoice (no double-email).
     const res2 = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2026-03",
@@ -277,6 +297,7 @@ Deno.test("emailCreatedInvoices: resolves recipients against the DB, no-ops with
   try {
     const a = await s.addSession("2026-04-04"); await s.mark(a, "present");
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2026-04",
@@ -307,6 +328,7 @@ Deno.test("emailCreatedInvoices: with a key, emails each invoice to the resolved
   try {
     const a = await s.addSession("2026-05-02"); await s.mark(a, "present");
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2026-05",
@@ -341,6 +363,7 @@ Deno.test("multi-class parent: one invoice covering BOTH classes' lessons", asyn
     await s.mark(b, "present", s.studentId2);
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2026-09",
@@ -384,6 +407,7 @@ Deno.test("multi-class parent: auto run defers the parent while any of their cla
     // child in an unmarked class -> bill nothing rather than lock in a
     // partial invoice that tomorrow's retry could never top up.
     const run1 = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "auto",
       billing_month: "2026-10",
     });
@@ -402,6 +426,7 @@ Deno.test("multi-class parent: auto run defers the parent while any of their cla
     // Coach marks the missing lesson; the retry now bills both classes at once.
     await s.mark(b, "present", s.studentId2);
     const run2 = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "auto",
       billing_month: "2026-10",
     });
@@ -434,6 +459,7 @@ Deno.test("multi-class parent: credit draws against the COMBINED gross", async (
     const m1 = await s.addSession("2026-11-07");
     await s.mark(m1, "present");
     await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2026-11",
@@ -449,6 +475,7 @@ Deno.test("multi-class parent: credit draws against the COMBINED gross", async (
     const c2 = await s.addSession("2026-12-12", s.classId2);
     await s.mark(c2, "present", s.studentId2);
     await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2026-12",
@@ -479,6 +506,7 @@ Deno.test("multi-class parent: force does NOT bypass the block; marking clears i
     const b = await s.addSession("2027-01-16", s.classId2); // unmarked
 
     const blocked = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-01",
@@ -492,6 +520,7 @@ Deno.test("multi-class parent: force does NOT bypass the block; marking clears i
     // invoice.
     await s.mark(b, "present", s.studentId2);
     const ok = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-01",
@@ -517,6 +546,7 @@ Deno.test("deferral is reported even when NO class was tallied", async () => {
     await s.addSession("2027-02-06"); // created, deliberately never marked
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "auto",
       billing_month: "2027-02",
     });
@@ -545,6 +575,7 @@ Deno.test("run day: auto run before the configured day generates nothing", async
 
     // 3 April, run day 7 -> too early.
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "auto",
       billing_month: "2027-03",
       now: new Date("2027-04-03T02:00:00Z"),
@@ -572,6 +603,7 @@ Deno.test("run day: auto run on the configured day generates normally", async ()
 
     // 7 May, run day 7 -> due today (boundary: >= not >).
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "auto",
       billing_month: "2027-04",
       now: new Date("2027-05-07T02:00:00Z"),
@@ -594,6 +626,7 @@ Deno.test("run day: a MANUAL run before the day generates anyway", async () => {
     await s.completeMonth("2027-05", undefined, new Date("2027-06-01T02:00:00Z"));
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-05",
@@ -619,6 +652,7 @@ Deno.test("run day: honours a changed setting, and SGT decides the day", async (
 
     // Day 14 in SGT -> still too early for a run day of 15.
     const early = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "auto",
       billing_month: "2027-06",
       now: new Date("2027-07-14T02:00:00Z"),
@@ -628,6 +662,7 @@ Deno.test("run day: honours a changed setting, and SGT decides the day", async (
     // 14 Jul 17:00 UTC is already the 15th in Singapore — the guard must read
     // the SGT day, not the UTC one, or it fires a day late every month.
     const due = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "auto",
       billing_month: "2027-06",
       now: new Date("2027-07-14T17:00:00Z"),
@@ -653,6 +688,7 @@ Deno.test("seal: a MANUAL run that finishes the month seals it; cron then no-ops
     const a = await s.addSession("2027-07-03"); await s.mark(a, "present");
 
     const manual = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-07",
@@ -670,6 +706,7 @@ Deno.test("seal: a MANUAL run that finishes the month seals it; cron then no-ops
 
     // The whole point: the scheduled run now has nothing to do.
     const cron = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "auto",
       billing_month: "2027-07",
       now: new Date("2027-08-07T02:00:00Z"),
@@ -693,6 +730,7 @@ Deno.test("seal: a forced run on an INCOMPLETE month bills nothing and seals not
     await s.addSession("2027-08-14"); // left unmarked -> class incomplete
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-08",
@@ -734,6 +772,7 @@ Deno.test("seal: a month with NOTHING recorded is never sealed", async () => {
   try {
     // A class and an enrolled student exist, but no session in the month.
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-11",
@@ -756,6 +795,7 @@ Deno.test("seal: a month with NOTHING recorded is never sealed", async () => {
     const a = await s.addSession("2027-11-06");
     await s.mark(a, "present");
     const after = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       billing_month: "2027-11",
     });
@@ -777,6 +817,7 @@ Deno.test("seal: a fully-marked month with NO billable lesson still seals", asyn
     await s.mark(a, "cancelled_rain");
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       billing_month: "2027-12",
     });
@@ -797,6 +838,7 @@ Deno.test("seal: sealing twice is a no-op, not a duplicate-key error", async () 
     const a = await s.addSession("2027-09-04"); await s.mark(a, "present");
 
     const first = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-09",
@@ -805,6 +847,7 @@ Deno.test("seal: sealing twice is a no-op, not a duplicate-key error", async () 
     assertEquals(first.invoices_created, 1);
 
     const second = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-09",
@@ -843,6 +886,7 @@ Deno.test("a child unenrolled mid-month is still billed for lessons they attende
       .eq("student_id", s.studentId);
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-10",
@@ -869,6 +913,7 @@ Deno.test("unenrolling a child clears the block their unmarked lesson caused", a
     void b;
 
     const blocked = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-11",
@@ -882,6 +927,7 @@ Deno.test("unenrolling a child clears the block their unmarked lesson caused", a
       .eq("student_id", s.studentId);
 
     const ok = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: true,
       billing_month: "2027-11",
@@ -918,6 +964,7 @@ Deno.test("BLOCKS a lesson date that has no session row at all", async () => {
     // 2026-01-31 is deliberately never touched: no session row, no attendance.
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: false,
       billing_month: "2026-01",
@@ -942,6 +989,7 @@ Deno.test("BLOCKS a class whose whole month is unmarked (no sessions at all)", a
   const s = await newScenario({ price: 30, enrolledAt: "2025-12-01" });
   try {
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual",
       force: false,
       billing_month: "2026-01",
@@ -969,6 +1017,7 @@ Deno.test("marking the missing lesson cancelled clears the block and bills the r
       await s.mark(id, "present");
     }
     const blocked = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual", force: false, billing_month: "2026-01",
     });
     assertEquals(blocked.status, "incomplete_attendance");
@@ -977,6 +1026,7 @@ Deno.test("marking the missing lesson cancelled clears the block and bills the r
     await s.mark(last, "cancelled_rain");
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual", force: false, billing_month: "2026-01",
     });
     assertEquals(res.invoices_created, 1);
@@ -1000,11 +1050,182 @@ Deno.test("a future lesson in the CURRENT month is not a gap", async () => {
     }
 
     const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
       mode: "manual", force: false, billing_month: "2026-01", now,
     });
     assertEquals(res.invoices_created, 1);
     assertEquals((await getInvoice(s.db, s.parentId, "2026-01"))!.gross, 60);
   } finally {
     await s.teardown();
+  }
+});
+
+// ── Tenant isolation in BILLING ─────────────────────────────────────────────
+// The engine runs with the service-role key, which BYPASSES RLS entirely — so
+// none of the phase-1 policies protect this path. Isolation here is enforced by
+// explicit tenant_id filters in core.ts, and these are the tests that prove it.
+// Each fails on a build where any one of those filters is missing.
+
+Deno.test("two tenants bill independently; neither sees the other's lessons", async () => {
+  const a = await newScenario({ price: 30 });
+  const b = await newScenario({ price: 50 });
+  try {
+    const sa = await a.addSession("2026-09-05"); await a.mark(sa, "present");
+    await a.completeMonth("2026-09");
+    const sb = await b.addSession("2026-09-06"); await b.mark(sb, "present");
+    await b.completeMonth("2026-09");
+
+    const resA = await generateInvoices(a.db, {
+      tenant_id: a.tenantId, mode: "manual", force: false, billing_month: "2026-09" });
+    assertEquals(resA.invoices_created, 1);
+    assertEquals((await getInvoice(a.db, a.parentId, "2026-09"))!.gross, 30);
+
+    const resB = await generateInvoices(b.db, {
+      tenant_id: b.tenantId, mode: "manual", force: false, billing_month: "2026-09" });
+    assertEquals(resB.invoices_created, 1);
+    assertEquals((await getInvoice(b.db, b.parentId, "2026-09"))!.gross, 50);
+  } finally {
+    await a.teardown(); await b.teardown();
+  }
+});
+
+Deno.test("sealing one tenant's month does NOT seal it for another", async () => {
+  // billing_periods used to be keyed by billing_month alone, so the first
+  // business to finish a month closed it for everyone — every other tenant then
+  // short-circuited on already_complete and silently billed nothing.
+  const a = await newScenario({ price: 30 });
+  const b = await newScenario({ price: 40 });
+  try {
+    const sa = await a.addSession("2026-10-03"); await a.mark(sa, "present");
+    await a.completeMonth("2026-10");
+    const resA = await generateInvoices(a.db, {
+      tenant_id: a.tenantId, mode: "manual", force: false, billing_month: "2026-10" });
+    assert(resA.sealed, "tenant A's completed month should seal");
+
+    const sb = await b.addSession("2026-10-03"); await b.mark(sb, "present");
+    await b.completeMonth("2026-10");
+    const resB = await generateInvoices(b.db, {
+      tenant_id: b.tenantId, mode: "manual", force: false, billing_month: "2026-10" });
+
+    assertEquals(resB.status !== "already_complete", true,
+      `tenant B was blocked by tenant A's seal: ${resB.status}`);
+    assertEquals(resB.invoices_created, 1);
+  } finally {
+    await a.teardown(); await b.teardown();
+  }
+});
+
+Deno.test("one tenant's unmarked lesson does not block another's billing", async () => {
+  const a = await newScenario({ price: 30, enrolledAt: "2025-12-01" }); // will be blocked
+  const b = await newScenario({ price: 40 });
+  try {
+    // Tenant A: a January Saturday with no session at all.
+    const sa = await a.addSession("2026-01-03"); await a.mark(sa, "present");
+
+    const sb = await b.addSession("2026-01-10"); await b.mark(sb, "present");
+    await b.completeMonth("2026-01");
+
+    const resA = await generateInvoices(a.db, {
+      tenant_id: a.tenantId, mode: "manual", force: false, billing_month: "2026-01" });
+    assertEquals(resA.status, "incomplete_attendance");
+
+    const resB = await generateInvoices(b.db, {
+      tenant_id: b.tenantId, mode: "manual", force: false, billing_month: "2026-01" });
+    assertEquals(resB.invoices_created, 1, "tenant B must bill despite tenant A being blocked");
+  } finally {
+    await a.teardown(); await b.teardown();
+  }
+});
+
+Deno.test("credit earned in one tenant is NOT spendable in another", async () => {
+  // The money-model invariant. Drawing a school's credit note against a private
+  // coach's invoice would move cash between two unrelated businesses.
+  const a = await newScenario({ price: 30 });
+  const b = await newScenario({ price: 30 });
+  try {
+    // Tenant A: bill, then correct to absent -> $30 credit with tenant A.
+    const s1 = await a.addSession("2026-11-07"); await a.mark(s1, "present");
+    await a.completeMonth("2026-11");
+    await generateInvoices(a.db, {
+      tenant_id: a.tenantId, mode: "manual", force: true, billing_month: "2026-11" });
+    await a.mark(s1, "absent");
+    assertEquals(await a.tenantCreditBalance(), 30);
+
+    // Same PARENT also deals with tenant B: link them and give them a lesson.
+    await b.db.from("parent_tenants")
+      .insert({ parent_id: a.parentId, tenant_id: b.tenantId });
+    const stu = await b.db.from("students")
+      .insert({ full_name: "Cross Kid", assignment_status: "assigned", tenant_id: b.tenantId })
+      .select("id").single();
+    await b.db.from("parent_students")
+      .insert({ parent_id: a.parentId, student_id: stu.data!.id });
+    await b.db.from("student_class_enrolments")
+      .insert({ student_id: stu.data!.id, class_id: b.classId, is_active: true });
+
+    const s2 = await b.addSession("2026-11-07");
+    await b.mark(s2, "present", stu.data!.id);
+    await b.mark(s2, "cancelled_rain");     // b's own child, same session
+    await b.completeMonth("2026-11");
+
+    const resB = await generateInvoices(b.db, {
+      tenant_id: b.tenantId, mode: "manual", force: true, billing_month: "2026-11" });
+    assertEquals(resB.invoices_created, 1);
+
+    // Tenant B's invoice must be billed in FULL — tenant A's credit is not theirs.
+    const invB = await getInvoice(b.db, a.parentId, "2026-11", b.tenantId);
+    assertEquals(invB!.gross, 30);
+    assertEquals(invB!.credit_applied, 0, "tenant A's credit must not touch tenant B's invoice");
+    assertEquals(invB!.net, 30);
+    // And A's credit is untouched, still waiting for A's next invoice.
+    assertEquals(await a.tenantCreditBalance(), 30);
+  } finally {
+    await b.db.from("parent_tenants").delete().eq("parent_id", a.parentId);
+    await b.teardown(); await a.teardown();
+  }
+});
+
+Deno.test("a parent with children in TWO tenants gets TWO invoices that month", async () => {
+  // The user's expected COMMON case (multiple kids, multiple private coaches).
+  // UNIQUE (parent_id, billing_month) forbade it outright.
+  const a = await newScenario({ price: 30 });
+  const b = await newScenario({ price: 45 });
+  try {
+    const s1 = await a.addSession("2026-12-05"); await a.mark(s1, "present");
+    await a.completeMonth("2026-12");
+
+    await b.db.from("parent_tenants")
+      .insert({ parent_id: a.parentId, tenant_id: b.tenantId });
+    const stu = await b.db.from("students")
+      .insert({ full_name: "Sibling", assignment_status: "assigned", tenant_id: b.tenantId })
+      .select("id").single();
+    await b.db.from("parent_students")
+      .insert({ parent_id: a.parentId, student_id: stu.data!.id });
+    await b.db.from("student_class_enrolments")
+      .insert({ student_id: stu.data!.id, class_id: b.classId, is_active: true });
+    const s2 = await b.addSession("2026-12-06");
+    await b.mark(s2, "present", stu.data!.id);
+    await b.mark(s2, "cancelled_rain");     // b's own child, same session
+    await b.completeMonth("2026-12");
+
+    await generateInvoices(a.db, {
+      tenant_id: a.tenantId, mode: "manual", force: true, billing_month: "2026-12" });
+    await generateInvoices(b.db, {
+      tenant_id: b.tenantId, mode: "manual", force: true, billing_month: "2026-12" });
+
+    const { data: invs } = await a.db
+      .from("invoices")
+      .select("tenant_id, gross_amount")
+      .eq("parent_id", a.parentId)
+      .eq("billing_month", "2026-12");
+
+    assertEquals(invs!.length, 2, "one invoice per business, not one in total");
+    const byTenant = Object.fromEntries(
+      invs!.map((i) => [i.tenant_id, Number(i.gross_amount)])
+    );
+    assertEquals(byTenant[a.tenantId], 30);
+    assertEquals(byTenant[b.tenantId], 45);
+  } finally {
+    await b.db.from("parent_tenants").delete().eq("parent_id", a.parentId);
+    await b.teardown(); await a.teardown();
   }
 });

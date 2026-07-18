@@ -53,6 +53,8 @@ export type Scenario = {
   mark: (sessionId: string, status: string, studentId?: string) => Promise<void>;
   /** Current pooled credit balance for the parent. */
   creditBalance: () => Promise<number>;
+  /** Per-tenant credit balance (the source of truth). */
+  tenantCreditBalance: () => Promise<number>;
   /** Mark every still-unsessioned expected lesson in a month as cancelled_rain,
    *  so the month passes the completeness gate without changing gross. */
   completeMonth: (
@@ -308,7 +310,17 @@ export async function newScenario(
     now: Date = new Date()
   ): Promise<void> {
     const cid = forClassId ?? classId;
-    const students = cid === classId2 && studentId2 ? [studentId2] : [studentId];
+
+    // EVERY actively-enrolled student, not just the scenario's own: the
+    // completeness gate requires a row for each of them, so a test that adds an
+    // extra student to the class would otherwise be left with an incomplete
+    // month and be correctly blocked.
+    const { data: enrolled } = await db
+      .from("student_class_enrolments")
+      .select("student_id")
+      .eq("class_id", cid)
+      .eq("is_active", true);
+    const students = (enrolled ?? []).map((e) => e.student_id as string);
 
     const { data: cls } = await db
       .from("classes")
@@ -351,6 +363,19 @@ export async function newScenario(
     }
   }
 
+  /** Credit held for this parent BY THIS TENANT — the real source of truth. */
+  async function tenantCreditBalance(): Promise<number> {
+    const { data } = await db
+      .from("parent_tenant_balances")
+      .select("credit_balance")
+      .eq("parent_id", parentId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    return Number(data?.credit_balance ?? 0);
+  }
+
+  /** The DEPRECATED pooled column. Still read by the parent app, so it is
+   *  dual-written; asserting on it is how we know the dual-write holds. */
   async function creditBalance(): Promise<number> {
     const { data } = await db
       .from("parents")
@@ -409,23 +434,34 @@ export async function newScenario(
     addSession,
     mark,
     creditBalance,
+    tenantCreditBalance,
     completeMonth,
     teardown,
   };
 }
 
 /** Read an invoice row for a parent/month. */
+/**
+ * Read a parent's invoice for a month.
+ *
+ * `tenantId` is optional but MATTERS once a parent deals with more than one
+ * business: there is now one invoice per parent PER TENANT per month, so an
+ * unscoped maybeSingle() sees two rows and returns null. Pass it in any test
+ * where the parent spans tenants.
+ */
 export async function getInvoice(
   db: SupabaseClient,
   parentId: string,
-  billingMonth: string
+  billingMonth: string,
+  tenantId?: string
 ) {
-  const { data } = await db
+  let q = db
     .from("invoices")
     .select("id, gross_amount, credit_applied, net_amount, status")
     .eq("parent_id", parentId)
-    .eq("billing_month", billingMonth)
-    .maybeSingle();
+    .eq("billing_month", billingMonth);
+  if (tenantId) q = q.eq("tenant_id", tenantId);
+  const { data } = await q.maybeSingle();
   if (!data) return null;
   return {
     id: data.id as string,

@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@supabase/supabase-js";
 
 // Manual, on-demand invoice generation triggered from the admin panel.
-// Verifies the caller is a superadmin, then invokes the generate-invoices
+// Verifies the caller administers a tenant, then invokes the generate-invoices
 // Edge Function server-side (so the CRON_SECRET is never exposed to the
 // browser). Runs the function in "manual" mode for a chosen month.
 //
@@ -28,19 +28,42 @@ export async function POST(req: NextRequest) {
   const adminClient = createAdminClient();
   const { data: profile } = await adminClient
     .from("profiles")
-    .select("role")
+    .select("role, tenant_id")
     .eq("id", userData.user.id)
     .single();
 
-  if (profile?.role !== "superadmin") {
+  // A TENANT admin bills their own business. The PLATFORM admin has no tenant
+  // of their own, so they must name one — billing "everything" from a support
+  // account is not a button anyone should have.
+  const isTenantAdmin = profile?.role === "tenant_admin";
+  const isPlatformAdmin = profile?.role === "platform_admin";
+  if (!isTenantAdmin && !isPlatformAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   // ── Parse + validate billing month ────────────────────────────────────────
-  const { billing_month } = await req.json();
+  const body = await req.json();
+  const billing_month = body?.billing_month;
   if (!billing_month || !/^\d{4}-\d{2}$/.test(billing_month)) {
     return NextResponse.json(
       { error: "billing_month must be in YYYY-MM format" },
+      { status: 400 }
+    );
+  }
+
+  // ── Resolve the tenant to bill ────────────────────────────────────────────
+  // NEVER taken from the request for a tenant admin: it comes from their own
+  // profile, so a crafted body cannot make one business bill another's
+  // families. The engine runs as service_role and bypasses RLS, so this is the
+  // only thing standing between the two.
+  const tenantId = isTenantAdmin ? profile!.tenant_id : body?.tenant_id;
+  if (!tenantId) {
+    return NextResponse.json(
+      {
+        error: isPlatformAdmin
+          ? "tenant_id is required — a platform admin must name the business to bill"
+          : "Your account is not attached to a business",
+      },
       { status: 400 }
     );
   }
@@ -63,7 +86,7 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${cronSecret}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ mode: "manual", billing_month }),
+      body: JSON.stringify({ mode: "manual", billing_month, tenant_id: tenantId }),
     });
   } catch (e) {
     return NextResponse.json(

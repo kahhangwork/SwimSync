@@ -43,6 +43,10 @@ export type GenerateOptions = {
   mode?: string;
   force?: boolean;
   billing_month?: string;
+  /** Restrict the run to ONE tenant. The admin route always sets this (an
+   *  admin may only bill their own business); the daily cron omits it and
+   *  every tenant is processed independently. */
+  tenant_id?: string;
   /** Clock injection — TESTS ONLY. Production callers omit it and get the real
    *  time. Exists so the run-day guard and the default billing month can be
    *  exercised deterministically rather than only on the right day of the
@@ -81,6 +85,7 @@ export type CreatedInvoice = {
 // A lesson standing between the admin and generation: which class, which date,
 // and how many enrolled students still have no attendance row on it.
 export type BlockingLesson = {
+  tenant_id: string;
   class_id: string;
   class_title: string;
   session_date: string;
@@ -90,6 +95,10 @@ export type BlockingLesson = {
 export type GenerateResult = {
   billing_month: string;
   status: string;
+  /** The tenant this result describes. Absent on a multi-tenant aggregate. */
+  tenant_id?: string;
+  /** Per-tenant breakdown, present only on a multi-tenant (cron) run. */
+  per_tenant?: GenerateResult[];
   mode?: string;
   forced?: boolean;
   invoices_created?: number;
@@ -106,8 +115,67 @@ export type GenerateResult = {
   created?: CreatedInvoice[];
 };
 
+/**
+ * Generate invoices — for one tenant, or for every tenant independently.
+ *
+ * TENANT ISOLATION IN BILLING IS ENFORCED HERE, IN CODE. The engine runs with
+ * the service-role key, which BYPASSES RLS entirely, so none of the policies in
+ * 20260718000900 protect this path. Every query below is scoped by tenant_id
+ * explicitly; if one is missed, the RLS work does not catch it.
+ *
+ * Each tenant is billed, gated, blocked and sealed in COMPLETE ISOLATION: one
+ * school's forgotten lesson must never hold up an unrelated coach's invoices,
+ * and one business finishing a month must never seal it for anyone else.
+ */
 export async function generateInvoices(
   supabase: SupabaseClient,
+  opts: GenerateOptions = {}
+): Promise<GenerateResult> {
+  const billingMonthForResult =
+    opts.billing_month && /^\d{4}-\d{2}$/.test(opts.billing_month)
+      ? opts.billing_month
+      : previousBillingMonth(opts.now instanceof Date ? opts.now : new Date());
+
+  // Scoped run: one tenant, and the result IS that tenant's result — the admin
+  // panel's shape is unchanged.
+  if (opts.tenant_id) {
+    return await generateForTenant(supabase, opts.tenant_id, opts);
+  }
+
+  // Unscoped (cron): every tenant, independently.
+  const { data: tenantRows, error: tErr } = await supabase
+    .from("tenants")
+    .select("id")
+    .order("id");
+  if (tErr) throw new Error(tErr.message);
+
+  const perTenant: GenerateResult[] = [];
+  for (const t of tenantRows ?? []) {
+    perTenant.push(await generateForTenant(supabase, t.id as string, opts));
+  }
+
+  const created = perTenant.flatMap((r) => r.created ?? []);
+  const blocking = perTenant.flatMap((r) => r.blocking ?? []);
+  const invoicesCreated = perTenant.reduce((n, r) => n + (r.invoices_created ?? 0), 0);
+
+  return {
+    billing_month: billingMonthForResult,
+    mode: opts.mode === "manual" ? "manual" : "auto",
+    forced: opts.force === true,
+    // An aggregate status, deliberately coarse: per-tenant detail is the thing
+    // to act on, and flattening several tenants' outcomes into one word would
+    // hide the tenant that actually needs attention.
+    status: `processed ${perTenant.length} tenant(s)`,
+    invoices_created: invoicesCreated,
+    blocking,
+    created,
+    per_tenant: perTenant,
+  };
+}
+
+async function generateForTenant(
+  supabase: SupabaseClient,
+  tenantId: string,
   opts: GenerateOptions = {}
 ): Promise<GenerateResult> {
   const mode = opts.mode === "manual" ? "manual" : "auto";
@@ -132,15 +200,19 @@ export async function generateInvoices(
   const monthEnd = `${billingMonth}-${String(lastDay).padStart(2, "0")}`;
 
   // ── Auto switch (auto mode only) ──────────────────────────────────────────
+  // Per-tenant settings. app_settings held these globally, which meant one
+  // school changing its run day changed everyone's.
+  const { data: tenantRow } = await supabase
+    .from("tenants")
+    .select("auto_invoice_enabled, invoice_run_day")
+    .eq("id", tenantId)
+    .maybeSingle();
+
   if (mode === "auto") {
-    const { data: setting } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "auto_invoice_enabled")
-      .maybeSingle();
-    const enabled = setting?.value === true || setting?.value === "true";
+    const enabled = tenantRow?.auto_invoice_enabled !== false;
     if (!enabled) {
       return {
+        tenant_id: tenantId,
         billing_month: billingMonth,
         status: "auto_disabled",
         message:
@@ -155,10 +227,12 @@ export async function generateInvoices(
       .from("billing_periods")
       .select("billing_month")
       .eq("billing_month", billingMonth)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
 
     if (billingPeriod) {
       return {
+        tenant_id: tenantId,
         billing_month: billingMonth,
         status: "already_complete",
         message:
@@ -190,6 +264,7 @@ export async function generateInvoices(
 
     if (today < runDay) {
       return {
+        tenant_id: tenantId,
         billing_month: billingMonth,
         status: "before_run_day",
         message:
@@ -205,6 +280,7 @@ export async function generateInvoices(
     .from("classes")
     .select("id, title, price_per_lesson, day_of_week")
     .eq("is_active", true)
+    .eq("tenant_id", tenantId)   // isolation: RLS does not apply to service_role
     .order("id");
 
   if (clsErr) throw new Error(clsErr.message);
@@ -378,6 +454,7 @@ export async function generateInvoices(
         const unmarked = unmarkedOn(date);
         if (unmarked.length) {
           blocking.push({
+            tenant_id: tenantId,
             class_id: cls.id,
             class_title: cls.title,
             session_date: date,
@@ -441,6 +518,7 @@ export async function generateInvoices(
         a.class_title.localeCompare(b.class_title)
     );
     return {
+      tenant_id: tenantId,
       billing_month: billingMonth,
       mode,
       forced: force,
@@ -495,6 +573,7 @@ export async function generateInvoices(
       .from("invoices")
       .select("id")
       .eq("parent_id", parentId)
+      .eq("tenant_id", tenantId)
       .eq("billing_month", billingMonth)
       .maybeSingle();
 
@@ -507,15 +586,20 @@ export async function generateInvoices(
       continue;
     }
 
-    // Get parent's available credit balance
-    const { data: parent } = await supabase
-      .from("parents")
+    // Credit available FROM THIS TENANT. Never crosses: a note earned at a
+    // school is not spendable against a private coach's invoice, or one
+    // business ends up paying another's bill. Pools freely across this parent's
+    // children WITHIN the tenant.
+    const { data: balanceRow } = await supabase
+      .from("parent_tenant_balances")
       .select("credit_balance")
-      .eq("id", parentId)
-      .single();
+      .eq("parent_id", parentId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
 
+    const available = Number(balanceRow?.credit_balance ?? 0);
     const gross = items.reduce((s, i) => s + i.amount, 0);
-    const credit = Math.min(Number(parent?.credit_balance ?? 0), gross);
+    const credit = Math.min(available, gross);
     const net = gross - credit;
 
     // Insert invoice
@@ -523,6 +607,7 @@ export async function generateInvoices(
       .from("invoices")
       .insert({
         parent_id: parentId,
+        tenant_id: tenantId,
         billing_month: billingMonth,
         gross_amount: gross,
         credit_applied: credit,
@@ -571,10 +656,14 @@ export async function generateInvoices(
       const nowIso = new Date().toISOString();
 
       // Available notes, oldest first (FIFO).
+      // Scoped to this tenant: drawing a school's note against a private
+      // coach's invoice would move money between businesses. This filter is
+      // the only thing preventing it — service_role bypasses RLS.
       const { data: availCNs } = await supabase
         .from("credit_notes")
         .select("id, amount")
         .eq("parent_id", parentId)
+        .eq("tenant_id", tenantId)
         .eq("status", "available")
         .order("issued_at", { ascending: true });
 
@@ -626,14 +715,35 @@ export async function generateInvoices(
         remaining -= draw;
       }
 
-      // Deduct the amount actually allocated from the pooled balance.
+      // Deduct what was actually allocated, from the PER-TENANT balance.
       const allocated = credit - remaining;
       await supabase
-        .from("parents")
+        .from("parent_tenant_balances")
         .update({
-          credit_balance: Number(parent!.credit_balance) - allocated,
+          credit_balance: available - allocated,
+          updated_at: nowIso,
         })
-        .eq("id", parentId);
+        .eq("parent_id", parentId)
+        .eq("tenant_id", tenantId);
+
+      // DUAL-WRITE the deprecated pooled column (expand/contract — see
+      // 20260718000600). The parent app still reads parents.credit_balance, so
+      // leaving it un-decremented here would show families MORE credit than
+      // they have until phase 4 moves those screens.
+      //
+      // REMOVE THIS, and the matching write in handle_attendance_update, in the
+      // same change that moves the last reader.
+      const { data: legacy } = await supabase
+        .from("parents")
+        .select("credit_balance")
+        .eq("id", parentId)
+        .maybeSingle();
+      if (legacy) {
+        await supabase
+          .from("parents")
+          .update({ credit_balance: Number(legacy.credit_balance) - allocated })
+          .eq("id", parentId);
+      }
     }
 
     invoicesCreated++;
@@ -695,12 +805,17 @@ export async function generateInvoices(
     !invoiceWriteFailed;
 
   if (monthFinished) {
+    // Sealed for THIS TENANT only. The key is (tenant_id, billing_month): a
+    // single billing_month key would have let one business finishing July close
+    // it for every other tenant, who would then silently bill nothing.
+    //
     // DO NOTHING on conflict, not a plain insert: a forced run bypasses the
-    // sealed-month guard, so a second one would otherwise hit a duplicate key
-    // on the billing_month primary key. The first seal is the true one — its
-    // invoices_issued reflects the run that actually did the work.
+    // sealed-month guard, so a second one would otherwise hit a duplicate key.
+    // The first seal is the true one — its invoices_issued reflects the run
+    // that actually did the work.
     await supabase.from("billing_periods").upsert(
       {
+        tenant_id: tenantId,
         billing_month: billingMonth,
         invoices_issued: invoicesCreated,
         notes:
@@ -708,11 +823,12 @@ export async function generateInvoices(
             ? "No billable sessions found for this month."
             : `All ${invoicesCreated} invoice(s) generated successfully.`,
       },
-      { onConflict: "billing_month", ignoreDuplicates: true }
+      { onConflict: "tenant_id,billing_month", ignoreDuplicates: true }
     );
   }
 
   return {
+    tenant_id: tenantId,
     billing_month: billingMonth,
     mode,
     forced: force,

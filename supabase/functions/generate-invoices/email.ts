@@ -355,15 +355,19 @@ export function buildBlockedEmailHtml(
 }
 
 /**
- * Email the coaches/superadmin that generation is blocked, at most once per
- * distinct set of blocking lessons per month. Never throws; a failure here
- * must not affect the run that produced it.
+ * Email a TENANT's coaches and admin that their generation is blocked, at most
+ * once per distinct set of blocking lessons per month. Never throws; a failure
+ * here must not affect the run that produced it.
+ *
+ * Scoped to the tenant: one school's unmarked lesson is not another business's
+ * problem, and telling every coach on the platform about it would leak the
+ * blocked class's title and dates across a business boundary.
  */
 export async function notifyGenerationBlocked(
   supabase: SupabaseClient,
   billingMonth: string,
   blocking: BlockingLessonSummary[],
-  opts: { apiKey?: string } = {}
+  opts: { apiKey?: string; tenantId?: string } = {}
 ): Promise<{ notified: number }> {
   if (!opts.apiKey || blocking.length === 0) return { notified: 0 };
 
@@ -381,14 +385,19 @@ export async function notifyGenerationBlocked(
       .eq("key", BLOCKED_NOTICE_KEY)
       .maybeSingle();
 
+    // Keyed by tenant AND month, so one business's alert state cannot suppress
+    // another's — with a single key, the first tenant to be blocked in a month
+    // would silence everyone else's alert for that month.
     const seen = (prior?.value ?? {}) as Record<string, string>;
-    if (seen[billingMonth] === fingerprint) return { notified: 0 };
+    const seenKey = opts.tenantId ? `${opts.tenantId}:${billingMonth}` : billingMonth;
+    if (seen[seenKey] === fingerprint) return { notified: 0 };
 
-    // Coaches who own a blocked class, plus every superadmin.
-    const { data: recipients } = await supabase
-      .from("profiles")
-      .select("email, role")
-      .in("role", ["coach", "superadmin"]);
+    // This tenant's coaches and admin, plus the platform admin (who has no
+    // tenant and is the fallback when something is stuck).
+    let q = supabase.from("profiles").select("email, role, tenant_id");
+    const { data: recipients } = opts.tenantId
+      ? await q.or(`tenant_id.eq.${opts.tenantId},role.eq.platform_admin`)
+      : await q.in("role", ["coach", "tenant_admin", "platform_admin"]);
 
     const html = buildBlockedEmailHtml(billingMonth, blocking);
     const subject = `Action needed: ${formatBillingMonth(
@@ -420,7 +429,7 @@ export async function notifyGenerationBlocked(
       await supabase
         .from("app_settings")
         .update({
-          value: { ...seen, [billingMonth]: fingerprint },
+          value: { ...seen, [seenKey]: fingerprint },
           updated_at: new Date().toISOString(),
         })
         .eq("key", BLOCKED_NOTICE_KEY);
