@@ -20,8 +20,8 @@
 INSERT INTO tenants (id, slug, display_name, kind, join_code, paynow_qr_url)
 VALUES (
   '70000000-0000-0000-0000-000000000001',
-  'marcus-swim',
-  'Coach Marcus Swim School',
+  'kahhang-swim',
+  'Coach Kah Hang Swimming Classes',
   'private',
   'SWIM-TEST',
   NULL

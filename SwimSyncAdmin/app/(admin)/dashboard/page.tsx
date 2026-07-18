@@ -18,6 +18,12 @@ type Metrics = {
   totalClasses: number;
 };
 
+type TenantInfo = {
+  id: string;
+  display_name: string;
+  join_code: string;
+};
+
 type UnassignedRow = {
   id: string;
   full_name: string;
@@ -45,6 +51,23 @@ export default function DashboardPage() {
   const [unassigned, setUnassigned] = useState<UnassignedRow[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tenant, setTenant] = useState<TenantInfo | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+
+  /**
+   * Rotate the join code. Existing families keep their access — the code is an
+   * invitation, not an ongoing credential — so this is safe to offer without a
+   * scary confirmation.
+   */
+  async function handleRegenerate() {
+    if (!tenant) return;
+    setRegenerating(true);
+    const { data, error } = await supabase.rpc("regenerate_join_code", {
+      p_tenant_id: tenant.id,
+    });
+    setRegenerating(false);
+    if (!error && data) setTenant({ ...tenant, join_code: data as string });
+  }
 
   useEffect(() => {
     async function load() {
@@ -125,14 +148,71 @@ export default function DashboardPage() {
     }
 
     load();
+
+    // The admin's own business. A platform admin has no tenant, so the card
+    // simply does not render for them.
+    (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("tenant_id")
+        .eq("id", auth.user.id)
+        .maybeSingle();
+      if (!profile?.tenant_id) return;
+      const { data: t } = await supabase
+        .from("tenants")
+        .select("id, display_name, join_code")
+        .eq("id", profile.tenant_id)
+        .maybeSingle();
+      if (t) setTenant(t as TenantInfo);
+    })();
   }, []);
 
   return (
     <div>
       <PageHeader
         title="Dashboard"
-        subtitle="Welcome back, Superadmin — here's your SwimSync overview"
+        subtitle={
+          tenant
+            ? `${tenant.display_name} — your SwimSync overview`
+            : "Your SwimSync overview"
+        }
       />
+
+      {/* The join code is how families reach this business. There is no public
+          directory of coaches, so without the code a parent cannot add a child
+          here at all — which makes this the most operationally important thing
+          on the page for a new school. */}
+      {tenant && (
+        <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                Parent join code
+              </p>
+              <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-sky-900">
+                {tenant.join_code}
+              </p>
+              <p className="mt-1 text-sm text-sky-800">
+                Share this with parents so they can add their children to your
+                classes.
+              </p>
+            </div>
+            <button
+              onClick={handleRegenerate}
+              disabled={regenerating}
+              className="rounded-xl border border-sky-300 bg-white px-4 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100 disabled:opacity-50"
+            >
+              {regenerating ? "Generating…" : "Generate a new code"}
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-sky-700">
+            Generating a new code does not remove families who have already
+            joined — it only stops the old code working for new ones.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <MetricCard

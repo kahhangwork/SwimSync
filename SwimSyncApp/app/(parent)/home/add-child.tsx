@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   ScrollView,
   SafeAreaView,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
@@ -15,7 +15,15 @@ import PrimaryButton from "@/components/PrimaryButton";
 
 const GENDER_OPTIONS = ["Male", "Female"];
 
+type JoinedTenant = { id: string; display_name: string };
+
 export default function AddChildScreen() {
+  // Which business this child is being added to. A child belongs to exactly one
+  // (students.tenant_id), and the parent may only pick from businesses they
+  // have actually JOINED with a code — never a directory of every coach on the
+  // platform, which would let a mis-tap put a child on a stranger's roster.
+  const [tenants, setTenants] = useState<JoinedTenant[] | null>(null);
+  const [tenantId, setTenantId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
   const [gender, setGender] = useState("Male");
@@ -25,7 +33,37 @@ export default function AddChildScreen() {
   const session = useAppStore((s) => s.session);
   const showToast = useAppStore((s) => s.showToast);
 
+  // Reloaded on focus, so returning from the join screen picks up a code the
+  // parent has just redeemed without a manual refresh.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const { data } = await supabase
+          .from("parent_tenants")
+          .select("tenant_id, tenants(id, display_name)")
+          .order("joined_at");
+        if (cancelled) return;
+
+        const list: JoinedTenant[] = (data ?? [])
+          .map((r: any) => r.tenants)
+          .filter(Boolean);
+        setTenants(list);
+        // One business is the overwhelmingly common case — select it rather
+        // than making every parent tap a single-option picker.
+        setTenantId((prev) => prev ?? (list.length === 1 ? list[0].id : null));
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
   async function handleSave() {
+    if (!tenantId) {
+      showToast("Choose which coach or school this child is with.", "error");
+      return;
+    }
     if (!name.trim()) {
       showToast("Full name is required.", "error");
       return;
@@ -67,6 +105,7 @@ export default function AddChildScreen() {
         notes: notes.trim() || null,
         assignment_status: "unassigned",
         is_active: true,
+        tenant_id: tenantId,
       })
       .select("id")
       .single();
@@ -117,6 +156,70 @@ export default function AddChildScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* No business joined yet: the form is useless until there is one, so
+            send them to the join screen rather than letting them fill it in and
+            fail on save. */}
+        {tenants !== null && tenants.length === 0 && (
+          <View className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
+            <Text className="text-base font-semibold text-gray-900">
+              Join your coach first
+            </Text>
+            <Text className="mt-1 text-sm text-gray-600">
+              Your coach or swim school will give you a join code. You&rsquo;ll
+              need it before you can add a child.
+            </Text>
+            <PrimaryButton
+              label="Enter a join code"
+              onPress={() => router.push("/(parent)/home/join-tenant")}
+              className="mt-4"
+            />
+          </View>
+        )}
+
+        {/* Which business. Shown as a read-only line when there is only one, a
+            picker when the family deals with several — the expected case for a
+            parent with children under different coaches. */}
+        {tenants !== null && tenants.length > 0 && (
+          <View className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+              Coach or school <Text className="text-red-500">*</Text>
+            </Text>
+            {tenants.length === 1 ? (
+              <Text className="text-gray-900">{tenants[0].display_name}</Text>
+            ) : (
+              <View className="gap-2">
+                {tenants.map((t) => (
+                  <TouchableOpacity
+                    key={t.id}
+                    onPress={() => setTenantId(t.id)}
+                    className={`py-3 px-4 rounded-xl border ${
+                      tenantId === t.id
+                        ? "bg-sky-500 border-sky-500"
+                        : "bg-gray-50 border-gray-200"
+                    }`}
+                  >
+                    <Text
+                      className={`font-medium text-sm ${
+                        tenantId === t.id ? "text-white" : "text-gray-700"
+                      }`}
+                    >
+                      {t.display_name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={() => router.push("/(parent)/home/join-tenant")}
+              className="mt-3"
+            >
+              <Text className="text-sm font-medium text-sky-600">
+                + Add another coach or school
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 gap-4">
           {/* Name */}
           <View>
