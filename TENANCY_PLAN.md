@@ -159,6 +159,14 @@ change is how one gets missed.
 New helpers: `current_tenant_id()`, `is_platform_admin()`, `is_tenant_admin(uuid)`,
 `tenant_serves_parent(uuid)`.
 
+> **PRODUCTION NAMING — a manual step after `supabase db push`.** The backfill names
+> each tenant after its coach's `full_name`, which is right for a private coach but not
+> when the business trades under a different name. For production the intended values are
+> **coach `Coach Kah Hang`** and **business `Coach Kah Hang Swimming Lessons`**. Set the
+> business name with **Rename** on the admin dashboard once the migration has run — it
+> appears on invoices and invoice emails, so it wants to be the business's name, not an
+> operator's. (The local seed deliberately keeps the fictional "Coach Marcus".)
+
 ### 1.4 Backfill (one-way, needs a verified backup first)
 
 1. Create tenant 1 from the existing real coach — `kind = 'private'`.

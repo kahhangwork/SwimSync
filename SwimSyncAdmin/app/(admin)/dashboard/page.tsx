@@ -53,6 +53,34 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
+
+  /**
+   * Rename the business.
+   *
+   * The tenant's name is seeded from the COACH's name by the migration that
+   * created it, which is right for a private coach and wrong for anyone who
+   * trades under a different name ("Coach Kah Hang" vs "Coach Kah Hang Swimming
+   * Lessons"). It also appears on invoices and invoice emails, so it needs to
+   * be the business's own name, not an operator's.
+   */
+  async function handleSaveName() {
+    if (!tenant) return;
+    const next = nameDraft.trim();
+    if (!next) return;
+    setSavingName(true);
+    const { error } = await supabase
+      .from("tenants")
+      .update({ display_name: next, updated_at: new Date().toISOString() })
+      .eq("id", tenant.id);
+    setSavingName(false);
+    if (!error) {
+      setTenant({ ...tenant, display_name: next });
+      setEditingName(false);
+    }
+  }
 
   /**
    * Rotate the join code. Existing families keep their access — the code is an
@@ -188,6 +216,46 @@ export default function DashboardPage() {
         <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
+              <div className="mb-2 flex items-center gap-2">
+                {editingName ? (
+                  <>
+                    <input
+                      value={nameDraft}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      className="rounded-lg border border-sky-300 px-2 py-1 text-sm"
+                      placeholder="Business name"
+                    />
+                    <button
+                      onClick={handleSaveName}
+                      disabled={savingName}
+                      className="text-sm font-medium text-sky-800 underline disabled:opacity-50"
+                    >
+                      {savingName ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      onClick={() => setEditingName(false)}
+                      className="text-sm text-sky-700"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm font-semibold text-sky-900">
+                      {tenant.display_name}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setNameDraft(tenant.display_name);
+                        setEditingName(true);
+                      }}
+                      className="text-xs font-medium text-sky-700 underline"
+                    >
+                      Rename
+                    </button>
+                  </>
+                )}
+              </div>
               <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
                 Parent join code
               </p>

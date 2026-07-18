@@ -34,7 +34,7 @@ let joinCode = null;
     check("admin dashboard shows the parent join code", !!joinCode, joinCode ?? "not found");
     check(
       "dashboard is titled with the business name",
-      body.includes("Coach Kah Hang Swimming Classes")
+      body.includes("Coach Marcus Swim School")
     );
   } catch (e) {
     check("admin step completed", false, String(e));
@@ -98,7 +98,7 @@ let joinCode = null;
     body = await page.evaluate(() => document.body.innerText);
     check(
       "after joining, add-child shows the business",
-      body.includes("Coach Kah Hang Swimming Classes"),
+      body.includes("Coach Marcus Swim School"),
       ""
     );
     check(

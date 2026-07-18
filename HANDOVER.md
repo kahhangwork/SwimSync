@@ -1213,6 +1213,13 @@ swaps `invoices` to `UNIQUE (parent_id, tenant_id, billing_month)`, moves credit
 primary key. **Keep in mind the engine runs as `service_role` and therefore bypasses every
 policy phase 1 wrote — tenant isolation in billing must be enforced in engine code.**
 
+**After `supabase db push` reaches production, rename the business.** The backfill names
+each tenant after its coach, so tenant 1 will come out as the coach's name. The intended
+production values are **coach `Coach Kah Hang`**, **business `Coach Kah Hang Swimming
+Lessons`** — set the latter with **Rename** on the admin dashboard. It appears on invoices
+and invoice emails. The local seed keeps the fictional "Coach Marcus Swim School" on
+purpose; don't "fix" it to match production.
+
 **Two things phase 2 must also do, because phase 1 deliberately deferred them:**
 
 - **Tighten the constraints it takes ownership of.** `invoices.tenant_id` and

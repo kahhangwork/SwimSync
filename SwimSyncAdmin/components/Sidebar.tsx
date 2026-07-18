@@ -12,6 +12,7 @@ import {
   Receipt,
   FileText,
   UserCog,
+  Globe,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,10 @@ const NAV = [
   { href: "/invoices",     label: "Invoices",             icon: Receipt         },
   { href: "/credit-notes", label: "Credit Notes",         icon: FileText        },
   { href: "/coaches",      label: "Coaches",              icon: UserCog         },
+  // Platform admin only — hidden for a tenant admin, who has one business and
+  // nothing cross-tenant to do. The page enforces this itself too; hiding it
+  // is the affordance, not the boundary.
+  { href: "/platform",     label: "Platform",             icon: Globe, platformOnly: true },
 ];
 
 export function Sidebar() {
@@ -33,6 +38,7 @@ export function Sidebar() {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -40,10 +46,11 @@ export function Sidebar() {
       setUserEmail(data.session.user.email ?? null);
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name")
+        .select("full_name, role")
         .eq("id", data.session.user.id)
         .single();
       setUserName(profile?.full_name ?? null);
+      setIsPlatformAdmin(profile?.role === "platform_admin");
     });
   }, []);
 
@@ -69,7 +76,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.filter((n) => !n.platformOnly || isPlatformAdmin).map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
