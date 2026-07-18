@@ -20,6 +20,7 @@ import {
   formatSgDate,
   type DayOfWeek,
 } from "@/lib/lessonDates";
+import { isLessonFullyMarked } from "@/lib/attendanceCompleteness";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 
@@ -186,10 +187,7 @@ export default function TodayScreen() {
       )) {
         if (date === todayDate) continue; // today already has its own card
         const sess = sessionByClassDate.get(`${cls.id}:${date}`);
-        const fullyMarked =
-          !!sess &&
-          activeStudentIds.every((id: string) => sess.markedStudentIds.has(id));
-        if (!fullyMarked) {
+        if (!isLessonFullyMarked(activeStudentIds, sess?.markedStudentIds)) {
           items.push({
             class_id: cls.id,
             class_title: cls.title,

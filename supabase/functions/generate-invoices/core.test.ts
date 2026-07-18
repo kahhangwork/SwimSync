@@ -196,6 +196,7 @@ Deno.test("carry-forward: credit exceeding the invoice leaves a partial note and
   try {
     // Month 1: one present @ $30 -> invoice $30
     const m1 = await s.addSession("2026-07-04"); await s.mark(m1, "present");
+    await s.completeMonth("2026-07"); // rest of July rained off — keeps gross at $30
     await generateInvoices(s.db, { mode: "manual", force: true, billing_month: "2026-07" });
 
     // Correct -> $30 credit note
@@ -567,6 +568,7 @@ Deno.test("run day: auto run on the configured day generates normally", async ()
   const s = await newScenario({ price: 30 });
   try {
     const a = await s.addSession("2027-04-03"); await s.mark(a, "present");
+    await s.completeMonth("2027-04", undefined, new Date("2027-05-07T02:00:00Z")); // the month's other Saturdays rained off
 
     // 7 May, run day 7 -> due today (boundary: >= not >).
     const res = await generateInvoices(s.db, {
@@ -589,6 +591,7 @@ Deno.test("run day: a MANUAL run before the day generates anyway", async () => {
   const s = await newScenario({ price: 30 });
   try {
     const a = await s.addSession("2027-05-01"); await s.mark(a, "present");
+    await s.completeMonth("2027-05", undefined, new Date("2027-06-01T02:00:00Z"));
 
     const res = await generateInvoices(s.db, {
       mode: "manual",
@@ -608,6 +611,7 @@ Deno.test("run day: honours a changed setting, and SGT decides the day", async (
   const s = await newScenario({ price: 30 });
   try {
     const a = await s.addSession("2027-06-05"); await s.mark(a, "present");
+    await s.completeMonth("2027-06", undefined, new Date("2027-07-14T17:00:00Z"));
     await s.db
       .from("app_settings")
       .update({ value: 15 })
@@ -886,6 +890,120 @@ Deno.test("unenrolling a child clears the block their unmarked lesson caused", a
     assertEquals(ok.invoices_created, 1);
     // Still billed for the lesson they DID attend.
     assertEquals((await getInvoice(s.db, s.parentId, "2027-11"))!.gross, 30);
+  } finally {
+    await s.teardown();
+  }
+});
+
+// ── The expected-vs-existing gate ───────────────────────────────────────────
+// The engine's completeness gate only ever looked at lesson_sessions rows that
+// EXIST. A lesson nobody touched at all has no session row (they are created
+// lazily by attendance marking, PRD §7.5), so it was invisible to the gate: the
+// run billed the marked lessons, reported the month complete, and sealed it —
+// and the unmarked lesson can never be added afterwards (§11.6).
+//
+// This is the exact underbill PRD §7.7's block exists to prevent. It was caught
+// only by computeClassCoverage() in the ADMIN UI, which derives expected dates
+// from the class weekday. The server never did, so the only effective gate was
+// client-side — the inverse of gotcha §7.8.
+Deno.test("BLOCKS a lesson date that has no session row at all", async () => {
+  // Saturdays in Jan 2026: 3, 10, 17, 24, 31. Enrolment predates the month, so
+  // all five are expected lessons.
+  const s = await newScenario({ price: 30, enrolledAt: "2025-12-01" });
+  try {
+    for (const d of ["2026-01-03", "2026-01-10", "2026-01-17", "2026-01-24"]) {
+      const id = await s.addSession(d);
+      await s.mark(id, "present");
+    }
+    // 2026-01-31 is deliberately never touched: no session row, no attendance.
+
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: false,
+      billing_month: "2026-01",
+    });
+
+    assertEquals(res.status, "incomplete_attendance");
+    assertEquals(res.invoices_created, 0);
+    assert(
+      (res.blocking ?? []).some((b) => b.session_date === "2026-01-31"),
+      `expected 2026-01-31 to block; got ${JSON.stringify(res.blocking)}`
+    );
+    assertEquals(await getInvoice(s.db, s.parentId, "2026-01"), null);
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("BLOCKS a class whose whole month is unmarked (no sessions at all)", async () => {
+  // The worst shape: not a partial gap but a class nobody touched all month.
+  // The old gate `continue`d on zero sessions, so if ANY other class was
+  // complete the month could seal with this class entirely unbilled.
+  const s = await newScenario({ price: 30, enrolledAt: "2025-12-01" });
+  try {
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: false,
+      billing_month: "2026-01",
+    });
+
+    assertEquals(res.status, "incomplete_attendance");
+    assertEquals(res.invoices_created, 0);
+    // All five January Saturdays are outstanding.
+    assertEquals(
+      (res.blocking ?? []).filter((b) => b.class_id === s.classId).length,
+      5
+    );
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("marking the missing lesson cancelled clears the block and bills the rest", async () => {
+  // The documented escape hatch (PRD §7.7): a lesson that did not run is
+  // recorded cancelled, which satisfies the gate without billing anyone.
+  const s = await newScenario({ price: 30, enrolledAt: "2025-12-01" });
+  try {
+    for (const d of ["2026-01-03", "2026-01-10", "2026-01-17", "2026-01-24"]) {
+      const id = await s.addSession(d);
+      await s.mark(id, "present");
+    }
+    const blocked = await generateInvoices(s.db, {
+      mode: "manual", force: false, billing_month: "2026-01",
+    });
+    assertEquals(blocked.status, "incomplete_attendance");
+
+    const last = await s.addSession("2026-01-31");
+    await s.mark(last, "cancelled_rain");
+
+    const res = await generateInvoices(s.db, {
+      mode: "manual", force: false, billing_month: "2026-01",
+    });
+    assertEquals(res.invoices_created, 1);
+    assertEquals((await getInvoice(s.db, s.parentId, "2026-01"))!.gross, 120);
+    assert(res.sealed, "a genuinely complete month should seal");
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("a future lesson in the CURRENT month is not a gap", async () => {
+  // The window clamps to today: billing an in-progress month must not block on
+  // lessons that have not happened yet.
+  const now = new Date("2026-01-15T02:00:00Z"); // Thu 15 Jan, SGT
+  const s = await newScenario({ price: 30, enrolledAt: "2025-12-01" });
+  try {
+    // Saturdays up to the 15th: 3, 10. The 17/24/31 are still in the future.
+    for (const d of ["2026-01-03", "2026-01-10"]) {
+      const id = await s.addSession(d);
+      await s.mark(id, "present");
+    }
+
+    const res = await generateInvoices(s.db, {
+      mode: "manual", force: false, billing_month: "2026-01", now,
+    });
+    assertEquals(res.invoices_created, 1);
+    assertEquals((await getInvoice(s.db, s.parentId, "2026-01"))!.gross, 60);
   } finally {
     await s.teardown();
   }

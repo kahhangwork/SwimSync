@@ -45,6 +45,14 @@ jobs:
       - name: Engine tests (Deno)
         run: supabase/functions/generate-invoices/test.sh
 
+      # RUN TWICE, deliberately. A completing run SEALS its billing month by
+      # writing billing_periods, so a suite that leaks one row passes the first
+      # time and short-circuits on "already_complete" the second (gotcha §7.15 —
+      # this has already happened once). teardown() clears the months its
+      # sessions fall in; this step is what proves it still does.
+      - name: Engine tests (Deno) — second run, proves no leaked state
+        run: supabase/functions/generate-invoices/test.sh
+
       - name: Stop Supabase stack
         if: always()
         run: supabase stop

@@ -19,6 +19,7 @@ import {
   formatSgDate,
   type DayOfWeek,
 } from "@/lib/lessonDates";
+import { countMarked } from "@/lib/attendanceCompleteness";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 import { confirmAction } from "@/lib/confirm";
@@ -143,13 +144,15 @@ export default function ClassRosterScreen() {
     const activeStudentIds = activeStudents.map((s) => s.id);
 
     const rows: Session[] = (sessionData ?? []).map((s: any) => {
-      const markedIds = new Set((s.attendance ?? []).map((a: any) => a.student_id));
+      const markedIds = new Set<string>(
+        (s.attendance ?? []).map((a: any) => a.student_id)
+      );
       return {
         id: s.id,
         session_date: s.session_date,
-        // Count only students still enrolled, matching the invoice engine's
-        // completeness rule rather than the raw attendance row count.
-        marked_count: activeStudentIds.filter((sid) => markedIds.has(sid)).length,
+        // Counts only students still enrolled — the shared completeness rule,
+        // not the raw attendance row count.
+        marked_count: countMarked(activeStudentIds, markedIds),
         total_count: totalStudents,
       };
     });

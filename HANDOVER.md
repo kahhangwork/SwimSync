@@ -93,7 +93,7 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   (waiting on the coach) and an empty filter result (§8g).
 - **Full RLS** — parents see only their data, coaches only their classes,
   superadmin everything. Covered by automated isolation tests.
-- **Automated tests** — backend **34 pgTAP + 51 Deno**, plus frontend suites
+- **Automated tests** — backend **34 pgTAP + 55 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest, `SwimSyncApp` jest-expo); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
@@ -189,13 +189,13 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 supabase test db                                  # 34 tests across 4 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
-supabase/functions/generate-invoices/test.sh      # 51 tests; needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 55 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
-cd SwimSyncAdmin && npm test                       # 38 tests
+cd SwimSyncAdmin && npm test                       # 49 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
-cd SwimSyncApp && npm test                         # 38 tests
+cd SwimSyncApp && npm test                         # 49 tests
 ```
 
 **Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
@@ -345,14 +345,17 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   - A class that legitimately didn't run needs **no new concept**: the coach marks
     everyone `cancelled_rain`/`cancelled_coach` (non-billable), which creates the
     session and drops the date out of the backlog permanently.
-  - **Completeness rule, hand-written in four places** — a lesson counts as marked only
-    when its session exists **and every actively-enrolled student has an attendance row
-    on it**: `core.ts:141-152` (engine gate), `SwimSyncAdmin/lib/classCoverage.ts`
-    (admin dialog), `(coach)/today/index.tsx` (`fullyMarked`), and
-    `(coach)/classes/[id]/roster.tsx` (`marked_count` + `isComplete`). The engine copy is
-    unavoidable (Deno, no npm resolution), but the rest is duplication waiting to drift —
-    **if you touch the rule, touch all four**, and consider extracting a shared helper
-    while you're there.
+  - **Completeness rule — now ONE definition** (`lib/attendanceCompleteness.ts`, extracted
+    2026-07-18). A lesson counts as marked only when its session exists **and every
+    actively-enrolled student has an attendance row on it**, and **a lesson with no session
+    row at all is UNMARKED, not absent** — sessions are created lazily, so "no row" is
+    exactly what a forgotten lesson looks like. Used by
+    `SwimSyncAdmin/lib/classCoverage.ts`, `(coach)/today/index.tsx` and
+    `(coach)/classes/[id]/roster.tsx`. **Duplicated byte-identical in both apps** (same
+    arrangement as `lessonDates.ts`), and the engine keeps its own Deno copy — so it is
+    **three edits, not one**. Callers still own their own *window* (billing month vs coach
+    backlog); only the meaning of "marked" is shared.
+    - **They had already diverged, and it was a live underbill — see §7.17.**
 - **Dates are Singapore-local; never derive a date string from `toISOString()`.** That
   yields the **UTC** date, which is the *previous day* in SGT (UTC+8) before 08:00 —
   this shipped a real double-billing bug (§7.7). Use `todayInSg()` / `toSgDate()` from
@@ -486,6 +489,24 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     genuinely reckoned with). Same shape as §7.14 (`Number(null)` → 0 → the most aggressive
     value): in both, an *absence* of input silently satisfied a rule written to police
     *presence* of input. Ask what your guard does on empty input, not just on bad input.
+18. **The engine's completeness gate could not see a lesson nobody touched.** FIXED
+    2026-07-18 (phase 0 of tenanting). `core.ts` selected `lesson_sessions` rows that
+    **exist** and checked those were fully marked — but sessions are created *lazily* by
+    attendance marking (PRD §7.5), so a lesson nobody touched has **no row**, and a class
+    with no rows at all was `continue`d entirely. A month with four lessons where three were
+    marked reported **"complete — billing month sealed"**: it billed three, sealed the month,
+    and the fourth could never be billed (later runs short-circuit on `already_complete`, and
+    the no-double-billing guard skips a parent who already has an invoice). A single
+    forgotten lesson became a permanent, silent underbill — the exact hole §8D was written to
+    close.
+    **The shape worth remembering:** the rule existed in four hand-written copies and they
+    had *drifted*. The admin's `computeClassCoverage()` derived expected dates from the class
+    weekday and caught this; the engine never did. So the only effective gate was the
+    **client-side** one — gotcha §7.8 inverted (there, the only live caller bypassed the
+    gate; here, the real gate wasn't the server's). **Two implementations of one safety rule
+    is one implementation and one liability.** Now shared — see §6.
+    Pinned by four Deno tests, incl. one that fails on the pre-fix engine with
+    `"complete — billing month sealed"` instead of `"incomplete_attendance"`.
 ---
 
 ## 8. What changed this session (2026-07-18 — the underbilling cluster: multi-class fix, run day, sealing, hard block, + the §8.1 empty-month seal fix)

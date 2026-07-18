@@ -1,6 +1,6 @@
 # SwimSync — Multi-Tenancy Implementation Plan
 
-_Drafted: 2026-07-18 · Status: **not started**_
+_Drafted: 2026-07-18 · Status: **phase 0 complete, phase 1 next**_
 
 How to build what `TENANCY_DESIGN.md` specifies. Design questions are settled there
 (§10); this document is order, files, verification and risk.
@@ -19,29 +19,43 @@ tenant exists — with two exceptions flagged explicitly (1.5 and 3). Phase 5 is
 
 ---
 
-## Phase 0 — Prerequisites (no schema change)
+## Phase 0 — Prerequisites — ✅ **COMPLETE 2026-07-18**
 
 Nothing here is tenanting; it is all removing hazards that make tenanting riskier.
 
-### 0.1 Extract the completeness-rule helper
+> **Phase 0 was NOT the no-op it was scoped as.** Extracting the completeness rule revealed
+> the four copies had **diverged**, and the engine's was wrong in a way that silently
+> underbilled: it inspected only `lesson_sessions` rows that exist, so a lesson nobody
+> touched was invisible to it — the month reported **"complete — billing month sealed"** and
+> that lesson could never be billed afterwards. Proven with a failing test before any fix;
+> full write-up in `HANDOVER.md` §7.17. The engine now derives expected lesson dates like
+> everything else, from one shared definition. **Deno 51 → 55; both frontends 38 → 49.**
 
-`BACKLOG.md` build-order #1, now a hard prerequisite: phase 2 makes the completeness gate
-per-tenant, and the rule is currently **hand-written in four places** (`HANDOVER.md` §6):
+### 0.1 Extract the completeness-rule helper — ✅ done
 
-| File | Copy |
-|---|---|
-| `supabase/functions/generate-invoices/core.ts:141-152` | engine gate |
-| `SwimSyncAdmin/lib/classCoverage.ts` | admin pre-flight dialog |
-| `SwimSyncApp/app/(coach)/today/index.tsx` | `fullyMarked` |
-| `SwimSyncApp/app/(coach)/classes/[id]/roster.tsx` | `marked_count` / `isComplete` |
+`BACKLOG.md` build-order #1, and a hard prerequisite: phase 2 makes the completeness gate
+per-tenant, and the rule was **hand-written in four places** that had already diverged.
 
-Extract to `lib/attendanceCompleteness.ts`, **duplicated byte-identical in both apps** —
-the same deliberate arrangement as `lessonDates.ts`, for the same reason (separate npm
-projects, no workspace). The Deno copy in `core.ts` stays separate and unavoidable. Four
-hand-written copies become three files, two of which `diff` clean.
+Shipped as `lib/attendanceCompleteness.ts` — `isLessonFullyMarked`, `countMarked`,
+`unmarkedStudents`, `unmarkedDates` — **duplicated byte-identical in both apps** (the same
+deliberate arrangement as `lessonDates.ts`: separate npm projects, no workspace), with its
+own test file in each. Callers keep their own *window* (billing month vs coach backlog);
+only the meaning of "marked" is shared.
 
-This matters beyond tidiness: the admin's pre-flight check and the engine compute the rule
-separately today, so **if they ever disagree the button enables and the server refuses.**
+| File | Was | Now |
+|---|---|---|
+| `generate-invoices/core.ts` | inspected only sessions that EXIST — **the bug** | derives expected dates via `dates.ts`; own Deno copy |
+| `SwimSyncAdmin/lib/classCoverage.ts` | own filter loop | `unmarkedDates()` |
+| `SwimSyncApp/app/(coach)/today/index.tsx` | `fullyMarked` | `isLessonFullyMarked()` |
+| `SwimSyncApp/app/(coach)/classes/[id]/roster.tsx` | own filter | `countMarked()` |
+
+**Three edits, not one** — the engine's Deno copy is unavoidable (no npm resolution in Edge
+Functions), so the byte-identical pair plus the Deno twin is the arrangement to maintain.
+
+Also added: `expectedLessonDates()` to `generate-invoices/dates.ts` (mirrors the app twin),
+and `completeMonth()` / `enrolledAt` / `dayOfWeek` to the Deno test helpers — a fixture that
+creates one session in a month where the class met four times is now correctly an
+*incomplete* month, which is what broke four existing tests and was the fix proving itself.
 
 ### 0.2 Settle the sealed July row — ✅ **DONE 2026-07-18**
 
@@ -50,14 +64,15 @@ empty (or hold no `2026-07` row), and phase 1.4 step 6 has nothing to migrate fo
 **Re-confirm at backfill time rather than trusting this line** — it is a snapshot, and the
 table is written by every completing invoice run.
 
-### 0.3 Make the Deno suite run twice in CI
+### 0.3 Make the Deno suite run twice in CI — ✅ done
 
 Gotcha §7.15: manual runs seal months, so a suite that passes once can fail on the second
 run from leaked state. Phase 2 rewrites sealing entirely. Running the suite twice in CI
 turns that class of bug from "discovered next week" into "discovered on the PR".
 
-**Verify:** all four suites green (34 pgTAP · 51 Deno · 38 admin · 38 app), both apps
-typecheck, Deno suite green **twice in a row**.
+**Verified 2026-07-18:** 34 pgTAP · **55** Deno (green twice in a row) · **49** admin ·
+**49** app; both apps `tsc --noEmit` clean; both `attendanceCompleteness.ts` twins and both
+`lessonDates.ts` twins confirmed byte-identical by `diff`.
 
 ---
 

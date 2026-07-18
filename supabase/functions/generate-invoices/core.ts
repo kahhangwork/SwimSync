@@ -26,9 +26,12 @@
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  APP_TIMEZONE,
   clampRunDay,
+  dateInTimeZone,
   dayOfMonthInTimeZone,
   DEFAULT_INVOICE_RUN_DAY,
+  expectedLessonDates,
   previousBillingMonth,
 } from "./dates.ts";
 
@@ -200,7 +203,7 @@ export async function generateInvoices(
   // are persisted to invoice_items and rendered in the email).
   const { data: classes, error: clsErr } = await supabase
     .from("classes")
-    .select("id, title, price_per_lesson")
+    .select("id, title, price_per_lesson, day_of_week")
     .eq("is_active", true)
     .order("id");
 
@@ -236,6 +239,11 @@ export async function generateInvoices(
   // the very retry that would have fixed it.
   let invoiceWriteFailed = false;
 
+  // Today in the APP timezone, not UTC — the clamp below decides whether a
+  // lesson counts as "should already have happened", and the UTC date is the
+  // previous day in SGT before 08:00 (gotcha §7.7).
+  const todayDate = dateInTimeZone(now, APP_TIMEZONE);
+
   for (const cls of classes ?? []) {
     // Sessions for this class within the billing month
     const { data: sessions } = await supabase
@@ -246,28 +254,59 @@ export async function generateInvoices(
       .lte("session_date", monthEnd)
       .order("session_date");
 
-    if (!sessions?.length) continue; // no lessons this month, nothing to bill
-
-    const sessionIds = sessions.map((s) => s.id);
+    const sessionIds = (sessions ?? []).map((s) => s.id);
     const sessionDateMap: Record<string, string> = Object.fromEntries(
-      sessions.map((s) => [s.id, s.session_date])
+      (sessions ?? []).map((s) => [s.id, s.session_date])
+    );
+    const sessionByDate = new Map<string, string>(
+      (sessions ?? []).map((s) => [s.session_date as string, s.id as string])
     );
 
-    // Active enrolments — who is EXPECTED to be marked. Drives the
-    // completeness gate only.
+    // Enrolments. `is_active` answers "who must be marked" (the gate);
+    // `enrolled_at` floors the expected-lesson window so a class is never asked
+    // about lessons from before anyone joined it.
     const { data: enrolments } = await supabase
       .from("student_class_enrolments")
-      .select("student_id")
-      .eq("class_id", cls.id)
-      .eq("is_active", true);
+      .select("student_id, enrolled_at, is_active")
+      .eq("class_id", cls.id);
 
-    const activeStudentIds = (enrolments ?? []).map((e) => e.student_id);
+    const activeStudentIds = (enrolments ?? [])
+      .filter((e) => e.is_active)
+      .map((e) => e.student_id);
+
+    // ── Lessons that SHOULD have run this month ─────────────────────────────
+    // lesson_sessions rows are created LAZILY by attendance marking (PRD §7.5),
+    // so a lesson nobody touched has no row at all. A gate that inspects only
+    // existing sessions cannot see it: the run bills the marked lessons,
+    // reports the month complete and SEALS it, and that lesson can never be
+    // billed afterwards (§11.6). Deriving the expected dates is the only way
+    // the engine can tell "fully marked" from "never marked".
+    //
+    // Floored at the earliest enrolment — including INACTIVE ones, because a
+    // child who has since left still attended lessons that ran. Clamped to
+    // today so future lessons in the current month are not counted as gaps.
+    const earliestEnrolment = (enrolments ?? [])
+      .map((e) => String(e.enrolled_at).slice(0, 10))
+      .sort()[0];
+    const windowFrom =
+      earliestEnrolment && earliestEnrolment > monthStart
+        ? earliestEnrolment
+        : monthStart;
+    const windowTo = todayDate < monthEnd ? todayDate : monthEnd;
+    const expectedDates = activeStudentIds.length
+      ? expectedLessonDates(String(cls.day_of_week), windowFrom, windowTo)
+      : [];
+
+    // Nothing recorded and nothing due — this class has no bearing on the month.
+    if (!sessionIds.length && !expectedDates.length) continue;
 
     // All attendance rows for these sessions
-    const { data: attRows } = await supabase
-      .from("attendance")
-      .select("lesson_session_id, student_id, status")
-      .in("lesson_session_id", sessionIds);
+    const { data: attRows } = sessionIds.length
+      ? await supabase
+          .from("attendance")
+          .select("lesson_session_id, student_id, status")
+          .in("lesson_session_id", sessionIds)
+      : { data: [] as { lesson_session_id: string; student_id: string; status: string }[] };
 
     // Who gets BILLED is a different question from who must be marked. Billing
     // follows the attendance rows that actually exist, NOT the current
@@ -284,21 +323,26 @@ export async function generateInvoices(
     // Nobody enrolled and nobody marked — nothing to bill or check.
     if (!billableStudentIds.length) continue;
 
-    // ── Gate: every active student must have a row for every session ────────
-    // Enforced only for automatic runs. Manual/force runs bill whatever
-    // attendance has been marked so far.
+    // ── Gate: every active student marked on every lesson that should have run ──
+    // Checked over the UNION of expected dates and dates that actually have a
+    // session: expected catches the lesson nobody touched, existing catches a
+    // make-up held on some other weekday.
     const attSet = new Set(
       (attRows ?? []).map((a) => `${a.lesson_session_id}:${a.student_id}`)
     );
-    let complete = true;
-    outer: for (const sessId of sessionIds) {
-      for (const stuId of activeStudentIds) {
-        if (!attSet.has(`${sessId}:${stuId}`)) {
-          complete = false;
-          break outer;
-        }
-      }
-    }
+    const datesToCheck = [
+      ...new Set<string>([...expectedDates, ...sessionByDate.keys()]),
+    ].sort();
+
+    /** Active students with no attendance row on `date`. No session at all
+     *  means nobody is marked, which is the whole point of this gate. */
+    const unmarkedOn = (date: string): string[] => {
+      const sessId = sessionByDate.get(date);
+      if (!sessId) return activeStudentIds;
+      return activeStudentIds.filter((s) => !attSet.has(`${sessId}:${s}`));
+    };
+
+    const complete = datesToCheck.every((d) => unmarkedOn(d).length === 0);
 
     // Parents of this class's students. Queried BEFORE the gate check because
     // the incomplete branch needs it to record who must be deferred. Covers
@@ -330,15 +374,13 @@ export async function generateInvoices(
     if (!complete) {
       classesIncomplete++;
       for (const pid of deferrableParentIds) deferredParents.add(pid);
-      for (const sessId of sessionIds) {
-        const unmarked = activeStudentIds.filter(
-          (stuId) => !attSet.has(`${sessId}:${stuId}`)
-        );
+      for (const date of datesToCheck) {
+        const unmarked = unmarkedOn(date);
         if (unmarked.length) {
           blocking.push({
             class_id: cls.id,
             class_title: cls.title,
-            session_date: sessionDateMap[sessId],
+            session_date: date,
             unmarked_student_count: unmarked.length,
           });
         }

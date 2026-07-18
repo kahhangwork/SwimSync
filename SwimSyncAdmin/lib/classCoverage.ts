@@ -13,6 +13,7 @@ import {
   toSgDate,
   type DayOfWeek,
 } from "./lessonDates";
+import { unmarkedDates } from "./attendanceCompleteness";
 
 export type CoverageClass = {
   id: string;
@@ -94,19 +95,23 @@ export function computeClassCoverage(
     const expected = expectedLessonDates(cls.day_of_week as DayOfWeek, from, to);
     if (expected.length === 0) continue;
 
-    const sessionByDate = new Map(
+    // Marked students per lesson DATE — the shape the shared completeness rule
+    // takes. A date absent from this map has no session at all, which the rule
+    // treats as unmarked (that is what a forgotten lesson looks like).
+    const markedByDate = new Map<string, Set<string>>(
       sessions
         .filter((s) => s.class_id === cls.id)
-        .map((s) => [s.session_date, s.id])
+        .map((s) => [
+          s.session_date,
+          new Set(
+            activeStudentIds.filter((studentId) =>
+              attendanceKeys.has(`${s.id}:${studentId}`)
+            )
+          ),
+        ])
     );
 
-    const missingDates = expected.filter((date) => {
-      const sessionId = sessionByDate.get(date);
-      if (!sessionId) return true;
-      return !activeStudentIds.every((studentId) =>
-        attendanceKeys.has(`${sessionId}:${studentId}`)
-      );
-    });
+    const missingDates = unmarkedDates(expected, markedByDate, activeStudentIds);
 
     coverage.push({
       classId: cls.id,

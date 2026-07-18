@@ -82,3 +82,58 @@ export function previousBillingMonth(
   const pm = m === 1 ? 12 : m - 1;
   return `${py}-${String(pm).padStart(2, "0")}`;
 }
+
+// ── Expected lesson dates ───────────────────────────────────────────────────
+// Mirrors expectedLessonDates() in {SwimSyncApp,SwimSyncAdmin}/lib/lessonDates.ts.
+// Duplicated Deno-side for the same reason as the rest of this file (no npm
+// resolution in Edge Functions). If you change the derivation, change all three.
+//
+// The engine needs this because lesson_sessions rows are created LAZILY by
+// attendance marking (PRD §7.5): a lesson nobody touched has no row at all, so
+// a gate that only inspects existing sessions cannot see it. Deriving the dates
+// a class SHOULD have run is the only way the engine can tell "fully marked"
+// from "never marked".
+
+export type DayOfWeek =
+  | "sunday" | "monday" | "tuesday" | "wednesday"
+  | "thursday" | "friday" | "saturday";
+
+const DAY_INDEX: Record<string, number> = {
+  sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
+  thursday: 4, friday: 5, saturday: 6,
+};
+
+const DAY_MS = 86_400_000;
+
+/** Parse "YYYY-MM-DD" as a UTC midnight instant. NaN if malformed. */
+function parseDate(date: string): number {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? Date.parse(`${date}T00:00:00Z`) : NaN;
+}
+
+function formatDate(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/**
+ * Every occurrence of `dayOfWeek` in [from, to], inclusive, ascending.
+ * Returns [] if from > to or either bound is malformed.
+ */
+export function expectedLessonDates(
+  dayOfWeek: string,
+  from: string,
+  to: string
+): string[] {
+  const start = parseDate(from);
+  const end = parseDate(to);
+  if (Number.isNaN(start) || Number.isNaN(end) || start > end) return [];
+
+  const target = DAY_INDEX[dayOfWeek];
+  if (target === undefined) return [];
+
+  const offset = (target - new Date(start).getUTCDay() + 7) % 7;
+  const dates: string[] = [];
+  for (let ms = start + offset * DAY_MS; ms <= end; ms += 7 * DAY_MS) {
+    dates.push(formatDate(ms));
+  }
+  return dates;
+}

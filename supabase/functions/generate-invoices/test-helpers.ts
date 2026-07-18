@@ -11,6 +11,7 @@ import {
   createClient,
   type SupabaseClient,
 } from "https://esm.sh/@supabase/supabase-js@2";
+import { APP_TIMEZONE, dateInTimeZone, expectedLessonDates } from "./dates.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "http://127.0.0.1:54321";
 const SERVICE_ROLE_KEY = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
@@ -51,6 +52,13 @@ export type Scenario = {
   mark: (sessionId: string, status: string, studentId?: string) => Promise<void>;
   /** Current pooled credit balance for the parent. */
   creditBalance: () => Promise<number>;
+  /** Mark every still-unsessioned expected lesson in a month as cancelled_rain,
+   *  so the month passes the completeness gate without changing gross. */
+  completeMonth: (
+    billingMonth: string,
+    classId?: string,
+    now?: Date
+  ) => Promise<void>;
   teardown: () => Promise<void>;
 };
 
@@ -80,11 +88,24 @@ async function createRoleUser(
  * exercise the multi-class-parent billing path.
  */
 export async function newScenario(
-  opts: { price?: number; secondClass?: { price?: number } } = {}
+  opts: {
+    price?: number;
+    secondClass?: { price?: number };
+    /** Backdate the enrolment (YYYY-MM-DD). Enrolments default to NOW(), and
+     *  expected-lesson derivation is floored at the earliest enrolment — so a
+     *  test billing a PAST month sees zero expected lessons unless the
+     *  enrolment predates that month. Only tests that exercise the
+     *  expected-vs-marked gate need this. */
+    enrolledAt?: string;
+    /** Class weekday; expected-lesson dates derive from it. Default saturday. */
+    dayOfWeek?: string;
+  } = {}
 ): Promise<Scenario> {
   const db = svc();
   const price = opts.price ?? 30;
   const tag = crypto.randomUUID().slice(0, 8);
+  const dayOfWeek = opts.dayOfWeek ?? "saturday";
+  const enrolExtra = opts.enrolledAt ? { enrolled_at: opts.enrolledAt } : {};
 
   // Coach (trigger creates profiles + coaches row)
   const coachProfileId = await createRoleUser(
@@ -106,7 +127,7 @@ export async function newScenario(
     .insert({
       coach_id: coachId,
       title: `Class ${tag}`,
-      day_of_week: "saturday",
+      day_of_week: dayOfWeek,
       start_time: "10:00",
       end_time: "11:00",
       location_name: "Test Pool",
@@ -149,6 +170,7 @@ export async function newScenario(
     student_id: studentId,
     class_id: classId,
     is_active: true,
+    ...enrolExtra,
   });
 
   // Tracked as arrays so teardown deletes every seeded row. A leaked class is
@@ -198,6 +220,7 @@ export async function newScenario(
       student_id: studentId2,
       class_id: classId2,
       is_active: true,
+      ...enrolExtra,
     });
   }
 
@@ -243,6 +266,67 @@ export async function newScenario(
       { onConflict: "lesson_session_id,student_id" }
     );
     if (error) throw new Error(`mark failed: ${error.message}`);
+  }
+
+  /**
+   * Mark every lesson the class was DUE in `billingMonth` that has no session
+   * yet as `cancelled_rain` — non-billable, so it satisfies the completeness
+   * gate without changing any gross amount.
+   *
+   * Needed because the engine now derives expected lesson dates from the class
+   * weekday: a fixture that creates one session in a month where the class met
+   * four times is an INCOMPLETE month and is correctly blocked. Tests that are
+   * about something else (run day, credit carry-forward) use this to say "the
+   * rest of the month happened and was rained off", keeping their assertions
+   * about the one lesson they care about.
+   */
+  async function completeMonth(
+    billingMonth: string,
+    forClassId?: string,
+    now: Date = new Date()
+  ): Promise<void> {
+    const cid = forClassId ?? classId;
+    const students = cid === classId2 && studentId2 ? [studentId2] : [studentId];
+
+    const { data: cls } = await db
+      .from("classes")
+      .select("day_of_week")
+      .eq("id", cid)
+      .single();
+
+    const [y, m] = billingMonth.split("-").map(Number);
+    const monthStart = `${billingMonth}-01`;
+    const monthEnd = `${billingMonth}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+
+    const { data: enrolRows } = await db
+      .from("student_class_enrolments")
+      .select("enrolled_at")
+      .eq("class_id", cid);
+    const earliest = (enrolRows ?? [])
+      .map((e) => String(e.enrolled_at).slice(0, 10))
+      .sort()[0];
+
+    // MUST use the same clock the engine will run at. A test billing a future
+    // month passes `now` to generateInvoices; completing the month against the
+    // real clock would derive zero expected lessons and leave the fixture
+    // incomplete in exactly the way the gate now catches.
+    const today = dateInTimeZone(now, APP_TIMEZONE);
+    const from = earliest && earliest > monthStart ? earliest : monthStart;
+    const to = today < monthEnd ? today : monthEnd;
+
+    const { data: existing } = await db
+      .from("lesson_sessions")
+      .select("session_date")
+      .eq("class_id", cid)
+      .gte("session_date", monthStart)
+      .lte("session_date", monthEnd);
+    const have = new Set((existing ?? []).map((s) => s.session_date as string));
+
+    for (const date of expectedLessonDates(String(cls!.day_of_week), from, to)) {
+      if (have.has(date)) continue;
+      const sid = await addSession(date, cid);
+      for (const stu of students) await mark(sid, "cancelled_rain", stu);
+    }
   }
 
   async function creditBalance(): Promise<number> {
@@ -298,6 +382,7 @@ export async function newScenario(
     addSession,
     mark,
     creditBalance,
+    completeMonth,
     teardown,
   };
 }
