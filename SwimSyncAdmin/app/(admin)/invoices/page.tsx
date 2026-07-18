@@ -182,10 +182,17 @@ export default function InvoicesPage() {
       if (!res.ok) {
         setGenResult(`Error: ${json.error ?? "generation failed"}`);
       } else {
+        // A deferred parent is billed NOTHING this run (a child of theirs sits
+        // in a class with unmarked attendance). Surfaced explicitly — silently
+        // reporting "Created 0 invoice(s)" would read as "nothing to bill".
+        const deferred = Number(json.parents_deferred ?? 0);
         setGenResult(
           `Created ${json.invoices_created} invoice(s) for ${formatBillingMonth(
             genMonth
-          )}.`
+          )}.` +
+            (deferred > 0
+              ? ` ${deferred} parent(s) deferred — a class they're in still has unmarked attendance.`
+              : "")
         );
         await loadInvoices();
       }

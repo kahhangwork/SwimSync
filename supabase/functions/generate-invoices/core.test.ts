@@ -310,3 +310,194 @@ Deno.test("emailCreatedInvoices: with a key, emails each invoice to the resolved
     await s.teardown();
   }
 });
+
+// ── Multi-class parent ─────────────────────────────────────────────────────
+// A parent with children in TWO classes used to be billed for only one: the
+// invoice was created during the first class and the "already exists" guard
+// skipped them for the second. Engine now tallies across all classes first.
+
+Deno.test("multi-class parent: one invoice covering BOTH classes' lessons", async () => {
+  const s = await newScenario({ price: 30, secondClass: { price: 20 } });
+  try {
+    const a = await s.addSession("2026-09-05");
+    await s.mark(a, "present");
+    const b = await s.addSession("2026-09-12", s.classId2);
+    await s.mark(b, "present", s.studentId2);
+
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2026-09",
+    });
+
+    // Exactly ONE invoice, carrying both classes. Pre-fix this was gross 30
+    // with a single line item — the second class silently dropped.
+    assertEquals(res.invoices_created, 1);
+    const inv = await getInvoice(s.db, s.parentId, "2026-09");
+    assertEquals(inv!.gross, 50);
+    assertEquals(inv!.net, 50);
+
+    const { data: items } = await s.db
+      .from("invoice_items")
+      .select("class_title, amount")
+      .eq("invoice_id", inv!.id);
+    assertEquals(items!.length, 2);
+    assertEquals(new Set(items!.map((i) => i.class_title)).size, 2);
+
+    // One CreatedInvoice for the parent, not two — two would double-email
+    // (and collide with UNIQUE(parent_id, billing_month)).
+    assertEquals(res.created!.length, 1);
+    assertEquals(res.created![0].items.length, 2);
+
+    const chk = await checkInvariants(s.db, s.parentId);
+    assert(chk.ok, chk.problems.join("; "));
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("multi-class parent: auto run defers the parent while any of their classes is unmarked", async () => {
+  const s = await newScenario({ price: 30, secondClass: { price: 20 } });
+  try {
+    const a = await s.addSession("2026-10-03");
+    await s.mark(a, "present");
+    // Class 2 has a session nobody marked -> that class is incomplete.
+    const b = await s.addSession("2026-10-10", s.classId2);
+
+    // Run 1: NOT forced. The parent has billable items from class 1, but a
+    // child in an unmarked class -> bill nothing rather than lock in a
+    // partial invoice that tomorrow's retry could never top up.
+    const run1 = await generateInvoices(s.db, {
+      mode: "auto",
+      billing_month: "2026-10",
+    });
+    assertEquals(run1.invoices_created, 0);
+    assertEquals(run1.parents_deferred, 1);
+    assert(run1.classes_still_incomplete! >= 1);
+    assertEquals(await getInvoice(s.db, s.parentId, "2026-10"), null);
+
+    const { data: sealedEarly } = await s.db
+      .from("billing_periods")
+      .select("billing_month")
+      .eq("billing_month", "2026-10")
+      .maybeSingle();
+    assertEquals(sealedEarly, null); // month must stay open for the retry
+
+    // Coach marks the missing lesson; the retry now bills both classes at once.
+    await s.mark(b, "present", s.studentId2);
+    const run2 = await generateInvoices(s.db, {
+      mode: "auto",
+      billing_month: "2026-10",
+    });
+    assertEquals(run2.invoices_created, 1);
+    assertEquals(run2.parents_deferred, 0);
+    assertEquals(run2.classes_still_incomplete, 0);
+
+    const inv = await getInvoice(s.db, s.parentId, "2026-10");
+    assertEquals(inv!.gross, 50);
+
+    const { data: sealed } = await s.db
+      .from("billing_periods")
+      .select("billing_month")
+      .eq("billing_month", "2026-10")
+      .maybeSingle();
+    assert(sealed, "fully-marked auto run should seal the month");
+  } finally {
+    // teardown() does not touch billing_periods, and run 2 seals the month —
+    // leaving it would make the NEXT run of this suite hit already_complete.
+    await s.db.from("billing_periods").delete().eq("billing_month", "2026-10");
+    await s.teardown();
+  }
+});
+
+Deno.test("multi-class parent: credit draws against the COMBINED gross", async () => {
+  const s = await newScenario({ price: 30, secondClass: { price: 20 } });
+  try {
+    // Month 1 (class 1 only): $30 invoice, then corrected to absent so the
+    // trigger issues a $30 credit note.
+    const m1 = await s.addSession("2026-11-07");
+    await s.mark(m1, "present");
+    await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2026-11",
+    });
+    await s.mark(m1, "absent");
+    assertEquals(await s.creditBalance(), 30);
+
+    // Month 2: both classes -> gross $50. Credit applies to the COMBINED
+    // gross, leaving $20 outstanding. Pre-fix, gross was $30 and the $30
+    // credit covered it exactly, wrongly marking the invoice PAID.
+    const c1 = await s.addSession("2026-12-05");
+    await s.mark(c1, "present");
+    const c2 = await s.addSession("2026-12-12", s.classId2);
+    await s.mark(c2, "present", s.studentId2);
+    await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2026-12",
+    });
+
+    const inv = await getInvoice(s.db, s.parentId, "2026-12");
+    assertEquals(inv!.gross, 50);
+    assertEquals(inv!.credit_applied, 30);
+    assertEquals(inv!.net, 20);
+    assertEquals(inv!.status, "outstanding");
+    assertEquals(await s.creditBalance(), 0);
+
+    const chk = await checkInvariants(s.db, s.parentId);
+    assert(chk.ok, chk.problems.join("; "));
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("multi-class parent: a FORCED run still bills (deferral is auto-only)", async () => {
+  // This is the path the admin panel actually uses on the 1st of the month
+  // (the route sends force: true). Deferral must NOT fire here — a forced run
+  // is an explicit human instruction and bills whatever is marked, exactly as
+  // it did before deferral existed.
+  const s = await newScenario({ price: 30, secondClass: { price: 20 } });
+  try {
+    const a = await s.addSession("2027-01-09");
+    await s.mark(a, "present");
+    await s.addSession("2027-01-16", s.classId2); // deliberately left unmarked
+
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-01",
+    });
+
+    assertEquals(res.invoices_created, 1);
+    assertEquals(res.parents_deferred, 0);
+
+    const inv = await getInvoice(s.db, s.parentId, "2027-01");
+    assertEquals(inv!.gross, 30); // only the marked lesson is billable
+    assertEquals(inv!.status, "outstanding");
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("deferral is reported even when NO class was tallied", async () => {
+  // Regression: parents_deferred used to be counted inside the phase-2 loop,
+  // which only visits parents who have billable items. When every class is
+  // incomplete nothing is tallied at all, so the count came back 0 while the
+  // entire month was blocked — reporting silence for the loudest case.
+  const s = await newScenario({ price: 30 });
+  try {
+    await s.addSession("2027-02-06"); // created, deliberately never marked
+
+    const res = await generateInvoices(s.db, {
+      mode: "auto",
+      billing_month: "2027-02",
+    });
+
+    assertEquals(res.invoices_created, 0);
+    assertEquals(res.parents_deferred, 1);
+    assertStringIncludes(res.status, "1 parent(s) deferred");
+  } finally {
+    await s.teardown();
+  }
+});
