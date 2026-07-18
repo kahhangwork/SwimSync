@@ -57,13 +57,20 @@ Created by `supabase/seed.sql` on every `supabase db reset`.
 
 | Role | Email | Password | Where to log in |
 |------|-------|----------|-----------------|
-| Superadmin | `superadmin@swimsync.test` | `password123` | Admin panel → http://localhost:3000 |
+| Platform admin | `superadmin@swimsync.test` | `password123` | Admin panel → http://localhost:3000 |
 | Coach | `coach@swimsync.test` | `password123` | Mobile app (Coach) |
 | Parent | *self-register in the app* | *you choose* | Mobile app (Parent) |
 
 - **Parents self-register** in the app (the "Register" link on the Sign In
   screen). Registration only ever creates *parent* accounts by design.
-- **Superadmin is web-only** — logging in as superadmin on mobile shows an
+- **Roles changed with multi-tenancy** (PRD §4.3). The seed now creates a
+  **platform_admin** (`superadmin@…`, cross-tenant support, belongs to no business) and a
+  **private coach** (`coach@…`) who is a **tenant_admin AND a coach** — the shape
+  production has. The seed tenant is *Coach Marcus Swim School*, join code **`SWIM-TEST`**.
+  Deliberately fictional; production's real names are set separately.
+- **A parent must enter a join code before adding a child.** Register in the app, then
+  enter `SWIM-TEST`. Without it, Add Child shows a "Join your coach first" gate.
+- **An admin who does not teach is web-only** — logging in on mobile shows an
   "unrecognised role" alert. Use the admin panel.
 - The seed also creates one class: **Saturday Beginners** (Sat 10–11am, Buona
   Vista, $25/lesson), owned by the coach above.
@@ -86,7 +93,8 @@ Created by `supabase/seed.sql` on every `supabase db reset`.
 
 ### Golden path (core loop)
 1. Mobile app → **Register** a parent → **Add Child**.
-2. Admin (superadmin) → **Unassigned Children** → assign the child to
+2. Admin (the tenant admin — log in as `coach@swimsync.test`, who is both) →
+   **Unassigned Children** → assign the child to
    *Saturday Beginners*.
 3. Mobile app → log out → log in as the **coach** → **mark attendance**.
 4. Admin → **Invoices** → pick the billing month → **Generate Invoices**.

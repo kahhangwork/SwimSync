@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-18_
+_Last updated: 2026-07-19_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -55,48 +55,42 @@ credit-note emails remain, now in _Notifications_); and the **UTC-derived defaul
 month fix** (**2026-07-17** — PRD §7.7, HANDOVER §8a). The list below is renumbered from what
 remains.)_
 
-1. **Extract the completeness-rule shared helper** (S, _Foundations_) — do **before** #2.
-   Active/inactive will edit that rule; extract it into one helper first so the change
-   lands in one place, not the four hand-written copies. Doing #2 first means editing four
-   copies and then re-touching them at extraction time.
-2. **Active / inactive status for parents and children** (M, _Admin_) — the anchor for the
+1. **Active / inactive status for parents and children** (M, _Admin_) — the anchor for the
    students table. Reconcile the two existing "inactive" notions (`is_active` vs
    `assignment_status`) and settle the status model **before** more fields are piled onto
-   students. Needs #1.
-3. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
+   students.
+2. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
    the stored `age` column (the same stale-second-source problem #2 fixes for status) and
    add NRIC. Rides the same students-schema + parent-home + admin-table edits as #2, so do
    it right after — otherwise those screens get touched twice.
-4. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
+3. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
    `parents`-table addition touching the registration form; group with #3's
    onboarding-form work so those screens are opened once.
-5. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field; do it
-   **after** the #2/#3 reconciliations so it respects the settled status/level model
+4. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field; do it
+   **after** the #1/#2 reconciliations so it respects the settled status/level model
    rather than adding churn to a table still being reconciled.
 
 _Shipped 2026-07-18 and removed from this list:_ the **multi-class-parent under-billing
 bug**, plus the configurable **invoice run day**, **month sealing**, and the **hard
 attendance block** — see PRD §7.7 and HANDOVER §8.
 
+_Shipped 2026-07-19 and removed:_ **extract the completeness-rule shared helper** (it was
+#1; done as tenanting phase 0, and it immediately exposed a live underbill — HANDOVER
+§7.18), and the whole **tenant/coach money cluster** including **coach wages**.
+
+**Note the renumbering:** #1 is now *active/inactive status*, which was #2. It is the
+oldest outstanding item in this document and is now genuinely next.
+
 ### Later — clusters with a fixed internal order
 
-- **The tenant/coach money cluster (the biggest re-work trap).** **Tenanted admin
-  accounts** (L) and **Coach type: private vs school** (M) are the *same schema decision* —
-  settle them **together**. **Coach wage tracking** (M) must come **after** coach type (a
-  private coach has no wage). None of this is needed until a second admin or coach exists —
-  but **do not build any coach/admin money feature before this schema lands**, or it gets
-  built twice (every `is_superadmin()` call site is rewritten when tenants arrive). When
-  wage tracking is actually wanted, *that* is the trigger to do tenanting + coach type
-  first. **Coach-created student profiles** (M) also belongs behind this — it reshapes the
-  parent-link + RLS surface that tenanting rewrites.
-  - **ACTIVE as of 2026-07-18 — this cluster is no longer "later".** A swim school pilots in
-    **August 2026**, which makes tenanting the immediate next build. `TENANCY_DESIGN.md` is
-    the design; its §9 sequences the work **after the 1 Aug invoice run** so the first real
-    billing cycle stays on the known-good single-tenant model. **Extract the
-    completeness-rule helper** (near-term #1) is now a hard prerequisite rather than a
-    nice-to-have — the completeness block becomes per-tenant, which edits all four
-    hand-written copies of that rule. **Multiple admin accounts per tenant** (M, below) is
-    explicitly *not* in the first cut.
+- ~~**The tenant/coach money cluster.**~~ **SHIPPED 2026-07-19** — multi-tenancy,
+  the role split, and coach wages are all built and live. See `PRD.md` §4.3/§7.13 and
+  `TENANCY_DESIGN.md`. It turned out **smaller than this entry feared**, and the reason
+  is worth keeping: treating a **private coach as a tenant of one** meant coach *type*
+  never became an authorization concept, so no rule branches on it and wages needed no
+  private-vs-school check at all. The "built twice" risk this entry warned about was
+  real, and was avoided by reframing rather than by building carefully.
+  **Coach-created student profiles** (M) still sits behind this and is now unblocked.
 - **The platform chain.** Native store builds (M) → Push notifications (M) — push can't
   work on the current static web app, so it can't precede native builds.
 - **The reminder chain.** Invoice emails **shipped** (HANDOVER §8c); the rest sequences after
@@ -251,34 +245,6 @@ already **many-to-many**, so a student can have two parents. What's missing is a
 rule and a decision about which parent's credit balance a correction lands in. Credit is
 pooled **per parent** (HANDOVER §6), so splitting invoices without splitting credit
 would produce a ledger nobody can explain.
-
-### Coach wage tracking — **M**
-Track what each coach is owed, from their rate and the classes or hours they actually
-taught.
-
-**Why:** SwimSync tracks every dollar coming *in* from parents and nothing going *out*
-to coaches — so the moment a coach isn't also the business owner, payroll is a
-spreadsheet rebuilt by hand each month from the same attendance data the app already
-holds. It's the other half of the billing loop, and it's the natural companion to
-tenanted admins above: an admin with three coaches under them has three people to pay.
-
-**This applies to school coaches only.** A **private coach has no wage** — the parents'
-invoices *are* their income and there's nobody upstream to pay them, so a rate on their
-record would be meaningless at best and double-counted revenue at worst. That makes
-**coach type** (Admin and operations) a hard prerequisite: without it there's no way to
-know which coaches this feature is even about. Build that first.
-
-**Notes:** the inputs are mostly here — `classes.start_time`/`end_time` give hours,
-`classes.coach_id` gives the attribution, and `lesson_sessions` records what actually
-ran. What's missing is a **rate on `coaches`** (the table has only
-`paynow_qr_url`/`bio` today) and a decision about which of two rate models it is:
-**per-class** or **per-hour**, since they diverge the moment a coach teaches a 90-minute
-lane. Rates change over time, so store them with an effective date rather than a single
-mutable column — otherwise recalculating an old month silently reprices history, which
-is the same class of bug as the UTC billing month below. Decide what a **cancelled**
-class means for pay before building: parents aren't billed for it, but a coach who
-showed up to an empty pool may still expect to be, and that's a policy question, not an
-engineering one.
 
 ### A session added AFTER a month is invoiced is never billed — **S**
 The hard block (HANDOVER §8) guarantees every lesson is marked *at generation time*. It does
@@ -488,46 +454,6 @@ constraint is the real gate here, not the feature.
 
 ## Admin and operations
 
-### Tenanted admin accounts — **L**
-Each admin owns a set of coaches and sees only what happens under them. Admin 1 has
-Coaches 1–3 and sees everything beneath them; Admin 2 has Coaches A–C and sees
-everything beneath *them*; neither can see the other's students, classes, attendance,
-or invoices.
-
-**Why:** `superadmin` is currently a **single global role that sees everything** — fine
-while the superadmin and the only coach are the same person, which is the assumption the
-whole authorisation model is built on. It's the thing that has to change before SwimSync
-can ever be run for a second business, and it can't be retrofitted quietly: the day a
-second admin exists without this, they see the first one's families.
-
-**Notes:** the biggest item in this document, and the one most likely to be
-underestimated. `is_superadmin()`
-(`supabase/migrations/20260309000600_rls_policies.sql:20`) is a bare
-`role = 'superadmin'` check with **no tenant dimension at all**, and it appears in
-roughly every policy in the file — every one becomes "…and in my tenant." Decide the
-tenant's shape first: a `tenants` table with `profiles.tenant_id`, scoped by a
-`current_tenant_id()` helper alongside the existing `coach_serves_parent()`, is the
-obvious shape. The subtleties are where the tenant boundary actually falls — a **parent
-is reachable only through their coach**, so a family that ever moves between coaches (or
-one child per coach) needs an answer before the schema is set. Also: existing rows all
-need a tenant on migration, and `classes` is readable by *any signed-in user* today —
-`classes_select` is a bare `USING (TRUE)`
-(`supabase/migrations/20260309000600_rls_policies.sql:161`) — which is a leak the moment
-tenants exist.
-Do this before onboarding a second admin, not after — backfilling a tenant boundary
-across live billing data is a different and worse project.
-
-> **A full design now exists: `TENANCY_DESIGN.md` (2026-07-18).** Read it before touching
-> this item — it supersedes the sketch above on several points. In particular: the tenant
-> boundary does **not** run through `parents` (they stay global, or PRD §11.3 breaks);
-> `students` gets a real `tenant_id` column rather than deriving it from enrolment; and the
-> largest piece of work is **not** the RLS rewrite but the **money model** — invoices become
-> unique per `(parent, tenant, month)`, credit balance becomes per-`(parent, tenant)`, month
-> sealing and the completeness block become per-tenant, and the invoice engine runs as
-> `service_role` so RLS does not protect it at all. Two further cross-tenant leaks are
-> recorded there that are not noted above: `coaches_select` is also `USING (TRUE)`, and
-> `profiles_select` exposes **every coach's name, email and phone** platform-wide.
-
 ### Multiple admin accounts per tenant — **M**
 More than one person can administer the same business — e.g. a school owner plus an
 operations manager, both seeing that school's coaches, classes, students and billing, and
@@ -549,58 +475,6 @@ capability nobody has asked for yet. Worth settling at the same time: whether a 
 is a *full* admin or a restricted one (e.g. can mark attendance and chase payment but cannot
 change class pricing), since that decides whether `role` on the join table is a real enum or
 a placeholder.
-
-### Coach type: private vs school — **M**
-
-> **Substantially reframed by `TENANCY_DESIGN.md` §1 (2026-07-18) — read that first.** The
-> conclusion there is that a **private coach is a tenant of one**, where the same person
-> holds the admin and coach roles. If that holds, coach type is **not an authorization
-> concept at all**: no rule branches on private-vs-school, they branch on tenant + role, and
-> `tenants.kind` survives only as onboarding copy. That deletes most of the "build every
-> money feature twice" risk this item warns about below — including for wages, where the
-> real question is "is this coach the tenant owner", not "what type are they". The item is
-> kept for its reasoning and its `close_student_enrolment()` note.
-
-A type on each coach that decides who they answer to. A **school coach** belongs to a
-tenanted admin (above) and is managed, paid, and seen by that admin. A **private coach**
-runs their own business and falls under the overall SwimSync platform admin instead.
-
-**Why:** these two coaches are not the same object wearing different labels — they have
-different owners, different money, and different privacy expectations, and almost every
-rule that follows branches on which one you're looking at. The clearest case is wages
-below: a school coach is *paid* by their admin, while a private coach **has no wage at
-all** — the parents' invoices are already their income, and there's nobody upstream to
-pay them. Building either feature without this distinction means building it twice.
-
-**Notes:** should be settled **as part of** tenanted admins above, not after it — it's
-the same schema decision, and getting it wrong is the expensive kind of wrong. Two
-things to get right:
-
-- **A private coach should be their own tenant, not a resident of one big "platform"
-  tenant.** "Falls under the SwimSync admin" is about *who administers them*, not about
-  who they sit beside. If every private coach shares one platform tenant, they can see
-  each other's families — which is the exact failure tenanting exists to prevent, just
-  moved somewhere less obvious. Give each private coach a tenant of one, and make the
-  platform admin a **cross-tenant operator role** rather than a tenant.
-- **That means `superadmin` is really two roles today**, and this is where they split:
-  the *platform* admin (SwimSync itself, sees everything, for support and billing) and a
-  *tenant* admin (a school, sees only their own). The `user_role` enum
-  (`parent`/`coach`/`superadmin`) can't express that, so it needs a new value — and
-  every current `is_superadmin()` call site has to be read as one or the other. Assume
-  the answer is "tenant admin" unless it's genuinely platform operations; defaulting the
-  other way hands schools each other's data.
-
-**Concrete first thing this must split (added 2026-07-18):** *Remove from class* and *Set
-inactive* are currently available to **both** the superadmin and the owning coach, via
-`close_student_enrolment()` (migration `20260718000200`). That is an interim model chosen
-because coach type doesn't exist yet. When it does: a **private coach keeps both** (it is
-their own business), while for a **school coach they move to the tenant admin**. The
-permission check lives in one place — the `is_superadmin() OR coach_serves_student()` line
-in that function — so the split is a small edit *if* it is remembered.
-
-Also decide whether a coach can **change type** — a private coach joining a school is an
-ordinary career move, and it means moving them *and their families* between tenants,
-which is the same hard case the tenanting item already flags.
 
 ### Active / inactive status for parents and children — **M**
 An explicit active/inactive state on each child and each parent, with the two kept in
@@ -857,5 +731,10 @@ Kept so the reasoning doesn't get re-litigated.
 | **`Alert.alert` for user feedback** | A **no-op on RN-web**, so it silently does nothing on the deployed app. Use `confirmAction` / the global Toast / inline form errors instead (HANDOVER §12a). The only sanctioned use left is the native-only media-library permission prompt. |
 | **Invoicing a child immediately when they are set inactive** | Proposed as "settle up what they owe on the way out"; rejected 2026-07-18. Invoices are `UNIQUE(parent_id, billing_month)`, so an early partial-month invoice makes the regular run skip that parent via the `already_exists` guard — stranding their **siblings'** lessons for that month. That is exactly the multi-class underbilling bug the same session fixed, re-entered through a new door. It also breaks PRD §7.7's one-complete-calendar-month rule. The normal cycle already bills them correctly, because billing follows **attendance rows** rather than current enrolment (HANDOVER §8). |
 | **An override / "Generate anyway" on the attendance block** | Removed deliberately 2026-07-18 (PRD §7.7). The case it appeared to serve — a class that genuinely didn't run — is already handled *inside* the completeness rule by marking everyone `cancelled_rain`/`cancelled_coach`. So the bypass wasn't covering a legitimate case; it was letting an unrecorded lesson through into a **permanent** underbill, because a lesson can never be added to an invoice that already exists (§11.6). The escape hatch for a class that can't be completed is removing the student, not overriding the check. |
-| **A per-tenant / per-coach invoice run day** | Same call as the timezone row below, reaffirmed by the user 2026-07-18: `app_settings.invoice_run_day` is **one global setting**. Per-coach scoping would mean inventing coach type *and* tenant scoping to hold a single integer, for a second coach who doesn't exist, controlling a scheduler that isn't enabled. Promoting one integer to a per-tenant column when tenanting lands is trivial next to the RLS rewrite that happens anyway. |
+| ~~**A per-tenant invoice run day**~~ **— NOW BUILT (2026-07-19)** | Kept as a record of the reasoning, which held up. It was correctly refused while there was one business, and shipped as a per-tenant column the moment tenanting arrived, exactly as this row predicted ("trivial next to the RLS rewrite that happens anyway"). A useful example of deferring a small generalisation until the thing that needs it exists. |
+| **A browsable directory of coaches / schools for parents** | Considered as the way a parent picks their business, rejected 2026-07-19 in favour of **join codes** (PRD §5.1). A list publishes SwimSync's entire customer roster to every parent and every competing school; worse, a mis-tap puts a child on a stranger's roster where that business's admin can see and bill them, because nothing in the flow proves the family deals with them. **Possession of a code is that proof.** It also stops scaling at a few hundred tenants. If a discovery feature is ever wanted, make it search-by-exact-name so the full list is never enumerable. |
+| **A "view as tenant" impersonation mode for the platform admin** | Rejected 2026-07-19 while building the platform page. It means scoping *every* admin screen to a chosen tenant rather than the caller's own — far larger than the support need, which is answered by a cross-tenant business list plus the ability to **move a student** between businesses (PRD §4.4). Revisit only if support actually gets stuck without it. |
+| **Cross-tenant students** (one child taking lessons at two businesses) | Out of scope 2026-07-19. A student belongs to one business, and `one_active_enrolment_per_student` already enforces one active class. Note this **is** a real thing in Singapore, so this is a "not yet" rather than a "never" — but it touches enrolment, billing and the tenant boundary at once. Revisit on actual demand, not in anticipation. |
+| **Platform billing (SwimSync charging the schools)** | Deliberately unbuilt 2026-07-19: the pilot is free. `tenants` is the natural billing subject when it arrives, so nothing in the current schema blocks it — but building it now would be a second money model with no payer. |
+| **A non-calendar wage cycle** (e.g. 16th–15th) | Wages assume **calendar months**, with only the *pay day* configurable (PRD §7.13). A different period boundary is a new period concept rather than a setting, and would need its own sealing and adjustment rules. Nobody has asked for it. |
 | **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8a.) |

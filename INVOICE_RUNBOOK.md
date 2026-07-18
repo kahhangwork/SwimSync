@@ -1,7 +1,7 @@
 # SwimSync — Monthly Invoice Runbook
 
 How to generate and collect invoices each month. Invoicing on SwimSync is
-**manual** (the free-tier cloud project has no cron), so the superadmin runs it
+**manual** (the free-tier cloud project has no cron), so the business's admin runs it
 by hand on the 1st. Keep this handy — it's a recurring task and easy to slip on
 the "bill the *previous* month" detail.
 
@@ -75,7 +75,10 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 
 ## Step-by-step
 
-1. Log in to **https://admin.swimsync.sg** as the superadmin.
+1. Log in to **https://admin.swimsync.sg** as the **tenant admin** — the business whose
+   invoices you are generating. *(Roles changed with multi-tenancy: `superadmin` split
+   into `tenant_admin` and `platform_admin`. A **platform admin has no Generate button**,
+   because generation runs for one business at a time — see PRD §4.3.)*
 2. Open **Invoices** (left sidebar).
 3. In the **Billing month** picker, select the **previous month**.
    ⚠️ It defaults to the *current* month — **you must change it** (e.g. on 1 Aug, set it to **Jul**).
@@ -156,7 +159,9 @@ Billing is based on **actual attendance**, so make sure last month is complete:
     entirely; that is what the empty-month guard now prevents.)
   - **If a month is closed by mistake** (e.g. a lesson surfaced afterwards),
     reopen it by deleting its row in the Supabase dashboard SQL editor:
-    `DELETE FROM billing_periods WHERE billing_month = '2026-07';`
+    `DELETE FROM billing_periods WHERE billing_month = '2026-07' AND tenant_id = '<the business>';`
+    *(the key is now `(tenant_id, billing_month)` — sealing is per business, so scope the
+    delete or you reopen the month for everyone)*
     Then generate again. Note the existing invoices are **not** rewritten — the
     no-double-billing guard skips parents who already have one, so a lesson
     added after invoicing still needs a credit-note correction rather than a
