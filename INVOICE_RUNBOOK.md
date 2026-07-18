@@ -11,8 +11,9 @@ the "bill the *previous* month" detail.
 
 > On/after the **1st**: finish marking last month's attendance → **admin.swimsync.sg → Invoices** →
 > set **Billing month = LAST month** (change it — it defaults to *this* month) →
-> **Generate Invoices** → **read the gap report** in the dialog → confirm →
-> eyeball the results → tell parents to pay → mark **Paid** as money lands.
+> **Generate Invoices** → if it says lessons are unmarked, **get them marked and come
+> back** (there is no override) → confirm → eyeball the results → tell parents to pay →
+> mark **Paid** as money lands.
 
 ---
 
@@ -58,9 +59,9 @@ you still generate manually every month.
 
 Billing is based on **actual attendance**, so make sure last month is complete:
 
-- [ ] **Read the gap report in the confirm dialog** (step 4 below) — it lists any
-      lesson with no attendance marked. This is the one check the app can do for
-      you; the rest are judgement.
+- [ ] **Every lesson is marked.** The app now *enforces* this: if any lesson in the month
+      has no attendance, **generation is refused** and the dialog names the class and date
+      (step 4 below). You cannot generate around it. The rest of this list is judgement.
 - [ ] Any trials are classified **Paid Trial** or **Free Trial** (not left as a bare trial).
 - [ ] Any needed attendance corrections are done. (Correcting a billable → non-billable
       status *after* an invoice exists auto-issues a **credit note** applied to the next
@@ -85,10 +86,17 @@ Billing is based on **actual attendance**, so make sure last month is complete:
      missing dates (e.g. *Saturday Beginners — 3 of 4 lessons marked · Missing:
      Sat, 18 Jul*). **Stop.** Cancel, get the coach to mark those lessons (they
      appear under **Unmarked Lessons** on the coach's Today tab), then come back.
-     The button says **Generate anyway** — it won't block you, because a class
-     that genuinely didn't run is a legitimate reason to proceed. But anything
-     you skip here is **money you won't bill**, and you can't top up the invoice
-     afterwards.
+     **The Generate button is disabled — there is no "generate anyway".** That is
+     deliberate: a lesson marked *after* an invoice exists can never be added to it,
+     so billing around a gap loses that money permanently.
+     Two ways forward, both legitimate:
+     - **The lesson ran** → the coach marks it (it appears under **Unmarked Lessons**
+       on their Today tab). Come back and generate.
+     - **The lesson didn't run** → the coach marks everyone **Cancelled — rain** or
+       **Cancelled — coach**. Non-billable, and it clears the block.
+     - **A child has stopped coming** and is holding the class open → **Remove from
+       class** on admin → Students (or the coach's roster). Lessons they already
+       attended are still billed.
 
    Then confirm. Give it ~5–8 seconds (the billing function can cold-start).
    You'll see a toast like **"Created N invoice(s) for <month>."**

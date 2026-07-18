@@ -1,6 +1,6 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-17_
+_Last updated: 2026-07-18_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -58,10 +58,17 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   Login/register errors are mapped to friendly copy (`lib/authErrors.ts`).
 - **Attendance** — coach marks/edits per session; audit-logged. A **"Set all ▾"** header
   menu bulk-sets every student to one status (Present/Absent/Cancelled-rain/coach) in one
-  tap, with a confirm guard when some are already marked (§8d, PRD §7.6).
+  tap, with a confirm guard when some are already marked (§8e, PRD §7.6).
 - **Invoice generation** — one `generate-invoices` engine, two modes: **automatic**
-  (cron-style; respects the `app_settings.auto_invoice_enabled` switch, a
-  completeness gate, and seals the month) and **manual on-demand** (admin button).
+  (cron-style; respects the `app_settings.auto_invoice_enabled` switch and
+  `invoice_run_day`, default the **7th**) and **manual on-demand** (admin button). **One
+  invoice per parent covering every class their children are in** (§8), and **unmarked
+  attendance blocks generation entirely in both modes — there is no override** (§8). A
+  month that finishes is **sealed**, by either mode, so later runs no-op.
+- **Closing an enrolment (verified UI + DB)** — **"Remove from class"** and **"Set
+  inactive"** on the admin Students page *and* the coach roster, via the
+  `close_student_enrolment()` RPC. This is what unblocks billing when a child has stopped
+  attending; their already-attended lessons still bill (§8).
 - **Credit-note flow (verified UI + backend)** — editing an invoiced attendance
   row billable→non-billable auto-issues a credit note and adds to the parent's
   pooled `credit_balance`; the next invoice draws it down FIFO. A partial-
@@ -78,13 +85,13 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   the coach's Today tab lists **Unmarked Lessons** and links straight to marking a past
   date, and the admin's invoice-generation dialog reports `N of M lessons marked` per
   class with the missing dates named. Closes the hole where a forgotten lesson was
-  silently unbillable and invisible to everyone (§8h).
+  silently unbillable and invisible to everyone (§8i).
 - **Parent Attendance states (verified UI)** — an unassigned child gets the
   "not assigned yet" state PRD §5.1 requires, distinct from "no lessons marked yet"
-  (waiting on the coach) and an empty filter result (§8f).
+  (waiting on the coach) and an empty filter result (§8g).
 - **Full RLS** — parents see only their data, coaches only their classes,
   superadmin everything. Covered by automated isolation tests.
-- **Automated tests** — backend **34 pgTAP + 29 Deno**, plus frontend suites
+- **Automated tests** — backend **34 pgTAP + 49 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest, `SwimSyncApp` jest-expo); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
@@ -94,12 +101,20 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 classes** are onboarded and the production DB is a **clean slate** (only the
 superadmin + the real coach/classes). See §11.
 
-> **`main` = what's live.** Vercel builds both sites from `main`, so a **push deploys** —
-> there is no separate release step. `git log origin/main` is the honest answer to
+> **`main` = what's live for the WEB APPS ONLY.** Vercel builds both sites from `main`, so a
+> push deploys them — but a push deploys **neither the Edge Function** (`supabase functions
+> deploy`) **nor migrations** (`supabase db push`). Both are separate, manual steps.
+> **This bit us:** migration `20260712000100_coach_read_parent_profile` sat merged-but-
+> undeployed for **six days** — the coach Billing screen could not show parent names in
+> production that whole time, and nothing surfaced it. Applied 2026-07-18 alongside §8's
+> three. **After any backend change, run `supabase migration list` and check nothing has an
+> empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> As of 2026-07-16 that includes the bulk attendance **"Set all"** control, **admin class
-> editing + a required day-of-week** (§8d), the unmarked-lesson safety net, and the parent
-> Attendance fixes (§8f). **Caveat worth keeping:** every check on that work ran against **local
+> As of 2026-07-18 that includes the whole §8 underbilling cluster (multi-class invoices, the
+> configurable run day, month sealing, and the hard attendance block), plus the earlier bulk
+> attendance **"Set all"** control, **admin class
+> editing + a required day-of-week** (§8e), the unmarked-lesson safety net, and the parent
+> Attendance fixes (§8g). **Caveat worth keeping:** every check on that work ran against **local
 > fixtures** — none of it has been driven against the real production DB. No schema or
 > migration is involved, so failure looks wrong rather than destroying data.
 
@@ -170,7 +185,7 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 supabase test db                                  # 34 tests across 4 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
-supabase/functions/generate-invoices/test.sh      # 29 tests; needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 49 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
 cd SwimSyncAdmin && npm test                       # 38 tests
@@ -202,6 +217,15 @@ no-op without a key). **Email** (`email.test.ts`): pure HTML builder + `sendInvo
 regression (1 Aug 00:30 SGT bills July, **fails on the old UTC path**), year rollover, and
 the `APP_TIMEZONE` seam (UTC vs SGT diverge at the boundary).
 
+_Also in `core.test.ts` (added §8):_ **multi-class** (one parent, two children, two
+classes → ONE invoice with both classes' items; the credit case proving credit draws
+against the *combined* gross), **auto-mode deferral** and its recovery, the **hard block**
+(unmarked attendance stops both auto and manual; marking it *cancelled* clears it), the
+**run day** (before/on/after, manual ignores it, SGT decides the day), **sealing** (a
+manual run that finishes the month seals it; a forced run on an incomplete month seals
+nothing; sealing twice is a no-op), and **billing-vs-enrolment** (a child unenrolled
+mid-month is still billed for what they attended; unenrolling clears the block they caused).
+
 _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
@@ -216,7 +240,7 @@ next additions.
 
 _Note:_ both apps now **typecheck clean** and CI enforces it — a **Typecheck (tsc)**
 step runs `tsc --noEmit` for `SwimSyncApp` and `SwimSyncAdmin` in the `frontend-tests`
-matrix (§8c). The app's 5 long-standing `tsc` errors in
+matrix (§8d). The app's 5 long-standing `tsc` errors in
 `app/(parent)/home/child/[id].tsx` (Supabase join typing) were cleared with an `any`
 cast. Run `npm run typecheck` in either app locally — but see §7.11: a local pass can
 still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
@@ -236,7 +260,7 @@ is already marked, and a bulk save persists `cancelled_rain` to the DB;
 `verify-class-edit.mjs` drives the admin Classes page — the create form no longer defaults
 the day (required choice) and an existing class edits Saturday→Sunday and persists;
 `verify-attendance-window.mjs` (+ `fixtures-attendance-window.sql`) drives the attendance
-window (§8a) across coach + parent — the roster button targets the most recent expected
+window (§8b) across coach + parent — the roster button targets the most recent expected
 lesson (not raw "today"), the "no lessons to mark yet" placeholder shows for a class with
 nothing due, and the parent screen distinguishes "no lessons have taken place yet" from
 "no lessons marked yet".
@@ -254,13 +278,37 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 - **Invoice engine split for testability:** `generate-invoices/core.ts` holds the
   billing logic (exported `generateInvoices(supabase, opts)`); `index.ts` is a thin
   Deno.serve handler (auth + client + call). Behaviour is identical either way.
-- **Invoice emails live in `email.ts`, deliberately OUT of `core.ts`** (§8b). The engine
+- **Invoice emails live in `email.ts`, deliberately OUT of `core.ts`** (§8c). The engine
   stays pure and returns a typed `created[]`; `index.ts` calls `emailCreatedInvoices()`
   *after* generation commits, so a delivery failure can never touch billing. Sends go via
   the **Resend HTTP API** (not Auth SMTP), keyed by `RESEND_API_KEY`, and are a **logged
   no-op when the key is unset** — so local + tests never send. Don't move sending into the
   engine or make it able to throw into the generation path. **The Edge Function is deployed
   by `supabase functions deploy`, NOT by a git push** (Vercel only builds the two web apps).
+- **One invoice per parent per month is built in TWO PHASES** (§8): the class loop only
+  *tallies* billable items into a cross-class map; invoice creation runs once per parent
+  afterwards. Creating invoices inside the class loop is what under-billed multi-class
+  families — the "already has an invoice" guard skipped them on their second class. **Don't
+  move invoice creation back inside the loop.**
+- **Unmarked attendance BLOCKS generation, with no override, in both modes** (§8, PRD §7.7).
+  This deliberately reverses the earlier "warn + Generate anyway". The justification for the
+  bypass (a class that genuinely didn't run) is already served inside the completeness rule:
+  mark it `cancelled_rain`/`cancelled_coach`. `force` no longer bypasses the gate — it only
+  skips the sealed-month guard. **Don't add an override**; add a way to mark the lesson.
+- **`close_student_enrolment()` is a SECURITY DEFINER RPC, not an RLS policy** (migration
+  `20260718000200`). The operation must also write `students.assignment_status`, and
+  `students_update` is (superadmin OR creator OR owning parent) — granting coaches UPDATE on
+  `students` would let them edit names, DOBs and notes too, because **RLS is row-level, not
+  column-level**. The function exposes exactly one operation, keeps its three writes
+  together, and is audit-logged. It deliberately offers no INSERT (assignment stays
+  superadmin, PRD §5.2) and no DELETE (history must survive, PRD §11.5; credit untouched,
+  §11.8). Permission is interim: when coach type lands, a private coach keeps it and a
+  school coach's admin takes it over.
+- **The billing timezone/run-day seam is GLOBAL, not per-tenant** — `APP_TIMEZONE` and
+  `app_settings.invoice_run_day`. Same reasoning as the timezone call (§8a), reaffirmed by
+  the user for the run day: multi-tenant is a don't-paint-into-a-corner concern with zero
+  users today. Promoting one integer to a per-tenant column later is trivial next to the
+  RLS rewrite tenanting requires anyway.
 - **Credit is pooled per PARENT** (`credit_notes.parent_id` + `parents.credit_balance`);
   a note's `student_id` is provenance only, so credit earned from one child is
   spendable against any child (invoices are one-per-parent-per-month).
@@ -309,7 +357,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   `updated_at`) are fine as-is — only date-*string* derivations are affected. The same
   rule now covers the **invoice engine's default billing month**: it is derived in the app
   timezone via `generate-invoices/dates.ts` (`previousBillingMonth()`), **not** `new
-  Date()`'s local/UTC fields — see §8 and gotcha §7.12. The timezone is a single seam
+  Date()`'s local/UTC fields — see §8a and gotcha §7.12. The timezone is a single seam
   (`APP_TIMEZONE`, default `Asia/Singapore`), **deliberately not per-tenant** — one
   configured zone is enough while all usage is SGT, and true multi-timezone folds into the
   tenanting work when that lands.
@@ -353,12 +401,16 @@ See LOCAL_DEV_GUIDE §"Running the tests".
    that **double-billed everyone**. Use `todayInSg()` + `dayOfWeekOf()` (§6). Pinned by
    `verify-tz-saturday.mjs`; audit with
    `grep -rn --include="*.ts" --include="*.tsx" -e "toISOString()\.split" -e "toISOString()\.slice" SwimSyncApp SwimSyncAdmin`.
-8. **The engine's completeness gate never fires on the admin path.**
-   `SwimSyncAdmin/app/api/generate-invoices/route.ts` hardcodes `force: true`, which
-   bypasses the gate, the auto switch, and the month seal — and cron isn't wired on the
-   free tier, so the auto path never runs at all. The **admin confirm modal's gap report
-   is therefore the only thing standing between a forgotten lesson and an underbill.**
-   It warns rather than blocks, by design. Don't assume the server will catch it.
+8. **~~The engine's completeness gate never fires on the admin path.~~ FIXED 2026-07-18
+   (§8).** For months, `SwimSyncAdmin/app/api/generate-invoices/route.ts` hardcoded
+   `force: true`, which bypassed the gate, the auto switch and the month seal — so the
+   admin confirm modal's gap report was the *only* thing between a forgotten lesson and an
+   underbill, and it merely warned. The route no longer sends `force`, and unmarked
+   attendance now **blocks** generation outright in every mode. Kept here because the
+   shape of the mistake is worth remembering: **a safety gate that the only live caller
+   bypasses is not a gate.** `force` still means "skip the sealed-month guard" (the
+   documented reopen path) and nothing more — don't re-add it to the route to "make
+   generation work"; if generation refuses, the answer is to mark the lesson.
 9. **`react-native-web` gives EVERY ScrollView `flexGrow: 1`** — horizontal ones
    included (`commonStyle` in its `ScrollView/index.js`). So a horizontal ScrollView in
    a column layout **expands to fill the leftover vertical height**, and its row content
@@ -384,21 +436,131 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     CI won't have. Both apps happen to pass without them today (verified), but before trusting
     any frontend typecheck, reproduce the CI condition: hide the artifacts
     (`mv .next .next__x; mv next-env.d.ts next-env.d.ts__x`) and re-run. This is why the CI
-    typecheck guard (§8c) was validated against a stubbed-out fresh checkout, not just a local
+    typecheck guard (§8d) was validated against a stubbed-out fresh checkout, not just a local
     pass.
 12. **The invoice engine's DEFAULT billing month was UTC-derived** — same family as #7,
     different door. `core.ts` computed the previous month from `new Date().getMonth()`,
     which is the **UTC** month on Edge Functions. The daily cron POSTs an empty body, so it
     used this default: at the 1am SGT run (17:00 UTC the day before) it would bill a month
     early (1 Aug → June, not July). Latent because invoicing is manual (the admin always
-    sends an explicit month) and cron is off. **Fixed** (§8) — the default now derives the
+    sends an explicit month) and cron is off. **Fixed** (§8a) — the default now derives the
     calendar date in `APP_TIMEZONE` via `generate-invoices/dates.ts`. Don't reintroduce a
     `new Date()`-field month derivation in the engine. Audit:
     `grep -rn "getMonth\|getFullYear\|new Date()" supabase/functions/generate-invoices/core.ts`.
 
+13. **Billing must follow ATTENDANCE ROWS, not active enrolments.** `core.ts` used to build
+    its billable student set from `student_class_enrolments … is_active`, so closing an
+    enrolment dropped that child's *already-attended* lessons from the invoice entirely.
+    Latent while nothing could unenrol — then the "Remove from class" button (§8) made a
+    silent month-sized underbill one tap away. The two questions are genuinely different:
+    **active enrolments answer "who must be marked" (the completeness gate); attendance
+    rows answer "who gets billed."** Don't collapse them back together. Audit:
+    `grep -n "activeStudentIds" supabase/functions/generate-invoices/core.ts`.
+14. **`Number(null)` is `0`, so a "missing setting" can clamp to the *most aggressive*
+    value.** `clampRunDay` coerced first and clamped into 1..28, which turned an unset
+    `invoice_run_day` into **day 1** — the earliest possible run, exactly what the setting
+    exists to prevent. Missing/unparseable/out-of-range-low now falls back to the default;
+    only too-*high* values clamp (29–31 → 28, which would otherwise never fire in
+    February). When normalising config, decide separately what "absent" means and what
+    "out of range" means — they are not the same answer.
+15. **A test suite that seals state can pass once and fail on the second run.** Manual runs
+    now seal a month (§8), so every completing test left a `billing_periods` row and the
+    *next* run short-circuited on `already_complete`. `teardown()` clears the months its
+    sessions fall in. **Run the Deno suite twice** after touching the engine — once proves
+    nothing about leaked state.
+16. **`SET LOCAL ROLE` outside a transaction is a no-op, and psql will not stop you.** An
+    RLS check written without `BEGIN`/`COMMIT` runs as `postgres`, which **bypasses RLS
+    entirely** — so every case "passes", including the ones that should be denied. Wrap
+    RLS probes in an explicit transaction, and make sure at least one case is expected to
+    FAIL, so a silently-superuser session is visible.
 ---
 
-## 8. What changed this session (2026-07-17 — UTC-derived default billing month fix)
+## 8. What changed this session (2026-07-18 — the underbilling cluster: multi-class fix, run day, sealing, hard block)
+
+**Four changes that together close underbilling from both ends — A fixes billing that was
+*wrong*, D prevents billing that is *incomplete*.** All merged to `main` (`b3bb2c5` →
+`6014095`, fast-forward, no PR), CI green, **and fully deployed**: `supabase db push`
+(4 migrations) + `supabase functions deploy generate-invoices` + Vercel from the push.
+
+**A — a multi-class parent was billed for only ONE class** (`b3bb2c5`). `core.ts` created
+invoices *inside* the per-class loop, so a parent's invoice was created during the first
+class their children appeared in, and the "already has an invoice" guard then skipped them
+for the second — silently dropping those lessons. Contradicted PRD §5.5 and, unlike a
+forgotten lesson, was invisible to the gap report. Restructured into **two phases**: the
+class loop only *tallies* into a cross-class map; invoice creation runs **once per parent**
+afterwards. Auto mode also **defers** a parent whose child sits in an incomplete class
+rather than writing a partial invoice tomorrow's retry could never top up.
+
+**B — the automatic run day is configurable, default the 7th** (`7135e38`). Billing on the
+1st is too early: the month's last lesson may be unmarked, and a lesson marked *after* the
+invoice exists can never join it. **Key finding: "the 1st" was never a cron setting** —
+`cron_schedule.sql` runs *daily* and the engine decided the month. So this is an engine-side
+guard needing no pg_cron change, which also makes it admin-editable and testable.
+
+**C — a month is sealed as soon as it is genuinely finished** (`867d228`), by *any* run,
+not just an automatic one. Prerequisite that had to land with it: completeness is now
+**measured always and enforced only when not forced** — `classesIncomplete` used to be
+incremented inside the `!force` branch, so a forced run always reported 0 and the engine
+could not tell whether the month it billed was actually complete. Sealing on that would
+have been strictly worse than not sealing.
+
+**D — generation is BLOCKED until attendance is complete, in every mode, no override**
+(`6014095`). The gap check previously only warned, and the admin route **hardcoded
+`force: true`** (the long-standing §7.8 gotcha), so the gate never fired on the only path
+that runs. Blocking beats warning because a lesson that genuinely did not run is recorded
+as `cancelled_rain`/`cancelled_coach`, which satisfies the check — so the bypass was never
+covering a legitimate case, it was letting an unrecorded lesson through into a permanent
+underbill. All-or-nothing, because invoicing the complete classes would strand the rest
+behind the same guard. A blocked *automatic* run emails the coach + superadmin, throttled
+by a fingerprint of the outstanding set so a daily cron cannot send a daily nag.
+
+**D's prerequisite — closing an enrolment, for coach as well as admin.** Without it the
+no-override design is unsafe: the gate reads **active enrolments** and never consults
+`students.is_active`, so a child who left with an open enrolment keeps their class
+permanently incomplete and would block **all** billing with dashboard SQL as the only
+remedy. Shipped **"Remove from class"** (→ unassigned) and **"Set inactive"** on the admin
+Students page and the coach roster, via `close_student_enrolment()` — see §6 for why an
+RPC rather than an RLS policy.
+
+**The trap inside that prerequisite (found before shipping, not after).** `core.ts` derived
+its billable set from *active enrolments*, so closing one **silently dropped that child's
+already-attended lessons** from the invoice — one tap of the new button would have cost a
+month's revenue for them. Active enrolments now drive **only** the completeness gate;
+billing follows the **attendance rows that exist**. Pinned by two tests.
+
+**Three bugs found in this session's own work, all by verification rather than review:**
+- `parents_deferred` was counted inside the phase-2 loop, which only visits parents *with*
+  billable items — so when every class was incomplete it reported **0 while the whole month
+  was blocked**, silence for the loudest case. Found by the live run, not the unit tests.
+- `clampRunDay(null)` returned **day 1**: `Number(null)` is `0`, which clamped *upward*,
+  turning "unset" into "bill on the 1st" — precisely what B exists to prevent.
+- Manual runs began sealing months, so every completing test left a `billing_periods` row
+  and the **second** run of the suite short-circuited on `already_complete`. Fixed in
+  `teardown()`, which now clears the months its sessions fall in.
+
+**Verified.** Deno **29 → 49** (all five new Part-A tests fail on the pre-fix engine — test
+(a) reports gross 30 instead of 50); pgTAP 34; admin 38; app 38; both apps typecheck. Every
+part also driven **live through the Edge Function** against real DB state, and the RLS
+boundary tested directly in psql. Docs: PRD §7.4/§7.7, `INVOICE_RUNBOOK.md`.
+
+**Not done (deliberate):**
+- **No tenanting, no coach type.** The user asked whether the run-day setting should be
+  per-tenant/per-coach; the call was **one global setting**, mirroring the `APP_TIMEZONE`
+  seam decision (§8a). Tenanting is an L that rewrites nearly every RLS policy, has an
+  unsettled design question (where a family that moves between coaches belongs), and has
+  **zero users** — one coach, one admin, the same person. Promoting one integer to a
+  per-tenant column later is trivial next to that rewrite.
+- **No settle-up invoice when a child is set inactive.** Considered and rejected: invoices
+  are `UNIQUE(parent_id, billing_month)`, so an early partial-month invoice would make the
+  regular run skip that parent and strand their siblings' lessons — the *same* bug A just
+  fixed. The normal cycle bills them, which the enrolment-decoupling above makes correct.
+- **No override on the block**, at the user's explicit call. The escape hatches are marking
+  the lesson cancelled, or removing the student — both verified live.
+- **`is_active` vs `assignment_status` still not reconciled.** This session *writes* the
+  enum but did not settle the two-sources-of-truth question; that stays the M-sized backlog
+  item, now overdue.
+
+## 8a. What changed (2026-07-17 — UTC-derived default billing month fix)
 
 **Fixed a latent billing bug: the invoice engine's default billing month was derived in
 UTC, so the daily cron would bill a month early.** Shipped to `main` (`745b3ea`,
@@ -441,9 +603,9 @@ bill the correct month.
 - **No save-time DB guard on `billing_month`** — out of scope; unrelated to this default-path
   fix. (The separate attendance-window save guard is still in BACKLOG → Foundations.)
 - **Didn't touch the related multi-class-parent under-billing bug** (BACKLOG → Billing) —
-  separate defect, still open and worth fixing before 1 Aug.
+  separate defect, still open and worth fixing before 1 Aug. _(Fixed 2026-07-18 — §8.)_
 
-## 8a. What changed (2026-07-17 — attendance marking window + clearer empty states)
+## 8b. What changed (2026-07-17 — attendance marking window + clearer empty states)
 
 **Bounded how far back a coach can mark attendance, and made the parent's empty states
 truthful.** Shipped to `main` (`16d3db3`, fast-forward, no PR). **No schema or billing
@@ -482,7 +644,7 @@ change** — reuses the read-time lesson-date logic (`lib/lessonDates.ts`).
   month" — a lesson marked right after a month is invoiced is still in-window but wouldn't bill.
   Filed in BACKLOG → Billing.
 
-## 8b. What changed this session (2026-07-16 — invoice email notifications)
+## 8c. What changed this session (2026-07-16 — invoice email notifications)
 
 **Parents now get emailed when their invoice is generated** — a branded, itemised "your
 invoice is ready" email via the Resend HTTP API. Shipped to `main` (`d13e1b3`,
@@ -531,7 +693,7 @@ siblings in different classes.
   failed send isn't retried. In BACKLOG. Keeps the first cut an 'S'.
 - **Itemised was folded IN** (not deferred) at the user's call — cheap on top of the summary.
 
-## 8c. What changed this session (2026-07-16 — typecheck baseline + CI guard)
+## 8d. What changed this session (2026-07-16 — typecheck baseline + CI guard)
 
 **Cleared the app's 5 pre-existing `tsc` errors and wired `tsc --noEmit` into CI for both
 apps, so the typecheck baseline is now enforced instead of a new type error hiding in
@@ -568,7 +730,7 @@ user-facing moved). This was Build-order item #2.
   still ahead of it.
 - **PRD untouched** — nothing shipped a behaviour change; this is types + CI + tooling only.
 
-## 8d. What changed this session (2026-07-16 — bulk attendance + admin class management + backlog ranking)
+## 8e. What changed this session (2026-07-16 — bulk attendance + admin class management + backlog ranking)
 
 **Shipped the bulk "Set all to…" control on the coach attendance screen (was the
 backlog's #1), added admin class-editing + a required day-of-week (root-causing the
@@ -647,7 +809,7 @@ Saturday classes), and ranked the backlog into a re-work-ordered build plan.**
 
 ---
 
-## 8e. What changed this session (2026-07-16 — backlog)
+## 8f. What changed this session (2026-07-16 — backlog)
 
 **Recorded six future features in `BACKLOG.md`. No code changed; nothing shipped.**
 
@@ -693,7 +855,7 @@ enrolment would still raise unmarked-lesson alarms.
 
 **Process note:** the six items were committed as `3e1270c` **directly to `main`** —
 unintentionally. The branch `docs/backlog-future-features` had been created for them,
-but a concurrent merge to `main` (§8f) moved `HEAD` between the branch checkout and the
+but a concurrent merge to `main` (§8g) moved `HEAD` between the branch checkout and the
 commit, so the commit landed on `main` and the branch was left an empty pointer at
 `8c1d5ad`. Deleted it. No harm done — the change was docs-only — but note `3e1270c`
 **has no CI run of its own**: it was pushed between two other commits and the green run
@@ -702,14 +864,14 @@ is on `b89ca52`, which contains it. **Two sessions in one repo means `git status
 
 ---
 
-## 8f. What changed this session (2026-07-16)
+## 8g. What changed this session (2026-07-16)
 
 **Fixed the parent Attendance screen — and shipped everything on this branch to
 production.**
 
 - **Merged to `main` and pushed: `2f746ca` → `8c1d5ad` (4 commits). CI green** across
   backend + both frontends. Vercel builds `swimsync.sg` / `admin.swimsync.sg` from
-  `main`, so the unmarked-lessons work (§8h), the docs split (§8g), and the fixes below
+  `main`, so the unmarked-lessons work (§8i), the docs split (§8h), and the fixes below
   are **now live**. Note what that means: everything before this was verified against
   **local fixtures only** — this is the first time any of it runs against the real
   production DB (clean slate, real coach, 4 real classes). Nothing here touches schema
@@ -744,7 +906,7 @@ production.**
 **Not done (deliberate):**
 - **PRD untouched — the gate genuinely wasn't met.** §5.1 *already* specified the
   "not assigned yet" state, so this fix makes the code match the spec rather than
-  departing from it. Nothing to correct. (§8g reached the same conclusion independently
+  departing from it. Nothing to correct. (§8h reached the same conclusion independently
   before the work landed.)
 - **`BACKLOG.md` left alone** — it was being written by a **concurrent session** while
   this one ran, and has since landed on its own as `3e1270c` (six items: coach wage
@@ -754,10 +916,10 @@ production.**
   **Two sessions ran against this repo today** — check `git log` before assuming an
   uncommitted file is yours.
 - **§5 test counts were stale and are now corrected** (app 29→**32**, admin 35→**38**).
-  They were wrong by my own hand in §8h: three `formatSgDate`/`dayOfWeekOf` tests were
+  They were wrong by my own hand in §8i: three `formatSgDate`/`dayOfWeekOf` tests were
   added to each app *after* the counts were written. Verified by running both suites.
 
-## 8g. What changed (2026-07-16 — docs split)
+## 8h. What changed (2026-07-16 — docs split)
 
 **Split the docs into three, so each one can be trusted for a different question.**
 
@@ -821,7 +983,7 @@ that earns a PRD edit now.
   - _Update: that work **landed** later the same day as `8c1d5ad` — see §8f. The PRD call
     above held._
 
-## 8h. What changed (2026-07-15)
+## 8i. What changed (2026-07-15)
 
 **Closed the silent-underbilling hole before the first real invoice run.**
 
@@ -843,7 +1005,8 @@ that earns a PRD edit now.
   - **Admin Invoices** — the pre-generation modal now *queries*: per class
     `N of M lessons marked` + the **missing dates named**, or a green all-clear. It
     warns, it doesn't block (button becomes **Generate anyway**) — a class that
-    genuinely didn't run is a legitimate reason to proceed.
+    genuinely didn't run is a legitimate reason to proceed. _(Reversed 2026-07-18: it now
+    blocks, with no override — see §8 and PRD §7.7.)_
 - **Timezone bug fixed (was live, could double-bill).** `today/index.tsx` mixed two
   clocks: `getDay()` (**local**) picked the weekday while `toISOString()` (**UTC**)
   picked the date. Before 08:00 SGT these disagree — the screen listed Saturday's
@@ -876,7 +1039,7 @@ that earns a PRD edit now.
 a rained-out class is 17 × 2 taps, which is where a coach abandons the task, and an
 abandoned cancellation looks exactly like a forgotten lesson. Additive; ships separately.
 
-## 8i. What changed (2026-07-13 → 07-14)
+## 8j. What changed (2026-07-13 → 07-14)
 
 - **Production email via Resend on `swimsync.sg`** — cloud custom SMTP
   (`smtp.resend.com:465`, sender `noreply@swimsync.sg`); branded reset template
@@ -904,7 +1067,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
   (suite 22 → 34). CI green across backend + both frontend jobs.
 - All merged to `main`, pushed, CI-verified.
 
-## 8j. Session (2026-07-12)
+## 8k. Session (2026-07-12)
 
 - **Auth polish — password reset** — implemented the mobile recovery flow end to
   end: new `(auth)/forgot-password.tsx` + `(auth)/reset-password.tsx` screens, wired
@@ -918,7 +1081,7 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
   email → reset screen (no bounce to home) → new password → re-login. Error mapping
   checked against live Supabase strings. Coach seed password restored to `password123`.
 
-## 8k. Session (2026-07-11)
+## 8l. Session (2026-07-11)
 
 - **Credit-note ledger fix** — added `credit_applications` (migration `20260711000100`)
   + updated the engine so partial credit reconciles; verified UI + backend.
@@ -938,42 +1101,43 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift. Keep this section to what's genuinely next.
 
-The MVP loop is built and live; the silent-underbilling hole is closed (§8h). **The
-product is no longer the blocker — real usage is.** The real classes are now on **Sunday**
-in production (the user moved them via the admin edit-class UI shipped in §8d), so the gap
-report expects the right weekday.
+The MVP loop is built and live, and as of §8 the **billing engine is the most-tested part
+of the product**. **The product is not the blocker — real usage is.**
 
-**Current status (2026-07-17):** parent onboarding is **ongoing** (~17 students expected
+**Current status (2026-07-18):** parent onboarding is **ongoing** (~17 students expected
 across the 4 Sunday classes); the **first real invoice run is 1 Aug 2026** (July's billing,
-manual — no cron on the free tier). **Invoice emails are LIVE** (deployed + `RESEND_API_KEY`
-set 2026-07-16 — §8b), so the 1 Aug run will email each parent; **watch the first run**
-(`emails_sent` in the response + Resend → Emails) — no live send has fired on prod yet.
-Recently shipped: the **attendance marking window + truthful parent empty states** (§8a) and
-the **UTC-billing-month fix** (§8, deployed to prod — the cron default now bills the SGT
-month).
+**manual** — cron is still off). Invoice emails are live but **no live send has ever fired
+on prod** — the 1 Aug run is the first.
 
-In order:
+**Read this before 1 Aug — invoicing behaves differently now (§8).**
 
-1. **Finish parent onboarding — the gate to real billing.** Parents self-register + add
-   their children via **`swimsync.sg/welcome`**, then the superadmin assigns each to a class
-   (admin **Unassigned Children**). Students are **parent-created** (coaches/admin can't
-   create them), so this is an onboarding push, not a build task.
-2. **First real invoice run — 1 Aug 2026.** Once the Sundays are marked, follow
-   **`INVOICE_RUNBOOK.md`** on the 1st (manual). The confirm dialog reports any lesson with
-   no attendance marked: **read it** — it is the only backstop against an underbill (§7.8).
-   Pick July explicitly in the month picker. **Before that run**, the pre-existing
-   **multi-class-parent under-billing bug** (BACKLOG → Billing) is worth fixing — a family
-   with siblings in two different classes is billed for only one; plausible with 4 classes.
-3. **Pick the next build item from `BACKLOG.md` → `## Build order`.** The UTC-billing-month
-   fix just shipped (§8) and is removed from the ranking; the near-term list is now led by
-   **extract the completeness-rule shared helper** (S) → **active/inactive status** (M). The
-   multi-class-parent bug in item 2 is the other near-term correctness item.
+1. **Generation is BLOCKED until every July lesson is marked.** No "Generate anyway". If
+   the button refuses, it names the class and date; the coach marks them — or marks them
+   **cancelled** if the lesson didn't run — and it proceeds. **Rehearse this in the admin
+   panel before the 1st**, so the dialog isn't a surprise on the day.
+   - If a class can't be completed because a child stopped attending, **remove them from
+     the class** (admin Students, or the coach's roster). Their attended lessons still bill.
+2. **First real invoice run — 1 Aug 2026.** Follow `INVOICE_RUNBOOK.md`; pick **July**
+   explicitly. Afterwards check `emails_sent` in the response and Resend → Emails, and spot-
+   check one invoice for a family with **siblings in two different classes** — that path was
+   broken until §8 and 1 Aug is its first real exercise.
+3. **Finish parent onboarding.** Parents self-register + add children via
+   **`swimsync.sg/welcome`**, then the superadmin assigns each to a class (admin
+   **Unassigned Children**). Students are parent-created, so this is an onboarding push, not
+   a build task.
 
-_Optional, low-cost:_ click through the live screens merged 2026-07-16 that have only ever
-run against local fixtures (§3) — parent **Attendance** (chips are pills, not tall
-capsules), coach **Today**, admin **Invoices → Generate**. Hard-refresh (static SPA).
+**Then pick from `BACKLOG.md` → `## Build order`.** Near-term list is now led by **extract
+the completeness-rule shared helper** (S — it carries real weight after §8: the admin's
+pre-flight check and the engine compute the rule separately, and if they disagree the button
+enables and the server refuses) → **active/inactive status** (M — §8 writes
+`assignment_status` but did **not** reconcile it with `is_active`; that's overdue).
 
----
+**Worth deciding, not urgent:** whether to **enable cron**. The two things that blocked it
+are done — the billing month is timezone-correct (§8a) and the run day is configurable
+(§8, default the 7th). Before switching it on, note the deferral/lockout interaction in
+BACKLOG → Foundations: an unfixable class blocks the month, and with cron on that becomes a
+silent stall rather than a button that refuses. The block-notification email (§8) is the
+mitigation, but it has never fired in production.
 
 ## 10. File map
 
@@ -984,8 +1148,11 @@ capsules), coach **Today**, admin **Invoices → Generate**. Hard-refresh (stati
 | `…/20260711000100_credit_applications.sql` | Credit-note allocation ledger (fixes partial-application drift) |
 | `supabase/functions/generate-invoices/core.ts` | Billing engine logic (exported, tested) |
 | `supabase/functions/generate-invoices/index.ts` | Thin HTTP handler (auth + client + call core) |
-| `supabase/functions/generate-invoices/email.ts` | Invoice-email builders + Resend sender + `emailCreatedInvoices()` orchestration (§8b) |
-| `supabase/functions/generate-invoices/dates.ts` | Timezone seam: `APP_TIMEZONE` + `previousBillingMonth()` — SGT-correct default billing month (§8) |
+| `supabase/functions/generate-invoices/email.ts` | Invoice-email builders + Resend sender + `emailCreatedInvoices()` orchestration (§8c) |
+| `supabase/migrations/20260718000200_coach_close_enrolment.sql` | `close_student_enrolment()` RPC — remove-from-class / set-inactive for superadmin **and** the owning coach (§6, §8) |
+| `supabase/migrations/20260718000100_…invoice_run_day` · `…000300_…invoice_block_notice` | `app_settings` seeds: automatic run day (default 7) + blocked-alert throttle state |
+| `SwimSyncAdmin/lib/studentStatus.ts` · `SwimSyncApp/lib/studentStatus.ts` | **Byte-identical twins** — `removeFromClass` / `setStudentInactive` over the RPC. Edit both (§6) |
+| `supabase/functions/generate-invoices/dates.ts` | Timezone seam: `APP_TIMEZONE` + `previousBillingMonth()` (SGT-correct default month, §8a) + `dayOfMonthInTimeZone`/`clampRunDay` for the run day (§8) |
 | `supabase/functions/generate-invoices/core.test.ts` · `email.test.ts` · `dates.test.ts` · `test.sh` | Deno integration + email + billing-month tests + runner |
 | `supabase/tests/*.test.sql` | pgTAP DB tests (trigger, RLS, constraints) |
 | `supabase/cloud/cron_schedule.sql` | Cloud-only daily cron wiring |
@@ -994,7 +1161,7 @@ capsules), coach **Today**, admin **Invoices → Generate**. Hard-refresh (stati
 | `…/(auth)/forgot-password.tsx` · `reset-password.tsx` | Password-reset flow (request link + set new password) |
 | `SwimSyncApp/app/_layout.tsx` | Root: session restore + `PASSWORD_RECOVERY` routing + native recovery deep-link handler |
 | `SwimSyncApp/lib/authErrors.ts` | Maps raw Supabase auth errors to friendly copy |
-| `SwimSyncApp/lib/attendanceBulk.ts` · `.test.ts` | Bulk "Set all to…" helper (`applyBulkStatus` + options) for the coach attendance screen (§8d) |
+| `SwimSyncApp/lib/attendanceBulk.ts` · `.test.ts` | Bulk "Set all to…" helper (`applyBulkStatus` + options) for the coach attendance screen (§8e) |
 | `SwimSyncApp/lib/lessonDates.ts` · `SwimSyncAdmin/lib/lessonDates.ts` | **Byte-identical twins** — SG-safe date strings + expected lesson dates. Edit both (§6) |
 | `SwimSyncAdmin/lib/classCoverage.ts` | Expected-vs-marked coverage maths for the admin pre-generation check |
 | `SwimSyncAdmin/app/(admin)/` | Admin pages; `app/api/` server routes |
@@ -1021,10 +1188,10 @@ store builds are deferred until the app "sticks."
 | Piece | Where | Notes |
 |-------|-------|-------|
 | **Backend** | Supabase project `cdmjeyauhxcgulhbxmsb` (region ap-southeast-1) | Free tier. Linked via `supabase link`; schema via `supabase db push`. |
-| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8b); needs `RESEND_API_KEY` secret set, else it's a no-op. Redeployed 2026-07-17 with the timezone-correct default billing month (§8); `APP_TIMEZONE` unset → defaults to `Asia/Singapore`. |
+| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8c); needs `RESEND_API_KEY` secret set, else it's a no-op. Redeployed 2026-07-17 with the timezone-correct default billing month (§8a), and **2026-07-18** with the multi-class fix, the configurable run day, month sealing and the hard attendance block (§8). `APP_TIMEZONE` unset → defaults to `Asia/Singapore`. |
 | **Admin panel** | Vercel `swimsync-admin` → **https://admin.swimsync.sg** (also `swimsync-admin.vercel.app`) | Root `SwimSyncAdmin`, **framework preset = Next.js**. |
 | **Mobile app (web)** | Vercel `swimsync-app` → **https://swimsync.sg** (apex, canonical; `www` 308-redirects; also `swimsync-app-psi.vercel.app`) | Root `SwimSyncApp`, **preset = Other** (`SwimSyncApp/vercel.json`: `expo export --platform web` → `dist`, SPA rewrite). |
-| **Email** | **Resend** → sender `noreply@swimsync.sg` | Two paths: **(1) Auth emails** (password reset) via cloud custom SMTP `smtp.resend.com:465` (user `resend`, pass = Resend API key, dashboard-only); branded reset template (dashboard + `supabase/templates/recovery.html`); auth rate limit 2→~30/hr; confirmation **OFF**. **(2) Invoice emails** (§8b) via the **Resend HTTP API** from the Edge Function, keyed by the `RESEND_API_KEY` secret (same key) — set with `supabase secrets set`. |
+| **Email** | **Resend** → sender `noreply@swimsync.sg` | Two paths: **(1) Auth emails** (password reset) via cloud custom SMTP `smtp.resend.com:465` (user `resend`, pass = Resend API key, dashboard-only); branded reset template (dashboard + `supabase/templates/recovery.html`); auth rate limit 2→~30/hr; confirmation **OFF**. **(2) Invoice emails** (§8c) via the **Resend HTTP API** from the Edge Function, keyed by the `RESEND_API_KEY` secret (same key) — set with `supabase secrets set`. |
 | **Domain / DNS** | `swimsync.sg` registered at **Exabytes**, DNS on **Cloudflare** | Vercel web records (`@`, `www`, `admin`) are **DNS-only** (grey — orange breaks Vercel SSL); apex uses Vercel's per-domain CNAME (`<hash>.vercel-dns-017.com`, Cloudflare-flattened). Resend records (`send` MX/SPF, `resend._domainkey`, `_dmarc`) coexist. **Supabase Site URL = `https://swimsync.sg`**; allow-list includes `swimsync.sg/**`, `www.swimsync.sg/**`, `admin.swimsync.sg/**`. |
 
 **Secrets/keys** live only in the dashboards (never committed): Supabase project keys

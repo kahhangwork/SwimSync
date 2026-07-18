@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-17_
+_Last updated: 2026-07-18_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -50,9 +50,9 @@ theme.
 
 _(Shipped and removed from this list: bulk "set all" on the attendance screen
 (**2026-07-16** — PRD §7.6); the `tsc`-baseline + CI-typecheck item (**2026-07-16** —
-HANDOVER §8c); the **invoice half of email notifications** (**2026-07-16** — PRD §7.7;
+HANDOVER §8d); the **invoice half of email notifications** (**2026-07-16** — PRD §7.7;
 credit-note emails remain, now in _Notifications_); and the **UTC-derived default billing
-month fix** (**2026-07-17** — PRD §7.7, HANDOVER §8). The list below is renumbered from what
+month fix** (**2026-07-17** — PRD §7.7, HANDOVER §8a). The list below is renumbered from what
 remains.)_
 
 1. **Extract the completeness-rule shared helper** (S, _Foundations_) — do **before** #2.
@@ -74,9 +74,9 @@ remains.)_
    **after** the #2/#3 reconciliations so it respects the settled status/level model
    rather than adding churn to a table still being reconciled.
 
-_Not ranked here but flagged for near-term attention:_ a **pre-existing multi-class-parent
-under-billing bug** (see _Billing_) — worth fixing before 1 Aug if any family has siblings
-in different classes.
+_Shipped 2026-07-18 and removed from this list:_ the **multi-class-parent under-billing
+bug**, plus the configurable **invoice run day**, **month sealing**, and the **hard
+attendance block** — see PRD §7.7 and HANDOVER §8.
 
 ### Later — clusters with a fixed internal order
 
@@ -91,7 +91,7 @@ in different classes.
   parent-link + RLS surface that tenanting rewrites.
 - **The platform chain.** Native store builds (M) → Push notifications (M) — push can't
   work on the current static web app, so it can't precede native builds.
-- **The reminder chain.** Invoice emails **shipped** (HANDOVER §8b); the rest sequences after
+- **The reminder chain.** Invoice emails **shipped** (HANDOVER §8c); the rest sequences after
   them: credit-note emails (M) → WhatsApp reminders (M) → Automated reminder workflows
   (M — needs a scheduler, i.e. cron; the UTC-billing-month fix that had to precede enabling
   cron is now **shipped**, so that prerequisite is cleared).
@@ -272,24 +272,33 @@ class means for pay before building: parents aren't billed for it, but a coach w
 showed up to an empty pool may still expect to be, and that's a policy question, not an
 engineering one.
 
-### Multi-class parent is under-billed — **S**
-A parent with children in **two different classes** is billed for only one of them. Found
-while reviewing the invoice-email work (HANDOVER §8b); **pre-existing, not introduced by it.**
+### A session added AFTER a month is invoiced is never billed — **S**
+The hard block (HANDOVER §8) guarantees every lesson is marked *at generation time*. It does
+not cover a `lesson_sessions` row created **afterwards** for an already-invoiced month.
 
-**Why:** the invoice engine (`generate-invoices/core.ts`) loops **per class** and creates a
-parent's invoice during the *first* class they appear in; when it reaches the parent's other
-class, the "already has an invoice for the month" guard (`core.ts:212-226`) skips them — so
-the second class's billable lessons are **silently dropped**. This contradicts PRD §5.5
-("all eligible lessons for a parent's children are included in the same invoice") and, unlike
-a forgotten lesson, isn't surfaced by the gap report. Real money, and it could bite on the
-**1 Aug** run if any family has siblings in different classes (plausible with 4 classes).
+**Why:** the parent has an invoice, so the `already_exists` guard skips them on any re-run,
+and the new lesson is silently unbillable — the same permanent-underbill shape the block was
+built to prevent, through the one door it doesn't watch. Much rarer now (it needs a
+back-dated mark into a closed month), but the failure is still invisible.
 
-**Notes:** the fix is to aggregate a parent's billable items **across all classes first**,
-then create one invoice — i.e. restructure the per-class loop so invoice creation happens
-once per parent after all classes are tallied, not inside the class loop. Add a Deno test
-(two classes, one parent, children in both → one invoice with both classes' items) — the
-engine's `core.test.ts` scenario helper currently seeds a single class, so it needs
-extending. Check the `credit`/FIFO path still reconciles once items span classes.
+**Notes:** the sealed month (`billing_periods`) makes this *mostly* unreachable — a sealed
+month is skipped entirely, and reopening it is a deliberate act. The honest fix is a
+"top-up" concept, or accepting that the correction tool is a credit note in the other
+direction. **Decide which before building anything**; the credit-note flow may already be
+the right answer, in which case this item becomes a doc line, not code.
+
+### An inactive CLASS is invisible to billing and to the block — **S**
+`core.ts` only scans `classes.is_active = true`.
+
+**Why:** deactivating a class at month end silently drops its billable lessons *and* stops
+it blocking generation — so the safety net has a hole exactly where someone is tidying up.
+Pre-existing, but the hard block makes the asymmetry sharper: everything else about a
+half-finished month now refuses loudly, and this one case stays quiet.
+
+**Notes:** no UI deactivates a class today (the admin Classes page edits but doesn't
+deactivate), which is why it has never bitten. Fix before adding one. Probably: bill from
+classes that had sessions in the month regardless of `is_active`, and keep `is_active` for
+*scheduling* only.
 
 ### Tie the attendance-marking window to un-invoiced months — **S**
 The coach's marking window floor is a **calendar proxy** — `max(start of last month, earliest
@@ -302,7 +311,7 @@ existing invoice — so it's markable yet unbillable, a small silent gap. The ca
 fine default for the manual monthly cadence; this closes the seam if it ever matters.
 
 **Notes:** would make `backlogWindowStart` consult `billing_periods`/existing invoices rather
-than a pure date rule. Minor; recorded so the limitation (noted in HANDOVER §8) isn't
+than a pure date rule. Minor; recorded so the limitation (noted in HANDOVER §8b) isn't
 re-derived. Related to the credit-note flow, which is the *correct* tool for changing an
 already-invoiced lesson.
 
@@ -405,7 +414,7 @@ pool. `classes.location_address` is already captured and currently just renders 
 ### Credit-note email notifications — **M** `[Phase 2]`
 Email the parent when a credit note is auto-issued (attendance edited billable→non-billable
 on an already-invoiced lesson). _(Invoice-generation emails **shipped 2026-07-16** — PRD
-§7.7, HANDOVER §8; this is the other half.)_
+§7.7, HANDOVER §8c; this is the other half.)_
 
 **Why:** the parent has no idea an adjustment happened until they open the app, so the coach
 fields "why is my bill different?" by hand — the same silent-notification gap the invoice
@@ -415,14 +424,14 @@ email closes, for the other side of the ledger.
 notes are issued by the `handle_attendance_update` **Postgres trigger** (`20260309000500`),
 not the Edge Function, so there's no server-side send point. Needs `pg_net` (cloud-only)
 firing from the trigger, or a Supabase DB webhook → a small endpoint that sends via Resend.
-**Reuse `email.ts`** (builders + `sendInvoiceEmail`, HANDOVER §8) once building. Guard
+**Reuse `email.ts`** (builders + `sendInvoiceEmail`, HANDOVER §8c) once building. Guard
 idempotency — the trigger can fire per edit.
 
 ### Track invoice-email delivery + retry — **S**
 Record when each invoice was emailed and only email not-yet-sent invoices, so a failed send
 retries on the next generation run.
 
-**Why:** the shipped invoice email (HANDOVER §8) is **best-effort** — a Resend hiccup
+**Why:** the shipped invoice email (HANDOVER §8c) is **best-effort** — a Resend hiccup
 silently drops that parent's notification, and the coach chases a bill they never heard
 about. Fine at ~17 parents; worth hardening once send volume or an observed failure makes
 silent drops a real cost.
@@ -530,6 +539,14 @@ things to get right:
   the answer is "tenant admin" unless it's genuinely platform operations; defaulting the
   other way hands schools each other's data.
 
+**Concrete first thing this must split (added 2026-07-18):** *Remove from class* and *Set
+inactive* are currently available to **both** the superadmin and the owning coach, via
+`close_student_enrolment()` (migration `20260718000200`). That is an interim model chosen
+because coach type doesn't exist yet. When it does: a **private coach keeps both** (it is
+their own business), while for a **school coach they move to the tenant admin**. The
+permission check lives in one place — the `is_superadmin() OR coach_serves_student()` line
+in that function — so the split is a small edit *if* it is remembered.
+
 Also decide whether a coach can **change type** — a private coach joining a school is an
 ordinary career move, and it means moving them *and their families* between tenants,
 which is the same hard case the tenanting item already flags.
@@ -546,7 +563,17 @@ pad every roster and every unmarked-lesson report forever. The inactive date is 
 that earns its keep: "when did they stop?" is the question behind every end-of-year
 reconciliation and every "why is this invoice short?"
 
-**Notes:** the columns half-exist, and that's the trap. **Start by reconciling what's
+**Notes:** **partially touched on 2026-07-18 and now overdue.** HANDOVER §8 shipped
+*"Remove from class"* (→ `assignment_status = 'unassigned'`) and *"Set inactive"*
+(→ `'inactive'` **and** `is_active = false`) via `close_student_enrolment()`, for the
+superadmin and the owning coach. That writes both notions in step but **did not settle which
+is authoritative** — exactly the reconciliation this item exists for, now with live callers
+depending on the current behaviour. What remains: the decision itself, the `inactivated_at`
+date, the parent-level cascade, and re-activation. Also note the invoice engine no longer
+consults enrolment for *billing* (only for the completeness gate — §8), so deactivating a
+child no longer loses their attended lessons.
+
+The columns half-exist, and that's the trap. **Start by reconciling what's
 already there rather than adding to it** — a student can currently be called inactive in
 *two* ways: `students.is_active` (boolean, defaults TRUE) and
 `students.assignment_status`, an enum whose values are `unassigned | assigned | inactive`
@@ -678,11 +705,16 @@ notices.
 **Notes:** the engine copy is **unavoidable** (Deno, no npm resolution), so the target is
 three-into-one, not four. Until then: **if you touch the rule, touch all four.**
 
+**Weightier since 2026-07-18** (HANDOVER §8): unmarked attendance now *blocks* invoicing, so
+the admin's pre-flight check (`classCoverage.ts`) and the engine's gate are two separate
+implementations of the rule that gates real money. If they drift, the button enables and the
+server refuses — safe, but confusing, and the reverse drift would be worse.
+
 ### Enforce the attendance window at save time — **S** `[handover]`
 The coach attendance screen (`(coach)/classes/[id]/attendance.tsx`) writes whatever `date` it
 is handed, with no validation.
 
-**Why:** as of HANDOVER §8 every *entry point* (the roster button, Unmarked Lessons, Past
+**Why:** as of HANDOVER §8b every *entry point* (the roster button, Unmarked Lessons, Past
 Sessions) is bounded to the lesson window, so the UX no longer offers a bad date. But the
 screen itself has no guard — a hand-typed URL, or a future new entry point that forgets the
 window, could still create/bill a session **outside the window or on a non-lesson day**. That's
@@ -710,7 +742,7 @@ migration, or they silently go stale and start lying, which is worse than no typ
 an **M**, not an **S**: it touches every query site, and even with the generic in place
 supabase-js still infers to-one embeds as arrays without `!inner`/`!hint` annotations, so
 a few casts remain. This **supersedes and absorbs** the `any`-cast fix already applied in
-`(parent)/home/child/[id].tsx` (shipped 2026-07-16, HANDOVER §8) — that cast was the
+`(parent)/home/child/[id].tsx` (shipped 2026-07-16, HANDOVER §8d) — that cast was the
 pragmatic `S`-sized fix to clear the baseline now; this is the thorough version for later. Do **not**
 start this while migrations are still landing (active/inactive, NRIC, coach wage, tenanting
 are all schema-touching backlog items ahead of it). The natural trigger is "the schema is
@@ -772,4 +804,7 @@ Kept so the reasoning doesn't get re-litigated.
 | **A parent-facing swimming-ability picker** | Removed on purpose (PRD §5.1). Parents self-reporting ability isn't information anyone trusted; the class a child is in is the real signal. If levels return they should be **coach-defined** — see the backlog item above. |
 | **Re-adding Notification Preferences / Help & Support buttons** | Removed as dead stubs with empty handlers, not lost (HANDOVER §12). Build the feature first, then the button. |
 | **`Alert.alert` for user feedback** | A **no-op on RN-web**, so it silently does nothing on the deployed app. Use `confirmAction` / the global Toast / inline form errors instead (HANDOVER §12a). The only sanctioned use left is the native-only media-library permission prompt. |
-| **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8.) |
+| **Invoicing a child immediately when they are set inactive** | Proposed as "settle up what they owe on the way out"; rejected 2026-07-18. Invoices are `UNIQUE(parent_id, billing_month)`, so an early partial-month invoice makes the regular run skip that parent via the `already_exists` guard — stranding their **siblings'** lessons for that month. That is exactly the multi-class underbilling bug the same session fixed, re-entered through a new door. It also breaks PRD §7.7's one-complete-calendar-month rule. The normal cycle already bills them correctly, because billing follows **attendance rows** rather than current enrolment (HANDOVER §8). |
+| **An override / "Generate anyway" on the attendance block** | Removed deliberately 2026-07-18 (PRD §7.7). The case it appeared to serve — a class that genuinely didn't run — is already handled *inside* the completeness rule by marking everyone `cancelled_rain`/`cancelled_coach`. So the bypass wasn't covering a legitimate case; it was letting an unrecorded lesson through into a **permanent** underbill, because a lesson can never be added to an invoice that already exists (§11.6). The escape hatch for a class that can't be completed is removing the student, not overriding the check. |
+| **A per-tenant / per-coach invoice run day** | Same call as the timezone row below, reaffirmed by the user 2026-07-18: `app_settings.invoice_run_day` is **one global setting**. Per-coach scoping would mean inventing coach type *and* tenant scoping to hold a single integer, for a second coach who doesn't exist, controlling a scheduler that isn't enabled. Promoting one integer to a per-tenant column when tenanting lands is trivial next to the RLS rewrite that happens anyway. |
+| **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8a.) |
