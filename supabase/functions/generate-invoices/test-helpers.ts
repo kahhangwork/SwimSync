@@ -202,11 +202,18 @@ export async function newScenario(
   }
 
   const sessionIds: string[] = [];
+  // Billing months this scenario could seal. Any run that finishes a month now
+  // writes billing_periods — including manual ones — and teardown() does not
+  // otherwise touch that table, so a leftover row makes the NEXT run of the
+  // suite short-circuit on "already_complete". Derived from session dates so
+  // tests get this for free.
+  const billingMonths = new Set<string>();
 
   async function addSession(
     date: string,
     forClassId?: string
   ): Promise<string> {
+    billingMonths.add(date.slice(0, 7));
     const { data: s, error } = await db
       .from("lesson_sessions")
       .insert({
@@ -267,6 +274,12 @@ export async function newScenario(
     await db.from("parent_students").delete().in("student_id", studentIds);
     await db.from("students").delete().in("id", studentIds);
     await db.from("classes").delete().in("id", classIds);
+    if (billingMonths.size) {
+      await db
+        .from("billing_periods")
+        .delete()
+        .in("billing_month", [...billingMonths]);
+    }
     await db.auth.admin.deleteUser(parentProfileId);
     await db.auth.admin.deleteUser(coachProfileId);
   }

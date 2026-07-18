@@ -120,11 +120,11 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 ## Good to know / gotchas
 
 - **Bill the previous month** — the picker defaults to the current month; always change it.
-- **One invoice per parent per month**, covering *all* their children together.
-  ⚠️ **Known bug (until fixed):** a parent with children in **two different classes** is
-  currently billed for only **one** class — the other is silently dropped (BACKLOG →
-  Billing). If any family has siblings in different classes, **verify that invoice by hand**
-  before telling them to pay.
+- **One invoice per parent per month**, covering *all* their children together —
+  **including children in different classes**. (This was a real bug until
+  2026-07-18: the engine created the invoice inside its per-class loop, so a
+  family with siblings in two classes was billed for only one. Fixed; the
+  engine now tallies every class before creating anything.)
 - **Only billable statuses count:** **Present** and **Paid Trial**. Absent,
   Cancelled (rain/coach), and Free Trial are excluded.
 - **Credit auto-applies** (oldest first). An invoice fully covered by credit is
@@ -136,6 +136,18 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 - **No billable attendance = no invoice** for that parent that month (expected).
 - If **Generate** errors (cold start / transient), just click it again — it's safe
   to retry (won't double-bill).
+- **A finished month gets "closed" (sealed).** When a run leaves every class
+  marked, every parent invoiced and nothing failed, the month is recorded in
+  `billing_periods` and later runs skip it with *"already_complete"*. The
+  result message says **"This month is complete and now closed."** A month with
+  unmarked attendance is deliberately **left open** so a later run can finish it.
+  - **If a month is closed by mistake** (e.g. a lesson surfaced afterwards),
+    reopen it by deleting its row in the Supabase dashboard SQL editor:
+    `DELETE FROM billing_periods WHERE billing_month = '2026-07';`
+    Then generate again. Note the existing invoices are **not** rewritten — the
+    no-double-billing guard skips parents who already have one, so a lesson
+    added after invoicing still needs a credit-note correction rather than a
+    top-up.
 
 ---
 

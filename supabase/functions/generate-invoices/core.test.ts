@@ -608,3 +608,111 @@ Deno.test("run day: honours a changed setting, and SGT decides the day", async (
     await s.teardown();
   }
 });
+
+// ── Sealing a finished month ───────────────────────────────────────────────
+// Once every parent is invoiced, nothing further should happen for that month
+// — whether it was finished by an early manual run or by the cron.
+
+Deno.test("seal: a MANUAL run that finishes the month seals it; cron then no-ops", async () => {
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2027-07-03"); await s.mark(a, "present");
+
+    const manual = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-07",
+    });
+    assertEquals(manual.invoices_created, 1);
+    assertEquals(manual.sealed, true);
+    assertEquals(manual.classes_still_incomplete, 0);
+
+    const { data: period } = await s.db
+      .from("billing_periods")
+      .select("billing_month")
+      .eq("billing_month", "2027-07")
+      .maybeSingle();
+    assert(period, "a completed manual run should seal the month");
+
+    // The whole point: the scheduled run now has nothing to do.
+    const cron = await generateInvoices(s.db, {
+      mode: "auto",
+      billing_month: "2027-07",
+      now: new Date("2027-08-07T02:00:00Z"),
+    });
+    assertEquals(cron.status, "already_complete");
+    assertEquals(cron.invoices_created, undefined); // returned before any work
+  } finally {
+    await s.db.from("billing_periods").delete().eq("billing_month", "2027-07");
+    await s.teardown();
+  }
+});
+
+Deno.test("seal: a forced run on an INCOMPLETE month bills but does NOT seal", async () => {
+  // The safety property. Sealing here would lock the unmarked lesson out
+  // permanently. Requires completeness to be MEASURED even under force —
+  // this test fails if that split is skipped and classesIncomplete is only
+  // counted on the non-forced path.
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2027-08-07"); await s.mark(a, "present");
+    await s.addSession("2027-08-14"); // left unmarked -> class incomplete
+
+    const res = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-08",
+    });
+
+    assertEquals(res.invoices_created, 1); // still bills what IS marked
+    assertEquals(res.sealed, false);
+    assert(
+      res.classes_still_incomplete! >= 1,
+      "forced runs must still MEASURE incompleteness, or sealing is unsafe"
+    );
+
+    const { data: period } = await s.db
+      .from("billing_periods")
+      .select("billing_month")
+      .eq("billing_month", "2027-08")
+      .maybeSingle();
+    assertEquals(period, null);
+  } finally {
+    await s.db.from("billing_periods").delete().eq("billing_month", "2027-08");
+    await s.teardown();
+  }
+});
+
+Deno.test("seal: sealing twice is a no-op, not a duplicate-key error", async () => {
+  // A forced run bypasses the sealed-month guard, so the seal can be reached
+  // a second time for the same month.
+  const s = await newScenario({ price: 30 });
+  try {
+    const a = await s.addSession("2027-09-04"); await s.mark(a, "present");
+
+    const first = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-09",
+    });
+    assertEquals(first.sealed, true);
+    assertEquals(first.invoices_created, 1);
+
+    const second = await generateInvoices(s.db, {
+      mode: "manual",
+      force: true,
+      billing_month: "2027-09",
+    });
+    assertEquals(second.sealed, true);
+    assertEquals(second.invoices_created, 0); // already_exists guard held
+
+    const { count } = await s.db
+      .from("billing_periods")
+      .select("billing_month", { count: "exact", head: true })
+      .eq("billing_month", "2027-09");
+    assertEquals(count, 1);
+  } finally {
+    await s.db.from("billing_periods").delete().eq("billing_month", "2027-09");
+    await s.teardown();
+  }
+});

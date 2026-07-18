@@ -219,7 +219,13 @@ export default function InvoicesPage() {
           )}.` +
             (deferred > 0
               ? ` ${deferred} parent(s) deferred — a class they're in still has unmarked attendance.`
-              : "")
+              : "") +
+            // Sealed means finished and closed: no scheduled run will touch
+            // this month again, so say so rather than leaving the admin
+            // wondering whether anything else is still coming.
+            (json.sealed
+              ? " This month is complete and now closed."
+              : " Month left open — some attendance is still unmarked.")
         );
         await loadInvoices();
       }

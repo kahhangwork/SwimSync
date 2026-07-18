@@ -83,6 +83,9 @@ export type GenerateResult = {
   invoices_created?: number;
   classes_still_incomplete?: number;
   parents_deferred?: number;
+  /** True when this run left the month finished and closed — no further run
+   *  will process it (they short-circuit on the sealed-month guard). */
+  sealed?: boolean;
   message?: string;
   results?: unknown[];
   created?: CreatedInvoice[];
@@ -211,6 +214,9 @@ export async function generateInvoices(
   const deferredParents = new Set<string>();
   let classesIncomplete = 0; // classes skipped because attendance not fully marked
   let invoicesCreated = 0;
+  // A month with a failed write must never be sealed — sealing would lock out
+  // the very retry that would have fixed it.
+  let invoiceWriteFailed = false;
 
   for (const cls of classes ?? []) {
     // Sessions for this class within the billing month
@@ -269,21 +275,39 @@ export async function generateInvoices(
       .select("parent_id, student_id")
       .in("student_id", activeStudentIds);
 
-    if (!complete && !force) {
+    // MEASURE completeness always; ENFORCE it only when not forced. The split
+    // matters: classesIncomplete used to be incremented inside the !force
+    // branch, so a forced run always ended with 0 and the engine had no way to
+    // know whether the month it just billed was actually finished. Sealing
+    // depends on that answer, so measuring must not be conditional.
+    if (!complete) {
       classesIncomplete++;
-      // Every parent with a child in this class is deferred — including those
-      // whose billable items all came from other, fully-marked classes. A
-      // partial invoice now is permanent: tomorrow's retry hits the
-      // already-exists guard and the missing lessons are never billed.
-      for (const ps of parentStudents ?? []) deferredParents.add(ps.parent_id);
+
+      if (!force) {
+        // Every parent with a child in this class is deferred — including
+        // those whose billable items all came from other, fully-marked
+        // classes. A partial invoice now is permanent: tomorrow's retry hits
+        // the already-exists guard and the missing lessons are never billed.
+        for (const ps of parentStudents ?? []) deferredParents.add(ps.parent_id);
+        log.push({
+          class_id: cls.id,
+          title: cls.title,
+          skipped: "incomplete_attendance",
+          parents_deferred: new Set(
+            (parentStudents ?? []).map((p) => p.parent_id)
+          ).size,
+        });
+        continue;
+      }
+
+      // Forced: bill whatever is marked, but the month is now known to be
+      // incomplete and must NOT be sealed — the unmarked lessons still need a
+      // later run.
       log.push({
         class_id: cls.id,
         title: cls.title,
-        skipped: "incomplete_attendance",
-        parents_deferred: new Set((parentStudents ?? []).map((p) => p.parent_id))
-          .size,
+        note: "incomplete_attendance_billed_anyway",
       });
-      continue;
     }
 
     // ── Tally this class's billable items into the cross-class map ──────────
@@ -389,6 +413,7 @@ export async function generateInvoices(
       .single();
 
     if (invErr || !invoice) {
+      invoiceWriteFailed = true;
       log.push({
         parent_id: parentId,
         error: invErr?.message ?? "invoice insert failed",
@@ -407,6 +432,7 @@ export async function generateInvoices(
       .insert(items.map((i) => ({ invoice_id: invoice.id, ...i })));
 
     if (itemsErr) {
+      invoiceWriteFailed = true;
       log.push({
         parent_id: parentId,
         invoice_id: invoice.id,
@@ -515,23 +541,42 @@ export async function generateInvoices(
     });
   }
 
-  // ── Seal the billing month (automatic, non-forced, fully-marked runs only) ─
-  // deferredParents can only be non-empty when classesIncomplete > 0, so the
-  // second clause is implied — stated anyway so the invariant is local.
-  if (
-    mode === "auto" &&
-    !force &&
+  // ── Seal the billing month once it is genuinely finished ──────────────────
+  // Mode-independent: an early MANUAL run that happens to complete the month
+  // seals it too, so the daily cron then returns "already_complete" instead of
+  // re-walking every class. (Previously only auto sealed, so a month finished
+  // by hand stayed open and was reprocessed until the cron got to it.)
+  //
+  // Safe only because completeness is now measured even under force — without
+  // that, a forced run would report 0 incomplete classes unconditionally and
+  // seal every month regardless of reality, locking out unmarked lessons for
+  // good. The three conditions are the whole safety property:
+  //   • no class left unmarked          (nothing still to bill)
+  //   • no parent deferred              (nobody skipped this run)
+  //   • no failed invoice write         (nothing to retry)
+  // If a month is ever sealed wrongly, delete its billing_periods row — see
+  // INVOICE_RUNBOOK.md.
+  const monthFinished =
     classesIncomplete === 0 &&
-    deferredParents.size === 0
-  ) {
-    await supabase.from("billing_periods").insert({
-      billing_month: billingMonth,
-      invoices_issued: invoicesCreated,
-      notes:
-        invoicesCreated === 0
-          ? "No billable sessions found for this month."
-          : `All ${invoicesCreated} invoice(s) generated successfully.`,
-    });
+    deferredParents.size === 0 &&
+    !invoiceWriteFailed;
+
+  if (monthFinished) {
+    // DO NOTHING on conflict, not a plain insert: a forced run bypasses the
+    // sealed-month guard, so a second one would otherwise hit a duplicate key
+    // on the billing_month primary key. The first seal is the true one — its
+    // invoices_issued reflects the run that actually did the work.
+    await supabase.from("billing_periods").upsert(
+      {
+        billing_month: billingMonth,
+        invoices_issued: invoicesCreated,
+        notes:
+          invoicesCreated === 0
+            ? "No billable sessions found for this month."
+            : `All ${invoicesCreated} invoice(s) generated successfully.`,
+      },
+      { onConflict: "billing_month", ignoreDuplicates: true }
+    );
   }
 
   return {
@@ -545,14 +590,14 @@ export async function generateInvoices(
     // so counting inside the phase-2 loop reported 0 while the whole month was
     // blocked, which is exactly the silent case this number exists to surface.
     parents_deferred: deferredParents.size,
-    status:
-      mode === "manual"
-        ? "manual run complete"
-        : classesIncomplete === 0
-        ? "complete — billing month sealed"
-        : deferredParents.size > 0
-        ? `partial — ${deferredParents.size} parent(s) deferred, will retry tomorrow`
-        : "partial — will retry tomorrow",
+    sealed: monthFinished,
+    status: monthFinished
+      ? "complete — billing month sealed"
+      : mode === "manual"
+      ? "manual run complete — month left open, attendance still incomplete"
+      : deferredParents.size > 0
+      ? `partial — ${deferredParents.size} parent(s) deferred, will retry tomorrow`
+      : "partial — will retry tomorrow",
     results: log,
     created,
   };
