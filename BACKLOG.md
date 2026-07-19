@@ -101,7 +101,8 @@ oldest outstanding item in this document and is now genuinely next.
 ### Unordered — no dependencies, pick by value
 
 Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-history view
-(S), Export to CSV (S), Disable a staff account (M), Better filtering/search (S), More polished
+(S), Export to CSV (S), Disable a staff account (M), Student-move loose ends (S), Better
+filtering/search (S), More polished
 dashboards (S), Deeper component-render tests (M), Production data cleanup (S),
 Email-confirmation copy/templates (S).
 
@@ -476,11 +477,10 @@ is a *full* admin or a restricted one (e.g. can mark attendance and chase paymen
 change class pricing), since that decides whether `role` on the join table is a real enum or
 a placeholder.
 
-### Active / inactive status for parents and children — **M**
-An explicit active/inactive state on each child and each parent, with the two kept in
-step: deactivating a child deactivates only that child; deactivating the **last** active
-child deactivates the parent; deactivating a parent deactivates all their children.
-Record the date each child went inactive.
+### Active / inactive status for parents and children — **M** `[handover]`
+An explicit active/inactive state on each child and each family, per business, with the
+date each went inactive. **Designed in full on 2026-07-19; not built.** The design below
+is decided — start at Phase 1 rather than re-opening it.
 
 **Why:** families leave, and today the only way to express that is deleting them — which
 destroys the billing history you need at tax time — or leaving them in place, where they
@@ -488,44 +488,94 @@ pad every roster and every unmarked-lesson report forever. The inactive date is 
 that earns its keep: "when did they stop?" is the question behind every end-of-year
 reconciliation and every "why is this invoice short?"
 
-**Notes:** **partially touched on 2026-07-18 and now overdue.** HANDOVER §8 shipped
-*"Remove from class"* (→ `assignment_status = 'unassigned'`) and *"Set inactive"*
-(→ `'inactive'` **and** `is_active = false`) via `close_student_enrolment()`, for the
-superadmin and the owning coach. That writes both notions in step but **did not settle which
-is authoritative** — exactly the reconciliation this item exists for, now with live callers
-depending on the current behaviour. What remains: the decision itself, the `inactivated_at`
-date, the parent-level cascade, and re-activation. Also note the invoice engine no longer
-consults enrolment for *billing* (only for the completeness gate — §8), so deactivating a
-child no longer loses their attended lessons.
+**The model — three concepts, three owners, three different words.** Two words for two
+different powers is the point: "inactive" already means two things today, and a third
+would have made it worse.
 
-The columns half-exist, and that's the trap. **Start by reconciling what's
-already there rather than adding to it** — a student can currently be called inactive in
-*two* ways: `students.is_active` (boolean, defaults TRUE) and
-`students.assignment_status`, an enum whose values are `unassigned | assigned | inactive`
-(`supabase/migrations/20260309000100_initial_schema.sql:14`). The enum is **live in the
-parent UI** — it renders as the status chip on `(parent)/home/index.tsx:243`. Adding a
-third notion of "inactive" beside those two would produce exactly the stale-second-source
-problem the NRIC item above describes for `age`. Decide first whether
-`assignment_status = 'inactive'` *is* this feature (and `is_active` is the redundant one),
-or whether assignment and activity are genuinely different axes — a child can plausibly
-be active but unassigned, which is an argument for keeping both, but that argument should
-be made on purpose and written down here.
+| Concept | Lives on | Who controls it | Means |
+|---|---|---|---|
+| **Enabled / disabled** | `profiles.is_active` | Platform admin | Can this person log in at all? |
+| **Active / inactive** | `parent_tenants.is_active`, `students.is_active` | The business's admin | Still a customer *of this business*? |
+| **Assigned / unassigned** | `students.assignment_status` | The business's admin | In a class right now? |
 
-What's genuinely missing is the **date** (add `students.inactivated_at DATE`; note
-`parents` has no active flag at all today — the parent's lives on `profiles.is_active`)
-and the **cascade**, which is the real design work. Note the asymmetry: parent→children
-is a plain cascade, but children→parent fires only when the *last* child goes inactive,
-and neither direction says what happens on **re**-activation — decide that explicitly
-rather than discovering it. Prefer a trigger over app-side logic so the invariant can't
-be bypassed by the admin panel, the app, or dashboard SQL taking different paths.
+Decisions made, with the reasoning worth keeping:
 
-Check the interaction with `student_class_enrolments.is_active` before starting: the
-invoice engine's completeness gate builds its student list from **active enrolments
-only** and never consults `students.is_active`
-(`supabase/functions/generate-invoices/core.ts:122-130`), so an inactive child with a
-live enrolment still counts — and shows up as an unmarked lesson, the false alarm that
-teaches a coach to ignore the report (PRD §7.5). Deactivating a child almost certainly
-has to close their enrolment too.
+- **`assignment_status` loses its `inactive` value**, becoming `unassigned | assigned`.
+  The two are genuinely separate axes — a new signup is *active but unassigned* — and
+  keeping a third way to say "left" is the drift this item exists to remove. This also
+  deletes the display override at `SwimSyncAdmin/app/(admin)/students/page.tsx:81`.
+- **Parent inactive is PER BUSINESS, on `parent_tenants`.** This item predates
+  multi-tenancy and the boundary matters: parents are global, so a school marking a
+  family inactive must not switch them off at their private coach.
+- **Cascades are PROMPTED, never silent**, both directions — last active child → offer to
+  mark the family inactive; family → offer to mark their N children. Same instinct as the
+  bulk-attendance confirm guard. A tap must not rewrite records that are off-screen.
+- **Re-activation is the JOIN CODE, and needs no new UI.** An inactive family can still log
+  in (they are not *disabled*); re-entering the business's code flips
+  `parent_tenants.is_active` back. `join_tenant_by_code()` must flip rather than collide
+  with `UNIQUE (parent_id, tenant_id)`. **A returning parent cannot re-sign-up** —
+  `profiles.email` is UNIQUE (`20260309000100_initial_schema.sql:26`) and so is
+  `auth.users.email`, so email-as-identity is already guaranteed and there is no dedup to
+  build. Reactivation restores **status only**: children stay inactive and the admin
+  reassigns them through the existing flow, because guessing which class they meant is how
+  you get a wrong roster.
+- **Platform-level disabling of PARENTS was considered and cut** — see
+  *Disable a staff account* below for the reasoning and where it went instead.
+
+**Phases.** 1–2 are additive and touch no RLS.
+
+| # | |
+|---|---|
+| 1 | `parent_tenants.is_active` + `inactivated_at`; `students.inactivated_at` |
+| 2 | `set_parent_tenant_active()`, `set_student_active()`; `join_tenant_by_code()` flips instead of colliding |
+| 3 | **A new admin Parents page** — there isn't one today (10 admin pages, none for parents), so this is a screen, not a button. Plus the cascade prompts and an "include inactive" toggle |
+| 4 | Platform page: parent status — children grouped by business with their active state. Deliberately **not** assigned/unassigned, which is the business's concern |
+| 5 | Parent app: an inactive business stays **visible and read-only** (past invoices are the tax-time record), actions gated |
+| 6 | **Contract**: drop `inactive` from the enum. Postgres cannot remove an enum value in place — new type, migrate rows, swap, drop. **Deploy the app FIRST** (dropping inverts the order; the live parent chip still reads the old value) |
+
+**Notes — what's already there, and the trap.** `close_student_enrolment()` (2026-07-18)
+writes `assignment_status` and `is_active` in step but **never settled which is
+authoritative**; there are now live callers depending on that. Critically,
+**`students.is_active` is effectively write-only today** — every roster, attendance screen,
+completeness check and billing query filters on `student_class_enrolments.is_active`, the
+*enrolment*, not the student. The only read anywhere is that one display override. So this
+is mostly *choosing* a model, not untangling two entrenched ones.
+
+`profiles.is_active` is **enforced nowhere at all** — not in RLS, not at login. A
+"deactivated" parent can log in and use the app normally today. Grep before Phase 2 lands:
+anything that happens to read it truthily changes behaviour the moment it means something.
+
+Check `student_class_enrolments.is_active` before starting: the completeness gate builds
+its student list from **active enrolments only** and never consults `students.is_active`
+(`supabase/functions/generate-invoices/core.ts`), so an inactive child with a live
+enrolment still counts — and shows as an unmarked lesson, the false alarm that teaches a
+coach to ignore the report (PRD §7.5). Deactivating a child almost certainly has to close
+their enrolment too.
+
+### Moving a student between businesses leaves two loose ends — **S**
+`reassign_student_tenant()` moves the student but not everything attached to them.
+
+**Why:** the platform admin's student-rescue tool (PRD §4.4) is the remedy when a parent
+joins with the wrong join code — so it runs at exactly the moment a family is confused,
+and it currently leaves them in a state nobody is told about.
+
+**Notes:** found 2026-07-19 while auditing the money paths; **not a data-loss bug**, but
+both ends are silent, which is the problem.
+
+- **The parent is never joined to the new business.** The RPC updates
+  `students.tenant_id` and closes enrolments, but writes no `parent_tenants` row — and
+  that row is what the add-child picker and the parent's billing grouping rely on. The
+  child lives at tenant B while the parent has no membership there.
+- **Credit is stranded, silently.** Balances are per `(parent, tenant)`. If the family
+  held credit at A and their only child leaves, it becomes unspendable. That is *correct*
+  by the never-crosses-businesses rule (PRD §5.6) — the failure is that nothing warns the
+  admin before the move.
+
+**This is for the mistake case only.** A genuine migration between businesses is a
+different flow and needs no code: the old business marks the family inactive, the new one
+gives them its join code, and the child is added there as a new record. History stays with
+the business that taught it, which is the isolation working correctly. Don't conflate the
+two by making the rescue tool "move everything".
 
 ### Disable a staff account (coach / tenant admin) — **M** `[handover]`
 Revoke a coach's or a tenant admin's access without deleting them. Absorbs the older
@@ -785,6 +835,7 @@ Kept so the reasoning doesn't get re-litigated.
 | **Invoicing a child immediately when they are set inactive** | Proposed as "settle up what they owe on the way out"; rejected 2026-07-18. Invoices are `UNIQUE(parent_id, billing_month)`, so an early partial-month invoice makes the regular run skip that parent via the `already_exists` guard — stranding their **siblings'** lessons for that month. That is exactly the multi-class underbilling bug the same session fixed, re-entered through a new door. It also breaks PRD §7.7's one-complete-calendar-month rule. The normal cycle already bills them correctly, because billing follows **attendance rows** rather than current enrolment (HANDOVER §8). |
 | **An override / "Generate anyway" on the attendance block** | Removed deliberately 2026-07-18 (PRD §7.7). The case it appeared to serve — a class that genuinely didn't run — is already handled *inside* the completeness rule by marking everyone `cancelled_rain`/`cancelled_coach`. So the bypass wasn't covering a legitimate case; it was letting an unrecorded lesson through into a **permanent** underbill, because a lesson can never be added to an invoice that already exists (§11.6). The escape hatch for a class that can't be completed is removing the student, not overriding the check. |
 | ~~**A per-tenant invoice run day**~~ **— NOW BUILT (2026-07-19)** | Kept as a record of the reasoning, which held up. It was correctly refused while there was one business, and shipped as a per-tenant column the moment tenanting arrived, exactly as this row predicted ("trivial next to the RLS rewrite that happens anyway"). A useful example of deferring a small generalisation until the thing that needs it exists. |
+| **Modelling substitute coaches** | Surfaced 2026-07-19 while making pay attribution effective-dated. A lesson pays the coach the class was assigned to **on that date** — so if Coach B covers one week for Coach A with no class change, **A is paid**. Not modelled, deliberately: the fix for a genuine cover is a per-session pay override, which the schema already supports (`session_pay_overrides`), and inventing a "who actually turned up" concept would add a second source of truth beside the class assignment for a case that has never occurred with one real coach. Revisit when a business has enough coaches to cover for each other. |
 | **A browsable directory of coaches / schools for parents** | Considered as the way a parent picks their business, rejected 2026-07-19 in favour of **join codes** (PRD §5.1). A list publishes SwimSync's entire customer roster to every parent and every competing school; worse, a mis-tap puts a child on a stranger's roster where that business's admin can see and bill them, because nothing in the flow proves the family deals with them. **Possession of a code is that proof.** It also stops scaling at a few hundred tenants. If a discovery feature is ever wanted, make it search-by-exact-name so the full list is never enumerable. |
 | **A "view as tenant" impersonation mode for the platform admin** | Rejected 2026-07-19 while building the platform page. It means scoping *every* admin screen to a chosen tenant rather than the caller's own — far larger than the support need, which is answered by a cross-tenant business list plus the ability to **move a student** between businesses (PRD §4.4). Revisit only if support actually gets stuck without it. |
 | **Cross-tenant students** (one child taking lessons at two businesses) | Out of scope 2026-07-19. A student belongs to one business, and `one_active_enrolment_per_student` already enforces one active class. Note this **is** a real thing in Singapore, so this is a "not yet" rather than a "never" — but it touches enrolment, billing and the tenant boundary at once. Revisit on actual demand, not in anticipation. |

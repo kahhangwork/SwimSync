@@ -71,6 +71,14 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 > **skips** parents who already have an invoice (no double-billing), so extra
 > attendance marked *after* generating won't top up an existing invoice.
 
+> **Changing a class's price is safe mid-month, but read the prompt.** Each lesson is
+> charged at the price in force **on the day it happened**, so a rise you enter today does
+> not reach backwards. The edit form asks which you mean: *"a change from today"* leaves
+> past lessons alone, *"fixing a mistake"* re-values them. Pick the second **only** for a
+> genuine typo — it rewrites what earlier lessons were worth. Once a month has been
+> generated, it is sealed and the form will refuse to reprice into it; use a credit note
+> instead. Same rule applies to the coach a class is assigned to and their pay.
+
 ---
 
 ## Step-by-step

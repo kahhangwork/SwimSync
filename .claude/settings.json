@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(supabase status*)",
+      "Bash(supabase projects list*)",
+      "Bash(supabase migration list*)",
+      "Bash(supabase functions list*)",
+      "Bash(supabase db dump*)"
+    ]
+  }
+}

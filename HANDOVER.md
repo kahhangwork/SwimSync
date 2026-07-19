@@ -100,7 +100,11 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 - **Coach wages (verified UI + backend, live)** — effective-dated rates, the pay-decision
   table, draft→frozen payouts with next-period adjustments. A coach sees their own pay;
   rates are admin-only.
-- **Automated tests** — backend **82 pgTAP + 64 Deno**, plus frontend suites
+- **Effective-dated class terms (verified UI + backend, live)** — a lesson is priced, and its
+  coach paid, from the terms in force on **its own date** (`class_rates`). Editing a class's
+  price no longer reprices last month; a handover no longer moves the outgoing coach's pay.
+  Admin class edits ask **correct-vs-change**. Closed three defects, two of them live (§8).
+- **Automated tests** — backend **108 pgTAP + 67 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest, `SwimSyncApp` jest-expo); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
@@ -119,12 +123,16 @@ superadmin + the real coach/classes). See §11.
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **As of 2026-07-19 production is fully caught up**: all tenancy migrations through
-> `20260719000600` are applied (`supabase migration list` shows nothing pending), and
-> `generate-invoices` is at **v10**. The two deploys this session had **opposite
-> orderings** and both were deliberate — phase 4 *dropped* columns so the app deployed
-> first; phase 5 only *added*, so migrations went first. Backups were taken before each
-> production migration (scratchpad, not committed).
+> **As of 2026-07-19 production is fully caught up**: every migration through
+> `20260719001000` is applied (`supabase migration list` shows nothing pending) and
+> `generate-invoices` is at **v11** — the effective-dated pricing engine (§8).
+> Backups were taken before each production migration (scratchpad, not committed).
+>
+> The **tenancy** deploys (§8.1) had **opposite orderings** and both were deliberate — phase 4
+> *dropped* columns so the app deployed first; phase 5 only *added*, so migrations went
+> first. **§8's deploy got that wrong**: the push to `main` went out before
+> `supabase db push`, so Vercel shipped an admin calling an RPC that did not exist yet.
+> The rule governs the **push**, not just the migration command — see §7.27.
 >
 > As of 2026-07-18 that also includes the whole §8a underbilling cluster (multi-class invoices, the
 > configurable run day, month sealing, and the hard attendance block) **and the same-day
@@ -200,10 +208,10 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 82 tests across 6 files
+supabase test db                                  # 108 tests across 7 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
-supabase/functions/generate-invoices/test.sh      # 64 tests; needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 67 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
 cd SwimSyncAdmin && npm test                       # 49 tests
@@ -394,6 +402,26 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   mutually recursive. Use a `SECURITY DEFINER` lookup (`class_tenant()`, `session_tenant()`,
   `parent_has_child_in_class()`). Note this could not happen while `classes_select` was
   `USING (TRUE)`: **the leak was also what kept the policy graph acyclic.**
+- **A FACT ABOUT A PAST LESSON IS NEVER A LIVE LOOKUP.** What a lesson cost and who was
+  paid for it come from `class_rates` via `class_rate_on(class, session_date)` — the terms
+  in force on the lesson's **own date** (`20260719000700`). Reading `classes.price_per_lesson`
+  or `classes.coach_id` at generation/payroll time is the bug this removed, three times over
+  (§8). `classes.price_per_lesson` survives only as a **trigger-synced display copy** and
+  carries a `COMMENT` saying so. Audit:
+  `grep -rn "price_per_lesson" supabase/functions SwimSyncAdmin SwimSyncApp` — every money
+  path must go through `class_rate_on`.
+  - **`classes.coach_id` stays where it is and means "who teaches this NOW".** It drives
+    **RLS** (`coach_owns_class`, `coach_owns_session`, `coach_serves_student`,
+    `coach_serves_parent`). Access follows the current coach; money follows history. Do not
+    "finish the job" by moving it into `class_rates` — that trades a billing fix for a
+    rewrite of the largest permission surface in the codebase.
+  - **A missing rate is a HARD FAILURE in both engines**, never a fallback to 0 or to
+    `classes.price_per_lesson`. Every class is guaranteed floor-dated terms
+    (`'2000-01-01'`, *not* `created_at` — attendance is markable a month back, so a lesson
+    legitimately predates the row that created its class).
+- **An adjustment is carried ONCE, via a running total**, not "emit once then suppress":
+  `owed_now − paid_originally − already_carried` (`20260719000900`). Suppression looks
+  equivalent and silently swallows a *second* genuine correction to the same lesson.
 - **Wage rates are EFFECTIVE-DATED and only ever INSERTED.** A lesson is priced at the rate
   in force *on the day it was taught*, so no number of raises can reprice history. Editing
   a rate in place would change what a coach was owed in March because of a June decision —
@@ -604,9 +632,109 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     `rm -rf SwimSyncAdmin/.next/types/app/<route>`. Related: Next treats `_`-prefixed
     folders as **private**, so a scratch route named `_logocheck` silently 404s.
 
+25. **A test can pass for the WRONG REASON, and a green suite hides it.** Writing the
+    regression test for the repricing bug (§8), I dated the price change `2026-08-01` —
+    *future* relative to the test clock. The display-sync trigger only tracks rates already
+    in force, so `classes.price_per_lesson` never moved and the **pre-fix engine read the
+    right number by accident**. The test passed on the very code it existed to catch. It was
+    only found by deliberately reverting the fix and re-running. **Every test written for a
+    known bug must be run against the unfixed code before you trust it** — "it passes" is
+    not the claim being made; "it fails without the fix" is. All 26 tests added this session
+    were checked that way, and five of the nine wages tests do *not* discriminate (they are
+    regression guards, and that is written next to them).
+26. **A guard that fires correctly can look like a broken fix.** The new
+    settled-money guard in `set_class_terms()` refused my own test, because the shared wages
+    fixture marks a **December 2026** payout paid while the test clock is July — so
+    "reprice from today" legitimately collides with a later paid period. The instinct is to
+    weaken the guard to make the test pass. **Move the test instead**: `class_terms.test.sql`
+    got its own tenant. A fixture is not a reason to loosen a real rule.
+27. **`git push` to `main` deploys the WEB APPS but not the database.** Obvious in the
+    abstract, and I still got the order wrong this session: pushing before
+    `supabase db push` shipped an admin panel calling `set_class_terms()` **before the RPC
+    existed**, so class editing was broken in production until the migration landed. The
+    rule from §6 is directional — **adding? migrate first. dropping? deploy the app first**
+    — and it governs the *push*, not just the migration command. Nothing is atomic here.
+
 ---
 
-## 8. What changed this session (2026-07-19 — MULTI-TENANCY, phases 0–5, live in production)
+## 8. What changed this session (2026-07-19, third session — a lesson is priced and paid by ITS OWN DATE)
+
+**Three defects of one shape, two of them live in production: a fact about a PAST lesson
+was resolved by a LIVE lookup instead of recorded as of the day it happened.** All fixed,
+tested, merged (`ad0e430`) and **fully deployed** — 4 migrations + `generate-invoices` **v11**.
+
+**None of this was planned.** The session set out to plan backlog item #1
+(active/inactive). It came out of the user asking a single question — *"if we let the admin
+change a class's coach, does that break the money?"* — which it did, twice.
+
+### The three bugs
+
+1. **Editing a class price silently repriced the previous month.** `core.ts` charged each
+   invoice line at the class's **current** `price_per_lesson`, read at generation time. A
+   rise on the 3rd repriced every unbilled lesson of the month before. Exposure ran from the
+   lesson to the invoice run — **up to five weeks** at run day 7. Invisible: the invoice
+   looked internally consistent, and once created a lesson can never be re-billed (§11.6).
+2. **Handing a class to another coach moved its entire unpaid history.** `session_pay_amount()`
+   and the payout loop resolved the coach through `classes.coach_id`, also live. The outgoing
+   coach's draft fell to **$0** and the incoming coach was paid, at their own rate, for
+   lessons they never taught. On the frozen path it was worse: the outgoing coach's
+   adjustment was computed from the *new* coach's rate.
+3. **A payout adjustment was re-emitted forever.** Found while testing (2). The engine
+   re-compared "owed now" vs "paid then" on every later run, so one **-$45** correction
+   appeared on 2026-04, 2026-12 *and* 2027-01 — and would have recurred every month.
+   `ON CONFLICT DO NOTHING` dedupes only *within* one payout.
+
+### The fix
+
+`class_rates` carries a class's commercial terms effective-dated — price **and** which coach
+is paid — resolved by `class_rate_on(class, date)`. **One table, not two:** one lookup and
+one way to miss, rather than two. `set_class_terms()` makes it reachable from the admin with
+the **correct-vs-change** choice the RPC cannot infer (PRD §7.3).
+
+For (3), the cure is a **running total**: `owed_now − paid_originally − already_carried`.
+Emitting once and then suppressing forever would have been *wrong* — a lesson can legitimately
+be corrected twice, and suppression swallows the second. There is a test for exactly that.
+
+### Deployed, in the right order — after I got it wrong first
+
+Additive, so **migrations lead, then the Edge Function, then Vercel**. I pushed to `main`
+before migrating, so Vercel shipped an admin calling `set_class_terms` **before the RPC
+existed** — class editing was broken in production for a few minutes. The plan said to
+migrate first; I ran the steps out of order. Backups (schema + data) were taken first.
+
+### Not done (deliberate)
+
+- **`classes.coach_id` was NOT moved into `class_rates`, and must not be.** It is
+  load-bearing for **RLS** — `coach_owns_class()`, `coach_owns_session()`,
+  `coach_serves_student()`, `coach_serves_parent()` all resolve access through it
+  (`20260309000600_rls_policies.sql:50-81`). Moving it would rewrite the largest permission
+  surface in the codebase to fix a billing bug. **Access follows the current coach; money
+  follows history.** Zero policies were touched. Consequence, stated so it is never a
+  surprise: a coach who hands over a class loses access to its past lessons (already true
+  before this change) while still being paid for them.
+- **Snapshot-at-marking was rejected in favour of effective-dating.** Writing `taught_by` /
+  `price` onto `lesson_sessions` when attendance is saved is cheaper, but wrong whenever a
+  lesson is marked **late** — and this app deliberately supports back-marking a month. The
+  user's question ("when exactly is the rate locked in?") is what exposed it. Effective
+  dating has no such window: the answer is the lesson's own date, full stop.
+- **No future-dating of terms.** The display sync tracks the rate in force *today* and
+  nothing re-runs when a future date merely arrives, so a future row would show a wrong
+  price until something touched the class. `set_class_terms()` refuses it. **Relax that and
+  the sync together, never alone.**
+- **Substitute coaches are not modelled** — see `BACKLOG.md` → *Deliberately not doing*.
+- **Backlog item #1 (active/inactive) was designed in full and NOT built.** The whole
+  six-phase design is written into its `BACKLOG.md` entry. Start at Phase 1.
+
+### Tests
+
+**+26** (82→108 pgTAP, 64→67 Deno). Every new billing/wages test was confirmed to **fail on
+the pre-fix code** — and one of them initially *passed*, see §7.25. New:
+`supabase/tests/class_terms.test.sql` (14) on its **own tenant**, because the wages fixture
+marks a December payout paid and the settled-money guard correctly refused; moving the test
+beat weakening a real guard. New driver `verify-class-terms.mjs` (10/10) covers the
+correct-vs-change prompt, which exists only in the UI.
+
+## 8.1 First session (2026-07-19) — MULTI-TENANCY, phases 0–5, live in production
 
 **SwimSync is now a multi-tenant platform.** Six phases, designed and built in one
 session, all deployed. `TENANCY_DESIGN.md` is the design (10 decisions, §10) and
@@ -694,7 +822,7 @@ matter: phase 4 **dropped** columns so the app had to deploy *first*; phase 5 on
 - **`HANDOVER.md` §9 was left stale for most of the session** and is rewritten below —
   it claimed "phase 2 is next" long after phase 5 shipped.
 
-## 8.2 Second session, same day (2026-07-19) — the SwimSync logo
+## 8.2 Second session (2026-07-19) — the SwimSync logo
 
 **The placeholder "S" tile is gone; both apps now carry a real mark — a poolside pace
 clock.** Picked over two other finalists because it reads as *recurring time*, which is
@@ -748,7 +876,7 @@ Function was involved, so there was nothing else to deploy.
 
 ---
 
-## 8a. What changed (2026-07-18 — the underbilling cluster: multi-class fix, run day, sealing, hard block, + the §8.1 empty-month seal fix)
+## 8a. What changed (2026-07-18 — the underbilling cluster: multi-class fix, run day, sealing, hard block, + the §8a.1 empty-month seal fix)
 
 **Four changes that together close underbilling from both ends — A fixes billing that was
 *wrong*, D prevents billing that is *incomplete*.** All merged to `main` (`b3bb2c5` →
@@ -1413,48 +1541,52 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-**Multi-tenancy is DONE and deployed (phases 0–5, §8).** The platform can now hold more
-than one business. What it cannot yet do is prove that on real data.
-
-### The one thing blocking everything else
+### The one thing blocking everything else — and it is now urgent
 
 **No attendance has ever been marked in production.** Zero `lesson_sessions`, zero
-`attendance` rows. Every part of the billing engine — per-tenant invoicing, credit
-isolation, the completeness gate, sealing, and now wages — is tested against fixtures and
-driven through the real UI, and **none of it has processed a single real lesson.**
+`attendance` rows. Every part of billing — invoicing, credit, the completeness gate,
+sealing, wages, and now effective-dated pricing — is tested against fixtures and driven
+through the real UI, and **none of it has processed a single real lesson.**
 
-That is also why the plan's definition of done is unmet: *"July 2026 has been billed under
-the new model"* is impossible while there is nothing to bill.
+It got more time-sensitive on 2026-07-19. The `class_rates` backfill (§8) is **correct by
+emptiness**: floor-dating every class's terms is *vacuously* right while there is no
+attendance for it to be wrong about. That stops being true the moment real lessons exist.
 
-1. **Get the coach marking attendance.** This is an onboarding push, not a build task, and
-   it is the gate on everything below.
-2. **Then bill a real month**, following `INVOICE_RUNBOOK.md`. Expect the completeness
-   gate to refuse until every lesson is marked — that is working as designed; the fix is
-   to mark them (or mark them cancelled), never to override.
-3. **Then onboard the school as tenant 2.** Cross-tenant isolation is proven in pgTAP with
-   two tenants and driven through both UIs, but **production has only ever had one
-   tenant**, so the isolation has never been exercised on real data. That is inherent
-   until the school arrives — and it is the moment it matters most.
+1. **Get the coach marking attendance.** An onboarding push, not a build task, and the gate
+   on everything below.
+2. **Then bill a real month**, following `INVOICE_RUNBOOK.md`. Expect the completeness gate
+   to refuse until every lesson is marked — working as designed; the fix is to mark them
+   (or mark them cancelled), never to override.
+3. **Then onboard the school as tenant 2.** Cross-tenant isolation is proven in pgTAP across
+   two tenants and driven through both UIs, but **production has only ever had one tenant**,
+   so it has never been exercised on real data. Inherent until the school arrives — and that
+   is the moment it matters most.
+
+### If you would rather build than onboard
+
+**`BACKLOG.md` → *Active / inactive status for parents and children*.** Designed in full on
+2026-07-19 and **not built** — the six-phase plan, the three-concept model
+(enabled/disabled · active/inactive · assigned/unassigned) and every decision behind it are
+written into that entry. **Start at Phase 1; do not re-open the design.** Phases 1–2 are
+three additive columns and three RPCs, and touch **no RLS**.
+
+Then pick from **`BACKLOG.md` → `## Build order`**.
 
 ### Small, concrete, and outstanding
 
-- **The join code is `SWIM-RVM9`.** This is now the *only* route in — there is no
-  directory, so a parent without it cannot add a child at all.
-- **`auto_invoice_enabled` is `false`** on the tenant, carried faithfully from the old
-  global setting. Automatic generation will not run until it is turned on.
-- **Set a coach rate** if you want payroll to compute anything (Admin → Coach Wages).
-  A coach with no rate is deliberately not on payroll.
+- **The join code is `SWIM-RVM9`.** The *only* route in — no directory, so a parent without
+  it cannot add a child at all.
+- **`auto_invoice_enabled` is `false`** on the tenant. Automatic generation will not run
+  until it is turned on.
+- **Set a coach rate** if you want payroll to compute anything (Admin → Coach Wages). A
+  coach with no rate is deliberately not on payroll.
 
 ### Worth deciding, not urgent
 
 **Whether to enable cron.** Both original blockers are long gone (timezone-correct billing
-month, configurable run day) and the engine is now per-tenant. Before switching it on,
-note that a blocked month becomes a *silent stall* rather than a button that refuses; the
-block-notification email is the mitigation and **has still never fired in production**.
-
-**Then pick from `BACKLOG.md` → `## Build order`.** Its #1 is now **active/inactive status
-for parents and children** — the oldest outstanding item in the document, and genuinely
-next now that the tenant cluster is gone.
+month, configurable run day) and the engine is per-tenant. Before switching it on: a blocked
+month becomes a *silent stall* rather than a button that refuses, and the block-notification
+email **has still never fired in production**.
 
 ## 10. File map
 
@@ -1478,7 +1610,11 @@ next now that the tenant cluster is gone.
 | `supabase/migrations/20260718000200_coach_close_enrolment.sql` | `close_student_enrolment()` RPC — remove-from-class / set-inactive for the tenant admin **and** the owning coach (§6, §8a) |
 | `supabase/migrations/20260718000100_…invoice_run_day` · `…000300_…invoice_block_notice` | `app_settings` seeds: automatic run day (default 7) + blocked-alert throttle state |
 | `SwimSyncAdmin/lib/studentStatus.ts` · `SwimSyncApp/lib/studentStatus.ts` | **Byte-identical twins** — `removeFromClass` / `setStudentInactive` over the RPC. Edit both (§6) |
-| `supabase/functions/generate-invoices/dates.ts` | Timezone seam: `APP_TIMEZONE` + `previousBillingMonth()` (SGT-correct default month, §8a) + `dayOfMonthInTimeZone`/`clampRunDay` for the run day (§8) |
+| `supabase/functions/generate-invoices/rates.ts` | `rateOn()` — the terms in force on a lesson's date. Pure + unit-tested, like `dates.ts`. Dates compared as **YYYY-MM-DD strings**, never parsed to `Date` (keeps the timezone traps of §7.7/§7.12 out). A missing rate **throws** (§6) |
+| `supabase/migrations/20260719000700_class_rates.sql` | Effective-dated price + paid coach, `class_rate_on()`, floor-dated backfill + seed trigger, display sync, RLS |
+| `supabase/migrations/20260719001000_set_class_terms.sql` | The only sanctioned class edit: both tables in one transaction, correct-vs-change, settled-money guards |
+| `supabase/tests/class_terms.test.sql` | correct-vs-change, rename-records-nothing, future-dating, cross-tenant coach, sealed-month refusal |
+| `supabase/functions/generate-invoices/dates.ts` | Timezone seam: `APP_TIMEZONE` + `previousBillingMonth()` (SGT-correct default month, §8a) + `dayOfMonthInTimeZone`/`clampRunDay` for the run day (§8a) |
 | `supabase/functions/generate-invoices/core.test.ts` · `email.test.ts` · `dates.test.ts` · `test.sh` | Deno integration + email + billing-month tests + runner |
 | `supabase/tests/*.test.sql` | pgTAP DB tests (trigger, RLS, constraints) |
 | `supabase/cloud/cron_schedule.sql` | Cloud-only daily cron wiring |
@@ -1518,7 +1654,7 @@ store builds are deferred until the app "sticks."
 | Piece | Where | Notes |
 |-------|-------|-------|
 | **Backend** | Supabase project `cdmjeyauhxcgulhbxmsb` (region ap-southeast-1) | Free tier. Linked via `supabase link`; schema via `supabase db push`. |
-| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8c); needs `RESEND_API_KEY` secret set, else it's a no-op. Redeployed 2026-07-17 with the timezone-correct default billing month (§8a), and **2026-07-18** with the multi-class fix, the configurable run day, month sealing and the hard attendance block (§8). `APP_TIMEZONE` unset → defaults to `Asia/Singapore`. |
+| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8c); needs `RESEND_API_KEY` secret set, else it's a no-op. Redeployed 2026-07-17 with the timezone-correct default billing month (§8a), and **2026-07-18** with the multi-class fix, the configurable run day, month sealing and the hard attendance block (§8a). `APP_TIMEZONE` unset → defaults to `Asia/Singapore`. |
 | **Admin panel** | Vercel `swimsync-admin` → **https://admin.swimsync.sg** (also `swimsync-admin.vercel.app`) | Root `SwimSyncAdmin`, **framework preset = Next.js**. |
 | **Mobile app (web)** | Vercel `swimsync-app` → **https://swimsync.sg** (apex, canonical; `www` 308-redirects; also `swimsync-app-psi.vercel.app`) | Root `SwimSyncApp`, **preset = Other** (`SwimSyncApp/vercel.json`: `expo export --platform web` → `dist`, SPA rewrite). |
 | **Email** | **Resend** → sender `noreply@swimsync.sg` | Two paths: **(1) Auth emails** (password reset) via cloud custom SMTP `smtp.resend.com:465` (user `resend`, pass = Resend API key, dashboard-only); branded reset template (dashboard + `supabase/templates/recovery.html`); auth rate limit 2→~30/hr; confirmation **OFF**. **(2) Invoice emails** (§8c) via the **Resend HTTP API** from the Edge Function, keyed by the `RESEND_API_KEY` secret (same key) — set with `supabase secrets set`. |

@@ -9,7 +9,7 @@
 | **Version** | 1.0 |
 | **Date** | March 2026 |
 
-> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). The **entire MVP core loop works and is verified end to end across the UI + backend**: parent self-registration, joining a business by code, child creation, admin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), the **credit-note correction flow** (auto-issue on attendance edit + FIFO application incl. partial carry-forward — see §5.6), and **PayNow QR** (coach upload → parent display → admin view). A partial-application ledger bug found during credit-note verification was fixed via a `credit_applications` allocation table (see §9.17). An **automated test suite** now covers the billing/credit engine (Deno) and DB triggers/RLS/constraints (pgTAP). **Password reset** is implemented on the mobile app (self-service recovery flow via `resetPasswordForEmail` → in-app reset screen → `updateUser`, working across Expo web and native deep links), and login/register errors are mapped to friendly copy — see §7.1. The code lives on GitHub (public, `kahhangwork/SwimSync`). **Now live in production on its own domain (web-first, free tier):** the mobile app at **https://swimsync.sg** and the admin at **https://admin.swimsync.sg** (Vercel), backend on Supabase, real transactional email via **Resend** (`noreply@swimsync.sg`, e.g. password-reset). A real coach + 4 classes are onboarded on a clean-slate production DB. Automated tests (82 pgTAP + 64 Deno + frontend vitest/jest-expo suites) run in CI on every push. Swimming ability is no longer a parent-entered field (see §5.1). Invoice generation is **manual** (no cron on the free tier) — see `INVOICE_RUNBOOK.md`. **SwimSync is now MULTI-TENANT** *(July 2026)*: a **tenant is a business**, a **private coach is a tenant of one**, and the old global `superadmin` has split into a **tenant admin** (one business) and a **platform admin** (cross-tenant support) — see §4.3. Parents join a business with a **join code** (§5.1); there is no public directory. Invoices, credit, month-sealing, the completeness block and the billing schedule are all **per business**, credit **never crosses** businesses (§5.6), invoice emails and the PayNow payee are **the business's** (§7.10), and **coach wages** are computed from attendance with effective-dated rates (§7.13). Cross-tenant isolation is enforced in RLS *and*, because the billing engine bypasses RLS, in engine code. **Each parent gets one invoice per business covering every class their children attend there**, generation is **blocked until all of the month's attendance is marked** (no override — a lesson that didn't run is marked *cancelled*), a finished month is **sealed** so it is never reprocessed (but a month with **nothing recorded** is never sealed — that vacuous seal locked a month out of billing entirely until it was fixed 2026-07-18), and the automatic path waits until a **configurable day of the month** (default the 7th) — see §7.7. Removing a child from a class, or marking them inactive, is available to the **business's admin and their coach** (§7.4). Generation also **emails the parent** a branded, itemized invoice on creation (best-effort, isolated from billing; live in production since 2026-07-16 — see §7.7). **Lesson sessions are created lazily, not pre-generated, and the lessons that *should* have happened are derived from each class's weekday at read time** — surfacing unmarked lessons to the coach and reporting attendance gaps to the admin before invoices are generated (see §7.5 and §7.7), which closes a hole where a forgotten lesson was silently unbillable and invisible to everyone. The only remaining gate to real billing is **real usage**: no attendance has yet been marked in production, so the engine has never processed a real lesson. Parents self-register at `swimsync.sg`, enter their coach's join code, add children, and the business's admin assigns classes. Native App/Play Store builds are deferred. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
+> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). The **entire MVP core loop works and is verified end to end across the UI + backend**: parent self-registration, joining a business by code, child creation, admin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), the **credit-note correction flow** (auto-issue on attendance edit + FIFO application incl. partial carry-forward — see §5.6), and **PayNow QR** (coach upload → parent display → admin view). A partial-application ledger bug found during credit-note verification was fixed via a `credit_applications` allocation table (see §9.17). An **automated test suite** now covers the billing/credit engine (Deno) and DB triggers/RLS/constraints (pgTAP). **Password reset** is implemented on the mobile app (self-service recovery flow via `resetPasswordForEmail` → in-app reset screen → `updateUser`, working across Expo web and native deep links), and login/register errors are mapped to friendly copy — see §7.1. The code lives on GitHub (public, `kahhangwork/SwimSync`). **Now live in production on its own domain (web-first, free tier):** the mobile app at **https://swimsync.sg** and the admin at **https://admin.swimsync.sg** (Vercel), backend on Supabase, real transactional email via **Resend** (`noreply@swimsync.sg`, e.g. password-reset). A real coach + 4 classes are onboarded on a clean-slate production DB. Automated tests (82 pgTAP + 64 Deno + frontend vitest/jest-expo suites) run in CI on every push. Swimming ability is no longer a parent-entered field (see §5.1). Invoice generation is **manual** (no cron on the free tier) — see `INVOICE_RUNBOOK.md`. **SwimSync is now MULTI-TENANT** *(July 2026)*: a **tenant is a business**, a **private coach is a tenant of one**, and the old global `superadmin` has split into a **tenant admin** (one business) and a **platform admin** (cross-tenant support) — see §4.3. Parents join a business with a **join code** (§5.1); there is no public directory. Invoices, credit, month-sealing, the completeness block and the billing schedule are all **per business**, credit **never crosses** businesses (§5.6), invoice emails and the PayNow payee are **the business's** (§7.10), and **coach wages** are computed from attendance with effective-dated rates (§7.13). **A lesson is priced and attributed by its OWN date** *(2026-07-19)*: a class's price and its paid coach are effective-dated, so editing a price no longer reprices the previous month and handing a class to another coach no longer moves the outgoing coach's pay — and a payout correction is carried once rather than every month thereafter (§7.3, §7.7, §7.13). Cross-tenant isolation is enforced in RLS *and*, because the billing engine bypasses RLS, in engine code. **Each parent gets one invoice per business covering every class their children attend there**, generation is **blocked until all of the month's attendance is marked** (no override — a lesson that didn't run is marked *cancelled*), a finished month is **sealed** so it is never reprocessed (but a month with **nothing recorded** is never sealed — that vacuous seal locked a month out of billing entirely until it was fixed 2026-07-18), and the automatic path waits until a **configurable day of the month** (default the 7th) — see §7.7. Removing a child from a class, or marking them inactive, is available to the **business's admin and their coach** (§7.4). Generation also **emails the parent** a branded, itemized invoice on creation (best-effort, isolated from billing; live in production since 2026-07-16 — see §7.7). **Lesson sessions are created lazily, not pre-generated, and the lessons that *should* have happened are derived from each class's weekday at read time** — surfacing unmarked lessons to the coach and reporting attendance gaps to the admin before invoices are generated (see §7.5 and §7.7), which closes a hole where a forgotten lesson was silently unbillable and invisible to everyone. The only remaining gate to real billing is **real usage**: no attendance has yet been marked in production, so the engine has never processed a real lesson. Parents self-register at `swimsync.sg`, enter their coach's join code, add children, and the business's admin assigns classes. Native App/Play Store builds are deferred. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. See `HANDOVER.md` for the current working state and next steps.
 
 ---
 
@@ -481,12 +481,35 @@ SwimSync shall allow superadmin to manage classes.
 - Assign a coach to a class
 
 *(implemented)* The admin **Classes** page supports both create and edit: each class row has
-an **Edit** action that opens the same form pre-filled and saves via an `UPDATE`, so day,
-time, coach, location, and rate can be changed in-panel (no dashboard SQL). The **day of
-week is a required, explicit choice** — the form no longer defaults it, so a class cannot be
-created on the wrong weekday by leaving the picker untouched. (A class is a *recurring
-weekly* definition keyed by `day_of_week`; there is no single class date — dated
-`lesson_sessions` are created lazily when attendance is marked, per §7.5.)
+an **Edit** action that opens the same form pre-filled, so day, time, coach, location, and
+rate can be changed in-panel (no dashboard SQL). The **day of week is a required, explicit
+choice** — the form no longer defaults it, so a class cannot be created on the wrong weekday
+by leaving the picker untouched. (A class is a *recurring weekly* definition keyed by
+`day_of_week`; there is no single class date — dated `lesson_sessions` are created lazily
+when attendance is marked, per §7.5.)
+
+#### Changing the price or coach asks *when* it takes effect *(implemented)*
+
+A class's **schedule** (title, day, time, location) is a plain fact that can simply be
+corrected. Its **money** — the price a parent pays and which coach is paid for it — is
+**effective-dated**, because both are applied to lessons that have already happened.
+
+So when an edit changes the price or the coach, SwimSync asks which of two things it is:
+
+| | What it means | Effect on past lessons |
+|---|---|---|
+| **A change from today** | The price rises, or a colleague takes the class over | **None.** Lessons already taught keep the old terms |
+| **Fixing a mistake** | The old value was never right (a typo) | Re-valued, because there was never a period at the old number |
+
+Without the distinction one of the two is always wrong: defaulting to "correct" makes every
+typo permanent fictional history, and defaulting to "change" lets every genuine price rise
+reach backwards into months already taught. The prompt appears **only** when the price or
+coach actually moved — renaming a class or shifting its time records nothing.
+
+A correction is **refused** once the affected month has been invoiced and sealed, or a coach
+payout covering it has been paid: that money is settled, and the remedy is a credit note or
+a payout adjustment rather than rewriting the record. Terms also cannot be dated into the
+future.
 
 ### 7.4 Student Management
 
@@ -587,6 +610,7 @@ SwimSync shall generate invoices monthly, with two trigger modes sharing one bil
 - Invoice generation runs after the billing month has ended — automatically from a **configurable day of the following month** (default the **7th**), or manually on demand (§5.5)
 - Invoice must cover the previous calendar month only
 - Invoice amount must be calculated from attendance records
+- Each lesson is charged at the class price **in force on the day that lesson happened** *(implemented — see below)*
 - Only billable attendance items must be included (Present, Paid Trial)
 - One invoice per parent per month with line items per lesson
 - Invoice status shall include at minimum: Outstanding, Paid
@@ -594,6 +618,21 @@ SwimSync shall generate invoices monthly, with two trigger modes sharing one bil
 - An invoice fully covered by credit is created directly as **Paid**
 
 > *For internal implementation, additional statuses such as Draft or Issued may be used if helpful.*
+
+#### A lesson is priced by its own date *(implemented — corrected 2026-07-19)*
+
+Each invoice line is charged at the class price **in force on that lesson's date**, not the
+class's price at the moment invoices are generated (§7.3).
+
+Until this was fixed the engine read the class's *current* price at generation time, so
+editing a price on the 3rd of a month silently repriced **every unbilled lesson of the
+previous month**. The exposure ran from the lesson until the invoice run — up to five weeks
+at the default run day of the 7th. It was invisible: the invoice looked internally
+consistent, and once created it can never be corrected except by credit note (§11.6).
+
+If no price is on record for a lesson's date, generation **fails and bills nothing** rather
+than charging zero. A $0 line would be a silent underbill on a document that freezes when
+created, and the lesson could never be billed again.
 
 #### Attendance-gap check before generating *(implemented)*
 
@@ -798,6 +837,14 @@ taught*. This is what stops a raise from silently repricing history — without 
 someone more money in June would change what they were owed in March. Backdating a rate
 deliberately *does* produce back pay, which is the point of backdating.
 
+**Who is paid is effective-dated too** *(implemented — corrected 2026-07-19)*. A lesson pays
+the coach who was assigned to teach it **on its own date**, not whoever holds the class now.
+Until this was fixed, handing a class to another coach moved its entire unpaid history: the
+outgoing coach's draft payout fell to zero and the incoming coach was paid, at their own
+rate, for lessons they never taught. A perfectly ordinary handover silently moved money
+between two people. Note the split this rests on — the class's **current** coach still
+governs who can see and mark it; only *pay* looks backwards.
+
 #### Draft, then frozen
 
 A payout is a **draft** until the admin marks it paid: it recalculates on every run, so
@@ -809,6 +856,14 @@ it belongs to, rather than rewriting what was already paid.
 This is deliberately *not* the credit-note model: an invoice freezes on generation
 because the parent has already been sent one, whereas a payout has no external artefact
 until money moves, so the draft window costs nothing and removes most adjustments.
+
+**An adjustment is carried once** *(implemented — corrected 2026-07-19)*. Each correction
+appears on exactly one payout and is then settled. Until this was fixed, the engine
+re-compared "what is owed now" against "what was paid then" on **every** later run and
+emitted the difference each time — so a single $45 correction reappeared on the next
+payout, and the one after that, indefinitely. A coach would have been docked the same $45
+every month. A *second* genuine correction to the same lesson still flows through
+normally; only the repetition is gone.
 
 #### Who sees what
 
@@ -1149,7 +1204,29 @@ parent only ever chooses among businesses they actually deal with, never a direc
 | **tenant_id** | UUID (FK) | Yes | |
 | **credit_balance** | Decimal | Yes | Spendable only at this business |
 
-### 9.21 CoachRates / ClassRateOverrides *(implemented)*
+### 9.21 ClassRates *(implemented)*
+
+*A class's commercial terms, **effective-dated**: what the parent pays for a lesson, and
+which coach is paid for it. One row is a complete snapshot from a date onward — changing
+either writes a new row carrying both (§7.3). This is what makes a lesson priced and
+attributed by **its own date** rather than by whatever the class says today (§7.7, §7.13).*
+
+*`Classes.price_per_lesson` remains as a **display** copy, kept in step automatically. It is
+**not** the billing source — writing to it changes nothing about what anyone is charged.*
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| **class_id** | UUID (FK) | Yes | References Classes.id |
+| **price_per_lesson** | Decimal | Yes | What the parent is charged per lesson |
+| **paid_coach_id** | UUID (FK) | Yes | Which coach earns this lesson |
+| **effective_from** | Date | Yes | Unique per class; the row in force on a date is the latest one on or before it |
+
+*Every class is guaranteed terms from the beginning of time, so no lesson can fall before
+its class's earliest row — attendance can be marked a month late, so a lesson legitimately
+predates the record that created its class. A lesson with no terms in force **fails the
+run** rather than defaulting to zero.*
+
+### 9.22 CoachRates / ClassRateOverrides *(implemented)*
 
 *What a coach is paid, **effective-dated**. A raise is a new row, never an edit — see §7.13.*
 
@@ -1164,7 +1241,7 @@ parent only ever chooses among businesses they actually deal with, never a direc
 duration calculation. `session_pay_overrides` records a single session's pay/don't-pay
 decision.
 
-### 9.22 CoachPayouts / CoachPayoutItems *(implemented)*
+### 9.23 CoachPayouts / CoachPayoutItems *(implemented)*
 
 *What a coach is owed for a month. Draft until marked paid, then frozen (§7.13).*
 
