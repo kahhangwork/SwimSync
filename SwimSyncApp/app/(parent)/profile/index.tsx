@@ -70,6 +70,11 @@ export default function ParentProfileScreen() {
             onPress={() => router.push("/(parent)/home/add-child")}
           />
           <MenuItem
+            icon="location-outline"
+            label="Contact Details"
+            onPress={() => router.push("/(parent)/profile/contact")}
+          />
+          <MenuItem
             icon="lock-closed-outline"
             label="Change Password"
             onPress={() => router.push("/(parent)/profile/change-password")}

@@ -19,6 +19,8 @@ export default function RegisterScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [postal, setPostal] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,6 +43,13 @@ export default function RegisterScreen() {
 
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    // Address and postal code are OPTIONAL — see below. Only the format is
+    // policed, and only when something was actually typed.
+    if (postal.trim() && !/^[0-9]{6}$/.test(postal.trim())) {
+      setError("Postal code should be 6 digits.");
       return;
     }
 
@@ -68,6 +77,23 @@ export default function RegisterScreen() {
       .from("profiles")
       .update({ phone: phone.trim() })
       .eq("id", data.user.id);
+
+    // Address lives on `parents`, not `profiles`: profiles is shared with
+    // coaches and admins, and a home address is a parent-shaped fact. Written
+    // after signup because the auth trigger is what creates the parents row.
+    //
+    // Best-effort, exactly like the phone update above: a failure here must
+    // never strand someone mid-registration with an account they cannot reach.
+    // They can supply it later from their profile.
+    if (address.trim() || postal.trim()) {
+      await supabase
+        .from("parents")
+        .update({
+          address: address.trim() || null,
+          postal_code: postal.trim() || null,
+        })
+        .eq("profile_id", data.user.id);
+    }
 
     setLoading(false);
 
@@ -163,6 +189,39 @@ export default function RegisterScreen() {
               onChangeText={setPhone}
               placeholder="+65 9123 4567"
               keyboardType="phone-pad"
+              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
+              placeholderTextColor="#9ca3af"
+            />
+          </View>
+
+          {/* Optional, and labelled so. The coach uses the postal code to
+              answer "is this family near a pool I teach at?" — but a signup
+              form that refuses to submit without an address would block the
+              onboarding it exists to help. Parents can add it later from their
+              profile. */}
+          <View>
+            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+              Address <Text className="text-gray-400">(optional)</Text>
+            </Text>
+            <TextInput
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Blk 123 Clementi Ave 3, #04-56"
+              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
+              placeholderTextColor="#9ca3af"
+            />
+          </View>
+
+          <View>
+            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+              Postal Code <Text className="text-gray-400">(optional)</Text>
+            </Text>
+            <TextInput
+              value={postal}
+              onChangeText={setPostal}
+              placeholder="120123"
+              keyboardType="number-pad"
+              maxLength={6}
               className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
               placeholderTextColor="#9ca3af"
             />

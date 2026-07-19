@@ -264,6 +264,15 @@ than the support capability this role needs.)*
 - A newly registered parent may create one or more child/student profiles
 - **Student profile includes:** child name, age/date of birth, gender, optional notes. *(implemented: parents do **not** set a swimming ability/level — the **class** a child is assigned to indicates their level. A per-child level field is reserved for a future "coach-defined levels" feature and is not populated today.)*
 - A child remains unassigned until the business's admin assigns that child to a coach/class
+- *(implemented 2026-07-19)* **Address and postal code are collected at registration, and
+  are optional.** The coach has no way to reach a family off-platform beyond a phone
+  number, and the postal code answers the question behind every enquiry — *is this family
+  near a pool I teach at?* Optional because a signup form that refuses to submit without
+  an address would block the very onboarding it exists to help, and because every parent
+  who registered before this has neither. They can supply them later from
+  **Profile → Contact Details**, which is what stops the field only ever holding data for
+  families who joined after it shipped.
+
 - *(implemented)* **A parent must join a business before adding a child.** The coach or
   school gives them a **join code** (e.g. `SWIM-4821`); entering it links the parent to
   that business. Add-child is gated on having joined at least one — with exactly one it
@@ -1122,7 +1131,9 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 |-------|------|----------|-------------|
 | **id** | UUID | Yes | Primary key |
 | **profile_id** | UUID (FK) | Yes | References Profiles.id |
-| **credit_balance** | Decimal | Yes | Running credit note balance (default 0.00) |
+| ~~**credit_balance**~~ | ~~Decimal~~ | — | *(implemented — moved)* Balances live on `parent_tenant_balances`, per (parent, business): credit never crosses businesses (§5.6) |
+| **address** | String | No | *(implemented 2026-07-19)* Home address, free text. On `parents` rather than `profiles` — that table is shared with coaches and admins, and a home address is a parent-shaped fact |
+| **postal_code** | String | No | *(implemented 2026-07-19)* Singapore 6-digit postal code. **TEXT, never an integer** — leading zeros are significant (`018956`) |
 | **created_at** | Timestamp | Yes | Record creation timestamp |
 
 ### 9.4 Students

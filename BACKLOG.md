@@ -55,11 +55,10 @@ credit-note emails remain, now in _Notifications_); and the **UTC-derived defaul
 month fix** (**2026-07-17** — PRD §7.7, HANDOVER §8a). The list below is renumbered from what
 remains.)_
 
-1. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
-   `parents`-table addition touching the registration form. Last because it is the only
-   one of the three on a different table and a different form; the earlier ordering
-   grouped it with the child-identity item as "onboarding-form work opened once", which
-   was wrong — add-child and register are different forms.
+**This list is empty.** All three near-term items shipped on 2026-07-19 (see below).
+Pick the next stretch from the sections beneath, or from `HANDOVER.md` §9 — which argues
+the real priority is not a build item at all, but getting real attendance marked in
+production.
 
 _Shipped 2026-07-18 and removed from this list:_ the **multi-class-parent under-billing
 bug**, plus the configurable **invoice run day**, **month sealing**, and the **hard
@@ -68,6 +67,11 @@ attendance block** — see PRD §7.7 and HANDOVER §8.
 _Shipped 2026-07-19 and removed:_ **extract the completeness-rule shared helper** (it was
 #1; done as tenanting phase 0, and it immediately exposed a live underbill — HANDOVER
 §7.18), and the whole **tenant/coach money cluster** including **coach wages**.
+
+_Shipped 2026-07-19 and removed:_ **address + postal code at parent signup** — optional at
+registration, editable afterwards at Profile → Contact Details (without which the field
+would only ever hold data for families who joined after it shipped). `postal_code` is TEXT.
+See PRD §5.1.
 
 _Shipped 2026-07-19 and removed:_ **coach-defined swimming levels** — per-business
 `tenant_levels` with an explicit order, set by the business's admin, read-only to coach and
@@ -296,49 +300,24 @@ already exists — expected lesson dates are derived at read time from
 unmarked-lessons backlog uses. Point it at the future instead of the past. **This does
 not require pre-generating sessions** — resist that; see HANDOVER §6.
 
-### Collect address and postal code at parent signup — **S**
-Add address and postal code to the registration form.
+### Child identification: NRIC last 4 — **S** — _considered and declined 2026-07-19_
+Capture the last 4 characters of a child's NRIC as part of their identity.
 
-**Why:** the coach has no way to reach a family off-platform beyond a phone number, and
-postal code is the one field that answers "is this family near a pool I teach at?" —
-which is the question behind every enquiry the coach currently answers from memory.
+**Status:** the problem this existed to solve — a coach with two students called "Ethan
+Tan" picking the wrong one — **is solved**, using **name + date of birth** instead
+(PRD §5.1). The stored `age` column is retired and age is derived. So this item is kept
+only for its reasoning, not as work.
 
-**Notes:** smaller than it looks — **email and phone are already collected** at signup
-(`profiles.email`, `profiles.phone`, set via the auth trigger; the form is
-`SwimSyncApp/app/(auth)/register.tsx`), so this is address + postal code only. Put them
-on `parents`, not `profiles`: `profiles` is shared with coaches and superadmins, and a
-home address is a parent-shaped fact. **Existing parents won't have them**, so the
-columns are nullable and any screen showing them needs an empty state — or the profile
-screen needs a prompt to fill them in. Postal code is 6 digits in Singapore and worth
-validating as such; the address itself should stay free text. Related: Maps integration
-above, if a parent address ever needs to be more than a string.
+**Why NRIC was declined:** partial NRIC (last 3 digits + checksum) is **still personal
+data** under PDPC guidance and its collection is restricted, so storing it needs a
+standing justification — and it would put regulated data on every coach's roster, since
+coaches can already read any student in their class. Date of birth was **already
+collected and already required** by the add-child form, so it answers the same question
+with no new personal data and no regulatory question at all.
 
-### Child identification: NRIC last 4 and derived age — **S**
-Capture the last 4 characters of a child's NRIC at registration, and show age as
-something derived from date of birth rather than stored.
-
-**Why:** **name alone isn't a unique identifier** — a coach with two students called
-"Ethan Tan" on the same roster has no way to tell them apart, and picks wrong on the
-attendance screen. Name + NRIC last 4 is how Singapore actually disambiguates people,
-and it's what the parent will already have to hand. (Last 4 = the last 3 digits and the
-letter, e.g. `S9012345A` → `345A`.)
-
-**Notes:** the DOB half is **mostly already done** — `students.date_of_birth` exists and
-`add-child.tsx` already requires it in `YYYY-MM-DD` form. The real gap is that
-`students.age` is a **stored integer**, described in the PRD's Students field table as
-"age (if DOB not provided)" — a second source of truth that silently goes stale the day
-after it's written. Derive age from `date_of_birth` at read time and **retire the stored
-column** — check `child/[id].tsx` and the admin student tables before dropping it.
-
-For the NRIC field: store the **last 4 only, never the full number**, and be deliberate
-that this is still PII — it goes on `students`, which coaches can already read for any
-student enrolled in their class via `coach_serves_student()`
-(`supabase/migrations/20260309000600_rls_policies.sql:133`), so it will be visible on
-rosters. Uniqueness should be a
-**warning, not a constraint** (two siblings can't share it, but a parent typo shouldn't
-block registration, and existing students have no value at all). That last point makes
-it nullable, so anything treating name + NRIC as *the* identifier needs a fallback for
-the rows that predate it.
+**Revisit only if** a real collision proves DOB insufficient — two children of the same
+name *and* the same birthday at one business. That has never happened, and the identity
+index would refuse the second one loudly rather than silently confusing them.
 
 ### Parent self-enrolment into classes — **M** `[MVP-excluded]`
 Let parents pick and join a class themselves rather than waiting for the superadmin.
