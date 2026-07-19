@@ -1,6 +1,6 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-19 (sixth session)_
+_Last updated: 2026-07-19 (seventh session)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -118,7 +118,7 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   defines its own **level ladder**, each rung carrying an ordered **skill list** (its
   curriculum); families have an **address**. A parent can now **edit a
   child**, which required closing two pre-existing defects first — see §8.
-- **Automated tests** — backend **198 pgTAP + 74 Deno**, plus frontend suites
+- **Automated tests** — backend **202 pgTAP + 74 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest 76, `SwimSyncApp` jest-expo 69); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
@@ -226,7 +226,7 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 198 tests across 15 files
+supabase test db                                  # 202 tests across 15 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
 supabase/functions/generate-invoices/test.sh      # 74 tests; needs deno (brew install deno)
@@ -258,7 +258,7 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `document_name_snapshot.test.sql` (7) | renaming a child does not rewrite an issued invoice or an immutable credit note; the note carries the name from the item it credits |
 | `tenant_levels.test.sql` (9) | per-business level ladders: RLS is **enabled** (not merely written), cross-tenant writes refused, a student cannot take another business's level, deleting a level unlevels rather than deletes |
 | `level_skills.test.sql` (11) | the skills taught at a level: order preserved, no duplicate skill within one level (ignoring case/whitespace), the tenant boundary, `CASCADE` on the level but `SET NULL` on the student, and the fix to the level-name constraint |
-| `platform_overview.test.sql` (20) | the platform admin's overview RPCs: FOUR caller shapes get zero rows (anon-equivalent, parent, coach, **and a tenant admin — even for their own tenant**), counts never leak across the tenant boundary, and `last_attendance_date` is **NULL, not a date and not 0**, for a business that has never marked anything |
+| `platform_overview.test.sql` (24) | the platform admin's overview RPCs: FOUR caller shapes get zero rows (anon-equivalent, parent, coach, **and a tenant admin — even for their own tenant**), counts never leak across the tenant boundary, and `last_attendance_date` is **NULL, not a date and not 0**, for a business that has never marked anything |
 | `parent_address.test.sql` (8) | a family maintains their own address only; `postal_code` is TEXT so leading zeros survive; `profile_id` cannot be reassigned |
 
 **Total: 178 across 14 files** — verified by `supabase test db`, and the per-file numbers
@@ -844,14 +844,40 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     component leaves part of a required structure to its callers, the callers will diverge** —
     put the required part inside. Audit: watch the Next dev overlay's issue count, and check
     the browser console on a page you have touched; a hydration error is silent otherwise.
+37. **A STORED COLUMN THAT NOTHING MAINTAINS IS NOT A FACT — don't display it, derive it.**
+    Two of these shipped together on the new Platform page and the user caught both within a
+    minute of seeing their own row:
+    - `tenants.kind` reads `'private'` because that is its **DEFAULT** and the tenancy
+      backfill hardcoded it. No screen, RPC or admin control has ever set it. Displaying it
+      as "Type" would have said *private* for a genuine swim school and nobody would have
+      questioned it, because it looks like data.
+    - The "no rate" warning fired on a **private coach**, whose absent rate is the state
+      PRD §7.13 calls **correct** — their income is their parents' invoices. A warning about
+      a correct state is noise that never goes away.
+    Both are now derived from *is this coach also the tenant's admin* — a fact something
+    actually maintains. **Before putting a column on a screen, find its writer.** If nothing
+    writes it, either derive the answer or don't show it; a reserved-for-later field rendered
+    as truth is worse than an empty column, because an empty column prompts a question.
+    Audit: `grep -rn "<column>" supabase/migrations/ | grep -i "update\|insert\|set "` — no
+    hits beyond the DDL means nothing maintains it.
 
 ---
 
-## 8.7 Seventh session (2026-07-19) — THE PLATFORM ADMIN GETS THEIR OWN PANEL — NOT DEPLOYED
+## 8.7 Seventh session (2026-07-19) — THE PLATFORM ADMIN GETS THEIR OWN PANEL — DEPLOYED
 
-Branch `feat/platform-admin-scope`, three commits, **one migration** (`20260719002300`).
-**Not deployed.** EXPAND only, so the order is **migrate first, then push** — the opposite of
+Branches `feat/platform-admin-scope` and `fix/derive-tenant-shape`, both merged and **live**.
+Two migrations, `20260719002300` and `20260719002400`, both applied (`migration list` shows
+47 local, none pending). Deployed **migrate first, then push** — EXPAND, the opposite of
 §8.6's branch, and the reason is the direction, not habit.
+
+**Verified in production without a login:** calling both RPCs with the public anon key
+returns `permission denied for function …` — the `REVOKE ALL … FROM PUBLIC` layer holding,
+before the body's gate is even reached. Re-checked *after* `002400`, because that migration
+**DROPs and recreates** the function and **a DROP takes its grants with it**; re-applying both
+REVOKEs is why the second check mattered.
+
+**Still unverified in production: anything behind a login** — the nav split, the refusals and
+the per-tenant table. Locally 30/30 and 6/6 across two drivers, but that is fixtures. See §9.
 
 ### The bug: every business page was open to an account with no business
 
@@ -898,11 +924,36 @@ production's actual situation, and no screen said it out loud before.
   "Search" button — a strict-mode violation nobody saw because the driver is hand-run.
   Confirmed pre-existing by running it against the unmodified page. Now 6/6.
 
+### Then the user looked at their own row and found two things wrong
+
+Both the same mistake — **a stored value displayed as a fact** (§7.37):
+
+- **"1 no rate" on a private coach.** PRD §7.13 says a private coach has no rate *by design*:
+  their income is their parents' invoices and there is nobody upstream to pay them. Flagging
+  it warns about the correct state, forever, on every private coach's row. Now counts
+  **staff** only — a coach who is *not* the owner and has no rate, which is the case where
+  payroll silently pays someone nothing.
+- **"Type: private"** came from `tenants.kind`, an enum defaulting to `'private'` that
+  **nothing sets, changes or reads** — hardcoded by the tenancy backfill and untouched since.
+  It would have read "private" for an actual swim school. Replaced with a **derived** shape:
+  one coach who is also the admin is a private coach, anything else is a school.
+
+Both discriminate on *is this coach also the tenant's admin*, never on `kind` — coach type is
+not a rule in this codebase (§6), and routing on which extension rows exist is the same
+principle that keeps a private coach working everywhere else.
+
+**`20260719002400` is a NEW migration, not an edit to `002300`** — that one was already
+applied in production, so editing it would have left the file disagreeing with the database
+and the change would never have shipped. `DROP` before `CREATE` because the return type
+changes, and both REVOKE layers re-applied because the DROP takes grants with it.
+
 ### Not done (deliberate)
 
 - **The family-status search still scans client-side** and is capped at 1000 (`BACKLOG.md`).
   Left working, not extended — fixing it is a server-side search, its own piece of work.
 - **No "view as tenant" impersonation.** Still rejected, for the reasons in PRD §4.4.
+- **`tenants.kind` left in the schema, read by nothing.** It is reserved for future pricing.
+  Recorded in `BACKLOG.md` → *Deliberately not doing* so nobody wires a display to it again.
 
 ---
 
@@ -2197,12 +2248,23 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### Loose end from this session — 2 minutes, do it first
+### Loose ends from this session — both need a production LOGIN, ~5 minutes total
 
-**Confirm the billing-month guard against production.** It shipped (v13) but has never been
-exercised there; the local `CRON_SECRET` doesn't match production's, so the probe was skipped.
-§8.6 has both ways to close it — the UI check is the quicker one: `admin.swimsync.sg` →
-Invoices should read **June 2026** and refuse to offer July.
+Everything shipped today is live, but three things were only ever verified against local
+fixtures, because nothing here has production credentials. All three are one login away:
+
+1. **The tenant admin's eleven pages still work.** Log in as the real coach. This is the
+   highest-stakes check on the list: §7.19 was a production lockout of exactly this account,
+   and the new gate keys on `tenant_id` precisely to avoid repeating it. If it misbehaves,
+   revert `6666918` alone — the RPCs and both migrations are additive and harmless by
+   themselves.
+2. **The platform admin's own panel.** Log in as the platform admin: you should land on
+   **Platform**, see only that nav item, and get one row for the real business — expect
+   *private coach · never · never run*, with **no** "unpaid" badge.
+3. **The billing-month guard.** `admin.swimsync.sg` → Invoices should read **June 2026** and
+   refuse to offer July. Shipped as `generate-invoices` v13 but never exercised against
+   production; the local `CRON_SECRET` doesn't match production's, so the direct probe was
+   skipped (§8.6 has it if you have the real secret).
 
 ### The one thing blocking everything else — and it has been urgent for four sessions
 
@@ -2320,6 +2382,10 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `supabase/tests/student_identity · student_tenant_pin · document_name_snapshot · tenant_levels · level_skills · parent_address` | This session's pgTAP (+50). Each was confirmed to FAIL without its fix |
 | `.claude/skills/run-ui-playwright/drivers/verify-{student-identity,edit-child,levels,level-skills,parent-address}.mjs` | Fifth session's UI drivers (49 checks). They caught three defects that typechecked clean and passed pgTAP |
 | `.claude/skills/run-ui-playwright/drivers/verify-invoice-controls.mjs` | Sixth session (21 checks): MEASURES the toggle's track/knob rects from the DOM and asserts the billing-month default + cap. Its **14/21 baseline on unfixed code** is what located the knob bug (§7.34) |
+| `SwimSyncAdmin/lib/adminNav.ts` (+ test) | Which pages an account can use, keyed on **`tenant_id`, never `role`** (§7.19). Sidebar, the layout gate and the post-login landing all derive from it, so they cannot disagree. Unknown routes fail closed |
+| `SwimSyncAdmin/components/RequiresTenant.tsx` | The audience gate, applied once in the `(admin)` layout. **Early-returns** so a refused page's children never mount — an overlay would leave the queries running (§7.10) |
+| `supabase/migrations/2026071900{2300,2400}` | `platform_tenant_overview()` + `platform_stranded_parents()`, then the derived-shape correction. SECURITY DEFINER, gated internally, REVOKEd from PUBLIC (§7.35) |
+| `.claude/skills/run-ui-playwright/drivers/verify-platform-admin-scope.mjs` | 30 checks: every refusal asserts the **absence of rows**, and the tenant-admin half asserts all eleven pages render their **content** — "no refusal" would also pass on a blank page |
 | `supabase/functions/generate-invoices/test-helpers.ts` → `monthEnded()` | The suite's clock seam. Supplies billing month + a clock at which it is billable + an early-enough enrolment as ONE fact, and **throws on a scenario expecting zero lessons** (§7.33) |
 
 gotchas: `swimsync-project`, `swimsync-backend-gotchas`.

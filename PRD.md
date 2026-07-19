@@ -247,7 +247,12 @@ support rather than daily operation.
   its join code, families, students, classes and coaches, plus the signals that say which
   business needs attention: **when attendance was last marked** (or *never*), how many of
   this month's recorded sessions are fully marked, whether last month was billed, and
-  whether any coach has no pay rate (which is why payroll would silently compute nothing)
+  whether any **member of staff** has no pay rate (which is why payroll would silently pay
+  them nothing). A coach who *owns* the business is deliberately not counted there: their
+  income is their own parents' invoices and a rate would be meaningless, per §7.13.
+  Whether a business is a private coach or a school is **derived** from whether its only
+  coach is also its admin — not stored, so it stays true when a coach hires their first
+  colleague
 - **Parents who registered but never entered a join code** — they belong to no business, so
   nobody else can see them
 - **Move a student to another business** — the remedy when a parent joins with the

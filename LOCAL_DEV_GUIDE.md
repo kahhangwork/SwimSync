@@ -57,7 +57,7 @@ Created by `supabase/seed.sql` on every `supabase db reset`.
 
 | Role | Email | Password | Where to log in |
 |------|-------|----------|-----------------|
-| Platform admin | `superadmin@swimsync.test` | `password123` | Admin panel → http://localhost:3000 |
+| Platform admin | `superadmin@swimsync.test` | `password123` | Admin panel → lands on **`/platform`**, and the eleven single-business pages refuse them by design (PRD §4.4) |
 | Coach | `coach@swimsync.test` | `password123` | Mobile app (Coach) |
 | Parent | *self-register in the app* | *you choose* | Mobile app (Parent) |
 
