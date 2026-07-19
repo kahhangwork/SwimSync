@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { landingRoute } from "@/lib/adminNav";
 import { supabase } from "@/lib/supabase";
 import { Logo } from "@/components/Logo";
 
@@ -32,7 +33,7 @@ export default function LoginPage() {
     // Verify superadmin role
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, tenant_id")
       .eq("id", data.session.user.id)
       .single();
 
@@ -45,7 +46,12 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    // A platform admin has no business, so /dashboard would show them
+    // cross-tenant totals labelled as one business. Derived from the SAME fact
+    // the sidebar and the page gate use — a second way of asking "which kind of
+    // admin is this?" is a second thing to keep in sync, and the two
+    // disagreeing is how you get a redirect loop.
+    router.push(landingRoute(profile?.tenant_id as string | null));
   }
 
   return (
