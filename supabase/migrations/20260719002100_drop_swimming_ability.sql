@@ -13,10 +13,17 @@
 -- unassigned. Nothing in that list is optional — it is most of both apps.
 --
 -- ORDER, EXPLICITLY:
---   1. Merge and push. Vercel builds BOTH projects, but they are SEPARATE
---      projects and deploy independently (§7.23) — confirm the surface you
---      changed, comparing a known-good route against a known-bad one.
---   2. Only then run this migration.
+--   1. `supabase db push` — applies every EXPAND migration up to 002000.
+--   2. Merge and push to main. Vercel builds BOTH projects, but they are
+--      SEPARATE projects and deploy independently (§7.23) — confirm the
+--      surface you changed, comparing a known-good route against a known-bad.
+--   3. Only then `supabase db push` again, which applies THIS migration alone.
+--
+-- NUMBERED 002100, AFTER the expand migrations, deliberately: `supabase db
+-- push` applies everything pending in one go, so a contract migration sitting
+-- in the middle (it was 001900) cannot be held back without moving the file
+-- out of the directory. Being last is what makes the two-phase deploy a plain
+-- `db push`, run twice.
 --
 -- ROLLBACK, if this is applied too early: re-add the column as nullable. It
 -- was always NULL, so nothing is lost by re-adding it and nothing was lost by

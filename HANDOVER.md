@@ -757,10 +757,15 @@ Take a backup first, per the §8 precedent.
 
 | Step | What | Why this order |
 |---|---|---|
-| 1 | `db push` **through `20260719001800`** | All EXPAND (adding). New UI queries the new columns/table |
+| 1 | `supabase db push` | Applies every EXPAND migration, `001400`→`002000`. New UI queries the new columns/table |
 | 2 | Push to `main` → Vercel builds **both** apps | |
 | 3 | **Confirm the deploy is live** | Two SEPARATE Vercel projects (§7.23). Compare a known-good route against `/levels` |
-| 4 | `db push` **`20260719001900`** ONLY | CONTRACT (dropping). Six screens select `swimming_ability`; applying this under the old bundle breaks parent home, parent child detail, coach roster, admin dashboard/students/unassigned |
+| 4 | `supabase db push` **again** | Applies `20260719002100` alone — CONTRACT (dropping). Six screens select `swimming_ability`; applying this under the old bundle breaks parent home, parent child detail, coach roster, admin dashboard/students/unassigned |
+
+> The contract migration is numbered **002100, after the expand ones, deliberately.**
+> `db push` applies everything pending in one go, so a contract migration sitting in the
+> middle cannot be held back without moving the file out of the directory. Being last is
+> what makes this two-phase deploy a plain `db push`, run twice.
 
 `generate-invoices` **must be redeployed** (`supabase functions deploy`) — `core.ts` changed
 (§8.3). A git push does not deploy it.
