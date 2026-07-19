@@ -3,7 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { todayInSg, monthBounds, formatSgDate } from "@/lib/lessonDates";
+import {
+  todayInSg,
+  monthBounds,
+  formatSgDate,
+  previousBillingMonth,
+} from "@/lib/lessonDates";
 import { computeClassCoverage, type ClassCoverage } from "@/lib/classCoverage";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -39,9 +44,16 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
-  // Invoice generation controls
-  const currentMonth = todayInSg().slice(0, 7); // YYYY-MM
-  const [genMonth, setGenMonth] = useState(currentMonth);
+  // Invoice generation controls.
+  //
+  // The latest month that can be billed is the one BEFORE today: invoices cover
+  // a complete calendar month (PRD §5.5). This used to default to the CURRENT
+  // month with no cap, so the obvious action on 19 July was to generate July —
+  // which billed the lessons so far and SEALED the month, stranding the rest.
+  // The engine now refuses that outright; this is the affordance that stops the
+  // admin being offered it in the first place.
+  const latestBillableMonth = previousBillingMonth();
+  const [genMonth, setGenMonth] = useState(latestBillableMonth);
   const [generating, setGenerating] = useState(false);
   const [genResult, setGenResult] = useState<string | null>(null);
   // The tenant this admin bills for. A tenant_admin has exactly one; a
@@ -265,6 +277,28 @@ export default function InvoicesPage() {
           `${formatBillingMonth(genMonth)} is already complete and closed — ` +
             `no invoices were generated. Nothing further is needed.`
         );
+      } else if (json.status === "month_not_ended") {
+        // The month has not finished, so it cannot be billed (PRD §5.5). The
+        // picker below is capped to prevent this, but the cap is an affordance
+        // and the engine is the guard — so this branch must exist.
+        setGenResult(`Error: ${json.message ?? "That month has not ended yet."}`);
+      } else if (
+        // ── FAIL SAFE ON ANYTHING UNRECOGNISED ────────────────────────────
+        // Everything below assumes a successful run. Without this, a refusal
+        // the engine grows LATER renders through the success path as a green
+        // "Created 0 invoice(s) for July 2026" — so the admin concludes the
+        // month is billed and never comes back. That is worse than the bug
+        // this guard was added for: a correct refusal presented as a
+        // completed billing. Any future status therefore fails safe by
+        // default rather than needing to be remembered here.
+        Number(json.invoices_created ?? 0) === 0 &&
+        !json.sealed &&
+        Number(json.parents_deferred ?? 0) === 0
+      ) {
+        setGenResult(
+          `Error: generation did not complete (${json.status ?? "unknown status"}). ` +
+            `${json.message ?? "No invoices were created."}`
+        );
       } else {
         // A deferred parent is billed NOTHING this run (a child of theirs sits
         // in a class with unmarked attendance). Surfaced explicitly — silently
@@ -381,9 +415,13 @@ export default function InvoicesPage() {
             <label className="block text-xs font-semibold text-gray-500 mb-1">
               Billing month
             </label>
+            {/* Capped at the last COMPLETED month. This is an affordance, not
+                the guard — `max` constrains neither a programmatically-set
+                value nor every browser, so the engine refuses it too. */}
             <input
               type="month"
               value={genMonth}
+              max={latestBillableMonth}
               onChange={(e) => setGenMonth(e.target.value)}
               className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
             />
@@ -402,28 +440,44 @@ export default function InvoicesPage() {
             {generating ? "Generating…" : "Generate Invoices"}
           </Button>
 
-          {/* Auto-generation toggle */}
+          {/* Auto-generation toggle.
+              `autoEnabled === null` means UNKNOWN, not off — a platform admin
+              has no tenant, so loadTenant() returns before reading any setting.
+              Rendering null as "off" (and `runDay ?? 7` as "day 7") presented
+              invented values as this business's configuration; it only ever
+              looked right because production happens to be false/7. */}
           <div className="ml-auto flex items-center gap-3">
             <div className="text-right">
               <div className="text-xs font-semibold text-gray-700">
                 Automatic monthly generation
               </div>
               <div className="text-[11px] text-gray-400">
-                Runs from day {runDay ?? 7} for the previous month
+                {autoEnabled === null
+                  ? "No business selected"
+                  : `Runs from day ${runDay ?? 7} for the previous month`}
               </div>
             </div>
+            {/* shrink-0: this is a flex item next to a two-line label, and w-11
+                is a flex BASIS, not a floor — without it the track squashes
+                while the absolutely-positioned knob keeps its 20px offset, so
+                the knob rides the edge or overhangs it. */}
             <button
               type="button"
               onClick={handleToggleAuto}
               disabled={togglingAuto || autoEnabled === null}
-              className={`relative h-6 w-11 rounded-full transition-colors ${
-                autoEnabled ? "bg-sky-500" : "bg-gray-300"
+              aria-label="Automatic monthly invoice generation"
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                autoEnabled === null
+                  ? "bg-gray-200"
+                  : autoEnabled
+                    ? "bg-sky-500"
+                    : "bg-gray-300"
               } disabled:opacity-50`}
               aria-pressed={!!autoEnabled}
             >
               <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                  autoEnabled ? "translate-x-5" : "translate-x-0.5"
+                className={`absolute top-0.5 left-0 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                  autoEnabled ? "translate-x-[1.375rem]" : "translate-x-0.5"
                 }`}
               />
             </button>
@@ -441,12 +495,15 @@ export default function InvoicesPage() {
           >
             Generate automatic invoices from day
           </label>
+          {/* Blank rather than "7" when unknown — see the toggle above. A
+              number shown here reads as this business's configured run day. */}
           <input
             id="run-day"
             type="number"
             min={1}
             max={28}
-            value={runDay ?? 7}
+            value={runDay ?? ""}
+            placeholder="—"
             disabled={savingRunDay || runDay === null}
             onChange={(e) => setRunDay(Number(e.target.value))}
             onBlur={(e) => handleSaveRunDay(Number(e.target.value))}

@@ -113,8 +113,8 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   defines its own **level ladder**, each rung carrying an ordered **skill list** (its
   curriculum); families have an **address**. A parent can now **edit a
   child**, which required closing two pre-existing defects first — see §8.
-- **Automated tests** — backend **178 pgTAP + 68 Deno**, plus frontend suites
-  (`SwimSyncAdmin` vitest 57, `SwimSyncApp` jest-expo 64); all run in CI on push to `main`. See §5.
+- **Automated tests** — backend **178 pgTAP + 74 Deno**, plus frontend suites
+  (`SwimSyncAdmin` vitest 62, `SwimSyncApp` jest-expo 69); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
 **https://swimsync.sg**, admin at **https://admin.swimsync.sg**, real email via
@@ -220,13 +220,13 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 supabase test db                                  # 178 tests across 14 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
-supabase/functions/generate-invoices/test.sh      # 68 tests; needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 74 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
-cd SwimSyncAdmin && npm test                       # 57 tests
+cd SwimSyncAdmin && npm test                       # 62 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
-cd SwimSyncApp && npm test                         # 64 tests
+cd SwimSyncApp && npm test                         # 69 tests
 ```
 
 **Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
@@ -255,7 +255,12 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 above are each file's `SELECT plan(n)`. Four of these files postdate the original
 four-row table and were only described in prose; if you add a suite, add a row.
 
-_Deno tests — `core.test.ts` + `email.test.ts` + `dates.test.ts` (run by `test.sh`):_ **Engine**
+_Deno tests — `core.test.ts` + `email.test.ts` + `dates.test.ts` (run by `test.sh`):_
+**The clock is part of every fixture** — `monthEnded()` in `test-helpers.ts` supplies the
+billing month, an instant at which it is billable, and an early-enough enrolment as ONE fact,
+and `newScenario()` **throws** on a scenario expecting zero lessons (§7.33). The
+completed-month guard is pinned by five tests including the SGT boundary (23:59 on 31 Jul
+refuses July; 00:00 on 1 Aug allows it) and the year rollover. **Engine**
 (`core.test.ts`): billable-only summing, paid vs free trial, no double-billing, the
 auto/manual completeness gate, the `auto_invoice_enabled` switch, FIFO credit application,
 **11.1** leap-year last-day / month-boundary billing, **11.7** credit-exceeds-invoice
@@ -309,7 +314,10 @@ runtime (checks the deep joins resolve — no NaN, no empty tables);
 is already marked, and a bulk save persists `cancelled_rain` to the DB;
 `verify-class-edit.mjs` drives the admin Classes page — the create form no longer defaults
 the day (required choice) and an existing class edits Saturday→Sunday and persists;
-`verify-attendance-window.mjs` (+ `fixtures-attendance-window.sql`) drives the attendance
+`verify-invoice-controls.mjs` drives the admin invoice controls — it MEASURES the toggle's
+track and knob rects from the DOM (§7.34) in both states and asserts the knob stays inside the
+track, that a click round-trips through the DB, and that the billing month defaults to and is
+capped at the last completed month; `verify-attendance-window.mjs` (+ `fixtures-attendance-window.sql`) drives the attendance
 window (§8b) across coach + parent — the roster button targets the most recent expected
 lesson (not raw "today"), the "no lessons to mark yet" placeholder shows for a class with
 nothing due, and the parent screen distinguishes "no lessons have taken place yet" from
@@ -771,9 +779,126 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     the new build has:
     `B=$(curl -s https://swimsync.sg | grep -oE '/_expo/static/js/web/[^"]+\.js' | head -1); curl -s "https://swimsync.sg$B" | grep -c "<new-string>"`
 
+32. **A CLAMP THAT MAKES A CHECK FAIR CAN ALSO MAKE IT VACUOUS.** The completeness gate
+    clamps its window to today (`windowTo = todayDate < monthEnd ? todayDate : monthEnd`) so a
+    lesson that has not happened yet is not reported as a gap. Entirely correct in itself —
+    and it meant a run on an **in-progress** month saw only the lessons so far, judged the
+    month **COMPLETE**, billed them, and **sealed** it. Every remaining lesson of that month
+    was then permanently unbillable (later runs short-circuit on the seal; the
+    `already_exists` guard skips the parent even if it is reopened). Nothing validated that
+    the billing month had **ended** — the engine checked only the `YYYY-MM` *format*, and the
+    admin's picker defaulted to the current month with no `max`. Fixed 2026-07-19: the engine
+    refuses `billingMonth > previousBillingMonth(now)` before anything can seal, and `force`
+    cannot reach it. **The shape worth remembering:** when a rule is relaxed to be fair to
+    incomplete input, ask what it now says about input that is *entirely* incomplete. Same
+    family as §7.17 (a conjunction of negatives is satisfied hardest by an empty run) — there
+    the guard was vacuously *true*, here the window was vacuously *small*.
+33. **A test suite that reads the real clock changes meaning as the calendar advances.** The
+    engine suite hardcoded billing months (`2026-07`, `2027-11`, `2028-02`) and mostly did not
+    say what "now" was, so months sat in the *future* of the test clock — where
+    `expectedLessonDates` returns nothing and the completeness gate passes by having nothing
+    to check. Tests were partly inert and nobody could tell, because the suite was green.
+    Correcting the clock made the gate engage for the first time and immediately exposed two
+    fixtures that had never actually been complete. Fixed by making the clock part of the
+    fixture (`monthEnded()` in `test-helpers.ts`), with `newScenario()` **throwing** on a
+    scenario that expects zero lessons. **Never date a test's fixture relative to the wall
+    clock**, and prefer a helper that cannot construct the vacuous case over a comment asking
+    the next person to check for it.
+34. **An absolutely-positioned element with NO `left`/`top` is placed at its STATIC position,
+    which is not necessarily the corner.** The auto-generation toggle's knob was
+    `absolute top-0.5` with no `left`, plus `translate-x-5` for the "on" state. A `<button>`
+    **centres its content**, so the knob's static x was already ~22px into a 44px track and
+    the transform pushed it to 42px — **18px outside the track**. Both states were wrong (off
+    sat flush against the *right* edge), which is why the reported symptom was "a blue pill
+    with no knob". Always anchor a transform-driven knob (`left-0`) so the offset is measured
+    from a known origin. Found by **measuring rects from the DOM**, not by looking at a
+    screenshot — `verify-invoice-controls.mjs`, same technique as §7.9. **Run a driver against
+    the unfixed code first**: the 14/21 baseline is what located the cause, and without it the
+    fix would have been a guess that happened to work.
+
 ---
 
-## 8. What changed this session (2026-07-19, fifth session — CHILD IDENTITY, LEVELS, ADDRESS — DEPLOYED, with an incident)
+## 8.6 Sixth session (2026-07-19) — THE BILLING MONTH MUST HAVE ENDED (+ the toggle) — NOT DEPLOYED
+
+Branch `fix/billing-month-guard`, three commits, **no migration**. **Not yet in production.**
+
+### The bug: you could bill a month that had not finished
+
+The admin's month picker defaulted to the **current** month with no `max`, and the engine
+validated only that `billing_month` matched `YYYY-MM`. So on 19 July the obvious action was to
+generate July — and the completeness gate's today-clamp made a mid-month run look **complete**,
+so it billed the lessons so far and **sealed** the month. Every remaining July lesson would
+then have been permanently unbillable. Full reasoning in §7.32.
+
+Inert only because production has no attendance rows — the exact condition §9 says is about to
+change, which is why this was worth doing before the onboarding push rather than after.
+
+- **The guard is in the ENGINE**, before the sealed-month guard so `force` cannot reach it.
+  `force` still means exactly one thing: skip the sealed-month guard. The picker's `max` is an
+  affordance; §7.8's lesson is that a gate only the client enforces is not a gate.
+- **A refusal must RENDER as a refusal.** `handleGenerate` fell through to a generic
+  *"Created N invoice(s)"* for any unknown status, so the refusal would have shown as a green
+  *"Created 0 invoice(s) for July 2026"* — a correct guard presented as a completed billing,
+  which is worse than the bug. The fallthrough now **fails safe** when a run created nothing,
+  sealed nothing and deferred nobody, so any status added later inherits that.
+
+### The test suite was the real work (§7.33)
+
+The guard broke 23 of 41 Deno tests — because the suite ran on the **real clock** with
+hardcoded months, so it had been partly inert and green. The months turned out to be
+arbitrary (`newScenario()` gives every test its own tenant and parents, so
+`UNIQUE(parent_id, billing_month)` cannot collide), so the clock is now part of the fixture
+via `monthEnded()`, `completeMonth()` inherits it, and **`newScenario()` throws on a scenario
+that expects zero lessons** — vacuity made impossible rather than discouraged.
+
+Correcting the clock made the completeness gate engage for the first time and immediately
+exposed two fixtures that had never been complete. One test changed meaning honestly: *"a month
+with NOTHING recorded is never sealed"* now returns `incomplete_attendance` (which additionally
+names the missing lessons) rather than `nothing_to_bill`, and a separate test covers the
+genuine nothing-due case. The safety property — the month is not sealed — is unchanged.
+
+**68 → 74 Deno.** Guard reverted and re-run: exactly the 4 engine guard tests go red, the
+fixture-guard test correctly stays green. Suite run twice (§7.15).
+
+### The toggle (§7.34)
+
+Measured, not guessed. `verify-invoice-controls.mjs` reads track/knob rects from the DOM; the
+**baseline against unfixed code scored 14/21** and is what located the cause — the knob had no
+`left` anchor, so it was positioned from its static (button-centred) origin and overhung the
+track by 18px. Also `shrink-0`, and `autoEnabled === null` now renders as *unknown* rather than
+as a fabricated "off, day 7" (a platform admin has no tenant). `handleToggleAuto` deliberately
+untouched — `auto_invoice_enabled` is `false` in production and enabling cron is a live
+decision, so a silent regression there would block it. Driver now **21/21**.
+
+### Deploy order for this one is ADMIN FIRST, then the function
+
+Opposite of the usual instinct, because the UI change is purely **restrictive**: it stops
+offering the current month while the engine is unchanged (harmless). Engine-first would open a
+window where the engine refuses and the admin renders fake success.
+
+```bash
+git checkout main && git merge fix/billing-month-guard && git push   # 1. admin (Vercel)
+# A 200 proves nothing (§7.31) — grep the served chunk for a string only the new build has:
+B=$(curl -sL https://admin.swimsync.sg/invoices \
+     | grep -oE '/_next/static/chunks/app/\(admin\)/invoices/[^"]+\.js' | head -1)
+curl -s "https://admin.swimsync.sg$B" | grep -c month_not_ended       # expect >= 1
+supabase functions deploy generate-invoices                           # 2. engine
+supabase functions list                                               # confirm v12 -> v13
+```
+
+**No migration**, so `supabase db push` is not run at all — §7.30's trap cannot fire here.
+
+### Also done
+
+Fixed three doc drifts found at session start (PRD §5.1 still called levels unbuilt; test
+counts said 167; the cron line read as blocked rather than as an open decision). Amended
+`.claude/skills/plan-review/SKILL.md` so review findings are folded into the step they govern
+as an executable form — a step, an assertion with a pass/fail value, or a named prohibition —
+rather than appended as a Risks section nobody reads at implementation time.
+
+---
+
+## 8. What changed (2026-07-19, fifth session — CHILD IDENTITY, LEVELS, ADDRESS — DEPLOYED, with an incident)
 
 > **How to read the §8 sections — they are NEWEST FIRST, and the numbering does not run in
 > reading order.** Five sessions happened on 2026-07-19, so the `.1`–`.4` suffixes number
@@ -964,7 +1089,8 @@ curl -s "https://admin.swimsync.sg$B" | grep -c tenant_level_skills
 
 ### (d) Tests
 
-**167 pgTAP** (128 → 167, +39 across five new files), **68 Deno** (+1), frontend **64 jest**
+**167 pgTAP** (128 → 167, +39 across five new files) — _mid-session; §8(f) then took it to the
+current **178**_ — **68 Deno** (+1), frontend **64 jest**
 (+8) and **57 vitest** (+8). Four new UI drivers: `verify-student-identity.mjs` (13),
 `verify-edit-child.mjs` (7), `verify-levels.mjs` (9), `verify-parent-address.mjs` (6).
 
@@ -1946,6 +2072,15 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > **This is the current shift, not the queue.** The full list of unbuilt ideas — with
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
+
+### First: there is an UNDEPLOYED branch
+
+`fix/billing-month-guard` (3 commits + docs) is merged nowhere and live nowhere. It closes a
+silent-underbill hole — billing a month that has not ended seals it and strands the rest
+(§7.32, §8.6). **Deploy admin first, then the edge function**; the commands are in §8.6.
+
+This matters *before* step 1 below, not after: the hole is inert only while production has no
+attendance, and step 1 is the act of ending that.
 
 ### The one thing blocking everything else — and it has been urgent for three sessions
 

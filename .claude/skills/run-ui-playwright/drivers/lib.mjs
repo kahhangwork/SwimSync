@@ -2,8 +2,11 @@
 // See ../SKILL.md for the gotchas these encode.
 import { chromium } from "playwright-core";
 
-export const ADMIN = "http://localhost:3000";
-export const EXPO = "http://localhost:8081";
+// Overridable because Next picks the next free port when 3000 is taken (a
+// stale dev server from another session is the usual cause), and Expo does the
+// same. Run e.g. ADMIN_URL=http://localhost:3001 node drivers/<driver>.mjs
+export const ADMIN = process.env.ADMIN_URL ?? "http://localhost:3000";
+export const EXPO = process.env.EXPO_URL ?? "http://localhost:8081";
 
 /** Launch Chrome. mobile=true gives a phone viewport for the Expo app. */
 export async function launch({ mobile = false, headless = true } = {}) {
