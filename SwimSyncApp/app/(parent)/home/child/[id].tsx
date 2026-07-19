@@ -21,7 +21,10 @@ type ChildDetail = {
   gender: string | null;
   swimming_ability: string | null;
   notes: string | null;
-  assignment_status: "unassigned" | "assigned" | "inactive";
+  // "inactive" was dropped from the enum — activity is its own axis now
+  // (students.is_active), so a departed child must not read "Unassigned".
+  assignment_status: "unassigned" | "assigned";
+  is_active: boolean;
   coach_name: string | null;
   class_day: string | null;
   class_time: string | null;
@@ -72,6 +75,7 @@ export default function ChildProfileScreen() {
         swimming_ability,
         notes,
         assignment_status,
+        is_active,
         student_class_enrolments(
           is_active,
           classes(
@@ -142,6 +146,7 @@ export default function ChildProfileScreen() {
       swimming_ability: student.swimming_ability,
       notes: student.notes,
       assignment_status: student.assignment_status,
+      is_active: student.is_active,
       coach_name: coachProfile?.full_name ?? null,
       class_day: cls?.day_of_week ?? null,
       class_time: cls
@@ -209,7 +214,10 @@ export default function ChildProfileScreen() {
               <Text className="text-xl font-bold text-gray-900">
                 {child.full_name}
               </Text>
-              <StatusBadge status={capitalize(child.assignment_status)} size="sm" />
+              <StatusBadge
+                status={child.is_active ? capitalize(child.assignment_status) : "Inactive"}
+                size="sm"
+              />
             </View>
           </View>
 
@@ -225,12 +233,19 @@ export default function ChildProfileScreen() {
           <Text className="text-base font-bold text-gray-900 mb-3">
             Class Assignment
           </Text>
-          {child.assignment_status === "assigned" ? (
+          {child.is_active && child.assignment_status === "assigned" ? (
             <View className="gap-2">
               <Row label="Coach"    value={child.coach_name ?? "—"} />
               <Row label="Day"      value={capitalize(child.class_day)} />
               <Row label="Time"     value={child.class_time ?? "—"} />
               <Row label="Location" value={child.class_location ?? "—"} />
+            </View>
+          ) : !child.is_active ? (
+            <View className="bg-gray-100 rounded-xl p-4">
+              <Text className="text-gray-600 text-sm">
+                No longer attending. Their attendance history and invoices are
+                still here. Contact your coach if this looks wrong.
+              </Text>
             </View>
           ) : (
             <View className="bg-yellow-50 rounded-xl p-4">

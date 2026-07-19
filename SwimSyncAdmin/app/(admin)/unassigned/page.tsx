@@ -64,6 +64,7 @@ export default function UnassignedPage() {
         "id, full_name, swimming_ability, parent_students(parents(profiles(full_name)))"
       )
       .eq("assignment_status", "unassigned")
+        .eq("is_active", true)
       .order("full_name");
 
     setStudents(

@@ -39,7 +39,10 @@ type AttendanceRecord = {
 type Child = {
   id: string;
   full_name: string;
-  assignment_status: "unassigned" | "assigned" | "inactive";
+  // "inactive" was dropped from the enum — activity is its own axis now
+  // (students.is_active), so a departed child must not read "Unassigned".
+  assignment_status: "unassigned" | "assigned";
+  is_active: boolean;
 };
 
 const FILTER_OPTIONS: FilterOption[] = ["All", "Present", "Absent", "Cancelled", "Trial"];
@@ -111,13 +114,14 @@ export default function AttendanceScreen() {
 
     const { data: links } = await supabase
       .from("parent_students")
-      .select("students(id, full_name, assignment_status)")
+      .select("students(id, full_name, assignment_status, is_active)")
       .eq("parent_id", parent.id);
 
     const childList: Child[] = (links ?? []).map((l: any) => ({
       id: l.students.id,
       full_name: l.students.full_name,
       assignment_status: l.students.assignment_status,
+      is_active: l.students.is_active,
     }));
 
     setChildren(childList);

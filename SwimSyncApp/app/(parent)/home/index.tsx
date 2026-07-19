@@ -18,7 +18,10 @@ type Child = {
   id: string;
   full_name: string;
   swimming_ability: string | null;
-  assignment_status: "unassigned" | "assigned" | "inactive";
+  // "inactive" was dropped from the enum — activity is its own axis now
+  // (students.is_active), so a departed child must not read "Unassigned".
+  assignment_status: "unassigned" | "assigned";
+  is_active: boolean;
   coach_name: string | null;
   class_day: string | null;
   class_time: string | null;
@@ -62,6 +65,7 @@ export default function ParentHomeScreen() {
             full_name,
             swimming_ability,
             assignment_status,
+            is_active,
             student_class_enrolments(
               is_active,
               classes(
@@ -103,6 +107,7 @@ export default function ParentHomeScreen() {
           full_name: s.full_name,
           swimming_ability: s.swimming_ability,
           assignment_status: s.assignment_status,
+          is_active: s.is_active,
           coach_name: coachProfile?.full_name ?? null,
           class_day: cls?.day_of_week ?? null,
           class_time: cls
@@ -247,12 +252,16 @@ export default function ParentHomeScreen() {
                       </View>
                     </View>
                     <StatusBadge
-                      status={capitalize(child.assignment_status)}
+                      status={
+                        child.is_active
+                          ? capitalize(child.assignment_status)
+                          : "Inactive"
+                      }
                       size="sm"
                     />
                   </View>
 
-                  {child.assignment_status === "assigned" ? (
+                  {child.is_active && child.assignment_status === "assigned" ? (
                     <View className="bg-sky-50 rounded-xl p-3 gap-1">
                       <View className="flex-row items-center gap-1.5">
                         <Ionicons name="person-outline" size={13} color="#0284c7" />
@@ -272,6 +281,16 @@ export default function ParentHomeScreen() {
                           {child.class_location ?? "—"}
                         </Text>
                       </View>
+                    </View>
+                  ) : !child.is_active ? (
+                    // An inactive child is NOT waiting for placement — telling
+                    // them "the admin will assign your child soon" promises
+                    // something that is not coming.
+                    <View className="bg-gray-100 rounded-xl p-3">
+                      <Text className="text-xs text-gray-600">
+                        No longer attending. Their attendance and invoices are
+                        still here. Contact your coach if this looks wrong.
+                      </Text>
                     </View>
                   ) : (
                     <View className="bg-yellow-50 rounded-xl p-3">

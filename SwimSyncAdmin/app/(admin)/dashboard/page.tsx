@@ -111,7 +111,8 @@ export default function DashboardPage() {
         supabase
           .from("students")
           .select("id", { count: "exact", head: true })
-          .eq("assignment_status", "unassigned"),
+          .eq("assignment_status", "unassigned")
+        .eq("is_active", true),
         supabase
           .from("invoices")
           .select("id", { count: "exact", head: true })
@@ -141,6 +142,7 @@ export default function DashboardPage() {
           "id, full_name, swimming_ability, parent_students(parents(profiles(full_name)))"
         )
         .eq("assignment_status", "unassigned")
+        .eq("is_active", true)
         .order("full_name")
         .limit(5);
 

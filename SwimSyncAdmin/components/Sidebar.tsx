@@ -15,6 +15,7 @@ import {
   Wallet,
   Globe,
   LogOut,
+  UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/unassigned",   label: "Unassigned Children", icon: UserX           },
   { href: "/classes",      label: "Classes",              icon: Layers          },
   { href: "/students",     label: "Students",             icon: Users           },
+  { href: "/parents",      label: "Parents",              icon: UsersRound      },
   { href: "/attendance",   label: "Attendance",           icon: CalendarCheck   },
   { href: "/invoices",     label: "Invoices",             icon: Receipt         },
   { href: "/credit-notes", label: "Credit Notes",         icon: FileText        },

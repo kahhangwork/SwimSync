@@ -37,6 +37,15 @@ type StudentRow = {
   full_name: string;
   tenant_id: string;
   assignment_status: string;
+  is_active: boolean;
+};
+
+type FamilyStatusRow = {
+  parent_name: string;
+  email: string;
+  tenant_name: string;
+  family_active: boolean;
+  children: { full_name: string; is_active: boolean }[];
 };
 
 export default function PlatformPage() {
@@ -95,6 +104,60 @@ export default function PlatformPage() {
     setTenants(rows);
   }
 
+  const [famSearch, setFamSearch] = useState("");
+  const [families, setFamilies] = useState<FamilyStatusRow[]>([]);
+  const [famMessage, setFamMessage] = useState<string | null>(null);
+
+  // Platform-admin view of a family ACROSS businesses — the one place that
+  // exists. A tenant admin can only ever see their own side of this.
+  //
+  // Deliberately shows activity but NOT assigned/unassigned: which class a
+  // child is in is the business's operational concern, and putting it here
+  // would invite the platform admin to reason about it.
+  async function handleFamilySearch() {
+    setFamMessage(null);
+    if (!famSearch.trim()) {
+      setFamilies([]);
+      return;
+    }
+    const { data } = await supabase
+      .from("parent_tenants")
+      .select(
+        "parent_id, tenant_id, is_active, tenants(display_name), parents(profile_id, profiles(full_name, email))"
+      );
+
+    const rows = (data ?? []) as any[];
+    const q = famSearch.trim().toLowerCase();
+    const matching = rows.filter((r) => {
+      const p = r.parents?.profiles ?? {};
+      return (
+        (p.full_name ?? "").toLowerCase().includes(q) ||
+        (p.email ?? "").toLowerCase().includes(q)
+      );
+    });
+
+    const { data: kids } = await supabase
+      .from("parent_students")
+      .select("parent_id, students(full_name, is_active, tenant_id)")
+      .in(
+        "parent_id",
+        matching.length ? matching.map((r) => r.parent_id) : ["00000000-0000-0000-0000-000000000000"]
+      );
+
+    setFamilies(
+      matching.map((r) => ({
+        parent_name: r.parents?.profiles?.full_name ?? "—",
+        email: r.parents?.profiles?.email ?? "—",
+        tenant_name: r.tenants?.display_name ?? "—",
+        family_active: r.is_active,
+        children: (kids ?? [])
+          .filter((k: any) => k.parent_id === r.parent_id && k.students?.tenant_id === r.tenant_id)
+          .map((k: any) => ({ full_name: k.students.full_name, is_active: k.students.is_active })),
+      }))
+    );
+    if (matching.length === 0) setFamMessage("No families matched.");
+  }
+
   async function handleSearch() {
     setMessage(null);
     if (!search.trim()) {
@@ -103,7 +166,7 @@ export default function PlatformPage() {
     }
     const { data } = await supabase
       .from("students")
-      .select("id, full_name, tenant_id, assignment_status")
+      .select("id, full_name, tenant_id, assignment_status, is_active")
       .ilike("full_name", `%${search.trim()}%`)
       .limit(25);
     setStudents((data ?? []) as StudentRow[]);
@@ -214,7 +277,7 @@ export default function PlatformPage() {
             <Thead>
               <Th>Child</Th>
               <Th>Currently with</Th>
-              <Th>Status</Th>
+              <Th>Active?</Th>
               <Th>Move to</Th>
             </Thead>
             <Tbody>
@@ -225,7 +288,7 @@ export default function PlatformPage() {
                     {tenants.find((t) => t.id === s.tenant_id)?.display_name ??
                       "—"}
                   </Td>
-                  <Td>{s.assignment_status}</Td>
+                  <Td>{s.is_active ? "Active" : "Inactive"}</Td>
                   <Td>
                     <select
                       defaultValue=""
@@ -246,6 +309,84 @@ export default function PlatformPage() {
                           </option>
                         ))}
                     </select>
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        )}
+      </div>
+
+      {/* ── Family status across businesses ──────────────────────────────────
+          Read-only on purpose. Whether a family is a customer of a business is
+          THAT business's call, so this shows the answer without offering to
+          change it. There is no login-blocking control here either: that is a
+          platform power over an ACCOUNT and is filed separately. */}
+      <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-5">
+        <h2 className="mb-1 text-lg font-semibold text-gray-900">Family status</h2>
+        <p className="mb-4 text-sm text-gray-500">
+          Where a family stands at each business they deal with. Read-only —
+          activity is the business&apos;s decision, not the platform&apos;s.
+        </p>
+
+        <div className="mb-4 flex gap-2">
+          <input
+            value={famSearch}
+            onChange={(e) => setFamSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleFamilySearch()}
+            placeholder="Search a parent's name or email"
+            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+          />
+          <button
+            onClick={handleFamilySearch}
+            className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
+          >
+            Search
+          </button>
+        </div>
+
+        {famMessage && (
+          <div className="mb-3 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            {famMessage}
+          </div>
+        )}
+
+        {families.length > 0 && (
+          <Table>
+            <Thead>
+              <Th>Parent</Th>
+              <Th>Business</Th>
+              <Th>Family</Th>
+              <Th>Children there</Th>
+            </Thead>
+            <Tbody>
+              {families.map((f, i) => (
+                <Tr key={`${f.email}:${f.tenant_name}:${i}`}>
+                  <Td>
+                    <div className="font-medium text-gray-900">{f.parent_name}</div>
+                    <div className="text-xs text-gray-500">{f.email}</div>
+                  </Td>
+                  <Td>{f.tenant_name}</Td>
+                  <Td>{f.family_active ? "Active" : "Inactive"}</Td>
+                  <Td>
+                    {f.children.length === 0 ? (
+                      <span className="text-gray-400">none</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {f.children.map((c) => (
+                          <span
+                            key={c.full_name}
+                            className={`rounded px-1.5 py-0.5 text-xs ${
+                              c.is_active
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-gray-100 text-gray-500 line-through"
+                            }`}
+                          >
+                            {c.full_name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </Td>
                 </Tr>
               ))}

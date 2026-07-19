@@ -39,9 +39,20 @@ export default function AddChildScreen() {
     useCallback(() => {
       let cancelled = false;
       (async () => {
+        // Only businesses this family is still ACTIVE with. A family the
+        // business has marked inactive can still log in and read their history
+        // — that is deliberate, their invoices are the record — but adding a
+        // new child there would silently re-enter a business that has closed
+        // them off. Re-entering the join code is the way back in, and it is
+        // the business's own gate.
+        //
+        // Gated on `is_active = false` explicitly, never on absence-of-truthy:
+        // a family with no rows at all is a NEW parent, and must land on the
+        // "join a business" prompt rather than an error.
         const { data } = await supabase
           .from("parent_tenants")
-          .select("tenant_id, tenants(id, display_name)")
+          .select("tenant_id, is_active, tenants(id, display_name)")
+          .eq("is_active", true)
           .order("joined_at");
         if (cancelled) return;
 
