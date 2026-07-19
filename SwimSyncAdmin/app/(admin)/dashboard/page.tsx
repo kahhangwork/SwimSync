@@ -27,7 +27,6 @@ type TenantInfo = {
 type UnassignedRow = {
   id: string;
   full_name: string;
-  swimming_ability: string | null;
   parent_name: string;
 };
 
@@ -139,7 +138,7 @@ export default function DashboardPage() {
       const { data: unassignedData } = await supabase
         .from("students")
         .select(
-          "id, full_name, swimming_ability, parent_students(parents(profiles(full_name)))"
+          "id, full_name, parent_students(parents(profiles(full_name)))"
         )
         .eq("assignment_status", "unassigned")
         .eq("is_active", true)
@@ -150,7 +149,6 @@ export default function DashboardPage() {
         (unassignedData ?? []).map((s: any) => ({
           id: s.id,
           full_name: s.full_name,
-          swimming_ability: s.swimming_ability,
           parent_name:
             s.parent_students?.[0]?.parents?.profiles?.full_name ?? "—",
         }))

@@ -31,7 +31,7 @@ type Student = {
   id: string;
   full_name: string;
   date_of_birth: string | null;
-  swimming_ability: string | null;
+  level_label: string | null;
 };
 
 type Session = {
@@ -116,7 +116,7 @@ export default function ClassRosterScreen() {
         student_class_enrolments(
           is_active,
           enrolled_at,
-          students(id, full_name, date_of_birth, swimming_ability)
+          students(id, full_name, date_of_birth, tenant_levels(label))
         )
       `)
       .eq("id", id)
@@ -145,7 +145,8 @@ export default function ClassRosterScreen() {
         id: e.students.id,
         full_name: e.students.full_name,
         date_of_birth: e.students.date_of_birth,
-        swimming_ability: e.students.swimming_ability,
+        // Off the JOINED tenant_levels row (§7.28).
+        level_label: e.students.tenant_levels?.label ?? null,
       }));
 
     setStudents(activeStudents);
@@ -372,9 +373,10 @@ export default function ClassRosterScreen() {
                     const ambiguous = duplicateNames.has(
                       student.full_name.trim().toLowerCase()
                     );
-                    if (age === null && !ambiguous) return null;
+                    if (age === null && !ambiguous && !student.level_label) return null;
                     return (
                       <Text className="text-xs text-gray-500 mt-0.5">
+                        {student.level_label ? `${student.level_label} · ` : ""}
                         {age !== null ? `Age ${age}` : "Age unknown"}
                         {/* WITH THE YEAR — formatSgDate's default omits it,
                             and the year is usually the only thing separating

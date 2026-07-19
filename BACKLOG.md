@@ -55,11 +55,7 @@ credit-note emails remain, now in _Notifications_); and the **UTC-derived defaul
 month fix** (**2026-07-17** — PRD §7.7, HANDOVER §8a). The list below is renumbered from what
 remains.)_
 
-1. **Coach-defined swimming levels** (M, _Coach workflow_) — a `students` field. The
-   status model it was waiting on is settled (PRD §7.14) and the identity work has just
-   opened the same table and the same roster/child-detail screens, so this rides those
-   edits.
-2. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
+1. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
    `parents`-table addition touching the registration form. Last because it is the only
    one of the three on a different table and a different form; the earlier ordering
    grouped it with the child-identity item as "onboarding-form work opened once", which
@@ -72,6 +68,10 @@ attendance block** — see PRD §7.7 and HANDOVER §8.
 _Shipped 2026-07-19 and removed:_ **extract the completeness-rule shared helper** (it was
 #1; done as tenanting phase 0, and it immediately exposed a live underbill — HANDOVER
 §7.18), and the whole **tenant/coach money cluster** including **coach wages**.
+
+_Shipped 2026-07-19 and removed:_ **coach-defined swimming levels** — per-business
+`tenant_levels` with an explicit order, set by the business's admin, read-only to coach and
+parent. The old fixed enum is dropped. See PRD §7.15.
 
 _Shipped 2026-07-19 and removed:_ **child identification + derived age** — shipped as
 **name + date of birth**, not NRIC. The NRIC half was dropped deliberately: partial NRIC
@@ -136,20 +136,6 @@ attendance (§5.5). A makeup means a student appears on a class they aren't enro
 and a lesson gets paid for on a date other than the one it happened. Worth designing on
 paper before touching code — probably a "makeup credit" concept distinct from the
 existing money-credit-note, so the two ledgers don't get confused with each other.
-
-### Coach-defined swimming levels — **M** `[handover]`
-Let coaches define their own level labels and set a level per student.
-
-**Why:** the class name currently carries the level ("SwimSafer Level 5"), which works
-for one coach with four classes and stops working the moment a coach wants to track a
-student's progress *within* a class, or a second coach uses different level names.
-
-**Notes:** `students.swimming_ability` (nullable enum) was **deliberately kept** in the
-schema for this and is always NULL today — nothing writes it, nothing displays it. When
-this returns it should be **coach-defined**, not the current fixed
-beginner/intermediate/advanced enum, and probably free text or a new table. **Do not
-re-add a parent-facing level picker** — parents self-reporting ability was removed on
-purpose (PRD §5.1, HANDOVER §6).
 
 ### Coach-created student profiles — **M** `[MVP-excluded]`
 Let a coach create a student directly, instead of only parents creating them.

@@ -17,7 +17,9 @@ import {
 type StudentRow = {
   id: string;
   full_name: string;
-  swimming_ability: string | null;
+  date_of_birth: string | null;
+  level_id: string | null;
+  level_label: string | null;
   assignment_status: string;
   is_active: boolean;
   inactivated_at: string | null;
@@ -83,15 +85,56 @@ export default function StudentsPage() {
     await load();
   }
 
+  const [levels, setLevels] = useState<{ id: string; label: string }[]>([]);
+  const [savingLevelFor, setSavingLevelFor] = useState<string | null>(null);
+  const [levelError, setLevelError] = useState<string | null>(null);
+
   useEffect(() => {
     load();
+    loadLevels();
   }, []);
+
+  async function loadLevels() {
+    // RLS scopes this to the caller's own business. Ordered by sort_order, not
+    // by label — a ladder sorted alphabetically puts "Advanced" above
+    // "Beginner", which is why sort_order exists at all.
+    const { data } = await supabase
+      .from("tenant_levels")
+      .select("id, label")
+      .order("sort_order")
+      .order("label");
+    setLevels(data ?? []);
+  }
+
+  async function setLevel(student: StudentRow, levelId: string | null) {
+    setSavingLevelFor(student.id);
+    setLevelError(null);
+    const { error } = await supabase
+      .from("students")
+      .update({ level_id: levelId })
+      .eq("id", student.id);
+    setSavingLevelFor(null);
+
+    if (error) {
+      // 23514 is the database refusing a level from another business. Not
+      // reachable from this picker, which only lists our own — but if it ever
+      // fires, saying "try again" would invite a retry that cannot succeed.
+      setLevelError(
+        error.code === "23514"
+          ? "That level belongs to a different business."
+          : `Could not update ${student.full_name}'s level.`
+      );
+      return;
+    }
+    load();
+  }
 
   async function load() {
     const { data } = await supabase
       .from("students")
       .select(`
-        id, full_name, swimming_ability, assignment_status, is_active, inactivated_at,
+        id, full_name, date_of_birth, level_id, assignment_status, is_active, inactivated_at,
+        tenant_levels(id, label),
         parent_students(parents(profiles(full_name))),
         student_class_enrolments(
           is_active,
@@ -108,7 +151,12 @@ export default function StudentsPage() {
         return {
           id: s.id,
           full_name: s.full_name,
-          swimming_ability: s.swimming_ability,
+          date_of_birth: s.date_of_birth,
+          level_id: s.level_id,
+          // Read off the JOINED tenant_levels row, not off the student — the
+          // select is `any`, so the wrong nesting level typechecks and renders
+          // every student unlevelled (§7.28).
+          level_label: s.tenant_levels?.label ?? null,
           // Two INDEPENDENT axes now. This used to collapse them —
           // `s.is_active ? s.assignment_status : "inactive"` — which is exactly
           // the ambiguity the active/inactive work removed: a child can be
@@ -146,6 +194,11 @@ export default function StudentsPage() {
 
   return (
     <div>
+      {levelError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {levelError}
+        </div>
+      )}
       <PageHeader
         title="Students"
         subtitle={`${students.length} students total`}
@@ -180,6 +233,7 @@ export default function StudentsPage() {
         <Thead>
           <tr>
             <Th>Student</Th>
+            <Th>Level</Th>
             <Th>Parent</Th>
             <Th>Status</Th>
             <Th>Class</Th>
@@ -190,13 +244,13 @@ export default function StudentsPage() {
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={6}>
+              <Td className="text-center text-gray-400 py-8" colSpan={7}>
                 Loading…
               </Td>
             </Tr>
           ) : filtered.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={6}>
+              <Td className="text-center text-gray-400 py-8" colSpan={7}>
                 No students found.
               </Td>
             </Tr>
@@ -204,6 +258,26 @@ export default function StudentsPage() {
             filtered.map((s) => (
               <Tr key={s.id}>
                 <Td className="font-medium text-gray-900">{s.full_name}</Td>
+                <Td>
+                  {/* Inline rather than behind a modal: placing a child on the
+                      ladder is a glance-and-set action, and an admin doing it
+                      for a new intake would otherwise open a dialog per child. */}
+                  <select
+                    value={s.level_id ?? ""}
+                    onChange={(e) => setLevel(s, e.target.value || null)}
+                    disabled={levels.length === 0 || savingLevelFor === s.id}
+                    className="rounded-lg border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
+                  >
+                    <option value="">
+                      {levels.length === 0 ? "No levels defined" : "—"}
+                    </option>
+                    {levels.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.label}
+                      </option>
+                    ))}
+                  </select>
+                </Td>
                 <Td className="text-gray-500">{s.parent_name}</Td>
                 <Td>
                   <StatusBadge status={statusLabel(s)} />

@@ -1010,6 +1010,43 @@ PDPA consent-withdrawal request, where "cannot log in, records retained" is righ
 financial records must be kept ~5 years; that has never happened. The real near-term need
 is revoking a **staff** account — a coach who leaves a school — and it is filed there.)*
 
+### 7.15 Swimming Levels *(implemented 2026-07-19)*
+
+Each business defines **its own level ladder** — "Seahorse", "SwimSafer Level 3", whatever
+it actually calls them — and places each child on a rung.
+
+Until this existed the **class name** carried the level. That works for one coach with four
+classes and stops working the moment anyone wants to track progress *within* a class, or a
+second business uses different names for the same thing.
+
+**A defined set, not free text.** Free text makes every typo a new level, nothing sorts,
+and there is no list to pick from. Each level carries an explicit **order**, which is the
+part that earns the table: a ladder sorted alphabetically puts "Advanced" above
+"Beginner".
+
+**Who does what:**
+
+| | |
+|---|---|
+| Defines the ladder | The business's **admin** |
+| Places a child on it | The business's **admin** |
+| Sees it | The child's **coach** (roster) and their **parent** (child profile), read-only |
+
+The coach deliberately has **no write path**. Granting coaches `UPDATE` on students to set
+a level would also let them edit names, dates of birth and notes, because row-level
+security is row-level, not column-level — the same reasoning that made closing an enrolment
+a dedicated RPC (§7.4). If coach-set levels are wanted later, that is an RPC, not a policy
+change.
+
+Levels are **per business**, and a child may only be given a level from *their own*
+business — enforced in the database, since no single-row policy can see across that
+reference. Retiring a level leaves its students **unlevelled**, never deleted.
+
+*(This replaces the original fixed beginner/intermediate/advanced field, which was never
+populated: parents stopped choosing an ability in §5.1, and nothing else ever wrote it.
+Deliberately not re-added: a parent-facing level picker — self-reported ability was
+removed on purpose, and a level is the coach's judgement.)*
+
 ---
 
 ## 8. Non-Functional Requirements
@@ -1099,7 +1136,8 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 | **date_of_birth** | Date | No | Date of birth |
 | ~~**age**~~ | ~~Integer~~ | — | *(implemented — **removed** 2026-07-19)* Age is **derived from `date_of_birth` at read time** (`ageFromDob` in `lib/lessonDates.ts`), never stored. A stored integer beside the date it comes from is a second source of truth that goes stale the day after it is written — the same disease effective-dated pricing removed from money. Had zero readers when dropped |
 | **gender** | Enum | No | male \| female \| other |
-| **swimming_ability** | Enum | No | *(implemented)* Reserved for a future coach-defined levels feature; **not set by parents** and currently always NULL. The child's assigned **class name** indicates their level instead. |
+| ~~**swimming_ability**~~ | ~~Enum~~ | — | *(implemented — **removed** 2026-07-19)* Superseded by `level_id`. The fixed beginner/intermediate/advanced enum was never populated and was never the right shape — a level ladder is a business's own vocabulary. Leaving a permanently-NULL column beside a real one guarantees someone eventually writes to the wrong one |
+| **level_id** | UUID (FK) | No | *(implemented)* The child's rung on their business's ladder (`tenant_levels`). Set by the business's admin; coaches have no write path to `students` by design. `ON DELETE SET NULL` — retiring a level unlevels students rather than deleting them |
 | **notes** | Text | No | Optional notes from parent |
 | **assignment_status** | Enum | Yes | *(implemented)* unassigned \| assigned (default unassigned). The `inactive` value was **removed** — activity is a separate axis, see §7.14 |
 | **is_active** | Boolean | Yes | Still a customer of their business? (default true) — §7.14 |

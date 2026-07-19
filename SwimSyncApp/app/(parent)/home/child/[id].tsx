@@ -20,7 +20,7 @@ type ChildDetail = {
   full_name: string;
   date_of_birth: string | null;
   gender: string | null;
-  swimming_ability: string | null;
+  level_label: string | null;
   notes: string | null;
   // "inactive" was dropped from the enum — activity is its own axis now
   // (students.is_active), so a departed child must not read "Unassigned".
@@ -73,7 +73,7 @@ export default function ChildProfileScreen() {
         full_name,
         date_of_birth,
         gender,
-        swimming_ability,
+        tenant_levels(label),
         notes,
         assignment_status,
         is_active,
@@ -144,7 +144,9 @@ export default function ChildProfileScreen() {
       full_name: student.full_name,
       date_of_birth: student.date_of_birth,
       gender: student.gender,
-      swimming_ability: student.swimming_ability,
+      // Cast because supabase-js infers a to-one embed as an ARRAY without an
+      // !inner hint. Read off tenant_levels, not off the student (§7.28).
+      level_label: (student as any).tenant_levels?.label ?? null,
       notes: student.notes,
       assignment_status: student.assignment_status,
       is_active: student.is_active,
@@ -244,6 +246,12 @@ export default function ChildProfileScreen() {
               <Row label="Age" value={`${age} ${age === 1 ? "year" : "years"} old`} />
             ) : null}
             <Row label="Gender"        value={capitalize(child.gender)} />
+            {/* Set by the business's admin; read-only to the parent. Omitted
+                rather than shown as "—" when unset — a business that does not
+                use levels should not have an empty row on every child. */}
+            {child.level_label ? (
+              <Row label="Level" value={child.level_label} />
+            ) : null}
             {child.notes ? <Row label="Notes" value={child.notes} /> : null}
           </View>
         </Card>

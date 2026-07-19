@@ -11,7 +11,6 @@ import { Modal } from "@/components/Modal";
 type Student = {
   id: string;
   full_name: string;
-  swimming_ability: string | null;
   parent_name: string;
 };
 
@@ -61,7 +60,7 @@ export default function UnassignedPage() {
     const { data } = await supabase
       .from("students")
       .select(
-        "id, full_name, swimming_ability, parent_students(parents(profiles(full_name)))"
+        "id, full_name, parent_students(parents(profiles(full_name)))"
       )
       .eq("assignment_status", "unassigned")
         .eq("is_active", true)
@@ -71,7 +70,6 @@ export default function UnassignedPage() {
       (data ?? []).map((s: any) => ({
         id: s.id,
         full_name: s.full_name,
-        swimming_ability: s.swimming_ability,
         parent_name:
           s.parent_students?.[0]?.parents?.profiles?.full_name ?? "—",
       }))

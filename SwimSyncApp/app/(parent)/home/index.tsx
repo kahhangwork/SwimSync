@@ -17,7 +17,6 @@ import Card from "@/components/Card";
 type Child = {
   id: string;
   full_name: string;
-  swimming_ability: string | null;
   // "inactive" was dropped from the enum — activity is its own axis now
   // (students.is_active), so a departed child must not read "Unassigned".
   assignment_status: "unassigned" | "assigned";
@@ -63,7 +62,6 @@ export default function ParentHomeScreen() {
           students(
             id,
             full_name,
-            swimming_ability,
             assignment_status,
             is_active,
             student_class_enrolments(
@@ -105,7 +103,6 @@ export default function ParentHomeScreen() {
         return {
           id: s.id,
           full_name: s.full_name,
-          swimming_ability: s.swimming_ability,
           assignment_status: s.assignment_status,
           is_active: s.is_active,
           coach_name: coachProfile?.full_name ?? null,
