@@ -85,7 +85,19 @@ These cost time to rediscover:
 6. **Both stacked screens are in the DOM.** Native-stack keeps the previous
    screen mounted under the current one, so `document.body.innerText` shows
    both. Assert on text unique to the target screen.
-7. Viewport: use a mobile viewport (`{ width: 420, height: 900 }, isMobile:true`)
+7. **`getByText` matches SUBSTRINGS, so short button labels collide.**
+   `getByText("Edit")` also matches **"Credit Balance"** — "Cr-*edit*-". Pairing
+   that with `.last()` clicked the balance label instead of the button, and the
+   driver reported "the form did not open", which sent me hunting a routing bug
+   that did not exist. Use `{ exact: true }` for short labels, and when a tap
+   seems to do nothing, print `await page.getByText(X).count()` and each match
+   before assuming the app is at fault.
+8. **A new route file needs Metro restarted**, and **direct URL navigation to a
+   nested screen does not work at all** — `/home/add-child` redirects to
+   `/home` even though the route is fine (gotcha 3). So "the URL redirected"
+   is NOT evidence that a route is missing. Navigate by tapping, and compare a
+   known-good route against the new one before concluding anything.
+9. Viewport: use a mobile viewport (`{ width: 420, height: 900 }, isMobile:true`)
    for the Expo app. A benign `pageerror` about "Cannot manually set color
    scheme" appears — ignore it.
 

@@ -224,6 +224,16 @@ export default function ChildProfileScreen() {
                 size="sm"
               />
             </View>
+            {/* Editing is the parent's, per PRD §7.4 — which claimed it long
+                before anything implemented it. Only the profile fields: the
+                business, the class assignment and activity all belong to the
+                business's admin. */}
+            <TouchableOpacity
+              onPress={() => router.push(`/(parent)/home/edit-child?id=${child.id}`)}
+              className="px-3 py-1.5 rounded-lg border border-gray-200"
+            >
+              <Text className="text-sm font-medium text-sky-600">Edit</Text>
+            </TouchableOpacity>
           </View>
 
           <View className="gap-2">

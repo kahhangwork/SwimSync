@@ -561,6 +561,22 @@ SwimSync shall allow **parents to create student profiles** and **superadmin to 
 
 - Parent can create and edit student profiles
 - Profile includes: full name, age/DOB, gender, optional notes *(swimming ability is **not** parent-entered — see §5.1)*
+- *(implemented 2026-07-19)* **Editing became real on this date.** The spec had claimed
+  it since the original draft, but nothing in the app could change a student — the child
+  detail screen was read-only. A parent can now edit **name, date of birth, gender and
+  notes**. What they cannot touch: the **business** (a student moves between businesses
+  only via the platform admin's RPC, §4.4), and **assignment** or **activity**, which are
+  the business admin's (§7.14).
+  Two defects had to be closed before this was safe to ship, both latent only because
+  nothing could write to `students`:
+  - **A parent could move their own child to another business.** `students_update`'s
+    `WITH CHECK` repeats its `USING` clause and never mentions the new `tenant_id`, while
+    "this parent owns this student" stays true after the move — so the row could be
+    injected onto a stranger's roster, defeating the join code, which is the *only* proof
+    a family deals with a business (§5.1). Now pinned in the database.
+  - **A rename rewrote invoices that had already been sent**, and credit notes this
+    document calls immutable (§7.8), because five screens read the student's name live.
+    Names are now snapshotted onto the document — see §7.7.
 - Student can be marked active/inactive by the business's admin — see §7.14
 - *(implemented)* **Remove from class** and **Set inactive** are available to the
   **business's tenant admin and to the coach whose class the child is in** (§4.3). These are
@@ -678,6 +694,26 @@ consistent, and once created it can never be corrected except by credit note (§
 If no price is on record for a lesson's date, generation **fails and bills nothing** rather
 than charging zero. A $0 line would be a silent underbill on a document that freezes when
 created, and the lesson could never be billed again.
+
+#### An invoice keeps the name it was issued with *(implemented 2026-07-19)*
+
+Each invoice line records the student's name **as invoiced**, and each credit note
+records the name **as credited**, taken from the invoice line it reverses. Neither is
+looked up live when the document is displayed.
+
+Until this was fixed, five screens joined the student's current name onto these
+documents, so correcting a child's name — supplying their full legal name, say — silently
+rewrote invoices a parent had already been sent, and credit notes §7.8 calls immutable
+permanent records. It was invisible: nothing failed, the document simply said something
+different than when it was issued.
+
+This is the same rule the class price and the paid coach already follow (§7.3): **a fact
+about a past lesson is never a live lookup.** The invoice line already snapshotted the
+class title for exactly this reason; the student's name had been missed.
+
+Rows created before this are NULL rather than back-filled — inventing a historical name
+from today's value would be a guess presented as a record, which is the failure being
+fixed. Those fall back to the live name, which is no worse than the previous behaviour.
 
 #### Attendance-gap check before generating *(implemented)*
 
