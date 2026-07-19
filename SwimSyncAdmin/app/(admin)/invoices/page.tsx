@@ -297,7 +297,7 @@ export default function InvoicesPage() {
     const { data } = await supabase
       .from("invoices")
       .select(
-        "id, billing_month, gross_amount, credit_applied, net_amount, status, parents(profiles(full_name)), invoice_items(students(full_name))"
+        "id, billing_month, gross_amount, credit_applied, net_amount, status, parents(profiles(full_name)), invoice_items(student_name, students(full_name))"
       )
       .order("generated_at", { ascending: false });
 
@@ -306,7 +306,7 @@ export default function InvoicesPage() {
         const studentNames = [
           ...new Set(
             (inv.invoice_items ?? [])
-              .map((item: any) => item.students?.full_name)
+              .map((item: any) => item.student_name ?? item.students?.full_name)
               .filter(Boolean)
           ),
         ].join(", ");

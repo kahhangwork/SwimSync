@@ -306,6 +306,11 @@ async function generateForTenant(
     amount: number;
     class_title: string;
     session_date: string;
+    // The name AS INVOICED. Snapshotted for the same reason class_title is:
+    // an invoice is a document that gets sent, and it must not rewrite itself
+    // when a child is renamed later. Reading it live is the same mistake as
+    // reading classes.price_per_lesson at generation time.
+    student_name: string | null;
   };
 
   const log: unknown[] = [];
@@ -442,6 +447,16 @@ async function generateForTenant(
       .select("parent_id, student_id")
       .in("student_id", billableStudentIds);
 
+    // Names to snapshot onto each line (see InvoiceItem.student_name). Scoped
+    // to the billable set, which is the same set the items are built from.
+    const { data: billedStudents } = await supabase
+      .from("students")
+      .select("id, full_name")
+      .in("id", billableStudentIds);
+    const studentNameById = new Map(
+      (billedStudents ?? []).map((s) => [s.id as string, s.full_name as string])
+    );
+
     // Deferral applies only to parents of ACTIVELY enrolled children: a parent
     // whose child has left is not waiting on anyone to mark that child, so an
     // unmarked lesson for someone else's child shouldn't hold their invoice.
@@ -517,6 +532,7 @@ async function generateForTenant(
             amount: rateOn(classRates ?? [], cls.id, sessionDate, cls.title).price,
             class_title: cls.title,
             session_date: sessionDate,
+            student_name: studentNameById.get(ps.student_id) ?? null,
           });
         }
       }

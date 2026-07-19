@@ -1358,3 +1358,54 @@ Deno.test("rates: a class with no rate in force refuses to bill, loudly", async 
     await s.teardown();
   }
 });
+
+// ── The invoice records the name it was ISSUED with ─────────────────────────
+// An invoice is a document that gets sent. Reading the student's name live at
+// display time meant a later rename silently rewrote invoices already in a
+// parent's hands — the same class of bug as reading classes.price_per_lesson at
+// generation time, and the reason class_title is snapshotted beside it.
+Deno.test("invoice_items snapshots the student name, and a rename cannot rewrite it", async () => {
+  const s = await newScenario({ price: 25 });
+  try {
+    const a = await s.addSession("2026-07-04");
+    await s.mark(a, "present");
+
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-07",
+    });
+
+    const inv = await getInvoice(s.db, s.parentId, "2026-07", s.tenantId);
+    const { data: before } = await s.db
+      .from("invoice_items")
+      .select("student_name")
+      .eq("invoice_id", inv!.id);
+
+    // The engine wrote a name at all — without this the rest passes vacuously
+    // on a NULL column (§7.17: ask what the check does when nothing happened).
+    assertEquals(before!.length, 1);
+    assert(
+      before![0].student_name && before![0].student_name.startsWith("Kid "),
+      `expected a snapshotted name, got ${JSON.stringify(before![0].student_name)}`,
+    );
+    const invoicedAs = before![0].student_name;
+
+    // An ordinary correction: the family supplies the child's full legal name.
+    await s.db
+      .from("students")
+      .update({ full_name: "Renamed Entirely" })
+      .eq("id", s.studentId);
+
+    const { data: after } = await s.db
+      .from("invoice_items")
+      .select("student_name")
+      .eq("invoice_id", inv!.id);
+
+    assertEquals(after![0].student_name, invoicedAs);
+    assert(
+      after![0].student_name !== "Renamed Entirely",
+      "the rename reached back into an already-issued invoice",
+    );
+  } finally {
+    await s.teardown();
+  }
+});

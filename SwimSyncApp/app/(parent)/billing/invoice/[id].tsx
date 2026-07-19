@@ -93,6 +93,7 @@ export default function InvoiceDetailScreen() {
             class_title,
             session_date,
             attendance_status,
+            student_name,
             students(full_name)
           )
         `)
@@ -139,7 +140,10 @@ export default function InvoiceDetailScreen() {
         items: (inv.invoice_items ?? [])
           .map((item: any) => ({
             id: item.id,
-            student_name: item.students?.full_name ?? "—",
+            // The name AS INVOICED, falling back to the live join only for
+            // rows written before the snapshot existed. Reading the live name
+            // first would let a later rename rewrite an invoice already sent.
+            student_name: item.student_name ?? item.students?.full_name ?? "—",
             class_title: item.class_title,
             session_date: item.session_date,
             attendance_status: item.attendance_status,

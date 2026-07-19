@@ -31,7 +31,7 @@ export default function CreditNotesPage() {
       const { data } = await supabase
         .from("credit_notes")
         .select(
-          "id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, students(full_name), parents(profiles(full_name))"
+          "id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, students(full_name), parents(profiles(full_name))"
         )
         .order("issued_at", { ascending: false });
 
@@ -39,7 +39,7 @@ export default function CreditNotesPage() {
         (data ?? []).map((cn: any) => ({
           id: cn.id,
           reference_number: cn.reference_number,
-          student_name: cn.students?.full_name ?? "—",
+          student_name: cn.student_name ?? cn.students?.full_name ?? "—",
           parent_name: cn.parents?.profiles?.full_name ?? "—",
           amount: Number(cn.amount),
           reason: cn.reason,
