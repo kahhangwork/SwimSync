@@ -55,10 +55,13 @@ credit-note emails remain, now in _Notifications_); and the **UTC-derived defaul
 month fix** (**2026-07-17** — PRD §7.7, HANDOVER §8a). The list below is renumbered from what
 remains.)_
 
-**This list is empty.** All three near-term items shipped on 2026-07-19 (see below).
-Pick the next stretch from the sections beneath, or from `HANDOVER.md` §9 — which argues
-the real priority is not a build item at all, but getting real attendance marked in
-production.
+**Nearly empty.** All three near-term items shipped on 2026-07-19 (see below). Two new
+items were raised on 2026-07-19 while reviewing the admin panel and are filed under
+_Admin and operations_: **the platform admin sees every tenant-scoped page** (S) and **the
+platform dashboard asks the wrong question** (M). Neither blocks anything.
+
+Otherwise pick from the sections beneath, or from `HANDOVER.md` §9 — which argues the real
+priority is not a build item at all, but getting real attendance marked in production.
 
 _Shipped 2026-07-18 and removed from this list:_ the **multi-class-parent under-billing
 bug**, plus the configurable **invoice run day**, **month sealing**, and the **hard
@@ -470,6 +473,49 @@ capability nobody has asked for yet. Worth settling at the same time: whether a 
 is a *full* admin or a restricted one (e.g. can mark attendance and chase payment but cannot
 change class pricing), since that decides whether `role` on the join table is a real enum or
 a placeholder.
+
+### The platform admin sees every tenant-scoped page — **S**
+Hide the eleven business-scoped nav items from a platform admin, leaving them the Platform
+page (and whatever replaces the dashboard, below).
+
+**Why:** `components/Sidebar.tsx` has a `platformOnly` flag but no inverse, so a platform
+admin gets Classes, Students, Attendance, Invoices, Coach Wages and the rest. Those pages
+don't error — their RLS reach is **every** tenant, so they render **cross-tenant data as
+though it were one business**. The dashboard is the clearest case: `dashboard/page.tsx` counts
+students with no tenant filter, so "Total Students — Across all coaches" is really across all
+*businesses*. A page that errors teaches you it isn't for you; a page that quietly sums two
+schools together looks authoritative and is wrong.
+
+**Notes:** the invoices page already knows this and says so in an amber banner ("Invoice
+generation runs for one business at a time, and your account is not attached to one") — the
+work is generalising that into the nav. Decide at the same time whether hiding them costs
+anything operationally: today the platform admin is the owner, and those pages are their only
+window into the one real tenant, which is what the item below is for.
+
+### The platform dashboard asks the wrong question — **M**
+Replace the tenant-shaped dashboard a platform admin currently sees with a per-tenant
+operations view.
+
+**Why:** a tenant admin asks *"how is my business doing?"*; a platform admin asks *"which
+business needs me?"* Global sums answer neither. The reframe is one row per tenant — name,
+kind, join code, active students, active coaches, classes — which `platform/page.tsx` already
+half-builds (it counts students and classes per tenant at lines 88-95).
+
+**Notes:** what turns it from a directory into an operations page is health signals:
+
+- **Last attendance marked, per tenant.** The best liveness signal there is — and the one that
+  would have shown at a glance that production has *never* had a lesson marked. Silence for a
+  fortnight is a holiday or a churn.
+- **Unmarked lessons this month, per tenant** — this is what will block their billing, and
+  blocking is silent if cron is ever enabled.
+- **Billing state for last month** — sealed / open / blocked / never run. Answers "who hasn't
+  been paid?"
+- **Tenants with no coach rate set**, so payroll silently computes nothing.
+- **Signups with no tenant** — a parent who registered but never entered a join code. They are
+  stranded and invisible today, and are exactly the case the student-move RPC exists for.
+
+Deliberately **not** there: anything that lets the platform admin act on one business's
+billing. §4.3 makes generation the tenant admin's, and the invoices banner already enforces it.
 
 ### Moving a student between businesses leaves two loose ends — **S**
 `reassign_student_tenant()` moves the student but not everything attached to them.
