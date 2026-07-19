@@ -1796,19 +1796,21 @@ SwimSync MVP is successful if:
 | **Coach pay** | *(implemented)* On payroll when a coach **has a rate**. Effective-dated so a raise never reprices history; draft until paid, then frozen (§7.13) |
 | **Initial usage** | Single coach first, but multi-coach capable |
 | **Parent onboarding** | Self-register with email/password |
-| **Student creation** | Done by parent |
+| **Student creation** | Done by parent *(implemented: parents also **edit** — name, DOB, gender, notes. The business, the class and activity stay the admin's, §7.4)* |
 | **Child visibility** | Parent sees their own created children |
 | **Assignment workflow** | Superadmin assigns children to coaches/classes |
 | **Web admin** | Dedicated Unassigned Children section |
 | **Class model** | One fixed weekly class per student, one coach per class |
 | **Attendance statuses** | Present, Absent, Cancelled (rain/coach), Trial (Paid/Free) |
 | **Attendance corrections** | Allowed; triggers credit note if lesson already invoiced |
-| **Pricing** | Class-level rate set at class level |
+| **Pricing** | Class-level rate, **effective-dated** — a lesson is priced by the terms in force on its OWN date, so editing a price never reprices last month (§7.3) |
 | **Credit** | *(implemented)* Pooled per parent **within a business**; never spendable at another (§5.6) |
 | **Billing source** | Actual attendance |
 | **Invoice timing** | Automatic from a **configurable day of the following month** (`invoice_run_day`, default the **7th**), **or** manual on-demand per month (the business's admin), toggled via the Automatic-generation switch. **All per business.** Either way, generation is **blocked while any lesson is unmarked** (§7.7) |
 | **Credit notes** | Auto-issued on post-invoice corrections; applied to next invoice |
 | **Invoice status** | Outstanding / Paid |
-| **Payment** | External PayNow via coach QR, manual verification |
+| **Payment** | External PayNow via **the business's** QR, manual verification *(implemented — changed from per-coach: a school has one bank account, §7.10)* |
+| **Child identity** | *(implemented)* **Name + date of birth**, unique per business; age is **derived**, never stored. NRIC declined — partial NRIC is regulated personal data and DOB was already collected (§5.1) |
+| **Swimming levels** | *(implemented)* Each business defines its **own ordered ladder**, each rung carrying a skill list. Admin-set, coach/parent read-only. No tiers or progression graph — businesses structure levels differently (§7.15) |
 | **Language** | English only |
 | **Not in MVP** | Makeup lessons, auto payment reconciliation |

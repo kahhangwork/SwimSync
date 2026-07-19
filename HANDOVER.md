@@ -442,7 +442,12 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   - **`set_students_active()` is the sole writer** of both flags, and takes an ARRAY so the
     set the admin confirmed in the prompt is the set that gets written. `parent_tenants`
     has **no UPDATE policy**, so RLS already forbids every other path.
-- **A FACT ABOUT A PAST LESSON IS NEVER A LIVE LOOKUP.** What a lesson cost and who was
+- **A FACT ABOUT A PAST LESSON IS NEVER A LIVE LOOKUP.** This now covers the student's
+  NAME as well: `invoice_items.student_name` and `credit_notes.student_name` record the
+  name the document was ISSUED with (2026-07-19). Five screens previously joined it live,
+  so a rename rewrote invoices already sent and credit notes PRD §7.8 calls immutable.
+  Pre-snapshot rows are NULL rather than back-filled — inventing a historical name from
+  today's value is a guess presented as a record. What a lesson cost and who was
   paid for it come from `class_rates` via `class_rate_on(class, session_date)` — the terms
   in force on the lesson's **own date** (`20260719000700`). Reading `classes.price_per_lesson`
   or `classes.coach_id` at generation/payroll time is the bug this removed, three times over
@@ -489,16 +494,53 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   workspace + Metro `watchFolders` + `transpilePackages` surgery. The file has **zero
   imports** so drift is cheap to spot (`diff` the two); each has its own test file
   (identical but for jest-globals vs a vitest import). **Edit both.**
-- **Swimming ability/level is NOT a parent-set field.** Parents no longer choose a
-  swimming ability when adding a child, and nothing writes `students.swimming_ability`
-  (it stays NULL — no hard-coded value). A child's **class name** is what indicates their
-  level. The `swimming_ability` column (nullable enum) is intentionally **kept** for a
-  future "coach-defined levels" feature but is unused/unshown today — the field was
-  removed from the Add-Child form and from all displays (parent home + child detail, coach
-  roster, admin students/dashboard/unassigned). Don't re-add a parent-facing level picker;
-  when levels return, they should be coach-defined (likely free-text or a new table, not
-  the current fixed beginner/intermediate/advanced enum). Verified end-to-end on the local
-  stack (add child → DB NULL → parent + detail render with no level, no crash).
+- **A LEVEL IS THE BUSINESS'S OWN VOCABULARY, AND IT IS NEVER PARENT-SET.**
+  `swimming_ability` (the fixed beginner/intermediate/advanced enum) is **gone** —
+  dropped 2026-07-19 after being always-NULL since parents stopped self-reporting
+  ability. Levels now live in `tenant_levels` (per business, explicitly ordered) with
+  `students.level_id`, and each rung carries an ordered `tenant_level_skills` list.
+  - **Don't re-add a parent-facing level picker.** Parents self-reporting ability was
+    removed on purpose; a level is the coach's judgement (PRD §5.1).
+  - **Skills are ROWS, not a text blob** — a curriculum is a list, and prose cannot be
+    counted, ordered, or ever ticked off. This is the whole reason per-child progress
+    tracking (backlogged) will not need a migration out of a description field.
+  - **The ladder is FLAT and generic on purpose.** Tiers, milestone markers and
+    progression graphs ("T4 → B3") are **deliberately not modelled**: businesses
+    structure levels differently, so modelling one school's shape forces every other
+    tenant into it. A school with 16 rungs across 5 tiers names them that way and orders
+    them; `tenant_levels.note` carries any progression rule in their own words.
+  - **The admin sets a student's level; coaches have no write path to `students`** —
+    granting them `UPDATE` would also expose names, DOBs and notes, because RLS is
+    row-level, not column-level. Coach-set levels would be an RPC, not a policy change.
+
+- **A CHILD IS IDENTIFIED BY NAME + DATE OF BIRTH, and age is DERIVED.**
+  `students_identity_uniq` is an **expression index** on
+  `(tenant_id, lower(trim(full_name)), date_of_birth)` — a plain index is defeated by a
+  trailing space or a capital, which is the appearance of a constraint without the
+  substance. NULL DOB never collides, which is what made it safe to apply to live data
+  with no backfill.
+  - **`students.age` is dropped and must not come back.** A stored integer beside the
+    date it derives from goes stale the day after it is written — the same disease
+    `class_rates` removed from money. Use `ageFromDob()` in `lessonDates.ts` (**both
+    apps**), which returns `null`, never `0`.
+  - **NRIC was considered and declined.** Partial NRIC is still personal data under PDPC
+    guidance and its collection is restricted, so it needs a standing justification and
+    would put regulated data on every coach's roster. DOB was already collected. Don't
+    reintroduce it without that reasoning changing.
+
+- **THE TENANT BOUNDARY ON `students` IS A TRIGGER, NOT A POLICY — AND NOT COLUMN GRANTS.**
+  `students_update`'s `WITH CHECK` cannot see the OLD row, so it cannot say "this column
+  did not change"; a parent could therefore move their own child to another business and
+  still satisfy it (fixed 2026-07-19, verified exploitable first). `pin_student_tenant()`
+  pins `tenant_id` and `created_by`; `pin_parent_identity()` does the same for
+  `parents.profile_id`.
+  - **Column grants were rejected deliberately.** `REVOKE UPDATE` + `GRANT UPDATE (cols)`
+    is equally airtight but enumerates columns, so every column added later is silently
+    read-only until someone extends the grant — a trap that would have fired on the very
+    next migration.
+  - The seam is **`current_user`, not `auth.uid()`**: the legitimate writers are
+    `SECURITY DEFINER` owned by `postgres`, so client DML is distinguishable by the role
+    it arrives as. Any new SECURITY DEFINER writer inherits the exemption automatically.
 
 - **The mark renders two different ways on purpose, and is absent from the invoice email
   on purpose.** `SwimSyncAdmin/components/Logo.tsx` inlines the SVG paths (recolourable via
@@ -1909,8 +1951,11 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 
 **No attendance has ever been marked in production.** Zero `lesson_sessions`, zero
 `attendance` rows. Invoicing, credit, the completeness gate, sealing, wages, effective-dated
-pricing and now active/inactive are all tested against fixtures and driven through the real
-UI — and **none of it has processed a single real lesson.**
+pricing, active/inactive, and now child identity and levels are all tested against fixtures
+and driven through the real UI — and **none of it has processed a single real lesson.**
+
+Five sessions of building have now stacked on top of that, which is itself the argument:
+each one adds surface that a first real lesson would exercise for the first time.
 
 Two things now depend on that not staying true much longer:
 
@@ -2010,6 +2055,13 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `brand/` | **The mark's source of truth** (`mark.svg`) + recolours, app-icon tile, adaptive foreground. `README.md` there has the regeneration table and where the mark must NOT go |
 | `SwimSyncApp/components/Logo.tsx` | The mark in the app: white-knockout **PNG** + `tintColor`. Deliberately not SVG — no `react-native-svg` (§6) |
 | `SwimSyncAdmin/components/Logo.tsx` | The mark in the admin: **inline SVG**, `currentColor`. Hand-kept copy of `brand/mark.svg` — edit both |
+| `supabase/migrations/20260719001400…002200` | This session: student identity + derived age, the tenant pin, document name snapshots, `tenant_levels`, the `swimming_ability` drop (CONTRACT), parent address, level skills |
+| `SwimSyncApp/lib/lessonDates.ts` | Also holds **`ageFromDob()`** — age is derived, never stored. **Twin file**: edit `SwimSyncAdmin/lib/lessonDates.ts` too |
+| `SwimSyncApp/app/(parent)/home/edit-child.tsx` | Parent edits their child (name/DOB/gender/notes). The first thing in the app that mutates `students` — see §6 on the tenant pin |
+| `SwimSyncApp/app/(parent)/profile/contact.tsx` | Parent's address + postal code, editable after signup (the backfill path for parents who predate the fields) |
+| `SwimSyncAdmin/app/(admin)/levels/page.tsx` | The business's level ladder **and** each rung's skill list (expand a row). Order is set here and preserved everywhere |
+| `supabase/tests/student_identity · student_tenant_pin · document_name_snapshot · tenant_levels · level_skills · parent_address` | This session's pgTAP (+50). Each was confirmed to FAIL without its fix |
+| `.claude/skills/run-ui-playwright/drivers/verify-{student-identity,edit-child,levels,level-skills,parent-address}.mjs` | This session's UI drivers (49 checks). They caught three defects that typechecked clean and passed pgTAP |
 
 gotchas: `swimsync-project`, `swimsync-backend-gotchas`.
 
