@@ -197,6 +197,43 @@ async function generateForTenant(
   } else {
     billingMonth = previousBillingMonth(now);
   }
+  // ── A month that has not ENDED can never be billed ────────────────────────
+  // Invoices cover one COMPLETE calendar month (PRD §5.5), and until this guard
+  // existed nothing enforced it: the format check above was the only validation,
+  // so an admin could select the current month and generate.
+  //
+  // What that did, and why it is a hard refusal rather than a warning: the
+  // completeness gate clamps its window to today (see `windowTo` below), which
+  // is right for its own purpose — a lesson that has not happened yet is not a
+  // gap. But it means a mid-month run sees only the lessons so far, judges the
+  // month COMPLETE, bills them, and SEALS it. Every remaining lesson of that
+  // month is then permanently unbillable: later runs short-circuit on the seal,
+  // and the already-exists guard skips the parent even if it is reopened. A
+  // silent, irreversible underbill — the §8a.1 / §7.18 family, one door along.
+  //
+  // Placed BEFORE the sealed-month guard so `force` cannot reach it. `force`
+  // means exactly one thing — skip the sealed-month guard — and must not grow a
+  // second meaning here: there is no legitimate case for billing an unfinished
+  // month, so an override would only ever cause the loss described above.
+  //
+  // Derived from previousBillingMonth(), NOT hand-rolled month arithmetic: it
+  // resolves the calendar month in APP_TIMEZONE, so at 00:30 SGT on 1 August
+  // (16:30 UTC on 31 July) it correctly yields July. A UTC-derived comparison
+  // would yield June here and REFUSE the month that is actually due — the same
+  // SGT/UTC divergence as §7.7 and §7.12, pointing the other way.
+  const latestBillableMonth = previousBillingMonth(now);
+  if (billingMonth > latestBillableMonth) {
+    return {
+      tenant_id: tenantId,
+      billing_month: billingMonth,
+      status: "month_not_ended",
+      message:
+        `Cannot generate invoices for ${billingMonth}: that month has not ended yet. ` +
+        `Invoices cover a whole calendar month, so the latest month that can be ` +
+        `billed today is ${latestBillableMonth}.`,
+    };
+  }
+
   const [by, bm] = billingMonth.split("-").map(Number);
   const monthStart = `${billingMonth}-01`;
   const lastDay = new Date(by, bm, 0).getDate();
