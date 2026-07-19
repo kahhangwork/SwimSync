@@ -1,6 +1,6 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-19_
+_Last updated: 2026-07-19 (fifth session)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -108,8 +108,12 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   coach paid, from the terms in force on **its own date** (`class_rates`). Editing a class's
   price no longer reprices last month; a handover no longer moves the outgoing coach's pay.
   Admin class edits ask **correct-vs-change**. Closed three defects, two of them live (§8).
-- **Automated tests** — backend **128 pgTAP + 67 Deno**, plus frontend suites
-  (`SwimSyncAdmin` vitest, `SwimSyncApp` jest-expo); all run in CI on push to `main`. See §5.
+- **Child identity, levels and address (verified UI + backend, ⚠️ NOT DEPLOYED)** — a child
+  is identified by **name + date of birth** (age derived, never stored); each business
+  defines its own **level ladder**; families have an **address**. A parent can now **edit a
+  child**, which required closing two pre-existing defects first — see §8.
+- **Automated tests** — backend **167 pgTAP + 68 Deno**, plus frontend suites
+  (`SwimSyncAdmin` vitest 57, `SwimSyncApp` jest-expo 64); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
 **https://swimsync.sg**, admin at **https://admin.swimsync.sg**, real email via
@@ -212,16 +216,16 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 128 tests across 8 files
+supabase test db                                  # 167 tests across 13 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
-supabase/functions/generate-invoices/test.sh      # 67 tests; needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 68 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
-cd SwimSyncAdmin && npm test                       # 49 tests
+cd SwimSyncAdmin && npm test                       # 57 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
-cd SwimSyncApp && npm test                         # 56 tests
+cd SwimSyncApp && npm test                         # 64 tests
 ```
 
 **Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
@@ -235,11 +239,17 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `rls_isolation.test.sql` (10) | RLS parent/parent isolation + superadmin sees all; **11.3** a parent sees all their children across coaches while each coach sees only students in their own classes |
 | `edge_cases.test.sql` (9) | PRD §11: **11.2** a child created before assignment defaults to unassigned with an empty (not error) class view, **11.4** no bare `trial` status, **11.5** re-enrol after unenrol keeps history, **11.8** unenrol leaves `credit_balance` untouched |
 | `tenant_isolation.test.sql` (24) | cross-tenant isolation across **two full tenants** — neither can see the other's families, classes, coaches, invoices, credit notes or attendance (§8.1) |
-| `coach_wages.test.sql` (36) | effective-dated wage rates, the pay-decision table (§7.13), pro-rata duration maths, flat rates, draft→frozen payouts, and next-period adjustments carried **once** (§8.3) |
+| `coach_wages.test.sql` (36) | effective-dated wage rates, the pay-decision table (§7.13), pro-rata duration maths, flat rates, draft→frozen payouts, and next-period adjustments carried **once** (see (c)) |
 | `class_terms.test.sql` (14) | effective-dated class terms — a lesson priced and attributed by **its own date**, correct-vs-change, and the settled-money guard. Runs on **its own tenant** (see §7.26) |
 | `active_inactive.test.sql` (20) | per-business active/inactive for families and children (§7.14), incl. the load-bearing one: **reactivating is not undone by the family having no active children** (§8) |
 
-**Total: 128 across 8 files** — verified by `supabase test db`, and the per-file numbers
+| `student_identity.test.sql` (9) | name + DOB identifies a child within a business; whitespace/case cannot defeat the expression index; NULL DOB is exempt (what made it safe on live data); `age` is gone |
+| `student_tenant_pin.test.sql` (6) | a parent or admin **cannot move a child to another business** (§8a), while ordinary edits and the platform admin's RPC still work |
+| `document_name_snapshot.test.sql` (7) | renaming a child does not rewrite an issued invoice or an immutable credit note; the note carries the name from the item it credits |
+| `tenant_levels.test.sql` (9) | per-business level ladders: RLS is **enabled** (not merely written), cross-tenant writes refused, a student cannot take another business's level, deleting a level unlevels rather than deletes |
+| `parent_address.test.sql` (8) | a family maintains their own address only; `postal_code` is TEXT so leading zeros survive; `profile_id` cannot be reassigned |
+
+**Total: 167 across 13 files** — verified by `supabase test db`, and the per-file numbers
 above are each file's `SELECT plan(n)`. Four of these files postdate the original
 four-row table and were only described in prose; if you add a suite, add a row.
 
@@ -701,23 +711,156 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
-## 8. What changed this session (2026-07-19, fourth session — ACTIVE / INACTIVE, all six phases, live)
+## 8. What changed this session (2026-07-19, fifth session — CHILD IDENTITY, LEVELS, ADDRESS — ⚠️ NOT DEPLOYED)
 
 > **How to read the §8 sections — they are NEWEST FIRST, and the numbering does not run in
-> reading order.** Four sessions happened on 2026-07-19, so the `.1`/`.2`/`.3` suffixes number
+> reading order.** Five sessions happened on 2026-07-19, so the `.1`–`.4` suffixes number
 > those sessions **chronologically** (`.1` = first) while they are *laid out* newest-first.
-> Hence the run: **§8** (4th session) → **§8.3** (3rd) → **§8.1** (1st) → **§8.2** (2nd) →
-> **§8a** (2026-07-18) → **§8b…§8m** (older, each one day earlier). The letters are the
-> pre-2026-07-19 log and are already in newest-first order.
+> Hence the run: **§8** (5th session) → **§8.4** (4th) → **§8.3** (3rd) → **§8.1** (1st) →
+> **§8.2** (2nd) → **§8a** (2026-07-18) → **§8b…§8m** (older, each one day earlier).
 >
-> **Don't "tidy" this by renumbering** — 70+ cross-references point at these labels, including
-> from `PRD.md`, `BACKLOG.md`, `TENANCY_DESIGN.md` and `TENANCY_PLAN.md`, and the labels are
-> load-bearing prose ("see §8a.1"). The cost is real and the gain is cosmetic. If a fifth
-> session on the same date ever needs a slot, it is **§8.4**, placed directly under this note.
+> The newest session's own subsections are lettered **(a)–(e)**, deliberately not numbered:
+> `§8.1` already means "the first session of 2026-07-19", and a second meaning would collide
+> with 70+ live cross-references.
+>
+> **Don't "tidy" this by renumbering** — those references reach in from `PRD.md`,
+> `BACKLOG.md`, `TENANCY_DESIGN.md` and `TENANCY_PLAN.md`, and the labels are load-bearing
+> prose ("see §8a.1"). The cost is real and the gain is cosmetic. A sixth same-date session
+> takes **§8.5**, and this section becomes it.
 
-**Backlog item #1 is built and deployed** — the oldest outstanding item in `BACKLOG.md`,
-now removed from it. Families and children carry an **active/inactive state per
-business**, with the date they left. `PRD.md` §7.14 is the spec; this is the session log.
+**Three backlog items, six commits, seven migrations — and NONE of it is in production.**
+The near-term build order in `BACKLOG.md` is now empty. See §8.0 below for the deploy
+runbook; it is not a normal one and the ordering is not uniform across the migrations.
+
+### ⚠️ DEPLOY RUNBOOK — read before pushing anything
+
+Branch: **`feat/student-identity-derived-age`**, 6 commits ahead of `main`, never pushed.
+
+> **There is a LIVE SECURITY FIX sitting undeployed here.** `20260719001500` closes a hole
+> that is exploitable in production *today*, by anyone with a parent login and the public
+> API URL — see (a) below. The user chose to hold it and ship the batch together. If that batch
+> slips, **deploy that one migration alone**: it is a single BEFORE UPDATE trigger, needs no
+> app deploy, and cannot break the live apps because nothing deployed writes to `students`.
+
+**Pre-flight (run against PRODUCTION before any migration):**
+```sql
+-- Must return ZERO rows or 20260719001400 fails mid-deploy.
+SELECT tenant_id, lower(trim(full_name)) AS nm, date_of_birth, count(*)
+FROM students GROUP BY 1,2,3 HAVING count(*) > 1;
+
+-- Must return 0 or 20260719001900 refuses (it has its own guard).
+SELECT count(*) FROM students WHERE swimming_ability IS NOT NULL;
+```
+Take a backup first, per the §8 precedent.
+
+**The ordering is NOT uniform — this is the §7.27 trap, twice:**
+
+| Step | What | Why this order |
+|---|---|---|
+| 1 | `db push` **through `20260719001800`** | All EXPAND (adding). New UI queries the new columns/table |
+| 2 | Push to `main` → Vercel builds **both** apps | |
+| 3 | **Confirm the deploy is live** | Two SEPARATE Vercel projects (§7.23). Compare a known-good route against `/levels` |
+| 4 | `db push` **`20260719001900`** ONLY | CONTRACT (dropping). Six screens select `swimming_ability`; applying this under the old bundle breaks parent home, parent child detail, coach roster, admin dashboard/students/unassigned |
+
+`generate-invoices` **must be redeployed** (`supabase functions deploy`) — `core.ts` changed
+(§8.3). A git push does not deploy it.
+
+**Rollback for step 4 if applied early:** `ALTER TABLE students ADD COLUMN swimming_ability
+swimming_ability;` — it was always NULL, so nothing is lost either way.
+
+### (a) A parent could move their child into another business (SECURITY, pre-existing)
+
+`students_update`'s `WITH CHECK` is a copy of its `USING` clause, and nothing in it mentions
+the **new** `tenant_id` — while `parent_owns_student(id)` stays true after the move.
+Verified exploitable: as the owning parent, one `UPDATE` put two children onto a rival
+business's roster.
+
+That defeats the **join code**, which is the only proof a family deals with a business
+(PRD §5.1), and lands the child where another admin can see and bill them. **Reachable
+today via a direct API call** — it has never been reachable through the UI only because
+nothing in the app updates `students`, which the edit-child screen changes.
+
+**RLS cannot express this**: a `WITH CHECK` cannot see the OLD row, so it cannot say "this
+column did not change". Hence a `BEFORE UPDATE` trigger. Chose that over column grants
+(`REVOKE UPDATE` + `GRANT UPDATE (cols)`) deliberately — both are airtight, but grants
+enumerate columns, so every column added later is silently read-only until someone extends
+the grant. That trap would have fired on the very next migration (levels).
+
+The seam is **`current_user`, not `auth.uid()`**: the three legitimate writers are
+`SECURITY DEFINER` owned by `postgres`, so `current_user` is `postgres` inside them while
+client DML always arrives as `authenticated`. The platform admin's rescue RPC still works,
+and is tested to prove it.
+
+### (b) A rename rewrote invoices that had already been sent (pre-existing)
+
+`invoice_items` snapshotted `class_title` and `session_date` but **not the student's name** —
+five screens joined `students(full_name)` live. So renaming a child silently altered
+invoices already in a parent's hands, and credit notes PRD §7.8 calls immutable.
+
+The codebase already states the rule: **a fact about a past lesson is never a live lookup.**
+`class_title` proves it was understood here; the name was missed. Now snapshotted on both
+tables, with the credit note taking its name from the **invoice item it credits** — a note
+reverses one specific line and must name the student as that line did.
+
+Pre-snapshot rows are **NULL, not back-filled**: inventing a historical name from today's
+value is a guess presented as a record, which is the failure being fixed.
+
+> **NEAR-MISS WORTH REMEMBERING.** `handle_attendance_update` has been redefined **six
+> times**, and I first wrote the `CREATE OR REPLACE` from its **original 2026-03 body**.
+> That silently reverted three later fixes: dropped `credit_notes.tenant_id`, reverted
+> per-tenant reference numbering to the global sequence, and moved credit accrual from
+> `parent_tenant_balances` back to the deprecated `parents.credit_balance` — **quietly
+> reinstating the cross-tenant credit pooling PRD §5.6 exists to forbid.** A NOT NULL
+> constraint caught it; nothing else would have. Before editing a long-lived function:
+> `grep -ln "<name>" supabase/migrations/*.sql | tail -1` and start from THAT body.
+
+### (c) What shipped, feature by feature
+
+- **Child identity = name + date of birth** (PRD §5.1). Shipped as DOB, **not NRIC**:
+  partial NRIC is still personal data under PDPC guidance, and DOB was already collected,
+  so the same question is answered with no new regulated data. `students_identity_uniq` is
+  an **expression index** — a raw index is defeated by a trailing space or a capital.
+  NULL DOB never collides, which is what makes it safe on live data with no backfill.
+- **`students.age` dropped**; age derived via `ageFromDob` in `lessonDates.ts` — **both
+  apps, both test files** (the twin rule). Returns null, never 0.
+- **Coach roster** shows each child's age, plus the **full birth date including the year**
+  for any name shared on that roster. The year is the point and was found by driving the
+  UI: the default date format omits it, so two same-named children born on the same
+  day-of-month rendered identically.
+- **Parent edit-child screen** — makes PRD §7.4's long-standing claim true. This is what
+  §8.1 and §8.2 were prerequisites for.
+- **Coach-defined levels** (PRD §7.15) — `tenant_levels` per business with explicit
+  `sort_order`, admin-set, coach/parent read-only. `swimming_ability` dropped.
+- **Address + postal code** (PRD §5.1) — optional at signup, editable at Profile →
+  Contact Details. `postal_code` is **TEXT**; leading zeros are significant.
+
+### (d) Tests
+
+**167 pgTAP** (128 → 167, +39 across five new files), **68 Deno** (+1), frontend **64 jest**
+(+8) and **57 vitest** (+8). Four new UI drivers: `verify-student-identity.mjs` (13),
+`verify-edit-child.mjs` (7), `verify-levels.mjs` (9), `verify-parent-address.mjs` (6).
+
+Every test written for a known bug was **run against the unfixed code first** (§7.25) —
+dropping the pin trigger fails 4 of 6 pin tests, nulling the snapshot fails both rename
+tests, removing the engine write fails the engine test, and the four age-boundary tests
+fail against a naive year-subtraction. Deno suite run twice (§7.15).
+
+### (e) Three things the UI drivers caught that nothing else did
+
+1. **The roster mapped `level_label` but rendered nothing** — the enum it replaced was never
+   rendered either, so swapping the field produced a value no screen displayed. Typechecked
+   clean, pgTAP green.
+2. **The birthday disambiguator omitted the year** (above).
+3. **A "duplicate rejected" check passes on a form where everything fails.** The identity
+   driver now carries a **positive control** — a legitimate save must succeed — after the
+   first version of that assertion proved nothing. Same shape as §7.17.
+
+Two Playwright gotchas are now in `run-ui-playwright/SKILL.md`: `getByText` matches
+**substrings**, so `getByText("Edit")` also matches **"Credit Balance"**; and direct URL
+navigation to a nested route redirects to the app root **even for routes that work**, so a
+redirect is not evidence a route is missing.
+
+## 8.4 Fourth session (2026-07-19) — ACTIVE / INACTIVE, all six phases, live
 
 ### The model, and the one decision everything follows from
 
@@ -1676,7 +1819,14 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### The one thing blocking everything else — and it has been urgent for two sessions
+### ⚠️ FIRST: there is undeployed work, including a live security fix
+
+Branch **`feat/student-identity-derived-age`** — 6 commits, 7 migrations, never pushed.
+**§8's DEPLOY RUNBOOK is the procedure**; the migration ordering is not uniform (one is a
+CONTRACT migration that must follow the app deploy), and one migration closes a hole that
+is exploitable in production right now. Do that before starting anything new.
+
+### The one thing blocking everything else — and it has been urgent for three sessions
 
 **No attendance has ever been marked in production.** Zero `lesson_sessions`, zero
 `attendance` rows. Invoicing, credit, the completeness gate, sealing, wages, effective-dated
@@ -1701,9 +1851,12 @@ Two things now depend on that not staying true much longer:
 
 ### If you would rather build than onboard
 
-Pick from **`BACKLOG.md` → `## Build order`**. Its #1 is now **NRIC last 4 + derived age**,
-which has been waiting to ride the students-schema edits that finally happened on
-2026-07-19 — so it no longer waits for anything.
+**`BACKLOG.md` → `## Build order` is now EMPTY** — all three near-term items shipped this
+session. Pick from the themed sections below it, or from the clusters. The nearest
+candidates with no dependencies: **credit-note emails** (the other half of the notification
+work), **coach-created student profiles** (unblocked by tenancy, and the friction the
+onboarding push is feeling right now), or **an upcoming-lessons view for parents** (small,
+and the building block already exists).
 
 ### Small, concrete, and outstanding
 
