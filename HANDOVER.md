@@ -108,7 +108,7 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   coach paid, from the terms in force on **its own date** (`class_rates`). Editing a class's
   price no longer reprices last month; a handover no longer moves the outgoing coach's pay.
   Admin class edits ask **correct-vs-change**. Closed three defects, two of them live (§8).
-- **Child identity, levels and address (verified UI + backend, ⚠️ NOT DEPLOYED)** — a child
+- **Child identity, levels and address (verified UI + backend, live)** — a child
   is identified by **name + date of birth** (age derived, never stored); each business
   defines its own **level ladder**; families have an **address**. A parent can now **edit a
   child**, which required closing two pre-existing defects first — see §8.
@@ -709,9 +709,27 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     screen that *rendered* it and decide what it says now, not just every branch that
     compared to it (§7.19 is the compile-time half of this; this is the runtime half).
 
+30. **`supabase db push` APPLIES EVERY PENDING MIGRATION, and auto-confirms when it is not
+    on a terminal.** It prints a `[Y/n]` listing them; run non-interactively, that is a
+    yes. This is §7.27's successor and it bit *harder*, because the deploy had been
+    explicitly designed in two phases and the contract migration **renumbered to sort last**
+    an hour earlier specifically so it could be held back. **Renumbering is a convention the
+    tool does not read.** All seven went in together, production dropped
+    `students.swimming_ability` while both live bundles still selected it, and six screens
+    broke. To hold one back it must not be in the directory:
+    `mv supabase/migrations/<contract>.sql /tmp/hold/` → push → deploy apps → move it back
+    → push again. Recovery is usually **forward** (deploy the app that stopped querying the
+    column), not a rollback.
+31. **An HTTP 200 does not tell you which BUNDLE is being served.** Both web apps are SPAs
+    that return 200 with the old JS. After the push above, the admin's `/levels` had gone
+    404→200 (§7.23's comparison, working) while `swimsync.sg` was **still serving the old
+    bundle including the dropped column's query**. Grep the deployed asset for a string only
+    the new build has:
+    `B=$(curl -s https://swimsync.sg | grep -oE '/_expo/static/js/web/[^"]+\.js' | head -1); curl -s "https://swimsync.sg$B" | grep -c "<new-string>"`
+
 ---
 
-## 8. What changed this session (2026-07-19, fifth session — CHILD IDENTITY, LEVELS, ADDRESS — ⚠️ NOT DEPLOYED)
+## 8. What changed this session (2026-07-19, fifth session — CHILD IDENTITY, LEVELS, ADDRESS — DEPLOYED, with an incident)
 
 > **How to read the §8 sections — they are NEWEST FIRST, and the numbering does not run in
 > reading order.** Five sessions happened on 2026-07-19, so the `.1`–`.4` suffixes number
@@ -732,46 +750,59 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 The near-term build order in `BACKLOG.md` is now empty. See §8.0 below for the deploy
 runbook; it is not a normal one and the ordering is not uniform across the migrations.
 
-### ⚠️ DEPLOY RUNBOOK — read before pushing anything
+### DEPLOYED 2026-07-19 — and the two-phase deploy failed. Read this before the next one.
 
-Branch: **`feat/student-identity-derived-age`**, 6 commits ahead of `main`, never pushed.
+Everything below is **live**: all 7 migrations applied, both Vercel projects serving the
+new bundles, `generate-invoices` at **v12**. Backups (data + schema) were taken first.
 
-> **There is a LIVE SECURITY FIX sitting undeployed here.** `20260719001500` closes a hole
-> that is exploitable in production *today*, by anyone with a parent login and the public
-> API URL — see (a) below. The user chose to hold it and ship the batch together. If that batch
-> slips, **deploy that one migration alone**: it is a single BEFORE UPDATE trigger, needs no
-> app deploy, and cannot break the live apps because nothing deployed writes to `students`.
+Pre-flight probes against production all passed: **0** identity collisions, **0** students
+with `swimming_ability` set, **0** with a stored `age`, and **0** invoice_items/credit_notes
+(so the name backfill was a no-op). Production held 8 students, 8 parents, 1 tenant,
+4 classes.
 
-**Pre-flight (run against PRODUCTION before any migration):**
-```sql
--- Must return ZERO rows or 20260719001400 fails mid-deploy.
-SELECT tenant_id, lower(trim(full_name)) AS nm, date_of_birth, count(*)
-FROM students GROUP BY 1,2,3 HAVING count(*) > 1;
+#### 🔥 THE INCIDENT: `supabase db push` APPLIES EVERYTHING, INCLUDING THE MIGRATION YOU MEANT TO HOLD BACK
 
--- Must return 0 or 20260719001900 refuses (it has its own guard).
-SELECT count(*) FROM students WHERE swimming_ability IS NOT NULL;
+The whole deploy was designed as two phases — expand, deploy the apps, *then* contract —
+and the contract migration was even **renumbered to `002100` an hour earlier** so that
+`db push` could be run twice. It made no difference.
+
+`supabase db push` prints a `[Y/n]` confirmation listing every pending migration. **Run
+non-interactively it auto-confirms**, so it applied all seven in one go, including
+`20260719002100_drop_swimming_ability.sql`. Production dropped the column while both live
+bundles still selected it — **six screens broken**: parent home, parent child detail, coach
+roster, admin dashboard, admin students, admin unassigned.
+
+**Renumbering is not a mechanism. It is a convention that the tool ignores.** To actually
+hold a migration back, it must not be in the directory when you push:
+
+```bash
+mkdir -p /tmp/hold && mv supabase/migrations/<contract>.sql /tmp/hold/
+supabase db push                 # expand only
+# ...deploy the apps, CONFIRM they are live...
+mv /tmp/hold/<contract>.sql supabase/migrations/ && supabase db push
 ```
-Take a backup first, per the §8 precedent.
 
-**The ordering is NOT uniform — this is the §7.27 trap, twice:**
+Recovery was **forward**, not back: the new bundles do not query the column, and every
+migration they need was already applied, so `git push` was the shortest path to a
+consistent state. A rollback (recreate the enum type, re-add the column) was the
+alternative and would have been slower for no benefit. Nothing was lost — the column was
+verifiably always NULL.
 
-| Step | What | Why this order |
-|---|---|---|
-| 1 | `supabase db push` | Applies every EXPAND migration, `001400`→`002000`. New UI queries the new columns/table |
-| 2 | Push to `main` → Vercel builds **both** apps | |
-| 3 | **Confirm the deploy is live** | Two SEPARATE Vercel projects (§7.23). Compare a known-good route against `/levels` |
-| 4 | `supabase db push` **again** | Applies `20260719002100` alone — CONTRACT (dropping). Six screens select `swimming_ability`; applying this under the old bundle breaks parent home, parent child detail, coach roster, admin dashboard/students/unassigned |
+#### The other half of the lesson: §7.23 again, and it was still worth checking
 
-> The contract migration is numbered **002100, after the expand ones, deliberately.**
-> `db push` applies everything pending in one go, so a contract migration sitting in the
-> middle cannot be held back without moving the file out of the directory. Being last is
-> what makes this two-phase deploy a plain `db push`, run twice.
+After the push, the admin's `/levels` went **404 → 200** while `/dashboard` held 200 — the
+known-good/known-bad comparison saying the admin was live. **The mobile app was still
+serving the OLD bundle at that moment**, `swimming_ability` query and all. Confirmed by
+fetching the bundle and grepping it, not by trusting an HTTP 200 (the app returns 200
+either way — it is an SPA shell). It took another ~25s.
 
-`generate-invoices` **must be redeployed** (`supabase functions deploy`) — `core.ts` changed
-(§8.3). A git push does not deploy it.
+```bash
+B=$(curl -s https://swimsync.sg | grep -oE '/_expo/static/js/web/[^"]+\.js' | head -1)
+curl -s "https://swimsync.sg$B" | grep -c "swimming_ability"   # 0 once correct
+```
 
-**Rollback for step 4 if applied early:** `ALTER TABLE students ADD COLUMN swimming_ability
-swimming_ability;` — it was always NULL, so nothing is lost either way.
+**Grep the deployed bundle for a string only the new build has.** A status code cannot
+tell you which bundle is being served.
 
 ### (a) A parent could move their child into another business (SECURITY, pre-existing)
 
@@ -1823,13 +1854,6 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > **This is the current shift, not the queue.** The full list of unbuilt ideas — with
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
-
-### ⚠️ FIRST: there is undeployed work, including a live security fix
-
-Branch **`feat/student-identity-derived-age`** — 6 commits, 7 migrations, never pushed.
-**§8's DEPLOY RUNBOOK is the procedure**; the migration ordering is not uniform (one is a
-CONTRACT migration that must follow the app deploy), and one migration closes a hole that
-is exploitable in production right now. Do that before starting anything new.
 
 ### The one thing blocking everything else — and it has been urgent for three sessions
 
