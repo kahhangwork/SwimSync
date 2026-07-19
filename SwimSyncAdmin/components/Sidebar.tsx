@@ -3,49 +3,23 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  UserX,
-  Layers,
-  Users,
-  CalendarCheck,
-  Receipt,
-  FileText,
-  UserCog,
-  Wallet,
-  Globe,
-  LogOut,
-  UsersRound,
-  Waves,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { Logo } from "@/components/Logo";
+import { navFor } from "@/lib/adminNav";
 
-const NAV = [
-  { href: "/dashboard",    label: "Dashboard",           icon: LayoutDashboard },
-  { href: "/unassigned",   label: "Unassigned Children", icon: UserX           },
-  { href: "/classes",      label: "Classes",              icon: Layers          },
-  { href: "/students",     label: "Students",             icon: Users           },
-  { href: "/levels",       label: "Swimming Levels",      icon: Waves           },
-  { href: "/parents",      label: "Parents",              icon: UsersRound      },
-  { href: "/attendance",   label: "Attendance",           icon: CalendarCheck   },
-  { href: "/invoices",     label: "Invoices",             icon: Receipt         },
-  { href: "/credit-notes", label: "Credit Notes",         icon: FileText        },
-  { href: "/coaches",      label: "Coaches",              icon: UserCog         },
-  { href: "/wages",        label: "Coach Wages",          icon: Wallet          },
-  // Platform admin only — hidden for a tenant admin, who has one business and
-  // nothing cross-tenant to do. The page enforces this itself too; hiding it
-  // is the affordance, not the boundary.
-  { href: "/platform",     label: "Platform",             icon: Globe, platformOnly: true },
-];
+
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  // undefined = not resolved yet. Distinct from null (= no business, i.e. a
+  // platform admin): rendering the business nav while we still don't know
+  // flashes eleven links at a platform admin before removing them.
+  const [tenantId, setTenantId] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -53,11 +27,11 @@ export function Sidebar() {
       setUserEmail(data.session.user.email ?? null);
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name, role")
+        .select("full_name, tenant_id")
         .eq("id", data.session.user.id)
         .single();
       setUserName(profile?.full_name ?? null);
-      setIsPlatformAdmin(profile?.role === "platform_admin");
+      setTenantId((profile?.tenant_id as string | null) ?? null);
     });
   }, []);
 
@@ -81,7 +55,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {NAV.filter((n) => !n.platformOnly || isPlatformAdmin).map(({ href, label, icon: Icon }) => {
+        {(tenantId === undefined ? [] : navFor(tenantId)).map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -114,7 +88,7 @@ export function Sidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">
-              {userName ?? "Superadmin"}
+              {userName ?? "Admin"}
             </p>
             <p className="text-xs text-gray-400 truncate">
               {userEmail ?? "—"}

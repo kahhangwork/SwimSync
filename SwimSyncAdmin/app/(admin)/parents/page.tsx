@@ -163,14 +163,12 @@ export default function ParentsPage() {
 
       <Table>
         <Thead>
-          <tr>
-            <Th>Parent</Th>
+<Th>Parent</Th>
             <Th>Contact</Th>
             <Th>Status</Th>
             <Th>Children here</Th>
             <Th>Actions</Th>
-          </tr>
-        </Thead>
+</Thead>
         <Tbody>
           {loading ? (
             <Tr>

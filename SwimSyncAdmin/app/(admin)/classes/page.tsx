@@ -265,8 +265,7 @@ export default function ClassesPage() {
 
       <Table>
         <Thead>
-          <tr>
-            <Th>Class Name</Th>
+<Th>Class Name</Th>
             <Th>Coach</Th>
             <Th>Day</Th>
             <Th>Time</Th>
@@ -274,8 +273,7 @@ export default function ClassesPage() {
             <Th>Rate</Th>
             <Th>Students</Th>
             <Th>Actions</Th>
-          </tr>
-        </Thead>
+</Thead>
         <Tbody>
           {loading ? (
             <Tr>

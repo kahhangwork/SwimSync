@@ -99,8 +99,7 @@ export default function CreditNotesPage() {
 
       <Table>
         <Thead>
-          <tr>
-            <Th>Reference</Th>
+<Th>Reference</Th>
             <Th>Student</Th>
             <Th>Parent</Th>
             <Th>Amount</Th>
@@ -108,8 +107,7 @@ export default function CreditNotesPage() {
             <Th>Linked Invoice</Th>
             <Th>Date</Th>
             <Th>Status</Th>
-          </tr>
-        </Thead>
+</Thead>
         <Tbody>
           {loading ? (
             <Tr>

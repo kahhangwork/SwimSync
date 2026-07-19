@@ -703,8 +703,7 @@ export default function InvoicesPage() {
 
       <Table>
         <Thead>
-          <tr>
-            <Th>Parent</Th>
+<Th>Parent</Th>
             <Th>Student(s)</Th>
             <Th>Month</Th>
             <Th>Gross</Th>
@@ -712,8 +711,7 @@ export default function InvoicesPage() {
             <Th>Net</Th>
             <Th>Status</Th>
             <Th>Action</Th>
-          </tr>
-        </Thead>
+</Thead>
         <Tbody>
           {loading ? (
             <Tr>

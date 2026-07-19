@@ -134,14 +134,12 @@ export default function AttendancePage() {
 
       <Table>
         <Thead>
-          <tr>
-            <Th>Student</Th>
+<Th>Student</Th>
             <Th>Class</Th>
             <Th>Coach</Th>
             <Th>Date</Th>
             <Th>Status</Th>
-          </tr>
-        </Thead>
+</Thead>
         <Tbody>
           {loading ? (
             <Tr>
