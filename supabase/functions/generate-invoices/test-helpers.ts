@@ -51,6 +51,13 @@ export type Scenario = {
    *  already-invoiced session fires the credit-note trigger, like the app).
    *  Defaults to the primary student. */
   mark: (sessionId: string, status: string, studentId?: string) => Promise<void>;
+  /** Change a class's terms from a date — a new effective-dated class_rates
+   *  row, which is the ONLY thing that changes what a lesson costs or who is
+   *  paid for it. Writing classes.price_per_lesson directly is display-only
+   *  and deliberately has no effect on billing (20260719000700). */
+  setRate: (
+    opts: { from: string; price?: number; paidCoachId?: string; classId?: string },
+  ) => Promise<void>;
   /** Current pooled credit balance for the parent. */
   creditBalance: () => Promise<number>;
   /** Per-tenant credit balance (the source of truth). */
@@ -380,6 +387,36 @@ export async function newScenario(
     return await tenantCreditBalance();
   }
 
+  /** Insert new effective-dated terms for a class. Carries forward whatever is
+   *  currently in force for anything not being changed, so a price change does
+   *  not silently reassign the coach (or vice versa). */
+  async function setRate(opts: {
+    from: string;
+    price?: number;
+    paidCoachId?: string;
+    classId?: string;
+  }): Promise<void> {
+    const cid = opts.classId ?? classId;
+
+    const { data: current } = await db
+      .from("class_rates")
+      .select("price_per_lesson, paid_coach_id")
+      .eq("class_id", cid)
+      .lte("effective_from", opts.from)
+      .order("effective_from", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { error } = await db.from("class_rates").upsert({
+      class_id: cid,
+      effective_from: opts.from,
+      price_per_lesson: opts.price ?? Number(current?.price_per_lesson),
+      paid_coach_id: opts.paidCoachId ?? current?.paid_coach_id ?? coachId,
+    }, { onConflict: "class_id,effective_from" });
+
+    if (error) throw new Error(`setRate: ${error.message}`);
+  }
+
   /**
    * Remove everything this scenario created, in dependency order.
    *
@@ -496,6 +533,7 @@ export async function newScenario(
     studentId2,
     addSession,
     mark,
+    setRate,
     creditBalance,
     tenantCreditBalance,
     completeMonth,

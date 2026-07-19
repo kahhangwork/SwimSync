@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
+import { todayInSg } from "@/lib/lessonDates";
 
 type ClassRow = {
   id: string;
@@ -84,6 +85,11 @@ export default function ClassesPage() {
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
   const [rate, setRate] = useState("");
+  const [original, setOriginal] = useState<{ price: number; coachId: string }>({
+    price: NaN,
+    coachId: "",
+  });
+  const [correctInPlace, setCorrectInPlace] = useState(false);
 
   useEffect(() => {
     loadClasses();
@@ -132,7 +138,16 @@ export default function ClassesPage() {
     );
   }
 
+  // The price/coach the edit form OPENED with. Comparing against these is
+  // what distinguishes "renamed the class" (records nothing) from "changed the
+  // money" (needs a correct-vs-change decision).
+  const moneyChanged =
+    editingId !== null &&
+    (parseFloat(rate) !== original.price || coachId !== original.coachId);
+
   function resetForm() {
+    setOriginal({ price: NaN, coachId: "" });
+    setCorrectInPlace(false);
     setTitle("");
     setCoachId("");
     setDay("");
@@ -145,6 +160,8 @@ export default function ClassesPage() {
   }
 
   function openEdit(cls: ClassRow) {
+    setOriginal({ price: Number(cls.price_per_lesson), coachId: cls.coach_id });
+    setCorrectInPlace(false);
     setTitle(cls.title);
     setCoachId(cls.coach_id);
     setDay(cls.day_of_week);
@@ -175,8 +192,29 @@ export default function ClassesPage() {
       price_per_lesson: parseFloat(rate),
     };
 
+    // Editing goes through set_class_terms, never a bare UPDATE. Price and
+    // coach are EFFECTIVE-DATED in class_rates (20260719000700): writing
+    // classes.price_per_lesson directly is display-only and changes nothing
+    // about what anyone is charged or paid. The RPC also writes both tables in
+    // one transaction, so a class's schedule and its billing terms cannot
+    // disagree. Creating a class is still a plain insert — the seed trigger
+    // gives it floor-dated terms.
     const { error } = editingId
-      ? await supabase.from("classes").update(payload).eq("id", editingId)
+      ? await supabase.rpc("set_class_terms", {
+          p_class_id: editingId,
+          p_title: title,
+          p_day_of_week: day,
+          p_start_time: startTime,
+          p_end_time: endTime,
+          p_location_name: location,
+          p_price_per_lesson: parseFloat(rate),
+          p_coach_id: coachId,
+          // A correction rewrites history (there was never a period at the old
+          // number); a change starts a new one from today. Only asked when the
+          // money actually moved — see moneyChanged.
+          p_effective_from: correctInPlace ? null : todayInSg(),
+          p_correct_in_place: correctInPlace,
+        })
       : await supabase.from("classes").insert({ ...payload, is_active: true });
 
     if (error) {
@@ -364,6 +402,46 @@ export default function ClassesPage() {
             value={rate}
             onChange={setRate}
           />
+
+          {/* Only asked when the money actually moved. These are genuinely
+              different intents and the wrong one is expensive either way: a
+              correction rewrites what past lessons were worth, while a change
+              leaves them alone. Defaulting silently would make every typo
+              permanent fictional history, or every price rise reach backwards
+              into months already taught. */}
+          {moneyChanged && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-sm font-medium text-amber-900">
+                You changed the price or coach. Which is this?
+              </p>
+              <label className="flex items-start gap-2 text-sm text-amber-900">
+                <input
+                  type="radio"
+                  className="mt-1"
+                  checked={!correctInPlace}
+                  onChange={() => setCorrectInPlace(false)}
+                />
+                <span>
+                  <strong>A change from today.</strong> Lessons already taught
+                  keep the old rate, and invoices and coach pay for them are
+                  unaffected.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm text-amber-900">
+                <input
+                  type="radio"
+                  className="mt-1"
+                  checked={correctInPlace}
+                  onChange={() => setCorrectInPlace(true)}
+                />
+                <span>
+                  <strong>Fixing a mistake.</strong> The old value was never
+                  right, so past lessons are re-valued too. Blocked if the month
+                  has already been invoiced or paid out.
+                </span>
+              </label>
+            </div>
+          )}
 
           {saveError && (
             <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">

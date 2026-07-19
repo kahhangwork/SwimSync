@@ -6,7 +6,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(24);
+SELECT plan(36);
 
 INSERT INTO tenants (id, slug, display_name, join_code, rain_pays_coach)
 VALUES ('88888888-0000-0000-0000-000000000001','wages','Wages Swim','SWIM-WAGE', FALSE);
@@ -204,6 +204,189 @@ SELECT is((SELECT amount FROM session_pay_amount('44000000-0000-0000-0000-000000
           90.00, 'and the July lesson still prices at the June rate, not October''s');
 SELECT is((SELECT amount FROM session_pay_amount('44000000-0000-0000-0000-00000000000f')),
           135.00, 'only a November lesson gets the October rate');
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- HANDOVER: changing a class's coach must NOT move its history (20260719000800)
+--
+-- Before effective-dated attribution, payroll resolved the coach through
+-- classes.coach_id at compute time. Handing a class over therefore moved the
+-- ENTIRE unpaid history with it: the outgoing coach's draft dropped to zero and
+-- the incoming coach was paid, at their own rate, for lessons they never
+-- taught. These pin that it cannot happen again.
+-- ══════════════════════════════════════════════════════════════════════════
+RESET ROLE;
+
+-- A second coach in the same business, on a DIFFERENT rate so a misattributed
+-- lesson shows up as a wrong amount, not just a wrong name.
+INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
+  updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
+VALUES
+  ('00000000-0000-0000-0000-000000000000','77000000-0000-0000-0000-000000000004',
+   'authenticated','authenticated','wage-coach-b@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
+   '{"full_name":"Wage Coach B","role":"coach","tenant_id":"88888888-0000-0000-0000-000000000001"}', now(), now(), '', '', '', '');
+
+INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from)
+SELECT c.id, 20.00, 60, '2026-01-01' FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000004';
+
+-- Coach B takes the class over from 15 Dec 2026. The class row itself moves to
+-- them too — that is what a real handover does, and it is exactly what used to
+-- drag the history along.
+INSERT INTO class_rates (class_id, price_per_lesson, paid_coach_id, effective_from)
+SELECT '66000000-0000-0000-0000-000000000001', 40.00, c.id, '2026-12-15'
+  FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000004';
+UPDATE classes SET coach_id = (SELECT id FROM coaches WHERE profile_id='77000000-0000-0000-0000-000000000004')
+ WHERE id='66000000-0000-0000-0000-000000000001';
+
+-- One lesson each side of the handover.
+INSERT INTO lesson_sessions (id, class_id, session_date, status) VALUES
+  ('44000000-0000-0000-0000-0000000000b1','66000000-0000-0000-0000-000000000001','2026-12-05','completed'),
+  ('44000000-0000-0000-0000-0000000000b2','66000000-0000-0000-0000-000000000001','2026-12-19','completed');
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
+  ('44000000-0000-0000-0000-0000000000b1','55000000-0000-0000-0000-000000000001','present','77000000-0000-0000-0000-000000000002'),
+  ('44000000-0000-0000-0000-0000000000b2','55000000-0000-0000-0000-000000000001','present','77000000-0000-0000-0000-000000000002');
+
+-- Coach A is on $90/hr from Oct; the class is 90 min -> $135. Coach B is on
+-- $20/hr -> $30. Wildly different, so a misattribution cannot hide.
+SELECT is((SELECT amount FROM session_pay_amount('44000000-0000-0000-0000-0000000000b1')),
+          135.00, 'a lesson BEFORE the handover still pays the ORIGINAL coach''s rate');
+SELECT is((SELECT amount FROM session_pay_amount('44000000-0000-0000-0000-0000000000b2')),
+          30.00, 'a lesson AFTER the handover pays the NEW coach''s rate');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" TO '{"sub":"77000000-0000-0000-0000-000000000001","role":"authenticated"}';
+SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2026-12');
+
+-- Asserted on THIS PERIOD'S OWN lessons (is_adjustment = FALSE) rather than
+-- gross_amount: gross also carries adjustments from earlier frozen months,
+-- which is unrelated to attribution — and is itself buggy, see the note at the
+-- end of this file.
+SELECT is(
+  (SELECT COALESCE(SUM(i.amount),0) FROM coach_payout_items i
+     JOIN coach_payouts p ON p.id=i.payout_id JOIN coaches c ON c.id=p.coach_id
+    WHERE p.period_month='2026-12' AND NOT i.is_adjustment
+      AND c.profile_id='77000000-0000-0000-0000-000000000002'),
+  135.00,
+  'the OUTGOING coach is still paid for the lesson they taught before handing over'
+);
+SELECT is(
+  (SELECT COALESCE(SUM(i.amount),0) FROM coach_payout_items i
+     JOIN coach_payouts p ON p.id=i.payout_id JOIN coaches c ON c.id=p.coach_id
+    WHERE p.period_month='2026-12' AND NOT i.is_adjustment
+      AND c.profile_id='77000000-0000-0000-0000-000000000004'),
+  30.00,
+  'the INCOMING coach is paid only for lessons from the handover date onward'
+);
+
+-- ── A frozen payout must not move, and must not spawn adjustments ──────────
+SELECT lives_ok(
+  $$ SELECT mark_payout_paid((SELECT p.id FROM coach_payouts p JOIN coaches c ON c.id=p.coach_id
+       WHERE p.period_month='2026-12' AND c.profile_id='77000000-0000-0000-0000-000000000002')) $$,
+  'the outgoing coach''s December payout can be marked paid'
+);
+
+-- Now hand the class over AGAIN, retroactively enough to have repriced
+-- December under the old engine. The paid record must be untouched.
+RESET ROLE;
+INSERT INTO class_rates (class_id, price_per_lesson, paid_coach_id, effective_from)
+SELECT '66000000-0000-0000-0000-000000000001', 40.00, c.id, '2027-01-05'
+  FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000002';
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" TO '{"sub":"77000000-0000-0000-0000-000000000001","role":"authenticated"}';
+SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2027-01');
+
+SELECT is(
+  (SELECT COALESCE(SUM(i.amount),0) FROM coach_payout_items i
+     JOIN coach_payouts p ON p.id=i.payout_id JOIN coaches c ON c.id=p.coach_id
+    WHERE p.period_month='2026-12' AND NOT i.is_adjustment
+      AND c.profile_id='77000000-0000-0000-0000-000000000002'),
+  135.00,
+  'the FROZEN December payout is unchanged after a later handover'
+);
+SELECT is(
+  (SELECT p.status FROM coach_payouts p JOIN coaches c ON c.id=p.coach_id
+    WHERE p.period_month='2026-12' AND c.profile_id='77000000-0000-0000-0000-000000000002')::TEXT,
+  'paid',
+  'and is still frozen'
+);
+SELECT is(
+  (SELECT COUNT(*)::INT FROM coach_payout_items i JOIN coach_payouts p ON p.id=i.payout_id
+    WHERE p.period_month='2027-01' AND i.is_adjustment
+      AND i.lesson_session_id IN ('44000000-0000-0000-0000-0000000000b1',
+                                  '44000000-0000-0000-0000-0000000000b2')),
+  0,
+  'a handover generates ZERO adjustments — attribution is not an amount change'
+);
+
+-- ── A lesson with no terms in force must refuse, not vanish ────────────────
+RESET ROLE;
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, tenant_id)
+SELECT '66000000-0000-0000-0000-000000000009', c.id, 'Rateless', 'sunday','10:00','11:00','Pool', 40,
+       '88888888-0000-0000-0000-000000000001'
+  FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000002';
+INSERT INTO lesson_sessions (id, class_id, session_date, status)
+VALUES ('44000000-0000-0000-0000-0000000000c1','66000000-0000-0000-0000-000000000009','2027-02-07','completed');
+-- Break the invariant the floor-dated backfill guarantees.
+DELETE FROM class_rates WHERE class_id='66000000-0000-0000-0000-000000000009';
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" TO '{"sub":"77000000-0000-0000-0000-000000000001","role":"authenticated"}';
+SELECT throws_ok(
+  $$ SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2027-02') $$,
+  NULL,
+  NULL,
+  'payroll refuses outright rather than silently dropping a lesson with no terms'
+);
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- AN ADJUSTMENT IS CARRIED ONCE (20260719000900)
+--
+-- Found while writing the handover tests above: the -45.00 correction to the
+-- 14 Mar lesson was re-emitted on 2026-04, 2026-12 AND 2027-01, and would have
+-- recurred on every payout forever — docking the coach the same $45 each month.
+-- The assertions above are scoped to non-adjustment items so they measure
+-- attribution rather than this; these measure this directly.
+-- ══════════════════════════════════════════════════════════════════════════
+
+SELECT is(
+  (SELECT COUNT(*)::INT FROM coach_payout_items i
+     JOIN coach_payouts p ON p.id = i.payout_id
+     JOIN coaches c ON c.id = p.coach_id
+    WHERE c.profile_id='77000000-0000-0000-0000-000000000002'
+      AND i.is_adjustment AND i.lesson_session_id='44000000-0000-0000-0000-00000000000b'),
+  1,
+  'the March correction is carried on exactly ONE payout, not re-emitted on every later one'
+);
+
+SELECT is(
+  (SELECT COALESCE(SUM(i.amount),0) FROM coach_payout_items i
+     JOIN coach_payouts p ON p.id = i.payout_id
+     JOIN coaches c ON c.id = p.coach_id
+    WHERE c.profile_id='77000000-0000-0000-0000-000000000002'
+      AND i.is_adjustment AND i.lesson_session_id='44000000-0000-0000-0000-00000000000b'),
+  -45.00,
+  'and the total carried equals the correction exactly — once, not N times'
+);
+
+-- A SECOND genuine correction to the same already-paid lesson must still flow.
+-- This is why the fix is a running total rather than "emit once, then never
+-- again": that simpler rule would silently swallow this.
+RESET ROLE;
+UPDATE attendance SET status='present'
+ WHERE lesson_session_id='44000000-0000-0000-0000-00000000000b';
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" TO '{"sub":"77000000-0000-0000-0000-000000000001","role":"authenticated"}';
+SELECT * FROM generate_coach_payouts('88888888-0000-0000-0000-000000000001','2027-03');
+
+SELECT is(
+  (SELECT COALESCE(SUM(i.amount),0) FROM coach_payout_items i
+     JOIN coach_payouts p ON p.id = i.payout_id
+     JOIN coaches c ON c.id = p.coach_id
+    WHERE c.profile_id='77000000-0000-0000-0000-000000000002'
+      AND i.is_adjustment AND i.lesson_session_id='44000000-0000-0000-0000-00000000000b'),
+  0.00,
+  'a SECOND correction restoring the lesson nets the carried adjustments back to zero'
+);
 
 SELECT * FROM finish();
 ROLLBACK;

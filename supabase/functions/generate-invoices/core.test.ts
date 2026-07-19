@@ -2,7 +2,12 @@
 // Supabase stack. Run with ./test.sh (or export SERVICE_ROLE_KEY first, then
 // `deno test --allow-net --allow-env core.test.ts`). Requires `supabase start`.
 
-import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertStringIncludes,
+} from "jsr:@std/assert@1";
 import { generateInvoices } from "./core.ts";
 import { emailCreatedInvoices } from "./email.ts";
 import {
@@ -220,8 +225,11 @@ Deno.test("carry-forward: credit exceeding the invoice leaves a partial note and
     await s.mark(m1, "absent");
     assertEquals(await s.creditBalance(), 30);
 
-    // Month 2: cheaper lesson so gross ($20) < available credit ($30)
-    await s.db.from("classes").update({ price_per_lesson: 20 }).eq("id", s.classId);
+    // Month 2: cheaper lesson so gross ($20) < available credit ($30).
+    // Via class_rates, dated from the start of August — writing
+    // classes.price_per_lesson directly is display-only and would leave July's
+    // and August's lessons both at $30 (20260719000700).
+    await s.setRate({ from: "2026-08-01", price: 20 });
     const n1 = await s.addSession("2026-08-01"); await s.mark(n1, "present");
     await generateInvoices(s.db, {
       tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-08" });
@@ -1264,5 +1272,89 @@ Deno.test("credit note references are numbered PER TENANT, both from 0001", asyn
     assert(refB.endsWith("-0001"), `tenant B got ${refB}`);
   } finally {
     await a.teardown(); await b.teardown();
+  }
+});
+
+// ============================================================
+// Effective-dated class terms (20260719000700 + rates.ts)
+//
+// These pin the defect that a class's CURRENT price was applied to PAST
+// lessons. The first one FAILS on the pre-fix engine — it bills July at the
+// August price — which is the point of writing it.
+// ============================================================
+
+Deno.test("rates: repricing a class does NOT change an earlier unbilled month", async () => {
+  const s = await newScenario({ price: 35 });
+  try {
+    // Two MAY lessons taught at $35, not yet invoiced.
+    const m1 = await s.addSession("2026-05-02"); await s.mark(m1, "present");
+    const m2 = await s.addSession("2026-05-09"); await s.mark(m2, "present");
+    await s.completeMonth("2026-05");
+
+    // The price rises to $45 from 1 June — AFTER those lessons were taught but
+    // BEFORE May is invoiced. That is the window the old engine was exposed to:
+    // it priced at generation time, so May would have billed at $45.
+    //
+    // The effective date must be in the PAST relative to the test clock, or
+    // this test silently proves nothing: the display-sync trigger only tracks
+    // rates already in force, so a future-dated change leaves
+    // classes.price_per_lesson untouched and the OLD engine reads the right
+    // number by accident. Verified to fail on the pre-fix engine.
+    await s.setRate({ from: "2026-06-01", price: 45 });
+
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-05" });
+
+    const inv = await getInvoice(s.db, s.parentId, "2026-05", s.tenantId);
+    assertEquals(inv!.gross, 70); // 2 x $35, the rate in force in MAY — not 2 x $45
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("rates: a mid-month change splits the invoice at the effective date", async () => {
+  const s = await newScenario({ price: 35 });
+  try {
+    const early = await s.addSession("2026-07-04"); await s.mark(early, "present");
+    const late  = await s.addSession("2026-07-18"); await s.mark(late,  "present");
+    await s.completeMonth("2026-07");
+
+    // Terms change part-way through the month.
+    await s.setRate({ from: "2026-07-15", price: 45 });
+
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-07" });
+
+    // 4 Jul @ $35 + 18 Jul @ $45 — each lesson at the rate in force on its day.
+    const inv = await getInvoice(s.db, s.parentId, "2026-07", s.tenantId);
+    assertEquals(inv!.gross, 80);
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("rates: a class with no rate in force refuses to bill, loudly", async () => {
+  const s = await newScenario({ price: 35 });
+  try {
+    const j1 = await s.addSession("2026-07-04"); await s.mark(j1, "present");
+    await s.completeMonth("2026-07");
+
+    // Break the invariant the floor-dated backfill guarantees. A $0 line, or a
+    // silent fall back to classes.price_per_lesson, would be a permanent
+    // underbill — the invoice freezes and that lesson can never be rebilled.
+    await s.db.from("class_rates").delete().eq("class_id", s.classId);
+
+    await assertRejects(
+      () => generateInvoices(s.db, {
+        tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-07" }),
+      Error,
+      "No class rate in force",
+    );
+
+    // Nothing was written: refusing must leave no partial invoice behind.
+    const inv = await getInvoice(s.db, s.parentId, "2026-07", s.tenantId);
+    assertEquals(inv, null);
+  } finally {
+    await s.teardown();
   }
 });

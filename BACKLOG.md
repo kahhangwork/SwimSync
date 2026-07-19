@@ -60,11 +60,11 @@ remains.)_
    `assignment_status`) and settle the status model **before** more fields are piled onto
    students.
 2. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
-   the stored `age` column (the same stale-second-source problem #2 fixes for status) and
-   add NRIC. Rides the same students-schema + parent-home + admin-table edits as #2, so do
+   the stored `age` column (the same stale-second-source problem #1 fixes for status) and
+   add NRIC. Rides the same students-schema + parent-home + admin-table edits as #1, so do
    it right after — otherwise those screens get touched twice.
 3. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
-   `parents`-table addition touching the registration form; group with #3's
+   `parents`-table addition touching the registration form; group with #2's
    onboarding-form work so those screens are opened once.
 4. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field; do it
    **after** the #1/#2 reconciliations so it respects the settled status/level model
@@ -101,7 +101,7 @@ oldest outstanding item in this document and is now genuinely next.
 ### Unordered — no dependencies, pick by value
 
 Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-history view
-(S), Export to CSV (S), Delete-coach action (S), Better filtering/search (S), More polished
+(S), Export to CSV (S), Disable a staff account (M), Better filtering/search (S), More polished
 dashboards (S), Deeper component-render tests (M), Production data cleanup (S),
 Email-confirmation copy/templates (S).
 
@@ -527,17 +527,52 @@ live enrolment still counts — and shows up as an unmarked lesson, the false al
 teaches a coach to ignore the report (PRD §7.5). Deactivating a child almost certainly
 has to close their enrolment too.
 
-### Delete-coach action in the admin UI — **S** `[handover]`
-A real delete/deactivate control for coaches.
+### Disable a staff account (coach / tenant admin) — **M** `[handover]`
+Revoke a coach's or a tenant admin's access without deleting them. Absorbs the older
+"delete-coach action" item, whose own note already concluded **deactivate is the right
+verb** — real deletion destroys billing history.
 
-**Why:** removing a coach currently means running SQL in the Supabase dashboard. That's
-fine for the owner and impossible for anyone else — and dashboard SQL against production
-is exactly where a bad afternoon comes from.
+**Why:** there is no way to switch off a staff account today. When a school's coach
+leaves, or SwimSync parts ways with a school, someone with access to that business's
+students, attendance and billing keeps it indefinitely. The only remedy is SQL in the
+Supabase dashboard — fine for the owner, impossible for anyone else, and dashboard SQL
+against production is exactly where a bad afternoon comes from.
 
-**Notes:** `classes.coach_id → coaches(id)` has **no cascade** (RESTRICT), so a coach
-can't be deleted while any class references them. The UI needs to say that plainly
-rather than surfacing a raw FK error. **Deactivate is probably the right verb** — real
-deletion destroys billing history. HANDOVER §9 lists this as "if asked."
+**Notes — the control sits at two different levels, and that's the main decision:**
+
+| Disabling… | Who does it | Why there |
+|---|---|---|
+| A **school's coach** | That business's **tenant admin** | Their own staffing. The platform has no business being in the loop |
+| A **tenant admin** | **Platform admin** | There is only one admin per business today, so nobody inside it can |
+| A whole **tenant** | **Platform admin** | Suspending a business; cascades to its accounts |
+
+**`profiles.is_active` is the right home** — it already exists, is global, covers every
+role, and is currently **enforced nowhere**, so it has no behaviour to break. Enforcement
+needs two layers: RLS teeth (`current_coach_id()` returning NULL for a disabled account,
+so a disabled session sees nothing whatever the client does) and a friendly sign-out
+message. ⚠️ **That helper feeds all 37 policies** — it is the highest-blast-radius edit
+available in this codebase, and wants its own pgTAP coverage before any UI exists.
+
+**Two traps, both already paid for elsewhere:**
+
+- **A private coach holds `tenant_admin` *and* a `coaches` row** (HANDOVER §6). "Disable
+  the coach" for them means locking the business owner out of their own business. Guard
+  it as *"cannot disable the sole tenant admin of a tenant"* — and check **which extension
+  rows exist**, never `role`. Branching on the role enum is exactly what locked the real
+  coach out of production (§7.19).
+- **`classes.coach_id` is RESTRICT with no cascade.** A disabled coach's classes still
+  exist and still need attendance marked — and unmarked attendance **blocks invoice
+  generation outright, with no override** (PRD §7.7). So disabling a coach without
+  reassigning their classes doesn't just orphan a roster, it **stops the business
+  billing**. Disabling must force reassignment, the same shape as the open-enrolment
+  problem in "Remove from class" (PRD §7.4). Surface it plainly, never as a raw FK error.
+
+**Parent accounts are deliberately excluded**, considered and dropped 2026-07-19. Families
+leaving a business is handled by tenant-level active/inactive (`parent_tenants.is_active`),
+which is the actual common case. The only genuine platform-level trigger for a parent is a
+PDPA consent-withdrawal request — where "can't log in, records retained" is right, since
+IRAS requires ~5 years of financial records — and that has never happened. It rides along
+free once staff disabling exists, because the mechanism is identical.
 
 ### Export to Excel / CSV — **S** `[MVP-excluded]` `[Phase 3]`
 Export attendance, invoices, and credit notes from the admin panel.

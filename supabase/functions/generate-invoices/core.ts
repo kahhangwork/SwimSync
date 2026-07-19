@@ -34,6 +34,7 @@ import {
   expectedLessonDates,
   previousBillingMonth,
 } from "./dates.ts";
+import { rateOn } from "./rates.ts";
 
 // Attendance statuses that result in a charge to the parent.
 // Per PRD 5.4: only Present and Paid Trial are billable.
@@ -287,6 +288,17 @@ async function generateForTenant(
 
   if (clsErr) throw new Error(clsErr.message);
 
+  // Effective-dated terms for those classes, fetched once rather than per
+  // lesson. Scoped transitively by class_id — the classes query above is
+  // already tenant-filtered, and RLS does not apply to service_role, so this
+  // filter is the isolation.
+  const { data: classRates, error: rateErr } = await supabase
+    .from("class_rates")
+    .select("class_id, price_per_lesson, paid_coach_id, effective_from")
+    .in("class_id", (classes ?? []).map((c) => c.id));
+
+  if (rateErr) throw new Error(rateErr.message);
+
   type InvoiceItem = {
     student_id: string;
     lesson_session_id: string;
@@ -494,13 +506,17 @@ async function generateForTenant(
             items = [];
             parentItems.set(ps.parent_id, items);
           }
+          // Priced by the LESSON'S OWN DATE, not the class's current price.
+          // Throws if no rate is in force — see rates.ts for why that must
+          // never degrade to 0 or to cls.price_per_lesson.
+          const sessionDate = sessionDateMap[sessId];
           items.push({
             student_id: ps.student_id,
             lesson_session_id: sessId,
             attendance_status: status,
-            amount: Number(cls.price_per_lesson),
+            amount: rateOn(classRates ?? [], cls.id, sessionDate, cls.title).price,
             class_title: cls.title,
-            session_date: sessionDateMap[sessId],
+            session_date: sessionDate,
           });
         }
       }

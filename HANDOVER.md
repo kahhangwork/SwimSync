@@ -737,12 +737,14 @@ forgot-password under Expo web — and the generated icons were inspected at tru
 sizes (the iOS app icon correctly carries **no alpha**; the Android adaptive foreground
 correctly does).
 
-**Status — NOT merged, nothing deployed.** Branch
-`worktree-logo-generation-and-replacement` (the logo itself is `18d486d`; this doc update
-sits on top of it), pushed to origin and rebased onto `e81109c`, so it is **0 behind**
-`origin/main` — a clean fast-forward whenever you want it. The rebase landed with **zero conflicts** even though the other 2026-07-19
-session touched the same two files (`Sidebar.tsx`, `(auth)/login.tsx`); both sides were
-checked to have survived rather than trusted. `main` and production are untouched.
+**Status — MERGED to `main` and pushed.** The logo is `18d486d` and this doc update
+`06aff62`; both sit on `origin/main`, and the
+`worktree-logo-generation-and-replacement` branch has been deleted local and remote. It
+had first been rebased onto `e81109c` with **zero conflicts** even though the other
+2026-07-19 session touched the same two files (`Sidebar.tsx`, `(auth)/login.tsx`); both
+sides were checked to have survived rather than trusted. **Vercel builds both web apps
+from `main`, so the push deployed the mark to production** — no migration or Edge
+Function was involved, so there was nothing else to deploy.
 
 ---
 
@@ -1436,19 +1438,12 @@ the new model"* is impossible while there is nothing to bill.
 
 ### Small, concrete, and outstanding
 
-- **Rename the business.** Production reads **`Kah Hang`**; it should be *"Coach Kah Hang
-  Swimming Lessons"*. The backfill named each tenant after its coach, which is right for a
-  private coach and wrong when the business trades under another name. **Dashboard →
-  Rename.** It appears on invoices and invoice emails.
 - **The join code is `SWIM-RVM9`.** This is now the *only* route in — there is no
   directory, so a parent without it cannot add a child at all.
 - **`auto_invoice_enabled` is `false`** on the tenant, carried faithfully from the old
   global setting. Automatic generation will not run until it is turned on.
 - **Set a coach rate** if you want payroll to compute anything (Admin → Coach Wages).
   A coach with no rate is deliberately not on payroll.
-- **Merge the logo branch.** `worktree-logo-generation-and-replacement` is pushed,
-  rebased onto `e81109c`, and a clean fast-forward (0 behind `main`). Small and entirely
-  independent of everything above — see §8.2.
 
 ### Worth deciding, not urgent
 
