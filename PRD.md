@@ -1073,6 +1073,13 @@ otherwise be thirty lines of skills) and their **parent** sees it on the child's
 For a parent this is the clearest answer the app has ever given to *"what is my child
 working towards?"* — a question it previously could not answer at all.
 
+**The ladder is a flat, ordered list of labels, deliberately.** Businesses structure their
+levels differently — tiers, numbered rungs, non-linear progression between them — so
+SwimSync models none of that. A school with sixteen rungs across five tiers names them
+that way and orders them; any progression rule lives in the level's **note**, in that
+business's own words. Imposing a tier-and-progression model would force every other
+tenant into one school's shape.
+
 *(Deliberately not built: **ticking skills off per child.** These describe the LEVEL, not
 any student's progress against it. Per-child tracking is a real feature — it needs coach
 write access to students, which they deliberately do not have, a marking UI, and a
