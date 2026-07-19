@@ -872,7 +872,7 @@ value is a guess presented as a record, which is the failure being fixed.
 - **Address + postal code** (PRD §5.1) — optional at signup, editable at Profile →
   Contact Details. `postal_code` is **TEXT**; leading zeros are significant.
 
-### (f) Level skills — added after the deploy, NOT yet deployed
+### (f) Level skills — added after the first deploy, and deployed cleanly
 
 A level's label says where a child is and nothing about what they are working on. Each
 rung now carries an **ordered list of skills** (`tenant_level_skills`) plus an optional
@@ -904,8 +904,21 @@ clearest answer the app has ever given to *"what is my child working towards?"*.
 curriculum text, including that a reorder **persists across a reload** rather than being
 local state.
 
-⚠️ **This is on `main` but NOT deployed** — it needs `supabase db push` (migration
-`20260719002200`) and a Vercel deploy. It is pure EXPAND, so migrate first, then push.
+**Deployed** (migration `20260719002200`, then the push). Pure EXPAND, so migrate-first
+applied and the failure mode from earlier today could not occur. Backup taken first; the
+pre-flight probe confirmed production had **0** levels, so tightening the name constraint
+could not collide with anything.
+
+Verification note worth copying: the admin's `/levels` returned **200 both before and
+after**, because that route already existed — a status code proved nothing. The page chunk
+is lazy-loaded behind auth, so the check that actually worked was pulling the route's own
+chunk out of the HTML and grepping it:
+
+```bash
+B=$(curl -sL https://admin.swimsync.sg/levels \
+     | grep -oE '/_next/static/chunks/app/\(admin\)/levels/[^"]+\.js' | head -1)
+curl -s "https://admin.swimsync.sg$B" | grep -c tenant_level_skills
+```
 
 ### (d) Tests
 
