@@ -11,6 +11,7 @@ import {
   monthBounds,
   backlogWindowStart,
   ageFromDob,
+  previousBillingMonth,
 } from "./lessonDates";
 
 describe("ageFromDob", () => {
@@ -232,5 +233,36 @@ describe("backlogWindowStart", () => {
 
   it("uses the month floor when the enrolment is older", () => {
     expect(backlogWindowStart("2026-08-01", "2026-03-02")).toBe("2026-07-01");
+  });
+});
+
+describe("previousBillingMonth", () => {
+  // Invoices cover a COMPLETE calendar month, so today's own month is never it.
+  it("is the month before today, not today's month", () => {
+    expect(previousBillingMonth("2026-07-19")).toBe("2026-06");
+    expect(previousBillingMonth("2026-07-01")).toBe("2026-06");
+    expect(previousBillingMonth("2026-07-31")).toBe("2026-06");
+  });
+
+  it("rolls back over the year boundary", () => {
+    expect(previousBillingMonth("2026-01-15")).toBe("2025-12");
+    expect(previousBillingMonth("2026-01-01")).toBe("2025-12");
+  });
+
+  // THE BOUNDARY. July becomes billable at 00:00 SGT on 1 August. The input is
+  // already an SGT date string (todayInSg()), so 1 August yields July — whereas
+  // deriving from a UTC clock at that instant yields June, refusing the month
+  // that has just become due. Same family as the timezone tests above.
+  it("makes July billable on 1 August, the day it becomes due", () => {
+    expect(previousBillingMonth("2026-08-01")).toBe("2026-07");
+  });
+
+  it("handles a 31-day month rolling back into a 30-day one", () => {
+    expect(previousBillingMonth("2026-05-31")).toBe("2026-04");
+  });
+
+  it("returns an empty string for a malformed date rather than guessing", () => {
+    expect(previousBillingMonth("nonsense")).toBe("");
+    expect(previousBillingMonth("2026-13")).toBe("");
   });
 });

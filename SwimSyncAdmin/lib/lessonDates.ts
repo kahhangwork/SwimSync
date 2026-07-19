@@ -217,3 +217,29 @@ export function backlogWindowStart(
     ? earliestEnrolmentDate
     : prevMonthStart;
 }
+
+/**
+ * The latest billing month that may be invoiced today, "YYYY-MM".
+ *
+ * Invoices cover one COMPLETE calendar month (PRD §5.5), so the answer is
+ * always the month BEFORE today in Singapore time — on 19 July 2026 that is
+ * "2026-06", and July only becomes billable at 00:00 SGT on 1 August.
+ *
+ * Mirrors previousBillingMonth() in the billing engine
+ * (supabase/functions/generate-invoices/dates.ts), which is where the rule is
+ * actually ENFORCED. This copy exists so the admin panel can default and cap
+ * its month picker to something the engine will accept — an affordance, never
+ * the guard. A `max` on an <input type="month"> constrains neither a
+ * programmatic value nor every browser.
+ *
+ * Derived from todayInSg(), not the runtime's local/UTC fields: before 08:00
+ * SGT the UTC date is the previous day, so on 1 August a UTC-derived answer is
+ * "2026-06" — refusing July on the very day it becomes due (§7.7, §7.12).
+ */
+export function previousBillingMonth(today: string = todayInSg()): string {
+  const t = parseDate(today);
+  if (Number.isNaN(t)) return "";
+  const d = new Date(t);
+  // Date.UTC normalises month -1 into the previous year, so January works.
+  return formatDate(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)).slice(0, 7);
+}

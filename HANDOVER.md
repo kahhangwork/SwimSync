@@ -964,7 +964,8 @@ curl -s "https://admin.swimsync.sg$B" | grep -c tenant_level_skills
 
 ### (d) Tests
 
-**167 pgTAP** (128 → 167, +39 across five new files), **68 Deno** (+1), frontend **64 jest**
+**167 pgTAP** (128 → 167, +39 across five new files) — _mid-session; §8(f) then took it to the
+current **178**_ — **68 Deno** (+1), frontend **64 jest**
 (+8) and **57 vitest** (+8). Four new UI drivers: `verify-student-identity.mjs` (13),
 `verify-edit-child.mjs` (7), `verify-levels.mjs` (9), `verify-parent-address.mjs` (6).
 
