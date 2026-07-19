@@ -88,7 +88,11 @@ try {
 
   // ── The rescue: move the child to the other business ─────────────────────
   await page.getByPlaceholder(/Search a child/).fill("Wrongcode");
-  await page.getByRole("button", { name: "Search" }).click();
+  // .first(): the page has TWO "Search" buttons — the student search and the
+  // family-status search below it — so a bare getByRole is a strict-mode
+  // violation. This driver had been failing on it since family status was
+  // added, which nobody noticed because the driver is run by hand.
+  await page.getByRole("button", { name: "Search" }).first().click();
   await page.waitForTimeout(1500);
   body = await page.evaluate(() => document.body.innerText);
   check("student search finds the child", body.includes("Wrongcode Kid"));

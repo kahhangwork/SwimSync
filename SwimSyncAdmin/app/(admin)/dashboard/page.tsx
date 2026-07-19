@@ -340,11 +340,9 @@ export default function DashboardPage() {
           </div>
           <Table>
             <Thead>
-              <tr>
-                <Th>Student</Th>
+<Th>Student</Th>
                 <Th>Parent</Th>
-              </tr>
-            </Thead>
+</Thead>
             <Tbody>
               {loading ? (
                 <Tr>
@@ -384,13 +382,11 @@ export default function DashboardPage() {
           </div>
           <Table>
             <Thead>
-              <tr>
-                <Th>Parent</Th>
+<Th>Parent</Th>
                 <Th>Month</Th>
                 <Th>Net</Th>
                 <Th>Status</Th>
-              </tr>
-            </Thead>
+</Thead>
             <Tbody>
               {loading ? (
                 <Tr>

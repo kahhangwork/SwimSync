@@ -8,10 +8,19 @@ export function Table({ children, className }: { children: React.ReactNode; clas
   );
 }
 
+/**
+ * Emits its own <tr>, so callers pass <Th> directly.
+ *
+ * It used not to, and the convention split: nine call sites wrapped their <Th>s
+ * in a <tr> and three did not. The three produced INVALID HTML — <th> cannot be
+ * a child of <thead> — which React reports as a hydration error at runtime on
+ * the wages, levels and platform pages. Owning the row here makes the broken
+ * form unrepresentable rather than something each caller must remember.
+ */
 export function Thead({ children }: { children: React.ReactNode }) {
   return (
     <thead className="border-b border-gray-200 bg-gray-50">
-      {children}
+      <tr>{children}</tr>
     </thead>
   );
 }

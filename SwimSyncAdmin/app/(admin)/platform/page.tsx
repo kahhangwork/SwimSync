@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { formatSgDate, toSgDate } from "@/lib/lessonDates";
 
 /**
  * Platform admin — cross-tenant operations, for SwimSync itself.
@@ -23,13 +24,31 @@ import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
  * security boundary.
  */
 
+// One row of platform_tenant_overview(). Every figure is computed in Postgres:
+// aggregating these in the browser is silently capped at max_rows = 1000, which
+// is correct today and quietly wrong later (see the migration's header).
 type TenantRow = {
-  id: string;
+  tenant_id: string;
   display_name: string;
   kind: string;
   join_code: string;
-  students: number;
-  classes: number;
+  active_students: number;
+  active_classes: number;
+  coaches: number;
+  coaches_without_rate: number;
+  /** NULL = nothing has EVER been marked. Renders as "never", never as a date. */
+  last_attendance_date: string | null;
+  sessions_this_month: number;
+  sessions_fully_marked: number;
+  last_month_billing: "sealed" | "open" | "never run";
+  active_families: number;
+};
+
+type StrandedParent = {
+  parent_id: string;
+  full_name: string | null;
+  email: string | null;
+  joined_at: string;
 };
 
 type StudentRow = {
@@ -55,6 +74,8 @@ export default function PlatformPage() {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [moving, setMoving] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [stranded, setStranded] = useState<StrandedParent[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -75,33 +96,32 @@ export default function PlatformPage() {
     })();
   }, []);
 
+  /**
+   * One round trip for the whole overview.
+   *
+   * This replaced an N+1 loop of client-side counts. Two reasons, and the
+   * second is the load-bearing one: the loop issued 2 queries per tenant, and
+   * more importantly every client-side aggregate here is capped at
+   * max_rows = 1000 SILENTLY — no error, just fewer rows — while a platform
+   * admin reads every tenant's data. Postgres has no such ceiling.
+   *
+   * The RPC gates on is_platform_admin() itself, so an empty result is also the
+   * correct answer for anyone else. Errors are surfaced rather than swallowed:
+   * an unchecked failure leaves the table empty, which reads as "no businesses"
+   * — false reassurance on the one page that exists to show trouble.
+   */
   async function loadTenants() {
-    // RLS lets only the platform admin read every tenant, so this returning
-    // more than one is itself a signal the role is right.
-    const { data } = await supabase
-      .from("tenants")
-      .select("id, display_name, kind, join_code")
-      .order("display_name");
-
-    const rows: TenantRow[] = [];
-    for (const t of data ?? []) {
-      const [{ count: students }, { count: classes }] = await Promise.all([
-        supabase
-          .from("students")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", t.id),
-        supabase
-          .from("classes")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", t.id),
-      ]);
-      rows.push({
-        ...(t as Omit<TenantRow, "students" | "classes">),
-        students: students ?? 0,
-        classes: classes ?? 0,
-      });
+    const [overview, strandedRes] = await Promise.all([
+      supabase.rpc("platform_tenant_overview"),
+      supabase.rpc("platform_stranded_parents"),
+    ]);
+    if (overview.error) {
+      setLoadError(overview.error.message);
+      return;
     }
-    setTenants(rows);
+    setLoadError(null);
+    setTenants((overview.data ?? []) as TenantRow[]);
+    setStranded((strandedRes.data ?? []) as StrandedParent[]);
   }
 
   const [famSearch, setFamSearch] = useState("");
@@ -214,31 +234,142 @@ export default function PlatformPage() {
         subtitle="Every business on SwimSync — support and cross-tenant fixes"
       />
 
+      {loadError && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          Could not load the overview: {loadError}
+        </div>
+      )}
+
+      {/* A tenant admin asks "how is MY business doing?"; a platform admin asks
+          "WHICH business needs me?" — so this is one row per business with the
+          signals that answer that, not a set of platform-wide totals. */}
       <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Businesses</h2>
+        <h2 className="text-sm font-semibold text-gray-900">Businesses</h2>
+        <p className="mt-1 mb-3 text-sm text-gray-600">
+          Counts are computed per business in the database, so they never mix
+          across tenants and never truncate.
+        </p>
         <Table>
           <Thead>
             <Th>Name</Th>
             <Th>Type</Th>
             <Th>Join code</Th>
+            <Th>Families</Th>
             <Th>Students</Th>
             <Th>Classes</Th>
+            <Th>Coaches</Th>
+            <Th>Last attendance</Th>
+            <Th>Sessions this month</Th>
+            <Th>Last month&apos;s billing</Th>
           </Thead>
           <Tbody>
+            {tenants.length === 0 && !loadError && (
+              <Tr>
+                <Td colSpan={10}>No businesses.</Td>
+              </Tr>
+            )}
             {tenants.map((t) => (
-              <Tr key={t.id}>
+              <Tr key={t.tenant_id}>
                 <Td>{t.display_name}</Td>
                 <Td>{t.kind}</Td>
                 <Td>
                   <span className="font-mono">{t.join_code}</span>
                 </Td>
-                <Td>{t.students}</Td>
-                <Td>{t.classes}</Td>
+                <Td>{t.active_families}</Td>
+                <Td>{t.active_students}</Td>
+                <Td>{t.active_classes}</Td>
+                <Td>
+                  {t.coaches}
+                  {/* A coach with no rate is deliberately not on payroll
+                      (PRD §7.13) — but it is also why payroll silently
+                      computes nothing, so say it before month end. */}
+                  {t.coaches_without_rate > 0 && (
+                    <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                      {t.coaches_without_rate} no rate
+                    </span>
+                  )}
+                </Td>
+                <Td>
+                  {/* NEVER must be visually distinct from a date and from a
+                      zero. This is the cell that shows a business has not
+                      started using SwimSync at all — or has stopped. */}
+                  {t.last_attendance_date ? (
+                    formatSgDate(t.last_attendance_date)
+                  ) : (
+                    <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-700">
+                      never
+                    </span>
+                  )}
+                </Td>
+                <Td>
+                  {/* Sessions RECORDED, and how many are fully marked. This
+                      deliberately does NOT claim to count lessons that were
+                      never recorded — a lesson nobody touched has no session
+                      row at all (PRD §7.5), and the rule that derives those
+                      lives in lessonDates.ts. See the migration header. */}
+                  {t.sessions_this_month === 0 ? (
+                    <span className="text-gray-400">none recorded</span>
+                  ) : (
+                    <span
+                      className={
+                        t.sessions_fully_marked < t.sessions_this_month
+                          ? "font-medium text-amber-700"
+                          : ""
+                      }
+                    >
+                      {t.sessions_fully_marked}/{t.sessions_this_month} marked
+                    </span>
+                  )}
+                </Td>
+                <Td>
+                  {/* "never run" and "open" mean different things to an
+                      operator and must not collapse into one word. */}
+                  {t.last_month_billing === "sealed" && (
+                    <span className="text-emerald-700">sealed</span>
+                  )}
+                  {t.last_month_billing === "open" && (
+                    <span className="text-amber-700">open</span>
+                  )}
+                  {t.last_month_billing === "never run" && (
+                    <span className="text-gray-400">never run</span>
+                  )}
+                </Td>
               </Tr>
             ))}
           </Tbody>
         </Table>
       </div>
+
+      {/* Registered, never entered a join code. They belong to no business, so
+          no tenant admin can see them and nothing else surfaces them — and they
+          are exactly who the student-move tool below exists for. */}
+      {stranded.length > 0 && (
+        <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <h2 className="text-sm font-semibold text-gray-900">
+            Signed up but not in any business ({stranded.length})
+          </h2>
+          <p className="mt-1 mb-3 text-sm text-gray-700">
+            These parents registered but never entered a join code, so no
+            business can see them. They are stuck until someone gives them one.
+          </p>
+          <Table>
+            <Thead>
+              <Th>Parent</Th>
+              <Th>Email</Th>
+              <Th>Registered</Th>
+            </Thead>
+            <Tbody>
+              {stranded.map((p) => (
+                <Tr key={p.parent_id}>
+                  <Td>{p.full_name ?? "—"}</Td>
+                  <Td>{p.email ?? "—"}</Td>
+                  <Td>{formatSgDate(toSgDate(p.joined_at))}</Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-gray-900">
@@ -285,7 +416,7 @@ export default function PlatformPage() {
                 <Tr key={s.id}>
                   <Td>{s.full_name}</Td>
                   <Td>
-                    {tenants.find((t) => t.id === s.tenant_id)?.display_name ??
+                    {tenants.find((t) => t.tenant_id === s.tenant_id)?.display_name ??
                       "—"}
                   </Td>
                   <Td>{s.is_active ? "Active" : "Inactive"}</Td>
@@ -302,9 +433,9 @@ export default function PlatformPage() {
                         {moving === s.id ? "Moving…" : "Choose…"}
                       </option>
                       {tenants
-                        .filter((t) => t.id !== s.tenant_id)
+                        .filter((t) => t.tenant_id !== s.tenant_id)
                         .map((t) => (
-                          <option key={t.id} value={t.id}>
+                          <option key={t.tenant_id} value={t.tenant_id}>
                             {t.display_name}
                           </option>
                         ))}

@@ -170,12 +170,10 @@ export default function UnassignedPage() {
 
       <Table>
         <Thead>
-          <tr>
-            <Th>Student</Th>
+<Th>Student</Th>
             <Th>Parent</Th>
             <Th>Action</Th>
-          </tr>
-        </Thead>
+</Thead>
         <Tbody>
           {loading ? (
             <Tr>

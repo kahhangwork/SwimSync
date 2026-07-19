@@ -152,15 +152,13 @@ export default function CoachesPage() {
 
       <Table>
         <Thead>
-          <tr>
-            <Th>Name</Th>
+<Th>Name</Th>
             <Th>Email</Th>
             <Th>Phone</Th>
             <Th>Classes</Th>
             <Th>PayNow QR</Th>
             <Th>Actions</Th>
-          </tr>
-        </Thead>
+</Thead>
         <Tbody>
           {loading ? (
             <Tr>

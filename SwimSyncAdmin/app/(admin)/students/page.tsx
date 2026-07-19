@@ -231,16 +231,14 @@ export default function StudentsPage() {
 
       <Table>
         <Thead>
-          <tr>
-            <Th>Student</Th>
+<Th>Student</Th>
             <Th>Level</Th>
             <Th>Parent</Th>
             <Th>Status</Th>
             <Th>Class</Th>
             <Th>Coach</Th>
             <Th>Actions</Th>
-          </tr>
-        </Thead>
+</Thead>
         <Tbody>
           {loading ? (
             <Tr>
