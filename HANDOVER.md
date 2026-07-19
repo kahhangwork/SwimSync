@@ -874,7 +874,19 @@ decision, so a silent regression there would block it. Driver now **21/21**.
 
 Opposite of the usual instinct, because the UI change is purely **restrictive**: it stops
 offering the current month while the engine is unchanged (harmless). Engine-first would open a
-window where the engine refuses and the admin renders fake success. See §11 for the commands.
+window where the engine refuses and the admin renders fake success.
+
+```bash
+git checkout main && git merge fix/billing-month-guard && git push   # 1. admin (Vercel)
+# A 200 proves nothing (§7.31) — grep the served chunk for a string only the new build has:
+B=$(curl -sL https://admin.swimsync.sg/invoices \
+     | grep -oE '/_next/static/chunks/app/\(admin\)/invoices/[^"]+\.js' | head -1)
+curl -s "https://admin.swimsync.sg$B" | grep -c month_not_ended       # expect >= 1
+supabase functions deploy generate-invoices                           # 2. engine
+supabase functions list                                               # confirm v12 -> v13
+```
+
+**No migration**, so `supabase db push` is not run at all — §7.30's trap cannot fire here.
 
 ### Also done
 
@@ -2060,6 +2072,15 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > **This is the current shift, not the queue.** The full list of unbuilt ideas — with
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
+
+### First: there is an UNDEPLOYED branch
+
+`fix/billing-month-guard` (3 commits + docs) is merged nowhere and live nowhere. It closes a
+silent-underbill hole — billing a month that has not ended seals it and strands the rest
+(§7.32, §8.6). **Deploy admin first, then the edge function**; the commands are in §8.6.
+
+This matters *before* step 1 below, not after: the hole is inert only while production has no
+attendance, and step 1 is the act of ending that.
 
 ### The one thing blocking everything else — and it has been urgent for three sessions
 
