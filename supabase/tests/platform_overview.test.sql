@@ -18,7 +18,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(20);
+SELECT plan(24);
 
 -- ── Two tenants, so a count that leaked across the boundary is visible ──────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -85,6 +85,22 @@ VALUES ('44000000-0000-0000-0000-00000000a5e1','44000000-0000-0000-0000-00000000
 INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from)
 SELECT c.id, 30, 60, '2000-01-01' FROM coaches c
 WHERE c.profile_id = '44000000-0000-0000-0000-0000000000a2';
+
+-- The case that made this wrong in the first place. Tenant C is a private coach
+-- exactly as production is: one coach, who is also the business's admin, with
+-- no rate. That is CORRECT and must produce no flag at all.
+INSERT INTO tenants (id, slug, display_name, kind, join_code)
+VALUES ('44444444-0000-0000-0000-000000000003','pov-c','POV C Solo','private','SWIM-POVC');
+INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
+  updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
+VALUES ('00000000-0000-0000-0000-000000000000','44000000-0000-0000-0000-0000000000c9',
+  'authenticated','authenticated','pov-solo@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
+  '{"full_name":"POV Solo","role":"tenant_admin","tenant_id":"44444444-0000-0000-0000-000000000003"}', now(), now(), '', '', '', '');
+-- The auth trigger makes a tenant_admin's profile but no coaches row, so add
+-- the coach half by hand: a private coach is BOTH, which is the whole point.
+INSERT INTO coaches (profile_id, tenant_id)
+VALUES ('44000000-0000-0000-0000-0000000000c9','44444444-0000-0000-0000-000000000003');
 
 -- ══ AUTHORIZATION — the reason this file exists ═════════════════════════════
 SET LOCAL ROLE authenticated;
@@ -160,15 +176,42 @@ SELECT is(
      WHERE tenant_id = '44444444-0000-0000-0000-000000000002'), 0,
   'tenant B reports no sessions — its lessons were never recorded');
 
--- ══ COACHES WITHOUT A RATE ═════════════════════════════════════════════════
+-- ══ STAFF WITHOUT A RATE — the flag must not fire on a private coach ═══════
+-- PRD §7.13: a coach who OWNS the business has no rate BY DESIGN — their income
+-- is their parents' invoices. Flagging that is noise on every private coach's
+-- row forever. Only a coach who does NOT own the business and has no rate is
+-- the real signal: payroll will silently pay them nothing.
 SELECT is(
-  (SELECT coaches_without_rate FROM platform_tenant_overview()
+  (SELECT staff_without_rate FROM platform_tenant_overview()
      WHERE tenant_id = '44444444-0000-0000-0000-000000000001'), 0,
-  'tenant A''s coach has a rate');
+  'tenant A''s coach has a rate, so nothing is flagged');
 SELECT is(
-  (SELECT coaches_without_rate FROM platform_tenant_overview()
+  (SELECT staff_without_rate FROM platform_tenant_overview()
      WHERE tenant_id = '44444444-0000-0000-0000-000000000002'), 1,
-  'tenant B''s coach has none — payroll would silently compute nothing');
+  'tenant B''s STAFF coach has none — payroll would silently pay them nothing');
+
+-- Tenant C (a private coach with no rate) is seeded in the setup block above.
+SELECT is(
+  (SELECT staff_without_rate FROM platform_tenant_overview()
+     WHERE tenant_id = '44444444-0000-0000-0000-000000000003'), 0,
+  'A PRIVATE COACH WITH NO RATE IS NOT FLAGGED — that state is correct (§7.13)');
+SELECT is(
+  (SELECT coaches FROM platform_tenant_overview()
+     WHERE tenant_id = '44444444-0000-0000-0000-000000000003'), 1,
+  'they are still counted as a coach — only the RATE warning is suppressed');
+
+-- ══ SHAPE IS DERIVED, NOT READ FROM tenants.kind ═══════════════════════════
+-- Every seeded tenant here has kind='private' or 'school' set arbitrarily; the
+-- reported shape must follow the DATA instead. Tenant B is stored 'private' but
+-- its coach is not its admin, so it is a school.
+SELECT is(
+  (SELECT shape FROM platform_tenant_overview()
+     WHERE tenant_id = '44444444-0000-0000-0000-000000000003'), 'private coach',
+  'one coach who is also the admin reads as a private coach');
+SELECT is(
+  (SELECT shape FROM platform_tenant_overview()
+     WHERE tenant_id = '44444444-0000-0000-0000-000000000002'), 'school',
+  'a coach who is NOT the admin reads as a school, whatever tenants.kind says');
 
 -- ══ BILLING STATE distinguishes "never run" from "open" ════════════════════
 SELECT is(

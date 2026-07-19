@@ -30,12 +30,16 @@ import { formatSgDate, toSgDate } from "@/lib/lessonDates";
 type TenantRow = {
   tenant_id: string;
   display_name: string;
-  kind: string;
+  /** DERIVED from the data, not tenants.kind — that column is an unmaintained
+   *  default nothing in the app ever sets. */
+  shape: "private coach" | "school";
   join_code: string;
   active_students: number;
   active_classes: number;
   coaches: number;
-  coaches_without_rate: number;
+  /** Coaches who are NOT the business's owner and have no rate. A private coach
+   *  having no rate is CORRECT (PRD §7.13), so they are deliberately excluded. */
+  staff_without_rate: number;
   /** NULL = nothing has EVER been marked. Renders as "never", never as a date. */
   last_attendance_date: string | null;
   sessions_this_month: number;
@@ -252,7 +256,7 @@ export default function PlatformPage() {
         <Table>
           <Thead>
             <Th>Name</Th>
-            <Th>Type</Th>
+            <Th>Shape</Th>
             <Th>Join code</Th>
             <Th>Families</Th>
             <Th>Students</Th>
@@ -271,7 +275,7 @@ export default function PlatformPage() {
             {tenants.map((t) => (
               <Tr key={t.tenant_id}>
                 <Td>{t.display_name}</Td>
-                <Td>{t.kind}</Td>
+                <Td>{t.shape}</Td>
                 <Td>
                   <span className="font-mono">{t.join_code}</span>
                 </Td>
@@ -280,12 +284,15 @@ export default function PlatformPage() {
                 <Td>{t.active_classes}</Td>
                 <Td>
                   {t.coaches}
-                  {/* A coach with no rate is deliberately not on payroll
-                      (PRD §7.13) — but it is also why payroll silently
-                      computes nothing, so say it before month end. */}
-                  {t.coaches_without_rate > 0 && (
+                  {/* Only STAFF are flagged. A coach who owns the business has
+                      no rate by design — their income is their parents'
+                      invoices (PRD §7.13) — so warning about it would be noise
+                      on every private coach's row forever. A coach who does NOT
+                      own it and has no rate will be paid nothing by payroll,
+                      which is the case worth catching before month end. */}
+                  {t.staff_without_rate > 0 && (
                     <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
-                      {t.coaches_without_rate} no rate
+                      {t.staff_without_rate} unpaid
                     </span>
                   )}
                 </Td>
