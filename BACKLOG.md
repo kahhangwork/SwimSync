@@ -55,17 +55,15 @@ credit-note emails remain, now in _Notifications_); and the **UTC-derived defaul
 month fix** (**2026-07-17** — PRD §7.7, HANDOVER §8a). The list below is renumbered from what
 remains.)_
 
-1. **Child identification: NRIC last 4 + derived age** (S, _Parent experience_) — retire
-   the stored `age` column and add NRIC. `age` is a second source of truth that goes stale
-   the day after it is written — the same disease the active/inactive work removed from
-   status. **The students-schema + parent-home + admin-table edits it was waiting to ride
-   have now happened** (2026-07-19), so it no longer has to wait for anything.
+1. **Coach-defined swimming levels** (M, _Coach workflow_) — a `students` field. The
+   status model it was waiting on is settled (PRD §7.14) and the identity work has just
+   opened the same table and the same roster/child-detail screens, so this rides those
+   edits.
 2. **Collect address + postal code at parent signup** (S, _Parent experience_) — a
-   `parents`-table addition touching the registration form; group with #1's
-   onboarding-form work so those screens are opened once.
-3. **Coach-defined swimming levels** (M, _Coach workflow_) — another students field. The
-   status model it was waiting on is now settled (PRD §7.14), so this is unblocked; do it
-   after #1 so the students table is opened once.
+   `parents`-table addition touching the registration form. Last because it is the only
+   one of the three on a different table and a different form; the earlier ordering
+   grouped it with the child-identity item as "onboarding-form work opened once", which
+   was wrong — add-child and register are different forms.
 
 _Shipped 2026-07-18 and removed from this list:_ the **multi-class-parent under-billing
 bug**, plus the configurable **invoice run day**, **month sealing**, and the **hard
@@ -74,6 +72,13 @@ attendance block** — see PRD §7.7 and HANDOVER §8.
 _Shipped 2026-07-19 and removed:_ **extract the completeness-rule shared helper** (it was
 #1; done as tenanting phase 0, and it immediately exposed a live underbill — HANDOVER
 §7.18), and the whole **tenant/coach money cluster** including **coach wages**.
+
+_Shipped 2026-07-19 and removed:_ **child identification + derived age** — shipped as
+**name + date of birth**, not NRIC. The NRIC half was dropped deliberately: partial NRIC
+is still personal data under PDPC guidance, and DOB was already collected, so the same
+question is answered with no new regulated data. See PRD §5.1. It also grew an
+**edit-child screen**, because the roster problem is about children who already exist and
+nothing in the app could edit one — which in turn surfaced two latent bugs (HANDOVER §8).
 
 _Shipped 2026-07-19 and removed:_ **active/inactive status for parents and children** —
 all six phases, live. It was the oldest outstanding item in this document. See PRD §7.14
@@ -641,25 +646,6 @@ is a reasonable long-term answer for Singapore.
 
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
-
-### Extract the completeness rule into a shared helper — **S** `[handover]`
-"A lesson is marked only when every actively-enrolled student has an attendance row on
-it" is **hand-written in four places**: `core.ts:141-152` (engine gate),
-`SwimSyncAdmin/lib/classCoverage.ts`, `(coach)/today/index.tsx` (`fullyMarked`), and
-`(coach)/classes/[id]/roster.tsx`.
-
-**Why:** HANDOVER §6 calls this "duplication waiting to drift," and it's right. This
-rule *is* the billing safety net — if the coach's screen and the admin's gap report ever
-disagree about what "marked" means, the disagreement shows up as an underbill nobody
-notices.
-
-**Notes:** the engine copy is **unavoidable** (Deno, no npm resolution), so the target is
-three-into-one, not four. Until then: **if you touch the rule, touch all four.**
-
-**Weightier since 2026-07-18** (HANDOVER §8): unmarked attendance now *blocks* invoicing, so
-the admin's pre-flight check (`classCoverage.ts`) and the engine's gate are two separate
-implementations of the rule that gates real money. If they drift, the button enables and the
-server refuses — safe, but confusing, and the reverse drift would be worse.
 
 ### Enforce the attendance window at save time — **S** `[handover]`
 The coach attendance screen (`(coach)/classes/[id]/attendance.tsx`) writes whatever `date` it

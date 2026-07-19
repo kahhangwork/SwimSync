@@ -234,6 +234,14 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `credit_note_trigger.test.sql` (11) | the `handle_attendance_update` auto credit-note trigger (billable→non-billable on an invoiced lesson); **11.6** the correction leaves the original invoice intact (not modified/deleted) and the note links back to it |
 | `rls_isolation.test.sql` (10) | RLS parent/parent isolation + superadmin sees all; **11.3** a parent sees all their children across coaches while each coach sees only students in their own classes |
 | `edge_cases.test.sql` (9) | PRD §11: **11.2** a child created before assignment defaults to unassigned with an empty (not error) class view, **11.4** no bare `trial` status, **11.5** re-enrol after unenrol keeps history, **11.8** unenrol leaves `credit_balance` untouched |
+| `tenant_isolation.test.sql` (24) | cross-tenant isolation across **two full tenants** — neither can see the other's families, classes, coaches, invoices, credit notes or attendance (§8.1) |
+| `coach_wages.test.sql` (36) | effective-dated wage rates, the pay-decision table (§7.13), pro-rata duration maths, flat rates, draft→frozen payouts, and next-period adjustments carried **once** (§8.3) |
+| `class_terms.test.sql` (14) | effective-dated class terms — a lesson priced and attributed by **its own date**, correct-vs-change, and the settled-money guard. Runs on **its own tenant** (see §7.26) |
+| `active_inactive.test.sql` (20) | per-business active/inactive for families and children (§7.14), incl. the load-bearing one: **reactivating is not undone by the family having no active children** (§8) |
+
+**Total: 128 across 8 files** — verified by `supabase test db`, and the per-file numbers
+above are each file's `SELECT plan(n)`. Four of these files postdate the original
+four-row table and were only described in prose; if you add a suite, add a row.
 
 _Deno tests — `core.test.ts` + `email.test.ts` + `dates.test.ts` (run by `test.sh`):_ **Engine**
 (`core.test.ts`): billable-only summing, paid vs free trial, no double-billing, the
@@ -694,6 +702,18 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 ---
 
 ## 8. What changed this session (2026-07-19, fourth session — ACTIVE / INACTIVE, all six phases, live)
+
+> **How to read the §8 sections — they are NEWEST FIRST, and the numbering does not run in
+> reading order.** Four sessions happened on 2026-07-19, so the `.1`/`.2`/`.3` suffixes number
+> those sessions **chronologically** (`.1` = first) while they are *laid out* newest-first.
+> Hence the run: **§8** (4th session) → **§8.3** (3rd) → **§8.1** (1st) → **§8.2** (2nd) →
+> **§8a** (2026-07-18) → **§8b…§8m** (older, each one day earlier). The letters are the
+> pre-2026-07-19 log and are already in newest-first order.
+>
+> **Don't "tidy" this by renumbering** — 70+ cross-references point at these labels, including
+> from `PRD.md`, `BACKLOG.md`, `TENANCY_DESIGN.md` and `TENANCY_PLAN.md`, and the labels are
+> load-bearing prose ("see §8a.1"). The cost is real and the gain is cosmetic. If a fifth
+> session on the same date ever needs a slot, it is **§8.4**, placed directly under this note.
 
 **Backlog item #1 is built and deployed** — the oldest outstanding item in `BACKLOG.md`,
 now removed from it. Families and children carry an **active/inactive state per

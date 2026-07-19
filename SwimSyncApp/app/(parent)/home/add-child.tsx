@@ -123,6 +123,17 @@ export default function AddChildScreen() {
 
     if (studentError || !student) {
       setLoading(false);
+      // A child is identified by name + date of birth within a business
+      // (students_identity_uniq). Hitting it almost always means this child is
+      // already registered — a parent tapping Save twice, or re-adding a child
+      // they forgot they had. Say that, rather than surfacing a raw 23505.
+      if (studentError?.code === "23505") {
+        showToast(
+          `${name.trim()} is already registered with this coach or school.`,
+          "error"
+        );
+        return;
+      }
       showToast("Failed to create child profile. Please try again.", "error");
       return;
     }

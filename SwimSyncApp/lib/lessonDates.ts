@@ -152,6 +152,45 @@ export function monthBounds(billingMonth: string): { start: string; end: string 
 }
 
 /**
+ * A child's age in whole years on a given date, derived from date of birth.
+ *
+ * DERIVED, NEVER STORED. `students.age` used to be a column beside
+ * `date_of_birth`, and it went stale the day after it was written. DOB is the
+ * fact; age is a view of it. Don't reintroduce a stored copy.
+ *
+ * Returns null for:
+ *   • a missing DOB — the column is nullable even though the add-child form
+ *     requires it, so rows predating that rule exist;
+ *   • a malformed DOB;
+ *   • a DOB in the future, which is a typo rather than an unborn swimmer.
+ *
+ * Callers must render null as "—" or omit the field, never as 0.
+ */
+export function ageFromDob(
+  dob: string | null | undefined,
+  today: string = todayInSg()
+): number | null {
+  if (!dob) return null;
+  const birth = parseDate(dob);
+  const now = parseDate(today);
+  if (Number.isNaN(birth) || Number.isNaN(now) || birth > now) return null;
+
+  const b = new Date(birth);
+  const n = new Date(now);
+  let age = n.getUTCFullYear() - b.getUTCFullYear();
+
+  // Compare month/day rather than dividing an epoch difference by 365 — leap
+  // years make that divisor wrong, and this function is read on every roster.
+  // A 29 Feb birthday therefore ages on 1 March in non-leap years.
+  const beforeBirthdayThisYear =
+    n.getUTCMonth() < b.getUTCMonth() ||
+    (n.getUTCMonth() === b.getUTCMonth() && n.getUTCDate() < b.getUTCDate());
+  if (beforeBirthdayThisYear) age -= 1;
+
+  return age;
+}
+
+/**
  * Lower bound for the coach's unmarked-lesson backlog:
  * max(first day of the previous month, earliest enrolment).
  *

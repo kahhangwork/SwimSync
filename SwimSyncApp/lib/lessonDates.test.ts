@@ -9,7 +9,55 @@ import {
   expectedLessonDates,
   monthBounds,
   backlogWindowStart,
+  ageFromDob,
 } from "./lessonDates";
+
+describe("ageFromDob", () => {
+  it("counts whole years, not elapsed days", () => {
+    expect(ageFromDob("2018-03-10", "2026-07-19")).toBe(8);
+  });
+
+  it("ages the child ON their birthday, not the day after", () => {
+    expect(ageFromDob("2018-07-19", "2026-07-19")).toBe(8);
+    expect(ageFromDob("2018-07-20", "2026-07-19")).toBe(7);
+  });
+
+  it("does not round up a birthday later this month", () => {
+    // Same month, day not yet reached — the naive year-subtraction says 8.
+    expect(ageFromDob("2018-07-31", "2026-07-19")).toBe(7);
+  });
+
+  it("does not round up a birthday later this year", () => {
+    expect(ageFromDob("2018-12-01", "2026-07-19")).toBe(7);
+  });
+
+  it("ages a 29 February birthday on 1 March in a non-leap year", () => {
+    // 2027 has no 29 Feb. Conventional treatment: they age on 1 March.
+    expect(ageFromDob("2016-02-29", "2027-02-28")).toBe(10);
+    expect(ageFromDob("2016-02-29", "2027-03-01")).toBe(11);
+    // ...and on the day itself when the year does have one.
+    expect(ageFromDob("2016-02-29", "2028-02-29")).toBe(12);
+  });
+
+  it("returns null rather than 0 for a missing DOB", () => {
+    // date_of_birth is nullable, so rows predating the required-DOB rule exist.
+    // Rendering these as 0 would put "0 years old" on a real roster.
+    expect(ageFromDob(null, "2026-07-19")).toBeNull();
+    expect(ageFromDob(undefined, "2026-07-19")).toBeNull();
+    expect(ageFromDob("", "2026-07-19")).toBeNull();
+  });
+
+  it("returns null for a malformed or future DOB", () => {
+    expect(ageFromDob("10-03-2018", "2026-07-19")).toBeNull();
+    expect(ageFromDob("not-a-date", "2026-07-19")).toBeNull();
+    // A future DOB is a typo, not an unborn swimmer — never a negative age.
+    expect(ageFromDob("2027-01-01", "2026-07-19")).toBeNull();
+  });
+
+  it("is exact on the day of birth", () => {
+    expect(ageFromDob("2026-07-19", "2026-07-19")).toBe(0);
+  });
+});
 
 describe("expectedLessonDates", () => {
   it("returns every Saturday in July 2026", () => {

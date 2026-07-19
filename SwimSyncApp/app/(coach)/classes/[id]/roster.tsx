@@ -17,6 +17,7 @@ import {
   backlogWindowStart,
   toSgDate,
   formatSgDate,
+  ageFromDob,
   type DayOfWeek,
 } from "@/lib/lessonDates";
 import { countMarked } from "@/lib/attendanceCompleteness";
@@ -29,6 +30,7 @@ import { removeFromClass } from "@/lib/studentStatus";
 type Student = {
   id: string;
   full_name: string;
+  date_of_birth: string | null;
   swimming_ability: string | null;
 };
 
@@ -80,6 +82,21 @@ export default function ClassRosterScreen() {
   const [windowStart, setWindowStart] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  // Names shared by more than one child on THIS roster — the two-Ethan-Tans
+  // case. Compared on the same normalised form as the database's identity
+  // index (trimmed + lowercased) so the screen and the constraint agree on
+  // what "the same name" means.
+  const duplicateNames = React.useMemo(() => {
+    const seen = new Set<string>();
+    const dupes = new Set<string>();
+    for (const s of students) {
+      const key = s.full_name.trim().toLowerCase();
+      if (seen.has(key)) dupes.add(key);
+      seen.add(key);
+    }
+    return dupes;
+  }, [students]);
   const showToast = useAppStore((s) => s.showToast);
 
   const todayDate = todayInSg();
@@ -99,7 +116,7 @@ export default function ClassRosterScreen() {
         student_class_enrolments(
           is_active,
           enrolled_at,
-          students(id, full_name, swimming_ability)
+          students(id, full_name, date_of_birth, swimming_ability)
         )
       `)
       .eq("id", id)
@@ -120,9 +137,14 @@ export default function ClassRosterScreen() {
 
     const activeStudents: Student[] = (cls.student_class_enrolments ?? [])
       .filter((e: any) => e.is_active)
+      // NOTE (§7.28): date_of_birth is read off `e.students`, NOT off the
+      // enrolment — both tables are in this nested select and the result is
+      // `any`, so the wrong nesting level would typecheck and render every
+      // child ageless.
       .map((e: any) => ({
         id: e.students.id,
         full_name: e.students.full_name,
+        date_of_birth: e.students.date_of_birth,
         swimming_ability: e.students.swimming_ability,
       }));
 
@@ -340,6 +362,34 @@ export default function ClassRosterScreen() {
                   <Text className="text-sm font-semibold text-gray-800">
                     {student.full_name}
                   </Text>
+                  {/* Age is the everyday useful fact. The BIRTHDAY only appears
+                      when another child on this roster shares the name — that
+                      is the case the identity rule exists for, and two children
+                      of the same name can easily be the same age, so age alone
+                      would not tell them apart. */}
+                  {(() => {
+                    const age = ageFromDob(student.date_of_birth);
+                    const ambiguous = duplicateNames.has(
+                      student.full_name.trim().toLowerCase()
+                    );
+                    if (age === null && !ambiguous) return null;
+                    return (
+                      <Text className="text-xs text-gray-500 mt-0.5">
+                        {age !== null ? `Age ${age}` : "Age unknown"}
+                        {/* WITH THE YEAR — formatSgDate's default omits it,
+                            and the year is usually the only thing separating
+                            two children of the same name. "born 10 Mar" would
+                            render identically for both of them. */}
+                        {ambiguous && student.date_of_birth
+                          ? ` · born ${formatSgDate(student.date_of_birth, {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}`
+                          : ""}
+                      </Text>
+                    );
+                  })()}
                 </View>
                 {/* A child who has stopped coming keeps this class permanently
                     "incomplete" — every lesson expects a mark for them — and

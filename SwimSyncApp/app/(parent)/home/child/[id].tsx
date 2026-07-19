@@ -10,6 +10,7 @@ import {
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import { ageFromDob } from "@/lib/lessonDates";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
@@ -174,6 +175,10 @@ export default function ChildProfileScreen() {
     );
   }
 
+  // Derived after the null guard so `child` is known present. Age is never
+  // stored — date_of_birth is the fact (see ageFromDob).
+  const age = ageFromDob(child?.date_of_birth ?? null);
+
   if (!child) {
     return (
       <SafeAreaView className="flex-1 bg-sky-50 items-center justify-center px-6">
@@ -223,6 +228,11 @@ export default function ChildProfileScreen() {
 
           <View className="gap-2">
             <Row label="Date of Birth" value={formatDate(child.date_of_birth)} />
+            {/* Derived, never stored — see ageFromDob. Omitted rather than
+                shown as 0 when the DOB is missing or unparseable. */}
+            {age !== null ? (
+              <Row label="Age" value={`${age} ${age === 1 ? "year" : "years"} old`} />
+            ) : null}
             <Row label="Gender"        value={capitalize(child.gender)} />
             {child.notes ? <Row label="Notes" value={child.notes} /> : null}
           </View>
