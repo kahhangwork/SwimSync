@@ -28,9 +28,97 @@ export function svc(): SupabaseClient {
   });
 }
 
+/**
+ * A billing month paired with the clock that makes it billable.
+ *
+ * WHY THIS EXISTS. The engine refuses a billing month that has not ENDED, so a
+ * test's billing month and its notion of "now" are no longer independent — they
+ * are one fact. Before this, tests hardcoded months (2026-07, 2027-11, 2028-02)
+ * and ran against the REAL system clock, which meant a test's meaning changed
+ * as the calendar advanced. That is HANDOVER §7.25 at suite scale: a test can
+ * pass for the wrong reason, and a green suite hides it.
+ *
+ * The months themselves are arbitrary — newScenario() gives every test its own
+ * tenant and its own parents, so UNIQUE(parent_id, billing_month) can never
+ * collide across tests. What matters is only the RELATIONSHIP between the month
+ * and the clock, which is what this type makes inseparable.
+ */
+export type BillingWindow = {
+  /** The month under test, "YYYY-MM". */
+  billingMonth: string;
+  /** An instant at which `billingMonth` is billable (or deliberately isn't). */
+  now: Date;
+  /** An enrolment date before the month starts, so the whole month's expected
+   *  lessons derive. Expected-lesson derivation is floored at the earliest
+   *  enrolment. */
+  enrolledAt: string;
+};
+
+/** Last calendar day of a "YYYY-MM". */
+function lastDayOf(billingMonth: string): number {
+  const [y, m] = billingMonth.split("-").map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
+/**
+ * Build the clock for a billing month.
+ *
+ * SGT is UTC+8 with no DST, so the SGT wall-clock times below are expressed as
+ * UTC by subtracting 8 hours. Date.UTC normalises the underflow, which is why
+ * `Date.UTC(y, m, 1, -8)` is the correct spelling of "midnight SGT on the 1st"
+ * and not a bug.
+ *
+ * `at` picks the instant, and the two boundary values are the whole point —
+ * they pin the SGT/UTC divergence that shipped twice before (§7.7, §7.12):
+ *
+ *   • "settled"      — the 8th of the following month, 02:00 SGT. The ordinary
+ *                      case: safely past month end AND past the default run day
+ *                      of 7, so it is valid for auto runs too.
+ *   • "first-instant"— 00:00 SGT on the 1st of the following month. The EARLIEST
+ *                      instant the month is billable. In UTC this is still the
+ *                      previous day (16:00 UTC on the last of the month), so a
+ *                      UTC-derived guard computes the wrong month here and
+ *                      wrongly refuses. This row is §7.12 restated as a test.
+ *   • "not-yet-ended"— 23:59 SGT on the last day of the month itself. The month
+ *                      is still in progress and MUST be refused.
+ */
+export function monthEnded(
+  billingMonth: string,
+  opts: { at?: "settled" | "first-instant" | "not-yet-ended" } = {}
+): BillingWindow {
+  if (!/^\d{4}-\d{2}$/.test(billingMonth)) {
+    throw new Error(`monthEnded: bad billing month ${billingMonth}`);
+  }
+  const [y, m] = billingMonth.split("-").map(Number); // m = 1..12
+  const at = opts.at ?? "settled";
+
+  let now: Date;
+  if (at === "not-yet-ended") {
+    // 23:59 SGT on the final day of the month itself.
+    now = new Date(Date.UTC(y, m - 1, lastDayOf(billingMonth), 23 - 8, 59));
+  } else if (at === "first-instant") {
+    // 00:00 SGT on the 1st of the FOLLOWING month. Date.UTC rolls m over.
+    now = new Date(Date.UTC(y, m, 1, -8));
+  } else {
+    // The 8th of the following month, 02:00 SGT.
+    now = new Date(Date.UTC(y, m, 8, 2 - 8));
+  }
+
+  // Enrol from the first day of the PREVIOUS month, so the entire billing
+  // month's expected lessons derive (the floor is the earliest enrolment).
+  const enrolledAt = `${new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10)}`;
+
+  return { billingMonth, now, enrolledAt };
+}
+
 export type Scenario = {
   db: SupabaseClient;
   tag: string;
+  /** The clock this scenario runs at, when built with `billing`. Pass it to
+   *  generateInvoices as `now` — never re-derive a date at the call site. */
+  now?: Date;
+  /** The billing month this scenario was built for, when built with `billing`. */
+  billingMonth?: string;
   coachId: string;
   coachProfileId: string;
   tenantId: string;
@@ -106,17 +194,52 @@ export async function newScenario(
      *  expected-lesson derivation is floored at the earliest enrolment — so a
      *  test billing a PAST month sees zero expected lessons unless the
      *  enrolment predates that month. Only tests that exercise the
-     *  expected-vs-marked gate need this. */
+     *  expected-vs-marked gate need this.
+     *  Supplied automatically when `billing` is passed. */
     enrolledAt?: string;
     /** Class weekday; expected-lesson dates derive from it. Default saturday. */
     dayOfWeek?: string;
+    /** The month under test and the clock that makes it billable — see
+     *  monthEnded(). Sets `enrolledAt`, exposes `now`/`billingMonth` on the
+     *  scenario, and makes completeMonth() inherit the same clock. */
+    billing?: BillingWindow;
   } = {}
 ): Promise<Scenario> {
   const db = svc();
   const price = opts.price ?? 30;
   const tag = crypto.randomUUID().slice(0, 8);
   const dayOfWeek = opts.dayOfWeek ?? "saturday";
-  const enrolExtra = opts.enrolledAt ? { enrolled_at: opts.enrolledAt } : {};
+  const scenarioNow = opts.billing?.now;
+  const billingMonth = opts.billing?.billingMonth;
+  const enrolledAt = opts.enrolledAt ?? opts.billing?.enrolledAt;
+  const enrolExtra = enrolledAt ? { enrolled_at: enrolledAt } : {};
+
+  // ── A VACUOUS FIXTURE IS A HARD ERROR, NOT A QUIET PASS ──────────────────
+  // The failure this prevents: a scenario whose clock and month yield ZERO
+  // expected lesson dates. The completeness gate is then satisfied by having
+  // nothing to check, so the test passes without exercising anything — the
+  // §7.17 shape (a guard made of negatives is satisfied hardest by empty
+  // input) wearing §7.25's clothes (passing for the wrong reason).
+  //
+  // Enforced here rather than reviewed for: a fixture that cannot be built
+  // wrong cannot be got wrong later either, by anyone.
+  if (opts.billing) {
+    const { billingMonth: bm, now } = opts.billing;
+    const monthStart = `${bm}-01`;
+    const monthEnd = `${bm}-${String(lastDayOf(bm)).padStart(2, "0")}`;
+    const today = dateInTimeZone(now, APP_TIMEZONE);
+    const from = enrolledAt && enrolledAt > monthStart ? enrolledAt : monthStart;
+    const to = today < monthEnd ? today : monthEnd;
+    const due = expectedLessonDates(dayOfWeek, from, to);
+    if (due.length === 0) {
+      throw new Error(
+        `newScenario: vacuous fixture — a ${dayOfWeek} class has ZERO expected ` +
+          `lessons in ${bm} for the window ${from}..${to} (clock ${now.toISOString()}). ` +
+          `The completeness gate would pass by having nothing to check, so the ` +
+          `test would prove nothing. Fix the month, the weekday or the clock.`
+      );
+    }
+  }
 
   // Each scenario gets its OWN tenant. Coaches now require one (the auth
   // trigger refuses to guess), and a shared tenant would let scenarios see each
@@ -312,10 +435,13 @@ export async function newScenario(
    * about the one lesson they care about.
    */
   async function completeMonth(
-    billingMonth: string,
+    monthToComplete: string,
     forClassId?: string,
-    now: Date = new Date()
+    // Inherits the SCENARIO's clock. Two clocks that can disagree is one rule
+    // with two implementations (§7.18) — see the note at `today` below.
+    now: Date = scenarioNow ?? new Date()
   ): Promise<void> {
+    const billingMonth = monthToComplete;
     const cid = forClassId ?? classId;
 
     // EVERY actively-enrolled student, not just the scenario's own: the
@@ -347,10 +473,11 @@ export async function newScenario(
       .map((e) => String(e.enrolled_at).slice(0, 10))
       .sort()[0];
 
-    // MUST use the same clock the engine will run at. A test billing a future
-    // month passes `now` to generateInvoices; completing the month against the
-    // real clock would derive zero expected lessons and leave the fixture
-    // incomplete in exactly the way the gate now catches.
+    // MUST use the same clock the engine will run at. Completing the month
+    // against a different clock derives a different set of expected lessons and
+    // leaves the fixture incomplete in exactly the way the gate catches. This
+    // now defaults to the scenario's own clock, so the two cannot drift apart
+    // unless a caller deliberately overrides it.
     const today = dateInTimeZone(now, APP_TIMEZONE);
     const from = earliest && earliest > monthStart ? earliest : monthStart;
     const to = today < monthEnd ? today : monthEnd;
@@ -522,6 +649,8 @@ export async function newScenario(
   return {
     db,
     tag,
+    now: scenarioNow,
+    billingMonth,
     coachId,
     coachProfileId,
     tenantId,
