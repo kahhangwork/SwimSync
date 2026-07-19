@@ -100,11 +100,15 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 - **Coach wages (verified UI + backend, live)** — effective-dated rates, the pay-decision
   table, draft→frozen payouts with next-period adjustments. A coach sees their own pay;
   rates are admin-only.
+- **Active/inactive families and children (verified UI + backend, live)** — per business,
+  with the date they left. Deactivating a child offers to take the siblings and states the
+  family consequence; a departed family returns by re-entering the join code. New admin
+  **Parents** page. `assignment_status` contracted to `unassigned | assigned` (PRD §7.14).
 - **Effective-dated class terms (verified UI + backend, live)** — a lesson is priced, and its
   coach paid, from the terms in force on **its own date** (`class_rates`). Editing a class's
   price no longer reprices last month; a handover no longer moves the outgoing coach's pay.
   Admin class edits ask **correct-vs-change**. Closed three defects, two of them live (§8).
-- **Automated tests** — backend **108 pgTAP + 67 Deno**, plus frontend suites
+- **Automated tests** — backend **128 pgTAP + 67 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest, `SwimSyncApp` jest-expo); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
@@ -124,7 +128,7 @@ superadmin + the real coach/classes). See §11.
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
 > **As of 2026-07-19 production is fully caught up**: every migration through
-> `20260719001000` is applied (`supabase migration list` shows nothing pending) and
+> `20260719001300` is applied (`supabase migration list` shows nothing pending) and
 > `generate-invoices` is at **v11** — the effective-dated pricing engine (§8).
 > Backups were taken before each production migration (scratchpad, not committed).
 >
@@ -208,7 +212,7 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 108 tests across 7 files
+supabase test db                                  # 128 tests across 8 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
 supabase/functions/generate-invoices/test.sh      # 67 tests; needs deno (brew install deno)
@@ -402,6 +406,22 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   mutually recursive. Use a `SECURITY DEFINER` lookup (`class_tenant()`, `session_tenant()`,
   `parent_has_child_in_class()`). Note this could not happen while `classes_select` was
   `USING (TRUE)`: **the leak was also what kept the policy graph acyclic.**
+- **ACTIVITY AND ASSIGNMENT ARE SEPARATE AXES, AND ACTIVITY IS PER BUSINESS.**
+  `students.is_active` / `parent_tenants.is_active` answer "still a customer of THIS
+  business?"; `assignment_status` (`unassigned | assigned`) answers "in a class?". A new
+  signup is **active but unassigned** — collapsing them is what made "inactive" ambiguous,
+  and the enum no longer carries an `inactive` value. Activity lives on `parent_tenants`
+  because parents are global: a global flag would let one business switch a family off at
+  another. Full spec: PRD §7.14.
+  - **The family flip is a CONSEQUENCE, not an invariant, and MUST NOT become a trigger.**
+    Deactivating a child asks about siblings; a family with no active children left going
+    inactive follows from that and is stated, not asked. A trigger enforcing
+    `no active children ⇔ family inactive` **breaks join-code reactivation**, because a
+    returning family has zero active children by design and would be flipped straight
+    back. Propagation is one-way and event-shaped, in `set_students_active()`.
+  - **`set_students_active()` is the sole writer** of both flags, and takes an ARRAY so the
+    set the admin confirmed in the prompt is the set that gets written. `parent_tenants`
+    has **no UPDATE policy**, so RLS already forbids every other path.
 - **A FACT ABOUT A PAST LESSON IS NEVER A LIVE LOOKUP.** What a lesson cost and who was
   paid for it come from `class_rates` via `class_rate_on(class, session_date)` — the terms
   in force on the lesson's **own date** (`20260719000700`). Reading `classes.price_per_lesson`
@@ -655,9 +675,104 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     rule from §6 is directional — **adding? migrate first. dropping? deploy the app first**
     — and it governs the *push*, not just the migration command. Nothing is atomic here.
 
+28. **A `.select()` result is `any`, so reading a column off the WRONG JOINED TABLE
+    typechecks.** The parent home query nests
+    `students(… student_class_enrolments(is_active …))`, and I added `s.is_active` to the
+    mapping — which resolved to nothing, because `is_active` was on the *enrolment*, not
+    the student. `tsc` was clean; **every child would have rendered as "Inactive"** in
+    production. Only driving the app caught it. When a column name exists on more than one
+    table in a nested select, read the select's shape, not the mapping's. Audit:
+    `grep -n "is_active" <the select block>` and check the nesting level.
+29. **Removing a value from an enum silently changes what OTHER screens say.** Dropping
+    `inactive` from `assignment_status` left departed children reading **"Unassigned"** to
+    their own parents, and reappearing in the admin's **Unassigned Children** queue as if
+    awaiting placement — because that is now literally their assignment status. Neither is
+    a type error and neither failed a test. When you retire an enum value, find every
+    screen that *rendered* it and decide what it says now, not just every branch that
+    compared to it (§7.19 is the compile-time half of this; this is the runtime half).
+
 ---
 
-## 8. What changed this session (2026-07-19, third session — a lesson is priced and paid by ITS OWN DATE)
+## 8. What changed this session (2026-07-19, fourth session — ACTIVE / INACTIVE, all six phases, live)
+
+**Backlog item #1 is built and deployed** — the oldest outstanding item in `BACKLOG.md`,
+now removed from it. Families and children carry an **active/inactive state per
+business**, with the date they left. `PRD.md` §7.14 is the spec; this is the session log.
+
+### The model, and the one decision everything follows from
+
+Three concepts, three owners, **three different words** — because "inactive" already
+meant two things and a third spelling would have made it worse:
+
+| | Column | Owner |
+|---|---|---|
+| **active / inactive** | `parent_tenants.is_active`, `students.is_active` | the business's admin |
+| **assigned / unassigned** | `students.assignment_status` | the business's admin |
+| *(enabled / disabled)* | *`profiles.is_active`* | *platform — **not built**, see below* |
+
+**Activity is PER BUSINESS**, on `parent_tenants`. This item predated multi-tenancy and
+that is the part it did not know: parents are global, so a school marking a family
+inactive must not switch them off at their private coach.
+
+**The family flip is a CONSEQUENCE, not a second question.** Deactivating a child is a
+choice (do the siblings go too?) — so the UI asks, naming them. A family with no active
+children being inactive follows from that — so the UI *states* it. The user proposed this
+shape and it is better than the plan's original "two independent prompts".
+
+**It is deliberately NOT a trigger, and that must not be "tidied" later.** A trigger fires
+after the write and cannot ask anything, so the sibling prompt would be a lie. Worse, a
+trigger maintaining `no active children ⇔ family inactive` **breaks reactivation**: a
+returning family has zero active children *by design*, and would be flipped straight back.
+Propagation is one-way and event-shaped.
+
+**Re-activation is the join code and needed no new UI.** An inactive family can still log
+in — they are not *disabled* — so they re-enter the business's code. A returning parent
+**cannot re-sign-up**: `profiles.email` is UNIQUE, so email-as-identity is already
+guaranteed by the schema and there was nothing to deduplicate.
+
+### Bugs found — two only visible in the running app
+
+1. **Inactive children reappeared in the Unassigned queue.** They are `unassigned` now, so
+   they looked exactly like new signups awaiting placement. Needed explicit `is_active`
+   guards on the queue and the dashboard counts.
+2. **`is_active` was read off the wrong table.** In the parent home query it sat inside
+   `student_class_enrolments`, not `students`, so `s.is_active` was `undefined` and **every
+   child would have rendered as "Inactive"**. It typechecked — the query is `any`. See §7.28.
+3. **A departed family was still promised a class.** The chip correctly read *Inactive*
+   while the banner beneath said *"the admin will assign your child soon."* Found by
+   looking at the screenshot, not by any assertion.
+
+### Deployed — app first, then the schema
+
+Phase 6 **drops** an enum value, so the ordering inverted: the push to `main` went out and
+Vercel served the new admin (`/parents` 404 → 200 while `/dashboard` held 200 — the
+known-good/known-bad comparison of §7.23) **before** the three migrations ran. The
+deployed build already handled the two-value enum *and* still tolerated the old value, so
+there was never a window where a live build queried something that did not exist. Backups
+taken first. `generate-invoices` untouched at **v11**.
+
+### Not done (deliberate)
+
+- **No login blocking.** Cut on purpose after the user pushed back: it is a **platform**
+  power over an account, not a business decision about a customer, which is why it gets a
+  different word (enabled/disabled). The one genuine parent trigger is a PDPA
+  consent-withdrawal request — and the real near-term need is revoking a **staff** account.
+  Filed as *Disable a staff account* in `BACKLOG.md`, with the reasoning.
+- **No trigger enforcing family/child consistency** (see above). A family can therefore be
+  active with zero active children — the Parents page **flags** that state rather than
+  preventing it.
+- **`profiles.is_active` still means nothing.** It exists, is enforced nowhere, and now has
+  a documented future owner. Do not assume it gates anything.
+
+### Tests
+
+**+20 pgTAP** (108 → 128) in `active_inactive.test.sql`, on its own tenants. The one worth
+keeping: *reactivating is not undone by the family having no active children* — the
+property that fails the moment someone converts the consequence into an invariant.
+`verify-active-inactive.mjs` drives all of it (**17/17**, re-run after the enum drop), plus
+a parent-app check that a departed child reads *Inactive* and is promised nothing.
+
+## 8.3 Third session (2026-07-19) — a lesson is priced and paid by ITS OWN DATE
 
 **Three defects of one shape, two of them live in production: a fact about a PAST lesson
 was resolved by a LIVE lookup instead of recorded as of the day it happened.** All fixed,
@@ -1541,41 +1656,40 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### The one thing blocking everything else — and it is now urgent
+### The one thing blocking everything else — and it has been urgent for two sessions
 
 **No attendance has ever been marked in production.** Zero `lesson_sessions`, zero
-`attendance` rows. Every part of billing — invoicing, credit, the completeness gate,
-sealing, wages, and now effective-dated pricing — is tested against fixtures and driven
-through the real UI, and **none of it has processed a single real lesson.**
+`attendance` rows. Invoicing, credit, the completeness gate, sealing, wages, effective-dated
+pricing and now active/inactive are all tested against fixtures and driven through the real
+UI — and **none of it has processed a single real lesson.**
 
-It got more time-sensitive on 2026-07-19. The `class_rates` backfill (§8) is **correct by
-emptiness**: floor-dating every class's terms is *vacuously* right while there is no
-attendance for it to be wrong about. That stops being true the moment real lessons exist.
+Two things now depend on that not staying true much longer:
+
+- The **`class_rates` backfill** (§8.3) is *correct by emptiness*. Floor-dating every class's
+  terms is vacuously right while there is no attendance for it to be wrong about.
+- The **completeness gate** has never refused a real month, and the block-notification email
+  has never fired in production.
 
 1. **Get the coach marking attendance.** An onboarding push, not a build task, and the gate
    on everything below.
-2. **Then bill a real month**, following `INVOICE_RUNBOOK.md`. Expect the completeness gate
-   to refuse until every lesson is marked — working as designed; the fix is to mark them
-   (or mark them cancelled), never to override.
+2. **Then bill a real month**, following `INVOICE_RUNBOOK.md`. Expect the gate to refuse
+   until every lesson is marked — working as designed; mark them (or mark them cancelled),
+   never override.
 3. **Then onboard the school as tenant 2.** Cross-tenant isolation is proven in pgTAP across
-   two tenants and driven through both UIs, but **production has only ever had one tenant**,
-   so it has never been exercised on real data. Inherent until the school arrives — and that
-   is the moment it matters most.
+   two tenants and driven through both UIs, but **production has only ever had one tenant**.
+   Inherent until the school arrives — and that is when it matters most.
 
 ### If you would rather build than onboard
 
-**`BACKLOG.md` → *Active / inactive status for parents and children*.** Designed in full on
-2026-07-19 and **not built** — the six-phase plan, the three-concept model
-(enabled/disabled · active/inactive · assigned/unassigned) and every decision behind it are
-written into that entry. **Start at Phase 1; do not re-open the design.** Phases 1–2 are
-three additive columns and three RPCs, and touch **no RLS**.
-
-Then pick from **`BACKLOG.md` → `## Build order`**.
+Pick from **`BACKLOG.md` → `## Build order`**. Its #1 is now **NRIC last 4 + derived age**,
+which has been waiting to ride the students-schema edits that finally happened on
+2026-07-19 — so it no longer waits for anything.
 
 ### Small, concrete, and outstanding
 
 - **The join code is `SWIM-RVM9`.** The *only* route in — no directory, so a parent without
-  it cannot add a child at all.
+  it cannot add a child at all. It is also now the **re-entry** route for a family that was
+  marked inactive (§8).
 - **`auto_invoice_enabled` is `false`** on the tenant. Automatic generation will not run
   until it is turned on.
 - **Set a coach rate** if you want payroll to compute anything (Admin → Coach Wages). A
@@ -1610,6 +1724,10 @@ email **has still never fired in production**.
 | `supabase/migrations/20260718000200_coach_close_enrolment.sql` | `close_student_enrolment()` RPC — remove-from-class / set-inactive for the tenant admin **and** the owning coach (§6, §8a) |
 | `supabase/migrations/20260718000100_…invoice_run_day` · `…000300_…invoice_block_notice` | `app_settings` seeds: automatic run day (default 7) + blocked-alert throttle state |
 | `SwimSyncAdmin/lib/studentStatus.ts` · `SwimSyncApp/lib/studentStatus.ts` | **Byte-identical twins** — `removeFromClass` / `setStudentInactive` over the RPC. Edit both (§6) |
+| `supabase/migrations/20260719001200_active_inactive_rpcs.sql` | `set_students_active()` (sole writer), `set_parent_tenant_active()`, `family_active_children()` (the read behind the prompt), join-code reactivation |
+| `supabase/migrations/20260719001300_drop_inactive_assignment_status.sql` | Enum contract, with the `pg_proc` guard that refuses if a function body still casts to the retired value (§7.21) |
+| `SwimSyncAdmin/app/(admin)/parents/page.tsx` | Families at this business — there was no Parents page before |
+| `supabase/tests/active_inactive.test.sql` | Family consequence both ways, the one-way property, the tenant boundary |
 | `supabase/functions/generate-invoices/rates.ts` | `rateOn()` — the terms in force on a lesson's date. Pure + unit-tested, like `dates.ts`. Dates compared as **YYYY-MM-DD strings**, never parsed to `Date` (keeps the timezone traps of §7.7/§7.12 out). A missing rate **throws** (§6) |
 | `supabase/migrations/20260719000700_class_rates.sql` | Effective-dated price + paid coach, `class_rate_on()`, floor-dated backfill + seed trigger, display sync, RLS |
 | `supabase/migrations/20260719001000_set_class_terms.sql` | The only sanctioned class edit: both tables in one transaction, correct-vs-change, settled-money guards |

@@ -63,6 +63,13 @@ Billing is based on **actual attendance**, so make sure last month is complete:
       has no attendance, **generation is refused** and the dialog names the class and date
       (step 4 below). You cannot generate around it. The rest of this list is judgement.
 - [ ] Any trials are classified **Paid Trial** or **Free Trial** (not left as a bare trial).
+- [ ] **Anyone who has stopped attending is marked inactive.** This is the fix when
+      generation refuses over a child who is never coming back: an open enrolment keeps
+      their class permanently incomplete, which blocks the *whole business* from billing.
+      Use **Students → Set inactive** (it offers to take their siblings, and marks the
+      family inactive once none are left) or **Parents → Set inactive**. Their already-
+      attended lessons still bill, and nothing is deleted. If they return, they re-enter
+      your join code.
 - [ ] Any needed attendance corrections are done. (Correcting a billable → non-billable
       status *after* an invoice exists auto-issues a **credit note** applied to the next
       month — that's expected, not something to avoid.)
