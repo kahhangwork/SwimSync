@@ -1,6 +1,6 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-19 (fifth session)_
+_Last updated: 2026-07-19 (sixth session)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -59,6 +59,11 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 - **Attendance** — coach marks/edits per session; audit-logged. A **"Set all ▾"** header
   menu bulk-sets every student to one status (Present/Absent/Cancelled-rain/coach) in one
   tap, with a confirm guard when some are already marked (§8e, PRD §7.6).
+- **A billing month must have ENDED before it can be billed (verified local, live)** — the
+  admin's picker defaults to and is capped at the last completed month, and the **engine
+  refuses** anything later, with no `force` override. Without it a mid-month run looked
+  *complete* to the attendance gate, billed the lessons so far and **sealed** the month,
+  stranding the rest permanently (§7.32). Not yet exercised against production — see §9.
 - **Invoice generation** — one `generate-invoices` engine, two modes: **automatic**
   (cron-style; respects the `app_settings.auto_invoice_enabled` switch and
   `invoice_run_day`, default the **7th**) and **manual on-demand** (admin button). **One
@@ -133,8 +138,12 @@ superadmin + the real coach/classes). See §11.
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
 > **As of 2026-07-19 production is fully caught up**: every migration through
-> `20260719001300` is applied (`supabase migration list` shows nothing pending) and
-> `generate-invoices` is at **v11** — the effective-dated pricing engine (§8).
+> `20260719002200` is applied (`supabase migration list` shows nothing pending) and
+> `generate-invoices` is at **v13** — the completed-month guard (§8.6), on top of the
+> effective-dated pricing engine (§8). *(This line said `20260719001300` / v11 for two
+> sessions after both had moved on — a version written into prose goes stale the moment
+> anything deploys. `supabase functions list` and `supabase migration list` are the honest
+> answers; treat this sentence as a hint, not a fact.)*
 > Backups were taken before each production migration (scratchpad, not committed).
 >
 > The **tenancy** deploys (§8.1) had **opposite orderings** and both were deliberate — phase 4
@@ -818,9 +827,11 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
-## 8.6 Sixth session (2026-07-19) — THE BILLING MONTH MUST HAVE ENDED (+ the toggle) — NOT DEPLOYED
+## 8.6 Sixth session (2026-07-19) — THE BILLING MONTH MUST HAVE ENDED (+ the toggle) — DEPLOYED
 
-Branch `fix/billing-month-guard`, three commits, **no migration**. **Not yet in production.**
+Branch `fix/billing-month-guard`, merged to `main` and pushed. **No migration.** Live:
+both Vercel sites rebuilt and `generate-invoices` is at **v13** (sha `7fc54436…`, was
+`f90c182d…`). Deployed **admin first, then the function** — see below for why.
 
 ### The bug: you could bill a month that had not finished
 
@@ -886,7 +897,33 @@ supabase functions deploy generate-invoices                           # 2. engin
 supabase functions list                                               # confirm v12 -> v13
 ```
 
-**No migration**, so `supabase db push` is not run at all — §7.30's trap cannot fire here.
+**No migration**, so `supabase db push` was never run — §7.30's trap could not fire here.
+
+**§7.31 fired again, and the poll is why it was caught.** The first THREE polls of
+`admin.swimsync.sg/invoices` returned a healthy 200 serving the **old** chunk
+(`page-4ec41c53…`); only the fourth had `page-472c9b43…` containing `month_not_ended`. A
+status code would have said "deployed" three times over, wrongly. **Always grep the served
+asset, and poll it — the window here was over 90 seconds.**
+
+### What is NOT verified in production, and how to close it
+
+The engine guard has **not** been exercised against production. The direct probe needs the
+production `CRON_SECRET`, which correctly differs from the local one (the local one returns
+`Unauthorized` — which does at least prove the function is live and its auth gate works).
+
+Resting on: v13 was bundled from source containing the guard (`core.ts:229`), and 74 Deno
+tests cover that exact code including both SGT boundary instants, with the guard proven to
+fail without itself. To close it, either:
+
+- **Through the UI** — log into `admin.swimsync.sg` → Invoices. The billing month should read
+  **June 2026** and the picker must refuse to offer July. This is the path a real admin takes.
+- **Direct probe** with the real secret — expect `"status":"month_not_ended"` naming `2026-06`,
+  and **no `billing_periods` row for July afterwards**:
+  ```bash
+  curl -s -X POST https://cdmjeyauhxcgulhbxmsb.supabase.co/functions/v1/generate-invoices \
+    -H "Authorization: Bearer $PROD_CRON_SECRET" -H "Content-Type: application/json" \
+    -d '{"mode":"manual","billing_month":"2026-07"}'
+  ```
 
 ### Also done
 
@@ -912,8 +949,16 @@ rather than appended as a Risks section nobody reads at implementation time.
 >
 > **Don't "tidy" this by renumbering** — those references reach in from `PRD.md`,
 > `BACKLOG.md`, `TENANCY_DESIGN.md` and `TENANCY_PLAN.md`, and the labels are load-bearing
-> prose ("see §8a.1"). The cost is real and the gain is cosmetic. A sixth same-date session
-> takes **§8.5**, and this section becomes it.
+> prose ("see §8a.1"). The cost is real and the gain is cosmetic.
+>
+> **RESOLVED 2026-07-19 (sixth session).** This note used to end "a sixth same-date session
+> takes §8.5, and this section becomes it" — i.e. the newest session always holds the bare
+> §8. That contradicts the rule directly above it: **16 references across these documents say
+> a bare "§8" and all of them mean the FIFTH session** (child identity / levels / address).
+> Renaming this section to §8.5 would silently repoint every one of them. So the sixth
+> session took **§8.6** and sits above this one instead; "newest is always §8" was the
+> cosmetic half and it lost. **New same-date sessions take the next §8.N and go on top** —
+> the bare §8 is now a permanent label for the fifth session, not a moving pointer.
 
 **Three backlog items, six commits, seven migrations — and NONE of it is in production.**
 The near-term build order in `BACKLOG.md` is now empty. See §8.0 below for the deploy
@@ -2073,16 +2118,14 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### First: there is an UNDEPLOYED branch
+### Loose end from this session — 2 minutes, do it first
 
-`fix/billing-month-guard` (3 commits + docs) is merged nowhere and live nowhere. It closes a
-silent-underbill hole — billing a month that has not ended seals it and strands the rest
-(§7.32, §8.6). **Deploy admin first, then the edge function**; the commands are in §8.6.
+**Confirm the billing-month guard against production.** It shipped (v13) but has never been
+exercised there; the local `CRON_SECRET` doesn't match production's, so the probe was skipped.
+§8.6 has both ways to close it — the UI check is the quicker one: `admin.swimsync.sg` →
+Invoices should read **June 2026** and refuse to offer July.
 
-This matters *before* step 1 below, not after: the hole is inert only while production has no
-attendance, and step 1 is the act of ending that.
-
-### The one thing blocking everything else — and it has been urgent for three sessions
+### The one thing blocking everything else — and it has been urgent for four sessions
 
 **No attendance has ever been marked in production.** Zero `lesson_sessions`, zero
 `attendance` rows. Invoicing, credit, the completeness gate, sealing, wages, effective-dated
@@ -2196,7 +2239,9 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `SwimSyncApp/app/(parent)/profile/contact.tsx` | Parent's address + postal code, editable after signup (the backfill path for parents who predate the fields) |
 | `SwimSyncAdmin/app/(admin)/levels/page.tsx` | The business's level ladder **and** each rung's skill list (expand a row). Order is set here and preserved everywhere |
 | `supabase/tests/student_identity · student_tenant_pin · document_name_snapshot · tenant_levels · level_skills · parent_address` | This session's pgTAP (+50). Each was confirmed to FAIL without its fix |
-| `.claude/skills/run-ui-playwright/drivers/verify-{student-identity,edit-child,levels,level-skills,parent-address}.mjs` | This session's UI drivers (49 checks). They caught three defects that typechecked clean and passed pgTAP |
+| `.claude/skills/run-ui-playwright/drivers/verify-{student-identity,edit-child,levels,level-skills,parent-address}.mjs` | Fifth session's UI drivers (49 checks). They caught three defects that typechecked clean and passed pgTAP |
+| `.claude/skills/run-ui-playwright/drivers/verify-invoice-controls.mjs` | Sixth session (21 checks): MEASURES the toggle's track/knob rects from the DOM and asserts the billing-month default + cap. Its **14/21 baseline on unfixed code** is what located the knob bug (§7.34) |
+| `supabase/functions/generate-invoices/test-helpers.ts` → `monthEnded()` | The suite's clock seam. Supplies billing month + a clock at which it is billable + an early-enough enrolment as ONE fact, and **throws on a scenario expecting zero lessons** (§7.33) |
 
 gotchas: `swimsync-project`, `swimsync-backend-gotchas`.
 
@@ -2211,7 +2256,7 @@ store builds are deferred until the app "sticks."
 | Piece | Where | Notes |
 |-------|-------|-------|
 | **Backend** | Supabase project `cdmjeyauhxcgulhbxmsb` (region ap-southeast-1) | Free tier. Linked via `supabase link`; schema via `supabase db push`. |
-| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8c); needs `RESEND_API_KEY` secret set, else it's a no-op. Redeployed 2026-07-17 with the timezone-correct default billing month (§8a), and **2026-07-18** with the multi-class fix, the configurable run day, month sealing and the hard attendance block (§8a). `APP_TIMEZONE` unset → defaults to `Asia/Singapore`. |
+| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8c); needs `RESEND_API_KEY` secret set, else it's a no-op. Redeployed 2026-07-17 with the timezone-correct default billing month (§8a), **2026-07-18** with the multi-class fix, the configurable run day, month sealing and the hard attendance block (§8a), and **2026-07-19** with the effective-dated pricing engine (§8) then the **completed-month guard** (§8.6) — currently **v13**. `supabase functions list` is the honest answer for the version, not this cell. `APP_TIMEZONE` unset → defaults to `Asia/Singapore`. |
 | **Admin panel** | Vercel `swimsync-admin` → **https://admin.swimsync.sg** (also `swimsync-admin.vercel.app`) | Root `SwimSyncAdmin`, **framework preset = Next.js**. |
 | **Mobile app (web)** | Vercel `swimsync-app` → **https://swimsync.sg** (apex, canonical; `www` 308-redirects; also `swimsync-app-psi.vercel.app`) | Root `SwimSyncApp`, **preset = Other** (`SwimSyncApp/vercel.json`: `expo export --platform web` → `dist`, SPA rewrite). |
 | **Email** | **Resend** → sender `noreply@swimsync.sg` | Two paths: **(1) Auth emails** (password reset) via cloud custom SMTP `smtp.resend.com:465` (user `resend`, pass = Resend API key, dashboard-only); branded reset template (dashboard + `supabase/templates/recovery.html`); auth rate limit 2→~30/hr; confirmation **OFF**. **(2) Invoice emails** (§8c) via the **Resend HTTP API** from the Edge Function, keyed by the `RESEND_API_KEY` secret (same key) — set with `supabase secrets set`. |

@@ -145,7 +145,12 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 
 ## Good to know / gotchas
 
-- **Bill the previous month** — the picker defaults to the current month; always change it.
+- **The month must have ENDED** *(changed 2026-07-19)*. The picker now **defaults to the
+  last completed month and will not offer anything later**, and the engine refuses it even
+  if one is forced through — so the old advice here ("the picker defaults to the current
+  month; always change it") no longer applies, and the mistake it warned about is no longer
+  possible. It mattered: billing a month still in progress looked like it worked, sealed the
+  month, and left the rest of its lessons permanently unbillable.
 - **One invoice per parent per month**, covering *all* their children together —
   **including children in different classes**. (This was a real bug until
   2026-07-18: the engine created the invoice inside its per-class loop, so a

@@ -66,6 +66,11 @@ questions until it clears that bar — then plans.
 
 Ranks the current plan's areas by **product risk** (most → least, each with a
 why), then folds concrete risk-reduction steps into the plan for each item.
+**Folds them into the step they govern, never into a trailing "Risks" section** —
+each as a step, an assertion with a pass/fail value, or a named prohibition — and
+prefers a *structural* mitigation (make the failure impossible) over a *vigilance*
+one (ask someone to remember). That preference is why review findings were being
+read at planning time and forgotten at implementation time.
 
 - **Invoke:** `/plan-review` (only fires when typed explicitly).
 - **Details:** [.claude/skills/plan-review/SKILL.md](.claude/skills/plan-review/SKILL.md)
