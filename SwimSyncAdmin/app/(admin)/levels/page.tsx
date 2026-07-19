@@ -17,18 +17,22 @@
 // be given a level from their own business — enforced in the database, since no
 // single-row policy can see across that reference.
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 
+type Skill = { id: string; label: string; sort_order: number };
+
 type Level = {
   id: string;
   label: string;
   sort_order: number;
+  note: string | null;
   student_count: number;
+  skills: Skill[];
 };
 
 export default function LevelsPage() {
@@ -38,9 +42,14 @@ export default function LevelsPage() {
   const [creating, setCreating] = useState(false);
   const [label, setLabel] = useState("");
   const [sortOrder, setSortOrder] = useState("");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Level | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [newSkill, setNewSkill] = useState("");
+  const [skillBusy, setSkillBusy] = useState(false);
+  const [skillError, setSkillError] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -51,7 +60,7 @@ export default function LevelsPage() {
     // RLS scopes this to the caller's own business, so no tenant filter here.
     const { data } = await supabase
       .from("tenant_levels")
-      .select("id, label, sort_order, students(id)")
+      .select("id, label, sort_order, note, students(id), tenant_level_skills(id, label, sort_order)")
       .order("sort_order")
       .order("label");
 
@@ -60,10 +69,17 @@ export default function LevelsPage() {
         id: l.id,
         label: l.label,
         sort_order: l.sort_order,
+        note: l.note,
         // Read off the JOINED students, not off the level — the select is
         // `any`, so the wrong nesting level would typecheck and silently
         // report every level as empty.
         student_count: (l.students ?? []).length,
+        // Ordered here rather than in the query: PostgREST cannot order an
+        // embedded resource, so sorting server-side would silently do nothing.
+        skills: [...(l.tenant_level_skills ?? [])].sort(
+          (a: Skill, b: Skill) =>
+            a.sort_order - b.sort_order || a.label.localeCompare(b.label)
+        ),
       }))
     );
     setLoading(false);
@@ -76,6 +92,7 @@ export default function LevelsPage() {
     // Default to the end of the ladder — a new level is far more often the next
     // rung than the first one.
     setSortOrder(String((levels.at(-1)?.sort_order ?? 0) + 1));
+    setNote("");
     setError(null);
   }
 
@@ -84,6 +101,7 @@ export default function LevelsPage() {
     setEditing(l);
     setLabel(l.label);
     setSortOrder(String(l.sort_order));
+    setNote(l.note ?? "");
     setError(null);
   }
 
@@ -108,7 +126,7 @@ export default function LevelsPage() {
 
     setBusy(true);
     setError(null);
-    const payload = { label: trimmed, sort_order: Number(sortOrder) };
+    const payload = { label: trimmed, sort_order: Number(sortOrder), note: note.trim() || null };
 
     const { error: err } = editing
       ? await supabase.from("tenant_levels").update(payload).eq("id", editing.id)
@@ -151,6 +169,67 @@ export default function LevelsPage() {
     load();
   }
 
+  // ── Skills ────────────────────────────────────────────────────────────────
+  async function addSkill(level: Level) {
+    const trimmed = newSkill.trim();
+    if (!trimmed) return;
+
+    setSkillBusy(true);
+    setSkillError(null);
+    const { error: err } = await supabase.from("tenant_level_skills").insert({
+      level_id: level.id,
+      label: trimmed,
+      // Append to the end. A curriculum is written in teaching order, so a new
+      // skill is far more often the next one than an insertion in the middle
+      // — and the order can be nudged afterwards.
+      sort_order: (level.skills.at(-1)?.sort_order ?? 0) + 1,
+    });
+    setSkillBusy(false);
+
+    if (err) {
+      setSkillError(
+        err.code === "23505"
+          ? `"${trimmed}" is already listed at this level.`
+          : "Could not add that skill."
+      );
+      return;
+    }
+    setNewSkill("");
+    load();
+  }
+
+  async function removeSkill(skill: Skill) {
+    setSkillBusy(true);
+    setSkillError(null);
+    const { error: err } = await supabase
+      .from("tenant_level_skills")
+      .delete()
+      .eq("id", skill.id);
+    setSkillBusy(false);
+    if (err) {
+      setSkillError("Could not remove that skill.");
+      return;
+    }
+    load();
+  }
+
+  // Swap sort_order with the neighbour. Two writes rather than a drag-and-drop
+  // library: the lists are 3-6 items and reordering is rare once a curriculum
+  // is entered.
+  async function moveSkill(level: Level, index: number, delta: number) {
+    const a = level.skills[index];
+    const b = level.skills[index + delta];
+    if (!a || !b) return;
+
+    setSkillBusy(true);
+    await supabase.from("tenant_level_skills")
+      .update({ sort_order: b.sort_order }).eq("id", a.id);
+    await supabase.from("tenant_level_skills")
+      .update({ sort_order: a.sort_order }).eq("id", b.id);
+    setSkillBusy(false);
+    load();
+  }
+
   return (
     <div>
       <PageHeader
@@ -179,27 +258,130 @@ export default function LevelsPage() {
             <Tr>
               <Th>Order</Th>
               <Th>Level</Th>
+              <Th>Skills</Th>
               <Th>Students</Th>
               <Th>&nbsp;</Th>
             </Tr>
           </Thead>
           <Tbody>
-            {levels.map((l) => (
-              <Tr key={l.id}>
-                <Td className="text-gray-500">{l.sort_order}</Td>
-                <Td className="font-medium text-gray-900">{l.label}</Td>
-                <Td className="text-gray-500">{l.student_count}</Td>
-                <Td>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => openEdit(l)}>
-                      Edit
-                    </Button>
-                    <Button variant="outline" onClick={() => setRemoving(l)}>
-                      Remove
-                    </Button>
-                  </div>
-                </Td>
-              </Tr>
+            {levels.map((l, li) => (
+              <React.Fragment key={l.id}>
+                <Tr>
+                  <Td className="text-gray-500">{l.sort_order}</Td>
+                  <Td className="font-medium text-gray-900">
+                    {l.label}
+                    {l.note && (
+                      <div className="mt-0.5 text-xs font-normal italic text-gray-500">
+                        {l.note}
+                      </div>
+                    )}
+                  </Td>
+                  <Td>
+                    <button
+                      onClick={() =>
+                        setExpanded(expanded === l.id ? null : l.id)
+                      }
+                      className="text-sm font-medium text-sky-600 hover:underline"
+                    >
+                      {l.skills.length === 0
+                        ? "Add skills"
+                        : `${l.skills.length} skill${
+                            l.skills.length === 1 ? "" : "s"
+                          }`}
+                      {expanded === l.id ? " \u25be" : " \u25b8"}
+                    </button>
+                  </Td>
+                  <Td className="text-gray-500">{l.student_count}</Td>
+                  <Td>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => openEdit(l)}>
+                        Edit
+                      </Button>
+                      <Button variant="outline" onClick={() => setRemoving(l)}>
+                        Remove
+                      </Button>
+                    </div>
+                  </Td>
+                </Tr>
+
+                {expanded === l.id && (
+                  <Tr>
+                    <Td colSpan={5} className="bg-gray-50">
+                      <div className="py-2">
+                        <p className="mb-2 text-xs text-gray-500">
+                          What is taught at this level, in teaching order. The
+                          coach and the child&rsquo;s parent both see this.
+                        </p>
+
+                        {l.skills.length === 0 ? (
+                          <p className="mb-3 text-sm text-gray-400">
+                            No skills listed yet.
+                          </p>
+                        ) : (
+                          <ol className="mb-3 space-y-1">
+                            {l.skills.map((sk, i) => (
+                              <li
+                                key={sk.id}
+                                className="flex items-center gap-2 text-sm text-gray-800"
+                              >
+                                <span className="w-5 text-right text-gray-400">
+                                  {i + 1}.
+                                </span>
+                                <span className="flex-1">{sk.label}</span>
+                                <button
+                                  onClick={() => moveSkill(l, i, -1)}
+                                  disabled={i === 0 || skillBusy}
+                                  className="px-1 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                                  aria-label="Move up"
+                                >
+                                  &uarr;
+                                </button>
+                                <button
+                                  onClick={() => moveSkill(l, i, 1)}
+                                  disabled={i === l.skills.length - 1 || skillBusy}
+                                  className="px-1 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                                  aria-label="Move down"
+                                >
+                                  &darr;
+                                </button>
+                                <button
+                                  onClick={() => removeSkill(sk)}
+                                  disabled={skillBusy}
+                                  className="px-1 text-gray-400 hover:text-red-600 disabled:opacity-30"
+                                  aria-label="Remove skill"
+                                >
+                                  &times;
+                                </button>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+
+                        <div className="flex gap-2">
+                          <input
+                            value={expanded === l.id ? newSkill : ""}
+                            onChange={(e) => setNewSkill(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") addSkill(l);
+                            }}
+                            placeholder="Aeroplane Kick"
+                            className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                          />
+                          <Button
+                            onClick={() => addSkill(l)}
+                            disabled={skillBusy || !newSkill.trim()}
+                          >
+                            Add skill
+                          </Button>
+                        </div>
+                        {skillError && (
+                          <p className="mt-2 text-sm text-red-600">{skillError}</p>
+                        )}
+                      </div>
+                    </Td>
+                  </Tr>
+                )}
+              </React.Fragment>
             ))}
           </Tbody>
         </Table>
@@ -237,6 +419,22 @@ export default function LevelsPage() {
               which would put &ldquo;Advanced&rdquo; above &ldquo;Beginner&rdquo;.
             </p>
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Note <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Progress to B3 upon completing T4"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              For anything about the level that isn&rsquo;t a skill — usually a
+              progression rule. Skills go in the list on the previous screen.
+            </p>
+          </div>
+
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={close} disabled={busy}>

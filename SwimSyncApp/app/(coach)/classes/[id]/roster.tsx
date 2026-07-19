@@ -32,6 +32,8 @@ type Student = {
   full_name: string;
   date_of_birth: string | null;
   level_label: string | null;
+  level_note: string | null;
+  level_skills: string[];
 };
 
 type Session = {
@@ -82,6 +84,8 @@ export default function ClassRosterScreen() {
   const [windowStart, setWindowStart] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  // Which student's level curriculum is expanded — poolside reference.
+  const [openLevelFor, setOpenLevelFor] = useState<string | null>(null);
 
   // Names shared by more than one child on THIS roster — the two-Ethan-Tans
   // case. Compared on the same normalised form as the database's identity
@@ -116,7 +120,7 @@ export default function ClassRosterScreen() {
         student_class_enrolments(
           is_active,
           enrolled_at,
-          students(id, full_name, date_of_birth, tenant_levels(label))
+          students(id, full_name, date_of_birth, tenant_levels(label, note, tenant_level_skills(label, sort_order)))
         )
       `)
       .eq("id", id)
@@ -147,6 +151,12 @@ export default function ClassRosterScreen() {
         date_of_birth: e.students.date_of_birth,
         // Off the JOINED tenant_levels row (§7.28).
         level_label: e.students.tenant_levels?.label ?? null,
+        level_note: e.students.tenant_levels?.note ?? null,
+        // Sorted here: PostgREST cannot order an embedded resource, so doing
+        // it in the query would silently do nothing.
+        level_skills: [...(e.students.tenant_levels?.tenant_level_skills ?? [])]
+          .sort((a: any, b: any) => a.sort_order - b.sort_order)
+          .map((sk: any) => sk.label),
       }));
 
     setStudents(activeStudents);
@@ -353,7 +363,8 @@ export default function ClassRosterScreen() {
             </Card>
           ) : (
             students.map((student) => (
-              <Card key={student.id} className="flex-row items-center gap-3">
+              <Card key={student.id}>
+               <View className="flex-row items-center gap-3">
                 <View className="w-9 h-9 rounded-full bg-sky-100 items-center justify-center">
                   <Text className="text-sky-600 font-bold text-sm">
                     {student.full_name.charAt(0)}
@@ -406,6 +417,46 @@ export default function ClassRosterScreen() {
                     {removingId === student.id ? "Removing…" : "Remove"}
                   </Text>
                 </Pressable>
+               </View>
+
+                {/* The level's curriculum, on tap. Collapsed by default: a
+                    roster of six children on three levels would otherwise be
+                    thirty lines of skills, and the coach opens the one they
+                    are teaching. */}
+                {student.level_label &&
+                (student.level_skills.length > 0 || student.level_note) ? (
+                  <Pressable
+                    onPress={() =>
+                      setOpenLevelFor(
+                        openLevelFor === student.id ? null : student.id
+                      )
+                    }
+                    className="mt-2 pt-2 border-t border-gray-100"
+                  >
+                    <Text className="text-xs font-medium text-sky-600">
+                      {openLevelFor === student.id ? "Hide" : "What"}{" "}
+                      {student.level_label} {openLevelFor === student.id ? "" : "covers"}
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {openLevelFor === student.id ? (
+                  <View className="mt-2 gap-1.5">
+                    {student.level_note ? (
+                      <Text className="text-xs italic text-gray-500 mb-1">
+                        {student.level_note}
+                      </Text>
+                    ) : null}
+                    {student.level_skills.map((skill, i) => (
+                      <View key={`${skill}-${i}`} className="flex-row gap-2">
+                        <Text className="text-xs text-sky-500 font-semibold w-3.5">
+                          {i + 1}
+                        </Text>
+                        <Text className="text-xs text-gray-700 flex-1">{skill}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               </Card>
             ))
           )}

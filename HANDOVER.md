@@ -110,9 +110,10 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   Admin class edits ask **correct-vs-change**. Closed three defects, two of them live (§8).
 - **Child identity, levels and address (verified UI + backend, live)** — a child
   is identified by **name + date of birth** (age derived, never stored); each business
-  defines its own **level ladder**; families have an **address**. A parent can now **edit a
+  defines its own **level ladder**, each rung carrying an ordered **skill list** (its
+  curriculum); families have an **address**. A parent can now **edit a
   child**, which required closing two pre-existing defects first — see §8.
-- **Automated tests** — backend **167 pgTAP + 68 Deno**, plus frontend suites
+- **Automated tests** — backend **178 pgTAP + 68 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest 57, `SwimSyncApp` jest-expo 64); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
@@ -216,7 +217,7 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 167 tests across 13 files
+supabase test db                                  # 178 tests across 14 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
 supabase/functions/generate-invoices/test.sh      # 68 tests; needs deno (brew install deno)
@@ -247,9 +248,10 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `student_tenant_pin.test.sql` (6) | a parent or admin **cannot move a child to another business** (§8a), while ordinary edits and the platform admin's RPC still work |
 | `document_name_snapshot.test.sql` (7) | renaming a child does not rewrite an issued invoice or an immutable credit note; the note carries the name from the item it credits |
 | `tenant_levels.test.sql` (9) | per-business level ladders: RLS is **enabled** (not merely written), cross-tenant writes refused, a student cannot take another business's level, deleting a level unlevels rather than deletes |
+| `level_skills.test.sql` (11) | the skills taught at a level: order preserved, no duplicate skill within one level (ignoring case/whitespace), the tenant boundary, `CASCADE` on the level but `SET NULL` on the student, and the fix to the level-name constraint |
 | `parent_address.test.sql` (8) | a family maintains their own address only; `postal_code` is TEXT so leading zeros survive; `profile_id` cannot be reassigned |
 
-**Total: 167 across 13 files** — verified by `supabase test db`, and the per-file numbers
+**Total: 178 across 14 files** — verified by `supabase test db`, and the per-file numbers
 above are each file's `SELECT plan(n)`. Four of these files postdate the original
 four-row table and were only described in prose; if you add a suite, add a row.
 
@@ -869,6 +871,41 @@ value is a guess presented as a record, which is the failure being fixed.
   `sort_order`, admin-set, coach/parent read-only. `swimming_ability` dropped.
 - **Address + postal code** (PRD §5.1) — optional at signup, editable at Profile →
   Contact Details. `postal_code` is **TEXT**; leading zeros are significant.
+
+### (f) Level skills — added after the deploy, NOT yet deployed
+
+A level's label says where a child is and nothing about what they are working on. Each
+rung now carries an **ordered list of skills** (`tenant_level_skills`) plus an optional
+**note** on the level for things that are not skills — "Progress to B3 upon completing
+T4", which an admin would otherwise have to enter as a fake skill.
+
+**A table, not a text field**, and that was the one real design decision. A description
+renders identically to a reader today, but the skills are a *list*: storing them as prose
+makes them uncountable, unorderable, and impossible to ever tick off. Per-child progress
+tracking is **deliberately not built** (it needs coach write access to students, which
+they deliberately do not have) — but it is filed, and the rows-not-prose choice is
+precisely what stops it needing a migration out of a text blob later.
+
+Coach sees it on the roster **collapsed** — six children across three levels would
+otherwise be thirty lines of skills. Parent sees it on the child profile, which is the
+clearest answer the app has ever given to *"what is my child working towards?"*.
+
+> **A comment I shipped this morning was a lie, and this fixes it.** `20260719001800` said
+> the level-name uniqueness was *"trimmed + lowercased … a constraint that ' Level 1'
+> defeats is not a constraint"* — and the code underneath it was a plain
+> `UNIQUE (tenant_id, label)`. Verified against the deployed schema: `'Seahorse'` and
+> `'  seahorse  '` both inserted. The comment described the intent and the code shipped the
+> exact thing the comment warned about. Now an expression index, with a guard that refuses
+> rather than silently dropping a row if any business already has colliding names. **A
+> comment asserting a property is not a test of it** — the pgTAP case for this fails on the
+> pre-fix schema.
+
+**+11 pgTAP** (167 → 178). `verify-level-skills.mjs` drives it 14/14 using the real
+curriculum text, including that a reorder **persists across a reload** rather than being
+local state.
+
+⚠️ **This is on `main` but NOT deployed** — it needs `supabase db push` (migration
+`20260719002200`) and a Vercel deploy. It is pure EXPAND, so migrate first, then push.
 
 ### (d) Tests
 

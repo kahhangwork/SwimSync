@@ -1051,6 +1051,35 @@ Levels are **per business**, and a child may only be given a level from *their o
 business — enforced in the database, since no single-row policy can see across that
 reference. Retiring a level leaves its students **unlevelled**, never deleted.
 
+#### What a level teaches *(implemented 2026-07-19)*
+
+A level's label says where a child is; it says nothing about what they are working on.
+Each level therefore carries an ordered **list of skills** — "Aeroplane Kick", "Torpedo
+Glide w/ board", "Rules of the pool" — as the business teaches them.
+
+**A list, not a paragraph.** Real curricula are discrete named skills in a deliberate
+order, and storing them as prose would make them opaque: nothing could count them, order
+them, or ever mark one as passed. Order is set by the admin and preserved everywhere,
+because a curriculum rendered alphabetically teaches "Rules of the pool" before
+"Aeroplane Kick".
+
+A level also carries an optional **note** for the things that are not skills — typically a
+progression rule such as *"Progress to B3 upon completing T4"*. Without it an admin would
+have to enter that line as a fake skill.
+
+**Who sees it:** the business's **admin** writes it; the child's **coach** sees it on the
+roster (collapsed by default, since a roster of six children across three levels would
+otherwise be thirty lines of skills) and their **parent** sees it on the child's profile.
+For a parent this is the clearest answer the app has ever given to *"what is my child
+working towards?"* — a question it previously could not answer at all.
+
+*(Deliberately not built: **ticking skills off per child.** These describe the LEVEL, not
+any student's progress against it. Per-child tracking is a real feature — it needs coach
+write access to students, which they deliberately do not have, a marking UI, and a
+decision about what happens to those records when a child changes level. Filed in
+`BACKLOG.md`. The skills are stored as rows rather than prose precisely so that feature
+would not have to migrate a curriculum out of a text blob.)*
+
 *(This replaces the original fixed beginner/intermediate/advanced field, which was never
 populated: parents stopped choosing an ability in §5.1, and nothing else ever wrote it.
 Deliberately not re-added: a parent-facing level picker — self-reported ability was

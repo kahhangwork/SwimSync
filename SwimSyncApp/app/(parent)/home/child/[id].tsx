@@ -21,6 +21,8 @@ type ChildDetail = {
   date_of_birth: string | null;
   gender: string | null;
   level_label: string | null;
+  level_note: string | null;
+  level_skills: string[];
   notes: string | null;
   // "inactive" was dropped from the enum — activity is its own axis now
   // (students.is_active), so a departed child must not read "Unassigned".
@@ -73,7 +75,7 @@ export default function ChildProfileScreen() {
         full_name,
         date_of_birth,
         gender,
-        tenant_levels(label),
+        tenant_levels(label, note, tenant_level_skills(label, sort_order)),
         notes,
         assignment_status,
         is_active,
@@ -147,6 +149,13 @@ export default function ChildProfileScreen() {
       // Cast because supabase-js infers a to-one embed as an ARRAY without an
       // !inner hint. Read off tenant_levels, not off the student (§7.28).
       level_label: (student as any).tenant_levels?.label ?? null,
+      level_note: (student as any).tenant_levels?.note ?? null,
+      // Sorted here, not in the query: PostgREST cannot order an embedded
+      // resource, so ordering server-side would silently do nothing and the
+      // curriculum would render in whatever order rows came back.
+      level_skills: [...((student as any).tenant_levels?.tenant_level_skills ?? [])]
+        .sort((a: any, b: any) => a.sort_order - b.sort_order)
+        .map((sk: any) => sk.label),
       notes: student.notes,
       assignment_status: student.assignment_status,
       is_active: student.is_active,
@@ -255,6 +264,36 @@ export default function ChildProfileScreen() {
             {child.notes ? <Row label="Notes" value={child.notes} /> : null}
           </View>
         </Card>
+
+        {/* What this level teaches — the clearest answer the app has to
+            "what is my child working towards?", which it could not answer at
+            all before. Read-only: the business's admin owns the curriculum. */}
+        {child.level_label && (child.level_skills.length > 0 || child.level_note) ? (
+          <Card>
+            <Text className="text-base font-bold text-gray-900 mb-1">
+              {child.level_label}
+            </Text>
+            {child.level_note ? (
+              <Text className="text-xs italic text-gray-500 mb-3">
+                {child.level_note}
+              </Text>
+            ) : (
+              <View className="mb-3" />
+            )}
+            {child.level_skills.length > 0 ? (
+              <View className="gap-2">
+                {child.level_skills.map((skill, i) => (
+                  <View key={`${skill}-${i}`} className="flex-row gap-2.5">
+                    <Text className="text-sky-500 font-semibold text-sm w-4">
+                      {i + 1}
+                    </Text>
+                    <Text className="text-sm text-gray-700 flex-1">{skill}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </Card>
+        ) : null}
 
         {/* Assignment / Class info */}
         <Card>

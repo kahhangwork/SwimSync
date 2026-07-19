@@ -141,6 +141,32 @@ and a lesson gets paid for on a date other than the one it happened. Worth desig
 paper before touching code — probably a "makeup credit" concept distinct from the
 existing money-credit-note, so the two ledgers don't get confused with each other.
 
+### Tick off swimming skills per child — **M**
+Mark which of a level's skills a child has passed, so a coach can see "Ethan has 4 of 6
+for Toddler 2" and a parent can watch progress accumulate.
+
+**Why:** the skills exist as data now (PRD §7.15) and describe the LEVEL only. The obvious
+next question from any coach looking at that list is "which of these has this child
+done?" — which is the actual pedagogical record a swim school keeps, and today still lives
+on paper or in the coach's head.
+
+**Notes:** deliberately deferred when the skill lists were built 2026-07-19, and the data
+was modelled as rows rather than prose *specifically* so this would not need a migration
+out of a text blob. What makes it an M rather than an S:
+
+- **Coaches have no write path to students**, by design — granting them `UPDATE` would
+  also let them edit names, dates of birth and notes, because RLS is row-level, not
+  column-level. This needs its own narrow table (`student_skill_progress`) with its own
+  policy, not a widening of `students_update`.
+- **Decide what happens when a child changes level.** Records should almost certainly be
+  kept and simply not shown — a child who moves up and later moves back should not lose
+  their history — but that is a decision, not a default.
+- **Decide whether a skill is binary or graded.** The source curriculum is a flat list,
+  which suggests passed / not-passed; anything richer is a bigger claim about how coaches
+  actually assess.
+- Watch the read cost: a roster of six children each with six skills is 36 rows, so fetch
+  it per class rather than per student.
+
 ### Coach-created student profiles — **M** `[MVP-excluded]`
 Let a coach create a student directly, instead of only parents creating them.
 
