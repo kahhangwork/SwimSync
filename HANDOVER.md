@@ -63,7 +63,8 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   admin's picker defaults to and is capped at the last completed month, and the **engine
   refuses** anything later, with no `force` override. Without it a mid-month run looked
   *complete* to the attendance gate, billed the lessons so far and **sealed** the month,
-  stranding the rest permanently (§7.32). Not yet exercised against production — see §9.
+  stranding the rest permanently (§7.32). **Confirmed on production 2026-07-19**: the picker
+  reads June 2026 and refuses to offer July.
 - **Invoice generation** — one `generate-invoices` engine, two modes: **automatic**
   (cron-style; respects the `app_settings.auto_invoice_enabled` switch and
   `invoice_run_day`, default the **7th**) and **manual on-demand** (admin button). **One
@@ -876,8 +877,10 @@ before the body's gate is even reached. Re-checked *after* `002400`, because tha
 **DROPs and recreates** the function and **a DROP takes its grants with it**; re-applying both
 REVOKEs is why the second check mattered.
 
-**Still unverified in production: anything behind a login** — the nav split, the refusals and
-the per-tenant table. Locally 30/30 and 6/6 across two drivers, but that is fixtures. See §9.
+**Confirmed on production 2026-07-19, by the user, signed in as both roles:** the platform
+admin lands on Platform with only that nav item and one correct business row; the real coach
+(tenant admin *and* coach — the §7.19 account) still has all eleven pages. That was the check
+that mattered, and it is the one no amount of local fixture work could have made.
 
 ### The bug: every business page was open to an account with no business
 
@@ -1035,25 +1038,24 @@ supabase functions list                                               # confirm 
 status code would have said "deployed" three times over, wrongly. **Always grep the served
 asset, and poll it — the window here was over 90 seconds.**
 
-### What is NOT verified in production, and how to close it
+### Verified on production 2026-07-19
 
-The engine guard has **not** been exercised against production. The direct probe needs the
-production `CRON_SECRET`, which correctly differs from the local one (the local one returns
-`Unauthorized` — which does at least prove the function is live and its auth gate works).
+The billing month reads **June 2026** and the picker refuses to offer July — checked by the
+user through the UI, which is the path a real admin takes.
 
-Resting on: v13 was bundled from source containing the guard (`core.ts:229`), and 74 Deno
-tests cover that exact code including both SGT boundary instants, with the guard proven to
-fail without itself. To close it, either:
+It was shipped before that check, resting on: v13 bundled from source containing the guard
+(`core.ts:229`), 74 Deno tests over that exact code including both SGT boundary instants, and
+the guard proven to fail without itself. The gap was real but bounded — worth naming rather
+than glossing, which is why it sat here until it was closed.
 
-- **Through the UI** — log into `admin.swimsync.sg` → Invoices. The billing month should read
-  **June 2026** and the picker must refuse to offer July. This is the path a real admin takes.
-- **Direct probe** with the real secret — expect `"status":"month_not_ended"` naming `2026-06`,
-  and **no `billing_periods` row for July afterwards**:
-  ```bash
-  curl -s -X POST https://cdmjeyauhxcgulhbxmsb.supabase.co/functions/v1/generate-invoices \
-    -H "Authorization: Bearer $PROD_CRON_SECRET" -H "Content-Type: application/json" \
-    -d '{"mode":"manual","billing_month":"2026-07"}'
-  ```
+If you ever want the server-side probe (it needs the production `CRON_SECRET`, which
+correctly differs from the local one), expect `"status":"month_not_ended"` naming `2026-06`
+and **no `billing_periods` row for July afterwards**:
+```bash
+curl -s -X POST https://cdmjeyauhxcgulhbxmsb.supabase.co/functions/v1/generate-invoices \
+  -H "Authorization: Bearer $PROD_CRON_SECRET" -H "Content-Type: application/json" \
+  -d '{"mode":"manual","billing_month":"2026-07"}'
+```
 
 ### Also done
 
@@ -2248,23 +2250,11 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### Loose ends from this session — both need a production LOGIN, ~5 minutes total
+### Nothing is outstanding from 2026-07-19
 
-Everything shipped today is live, but three things were only ever verified against local
-fixtures, because nothing here has production credentials. All three are one login away:
-
-1. **The tenant admin's eleven pages still work.** Log in as the real coach. This is the
-   highest-stakes check on the list: §7.19 was a production lockout of exactly this account,
-   and the new gate keys on `tenant_id` precisely to avoid repeating it. If it misbehaves,
-   revert `6666918` alone — the RPCs and both migrations are additive and harmless by
-   themselves.
-2. **The platform admin's own panel.** Log in as the platform admin: you should land on
-   **Platform**, see only that nav item, and get one row for the real business — expect
-   *private coach · never · never run*, with **no** "unpaid" badge.
-3. **The billing-month guard.** `admin.swimsync.sg` → Invoices should read **June 2026** and
-   refuse to offer July. Shipped as `generate-invoices` v13 but never exercised against
-   production; the local `CRON_SECRET` doesn't match production's, so the direct probe was
-   skipped (§8.6 has it if you have the real secret).
+All seven sessions' work is merged, deployed and **confirmed on production by the user**: the
+billing-month guard refuses July, the platform admin has their own panel, and the real coach
+— the §7.19 account — still has all eleven pages. Start clean.
 
 ### The one thing blocking everything else — and it has been urgent for four sessions
 
@@ -2273,8 +2263,11 @@ fixtures, because nothing here has production credentials. All three are one log
 pricing, active/inactive, and now child identity and levels are all tested against fixtures
 and driven through the real UI — and **none of it has processed a single real lesson.**
 
-Five sessions of building have now stacked on top of that, which is itself the argument:
-each one adds surface that a first real lesson would exercise for the first time.
+**Seven** sessions of building have now stacked on top of that, which is itself the argument:
+each one adds surface that a first real lesson would exercise for the first time. The newest
+addition is the sharpest illustration — the Platform page's *last attendance* column reads
+**never**, in red, which is the first time any screen has said out loud what has been true
+since launch.
 
 Two things now depend on that not staying true much longer:
 
