@@ -118,8 +118,8 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   defines its own **level ladder**, each rung carrying an ordered **skill list** (its
   curriculum); families have an **address**. A parent can now **edit a
   child**, which required closing two pre-existing defects first — see §8.
-- **Automated tests** — backend **178 pgTAP + 74 Deno**, plus frontend suites
-  (`SwimSyncAdmin` vitest 62, `SwimSyncApp` jest-expo 69); all run in CI on push to `main`. See §5.
+- **Automated tests** — backend **198 pgTAP + 74 Deno**, plus frontend suites
+  (`SwimSyncAdmin` vitest 76, `SwimSyncApp` jest-expo 69); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
 **https://swimsync.sg**, admin at **https://admin.swimsync.sg**, real email via
@@ -226,13 +226,13 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 178 tests across 14 files
+supabase test db                                  # 198 tests across 15 files
 
 # Backend — Function tests (Deno): generate-invoices billing math + credit ledger
 supabase/functions/generate-invoices/test.sh      # 74 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
-cd SwimSyncAdmin && npm test                       # 62 tests
+cd SwimSyncAdmin && npm test                       # 76 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
 cd SwimSyncApp && npm test                         # 69 tests
@@ -258,6 +258,7 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `document_name_snapshot.test.sql` (7) | renaming a child does not rewrite an issued invoice or an immutable credit note; the note carries the name from the item it credits |
 | `tenant_levels.test.sql` (9) | per-business level ladders: RLS is **enabled** (not merely written), cross-tenant writes refused, a student cannot take another business's level, deleting a level unlevels rather than deletes |
 | `level_skills.test.sql` (11) | the skills taught at a level: order preserved, no duplicate skill within one level (ignoring case/whitespace), the tenant boundary, `CASCADE` on the level but `SET NULL` on the student, and the fix to the level-name constraint |
+| `platform_overview.test.sql` (20) | the platform admin's overview RPCs: FOUR caller shapes get zero rows (anon-equivalent, parent, coach, **and a tenant admin — even for their own tenant**), counts never leak across the tenant boundary, and `last_attendance_date` is **NULL, not a date and not 0**, for a business that has never marked anything |
 | `parent_address.test.sql` (8) | a family maintains their own address only; `postal_code` is TEXT so leading zeros survive; `profile_id` cannot be reassigned |
 
 **Total: 178 across 14 files** — verified by `supabase test db`, and the per-file numbers
@@ -824,6 +825,84 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     screenshot — `verify-invoice-controls.mjs`, same technique as §7.9. **Run a driver against
     the unfixed code first**: the 14/21 baseline is what located the cause, and without it the
     fix would have been a guess that happened to work.
+35. **`CREATE FUNCTION` GRANTS `EXECUTE` TO `PUBLIC` BY DEFAULT — including `anon`.** A
+    `SECURITY DEFINER` function runs as its owner and **bypasses RLS entirely**, so its own
+    body is the whole boundary; there is no policy behind it to catch a mistake. Combined
+    with the default grant, forgetting either layer exposes it to unauthenticated callers.
+    Always **`REVOKE ALL … FROM PUBLIC`** *and* gate the body. And test the gate against
+    **every caller shape that can reach it** — for `platform_tenant_overview()` that is anon,
+    a parent, a coach *and* a tenant admin, not "a non-admin": three of those four arrive
+    through ordinary sessions, and a test that tries only one proves almost nothing. Audit:
+    `grep -n "SECURITY DEFINER" -A 12 supabase/migrations/*.sql` and check each has both.
+36. **A shared table component that does not emit its own `<tr>` splits the convention, and
+    the losing half is INVALID HTML.** `<th>` cannot be a child of `<thead>`; React reports
+    it as a **hydration error at runtime**. `Thead` left the row to callers, so nine call
+    sites wrapped their `<Th>`s and three did not — `/wages`, `/levels` and `/platform` were
+    throwing hydration errors **in production** and nobody had noticed, because the page
+    still renders. Fixed by making `Thead` own the `<tr>`, which makes the broken form
+    unrepresentable rather than something each caller must remember. **When a shared
+    component leaves part of a required structure to its callers, the callers will diverge** —
+    put the required part inside. Audit: watch the Next dev overlay's issue count, and check
+    the browser console on a page you have touched; a hydration error is silent otherwise.
+
+---
+
+## 8.7 Seventh session (2026-07-19) — THE PLATFORM ADMIN GETS THEIR OWN PANEL — NOT DEPLOYED
+
+Branch `feat/platform-admin-scope`, three commits, **one migration** (`20260719002300`).
+**Not deployed.** EXPAND only, so the order is **migrate first, then push** — the opposite of
+§8.6's branch, and the reason is the direction, not habit.
+
+### The bug: every business page was open to an account with no business
+
+`Sidebar.tsx` had a `platformOnly` flag for `/platform` but **no inverse**, so a platform
+admin saw all eleven business tabs. They did not error — a platform admin's RLS reach is
+every row of every table across every tenant — they rendered **several businesses' data as
+though it were one**. The dashboard's *"Total Students — Across all coaches"* was really
+across all *businesses*. An error teaches you a page is not for you; a page that quietly sums
+two schools together looks authoritative and is wrong.
+
+- **Gated on `tenant_id`, never on `role`.** A private coach holds `tenant_admin` *and* a
+  `coaches` row; branching on the enum is what shipped *"Unrecognised role"* to the only real
+  coach in production (§7.19). The question is "do you have a business?" and `tenant_id`
+  answers it, so a renamed or added role keeps working.
+- **The guard UNMOUNTS rather than overlaying.** A notice rendered above `children` leaves
+  the page mounted — effects fire, tables paint underneath, and a test looking for the notice
+  passes anyway (§7.10). `RequiresTenant` early-returns; an unmounted child cannot query.
+- Applied once in the `(admin)` layout, keyed off each route's `scope` in `lib/adminNav.ts` —
+  the same declaration the sidebar renders from. **Unknown paths fail closed.**
+- `/dashboard` redirects (nobody chooses to visit it); everything else refuses in place.
+
+### The platform page now answers the operator's question
+
+One row per business: families, students, classes, coaches (flagged when any has **no rate**,
+which is why payroll silently computes nothing), **last attendance**, sessions recorded vs
+fully marked, and last month's billing state — plus **parents who registered but never
+entered a join code**, who belong to no business and were invisible to everyone.
+
+On the seeded stack it reads at a glance: *never marked · 1 no rate · never run*. That is
+production's actual situation, and no screen said it out loud before.
+
+- **`platform_tenant_overview()` aggregates in Postgres**, replacing an N+1 client loop that
+  was also silently capped at `max_rows = 1000` — correct at one tenant, quietly wrong later
+  (§7.17 / §7.32's family). See §7.35 for the SECURITY DEFINER trap it had to avoid.
+- **No "unmarked lessons" column, deliberately.** That needs the expected-lesson-dates rule,
+  which already exists in three hand-written copies; a fourth is what §7.18 is about. The RPC
+  returns **facts about rows that exist**, and the labels say so.
+
+### Found and fixed on the way
+
+- **`<th>` cannot be a child of `<thead>`** — a **live hydration error** on `/wages`,
+  `/levels` and `/platform`. See §7.36; `Thead` now owns the `<tr>`.
+- **`verify-platform-admin.mjs` had been failing 3/4** since family status added a second
+  "Search" button — a strict-mode violation nobody saw because the driver is hand-run.
+  Confirmed pre-existing by running it against the unmodified page. Now 6/6.
+
+### Not done (deliberate)
+
+- **The family-status search still scans client-side** and is capped at 1000 (`BACKLOG.md`).
+  Left working, not extended — fixing it is a server-side search, its own piece of work.
+- **No "view as tenant" impersonation.** Still rejected, for the reasons in PRD §4.4.
 
 ---
 

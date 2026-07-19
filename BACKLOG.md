@@ -55,12 +55,11 @@ credit-note emails remain, now in _Notifications_); and the **UTC-derived defaul
 month fix** (**2026-07-17** — PRD §7.7, HANDOVER §8a). The list below is renumbered from what
 remains.)_
 
-**Nearly empty.** All three near-term items shipped on 2026-07-19 (see below). Two new
-items were raised on 2026-07-19 while reviewing the admin panel and are filed under
-_Admin and operations_: **the platform admin sees every tenant-scoped page** (S) and **the
-platform dashboard asks the wrong question** (M). Neither blocks anything.
+**This list is empty.** All three near-term items shipped on 2026-07-19, and the two
+platform-admin items raised the same day shipped too — the panel is now scoped by audience
+and the Platform page is a per-tenant operations view (PRD §4.4, HANDOVER §8.7).
 
-Otherwise pick from the sections beneath, or from `HANDOVER.md` §9 — which argues the real
+Pick from the sections beneath, or from `HANDOVER.md` §9 — which argues the real
 priority is not a build item at all, but getting real attendance marked in production.
 
 _Shipped 2026-07-18 and removed from this list:_ the **multi-class-parent under-billing
@@ -474,48 +473,21 @@ is a *full* admin or a restricted one (e.g. can mark attendance and chase paymen
 change class pricing), since that decides whether `role` on the join table is a real enum or
 a placeholder.
 
-### The platform admin sees every tenant-scoped page — **S**
-Hide the eleven business-scoped nav items from a platform admin, leaving them the Platform
-page (and whatever replaces the dashboard, below).
+### The family-status search scans every membership client-side — **S**
+`handleFamilySearch` on the Platform page fetches **all** `parent_tenants` rows and filters
+in the browser.
 
-**Why:** `components/Sidebar.tsx` has a `platformOnly` flag but no inverse, so a platform
-admin gets Classes, Students, Attendance, Invoices, Coach Wages and the rest. Those pages
-don't error — their RLS reach is **every** tenant, so they render **cross-tenant data as
-though it were one business**. The dashboard is the clearest case: `dashboard/page.tsx` counts
-students with no tenant filter, so "Total Students — Across all coaches" is really across all
-*businesses*. A page that errors teaches you it isn't for you; a page that quietly sums two
-schools together looks authoritative and is wrong.
+**Why:** PostgREST caps every response at `max_rows = 1000` (`config.toml`) and does so
+**silently** — no error, just fewer rows. So the search quietly stops finding families once
+the platform passes a thousand memberships, and the failure looks like "that family isn't on
+SwimSync" rather than like a bug. It is the same ceiling `platform_tenant_overview()` was
+added to avoid; this is the one client-side scan left on that page.
 
-**Notes:** the invoices page already knows this and says so in an amber banner ("Invoice
-generation runs for one business at a time, and your account is not attached to one") — the
-work is generalising that into the nav. Decide at the same time whether hiding them costs
-anything operationally: today the platform admin is the owner, and those pages are their only
-window into the one real tenant, which is what the item below is for.
-
-### The platform dashboard asks the wrong question — **M**
-Replace the tenant-shaped dashboard a platform admin currently sees with a per-tenant
-operations view.
-
-**Why:** a tenant admin asks *"how is my business doing?"*; a platform admin asks *"which
-business needs me?"* Global sums answer neither. The reframe is one row per tenant — name,
-kind, join code, active students, active coaches, classes — which `platform/page.tsx` already
-half-builds (it counts students and classes per tenant at lines 88-95).
-
-**Notes:** what turns it from a directory into an operations page is health signals:
-
-- **Last attendance marked, per tenant.** The best liveness signal there is — and the one that
-  would have shown at a glance that production has *never* had a lesson marked. Silence for a
-  fortnight is a holiday or a churn.
-- **Unmarked lessons this month, per tenant** — this is what will block their billing, and
-  blocking is silent if cron is ever enabled.
-- **Billing state for last month** — sealed / open / blocked / never run. Answers "who hasn't
-  been paid?"
-- **Tenants with no coach rate set**, so payroll silently computes nothing.
-- **Signups with no tenant** — a parent who registered but never entered a join code. They are
-  stranded and invisible today, and are exactly the case the student-move RPC exists for.
-
-Deliberately **not** there: anything that lets the platform admin act on one business's
-billing. §4.3 makes generation the tenant admin's, and the invoices banner already enforces it.
+**Notes:** found 2026-07-19 while rebuilding the page around the RPC. Deliberately left
+working rather than extended — the fix is a server-side search (an RPC taking the query
+string, or a `.ilike` filter pushed into the query instead of `.filter()` in JS), which is
+its own piece of work. Harmless at today's scale; the reason to record it is that the failure
+mode is invisible.
 
 ### Moving a student between businesses leaves two loose ends — **S**
 `reassign_student_tenant()` moves the student but not everything attached to them.
