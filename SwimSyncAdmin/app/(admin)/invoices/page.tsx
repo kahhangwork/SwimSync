@@ -20,6 +20,7 @@ type InvoiceRow = {
   id: string;
   billing_month: string;
   gross_amount: number;
+  package_applied: number;
   credit_applied: number;
   net_amount: number;
   status: string;
@@ -331,7 +332,7 @@ export default function InvoicesPage() {
     const { data } = await supabase
       .from("invoices")
       .select(
-        "id, billing_month, gross_amount, credit_applied, net_amount, status, parents(profiles(full_name)), invoice_items(student_name, students(full_name))"
+        "id, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, parents(profiles(full_name)), invoice_items(student_name, students(full_name))"
       )
       .order("generated_at", { ascending: false });
 
@@ -348,6 +349,7 @@ export default function InvoicesPage() {
           id: inv.id,
           billing_month: inv.billing_month,
           gross_amount: Number(inv.gross_amount),
+          package_applied: Number(inv.package_applied),
           credit_applied: Number(inv.credit_applied),
           net_amount: Number(inv.net_amount),
           status: inv.status,
@@ -707,6 +709,7 @@ export default function InvoicesPage() {
             <Th>Student(s)</Th>
             <Th>Month</Th>
             <Th>Gross</Th>
+            <Th>Package</Th>
             <Th>Credit</Th>
             <Th>Net</Th>
             <Th>Status</Th>
@@ -715,13 +718,13 @@ export default function InvoicesPage() {
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={8}>
+              <Td className="text-center text-gray-400 py-8" colSpan={9}>
                 Loading…
               </Td>
             </Tr>
           ) : filtered.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={8}>
+              <Td className="text-center text-gray-400 py-8" colSpan={9}>
                 No invoices found.
               </Td>
             </Tr>
@@ -732,6 +735,11 @@ export default function InvoicesPage() {
                 <Td className="text-gray-600 text-xs">{inv.student_names}</Td>
                 <Td>{formatBillingMonth(inv.billing_month)}</Td>
                 <Td>S${inv.gross_amount.toFixed(2)}</Td>
+                <Td className="text-blue-600">
+                  {inv.package_applied > 0
+                    ? `−S$${inv.package_applied.toFixed(2)}`
+                    : "—"}
+                </Td>
                 <Td className="text-blue-600">
                   {inv.credit_applied > 0
                     ? `−S$${inv.credit_applied.toFixed(2)}`

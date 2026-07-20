@@ -23,6 +23,7 @@ type StudentRow = {
   assignment_status: string;
   is_active: boolean;
   inactivated_at: string | null;
+  parent_id: string | null;
   parent_name: string;
   class_title: string | null;
   coach_name: string | null;
@@ -89,9 +90,58 @@ export default function StudentsPage() {
   const [savingLevelFor, setSavingLevelFor] = useState<string | null>(null);
   const [levelError, setLevelError] = useState<string | null>(null);
 
+  // ── "Running low" package filter ──────────────────────────────────────────
+  // Families whose LIVE package balance (stored minus attended-but-uninvoiced
+  // draws — package_live_balances(), the single derivation, never recomputed
+  // here) is at or below the business's own threshold. The threshold is
+  // per-tenant (tenants.low_package_lessons): what counts as "running low" is
+  // the business's call, not a constant SwimSync picks for everyone.
+  // Families with NO package are never "running low" — they are ad-hoc.
+  const [lowOnly, setLowOnly] = useState(false);
+  const [threshold, setThreshold] = useState("2");
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [liveLessonsByParent, setLiveLessonsByParent] = useState<
+    Map<string, number>
+  >(new Map());
+
+  async function loadPackages() {
+    const { data: userRes } = await supabase.auth.getUser();
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("tenant_id, tenants(low_package_lessons)")
+      .eq("id", userRes.user?.id)
+      .single();
+    setTenantId((prof as any)?.tenant_id ?? null);
+    const stored = (prof as any)?.tenants?.low_package_lessons;
+    if (stored !== null && stored !== undefined) setThreshold(String(stored));
+
+    const { data: live } = await supabase.rpc("package_live_balances");
+    const byParent = new Map<string, number>();
+    for (const r of (live as any[]) ?? []) {
+      byParent.set(
+        r.parent_id,
+        (byParent.get(r.parent_id) ?? 0) + Number(r.live_lessons_remaining)
+      );
+    }
+    setLiveLessonsByParent(byParent);
+  }
+
+  async function saveThreshold(value: string) {
+    setThreshold(value);
+    // Empty BEFORE coercing (§7.22): an empty field must not save 0.
+    if (value.trim() === "" || !Number.isInteger(Number(value)) || Number(value) < 0)
+      return;
+    if (!tenantId) return;
+    await supabase
+      .from("tenants")
+      .update({ low_package_lessons: Number(value) })
+      .eq("id", tenantId);
+  }
+
   useEffect(() => {
     load();
     loadLevels();
+    loadPackages();
   }, []);
 
   async function loadLevels() {
@@ -135,7 +185,7 @@ export default function StudentsPage() {
       .select(`
         id, full_name, date_of_birth, level_id, assignment_status, is_active, inactivated_at,
         tenant_levels(id, label),
-        parent_students(parents(profiles(full_name))),
+        parent_students(parents(id, profiles(full_name))),
         student_class_enrolments(
           is_active,
           classes(title, coaches(profiles(full_name)))
@@ -164,6 +214,7 @@ export default function StudentsPage() {
           assignment_status: s.assignment_status,
           is_active: s.is_active,
           inactivated_at: s.inactivated_at,
+          parent_id: s.parent_students?.[0]?.parents?.id ?? null,
           parent_name:
             s.parent_students?.[0]?.parents?.profiles?.full_name ?? "—",
           class_title: activeEnrolment?.classes?.title ?? null,
@@ -183,13 +234,25 @@ export default function StudentsPage() {
     return "Unassigned";
   };
 
+  const thresholdNum =
+    threshold.trim() === "" || !Number.isFinite(Number(threshold))
+      ? null
+      : Number(threshold);
+
+  const runningLow = (s: StudentRow) =>
+    s.parent_id !== null &&
+    liveLessonsByParent.has(s.parent_id) && // no package ⇒ ad-hoc, never "low"
+    thresholdNum !== null &&
+    (liveLessonsByParent.get(s.parent_id) ?? 0) <= thresholdNum;
+
   const filtered = students.filter((s) => {
     const matchSearch =
       s.full_name.toLowerCase().includes(search.toLowerCase()) ||
       s.parent_name.toLowerCase().includes(search.toLowerCase());
     const label = statusLabel(s);
     const matchStatus = statusFilter === "All" || label === statusFilter;
-    return matchSearch && matchStatus;
+    const matchLow = !lowOnly || runningLow(s);
+    return matchSearch && matchStatus && matchLow;
   });
 
   return (
@@ -226,6 +289,33 @@ export default function StudentsPage() {
               {f}
             </button>
           ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setLowOnly(!lowOnly)}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+              lowOnly
+                ? "bg-amber-500 text-white"
+                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+            title="Families whose prepaid package is nearly used up — time to remind them to renew. Counts lessons attended but not yet invoiced."
+          >
+            Package running low
+          </button>
+          {lowOnly && (
+            <label className="flex items-center gap-1.5 text-xs text-gray-600">
+              at
+              <input
+                value={threshold}
+                onChange={(e) => saveThreshold(e.target.value)}
+                inputMode="numeric"
+                className="w-12 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-xs"
+                aria-label="Low-package threshold in lessons"
+              />
+              lessons or fewer
+            </label>
+          )}
         </div>
       </div>
 
@@ -276,7 +366,20 @@ export default function StudentsPage() {
                     ))}
                   </select>
                 </Td>
-                <Td className="text-gray-500">{s.parent_name}</Td>
+                <Td className="text-gray-500">
+                  {s.parent_name}
+                  {s.parent_id !== null &&
+                    liveLessonsByParent.has(s.parent_id) && (
+                      <span
+                        className={`ml-1.5 text-xs font-medium ${
+                          runningLow(s) ? "text-amber-600" : "text-gray-400"
+                        }`}
+                        title="Prepaid lessons remaining across the family's packages, counting attended-but-uninvoiced lessons"
+                      >
+                        · {liveLessonsByParent.get(s.parent_id)} left
+                      </span>
+                    )}
+                </Td>
                 <Td>
                   <StatusBadge status={statusLabel(s)} />
                 </Td>

@@ -35,6 +35,7 @@ import {
   Globe,
   UsersRound,
   Waves,
+  Package,
 } from "lucide-react";
 
 /** A page's audience. `tenant` = shows ONE business. `platform` = cross-tenant. */
@@ -59,6 +60,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/parents",      label: "Parents",              icon: UsersRound,      scope: "tenant"   },
   { href: "/attendance",   label: "Attendance",           icon: CalendarCheck,   scope: "tenant"   },
   { href: "/invoices",     label: "Invoices",             icon: Receipt,         scope: "tenant"   },
+  { href: "/packages",     label: "Packages",             icon: Package,         scope: "tenant"   },
   { href: "/credit-notes", label: "Credit Notes",         icon: FileText,        scope: "tenant"   },
   { href: "/coaches",      label: "Coaches",              icon: UserCog,         scope: "tenant"   },
   { href: "/wages",        label: "Coach Wages",          icon: Wallet,          scope: "tenant"   },

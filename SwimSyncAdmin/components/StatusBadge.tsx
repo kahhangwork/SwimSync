@@ -12,6 +12,7 @@ const config: Record<string, string> = {
   Assigned:     "bg-green-100 text-green-700",
   Unassigned:   "bg-yellow-100 text-yellow-700",
   Inactive:     "bg-gray-100 text-gray-400",
+  Active:       "bg-green-100 text-green-700",
 };
 
 export function StatusBadge({ status }: { status: string }) {

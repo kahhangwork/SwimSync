@@ -22,11 +22,12 @@ describe("hasTenant", () => {
 });
 
 describe("navFor", () => {
-  it("gives a business admin the eleven business pages and NOT Platform", () => {
+  it("gives a business admin the twelve business pages and NOT Platform", () => {
     const hrefs = navFor(A_TENANT).map((n) => n.href);
-    expect(hrefs).toHaveLength(11);
+    expect(hrefs).toHaveLength(12); // 11 + Packages (2026-07-20)
     expect(hrefs).toContain("/dashboard");
     expect(hrefs).toContain("/wages");
+    expect(hrefs).toContain("/packages");
     expect(hrefs).not.toContain("/platform");
   });
 

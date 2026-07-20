@@ -19,6 +19,7 @@ type ClassRow = {
   end_time: string;
   location_name: string;
   price_per_lesson: number;
+  category_id: string | null;
   student_count: number;
 };
 
@@ -91,17 +92,31 @@ export default function ClassesPage() {
   });
   const [correctInPlace, setCorrectInPlace] = useState(false);
 
+  // Class categories scope prepaid packages (see /packages). Optional on a
+  // class; a class with none is outside every scoped package and bills ad-hoc.
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categoryId, setCategoryId] = useState("");
+
   useEffect(() => {
     loadClasses();
     loadCoaches();
+    loadCategories();
   }, []);
+
+  async function loadCategories() {
+    const { data } = await supabase
+      .from("class_categories")
+      .select("id, name")
+      .order("name");
+    setCategories(data ?? []);
+  }
 
   async function loadClasses() {
     setLoading(true);
     const { data } = await supabase
       .from("classes")
       .select(
-        "id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, coaches(profiles(full_name)), student_class_enrolments(id, is_active)"
+        "id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id, coaches(profiles(full_name)), student_class_enrolments(id, is_active)"
       )
       .eq("is_active", true)
       .order("day_of_week")
@@ -118,6 +133,7 @@ export default function ClassesPage() {
         end_time: c.end_time,
         location_name: c.location_name,
         price_per_lesson: Number(c.price_per_lesson),
+        category_id: c.category_id ?? null,
         student_count: (c.student_class_enrolments ?? []).filter(
           (e: any) => e.is_active
         ).length,
@@ -155,6 +171,7 @@ export default function ClassesPage() {
     setEndTime("");
     setLocation("");
     setRate("");
+    setCategoryId("");
     setSaveError(null);
     setEditingId(null);
   }
@@ -169,6 +186,7 @@ export default function ClassesPage() {
     setEndTime(cls.end_time.slice(0, 5));
     setLocation(cls.location_name);
     setRate(String(cls.price_per_lesson));
+    setCategoryId(cls.category_id ?? "");
     setSaveError(null);
     setEditingId(cls.id);
     setShowModal(true);
@@ -190,6 +208,7 @@ export default function ClassesPage() {
       end_time: endTime,
       location_name: location,
       price_per_lesson: parseFloat(rate),
+      category_id: categoryId || null,
     };
 
     // Editing goes through set_class_terms, never a bare UPDATE. Price and
@@ -221,6 +240,22 @@ export default function ClassesPage() {
       setSaveError(error.message);
       setSaving(false);
       return;
+    }
+
+    // Category is SCOPE, not money — it says which packages can pay for this
+    // class, never what a lesson costs — so it does not belong in
+    // set_class_terms and is not effective-dated. A plain UPDATE alongside
+    // the RPC (create includes it in the insert payload above).
+    if (editingId) {
+      const { error: catErr } = await supabase
+        .from("classes")
+        .update({ category_id: categoryId || null })
+        .eq("id", editingId);
+      if (catErr) {
+        setSaveError(`Saved, but the category was not: ${catErr.message}`);
+        setSaving(false);
+        return;
+      }
     }
 
     setSaving(false);
@@ -369,6 +404,31 @@ export default function ClassesPage() {
               ))}
             </select>
           </div>
+
+          {categories.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Category
+              </label>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+              >
+                <option value="">— None —</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Which prepaid packages can pay for this class (see Packages).
+                A class with no category is outside every category-scoped
+                package.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field
