@@ -95,8 +95,9 @@ Billing is based on **actual attendance**, so make sure last month is complete:
    into `tenant_admin` and `platform_admin`. A **platform admin has no Generate button**,
    because generation runs for one business at a time — see PRD §4.3.)*
 2. Open **Invoices** (left sidebar).
-3. In the **Billing month** picker, select the **previous month**.
-   ⚠️ It defaults to the *current* month — **you must change it** (e.g. on 1 Aug, set it to **Jul**).
+3. Check the **Billing month** picker. It **defaults to the last completed month** and
+   won't offer anything later — the engine refuses a month that hasn't ended (PRD §7.7,
+   since 2026-07-19). You only touch it to bill an *older* open month.
 4. Click **Generate Invoices**. A dialog checks every class's schedule against
    what's actually marked, and reports either:
    - ✅ **"All N classes fully marked"** → go ahead.
@@ -123,8 +124,13 @@ Billing is based on **actual attendance**, so make sure last month is complete:
    > engine can't miss it, because to the engine it never happened. That dialog
    > is the only thing that will tell you.
 5. **Verify** in the list below: one row per parent for that month, each with
-   **Gross / Credit / Net** and an **Outstanding** badge. Spot-check a couple
+   **Gross / Package / Credit / Net** and an **Outstanding** badge. Spot-check a couple
    against what you marked (billable lessons × class rate).
+   - **If a family holds a prepaid package** (PRD §7.16), their in-scope lessons are
+     priced at the *package's* locked rate — not the class rate — and appear in the
+     **Package** column; an invoice fully covered arrives already **Paid**. That is
+     correct, not an error. Their package balance only moves at this moment, so the
+     app's "lessons remaining" and the stored balance agree right after generating.
 
 ---
 

@@ -90,6 +90,15 @@ _Shipped 2026-07-19 and removed:_ **active/inactive status for parents and child
 all six phases, live. It was the oldest outstanding item in this document. See PRD §7.14
 for what it does and HANDOVER §8 for how it went.
 
+_Shipped 2026-07-20 and removed:_ **package / subscription pricing** — as prepaid
+lesson packages, live same day (PRD §7.16, `PACKAGES_DESIGN.md`, HANDOVER §8.8). Worth
+keeping: the old entry's two warnings were **wrong** in instructive ways — it predicted
+a "second billing model inverting billing-derives-from-attendance" (the build refused
+that shape: same engine, money moves at invoice time, ad-hoc path byte-identical) and
+client-side concurrent drawdown (drawdown lives in the single-threaded engine; live
+displays are a read-only RPC). Its follow-ups are queued as items: parent-facing
+package notifications, in-app refunds.
+
 ### Later — clusters with a fixed internal order
 
 - ~~**The tenant/coach money cluster.**~~ **SHIPPED 2026-07-19** — multi-tenancy,
@@ -220,21 +229,6 @@ a gateway takes a cut of a part-time coach's margin, and the current stack is
 deliberately $0. Probably only makes sense if SwimSync ever serves coaches other than
 its owner. Related: automatic PayNow detection above gets much of the benefit without
 the fee.
-
-### ~~Package / subscription pricing~~ — **SHIPPED 2026-07-20** `[MVP-excluded]` `[Phase 3]`
-Built as **prepaid lesson packages** — see PRD §7.16 and `PACKAGES_DESIGN.md` for the
-full model and the reasoning. Two of this entry's old warnings turned out to be wrong
-in instructive ways, kept here so the next big item benefits:
-
-- It predicted a **second billing model** that "inverts billing-derives-from-attendance".
-  The build deliberately refused that shape: attendance still drives everything, money
-  still moves only at invoice time, and a package is a prepaid balance the SAME engine
-  draws down. The ad-hoc path is byte-identical (tripwire-tested) — no second model.
-- It predicted client-visible concurrent drawdown. Drawdown lives in the single-threaded
-  invoice engine instead; live displays are a read-only RPC. No concurrency surface.
-
-**Follow-ups now queued below:** in-app refunds (settled offline today), parent-facing
-low-balance/expiry notifications (the ADMIN-facing filter shipped).
 
 ### Parent-facing package notifications — **S**
 Email/notify the parent when their package runs low or approaches expiry.

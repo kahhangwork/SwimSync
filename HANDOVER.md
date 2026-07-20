@@ -1,7 +1,7 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-20 (eighth session — prepaid packages; built and verified
-locally, NOT yet deployed — see §9)_
+_Last updated: 2026-07-20 (eighth session — prepaid packages, built AND deployed to
+production the same day; dormant until the first product is created)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -120,8 +120,9 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   defines its own **level ladder**, each rung carrying an ordered **skill list** (its
   curriculum); families have an **address**. A parent can now **edit a
   child**, which required closing two pre-existing defects first — see §8.
-- **Prepaid lesson packages (verified local: pgTAP + Deno + UI driver — NOT yet
-  deployed)** — a business sells N lessons at a locked rate, valid M months, scoped to
+- **Prepaid lesson packages (verified local: pgTAP + Deno + UI driver — LIVE in
+  production 2026-07-20, dormant until a product exists)** — a business sells N
+  lessons at a locked rate, valid M months, scoped to
   its own class categories; a prepaid dollar balance per (parent, tenant) drawn down by
   the invoice engine at the package's rate, live-displayed via one RPC everywhere
   (parent card, admin tables, the students "running low" filter with a per-tenant
@@ -147,13 +148,14 @@ superadmin + the real coach/classes). See §11.
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **As of 2026-07-19 production is fully caught up**: every migration through
-> `20260719002200` is applied (`supabase migration list` shows nothing pending) and
-> `generate-invoices` is at **v13** — the completed-month guard (§8.6), on top of the
-> effective-dated pricing engine (§8). *(This line said `20260719001300` / v11 for two
-> sessions after both had moved on — a version written into prose goes stale the moment
-> anything deploys. `supabase functions list` and `supabase migration list` are the honest
-> answers; treat this sentence as a hint, not a fact.)*
+> **As of 2026-07-20 production is fully caught up**: every migration through
+> `20260720000200` is applied (`supabase migration list` shows nothing pending),
+> `generate-invoices` is at **v14** (package drawdown, on top of the completed-month
+> guard and effective-dated pricing), and a SECOND function exists: **`package-emails`
+> v1** (verify_jwt ON — deployed separately, and a deploy of generate-invoices does NOT
+> touch it). *(The previous version of this line went stale for two sessions —
+> `supabase functions list` and `supabase migration list` are the honest answers; treat
+> this sentence as a hint, not a fact.)*
 > Backups were taken before each production migration (scratchpad, not committed).
 >
 > The **tenancy** deploys (§8.1) had **opposite orderings** and both were deliberate — phase 4
@@ -926,12 +928,25 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
-## 8.8 Eighth session (2026-07-20) — PREPAID LESSON PACKAGES — BUILT, NOT YET DEPLOYED
+## 8.8 Eighth session (2026-07-20) — PREPAID LESSON PACKAGES — BUILT **AND DEPLOYED**
 
-Branch **`feat/lesson-packages`**, seven commits, **NOT merged to `main` and nothing
-deployed** — the deploy sequence is §9's first item. Designed with the user across a long
-walkthrough first (the record is `PACKAGES_DESIGN.md`, written via /plan-review with
-mitigations inline); every phase then built and verified locally in one run.
+Branch **`feat/lesson-packages`**, eight commits, merged to `main` and **deployed to
+production the same evening** (deploy record below). Designed with the user across a
+long walkthrough first (the record is `PACKAGES_DESIGN.md`, written via /plan-review
+with mitigations inline); every phase then built and verified locally in one run.
+
+**Deploy record (2026-07-20, EXPAND order — migrate first, push last):** backup taken
+(scratchpad) → pending set verified as exactly `20260720000100`+`000200` → `db push` →
+re-listed clean → schema RE-VERIFIED against the remote (all four tables present with
+RLS enabled — the §7.20 audit run on production, not assumed) → `generate-invoices`
+**v14** + `package-emails` **v1** deployed and confirmed via `functions list` → merge,
+push, branch deleted → smoked: admin `/packages` 200 (a route only the new build has),
+the app bundle greps for the new UI strings (the app's Vercel project finished AFTER
+the admin's — §7.23 verbatim), CI green on the merged main.
+
+**Production is dormant by design**: no categories, products or packages exist, so
+every family still bills exactly as before. The feature activates the day the admin
+creates a category + product (Admin → Packages).
 
 **What shipped (local):** the full §7.16 feature — schema (`20260720000100`), engine
 drawdown, correction-restore trigger (`20260720000200`), admin Packages page + class
@@ -2361,34 +2376,15 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### FIRST: the packages feature is built and verified but NOT deployed (§8.8)
+### Nothing is outstanding from 2026-07-20
 
-Branch `feat/lesson-packages` is complete and green locally; nothing has touched
-production. The deploy is pure EXPAND, so the order is (§6 / §7.27 / §7.30):
+Packages are **built, deployed and smoked** (§8.8's deploy record) — dormant in
+production until a product exists. Everything from the seven prior sessions remains
+live and user-confirmed. Start clean.
 
-1. **Backup** the production DB (scratchpad, not committed).
-2. `supabase migration list` — the pending set must be EXACTLY
-   `20260720000100` + `20260720000200` (§7.30: db push applies everything pending).
-3. `supabase db push`, then `supabase migration list` again — nothing pending.
-4. `supabase functions deploy generate-invoices` (engine v13 → v14) **and**
-   `supabase functions deploy package-emails` (a NEW function — a plain deploy of the
-   old one does not create it). Verify both via `supabase functions list`.
-5. `git checkout main && git merge feat/lesson-packages` → push → both Vercel sites
-   rebuild. Delete the branch (local + remote).
-6. Smoke on production as the real coach: /packages renders empty (no products yet),
-   /students filter present, app Billing shows the Packages tab with the
-   "doesn't offer packages yet" state.
-
-Until step 5, production parents see no change at all; steps 3–4 are invisible to the
-running apps (additive schema, and the engine change only activates when a package
-exists). There is no partial-deploy hazard beyond the standing rule: never push the web
-apps before the migrations.
-
-### Then: everything from 2026-07-19 remains done
-
-All seven prior sessions' work is merged, deployed and **confirmed on production by the
-user**: the billing-month guard refuses July, the platform admin has their own panel, and
-the real coach — the §7.19 account — still has all eleven (now twelve) pages.
+**One check only the user can run:** log in to production as the real coach and confirm
+the twelve nav items render and `/packages` shows its empty state — the same
+"no local fixture can prove a real login" reasoning as §8.7.
 
 ### The one thing blocking everything else — and it has been urgent for four sessions
 
@@ -2437,6 +2433,9 @@ and the building block already exists).
   until it is turned on.
 - **Set a coach rate** if you want payroll to compute anything (Admin → Coach Wages). A
   coach with no rate is deliberately not on payroll.
+- **Packages are live but dormant** — to switch them on: Admin → Packages → add a
+  category, tag the classes (Classes page), create a product. Parents then see it under
+  Billing → Packages. Until then, nothing anywhere changes for anyone.
 
 ### Worth deciding, not urgent
 
@@ -2471,6 +2470,13 @@ email **has still never fired in production**.
 | `supabase/migrations/20260719001300_drop_inactive_assignment_status.sql` | Enum contract, with the `pg_proc` guard that refuses if a function body still casts to the retired value (§7.21) |
 | `SwimSyncAdmin/app/(admin)/parents/page.tsx` | Families at this business — there was no Parents page before |
 | `supabase/tests/active_inactive.test.sql` | Family consequence both ways, the one-way property, the tenant boundary |
+| `PACKAGES_DESIGN.md` | **The prepaid-packages design of record** — the locked decision table + the /plan-review risk mitigations, inline. Read before changing anything package-shaped |
+| `supabase/migrations/20260720000100_lesson_packages.sql` | The four package tables, CHECKs, lifecycle trigger (NOT definer — §7.38), RLS, `package_live_balances()` |
+| `supabase/migrations/20260720000200_package_correction_restore.sql` | `handle_attendance_update` 7th redefinition: restore-to-package, refund-at-most-once |
+| `supabase/tests/lesson_packages.test.sql` · `package_corrections.test.sql` | The package money rules + the correction paths (30 + 12) |
+| `supabase/functions/generate-invoices/packages.test.ts` | Engine drawdown incl. the no-package TRIPWIRE and the fault-injection unsealed-month test |
+| `supabase/functions/package-emails/` | Purchase emails (request + confirm), caller-authorized, own deploy |
+| `SwimSyncAdmin/app/(admin)/packages/page.tsx` | Admin: pending queue, products, held packages (live balances), class categories |
 | `supabase/functions/generate-invoices/rates.ts` | `rateOn()` — the terms in force on a lesson's date. Pure + unit-tested, like `dates.ts`. Dates compared as **YYYY-MM-DD strings**, never parsed to `Date` (keeps the timezone traps of §7.7/§7.12 out). A missing rate **throws** (§6) |
 | `supabase/migrations/20260719000700_class_rates.sql` | Effective-dated price + paid coach, `class_rate_on()`, floor-dated backfill + seed trigger, display sync, RLS |
 | `supabase/migrations/20260719001000_set_class_terms.sql` | The only sanctioned class edit: both tables in one transaction, correct-vs-change, settled-money guards |
@@ -2528,7 +2534,7 @@ store builds are deferred until the app "sticks."
 | Piece | Where | Notes |
 |-------|-------|-------|
 | **Backend** | Supabase project `cdmjeyauhxcgulhbxmsb` (region ap-southeast-1) | Free tier. Linked via `supabase link`; schema via `supabase db push`. |
-| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8c); needs `RESEND_API_KEY` secret set, else it's a no-op. Redeployed 2026-07-17 with the timezone-correct default billing month (§8a), **2026-07-18** with the multi-class fix, the configurable run day, month sealing and the hard attendance block (§8a), and **2026-07-19** with the effective-dated pricing engine (§8) then the **completed-month guard** (§8.6) — currently **v13**. `supabase functions list` is the honest answer for the version, not this cell. `APP_TIMEZONE` unset → defaults to `Asia/Singapore`. |
+| **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8c); needs `RESEND_API_KEY` secret set, else it's a no-op. Redeployed 2026-07-17 with the timezone-correct default billing month (§8a), **2026-07-18** with the multi-class fix, the configurable run day, month sealing and the hard attendance block (§8a), **2026-07-19** with the effective-dated pricing engine (§8) then the **completed-month guard** (§8.6), and **2026-07-20** with package drawdown (§8.8) — currently **v14**. A **second function exists since 2026-07-20: `package-emails` v1** (purchase request/confirm emails; verify_jwt ON, no CRON_SECRET; same `RESEND_API_KEY`; **deployed separately** — deploying generate-invoices does not touch it). `supabase functions list` is the honest answer for versions, not this cell. `APP_TIMEZONE` unset → defaults to `Asia/Singapore`. |
 | **Admin panel** | Vercel `swimsync-admin` → **https://admin.swimsync.sg** (also `swimsync-admin.vercel.app`) | Root `SwimSyncAdmin`, **framework preset = Next.js**. |
 | **Mobile app (web)** | Vercel `swimsync-app` → **https://swimsync.sg** (apex, canonical; `www` 308-redirects; also `swimsync-app-psi.vercel.app`) | Root `SwimSyncApp`, **preset = Other** (`SwimSyncApp/vercel.json`: `expo export --platform web` → `dist`, SPA rewrite). |
 | **Email** | **Resend** → sender `noreply@swimsync.sg` | Two paths: **(1) Auth emails** (password reset) via cloud custom SMTP `smtp.resend.com:465` (user `resend`, pass = Resend API key, dashboard-only); branded reset template (dashboard + `supabase/templates/recovery.html`); auth rate limit 2→~30/hr; confirmation **OFF**. **(2) Invoice emails** (§8c) via the **Resend HTTP API** from the Edge Function, keyed by the `RESEND_API_KEY` secret (same key) — set with `supabase secrets set`. |

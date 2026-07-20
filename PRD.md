@@ -1912,5 +1912,6 @@ SwimSync MVP is successful if:
 | **Payment** | External PayNow via **the business's** QR, manual verification *(implemented — changed from per-coach: a school has one bank account, §7.10)* |
 | **Child identity** | *(implemented)* **Name + date of birth**, unique per business; age is **derived**, never stored. NRIC declined — partial NRIC is regulated personal data and DOB was already collected (§5.1) |
 | **Swimming levels** | *(implemented)* Each business defines its **own ordered ladder**, each rung carrying a skill list. Admin-set, coach/parent read-only. No tiers or progression graph — businesses structure levels differently (§7.15) |
+| **Prepaid packages** | *(implemented)* Dollars stored, lessons derived; locked rate for the package's life (a price rise is a new product); scoped by the business's own class categories; drawn down at invoice time by the same engine; ad-hoc billing unchanged and still the default (§7.16) |
 | **Language** | English only |
 | **Not in MVP** | Makeup lessons, auto payment reconciliation |
