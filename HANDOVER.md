@@ -1,6 +1,7 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-19 (seventh session)_
+_Last updated: 2026-07-20 (eighth session — prepaid packages; built and verified
+locally, NOT yet deployed — see §9)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -119,7 +120,15 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   defines its own **level ladder**, each rung carrying an ordered **skill list** (its
   curriculum); families have an **address**. A parent can now **edit a
   child**, which required closing two pre-existing defects first — see §8.
-- **Automated tests** — backend **202 pgTAP + 74 Deno**, plus frontend suites
+- **Prepaid lesson packages (verified local: pgTAP + Deno + UI driver — NOT yet
+  deployed)** — a business sells N lessons at a locked rate, valid M months, scoped to
+  its own class categories; a prepaid dollar balance per (parent, tenant) drawn down by
+  the invoice engine at the package's rate, live-displayed via one RPC everywhere
+  (parent card, admin tables, the students "running low" filter with a per-tenant
+  threshold). Request → PayNow → admin confirm; corrections restore the package, never
+  mint cash credit. Ad-hoc billing byte-identical (tripwire-tested). PRD §7.16,
+  `PACKAGES_DESIGN.md`, §8.8.
+- **Automated tests** — backend **244 pgTAP + 90 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest 76, `SwimSyncApp` jest-expo 69); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
@@ -227,10 +236,10 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 202 tests across 15 files
+supabase test db                                  # 244 tests across 17 files
 
-# Backend — Function tests (Deno): generate-invoices billing math + credit ledger
-supabase/functions/generate-invoices/test.sh      # 74 tests; needs deno (brew install deno)
+# Backend — Function tests (Deno): billing math, credit + package ledgers, emails
+supabase/functions/generate-invoices/test.sh      # 90 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
 cd SwimSyncAdmin && npm test                       # 76 tests
@@ -261,10 +270,12 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `level_skills.test.sql` (11) | the skills taught at a level: order preserved, no duplicate skill within one level (ignoring case/whitespace), the tenant boundary, `CASCADE` on the level but `SET NULL` on the student, and the fix to the level-name constraint |
 | `platform_overview.test.sql` (24) | the platform admin's overview RPCs: FOUR caller shapes get zero rows (anon-equivalent, parent, coach, **and a tenant admin — even for their own tenant**), counts never leak across the tenant boundary, and `last_attendance_date` is **NULL, not a date and not 0**, for a business that has never marked anything |
 | `parent_address.test.sql` (8) | a family maintains their own address only; `postal_code` is TEXT so leading zeros survive; `profile_id` cannot be reassigned |
+| `lesson_packages.test.sql` (30) | prepaid packages: RLS on all four tables, $0-rate/0-lesson products refused, product money terms immutable, request snapshots come from the PRODUCT (a parent cannot claim a price or an active status), only non-client roles move a balance, `package_live_balances()` draws locked-rate/in-scope/FIFO and leaves the stored balance alone |
+| `package_corrections.test.sql` (12) | a correction on a package-funded line restores the package (even expired) and mints NO cash credit note; flip-flops refund at most once; ad-hoc lines keep the credit-note path byte-identical |
 
-**Total: 178 across 14 files** — verified by `supabase test db`, and the per-file numbers
-above are each file's `SELECT plan(n)`. Four of these files postdate the original
-four-row table and were only described in prose; if you add a suite, add a row.
+**Total: 244 across 17 files** — verified by `supabase test db` 2026-07-20 (the previous
+"total" line here had been stale for several sessions while §3 was right; per §7.37,
+the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
 _Deno tests — `core.test.ts` + `email.test.ts` + `dates.test.ts` (run by `test.sh`):_
 **The clock is part of every fixture** — `monthEnded()` in `test-helpers.ts` supplies the
@@ -291,6 +302,15 @@ against the *combined* gross), **auto-mode deferral** and its recovery, the **ha
 manual run that finishes the month seals it; a forced run on an incomplete month seals
 nothing; sealing twice is a no-op), and **billing-vs-enrolment** (a child unenrolled
 mid-month is still billed for what they attended; unenrolling clears the block they caused).
+
+_Also in the Deno suite (added 2026-07-20):_ **`packages.test.ts`** (9) — the
+no-package TRIPWIRE (a parent with no package produces the pre-package invoice,
+byte-for-byte), locked-rate coverage both ways, chronological exhaustion cutover,
+FIFO-by-expiry, the expiry boundary ON `expires_on`, coverage starting at confirmation,
+category scope, package-then-credit precedence, and the ⚠RISK-4 pin:
+`package_live_balances()`'s prediction equals the engine's settled result. All 9
+verified failing on the pre-package engine. Plus **`../package-emails/email.test.ts`**
+(7) — purchase-email builders (escaping, no-key no-op), run by the same `test.sh`.
 
 _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
@@ -325,6 +345,11 @@ runtime (checks the deep joins resolve — no NaN, no empty tables);
 is already marked, and a bulk save persists `cancelled_rain` to the DB;
 `verify-class-edit.mjs` drives the admin Classes page — the create form no longer defaults
 the day (required choice) and an existing class edits Saturday→Sunday and persists;
+`verify-packages.mjs` (+ `fixtures-packages.sql`) drives prepaid packages across both
+UIs — the parent card shows the LIVE count (9 of 10, the un-invoiced lesson already
+subtracted), request → PayNow (the requested package's price, not the held one's) →
+pending → admin confirm → Active, and the students "running low" filter obeys its
+per-tenant threshold in both directions (16 checks);
 `verify-invoice-controls.mjs` drives the admin invoice controls — it MEASURES the toggle's
 track and knob rects from the DOM (§7.34) in both states and asserts the knob stays inside the
 track, that a click round-trips through the DB, and that the billing month defaults to and is
@@ -384,6 +409,31 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 - **`credit_applications` ledger** records every partial draw of a note against an
   invoice, so the note ledger reconciles with `invoices.credit_applied`. Invariants:
   `SUM(applications by invoice) = credit_applied`; `credit_balance = SUM(remaining across notes)`.
+- **A PACKAGE IS MONEY AT A LOCKED RATE, AND ONLY THE ENGINE MOVES IT** (2026-07-20,
+  PRD §7.16, `PACKAGES_DESIGN.md`). The rules that must not be re-derived wrongly:
+  - **Dollars stored, lessons derived** (`balance ÷ rate` — exact because drawdown is
+    locked-rate). Don't store a lesson counter; it has no answer when a lesson isn't the
+    price you expected (HANDOVER of the age/DOB rule to money).
+  - **Drawdown happens at INVOICE time, in `core.ts` phase 2** — never at marking time.
+    Live displays derive via **`package_live_balances()`, the ONLY derivation of pending
+    draws**; parent app + admin both call it. Do NOT reimplement "lessons left" in TS —
+    a Deno test pins the RPC's prediction against the engine's settled result, and the
+    grep gate is `grep -rn "value_remaining" SwimSyncApp/app SwimSyncAdmin/app`
+    (stored-column display only; no arithmetic with attendance).
+  - **Instance terms are snapshotted from the product BY THE DB at request time**
+    (lifecycle trigger, NOT SECURITY DEFINER — §7.38); product money terms are immutable
+    by trigger (a price change is retire + new product); balances are CHECK-bounded
+    `0 ≤ value_remaining ≤ total_value` and client-immutable via the current_user seam.
+  - **Corrections restore the package** (reversal rows in `package_applications`, at
+    most once per line), never a cash credit note — prepaid value and refund liability
+    are separate pots. The trigger is on its SEVENTH redefinition; start any edit from
+    `grep -ln "handle_attendance_update" supabase/migrations/*.sql | tail -1`.
+  - **Categories scope packages and are the class axis; tiers are products.** "No
+    category = private coach" is FALSE — scope-less packages are just all-classes, and
+    a tenant with no packages is simply ad hoc (coach type must not sneak back in).
+  - **`package-emails`** is a separate Edge Function (verify_jwt ON, caller re-checked
+    in-body), sharing the project-wide `RESEND_API_KEY`. Deployed separately, like
+    everything under `supabase/functions/`.
 - **RLS** uses `SECURITY DEFINER` helpers (`is_superadmin()`, `current_parent_id()`,
   `current_coach_id()`, `coach_serves_parent()`) to avoid policy recursion — see
   `20260309000600_rls_policies.sql`. Plus `coach_serves_parent_profile()` (migration
@@ -861,6 +911,62 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     as truth is worse than an empty column, because an empty column prompts a question.
     Audit: `grep -rn "<column>" supabase/migrations/ | grep -i "update\|insert\|set "` — no
     hits beyond the DDL means nothing maintains it.
+
+38. **A `SECURITY DEFINER` trigger cannot see who the client is — `current_user` inside it
+    is `postgres`, so every current_user-seam check waves everyone through.** The package
+    lifecycle trigger shipped its first draft as DEFINER (to read products "safely") and a
+    parent's request could insert itself as `active` — caught because pgTAP tests the
+    parent role path. `pin_student_tenant()` works precisely because it is NOT definer:
+    client DML arrives as `authenticated`, definer functions as `postgres`, the engine as
+    `service_role`, and a plain trigger sees those differences. If a trigger needs both the
+    seam and privileged reads, it is two functions, not one flag. Audit:
+    `grep -B3 "current_user" supabase/migrations/*.sql | grep -i "definer"` — any hit is
+    this bug.
+
+---
+
+## 8.8 Eighth session (2026-07-20) — PREPAID LESSON PACKAGES — BUILT, NOT YET DEPLOYED
+
+Branch **`feat/lesson-packages`**, seven commits, **NOT merged to `main` and nothing
+deployed** — the deploy sequence is §9's first item. Designed with the user across a long
+walkthrough first (the record is `PACKAGES_DESIGN.md`, written via /plan-review with
+mitigations inline); every phase then built and verified locally in one run.
+
+**What shipped (local):** the full §7.16 feature — schema (`20260720000100`), engine
+drawdown, correction-restore trigger (`20260720000200`), admin Packages page + class
+categories + the per-tenant "running low" students filter, the parent Packages tab with
+request→PayNow→confirm flow, purchase emails via a new `package-emails` Edge Function,
+and `verify-packages.mjs` (16/16 against both running UIs).
+
+**Design calls worth remembering** (full reasoning in PACKAGES_DESIGN.md §1): dollars
+stored / lessons derived; locked rate always, price rise = new product; scope =
+tenant-defined class categories, tiers = products (a class is never duplicated per
+tier); wallet floors at zero and the INVOICE stays the only debt instrument (an early
+"wallet can go negative" idea was walked back — a negative wallet and an outstanding
+invoice are the same debt recorded twice); FIFO by earliest expiry; expiry judged on the
+lesson's own date; restore-not-credit on corrections. The cash-vs-value-granted problem
+dissolved once the discount moved into the rate itself.
+
+**Verification:** 244 pgTAP (30 + 12 new) with the correction suite proven failing 9/12
+on the pre-fix trigger; 90 Deno (9 + 7 new) run twice, all 9 engine tests proven failing
+on the pre-package engine; both apps typecheck under the §7.11 stubbed condition; the
+§7.20 RLS audit returns zero rows; the ⚠RISK-1 tenant-filter grep and ⚠RISK-4
+no-TS-derivation grep both pass. The pre-commit gate in PACKAGES_DESIGN.md was walked.
+
+**Found on the way:** the SECURITY DEFINER trigger seam bug (now gotcha **§7.38** —
+caught by pgTAP exercising the parent role, verified the failing way); the driver's
+first run bought the wrong product (`.first()` on an ambiguous button) and one of its
+own assertions was §7.10-weak (page-wide innerText matching the products table) — both
+fixed, and the weak assertion replaced with a string only the held-row cell renders.
+
+**One honest caveat:** a *package-write-failure leaves the month unsealed* path exists
+in code (`invoiceWriteFailed`) but has no test — forcing that failure needs fault
+injection the real-client test harness doesn't have. Noted here rather than silently
+skipped.
+
+**Deliberately not done:** in-app refunds (admin cancels, remaining value shown, money
+settles offline); parent low-balance notifications (admin filter shipped first);
+arbitrary top-ups (buy another package). All in `BACKLOG.md` with reasoning.
 
 ---
 
@@ -2250,11 +2356,34 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### Nothing is outstanding from 2026-07-19
+### FIRST: the packages feature is built and verified but NOT deployed (§8.8)
 
-All seven sessions' work is merged, deployed and **confirmed on production by the user**: the
-billing-month guard refuses July, the platform admin has their own panel, and the real coach
-— the §7.19 account — still has all eleven pages. Start clean.
+Branch `feat/lesson-packages` is complete and green locally; nothing has touched
+production. The deploy is pure EXPAND, so the order is (§6 / §7.27 / §7.30):
+
+1. **Backup** the production DB (scratchpad, not committed).
+2. `supabase migration list` — the pending set must be EXACTLY
+   `20260720000100` + `20260720000200` (§7.30: db push applies everything pending).
+3. `supabase db push`, then `supabase migration list` again — nothing pending.
+4. `supabase functions deploy generate-invoices` (engine v13 → v14) **and**
+   `supabase functions deploy package-emails` (a NEW function — a plain deploy of the
+   old one does not create it). Verify both via `supabase functions list`.
+5. `git checkout main && git merge feat/lesson-packages` → push → both Vercel sites
+   rebuild. Delete the branch (local + remote).
+6. Smoke on production as the real coach: /packages renders empty (no products yet),
+   /students filter present, app Billing shows the Packages tab with the
+   "doesn't offer packages yet" state.
+
+Until step 5, production parents see no change at all; steps 3–4 are invisible to the
+running apps (additive schema, and the engine change only activates when a package
+exists). There is no partial-deploy hazard beyond the standing rule: never push the web
+apps before the migrations.
+
+### Then: everything from 2026-07-19 remains done
+
+All seven prior sessions' work is merged, deployed and **confirmed on production by the
+user**: the billing-month guard refuses July, the platform admin has their own panel, and
+the real coach — the §7.19 account — still has all eleven (now twelve) pages.
 
 ### The one thing blocking everything else — and it has been urgent for four sessions
 

@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-19 (sixth session)_
+_Last updated: 2026-07-20 (packages session)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -117,7 +117,7 @@ Email-confirmation copy/templates (S).
 
 ### Later — big features carrying their own dependencies
 
-Package pricing (L), Makeup lessons (L), Multiple classes per child (M), Parent
+Makeup lessons (L), Multiple classes per child (M), Parent
 self-enrolment (M), Coach-assisted assignment (M), Household split billing (M), Auto PayNow
 detection (L), In-app payment gateway (L), Multiple coaches per class (S), Multi-language
 (M), Shared `lessonDates` package (M — *not recommended*, see the item), Generate real
@@ -221,39 +221,38 @@ deliberately $0. Probably only makes sense if SwimSync ever serves coaches other
 its owner. Related: automatic PayNow detection above gets much of the benefit without
 the fee.
 
-### Package / subscription pricing — **L** `[MVP-excluded]` `[Phase 3]`
-Sell a block of lessons (or a monthly subscription) up front instead of billing per
-attended lesson.
+### ~~Package / subscription pricing~~ — **SHIPPED 2026-07-20** `[MVP-excluded]` `[Phase 3]`
+Built as **prepaid lesson packages** — see PRD §7.16 and `PACKAGES_DESIGN.md` for the
+full model and the reasoning. Two of this entry's old warnings turned out to be wrong
+in instructive ways, kept here so the next big item benefits:
 
-**Why:** it's how a lot of swim schools actually price, it smooths the coach's cash
-flow, and it makes revenue predictable. Pay-per-attendance means a rainy month is a pay
-cut.
+- It predicted a **second billing model** that "inverts billing-derives-from-attendance".
+  The build deliberately refused that shape: attendance still drives everything, money
+  still moves only at invoice time, and a package is a prepaid balance the SAME engine
+  draws down. The ad-hoc path is byte-identical (tripwire-tested) — no second model.
+- It predicted client-visible concurrent drawdown. Drawdown lives in the single-threaded
+  invoice engine instead; live displays are a read-only RPC. No concurrency surface.
 
-**Notes:** this is not a pricing tweak, it's a **second billing model** living beside
-the first, and it inverts the core rule that billing derives from attendance (§5.5).
-Packages need a balance to draw down, an expiry policy, and a completely different
-answer to "what happens when a lesson is cancelled." Expect it to touch the invoice
-engine, the credit ledger, and every billing screen.
+**Follow-ups now queued below:** in-app refunds (settled offline today), parent-facing
+low-balance/expiry notifications (the ADMIN-facing filter shipped).
 
-Decisions already made:
+### Parent-facing package notifications — **S**
+Email/notify the parent when their package runs low or approaches expiry.
 
-- **Coexists with pay-per-use, doesn't replace it.** Today's model is entirely
-  pay-per-use — the student attends, and the parent settles the month's attended lessons
-  at month end. Package means the parent pays for e.g. 10 lessons up front and each
-  attendance draws the balance down 10 → 9. Both models must be live at once, so
-  **the payment model is a property of the enrolment, not of the system** — and the
-  invoice engine has to skip package-covered attendance rather than bill it twice.
-- **A package belongs to the parent, not the child.** A parent with 3 kids buys one
-  package and all 3 draw from the same balance. This has precedent worth following:
-  `parents.credit_balance` is already pooled per parent (HANDOVER §6), so a package
-  balance hanging off `parents` matches the ledger people already have a mental model
-  for. It also means concurrent draw-down is real — two kids in Saturday classes marked
-  from two screens hit one balance, so the decrement belongs in the database, not the
-  client.
+**Why:** today the parent must open the app to notice; the admin has a "running low"
+filter (per-tenant threshold) but the nudge still travels by hand. The building blocks
+exist: `package_live_balances()` is the number, and the `package-emails` function is
+the delivery path — this is a scheduled check away (needs cron, like the reminder
+chain).
 
-Still open before starting: expiry, what happens when a balance hits zero mid-month
-(fall back to pay-per-use, or block?), and whether a refund of unused lessons lands in
-`credit_balance` or back on the card.
+### In-app package refunds — **S**
+Record a refund against a cancelled package instead of settling fully offline.
+
+**Why:** cancellation freezes the remaining value and shows it, but the money movement
+lives outside SwimSync — fine at one tenant, unauditable at ten. **Notes:** the
+commercial convention discussed 2026-07-20: refund = paid − (lessons taken × walk-in
+rate), i.e. claw back the volume discount on lessons actually used; don't apportion
+"bonus vs cash".
 
 ### Household-level split billing — **M** `[MVP-excluded]`
 Let two parents (e.g. separated households) each receive a share of the invoice.

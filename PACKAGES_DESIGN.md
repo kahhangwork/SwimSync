@@ -1,8 +1,9 @@
 # SwimSync — Prepaid Lesson Packages: Design & Implementation Plan
 
-_Drafted 2026-07-20. Status: **plan — nothing below is built.** This document is the
-plan of record for the packages feature; it graduates into PRD.md section(s) as
-phases ship, the same way TENANCY_DESIGN.md did._
+_Drafted 2026-07-20. Status: **BUILT — all phases, 2026-07-20** (branch
+`feat/lesson-packages`; deployment pending, see HANDOVER §9). Shipped behaviour now
+lives in PRD §7.16; this document remains the design record — the decision table below
+and the risk mitigations are the durable part, the same role TENANCY_DESIGN.md plays._
 
 Mitigations from `/plan-review` are inlined next to the step they govern, marked
 `⚠ RISK n`. The pre-commit gate at the bottom is walked before every commit in this
