@@ -80,6 +80,8 @@ export type CreatedInvoice = {
   tenant_id: string;
   billing_month: string;
   gross: number;
+  /** Prepaid package value applied. net = gross − package − credit. */
+  package: number;
   credit: number;
   net: number;
   items: CreatedInvoiceItem[];
@@ -318,7 +320,7 @@ async function generateForTenant(
   // are persisted to invoice_items and rendered in the email).
   const { data: classes, error: clsErr } = await supabase
     .from("classes")
-    .select("id, title, price_per_lesson, day_of_week")
+    .select("id, title, price_per_lesson, day_of_week, category_id")
     .eq("is_active", true)
     .eq("tenant_id", tenantId)   // isolation: RLS does not apply to service_role
     .order("id");
@@ -348,6 +350,9 @@ async function generateForTenant(
     // when a child is renamed later. Reading it live is the same mistake as
     // reading classes.price_per_lesson at generation time.
     student_name: string | null;
+    // The class's category at generation time — used ONLY to match packages
+    // in phase 2. NOT a column on invoice_items; stripped before insert.
+    class_category_id: string | null;
   };
 
   const log: unknown[] = [];
@@ -570,6 +575,7 @@ async function generateForTenant(
             class_title: cls.title,
             session_date: sessionDate,
             student_name: studentNameById.get(ps.student_id) ?? null,
+            class_category_id: (cls.category_id as string | null) ?? null,
           });
         }
       }
@@ -603,6 +609,51 @@ async function generateForTenant(
         `Cannot generate invoices for ${billingMonth}: ${blocking.length} lesson(s) still have unmarked attendance. Mark them — or mark them cancelled if the lesson did not run — then generate again.`,
       results: log,
     };
+  }
+
+  // ── Active prepaid packages for this tenant, in draw order ────────────────
+  // FIFO by earliest expiry (tie: confirmed_at, then id) — the exact order
+  // package_live_balances() simulates; a Deno test pins the two against each
+  // other so the derivation and the real draw cannot drift apart (§7.18).
+  // Isolation: explicit tenant filter — RLS does not apply to service_role.
+  const { data: pkgRows, error: pkgErr } = await supabase
+    .from("parent_packages")
+    .select(
+      "id, parent_id, category_id, rate_per_lesson, value_remaining, confirmed_at, expires_on"
+    )
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .order("expires_on", { ascending: true })
+    .order("confirmed_at", { ascending: true })
+    .order("id", { ascending: true });
+  if (pkgErr) throw new Error(pkgErr.message);
+
+  type ActivePackage = {
+    id: string;
+    category_id: string | null;
+    rate: number;
+    remaining: number;
+    startsOn: string;
+    endsOn: string;
+    drawn: number;
+  };
+  const packagesByParent = new Map<string, ActivePackage[]>();
+  for (const p of pkgRows ?? []) {
+    const list = packagesByParent.get(p.parent_id as string) ?? [];
+    list.push({
+      id: p.id as string,
+      category_id: (p.category_id as string | null) ?? null,
+      rate: Number(p.rate_per_lesson),
+      remaining: Number(p.value_remaining),
+      // Coverage is judged against the LESSON's own date: from the SGT date
+      // of confirmation through expiry. A package bought mid-month covers
+      // lessons from purchase onward, and a package that has expired by
+      // GENERATION time still pays for lessons taken while it was live.
+      startsOn: dateInTimeZone(new Date(p.confirmed_at as string), APP_TIMEZONE),
+      endsOn: String(p.expires_on),
+      drawn: 0,
+    });
+    packagesByParent.set(p.parent_id as string, list);
   }
 
   // ── Phase 2: create ONE invoice per parent, across all their classes ──────
@@ -657,6 +708,32 @@ async function generateForTenant(
       continue;
     }
 
+    // ── Prepaid packages: cover in-scope lessons at the PACKAGE's locked rate ─
+    // Chronological items, packages FIFO by expiry. A covered line is REPRICED
+    // to the package rate — the package IS a price agreement, so the invoice
+    // line records what the family actually pays, not the walk-in price. An
+    // uncovered line (out of scope, outside the window, or the package cannot
+    // fully fund it) keeps its class_rate_on price: the shortfall path is
+    // today's ad-hoc billing, unchanged. A parent with no packages never
+    // enters this block and takes the exact statements they always did.
+    const pkgs = packagesByParent.get(parentId) ?? [];
+    const pkgDrawByItem = new Map<number, { pkg: ActivePackage; amount: number }>();
+    let packageApplied = 0;
+    for (let idx = 0; idx < items.length; idx++) {
+      const it = items[idx];
+      for (const p of pkgs) {
+        if (p.category_id && p.category_id !== it.class_category_id) continue;
+        if (it.session_date < p.startsOn || it.session_date > p.endsOn) continue;
+        if (p.remaining < p.rate) continue; // never a partial draw
+        p.remaining -= p.rate;
+        p.drawn += p.rate;
+        it.amount = p.rate; // locked rate, whatever the class charges walk-ins
+        pkgDrawByItem.set(idx, { pkg: p, amount: p.rate });
+        packageApplied += p.rate;
+        break;
+      }
+    }
+
     // Credit available FROM THIS TENANT. Never crosses: a note earned at a
     // school is not spendable against a private coach's invoice, or one
     // business ends up paying another's bill. Pools freely across this parent's
@@ -669,9 +746,12 @@ async function generateForTenant(
       .maybeSingle();
 
     const available = Number(balanceRow?.credit_balance ?? 0);
+    // Gross sums the FINAL line amounts (package-repriced where covered).
+    // Package covers its own lines by construction; credit notes then apply
+    // to whatever cash remains — the two pots never overlap.
     const gross = items.reduce((s, i) => s + i.amount, 0);
-    const credit = Math.min(available, gross);
-    const net = gross - credit;
+    const credit = Math.min(available, gross - packageApplied);
+    const net = gross - packageApplied - credit;
 
     // Insert invoice
     const { data: invoice, error: invErr } = await supabase
@@ -681,6 +761,7 @@ async function generateForTenant(
         tenant_id: tenantId,
         billing_month: billingMonth,
         gross_amount: gross,
+        package_applied: packageApplied,
         credit_applied: credit,
         net_amount: net,
         status: net === 0 ? "paid" : "outstanding",
@@ -703,9 +784,20 @@ async function generateForTenant(
     // parent an invoice with no line items — and the credit-note trigger,
     // which keys off invoice_items, could never fire for those lessons.
     // Stop before touching money.
-    const { error: itemsErr } = await supabase
+    //
+    // class_category_id is engine-internal (package matching) — stripped here,
+    // NOT a column. .select() returns the new ids so package draws can ledger
+    // against their invoice_item_id; rows are matched back by
+    // (lesson_session_id, student_id), which attendance makes unique.
+    const { data: insertedItems, error: itemsErr } = await supabase
       .from("invoice_items")
-      .insert(items.map((i) => ({ invoice_id: invoice.id, ...i })));
+      .insert(
+        items.map(({ class_category_id: _cat, ...i }) => ({
+          invoice_id: invoice.id,
+          ...i,
+        }))
+      )
+      .select("id, lesson_session_id, student_id");
 
     if (itemsErr) {
       invoiceWriteFailed = true;
@@ -715,6 +807,73 @@ async function generateForTenant(
         error: `invoice_items insert failed: ${itemsErr.message}`,
       });
       continue;
+    }
+
+    // ── Record package draws: ledger rows + balance decrements ──────────────
+    // A failure here is money-shaped: the invoice's lines are already priced
+    // at package rates, so draws that fail to record would hand out the
+    // package price without consuming the package. Flag invoiceWriteFailed —
+    // an unsealed month is the retry path (§7.17: a failed write must never
+    // be sealed over).
+    if (packageApplied > 0) {
+      const itemIdByKey = new Map(
+        (insertedItems ?? []).map((r) => [
+          `${r.lesson_session_id}:${r.student_id}`,
+          r.id as string,
+        ])
+      );
+
+      const ledgerRows: {
+        parent_package_id: string;
+        invoice_item_id: string;
+        amount: number;
+      }[] = [];
+      let ledgerMappingFailed = false;
+      for (const [idx, draw] of pkgDrawByItem) {
+        const it = items[idx];
+        const itemId = itemIdByKey.get(`${it.lesson_session_id}:${it.student_id}`);
+        if (!itemId) {
+          ledgerMappingFailed = true;
+          break;
+        }
+        ledgerRows.push({
+          parent_package_id: draw.pkg.id,
+          invoice_item_id: itemId,
+          amount: draw.amount,
+        });
+      }
+
+      const { error: ledgerErr } = ledgerMappingFailed
+        ? { error: { message: "could not match a drawn item to its inserted row" } }
+        : await supabase.from("package_applications").insert(ledgerRows);
+
+      if (ledgerErr) {
+        invoiceWriteFailed = true;
+        log.push({
+          parent_id: parentId,
+          invoice_id: invoice.id,
+          error: `package_applications insert failed: ${ledgerErr.message}`,
+        });
+        continue;
+      }
+
+      for (const p of pkgs) {
+        if (p.drawn <= 0) continue;
+        const { error: balErr } = await supabase
+          .from("parent_packages")
+          .update({ value_remaining: p.remaining })
+          .eq("id", p.id)
+          .eq("tenant_id", tenantId); // isolation: service_role bypasses RLS
+        if (balErr) {
+          invoiceWriteFailed = true;
+          log.push({
+            parent_id: parentId,
+            invoice_id: invoice.id,
+            error: `package balance update failed for ${p.id}: ${balErr.message}`,
+          });
+        }
+        p.drawn = 0; // settled; p.remaining already reflects the draws
+      }
     }
 
     // Apply credit balance FIFO. Draw down each credit note by the
@@ -809,6 +968,7 @@ async function generateForTenant(
       tenant_id: tenantId,
       billing_month: billingMonth,
       gross,
+      package: packageApplied,
       credit,
       net,
       items: items.map((i) => ({
@@ -823,6 +983,7 @@ async function generateForTenant(
       invoice_id: invoice.id,
       billing_month: billingMonth,
       gross,
+      package: packageApplied,
       credit,
       net,
     });

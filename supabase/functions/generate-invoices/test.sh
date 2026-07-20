@@ -11,4 +11,4 @@ eval "$(cd "$ROOT" && supabase status -o env)"
 export SUPABASE_URL="${API_URL}"
 export SERVICE_ROLE_KEY
 
-exec deno test --allow-net --allow-env core.test.ts email.test.ts dates.test.ts
+exec deno test --allow-net --allow-env core.test.ts email.test.ts dates.test.ts packages.test.ts

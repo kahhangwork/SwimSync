@@ -46,6 +46,8 @@ export type InvoiceEmailData = {
   logoUrl?: string | null;
   billingMonth: string; // YYYY-MM
   gross: number;
+  /** Prepaid package value applied. net = gross − package − credit. */
+  packageApplied?: number;
   credit: number;
   net: number;
   items: InvoiceEmailItem[];
@@ -117,6 +119,17 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
     )
     .join("");
 
+  const packageRow =
+    (data.packageApplied ?? 0) > 0
+      ? `
+              <tr>
+                <td colspan="2" style="padding:6px 0;font-size:13px;color:#475569;text-align:right;">Package applied</td>
+                <td style="padding:6px 0;font-size:13px;color:#2563eb;text-align:right;white-space:nowrap;">−${escapeHtml(
+                  money(data.packageApplied ?? 0)
+                )}</td>
+              </tr>`
+      : "";
+
   const creditRow =
     data.credit > 0
       ? `
@@ -128,9 +141,15 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
               </tr>`
       : "";
 
+  const coveredBy =
+    (data.packageApplied ?? 0) > 0 && data.credit > 0
+      ? "your lesson package and credit balance"
+      : (data.packageApplied ?? 0) > 0
+        ? "your lesson package"
+        : "your credit balance";
   const payBlock = fullyCovered
     ? `<p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#475569;">
-              This invoice is <strong>fully covered by your credit balance</strong> — there's nothing to pay. You can view the details in the app.
+              This invoice is <strong>fully covered by ${coveredBy}</strong> — there's nothing to pay. You can view the details in the app.
             </p>`
     : `<p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">
               Pay via the coach's PayNow QR code shown in the app, then the coach will mark it as paid.
@@ -176,7 +195,7 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
                 <td style="padding:10px 0 6px;font-size:13px;color:#0f172a;text-align:right;white-space:nowrap;">${escapeHtml(
                   money(data.gross)
                 )}</td>
-              </tr>${creditRow}
+              </tr>${packageRow}${creditRow}
               <tr>
                 <td colspan="2" style="padding:8px 0;font-size:16px;font-weight:700;color:#0f172a;text-align:right;border-top:2px solid #e2e8f0;">Amount due</td>
                 <td style="padding:8px 0;font-size:16px;font-weight:700;color:${
@@ -322,6 +341,7 @@ export async function emailCreatedInvoices(
         logoUrl: brand?.logo ?? null,
         billingMonth: inv.billing_month,
         gross: inv.gross,
+        packageApplied: inv.package,
         credit: inv.credit,
         net: inv.net,
         appUrl,

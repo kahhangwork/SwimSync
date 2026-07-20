@@ -687,7 +687,7 @@ export async function getInvoice(
 ) {
   let q = db
     .from("invoices")
-    .select("id, gross_amount, credit_applied, net_amount, status")
+    .select("id, gross_amount, package_applied, credit_applied, net_amount, status")
     .eq("parent_id", parentId)
     .eq("billing_month", billingMonth);
   if (tenantId) q = q.eq("tenant_id", tenantId);
@@ -696,6 +696,7 @@ export async function getInvoice(
   return {
     id: data.id as string,
     gross: Number(data.gross_amount),
+    package_applied: Number(data.package_applied),
     credit_applied: Number(data.credit_applied),
     net: Number(data.net_amount),
     status: data.status as string,
@@ -714,7 +715,7 @@ export async function checkInvariants(db: SupabaseClient, parentId: string) {
 
   const { data: invoices } = await db
     .from("invoices")
-    .select("id, gross_amount, credit_applied")
+    .select("id, gross_amount, package_applied, credit_applied")
     .eq("parent_id", parentId);
   for (const inv of invoices ?? []) {
     // Gross must equal the line items backing it. This is what catches a
@@ -740,6 +741,30 @@ export async function checkInvariants(db: SupabaseClient, parentId: string) {
       problems.push(
         `invoice ${inv.id}: credit_applied=${inv.credit_applied} but SUM(applications)=${sum}`
       );
+    }
+
+    // Package invariant: the invoice's package_applied must equal the LIVE
+    // (unreversed) package_applications against its items.
+    const { data: invItems } = await db
+      .from("invoice_items")
+      .select("id")
+      .eq("invoice_id", inv.id);
+    const itemIds = (invItems ?? []).map((i) => i.id as string);
+    if (itemIds.length) {
+      const { data: pkgApps } = await db
+        .from("package_applications")
+        .select("amount")
+        .in("invoice_item_id", itemIds)
+        .is("reversed_at", null);
+      const pkgSum = (pkgApps ?? []).reduce((s, a) => s + Number(a.amount), 0);
+      const declared = Number(
+        (inv as unknown as { package_applied?: number }).package_applied ?? 0
+      );
+      if (Math.abs(pkgSum - declared) > 0.001) {
+        problems.push(
+          `invoice ${inv.id}: package_applied=${declared} but SUM(live package_applications)=${pkgSum}`
+        );
+      }
     }
   }
 
