@@ -128,7 +128,7 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   threshold). Request → PayNow → admin confirm; corrections restore the package, never
   mint cash credit. Ad-hoc billing byte-identical (tripwire-tested). PRD §7.16,
   `PACKAGES_DESIGN.md`, §8.8.
-- **Automated tests** — backend **244 pgTAP + 90 Deno**, plus frontend suites
+- **Automated tests** — backend **244 pgTAP + 91 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest 76, `SwimSyncApp` jest-expo 69); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
@@ -239,7 +239,7 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 supabase test db                                  # 244 tests across 17 files
 
 # Backend — Function tests (Deno): billing math, credit + package ledgers, emails
-supabase/functions/generate-invoices/test.sh      # 90 tests; needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 91 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
 cd SwimSyncAdmin && npm test                       # 76 tests
@@ -303,13 +303,14 @@ manual run that finishes the month seals it; a forced run on an incomplete month
 nothing; sealing twice is a no-op), and **billing-vs-enrolment** (a child unenrolled
 mid-month is still billed for what they attended; unenrolling clears the block they caused).
 
-_Also in the Deno suite (added 2026-07-20):_ **`packages.test.ts`** (9) — the
+_Also in the Deno suite (added 2026-07-20):_ **`packages.test.ts`** (10) — the
 no-package TRIPWIRE (a parent with no package produces the pre-package invoice,
 byte-for-byte), locked-rate coverage both ways, chronological exhaustion cutover,
 FIFO-by-expiry, the expiry boundary ON `expires_on`, coverage starting at confirmation,
 category scope, package-then-credit precedence, and the ⚠RISK-4 pin:
-`package_live_balances()`'s prediction equals the engine's settled result. All 9
-verified failing on the pre-package engine. Plus **`../package-emails/email.test.ts`**
+`package_live_balances()`'s prediction equals the engine's settled result, and the
+fault-injection test (a failed ledger write holds the month open). All verified
+failing on the pre-package engine or a mutated flag. Plus **`../package-emails/email.test.ts`**
 (7) — purchase-email builders (escaping, no-key no-op), run by the same `test.sh`.
 
 _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
@@ -948,7 +949,7 @@ lesson's own date; restore-not-credit on corrections. The cash-vs-value-granted 
 dissolved once the discount moved into the rate itself.
 
 **Verification:** 244 pgTAP (30 + 12 new) with the correction suite proven failing 9/12
-on the pre-fix trigger; 90 Deno (9 + 7 new) run twice, all 9 engine tests proven failing
+on the pre-fix trigger; 91 Deno (10 + 7 new) run twice, all engine tests proven failing
 on the pre-package engine; both apps typecheck under the §7.11 stubbed condition; the
 §7.20 RLS audit returns zero rows; the ⚠RISK-1 tenant-filter grep and ⚠RISK-4
 no-TS-derivation grep both pass. The pre-commit gate in PACKAGES_DESIGN.md was walked.
@@ -959,10 +960,14 @@ first run bought the wrong product (`.first()` on an ambiguous button) and one o
 own assertions was §7.10-weak (page-wide innerText matching the products table) — both
 fixed, and the weak assertion replaced with a string only the held-row cell renders.
 
-**One honest caveat:** a *package-write-failure leaves the month unsealed* path exists
-in code (`invoiceWriteFailed`) but has no test — forcing that failure needs fault
-injection the real-client test harness doesn't have. Noted here rather than silently
-skipped.
+**The write-failure path is now tested too** (closed 2026-07-20, same session, after
+the user asked about it): `generateInvoices` takes the client as a PARAMETER, so fault
+injection is just a Proxy shim that fails exactly the `package_applications` insert —
+no harness needed, an oversight in the original "can't test this" claim. The test pins:
+month unsealed + no `billing_periods` row, failure named in the run log, balance
+untouched (the decrement is sequenced after the ledger), `checkInvariants` DETECTS the
+invoice/ledger mismatch, and a clean retry seals. Proven discriminating by mutating the
+flag out and watching it fail on "must not seal" (§7.25).
 
 **Deliberately not done:** in-app refunds (admin cancels, remaining value shown, money
 settles offline); parent low-balance notifications (admin filter shipped first);

@@ -18,6 +18,7 @@
 // tripwire is the one deliberate exception and is labelled above.
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateInvoices } from "./core.ts";
 import {
   newScenario,
@@ -376,6 +377,94 @@ Deno.test("precedence: the package covers its lines, credit notes then cover the
 
     const chk = await checkInvariants(s.db, s.parentId);
     assert(chk.ok, chk.problems.join("; "));
+  } finally {
+    await s.teardown();
+  }
+});
+
+// ── ⚠ RISK 1: a failed package write must leave the month UNSEALED ──────────
+// The engine has no transactions: invoice → items → package ledger → balance
+// are independent writes. If the ledger insert fails, the invoice's lines are
+// already priced at package rates with no recorded draw — a mismatch a human
+// must reconcile. The engine's whole obligation is to FLAG it (log + hold the
+// month open, §7.17: a failed write must never be sealed over). Fault
+// injection is a client shim: generateInvoices takes the client as a
+// parameter, so a wrapper that fails exactly the package_applications insert
+// is the whole harness. The assertions below are precisely the flag's effect,
+// so deleting the invoiceWriteFailed set on this path fails this test.
+
+function failPackageLedger(real: SupabaseClient): SupabaseClient {
+  return new Proxy(real, {
+    get(target, prop, receiver) {
+      if (prop === "from") {
+        return (table: string) =>
+          table === "package_applications"
+            ? {
+                insert: () =>
+                  Promise.resolve({
+                    data: null,
+                    error: { message: "injected ledger failure (test)" },
+                  }),
+              }
+            : target.from(table);
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  }) as SupabaseClient;
+}
+
+Deno.test("a failed package-ledger write holds the month OPEN and touches no balance", async () => {
+  const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
+  try {
+    const productId = await addProduct(s, { lessons: 10, rate: 40 });
+    const pkgId = await buyPackage(s, productId, "2026-12-01T04:00:00Z");
+
+    const a = await s.addSession("2027-01-02"); await s.mark(a, "present");
+    await s.completeMonth("2027-01");
+
+    // Run 1: the ledger write fails.
+    const res = await generateInvoices(failPackageLedger(s.db), {
+      tenant_id: s.tenantId, mode: "manual", force: true,
+      billing_month: "2027-01", now: s.now,
+    });
+
+    assertEquals(res.sealed, false, "a month with a failed write must not seal");
+    const { data: sealRows } = await s.db
+      .from("billing_periods")
+      .select("billing_month")
+      .eq("tenant_id", s.tenantId)
+      .eq("billing_month", "2027-01");
+    assertEquals((sealRows ?? []).length, 0, "no billing_periods row was written");
+
+    // The failure is LOGGED against the parent, not swallowed.
+    assert(
+      (res.results ?? []).some((r) =>
+        JSON.stringify(r).includes("injected ledger failure")
+      ),
+      "the failed write is named in the run log"
+    );
+
+    // Balance untouched: the decrement is sequenced AFTER the ledger, so a
+    // ledger failure must not spend the package.
+    assertEquals(await pkgRemaining(s, pkgId), 400);
+
+    // The known mismatch state this flag exists to surface: the invoice
+    // carries package pricing with no live ledger rows — and checkInvariants
+    // DETECTS it, which is what makes the mismatch reconcilable rather than
+    // silent.
+    const inv = await getInvoice(s.db, s.parentId, "2027-01");
+    assertEquals(inv!.package_applied, 40);
+    const chk = await checkInvariants(s.db, s.parentId);
+    assert(!chk.ok, "checkInvariants must flag the invoice/ledger mismatch");
+
+    // Run 2, healthy client: the parent is skipped (no double-billing) and
+    // the month NOW seals — the retry path the open month exists for.
+    const res2 = await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true,
+      billing_month: "2027-01", now: s.now,
+    });
+    assertEquals(res2.invoices_created, 0);
+    assertEquals(res2.sealed, true, "a clean retry seals the month");
   } finally {
     await s.teardown();
   }
