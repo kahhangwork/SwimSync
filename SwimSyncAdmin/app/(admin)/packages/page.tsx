@@ -349,6 +349,13 @@ export default function PackagesPage() {
       setError("Could not confirm that purchase.");
       return;
     }
+    // Best-effort "your package is active" email to the parent. Never blocks
+    // or fails the confirmation — the package is already active.
+    supabase.functions
+      .invoke("package-emails", {
+        body: { type: "confirmed", package_id: p.id },
+      })
+      .catch(() => {});
     load();
   }
 

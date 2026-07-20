@@ -224,6 +224,14 @@ export default function BillingScreen() {
         setPackageError("Could not request that package. Please try again.");
         return;
       }
+      // Best-effort email with the amount + PayNow instructions. Fire and
+      // forget: the parent is already being shown the PayNow screen, so a
+      // failed email must never fail the request.
+      supabase.functions
+        .invoke("package-emails", {
+          body: { type: "requested", package_id: data.id },
+        })
+        .catch(() => {});
       await loadData();
       router.push(`/(parent)/billing/paynow?packageId=${data.id}`);
     },
