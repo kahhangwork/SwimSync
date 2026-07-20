@@ -34,6 +34,7 @@ type InvoiceDetail = {
   id: string;
   billing_month: string;
   gross_amount: number;
+  package_applied: number;
   credit_applied: number;
   net_amount: number;
   status: "outstanding" | "paid";
@@ -80,6 +81,7 @@ export default function InvoiceDetailScreen() {
           id,
           billing_month,
           gross_amount,
+          package_applied,
           credit_applied,
           net_amount,
           status,
@@ -132,6 +134,7 @@ export default function InvoiceDetailScreen() {
             ? (inv as any).tenants[0]
             : (inv as any).tenants)?.display_name ?? "Your coach",
         gross_amount: Number(inv.gross_amount),
+        package_applied: Number((inv as any).package_applied ?? 0),
         credit_applied: Number(inv.credit_applied),
         net_amount: Number(inv.net_amount),
         status: inv.status,
@@ -228,6 +231,14 @@ export default function InvoiceDetailScreen() {
                 S${invoice.gross_amount.toFixed(2)}
               </Text>
             </View>
+            {invoice.package_applied > 0 && (
+              <View className="flex-row justify-between">
+                <Text className="text-sm text-blue-500">Package Applied</Text>
+                <Text className="text-sm text-blue-500">
+                  −S${invoice.package_applied.toFixed(2)}
+                </Text>
+              </View>
+            )}
             {invoice.credit_applied > 0 && (
               <View className="flex-row justify-between">
                 <Text className="text-sm text-blue-500">Credit Applied</Text>

@@ -17,13 +17,17 @@ type CoachQR = {
 };
 
 export default function PayNowScreen() {
-  const { invoiceId, coachId } = useLocalSearchParams<{
+  const { invoiceId, coachId, packageId } = useLocalSearchParams<{
     invoiceId: string;
     coachId: string;
+    /** Paying for a PACKAGE REQUEST instead of an invoice. Same payee logic:
+     *  the QR is the business's. */
+    packageId: string;
   }>();
 
   const [netAmount, setNetAmount] = useState<number | null>(null);
   const [billingMonth, setBillingMonth] = useState<string | null>(null);
+  const [packageName, setPackageName] = useState<string | null>(null);
   const [coachQR, setCoachQR] = useState<CoachQR | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,10 +35,33 @@ export default function PayNowScreen() {
     async function load() {
       setLoading(true);
 
-      // The QR comes from the invoice's BUSINESS, not the coach who taught the
-      // lesson. A school with three coaches has one bank account; showing an
+      // The QR comes from the BUSINESS, not the coach who taught the lesson.
+      // A school with three coaches has one bank account; showing an
       // individual coach's QR would send a parent's money to the wrong person.
       // For a private coach the tenant is theirs, so nothing changes for them.
+      if (packageId) {
+        const { data: pkg } = await supabase
+          .from("parent_packages")
+          .select("name, total_value, status, tenants(display_name, paynow_qr_url)")
+          .eq("id", packageId)
+          .single();
+        if (pkg) {
+          setNetAmount(Number(pkg.total_value));
+          setPackageName(pkg.name);
+          const t: any = Array.isArray((pkg as any).tenants)
+            ? (pkg as any).tenants[0]
+            : (pkg as any).tenants;
+          if (t) {
+            setCoachQR({
+              coach_name: t.display_name ?? "Your coach",
+              paynow_qr_url: t.paynow_qr_url ?? null,
+            });
+          }
+        }
+        setLoading(false);
+        return;
+      }
+
       const invoiceRes = invoiceId
         ? await supabase
             .from("invoices")
@@ -69,7 +96,7 @@ export default function PayNowScreen() {
     // coachId is still accepted in the route params for backwards
     // compatibility with existing links, but is no longer used to resolve the
     // payee — the invoice's tenant is authoritative.
-  }, [invoiceId]);
+  }, [invoiceId, packageId]);
 
   return (
     <SafeAreaView className="flex-1 bg-sky-50">
@@ -96,6 +123,9 @@ export default function PayNowScreen() {
               </Text>
               {billingMonth && (
                 <Text className="text-xs text-red-400 mt-1">{billingMonth}</Text>
+              )}
+              {packageName && (
+                <Text className="text-xs text-red-400 mt-1">{packageName}</Text>
               )}
             </View>
           )}

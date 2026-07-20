@@ -29,6 +29,8 @@ const statusConfig: Record<string, { bg: string; text: string; label?: string }>
   Unassigned:     { bg: "bg-yellow-100", text: "text-yellow-700" },
   Inactive:       { bg: "bg-gray-100",   text: "text-gray-500" },
   "Not Marked":   { bg: "bg-gray-100",   text: "text-gray-400", label: "–" },
+  Active:         { bg: "bg-green-100",  text: "text-green-700" },
+  Pending:        { bg: "bg-yellow-100", text: "text-yellow-700" },
 };
 
 interface Props {
