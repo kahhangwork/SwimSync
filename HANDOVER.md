@@ -1,7 +1,8 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-20 (eighth session — prepaid packages, built AND deployed to
-production the same day; dormant until the first product is created)_
+_Last updated: 2026-07-21 (ninth session — a business can now be created in-app: the
+platform admin provisions a tenant and invites its first admin. Built AND deployed the
+same day; dormant until the first business is provisioned)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -132,8 +133,15 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   threshold). Request → PayNow → admin confirm; corrections restore the package, never
   mint cash credit. Ad-hoc billing byte-identical (tripwire-tested). PRD §7.16,
   `PACKAGES_DESIGN.md`, §8.8.
-- **Automated tests** — backend **244 pgTAP + 91 Deno**, plus frontend suites
-  (`SwimSyncAdmin` vitest 76, `SwimSyncApp` jest-expo 69); all run in CI on push to `main`. See §5.
+- **Creating a business (verified UI + backend, live 2026-07-21)** — the platform admin
+  provisions a tenant and invites its first admin from `/platform`: `provision_tenant()` is
+  the **only** INSERT path into `tenants`, the invite link is minted with
+  `generateLink({type:'invite'})` and mailed by us via Resend, and `/accept-invite` takes
+  the new owner from email to signed-in. The overview shows each business's admin as
+  `no admin` / `invited` / `active`. **Dormant in production** — nothing provisioned yet.
+  PRD §4.4, `TENANT_PROVISIONING_PLAN.md`, §8.9.
+- **Automated tests** — backend **265 pgTAP + 91 Deno**, plus frontend suites
+  (`SwimSyncAdmin` vitest 88, `SwimSyncApp` jest-expo 69); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
 **https://swimsync.sg**, admin at **https://admin.swimsync.sg**, real email via
@@ -151,8 +159,8 @@ superadmin + the real coach/classes). See §11.
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **As of 2026-07-20 production is fully caught up**: every migration through
-> `20260720000200` is applied (`supabase migration list` shows nothing pending),
+> **As of 2026-07-21 production is fully caught up**: every migration through
+> `20260721000300` is applied (`supabase migration list` shows nothing pending),
 > `generate-invoices` is at **v14** (package drawdown, on top of the completed-month
 > guard and effective-dated pricing), and a SECOND function exists: **`package-emails`
 > v1** (verify_jwt ON — deployed separately, and a deploy of generate-invoices does NOT
@@ -241,13 +249,13 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 244 tests across 17 files
+supabase test db                                  # 265 tests across 18 files
 
 # Backend — Function tests (Deno): billing math, credit + package ledgers, emails
 supabase/functions/generate-invoices/test.sh      # 91 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
-cd SwimSyncAdmin && npm test                       # 76 tests
+cd SwimSyncAdmin && npm test                       # 88 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
 cd SwimSyncApp && npm test                         # 69 tests
@@ -276,9 +284,10 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `platform_overview.test.sql` (24) | the platform admin's overview RPCs: FOUR caller shapes get zero rows (anon-equivalent, parent, coach, **and a tenant admin — even for their own tenant**), counts never leak across the tenant boundary, and `last_attendance_date` is **NULL, not a date and not 0**, for a business that has never marked anything |
 | `parent_address.test.sql` (8) | a family maintains their own address only; `postal_code` is TEXT so leading zeros survive; `profile_id` cannot be reassigned |
 | `lesson_packages.test.sql` (30) | prepaid packages: RLS on all four tables, $0-rate/0-lesson products refused, product money terms immutable, request snapshots come from the PRODUCT (a parent cannot claim a price or an active status), only non-client roles move a balance, `package_live_balances()` draws locked-rate/in-scope/FIFO and leaves the stored balance alone |
+| `tenant_provisioning.test.sql` (21) | creating a business: parent, coach, **tenant admin** and anon all REFUSED (each in an explicit transaction, 7.16) and `tenants` does not grow after any of them; slug derivation incl. a **non-ASCII name** that would otherwise violate NOT NULL; join-code shape + uniqueness; a fresh tenant reports `admin_status = none`. The two ACL assertions are near-vacuous locally by construction (7.39) |
 | `package_corrections.test.sql` (12) | a correction on a package-funded line restores the package (even expired) and mints NO cash credit note; flip-flops refund at most once; ad-hoc lines keep the credit-note path byte-identical |
 
-**Total: 244 across 17 files** — verified by `supabase test db` 2026-07-20 (the previous
+**Total: 265 across 18 files** — verified by `supabase test db` 2026-07-21 (the previous
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
@@ -356,6 +365,10 @@ UIs — the parent card shows the LIVE count (9 of 10, the un-invoiced lesson al
 subtracted), request → PayNow (the requested package's price, not the held one's) →
 pending → admin confirm → Active, and the students "running low" filter obeys its
 per-tenant threshold in both directions (16 checks);
+`verify-tenant-provisioning.mjs` drives creating a business end to end across the platform
+panel and a second browser context - mismatched confirmation email refused, join code shown,
+the delivery outcome stated explicitly, `invited` -> accept -> **the new admin signs in** ->
+`active` (15 checks; the sign-in is the load-bearing one, per 7.19);
 `verify-invoice-controls.mjs` drives the admin invoice controls — it MEASURES the toggle's
 track and knob rects from the DOM (§7.34) in both states and asserts the knob stays inside the
 track, that a click round-trips through the DB, and that the billing month defaults to and is
@@ -440,6 +453,37 @@ See LOCAL_DEV_GUIDE §"Running the tests".
   - **`package-emails`** is a separate Edge Function (verify_jwt ON, caller re-checked
     in-body), sharing the project-wide `RESEND_API_KEY`. Deployed separately, like
     everything under `supabase/functions/`.
+- **A BUSINESS IS CREATED BY ONE RPC, AND ONLY THE PLATFORM ADMIN MAY CALL IT**
+  (2026-07-21, PRD §4.4, `TENANT_PROVISIONING_PLAN.md`). The rules that must not be
+  re-derived wrongly:
+  - **`provision_tenant()` is the only INSERT path into `tenants`.** The table has no
+    INSERT grant and no `tenants_insert` policy, and it must stay that way — a tenant is
+    the top of the isolation hierarchy, so a caller who can mint one has the largest blast
+    radius in the schema. Audit:
+    `grep -rn "tenants_insert\|GRANT INSERT.*tenants" supabase/migrations/` — no hits.
+  - **The route calls it with the CALLER's token, never the service-role client.**
+    `is_platform_admin()` resolves `auth.uid()`, which is NULL for `service_role`. Calling
+    it as service role does not silently pass — it is refused — but it refuses for the
+    wrong reason, and the pattern is one edit away from §7.8's "gate the only live caller
+    bypasses". Service role is used only for the invite and the compensating delete.
+  - **It RAISES rather than returning zero rows**, deliberately unlike
+    `platform_tenant_overview()`. That one is a READ tool, where a 500 is
+    indistinguishable from an outage; this is a WRITE, where a silent no-op reads as
+    success.
+  - **The tenant is created BEFORE its admin, and the route must compensate.** The auth
+    trigger refuses to create a `tenant_admin` without a `tenant_id` rather than guessing,
+    so the two writes cannot share a transaction. The intermediate state — a business that
+    is live and **joinable** with no operator — is worse than either endpoint, so a failed
+    invite deletes the tenant. `admin_status = 'none'` on the overview is the backstop for
+    any that escape. **Don't "simplify" this by creating the auth user first**; it cannot
+    be done.
+  - **`is_coach` on the invite, NOT `tenants.kind`, decides whether a `coaches` row is
+    made.** That is the private-coach-as-a-tenant-of-one shape. `kind` is copy and future
+    pricing and must never reach an RLS policy or drive this checkbox — a school's owner
+    may teach too.
+  - **Exactly one admin per tenant**, because the role lives on `profiles.tenant_id`. That
+    is a known limit with a named seam (`tenant_members`), not an invariant — see
+    `BACKLOG.md`.
 - **RLS** uses `SECURITY DEFINER` helpers (`is_superadmin()`, `current_parent_id()`,
   `current_coach_id()`, `coach_serves_parent()`) to avoid policy recursion — see
   `20260309000600_rls_policies.sql`. Plus `coach_serves_parent_profile()` (migration
@@ -891,6 +935,7 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     a parent, a coach *and* a tenant admin, not "a non-admin": three of those four arrive
     through ordinary sessions, and a test that tries only one proves almost nothing. Audit:
     `grep -n "SECURITY DEFINER" -A 12 supabase/migrations/*.sql` and check each has both.
+    **AND THAT IS STILL NOT ENOUGH IN PRODUCTION — see §7.39.**
 36. **A shared table component that does not emit its own `<tr>` splits the convention, and
     the losing half is INVALID HTML.** `<th>` cannot be a child of `<thead>`; React reports
     it as a **hydration error at runtime**. `Thead` left the row to callers, so nine call
@@ -928,6 +973,128 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     seam and privileged reads, it is two functions, not one flag. Audit:
     `grep -B3 "current_user" supabase/migrations/*.sql | grep -i "definer"` — any hit is
     this bug.
+
+39. **`REVOKE ALL … FROM PUBLIC` DOES NOT REMOVE ROLE GRANTS, AND THE LOCAL STACK WILL NOT
+    SHOW YOU THE DIFFERENCE.** `provision_tenant()` shipped with the §7.35 recipe —
+    `REVOKE ALL … FROM PUBLIC; GRANT EXECUTE … TO authenticated;` — and local `pg_proc`
+    confirmed it: `{postgres, authenticated}`. A `supabase db dump` of the **remote**, taken
+    straight after `db push`, showed `GRANT ALL … TO "anon"`, `"authenticated"` *and*
+    `"service_role"`. Two causes, both permanent:
+    - **`PUBLIC` is its own grantee, not an umbrella** over `anon`/`authenticated`/
+      `service_role`. Revoking it leaves every role-specific grant untouched.
+    - **Supabase *cloud* carries project-level `ALTER DEFAULT PRIVILEGES` granting EXECUTE
+      on new `public` functions to all three roles.** This repo's `20260309000800_grants.sql`
+      sets default privileges for **TABLES and SEQUENCES only** — the function grants are the
+      platform's, and **the local stack does not reproduce them.**
+    So a grant verified with `pg_proc` locally can be wrong in production, and a pgTAP
+    assertion on it is **vacuous by construction** — it passes locally for the wrong reason.
+    **The only honest check is a dump of the remote after pushing**, which is now a step in
+    every deploy. Write `REVOKE ALL … FROM anon, service_role` explicitly, next to the
+    PUBLIC revoke. Nothing was exposed here (both roles have `auth.uid() = NULL`, so the
+    body gate refused them) — but the second layer was absent while a comment claimed it
+    held. **Still outstanding:** `regenerate_join_code()` and `close_student_enrolment()`
+    have the same grants; backlogged, not swept mid-deploy. Audit:
+    `supabase db dump --file /tmp/p.sql && grep -E '(GRANT|REVOKE).*ON FUNCTION' /tmp/p.sql | grep '"anon"'`.
+
+40. **GET A FUNCTION'S CURRENT DEFINITION FROM THE DATABASE, NOT FROM THE MIGRATION FILE YOU
+    FOUND FIRST.** Extending `platform_tenant_overview()` meant copying its body verbatim —
+    so I copied it from `20260719002300_platform_tenant_overview.sql`, the file whose name
+    matches. But `20260719002400` had already redefined it: `kind` → a derived `shape`,
+    `coaches_without_rate` → `staff_without_rate`. The new migration silently **reverted
+    both**, and the verbatim-diff check I wrote to prevent exactly this passed — **because it
+    diffed against the same wrong file.** It was caught only by dumping the live definition.
+    A function redefined N times has N files and only the last one is true; the filename tells
+    you when it was written, not whether it is current. Same family as the package trigger's
+    "start from `grep -ln … | tail -1`", except `tail -1` is *also* only a heuristic — the
+    database is the fact:
+    `SELECT pg_get_functiondef('public.<fn>()'::regprocedure);`
+    Then diff your new body against **that**, not against a file.
+
+41. **AN UNLISTED AUTH REDIRECT IS NOT REJECTED — IT IS SILENTLY REPLACED WITH `site_url`.**
+    The first invite generated came back with `redirect_to=http://127.0.0.1:3000` instead of
+    the `/accept-invite` we asked for, because that URL was not in
+    `[auth].additional_redirect_urls`. Nothing errored: the email sends, the link works, the
+    token is valid — the user just lands on the wrong page, which for a first-time invite is
+    the admin root instead of the form that sets their password. **If an auth email lands
+    somewhere unexpected, suspect the allow-list before the code.** Note it is an **exact**
+    match, so `localhost:3000` and `127.0.0.1:3000` are different entries — and the admin
+    panel's `/reset-password` had never been listed at all, meaning the existing
+    forgot-password flow was likely landing wrong in production too. Remember it is read only
+    at **boot** (§4): `supabase stop && supabase start`. Production keeps its own copy in the
+    Supabase dashboard, which no migration touches.
+
+---
+
+## 8.9 Ninth session (2026-07-21) — A BUSINESS CAN NOW BE CREATED IN-APP — BUILT **AND DEPLOYED**
+
+Branch **`feat/tenant-provisioning`**, two commits, merged to `main` and **deployed the
+same afternoon**. Planned with `/plan-with-confidence` + `/plan-review`; the plan, its
+eight ranked risks and what each mitigation actually caught are in
+**`TENANT_PROVISIONING_PLAN.md`**.
+
+**The gap:** everything downstream of a tenant existing was built — RLS, join codes,
+per-tenant billing, wages, packages — but **nothing could create one.** `tenants` granted
+only SELECT/UPDATE, there was no `tenants_insert` policy and no `create_tenant` RPC, and
+nothing could mint a `tenant_admin` at all. Every tenant alive came from `seed.sql`, the
+backfill, or dashboard SQL. Onboarding the school as tenant 2 meant a database console.
+
+**What shipped:** `provision_tenant()` (the only INSERT path into `tenants`, platform-admin
+only), `admin_email`/`admin_status` on `platform_tenant_overview()`, `/api/provision-tenant`
++ `/api/resend-invite`, a code-owned Resend invite email, an `/accept-invite` first-password
+page, the **New business** form on `/platform` with an Admin column showing
+`no admin`/`invited`/`active` + Resend, and the `create-coach` platform-admin fix. PRD §4.4.
+
+**Deploy record (2026-07-21, EXPAND order — migrate first, push last):** backup taken
+(schema + data, scratchpad) → `db push --dry-run` confirmed exactly the expected set →
+pushed → **remote schema re-verified by dumping it** → *found a grants defect, see below*
+→ fix migration pushed and re-verified → `migration list` clean → merge, push, branch
+deleted → smoked `https://admin.swimsync.sg/accept-invite` (a route only the new build
+has) serving real content, `/api/provision-tenant` 401ing unauthenticated → CI green.
+
+**The deploy found a real defect that local testing could not.** `20260721000100` ended
+`REVOKE ALL ... FROM PUBLIC; GRANT EXECUTE ... TO authenticated;` and local `pg_proc` agreed
+— `{postgres, authenticated}`. **Production had granted `anon` and `service_role` too.**
+`REVOKE FROM PUBLIC` does not remove role grants, and Supabase *cloud* default-grants new
+public functions to all three; the local stack does not. Nothing was exposed (both roles
+have `auth.uid() = NULL`, so the body gate refuses them), but the second layer was missing
+and `000100`'s comment described a protection that only held locally. `20260721000300`
+revokes both explicitly; the wrong comment is **corrected in place rather than deleted**,
+because the mistake is the lesson. Now gotcha **§7.39**.
+
+**Two more near-misses worth keeping:**
+- **The overview migration was nearly built from a superseded file.** I copied
+  `platform_tenant_overview()`'s body from `20260719002300` — but `20260719002400` had
+  already replaced `kind` with a derived `shape` and `coaches_without_rate` with
+  `staff_without_rate`. The migration silently reverted both, and the verbatim-diff check
+  passed *because it diffed against the same wrong file*. Caught only by
+  `pg_get_functiondef()` on the live DB. Now gotcha **§7.40**.
+- **The invite link silently went to the wrong page.** The first end-to-end run produced
+  `redirect_to=http://127.0.0.1:3000` — Supabase had substituted `site_url` because
+  `/accept-invite` was not in `additional_redirect_urls`. An unlisted redirect is not
+  rejected, it is replaced. `config.toml` now lists every admin URL, and the admin panel's
+  `/reset-password` had **never** been listed either. Now gotcha **§7.41**.
+
+**Verification:** 265 pgTAP (+21 in a new `tenant_provisioning.test.sql`, incl. four
+refusal shapes **mutation-tested** — deleting the gate fails four assertions, one of which
+proves the ungated function wrote rows), 88 admin vitest (+12), 69 app jest, both apps
+typecheck under the §7.11 stubbed condition, and `verify-tenant-provisioning.mjs` **15/15**
+through both real UIs: provision → invited → accept → sign in → active.
+
+**Deliberately not done:** public self-service signup (an open door that mints join codes,
+with no billing or approval in front of it); a delete-business button (cascades into
+families, invoices and attendance — SQL is the right remedy for a rare typo); Supabase's own
+invite email (needs a prod dashboard paste nothing in the repo can see). All three, with
+reasoning, in `BACKLOG.md` → *Deliberately not doing*.
+
+**Left open, deliberately:** `anon` also holds EXECUTE on `regenerate_join_code()` and
+`close_student_enrolment()` — the same pre-existing cloud default. **Not** swept mid-deploy;
+it is a backlog item, and the blanket
+`ALTER DEFAULT PRIVILEGES ... REVOKE EXECUTE ... FROM anon` fix needs deciding deliberately,
+because it would change every future function including PostgREST-facing ones.
+Also **not driven through the Expo app**: the provisioned admin's row shape is byte-identical
+to the seed coach who logs in there today (`{tenant_admin, tenant, coaches row, no parents
+row}`), and routing is on extension rows not the enum (§7.19) — that is the argument, not a
+UI run.
 
 ---
 
@@ -2379,15 +2546,23 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### Nothing is outstanding from 2026-07-20
+### Outstanding from 2026-07-21 — two things, both first-use
 
-Packages are **built, deployed and smoked** (§8.8's deploy record) — dormant in
-production until a product exists. Everything from the seven prior sessions remains
-live and user-confirmed. Start clean.
+Tenant provisioning is **built, deployed and smoked** (§8.9's deploy record), and like
+packages it is **dormant until used**: no business has been provisioned in production.
+That means two paths have never run for real, and both fail *quietly* rather than loudly:
 
-**One check only the user can run:** log in to production as the real coach and confirm
-the twelve nav items render and `/packages` shows its empty state — the same
-"no local fixture can prove a real login" reasoning as §8.7.
+1. **`RESEND_API_KEY` on the admin's Vercel project.** The user added it during the
+   deploy; it has not been exercised. If it is missing or wrong, provisioning still
+   "succeeds" and shows a copyable invite link instead of sending — deliberate (§8.9), but
+   easy to mistake for the intended flow. The first real provision is the test.
+2. **The production redirect allow-list.** `/accept-invite` + `/reset-password` were added
+   to the Supabase dashboard during the deploy. If either is wrong, the invite email still
+   arrives and the link still works — it just lands on the wrong page (§7.41).
+
+**A check only the user can run:** provision the school (Platform → New business) and
+watch that the invite **arrives** and lands on `/accept-invite`. That single action
+exercises both of the above and is the natural next step anyway — see below.
 
 ### The one thing blocking everything else — and it has been urgent for four sessions
 
@@ -2396,11 +2571,14 @@ the twelve nav items render and `/packages` shows its empty state — the same
 pricing, active/inactive, and now child identity and levels are all tested against fixtures
 and driven through the real UI — and **none of it has processed a single real lesson.**
 
-**Seven** sessions of building have now stacked on top of that, which is itself the argument:
-each one adds surface that a first real lesson would exercise for the first time. The newest
-addition is the sharpest illustration — the Platform page's *last attendance* column reads
-**never**, in red, which is the first time any screen has said out loud what has been true
-since launch.
+**Eight** sessions of building have now stacked on top of that, which is itself the argument:
+each one adds surface that a first real lesson would exercise for the first time. The Platform
+page's *last attendance* column still reads **never**, in red — it has said so since it was
+built two sessions ago, and nothing has changed it.
+
+This session made the *next* step cheaper rather than moving this one: onboarding the school
+is now a button (§8.9). That is progress on step 3 below while step 1 stayed still, which is
+worth noticing rather than glossing.
 
 Two things now depend on that not staying true much longer:
 
@@ -2414,18 +2592,26 @@ Two things now depend on that not staying true much longer:
 2. **Then bill a real month**, following `INVOICE_RUNBOOK.md`. Expect the gate to refuse
    until every lesson is marked — working as designed; mark them (or mark them cancelled),
    never override.
-3. **Then onboard the school as tenant 2.** Cross-tenant isolation is proven in pgTAP across
-   two tenants and driven through both UIs, but **production has only ever had one tenant**.
-   Inherent until the school arrives — and that is when it matters most.
+3. **Then onboard the school as tenant 2 — which is now a button, not a SQL script**
+   (§8.9, PRD §4.4). Platform → New business. Cross-tenant isolation is proven in pgTAP
+   across two tenants and driven through both UIs, but **production has only ever had one
+   tenant**, so the school's arrival is the first time any of it is load-bearing on real
+   data. It is also what proves the two first-use paths above.
+   **Note the standing limit:** provisioning mints **exactly one admin** and there is no way
+   to add a second without SQL (`BACKLOG.md` → *Multiple admin accounts per tenant*). If the
+   school expects two people to run it, say so before onboarding rather than after.
 
 ### If you would rather build than onboard
 
-**`BACKLOG.md` → `## Build order` is now EMPTY** — all three near-term items shipped this
-session. Pick from the themed sections below it, or from the clusters. The nearest
-candidates with no dependencies: **credit-note emails** (the other half of the notification
-work), **coach-created student profiles** (unblocked by tenancy, and the friction the
-onboarding push is feeling right now), or **an upcoming-lessons view for parents** (small,
-and the building block already exists).
+**`BACKLOG.md` → `## Build order` is EMPTY** and has been since 2026-07-19. Pick from the
+themed sections below it, or from the clusters. The nearest candidates with no dependencies:
+**credit-note emails** (the other half of the notification work), **coach-created student
+profiles** (unblocked by tenancy, and the friction the onboarding push is feeling right now),
+or **an upcoming-lessons view for parents** (small, and the building block already exists).
+
+**One small security-hygiene item arrived this session:** *revoke `anon` EXECUTE from the
+remaining SECURITY DEFINER functions* (S). Not urgent — every body gate holds — but it is
+the second layer that §7.39 showed was missing, and it is an afternoon.
 
 ### Small, concrete, and outstanding
 
@@ -2439,6 +2625,10 @@ and the building block already exists).
 - **Packages are live but dormant** — to switch them on: Admin → Packages → add a
   category, tag the classes (Classes page), create a product. Parents then see it under
   Billing → Packages. Until then, nothing anywhere changes for anyone.
+- **Business provisioning is live but unused** — Platform → New business. Creating one is
+  immediate and its **join code works straight away**, so don't create a test business in
+  production to "see how it looks": there is deliberately no delete button, and the remedy
+  is SQL (§8.9). Drive it locally instead — `verify-tenant-provisioning.mjs`.
 
 ### Worth deciding, not urgent
 
@@ -2473,6 +2663,7 @@ email **has still never fired in production**.
 | `supabase/migrations/20260719001300_drop_inactive_assignment_status.sql` | Enum contract, with the `pg_proc` guard that refuses if a function body still casts to the retired value (§7.21) |
 | `SwimSyncAdmin/app/(admin)/parents/page.tsx` | Families at this business — there was no Parents page before |
 | `supabase/tests/active_inactive.test.sql` | Family consequence both ways, the one-way property, the tenant boundary |
+| `TENANT_PROVISIONING_PLAN.md` | **The tenant-provisioning design of record** - the settled decisions, the eight ranked risks with their mitigations inline, and a *What actually happened* header recording which of them fired. Read before changing anything about creating a business |
 | `PACKAGES_DESIGN.md` | **The prepaid-packages design of record** — the locked decision table + the /plan-review risk mitigations, inline. Read before changing anything package-shaped |
 | `supabase/migrations/20260720000100_lesson_packages.sql` | The four package tables, CHECKs, lifecycle trigger (NOT definer — §7.38), RLS, `package_live_balances()` |
 | `supabase/migrations/20260720000200_package_correction_restore.sql` | `handle_attendance_update` 7th redefinition: restore-to-package, refund-at-most-once |
@@ -2540,7 +2731,7 @@ store builds are deferred until the app "sticks."
 | **Edge Function** | `generate-invoices` deployed | Auth via `CRON_SECRET` secret (set with `supabase secrets set`). Cold-start ~5–8s. **Deployed by `supabase functions deploy generate-invoices` — a git push does NOT deploy it.** Now also emails parents on invoice creation (§8c); needs `RESEND_API_KEY` secret set, else it's a no-op. Redeployed 2026-07-17 with the timezone-correct default billing month (§8a), **2026-07-18** with the multi-class fix, the configurable run day, month sealing and the hard attendance block (§8a), **2026-07-19** with the effective-dated pricing engine (§8) then the **completed-month guard** (§8.6), and **2026-07-20** with package drawdown (§8.8) — currently **v14**. A **second function exists since 2026-07-20: `package-emails` v1** (purchase request/confirm emails; verify_jwt ON, no CRON_SECRET; same `RESEND_API_KEY`; **deployed separately** — deploying generate-invoices does not touch it). `supabase functions list` is the honest answer for versions, not this cell. `APP_TIMEZONE` unset → defaults to `Asia/Singapore`. |
 | **Admin panel** | Vercel `swimsync-admin` → **https://admin.swimsync.sg** (also `swimsync-admin.vercel.app`) | Root `SwimSyncAdmin`, **framework preset = Next.js**. |
 | **Mobile app (web)** | Vercel `swimsync-app` → **https://swimsync.sg** (apex, canonical; `www` 308-redirects; also `swimsync-app-psi.vercel.app`) | Root `SwimSyncApp`, **preset = Other** (`SwimSyncApp/vercel.json`: `expo export --platform web` → `dist`, SPA rewrite). |
-| **Email** | **Resend** → sender `noreply@swimsync.sg` | Two paths: **(1) Auth emails** (password reset) via cloud custom SMTP `smtp.resend.com:465` (user `resend`, pass = Resend API key, dashboard-only); branded reset template (dashboard + `supabase/templates/recovery.html`); auth rate limit 2→~30/hr; confirmation **OFF**. **(2) Invoice emails** (§8c) via the **Resend HTTP API** from the Edge Function, keyed by the `RESEND_API_KEY` secret (same key) — set with `supabase secrets set`. |
+| **Email** | **Resend** → sender `noreply@swimsync.sg` | Two paths: **(1) Auth emails** (password reset) via cloud custom SMTP `smtp.resend.com:465` (user `resend`, pass = Resend API key, dashboard-only); branded reset template (dashboard + `supabase/templates/recovery.html`); auth rate limit 2→~30/hr; confirmation **OFF**. **(2) Invoice + package emails** (§8c) via the **Resend HTTP API** from the Edge Functions, keyed by the `RESEND_API_KEY` secret (same key) — set with `supabase secrets set`. **(3) Business-invite emails** (§8.9, 2026-07-21) via the Resend HTTP API from the **admin panel's Next.js route**, so `RESEND_API_KEY` is ALSO a **Vercel env var on the `swimsync-admin` project** — a Supabase secret is not visible to Vercel. The user reused the existing `swimsync-edge` Resend key rather than minting a second, so **rotating it takes down invoice, package AND invite email together**. Note the deliberate inversion: an invoice email is best-effort and swallowed, but the invite IS the deliverable, so a failed send surfaces the link in the UI instead. |
 | **Domain / DNS** | `swimsync.sg` registered at **Exabytes**, DNS on **Cloudflare** | Vercel web records (`@`, `www`, `admin`) are **DNS-only** (grey — orange breaks Vercel SSL); apex uses Vercel's per-domain CNAME (`<hash>.vercel-dns-017.com`, Cloudflare-flattened). Resend records (`send` MX/SPF, `resend._domainkey`, `_dmarc`) coexist. **Supabase Site URL = `https://swimsync.sg`**; allow-list includes `swimsync.sg/**`, `www.swimsync.sg/**`, `admin.swimsync.sg/**`. |
 
 **Secrets/keys** live only in the dashboards (never committed): Supabase project keys

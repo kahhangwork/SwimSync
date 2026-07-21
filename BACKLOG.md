@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-20 (packages session)_
+_Last updated: 2026-07-21 (tenant provisioning session)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -122,7 +122,8 @@ Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-histo
 (S), Export to CSV (S), Disable a staff account (M), Student-move loose ends (S), Better
 filtering/search (S), More polished
 dashboards (S), Deeper component-render tests (M), Production data cleanup (S),
-Email-confirmation copy/templates (S).
+Email-confirmation copy/templates (S), Revoke `anon` EXECUTE from the remaining
+SECURITY DEFINER functions (S).
 
 ### Later — big features carrying their own dependencies
 
@@ -466,6 +467,48 @@ is a *full* admin or a restricted one (e.g. can mark attendance and chase paymen
 change class pricing), since that decides whether `role` on the join table is a real enum or
 a placeholder.
 
+**Sharper since 2026-07-21:** provisioning a business (PRD §4.4) now mints **exactly one**
+admin and there is no way to add a second afterwards — not even by hand, short of SQL. So
+this is no longer only "sharing work is awkward"; it is the single remaining gap in
+business onboarding, and it is felt on day one rather than eventually. The provisioning
+route and `/accept-invite` both assume one admin per tenant and will need revisiting with
+the join table. See `TENANT_PROVISIONING_PLAN.md`.
+
+### Revoke `anon` EXECUTE from the remaining SECURITY DEFINER functions — **S**
+`regenerate_join_code()`, `close_student_enrolment()` and the other `SECURITY DEFINER`
+RPCs hold `EXECUTE` for **`anon`** and `service_role` in production. Add explicit
+`REVOKE ... FROM anon, service_role` for each, the way `platform_tenant_overview()` and
+`provision_tenant()` already do.
+
+**Why:** these functions bypass RLS, so their in-body gate is their entire boundary.
+Today every gate holds — `auth.uid()` is NULL for both roles, so `is_platform_admin()` /
+`can_admin_tenant()` / `current_coach_id()` all evaluate false and the functions refuse —
+which is why this is **defence in depth, not a live hole**. But it means a single missing
+or mis-written gate in a future function is the only thing between anonymous callers and
+an RLS-bypassing routine, with no second layer behind it.
+
+**Notes:** found 2026-07-21 while deploying tenant provisioning, by dumping the **remote**
+schema after `db push` (HANDOVER §7.39). Two things conspire, and both will bite the next
+RPC too:
+- **`REVOKE ... FROM PUBLIC` does not remove role-specific grants.** `PUBLIC` is its own
+  grantee, not an umbrella over `anon`/`authenticated`/`service_role`. A migration ending
+  in `REVOKE FROM PUBLIC; GRANT TO authenticated;` reads as airtight and is not.
+- **Supabase *cloud* carries project-level default privileges** granting `EXECUTE` on new
+  `public` functions to all three roles. This repo's `20260309000800_grants.sql` sets
+  default privileges for TABLES and SEQUENCES only, so the function grants are the
+  platform's — and **the local stack does not reproduce them**, so `pg_proc` locally says
+  `{postgres, authenticated}` while production says otherwise.
+
+A pgTAP assertion is near-vacuous here for that reason (it passes locally by
+construction). The honest check is `supabase db dump` against the remote. Audit:
+`grep -E '(GRANT|REVOKE).*ON FUNCTION' <dump> | grep '"anon"'`.
+
+The tempting fix — a blanket
+`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon` — was
+**not** taken during the deploy: it changes the grant for every future function at once,
+including PostgREST-facing ones that may legitimately need `anon`, and a deploy is the
+wrong moment to find out which. Decide that deliberately, not as a side effect.
+
 ### The family-status search scans every membership client-side — **S**
 `handleFamilySearch` on the Platform page fetches **all** `parent_tenants` rows and filters
 in the browser.
@@ -756,4 +799,7 @@ Kept so the reasoning doesn't get re-litigated.
 | **Platform billing (SwimSync charging the schools)** | Deliberately unbuilt 2026-07-19: the pilot is free. `tenants` is the natural billing subject when it arrives, so nothing in the current schema blocks it — but building it now would be a second money model with no payer. |
 | **Putting the SwimSync mark on the invoice email** | Rejected 2026-07-19 while adding the logo. That header is the **tenant's** logo and business name by design (PRD §7.10): a parent pays their coach or school, and an invoice headed "SwimSync" reads as a platform bill — actively confusing for a family with children at two businesses. SwimSync is named in the footer as sender of record, and that is the whole of its billing there. The *recovery* email is a separate case and also stays wordmark-only: SVG does not render in most mail clients, and a hosted PNG adds a broken-image failure mode to the one message a locked-out user needs. (HANDOVER §8.2, `brand/README.md`.) |
 | **A non-calendar wage cycle** (e.g. 16th–15th) | Wages assume **calendar months**, with only the *pay day* configurable (PRD §7.13). A different period boundary is a new period concept rather than a setting, and would need its own sealing and adjustment rules. Nobody has asked for it. |
+| **Public self-service signup for businesses** (a "Start your business" page on the admin panel) | Considered 2026-07-21 while building tenant provisioning (PRD §4.4) and rejected in favour of platform-admin onboarding. With **no platform billing and no approval step**, an open signup form is an open door: spam tenants, unbounded free-tier growth, and — the real cost — every one of them mints a **join code**, which is the only proof a family deals with a business (§5.1). SwimSync onboards businesses one conversation at a time; the second one is a hand-onboarded school. Revisit when there is inbound demand *and* something gating it (payment, or manual approval before the tenant becomes joinable). |
+| **Deleting a business from the admin panel** | Rejected 2026-07-21 with provisioning. A tenant deletion cascades into its families, students, invoices, credit notes and attendance — so a destructive button sitting on a support panel is a bigger risk than the mis-typed name it would fix, and the mistake it fixes is rare and cheap to correct in SQL. A **failed** provision already cleans up after itself (the route deletes the tenant if the invite fails), which covers the only case that happens automatically. An "only if the tenant is empty" variant was considered and judged not worth its own RPC, guard and tests. |
+| **Sending the invite through Supabase Auth's own invite email** | Considered 2026-07-21 and rejected in favour of `generateLink({type:'invite'})` + our own Resend send. Supabase's path would need a `templates/invite.html` **pasted into the production dashboard**, where nothing in the repo can see it and no test can catch it drifting from the file — and resending to an already-invited user has uncertain semantics (it may 422 rather than re-send). Our own send makes the template code-owned and unit-tested, no-ops without `RESEND_API_KEY`, and makes Resend deterministic. Note the deliberate inversion of the invoice-email rule: an invoice email is best-effort because billing must not depend on delivery, whereas **the invite IS the deliverable**, so a failed send surfaces the link for the operator instead of being swallowed. |
 | **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8a.) |

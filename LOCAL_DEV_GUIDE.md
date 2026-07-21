@@ -141,6 +141,24 @@ account. The seed coach is also their tenant's admin, so they can set it.
    → the QR of the business that *issued that invoice* renders. Admin → **Coaches** →
    the row shows **Uploaded** + a QR modal.
 
+### Create a business (PRD §4.4)
+Log in to the admin panel as the **platform admin** (`superadmin@swimsync.test`) →
+**Platform** → **New business**. Fill in the business name, the admin's name and email
+(twice — a typo here would hand a stranger admin of a business), and tick **"this person
+also teaches"** if they should get a coach account too.
+
+Locally there is no `RESEND_API_KEY`, so **no email is sent** — that is expected. The
+success panel shows a warning with the **one-time invite link**; open it to land on
+`/accept-invite`, set a password, and sign in as the new admin.
+
+> **If the invite link lands on the admin root instead of `/accept-invite`**, the URL is
+> missing from `[auth].additional_redirect_urls` in `supabase/config.toml`. An unlisted
+> redirect is **not rejected** — `site_url` is silently substituted. Add it, then
+> `supabase stop && supabase start` (the list is read only at boot).
+
+`verify-tenant-provisioning.mjs` drives this whole loop, including the new admin signing
+in and their status flipping `invited` → `active`.
+
 ### Prepaid packages flow (PRD §7.16)
 Packages are **dormant until a product exists** — with no category or product, every
 family bills ad hoc exactly as before. To switch them on locally:
