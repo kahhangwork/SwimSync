@@ -109,18 +109,23 @@ $$;
 REVOKE ALL ON FUNCTION public.provision_tenant(TEXT, tenant_kind) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.provision_tenant(TEXT, tenant_kind) TO authenticated;
 
--- NOTE THE OMISSION, IT IS DELIBERATE: `service_role` is NOT granted EXECUTE.
+-- !! THE TWO LINES ABOVE ARE NOT SUFFICIENT — SEE 20260721000300.
 --
--- is_platform_admin() resolves auth.uid(), which is NULL for the service role —
--- so a service-role call would evaluate the gate against nobody and the
--- function's entire boundary would rest on the API route remembering to use the
--- caller's token instead. Withholding the grant turns that from a rule someone
--- must remember into a loud "permission denied for function provision_tenant".
+-- This migration originally claimed that omitting a `service_role` grant made a
+-- service-role call fail loudly. That was true on the LOCAL stack and FALSE in
+-- production: REVOKE ... FROM PUBLIC does not remove role-specific grants, and
+-- Supabase cloud's project-level default privileges had already granted EXECUTE
+-- to anon, authenticated AND service_role at CREATE time. A dump of the remote
+-- taken right after this was pushed showed all three.
 --
--- So if you ever see that error: the caller is using the SERVICE-ROLE client
--- when it must use the signed-in user's. Fix the caller. DO NOT add
--- `GRANT EXECUTE ... TO service_role` — that re-opens the hole this closes,
--- and it is the same family as the gate that the only live caller bypassed.
+-- 20260721000300 revokes anon and service_role explicitly. The claim is left
+-- here, corrected rather than deleted, because the mistake is the lesson:
+-- verifying a grant with pg_proc on the local stack does not tell you what
+-- production has.
+--
+-- Either way the boundary held: auth.uid() is NULL for both anon and
+-- service_role, so is_platform_admin() is false and the body raises before
+-- writing. DO NOT add `GRANT EXECUTE ... TO service_role`.
 
 COMMENT ON FUNCTION public.provision_tenant(TEXT, tenant_kind) IS
   'Platform-admin-only: create a business + its join code. The ONLY INSERT path '

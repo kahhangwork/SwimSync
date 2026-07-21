@@ -20,7 +20,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(19);
+SELECT plan(21);
 
 -- ── Callers: one of each shape that can reach an RPC ────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code)
@@ -169,6 +169,20 @@ SELECT is(
   (SELECT COUNT(DISTINCT join_code)::INT FROM tenants),
   (SELECT COUNT(*)::INT FROM tenants),
   'every tenant has a distinct join code');
+
+-- ══ WHO HOLDS EXECUTE ══════════════════════════════════════════════════════
+-- These two are near-vacuous locally — the local stack never granted anon or
+-- service_role in the first place. They are here because PRODUCTION did: cloud
+-- carries project-level default privileges that grant EXECUTE on new public
+-- functions to all three roles, and REVOKE ... FROM PUBLIC does not remove
+-- them (fixed in 20260721000300). So these assert the intended ACL rather than
+-- prove it, and the real check is a dump of the REMOTE after pushing.
+SELECT ok(
+  NOT has_function_privilege('anon', 'public.provision_tenant(text,tenant_kind)', 'EXECUTE'),
+  'anon holds no EXECUTE on provision_tenant');
+SELECT ok(
+  NOT has_function_privilege('service_role', 'public.provision_tenant(text,tenant_kind)', 'EXECUTE'),
+  'service_role holds no EXECUTE — the route must call it as the signed-in user');
 
 SELECT * FROM finish();
 ROLLBACK;
