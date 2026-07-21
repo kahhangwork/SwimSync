@@ -25,11 +25,26 @@ Make sure **Docker Desktop is running** first. Check status any time with
 > `[auth].additional_redirect_urls` (the password-reset redirect allow-list) are
 > only read at boot, so the mobile reset link is rejected until you restart.
 
-### Terminal 2 — Invoice Edge Function (needed for the Generate Invoices button)
+### Terminal 2 — Edge Functions (needed for Generate Invoices, and package emails)
 ```bash
 cd /Users/kahhang/Documents/Code/SwimSync
 supabase functions serve generate-invoices --env-file supabase/functions/.env --no-verify-jwt
 ```
+
+There are **two** Edge Functions. `generate-invoices` is the one you need for the core
+loop. If you're working on **prepaid packages** (PRD §7.16), the purchase-email path
+lives in a second function and needs its own terminal:
+
+```bash
+supabase functions serve package-emails --env-file supabase/functions/.env
+```
+> Note the **missing `--no-verify-jwt`**: `package-emails` runs with `verify_jwt` ON and
+> re-checks the caller in-body, so it must receive a real user JWT. Both functions are
+> deployed **separately** (`supabase functions deploy <name>`) — deploying one does not
+> touch the other, and a `git push` deploys neither.
+
+Emails are a **logged no-op unless `RESEND_API_KEY` is set** in
+`supabase/functions/.env`, so leaving it blank locally is expected and correct.
 
 ### Terminal 3 — Admin panel (web)
 ```bash
@@ -117,11 +132,36 @@ Created by `supabase/seed.sql` on every `supabase db reset`.
    and a reduced net (or **Paid** if fully covered; surplus carries forward).
 
 ### PayNow QR flow
+The QR belongs to the **business**, not the coach (PRD §7.10) — a school has one bank
+account. The seed coach is also their tenant's admin, so they can set it.
+
 1. Coach app → **Settings** → **Upload QR Code** → pick an image. Stored at
-   `paynow-qr/<coach_id>/…`, saved to `coaches.paynow_qr_url`.
+   `paynow-qr/<tenant_id>/paynow-qr`, saved to **`tenants.paynow_qr_url`**.
 2. Parent app → **Billing** → open an outstanding invoice → **Pay via PayNow QR**
-   → the coach's QR renders. Admin → **Coaches** → the row shows **Uploaded** + a
-   QR modal.
+   → the QR of the business that *issued that invoice* renders. Admin → **Coaches** →
+   the row shows **Uploaded** + a QR modal.
+
+### Prepaid packages flow (PRD §7.16)
+Packages are **dormant until a product exists** — with no category or product, every
+family bills ad hoc exactly as before. To switch them on locally:
+
+1. Admin → **Packages** → create a **class category**, then a **product** (N lessons,
+   a locked rate, valid M months, scoped to that category).
+2. Admin → **Classes** → tag the relevant classes with that category.
+3. Parent app → **Billing → Packages** → request the package → **PayNow** screen shows
+   the *requested* product's price.
+4. Admin → **Packages** → confirm the pending request → it becomes **Active**.
+5. Mark attendance, then generate invoices: the engine draws the balance down **at the
+   package's locked rate**, at invoice time (never at marking time).
+
+The parent card and the admin tables both read live balances from the
+**`package_live_balances()`** RPC — the only derivation of pending draws. Don't
+recompute "lessons left" in TypeScript. The admin students **"Package running low"**
+filter uses the per-tenant `tenants.low_package_lessons` threshold; families with no
+package are never "running low", they're ad hoc.
+
+There's a UI driver that walks this whole flow end to end across both apps:
+`.claude/skills/run-ui-playwright/drivers/verify-packages.mjs` (+ `fixtures-packages.sql`).
 
 ### Invoke the function directly (faithful test, no UI)
 ```bash
@@ -153,12 +193,21 @@ running (`supabase start`). Two suites:
 # 1. Database tests (pgTAP) — credit-note trigger, RLS isolation, constraints.
 supabase test db
 
-# 2. Function tests (Deno) — generate-invoices billing math + credit ledger, plus the
-#    invoice-email builders/sender + orchestration. test.sh exports SERVICE_ROLE_KEY from
-#    `supabase status` and runs deno test. (Local generation sends no emails unless
-#    RESEND_API_KEY is set in supabase/functions/.env — leaving it blank is expected.)
+# 2. Function tests (Deno) — generate-invoices billing math + credit ledger + package
+#    drawdown, plus the invoice- and package-email builders/senders + orchestration.
+#    test.sh exports SERVICE_ROLE_KEY from `supabase status` and runs deno test. (Local
+#    generation sends no emails unless RESEND_API_KEY is set in supabase/functions/.env
+#    — leaving it blank is expected.)
 supabase/functions/generate-invoices/test.sh
 ```
+
+> **Run the Deno suite twice** after touching the engine. A completing run **seals** its
+> billing month, so leaked state makes a second run short-circuit on `already_complete` —
+> passing once proves nothing (HANDOVER §7.15).
+
+The frontend suites need no stack: `cd SwimSyncAdmin && npm test` (vitest) and
+`cd SwimSyncApp && npm test` (jest-expo). Current counts live in HANDOVER §5 — and by
+its own rule, **the test runner is the fact and the prose is the hint**.
 
 Each test seeds its own data and rolls back / tears down, so they leave the DB as
 they found it. See `supabase/tests/*.test.sql` and

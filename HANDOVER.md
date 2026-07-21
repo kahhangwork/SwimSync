@@ -83,9 +83,12 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   pooled `credit_balance`; the next invoice draws it down FIFO. A partial-
   application ledger bug was found and fixed (see §6). Driven end to end through
   the coach edit screen → parent Billing → admin Credit Notes.
-- **PayNow QR (verified UI + backend)** — coach uploads their QR in `(coach)/settings`
-  (→ `paynow-qr/<coach_id>/…` storage → `coaches.paynow_qr_url`); the parent sees
-  it on the invoice's PayNow screen; the admin Coaches page shows it.
+- **PayNow QR (verified UI + backend)** — the QR belongs to the **business, not the coach**
+  (PRD §7.10): uploaded in `(coach)/settings` by a coach who is also their tenant's admin
+  (→ `paynow-qr/<tenant_id>/paynow-qr` storage → **`tenants.paynow_qr_url`**); the parent
+  sees the QR of the business that **issued the invoice** on the PayNow screen; the admin
+  Coaches page shows it. A school with three coaches has one bank account — an individual
+  coach's QR would send the payment to the wrong person.
 - **Coach Billing screen (verified UI)** — queries live invoices (RLS-scoped) and marks
   them paid (invoice update + `payment_records` insert), web-safe via Toast /
   `confirmAction`. Needs `coach_serves_parent_profile()` to show parent names (§6).

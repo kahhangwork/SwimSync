@@ -160,7 +160,33 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000", "http://localhost:8081", "http://localhost:8081/reset-password", "swimsync://reset-password"]
+# EXACT-MATCH allow-list. A redirect that is not listed here is not rejected
+# loudly — Supabase silently substitutes `site_url`, so the link still works and
+# simply lands somewhere else. That is how an invite ends up dropping a new
+# business owner on the admin root instead of the page that sets their password.
+# If a recovery/invite link lands on the wrong page, SUSPECT THIS LIST FIRST.
+#
+# Read only at BOOT: after editing, `supabase stop && supabase start`.
+#
+# The mobile app is on :8081 (Expo web) and swimsync:// (native); the ADMIN panel
+# is on :3000 — note `npm run dev` serves it as localhost while site_url below
+# says 127.0.0.1, and these are different origins to the allow-list, so both are
+# listed.
+additional_redirect_urls = [
+  "https://127.0.0.1:3000",
+  "http://localhost:8081",
+  "http://localhost:8081/reset-password",
+  "swimsync://reset-password",
+  # Admin panel — password reset and first-time invite acceptance.
+  "http://localhost:3000/reset-password",
+  "http://localhost:3000/accept-invite",
+  "http://127.0.0.1:3000/reset-password",
+  "http://127.0.0.1:3000/accept-invite",
+  # Production admin. Harmless locally; keeps this list the single description
+  # of every URL an auth email may legitimately return to.
+  "https://admin.swimsync.sg/reset-password",
+  "https://admin.swimsync.sg/accept-invite",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.

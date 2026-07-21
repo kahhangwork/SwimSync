@@ -23,8 +23,23 @@ export async function POST(req: NextRequest) {
     .eq("id", userData.user.id)
     .single();
 
-  if (profile?.role !== "tenant_admin" && profile?.role !== "platform_admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // A TENANT admin only. This used to admit platform_admin too, but a platform
+  // admin belongs to no business, so their profile.tenant_id is NULL by design
+  // — and line ~48 passes exactly that to the auth trigger, which REFUSES to
+  // create a coach without a tenant rather than guessing. So the platform-admin
+  // path could only ever produce a 500 from deep inside the trigger. Refusing it
+  // here says why. A coach belongs to one business; whoever creates them must
+  // be standing in it.
+  if (profile?.role !== "tenant_admin") {
+    return NextResponse.json(
+      {
+        error:
+          profile?.role === "platform_admin"
+            ? "A platform admin belongs to no business, so there is no tenant to add this coach to. Ask that business's own admin to add them."
+            : "Forbidden",
+      },
+      { status: 403 }
+    );
   }
 
   // Parse body

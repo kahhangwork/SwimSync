@@ -46,6 +46,12 @@ type TenantRow = {
   sessions_fully_marked: number;
   last_month_billing: "sealed" | "open" | "never run";
   active_families: number;
+  /** The business's own admin. NULL when it has none at all. */
+  admin_email: string | null;
+  /** Whether that admin has EVER signed in. A profiles row only proves an
+   *  invite was issued — 'none' means the business is live and joinable with
+   *  nobody able to operate it, which is a fault, not a blank. */
+  admin_status: "none" | "invited" | "active";
 };
 
 type StrandedParent = {
@@ -80,6 +86,30 @@ export default function PlatformPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [stranded, setStranded] = useState<StrandedParent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // ── Provisioning a new business ───────────────────────────────────────────
+  const [showNew, setShowNew] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [resending, setResending] = useState<string | null>(null);
+  const [newBiz, setNewBiz] = useState({
+    businessName: "",
+    kind: "private" as "private" | "school",
+    adminName: "",
+    adminEmail: "",
+    // Typed twice on purpose: this invite grants tenant_admin to whoever opens
+    // it, so a mistyped address is a cross-tenant data exposure, not a bounced
+    // email.
+    adminEmailConfirm: "",
+    isCoach: true,
+  });
+  const [newBizError, setNewBizError] = useState<string | null>(null);
+  const [provisioned, setProvisioned] = useState<{
+    businessName: string;
+    joinCode: string;
+    adminEmail: string;
+    emailSent: boolean;
+    inviteLink: string | null;
+  } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -126,6 +156,94 @@ export default function PlatformPage() {
     setLoadError(null);
     setTenants((overview.data ?? []) as TenantRow[]);
     setStranded((strandedRes.data ?? []) as StrandedParent[]);
+  }
+
+  /** POST helper that carries the caller's token — the API routes verify it,
+   *  and provision_tenant()'s gate is evaluated against THIS user, not the
+   *  service role. */
+  async function postAs(path: string, body: unknown) {
+    const { data: sess } = await supabase.auth.getSession();
+    const res = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sess.session?.access_token ?? ""}`,
+      },
+      body: JSON.stringify(body),
+    });
+    return { res, json: await res.json().catch(() => ({})) };
+  }
+
+  async function provisionTenant(e: React.FormEvent) {
+    e.preventDefault();
+    setNewBizError(null);
+
+    if (!newBiz.businessName.trim()) {
+      setNewBizError("The business needs a name.");
+      return;
+    }
+    if (!newBiz.adminName.trim()) {
+      setNewBizError("The admin needs a name.");
+      return;
+    }
+    if (
+      newBiz.adminEmail.trim().toLowerCase() !==
+      newBiz.adminEmailConfirm.trim().toLowerCase()
+    ) {
+      setNewBizError(
+        "The two email addresses don't match. This invite grants full admin of the business, so it must go to the right person."
+      );
+      return;
+    }
+
+    setCreating(true);
+    const { res, json } = await postAs("/api/provision-tenant", {
+      businessName: newBiz.businessName.trim(),
+      kind: newBiz.kind,
+      adminName: newBiz.adminName.trim(),
+      adminEmail: newBiz.adminEmail.trim(),
+      isCoach: newBiz.isCoach,
+    });
+    setCreating(false);
+
+    if (!res.ok) {
+      setNewBizError(json.error ?? "Could not create the business.");
+      return;
+    }
+
+    setProvisioned({
+      businessName: newBiz.businessName.trim(),
+      joinCode: json.joinCode,
+      adminEmail: json.adminEmail,
+      emailSent: Boolean(json.emailSent),
+      inviteLink: json.inviteLink ?? null,
+    });
+    setShowNew(false);
+    setNewBiz({
+      businessName: "",
+      kind: "private",
+      adminName: "",
+      adminEmail: "",
+      adminEmailConfirm: "",
+      isCoach: true,
+    });
+    await loadTenants();
+  }
+
+  async function resendInvite(tenantId: string) {
+    setResending(tenantId);
+    setMessage(null);
+    const { res, json } = await postAs("/api/resend-invite", { tenantId });
+    setResending(null);
+    if (!res.ok) {
+      setMessage(json.error ?? "Could not resend the invite.");
+      return;
+    }
+    setMessage(
+      json.emailSent
+        ? `Invite resent to ${json.adminEmail}.`
+        : `No email was sent (${json.emailReason}). Copy this link to them: ${json.inviteLink}`
+    );
   }
 
   const [famSearch, setFamSearch] = useState("");
@@ -247,16 +365,211 @@ export default function PlatformPage() {
       {/* A tenant admin asks "how is MY business doing?"; a platform admin asks
           "WHICH business needs me?" — so this is one row per business with the
           signals that answer that, not a set of platform-wide totals. */}
+      {/* The join code is the ONLY route into a business — there is no
+          directory — so it is shown once, prominently, at the moment it is
+          created. */}
+      {provisioned && (
+        <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4">
+          <h3 className="text-sm font-semibold text-green-900">
+            {provisioned.businessName} is set up
+          </h3>
+          <p className="mt-1 text-sm text-green-800">
+            Join code:{" "}
+            <span className="font-mono font-semibold">
+              {provisioned.joinCode}
+            </span>{" "}
+            — parents enter this in the app to join.
+          </p>
+          {provisioned.emailSent ? (
+            <p className="mt-1 text-sm text-green-800">
+              An invite to set a password was sent to{" "}
+              <strong>{provisioned.adminEmail}</strong>.
+            </p>
+          ) : (
+            /* The email IS the deliverable here — unlike an invoice email, a
+               missing invite means the owner has no way in at all. So this must
+               never read as a plain success. */
+            <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+              <p className="text-sm font-semibold text-amber-900">
+                No invite email was sent.
+              </p>
+              <p className="mt-1 text-sm text-amber-800">
+                Send this one-time link to <strong>{provisioned.adminEmail}</strong>{" "}
+                yourself — they cannot sign in until they use it:
+              </p>
+              <code className="mt-2 block break-all rounded bg-white p-2 text-xs text-gray-800">
+                {provisioned.inviteLink}
+              </code>
+            </div>
+          )}
+          <button
+            onClick={() => setProvisioned(null)}
+            className="mt-3 text-xs font-medium text-green-800 hover:text-green-900"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-gray-900">Businesses</h2>
-        <p className="mt-1 mb-3 text-sm text-gray-600">
-          Counts are computed per business in the database, so they never mix
-          across tenants and never truncate.
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Businesses</h2>
+            <p className="mt-1 mb-3 text-sm text-gray-600">
+              Counts are computed per business in the database, so they never mix
+              across tenants and never truncate.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setShowNew(true);
+              setNewBizError(null);
+            }}
+            className="shrink-0 rounded-xl bg-sky-500 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-600"
+          >
+            New business
+          </button>
+        </div>
+
+        {showNew && (
+          <form
+            onSubmit={provisionTenant}
+            className="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-4"
+          >
+            <h3 className="text-sm font-semibold text-gray-900">
+              Create a business
+            </h3>
+            <p className="mt-1 text-xs text-gray-600">
+              This creates the business and emails its admin a link to set their
+              password. The business is live — and its join code works — as soon
+              as it is created.
+            </p>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Business name
+                </label>
+                <input
+                  value={newBiz.businessName}
+                  onChange={(e) =>
+                    setNewBiz({ ...newBiz, businessName: e.target.value })
+                  }
+                  placeholder="Dolphin Swim Academy"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Admin&apos;s name
+                </label>
+                <input
+                  value={newBiz.adminName}
+                  onChange={(e) =>
+                    setNewBiz({ ...newBiz, adminName: e.target.value })
+                  }
+                  placeholder="Marcus Tan"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Type
+                </label>
+                <select
+                  value={newBiz.kind}
+                  onChange={(e) =>
+                    setNewBiz({
+                      ...newBiz,
+                      kind: e.target.value as "private" | "school",
+                    })
+                  }
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="private">Private coach</option>
+                  <option value="school">Swim school</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Admin&apos;s email
+                </label>
+                <input
+                  type="email"
+                  value={newBiz.adminEmail}
+                  onChange={(e) =>
+                    setNewBiz({ ...newBiz, adminEmail: e.target.value })
+                  }
+                  placeholder="marcus@example.com"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Confirm email
+                </label>
+                <input
+                  type="email"
+                  value={newBiz.adminEmailConfirm}
+                  onChange={(e) =>
+                    setNewBiz({
+                      ...newBiz,
+                      adminEmailConfirm: e.target.value,
+                    })
+                  }
+                  placeholder="marcus@example.com"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* This checkbox — not `kind` — is what decides whether a coaches
+                row is created. A private coach is a tenant of ONE: they
+                administer the business and teach in it. It is deliberately
+                independent of the type above, because a school's owner may
+                teach too. `kind` is onboarding copy and future pricing only and
+                must never reach an RLS policy. */}
+            <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={newBiz.isCoach}
+                onChange={(e) =>
+                  setNewBiz({ ...newBiz, isCoach: e.target.checked })
+                }
+                className="rounded border-gray-300"
+              />
+              This person also teaches (give them a coach account too)
+            </label>
+
+            {newBizError && (
+              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {newBizError}
+              </p>
+            )}
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="submit"
+                disabled={creating}
+                className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-60"
+              >
+                {creating ? "Creating…" : "Create & invite"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNew(false)}
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
         <Table>
           <Thead>
             <Th>Name</Th>
             <Th>Shape</Th>
+            <Th>Admin</Th>
             <Th>Join code</Th>
             <Th>Families</Th>
             <Th>Students</Th>
@@ -269,13 +582,49 @@ export default function PlatformPage() {
           <Tbody>
             {tenants.length === 0 && !loadError && (
               <Tr>
-                <Td colSpan={10}>No businesses.</Td>
+                <Td colSpan={11}>No businesses.</Td>
               </Tr>
             )}
             {tenants.map((t) => (
               <Tr key={t.tenant_id}>
                 <Td>{t.display_name}</Td>
                 <Td>{t.shape}</Td>
+                <Td>
+                  {/* A business with NO admin is the bad intermediate state of
+                      provisioning: its join code works, so parents can join it,
+                      but nobody can operate it. The route compensates by
+                      deleting the tenant when an invite fails — this cell is the
+                      backstop for any orphan that escapes that. */}
+                  {t.admin_status === "none" ? (
+                    <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-700">
+                      no admin
+                    </span>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-700">
+                        {t.admin_email}
+                      </span>
+                      {t.admin_status === "invited" ? (
+                        <>
+                          <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                            invited
+                          </span>
+                          <button
+                            onClick={() => resendInvite(t.tenant_id)}
+                            disabled={resending === t.tenant_id}
+                            className="text-xs font-medium text-sky-600 hover:text-sky-700 disabled:opacity-50"
+                          >
+                            {resending === t.tenant_id ? "Sending…" : "Resend"}
+                          </button>
+                        </>
+                      ) : (
+                        <span className="rounded bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                          active
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </Td>
                 <Td>
                   <span className="font-mono">{t.join_code}</span>
                 </Td>
