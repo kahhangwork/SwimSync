@@ -104,6 +104,23 @@ export default function StudentsPage() {
   // Families with NO package are never "running low" — they are ad-hoc.
   const [lowOnly, setLowOnly] = useState(false);
   const [unclaimedOnly, setUnclaimedOnly] = useState(false);
+  // ── Add a student whose parent has not registered ─────────────────────────
+  // The other half of PRD §7.17: the coach's walk-in form handles a TRIAL (one
+  // lesson, marked on the spot), and this handles the ONGOING case — a child
+  // who is already attending weekly while their parent takes their time
+  // signing up. Both go through add_unclaimed_student(); only the enrolment
+  // lifecycle differs.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addDob, setAddDob] = useState("");
+  const [addClassId, setAddClassId] = useState("");
+  const [addPhone, setAddPhone] = useState("");
+  const [addEmail, setAddEmail] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [classOptions, setClassOptions] = useState<
+    { id: string; title: string }[]
+  >([]);
   const [inviting, setInviting] = useState<StudentRow | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -152,6 +169,7 @@ export default function StudentsPage() {
     load();
     loadLevels();
     loadPackages();
+    loadClasses();
   }, []);
 
   async function loadLevels() {
@@ -187,6 +205,57 @@ export default function StudentsPage() {
       return;
     }
     load();
+  }
+
+  async function loadClasses() {
+    // RLS already scopes a tenant_admin to their own business's classes.
+    const { data } = await supabase
+      .from("classes")
+      .select("id, title")
+      .eq("is_active", true)
+      .order("title");
+    setClassOptions((data ?? []) as { id: string; title: string }[]);
+  }
+
+  async function handleAddStudent() {
+    const name = addName.trim();
+    if (!name || !addClassId) return;
+    setAddBusy(true);
+    setAddError(null);
+
+    // p_kind: 'ongoing' — an OPEN enrolment, because this child attends every
+    // week. That means they also join the completeness gate, which is correct:
+    // from now on the coach must mark them, and a forgotten lesson blocks
+    // billing rather than vanishing.
+    //
+    // No session date and no attendance status: those belong to the coach's
+    // trial path. Enrolment is dated from now, so lessons taught BEFORE today
+    // are not expected of them (and so are neither blocked nor billed) — the
+    // coach back-dates on the attendance screen if those need capturing.
+    const { error } = await supabase.rpc("add_unclaimed_student", {
+      p_class_id: addClassId,
+      p_full_name: name,
+      p_kind: "ongoing",
+      p_date_of_birth: addDob || null,
+      p_contact_phone: addPhone.trim() || null,
+      p_contact_email: addEmail.trim() || null,
+    });
+
+    setAddBusy(false);
+    if (error) {
+      // The RPC returns a plain sentence for a duplicate name+DOB rather than
+      // a raw constraint error (PRD §5.1) — show it as-is.
+      setAddError(error.message);
+      return;
+    }
+
+    setAddOpen(false);
+    setAddName("");
+    setAddDob("");
+    setAddClassId("");
+    setAddPhone("");
+    setAddEmail("");
+    await load();
   }
 
   async function handleInviteParent() {
@@ -322,6 +391,16 @@ export default function StudentsPage() {
       <PageHeader
         title="Students"
         subtitle={`${students.length} students total`}
+        action={
+          <Button
+            onClick={() => {
+              setAddOpen(true);
+              setAddError(null);
+            }}
+          >
+            Add student
+          </Button>
+        }
       />
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -509,6 +588,107 @@ export default function StudentsPage() {
           )}
         </Tbody>
       </Table>
+
+      {/* ── Add a student whose parent hasn't registered ────────────────────
+          For a child already attending weekly. A TRIAL is the coach's job —
+          it marks attendance on the spot, and back-dating a missed one already
+          works from the attendance screen — so this form deliberately offers
+          only the ongoing shape. */}
+      <Modal
+        title="Add a student"
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            For a child who is already attending but whose parent hasn&apos;t
+            signed up yet. They&apos;ll appear on the coach&apos;s roster
+            straight away; invite the parent whenever they&apos;re ready and
+            everything already marked becomes theirs.
+          </p>
+
+          <label className="block">
+            <span className="text-xs font-semibold text-gray-600">
+              Child&apos;s full name
+            </span>
+            <input
+              value={addName}
+              onChange={(e) => setAddName(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-semibold text-gray-600">Class</span>
+            <select
+              value={addClassId}
+              onChange={(e) => setAddClassId(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="">Choose a class…</option>
+              {classOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-semibold text-gray-600">
+              Date of birth <span className="font-normal">(optional)</span>
+            </span>
+            <input
+              type="date"
+              value={addDob}
+              onChange={(e) => setAddDob(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-xs font-semibold text-gray-600">
+                Parent&apos;s phone
+              </span>
+              <input
+                value={addPhone}
+                onChange={(e) => setAddPhone(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-gray-600">
+                Parent&apos;s email
+              </span>
+              <input
+                type="email"
+                value={addEmail}
+                onChange={(e) => setAddEmail(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+          <p className="-mt-1 text-[11px] text-gray-400">
+            Both optional, and both save you work later — the email is what the
+            invite goes to.
+          </p>
+
+          {addError && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {addError}
+            </p>
+          )}
+
+          <Button
+            className="w-full"
+            disabled={addBusy || !addName.trim() || !addClassId}
+            onClick={handleAddStudent}
+          >
+            {addBusy ? "Adding…" : "Add student"}
+          </Button>
+        </div>
+      </Modal>
 
       {/* ── Invite the parent of an unclaimed child ─────────────────────────
           The happy path for a child a coach added. Unlike self-registration
