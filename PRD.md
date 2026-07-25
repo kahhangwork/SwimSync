@@ -1378,6 +1378,65 @@ attendance would destroy the basis for a payout that may already have been made.
 
 ---
 
+### 7.18 Parents Claiming Their Own Child *(built 2026-07-26 — not yet live)*
+
+§7.17 covers the case where the **admin invites** the parent: the link is asserted by
+someone who knows it is right, and there is nothing to get wrong. This covers the other
+direction — the parent registers on their own first, opens Add Child, and types the name
+of a child their coach put on the roster weeks ago.
+
+Before this, that produced a **second student record with none of the attendance**. The
+original kept holding the billing month open with nobody to bill, the duplicate
+accumulated nothing, and nothing in the product mentioned either fact. The remedy was SQL.
+
+#### What the parent sees
+
+Add Child now checks the roster **before it creates anything**. If a child there looks
+like the one being added, the parent is asked — not told:
+
+> **Is this your child?**
+> Your coach may have already added your child.
+> *Ethan T. W. M. — Saturday Beginners on Sat 11 Jul*
+>
+> [ Yes, that's my child ] [ I'm not sure ] [ No, add them as a new child ]
+
+- The candidate is **masked** — first name, then initials. The parent has already typed a
+  matching name, so the given name is close to information they supplied; the family name
+  is not. **The masking is done in the database**, so a full name never reaches the app.
+- The lesson detail is deliberate: it is what a real parent can check and a guesser cannot.
+- **Yes** and **I'm not sure** both send a request to the business's admin. **Neither
+  attaches the child.** A wrong link would hand a stranger a family's attendance and
+  billing history, and the parent's own certainty cannot price that risk.
+- **No** creates the child exactly as entered. The parent may well be right.
+- While a request is waiting, that parent **cannot re-add that child** — otherwise tapping
+  Save again would walk straight round the question. Their home screen shows how long it
+  has been waiting and what to do about it.
+
+A candidate is only ever offered when a signal already points at it: a matching phone
+number, or a matching **given name** (or two matching name parts). A shared surname alone
+matches nothing — in Singapore that would turn the prompt into a directory of the
+business's unclaimed children.
+
+#### What the admin sees
+
+A **Parent Requests** page, with a count badge in the sidebar. Each request shows what the
+parent typed **next to** the record on the roster, because *"are these the same child?"*
+cannot be answered from either alone — plus the parent's name, email and phone, and how
+many lessons the candidate already has. Approving is a two-step confirm naming both
+parties, and it silently closes any competing request on that child.
+
+Every approval can be **undone**, until the child has been invoiced to that parent.
+
+#### Duplicates that already exist
+
+Two records that look like the same child are flagged on the **Students** page and can be
+merged. The record holding the **history** always survives; the other is deleted, with its
+contents written to the audit log first. Merging **refuses** when both records have
+lessons recorded, or when the duplicate already appears on an invoice — those need a
+person, not a button.
+
+---
+
 ## 8. Non-Functional Requirements
 
 ### 8.1 Platform

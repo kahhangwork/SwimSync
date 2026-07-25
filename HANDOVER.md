@@ -148,8 +148,17 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   bill **holds the month open** instead of being silently dropped and sealed over, released
   by inviting the parent or recording a settlement. PRD §7.17,
   `TRIAL_ONBOARDING_PLAN.md`, §8.10.
-- **Automated tests** — backend **299 pgTAP + 108 Deno**, plus frontend suites
-  (`SwimSyncAdmin` vitest 106, `SwimSyncApp` jest-expo 79); all run in CI on push to `main`. See §5.
+- **A parent can claim the child their coach already added (verified local: pgTAP + vitest +
+  jest + UI driver — BUILT 2026-07-26, ⚠ NOT YET DEPLOYED)** — Add Child checks the roster
+  before it creates anything: a matching child produces a masked candidate card and three
+  answers (Confirm / Not Sure / No), both claim answers file a request for the **admin to
+  decide**, and a pending request blocks that parent from re-adding that child. The admin
+  gets a queue with a sidebar badge, a two-step confirm naming both parties, and — because
+  nothing else in the product can unlink a parent from a child (§7.47) — an **undo**.
+  Duplicates that already exist are detected on the Students page and folded together by
+  `merge_students()`. PRD §7.18, `PARENT_CLAIM_PLAN.md`, §8.12.
+- **Automated tests** — backend **354 pgTAP + 108 Deno**, plus frontend suites
+  (`SwimSyncAdmin` vitest 120, `SwimSyncApp` jest-expo 89); all run in CI on push to `main`. See §5.
 
 > **§3's old "clean slate" claim was WRONG and is corrected here (2026-07-25).** It said
 > production held "only the superadmin + the real coach/classes". Reading the actual dump:
@@ -300,9 +309,11 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `lesson_packages.test.sql` (30) | prepaid packages: RLS on all four tables, $0-rate/0-lesson products refused, product money terms immutable, request snapshots come from the PRODUCT (a parent cannot claim a price or an active status), only non-client roles move a balance, `package_live_balances()` draws locked-rate/in-scope/FIFO and leaves the stored balance alone |
 | `tenant_provisioning.test.sql` (21) | creating a business: parent, coach, **tenant admin** and anon all REFUSED (each in an explicit transaction, 7.16) and `tenants` does not grow after any of them; slug derivation incl. a **non-ASCII name** that would otherwise violate NOT NULL; join-code shape + uniqueness; a fresh tenant reports `admin_status = none`. The two ACL assertions are near-vacuous locally by construction (7.39) |
 | `package_corrections.test.sql` (12) | a correction on a package-funded line restores the package (even expired) and mints NO cash credit note; flip-flops refund at most once; ad-hoc lines keep the credit-note path byte-identical |
+| `student_claims.test.sql` (35) | parents claiming their own child: the disclosure surface (a surname-only overlap returns **nothing**; an unjoined tenant is **refused**, not handed an empty set; a claimed child is never a candidate; masking happens in SQL), the phone signal matching across `+65` vs 8 digits, the **tripwire** that a non-matching child is created exactly as before, Confirm **not** linking, the pending block **with a NULL dob on both sides** (fails on `=`), claim RLS both ways, approve auto-declining competing claims, the dob enrichment, **undo**, `list_student_claims()` seeing a parent `profiles_select` hides (§7.48), and the contract: a parent can no longer INSERT a student directly while the admin still can |
+| `student_merge.test.sql` (20) | folding a duplicate into the row with the history: five refusals (cross-tenant, both-marked, **wrong direction**, invoiced duplicate, same row) each asserting `students` did not shrink; the move of parent links, trial bookings and settlements with **global counts unchanged** — a merge moves rows, never destroys them; and §7.46's guard, proved by **creating a cascading FK at runtime** and asserting the merge refuses |
 | `trial_onboarding.test.sql` (32) | a child before their parent: THREE refusal shapes for `add_unclaimed_student()` (parent, cross-tenant coach, anon) each asserting `students` did not grow, the **tenant derived from the class** (nothing downstream would catch a wrong one — §7.42), `created_by` = the calling coach, a trial enrolment closed on its own date, **session idempotency** (two walk-ins on one date share ONE session — §7.43), the plain-English duplicate name+DOB error, settlement RLS, and `link_invited_parent()` incl. same-parent idempotency vs a different parent refused |
 
-**Total: 299 across 19 files** — verified by `supabase test db` 2026-07-25 (the previous
+**Total: 354 across 21 files** — verified by `supabase test db` 2026-07-26 (the previous
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
@@ -348,9 +359,10 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 _Frontend tests:_
 `SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`,
 `components/StatusBadge.test.tsx`, `lib/lessonDates.test.ts`,
-`lib/classCoverage.test.ts`); `SwimSyncApp` uses **jest-expo**
-(`jest.config.js`, `lib/authErrors.test.ts`, `lib/lessonDates.test.ts`,
-`lib/attendanceBulk.test.ts`, scoped to `lib/**` unit tests for now). Deeper
+`lib/classCoverage.test.ts`, `lib/duplicateStudents.test.ts`); `SwimSyncApp` uses
+**jest-expo** (`jest.config.js`, `lib/authErrors.test.ts`, `lib/lessonDates.test.ts`,
+`lib/attendanceBulk.test.ts`, `lib/claimCandidates.test.ts`, scoped to `lib/**` unit
+tests for now). Deeper
 component-render tests (RN screens with mocked Supabase, admin tables) are the natural
 next additions.
 
@@ -391,7 +403,14 @@ capped at the last completed month; `verify-attendance-window.mjs` (+ `fixtures-
 window (§8b) across coach + parent — the roster button targets the most recent expected
 lesson (not raw "today"), the "no lessons to mark yet" placeholder shows for a class with
 nothing due, and the parent screen distinguishes "no lessons have taken place yet" from
-"no lessons marked yet".
+"no lessons marked yet";
+`verify-parent-claim.mjs` (+ `fixtures-parent-claim.sql`) drives the whole claim + merge
+loop across both real UIs — the popup OPENS (slice 1 shipped an invisible modal, §8.10),
+the candidate is masked, Confirm is inert until one is chosen, the parent is **blocked**
+from re-adding, the admin queue shows who is asking, approve is a two-step confirm, undo
+is offered, and the "no, different child" branch produces a duplicate that the Students
+page flags and merges (21 checks). **It found two bugs no unit test could reach** — both
+read paths rather than RPCs (§7.48, and duplicate detection hiding same-parent pairs).
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
@@ -1087,6 +1106,96 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     `trial_bookings.category_id` is that snapshot, and the engine is prohibited from
     joining `classes` to price a trial. The same trap waits for any future feature that
     prices by category.
+
+46. **THE LIST OF WHAT CASCADES FROM A TABLE IS NOT STATIC, AND A STALE COPY OF IT IS A
+    DATA-LOSS BUG.** `BACKLOG.md` asserted for weeks that *"of five FKs into `students`,
+    only `parent_students` cascades … so a mis-aimed merge cannot destroy anything"*, and
+    the merge design rested on that sentence. It was **already false when it was written**:
+    `student_settlements` (`20260725000100`) and `trial_bookings` (`20260725000700`) had
+    been added **in the same session**, both `ON DELETE CASCADE`. `student_claims` then
+    made a fourth in the very migration series that corrected the documentation. So the
+    count went five/one → eight/four while a document confidently stated otherwise.
+    **A comment cannot be the mitigation, because the person who adds the next cascading FK
+    will not read it.** Any function that DELETEs a tenanted row must ask the catalogue and
+    refuse on anything it has not been taught to move:
+    ```sql
+    SELECT string_agg(conrelid::regclass::text, ', ') FROM pg_constraint
+     WHERE confrelid = 'students'::regclass AND contype='f' AND confdeltype='c'
+       AND conrelid::regclass::text NOT IN (<the ones it handles>);
+    ```
+    `merge_students()` does this and `student_merge.test.sql` proves it by **creating a
+    cascading FK at runtime** and asserting the merge refuses. Audit:
+    `SELECT conrelid::regclass, confdeltype FROM pg_constraint WHERE confrelid='<t>'::regclass AND contype='f';`
+
+47. **A BUSINESS'S OWN ADMIN CANNOT UNLINK A PARENT FROM A CHILD — SO ANY FEATURE THAT
+    CREATES A FAMILY LINK MUST SHIP ITS OWN REVERSAL.** `parent_students_delete` is
+    `USING (parent_id = current_parent_id() OR is_platform_admin())`: the **parent** can
+    unlink and the **platform** admin can, but the tenant admin — the person clicking the
+    button that creates the link — cannot. Found while reviewing the claim-approval flow,
+    where it would have made a mis-approval permanent and fixable only by SQL against
+    production. `undo_student_claim()` (`20260726000400`) is that reversal, and it ships in
+    the **same migration** as approve for exactly this reason.
+    **Do NOT "fix" this by widening `parent_students_delete` to tenant admins** — that
+    grants a blanket delete over every family link in the business to close a one-row
+    problem, and RLS is row-level, so there is no way to say "only the link you just made".
+
+48. **A PARENT WHO HAS JOINED BY CODE BUT HAS NO CHILD YET IS INVISIBLE TO THE BUSINESS'S
+    ADMIN.** `profiles_select` reaches a parent through
+    `EXISTS (… tenant_serves_parent(p.id))`, and that helper goes via **the parent's
+    children's enrolments**. A parent who has redeemed the join code and added nothing is
+    served by nobody, so the admin cannot read their name, email or phone.
+    This bit the claim queue — the one screen whose entire job is *"who is asking?"* — which
+    showed an em dash for every requester while every RPC underneath was correct. **A join
+    that works under `service_role` in a REST probe can return NULL under the caller's own
+    RLS; test the read path as the actual role.** Only the UI driver caught it. The fix is a
+    narrow `SECURITY DEFINER` reader (`list_student_claims()`), not a sixth branch on the
+    most load-bearing policy in the schema.
+---
+
+## 8.12 Twelfth session (2026-07-26) — PARENTS CAN CLAIM THEIR OWN CHILD — BUILT, **NOT YET DEPLOYED**
+
+Branch **`feat/parent-claim`**, six commits. Planned with `/plan-with-confidence` +
+`/plan-review`; the plan and its 7 inlined mitigations are in **`PARENT_CLAIM_PLAN.md`**.
+Slice 2 of trial onboarding — slice 1 shipped the **invite** path (the admin asserts the
+link); this is the other direction, where the parent gets there first.
+
+**⚠ NOT DEPLOYED. The deploy has an ordering constraint — see §12 of the plan.** Five
+migrations are additive and go first; **`20260726000600` is a CONTRACT** (it removes the
+parent branch from `students_insert`) and must be pushed **after** the app is live, or
+every family loses Add Child. `supabase/rollback/20260726_parent_claim_DOWN.sql` was
+**executed forward, back and forward again**, not merely written.
+
+**The shape.** Matching happens at **Add Child**, on the name and DOB the parent has just
+typed. The join-code trigger the first planning round chose was dropped on the user's
+redirect, and the reason is decisive: the only signal available at join time is
+`profiles.phone` vs `students.provisional_contact_phone`, and that column is optional on
+both paths that create an unclaimed child — so for most children it would never fire.
+
+Three answers: **Confirm · Not Sure · No.** Both claim answers go to the admin queue;
+**neither attaches the child.** The user considered auto-linking a strong name+DOB match
+and declined — *the admin confirms every claim* stands.
+
+**Four findings worth keeping:**
+- **§7.46** — the cascading-FK list went five/one → eight/four while `BACKLOG.md` asserted
+  otherwise, and the merge design rested on that sentence. The guard is now a catalogue
+  query, not a comment.
+- **§7.47** — a tenant admin **cannot** unlink a parent from a child. `undo_student_claim()`
+  therefore ships in the same migration as approve.
+- **§7.48** — a parent who joined by code but has no child yet is invisible to the admin
+  under `profiles_select`. The claim queue showed an em dash for every requester while
+  every RPC was correct.
+- **A latent test bug, fixed in passing:** `lesson_packages` assertions 25-26 failed on a
+  clean checkout of `main` with no code change. The fixture dated its sessions
+  `CURRENT_DATE` (the **server's** UTC date) while package coverage starts on the SGT
+  confirmation date — so the suite went red for **eight hours a day**, 00:00–08:00 SGT,
+  and had done since 2026-07-20. §7.7 in a test rather than in product code.
+
+**Verification:** pgTAP **299 → 354**, Deno **108** (unchanged — the engine is untouched),
+admin vitest **106 → 120**, app jest **79 → 89**, both typecheck, and
+`verify-parent-claim.mjs` **21/21** through both real UIs. The driver found §7.48 and the
+duplicate-detection bug; **neither was reachable from any unit test**, both being read
+paths rather than RPCs.
+
 ---
 
 ## 8.11 Eleventh session (2026-07-25) — CATEGORIES ARE MANDATORY, AND A TRIAL IS A BOOKING — BUILT **AND DEPLOYED**
@@ -2756,6 +2865,31 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > **This is the current shift, not the queue.** The full list of unbuilt ideas — with
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
+
+### ⚠ FIRST: slice 2 is BUILT AND UNDEPLOYED, and its deploy is ORDER-SENSITIVE
+
+`feat/parent-claim` is merged to nothing yet. Six migrations exist; **five are additive
+and one is a contract**, and getting the order wrong breaks the single path every new
+family walks:
+
+1. `supabase db push` the **additive five** (`20260726000100`–`000500`, `000700`).
+2. Push `main` → Vercel builds both apps. **Verify Add Child still works** — at this
+   point the app uses the RPC but the old policy is still in place, which is the safe
+   overlap.
+3. **Then** push `20260726000600`, which removes the parent branch from
+   `students_insert`.
+4. `supabase migration list --linked` — nothing pending. A `pg-delta` SSL stack trace
+   from `db push` means nothing either way (§8.11); the list is the fact.
+5. Dump the remote and check the six new functions' grants (§7.39 — local `pg_proc`
+   cannot confirm this).
+6. **Create a child through the real parent app on production.** The deploy is not
+   finished until that has happened; step 3 removed the only path every family uses.
+
+Rollback if step 3 goes wrong: `supabase/rollback/20260726_parent_claim_DOWN.sql`,
+already executed forward and back locally.
+
+**The Edge Function is untouched** — do not redeploy `generate-invoices`. Its 108 tests
+are unchanged for that reason.
 
 ### Outstanding from 2026-07-25 — ONE unverified path
 

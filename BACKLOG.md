@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-25 (trial onboarding session)_
+_Last updated: 2026-07-26 (parents claiming their own child — built, awaiting deploy)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -110,8 +110,8 @@ package notifications, in-app refunds.
   real, and was avoided by reframing rather than by building carefully.
   **Coach-created student profiles** sat behind this and **shipped 2026-07-25** as part
   of trial onboarding (PRD §7.17) — a coach adds a walk-in or an unregistered student
-  into their own class. What remains of the idea is *Parents claiming their own child*
-  below.
+  into their own class. **What remained — *Parents claiming their own child* — was BUILT
+  2026-07-26** (PRD §7.18). This cluster is now complete.
 - **The platform chain.** Native store builds (M) → Push notifications (M) — push can't
   work on the current static web app, so it can't precede native builds.
 - **The reminder chain.** Invoice emails **shipped** (HANDOVER §8c); the rest sequences after
@@ -182,9 +182,20 @@ out of a text blob. What makes it an M rather than an S:
 - Watch the read cost: a roster of six children each with six skills is 36 rows, so fetch
   it per class rather than per student.
 
-### Parents claiming their own child — **M**
+### ~~Parents claiming their own child~~ — **BUILT 2026-07-26** (not yet deployed)
 Let a parent who registers independently find the child their coach already added,
 instead of creating a duplicate.
+
+> **SHIPPED as PRD §7.18** — see `PARENT_CLAIM_PLAN.md` and HANDOVER §8.12. The matching
+> happens at **Add Child** (not at join-code time: the only signal available there is a
+> phone that is optional on both paths that create an unclaimed child, so for most
+> children it would never fire). Three answers — Confirm / Not Sure / No — and **both
+> claim answers go to the admin queue**; the rule that the admin confirms every claim
+> held. Merge and duplicate detection shipped with it.
+>
+> The notes below are kept because they were the design, and every one of them survived
+> the build. Two things they got WRONG are corrected in place: the FK cascade list, and
+> the assumption that a merge only ever pairs an unclaimed row with a claimed one.
 
 **Why:** slice 1 of trial onboarding (PRD §7.17) ships the **invite** path — the admin
 emails the parent and the child is attached with no ambiguity. But a parent can always
