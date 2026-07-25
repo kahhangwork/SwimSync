@@ -214,10 +214,18 @@ of the attendance. The admin has no in-app way to merge them; the remedy is SQL.
   full name, DOB, gender, notes — are copied onto it first.
 - **Hard-delete the emptied duplicate, don't tombstone it.** `students_identity_uniq` is
   on `(tenant_id, lower(trim(full_name)), date_of_birth)`, so after the merge a tombstone
-  would collide with the survivor. Write the deleted row into `audit_log` instead. The
-  database already refuses to delete a student carrying history — only `parent_students`
-  cascades; enrolments, attendance, invoice_items and credit_notes are all `NO ACTION` —
-  so a mis-aimed merge cannot destroy anything.
+  would collide with the survivor. Write the deleted row into `audit_log` instead.
+  - ⚠ **CORRECTED 2026-07-26 — the earlier version of this bullet was wrong, and it was
+    the one the merge design leaned on.** It said "of five FKs into `students`, only
+    `parent_students` cascades … so a mis-aimed merge cannot destroy anything." There are
+    now **seven FKs and THREE cascade**: `parent_students`, plus **`student_settlements`**
+    (`20260725000100`) and **`trial_bookings`** (`20260725000700`) — both added by the
+    trial work *in the same session that wrote the old sentence*. Enrolments, attendance,
+    `invoice_items` and `credit_notes` are still `NO ACTION`, so the guarantee that
+    matters holds: the DB still refuses to delete a student carrying **attendance or
+    money**. But a delete now silently takes that row's **trial bookings and settlements**
+    with it, and a settlement is *recorded revenue* (see Revenue reporting below). A merge
+    must therefore MOVE those rows before deleting, and verify it did.
 - Until this ships, the fix is SQL.
 
 **What slice 1 actually shipped, and what it proved (2026-07-25).** Read this before
@@ -245,7 +253,7 @@ planning slice 2 — it is the difference between what exists and what does not:
 | Candidate lookup | Must be `SECURITY DEFINER` — a registering parent matches no branch of `students_select`, so they cannot see an unclaimed child at all. |
 | Identity of the child | `students_identity_uniq` is `(tenant_id, lower(trim(full_name)), date_of_birth)`, and **NULL DOB never collides** — which is exactly why a coach-added child (often no DOB) and a parent-added one silently become two rows. |
 | Linking | `link_invited_parent()` — reuse it. |
-| Deleting the emptied duplicate | Safe ONLY because the DB refuses otherwise: of five FKs into `students`, only `parent_students` cascades; enrolments, attendance, invoice_items and credit_notes are all `NO ACTION`. A merge cannot destroy history even if aimed wrongly. |
+| Deleting the emptied duplicate | Partly safe: of **seven** FKs into `students`, enrolments, attendance, `invoice_items` and `credit_notes` are `NO ACTION`, so a mis-aimed merge cannot destroy **history or money**. But `parent_students`, `student_settlements` and `trial_bookings` **CASCADE** — those must be moved first. See the corrected bullet above. |
 | Where the parent adds a child | `SwimSyncApp` Add Child — that is where the match must be offered, before the duplicate exists. |
 
 ### Attendance edit history view — **S** `[Phase 2]`
