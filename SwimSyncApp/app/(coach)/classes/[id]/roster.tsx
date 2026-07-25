@@ -20,7 +20,10 @@ import {
   ageFromDob,
   type DayOfWeek,
 } from "@/lib/lessonDates";
-import { countMarked } from "@/lib/attendanceCompleteness";
+import {
+  countMarked,
+  expectedStudentsOn,
+} from "@/lib/attendanceCompleteness";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 import { confirmAction } from "@/lib/confirm";
@@ -176,17 +179,38 @@ export default function ClassRosterScreen() {
     const totalStudents = activeStudents.length;
     const activeStudentIds = activeStudents.map((s) => s.id);
 
+    // Trial bookings for this class. A booked child is expected at ONE lesson
+    // and is not enrolled, so the counts below would read "3 of 3 marked" while
+    // the invoice engine refuses to close the month over an unmarked fourth.
+    const { data: bookingRows } = await supabase
+      .from("trial_bookings")
+      .select("student_id, session_date")
+      .eq("class_id", id)
+      .is("cancelled_at", null);
+
+    const bookedByDate = new Map<string, string[]>();
+    for (const b of bookingRows ?? []) {
+      const list = bookedByDate.get(b.session_date as string) ?? [];
+      list.push(b.student_id as string);
+      bookedByDate.set(b.session_date as string, list);
+    }
+
     const rows: Session[] = (sessionData ?? []).map((s: any) => {
       const markedIds = new Set<string>(
         (s.attendance ?? []).map((a: any) => a.student_id)
       );
+      // Enrolled students PLUS anyone booked for a trial that day — the shared
+      // rule, so this screen and the engine count the same people.
+      const expectedHere = expectedStudentsOn(
+        s.session_date,
+        activeStudentIds,
+        bookedByDate
+      );
       return {
         id: s.id,
         session_date: s.session_date,
-        // Counts only students still enrolled — the shared completeness rule,
-        // not the raw attendance row count.
-        marked_count: countMarked(activeStudentIds, markedIds),
-        total_count: totalStudents,
+        marked_count: countMarked(expectedHere, markedIds),
+        total_count: expectedHere.length || totalStudents,
       };
     });
 

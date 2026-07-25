@@ -39,6 +39,13 @@ export type CoverageAttendance = {
   student_id: string;
 };
 
+/** A child booked for a TRIAL — expected at ONE lesson, not enrolled. */
+export type CoverageBooking = {
+  class_id: string;
+  student_id: string;
+  session_date: string;
+};
+
 export type ClassCoverage = {
   classId: string;
   title: string;
@@ -64,7 +71,9 @@ export function computeClassCoverage(
   sessions: CoverageSession[],
   attendance: CoverageAttendance[],
   billingMonth: string,
-  today: string
+  today: string,
+  /** Live trial bookings in the month. Omitted by callers that have none. */
+  bookings: CoverageBooking[] = []
 ): ClassCoverage[] {
   const bounds = monthBounds(billingMonth);
   if (!bounds.start) return [];
@@ -81,7 +90,20 @@ export function computeClassCoverage(
       .filter((e) => e.is_active)
       .map((e) => e.student_id);
 
-    if (activeStudentIds.length === 0) continue;
+    // Bookings for THIS class, by date. A trial is expected at one lesson, so
+    // this is per-date rather than a single set for the month.
+    const bookedByDate = new Map<string, string[]>();
+    for (const b of bookings) {
+      if (b.class_id !== cls.id) continue;
+      const list = bookedByDate.get(b.session_date) ?? [];
+      list.push(b.student_id);
+      bookedByDate.set(b.session_date, list);
+    }
+
+    // Nothing enrolled AND nothing booked means nothing to mark or bill.
+    // Checking enrolments alone would skip a class whose only attendee this
+    // month is a trial — and an unmarked trial is what holds the month open.
+    if (activeStudentIds.length === 0 && bookedByDate.size === 0) continue;
 
     // Bound by the earliest enrolment across ALL enrolments, active or not — an
     // active-only bound would let a fully-unenrolled class hide lessons it ran.
@@ -103,21 +125,35 @@ export function computeClassCoverage(
         .filter((s) => s.class_id === cls.id)
         .map((s) => [
           s.session_date,
+          // Marked students on this session — enrolled OR booked. Filtering to
+          // active enrolments alone would report a marked trial as unmarked.
           new Set(
-            activeStudentIds.filter((studentId) =>
-              attendanceKeys.has(`${s.id}:${studentId}`)
-            )
+            [
+              ...activeStudentIds,
+              ...(bookedByDate.get(s.session_date) ?? []),
+            ].filter((studentId) => attendanceKeys.has(`${s.id}:${studentId}`))
           ),
         ])
     );
 
-    const missingDates = unmarkedDates(expected, markedByDate, activeStudentIds);
+    // Booking dates join the expected list: a trial on a date with no session
+    // yet would otherwise be invisible here while the engine blocks on it.
+    const expectedWithTrials = [
+      ...new Set([...expected, ...bookedByDate.keys()]),
+    ].sort();
+
+    const missingDates = unmarkedDates(
+      expectedWithTrials,
+      markedByDate,
+      activeStudentIds,
+      bookedByDate
+    );
 
     coverage.push({
       classId: cls.id,
       title: cls.title,
-      expected: expected.length,
-      marked: expected.length - missingDates.length,
+      expected: expectedWithTrials.length,
+      marked: expectedWithTrials.length - missingDates.length,
       missingDates,
     });
   }

@@ -232,3 +232,67 @@ describe("computeClassCoverage", () => {
     ).toEqual([]);
   });
 });
+
+// ⚠ RISK N. The engine and this check compute the same rule separately, and
+// they diverged once before — the client became the only effective gate and it
+// cost a live underbill (§7.18). A booked-but-unmarked trial is the newest way
+// they could disagree: the engine expects the child on their lesson and refuses
+// to seal, so this dialog must name the same lesson rather than report all clear.
+describe("trial bookings", () => {
+  const cls = [{ id: "c1", title: "Sat Group", day_of_week: "saturday" as const }];
+  const enrolled = [
+    { class_id: "c1", student_id: "s1", is_active: true, enrolled_at: "2026-01-01" },
+  ];
+  const sess1 = { id: "sess1", class_id: "c1", session_date: "2026-08-01" };
+  const booking = [
+    { class_id: "c1", student_id: "trial1", session_date: "2026-08-01" },
+  ];
+
+  it("reports a booked-but-unmarked trial as a missing lesson", () => {
+    const out = computeClassCoverage(
+      cls, enrolled, [sess1],
+      // The enrolled student IS marked; the booked child is not.
+      [{ lesson_session_id: "sess1", student_id: "s1" }],
+      "2026-08", "2026-08-31", booking
+    );
+    expect(out[0].missingDates).toContain("2026-08-01");
+  });
+
+  it("clears once the trial is marked", () => {
+    const out = computeClassCoverage(
+      cls, enrolled, [sess1],
+      [
+        { lesson_session_id: "sess1", student_id: "s1" },
+        { lesson_session_id: "sess1", student_id: "trial1" },
+      ],
+      "2026-08", "2026-08-31", booking
+    );
+    expect(out[0].missingDates).not.toContain("2026-08-01");
+  });
+
+  // A trial is expected at ONE lesson. Expecting them weekly would make every
+  // other Saturday of the month report as missing.
+  it("does not expect a booked child at the class's other lessons", () => {
+    const out = computeClassCoverage(
+      cls, enrolled,
+      [sess1, { id: "sess2", class_id: "c1", session_date: "2026-08-08" }],
+      [
+        { lesson_session_id: "sess1", student_id: "s1" },
+        { lesson_session_id: "sess1", student_id: "trial1" },
+        { lesson_session_id: "sess2", student_id: "s1" },
+      ],
+      "2026-08", "2026-08-31", booking
+    );
+    expect(out[0].missingDates).not.toContain("2026-08-08");
+  });
+
+  // Passing no bookings at all must behave exactly as before this existed.
+  it("is unchanged when a business has no bookings", () => {
+    const out = computeClassCoverage(
+      cls, enrolled, [sess1],
+      [{ lesson_session_id: "sess1", student_id: "s1" }],
+      "2026-08", "2026-08-31"
+    );
+    expect(out[0].missingDates).not.toContain("2026-08-01");
+  });
+});

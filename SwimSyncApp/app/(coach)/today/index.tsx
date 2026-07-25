@@ -20,7 +20,10 @@ import {
   formatSgDate,
   type DayOfWeek,
 } from "@/lib/lessonDates";
-import { isLessonFullyMarked } from "@/lib/attendanceCompleteness";
+import {
+  isLessonFullyMarked,
+  expectedStudentsOn,
+} from "@/lib/attendanceCompleteness";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 
@@ -165,13 +168,36 @@ export default function TodayScreen() {
     // Lessons that should have happened but aren't fully marked. A lesson is
     // only "marked" once every active student has an attendance row — the same
     // rule the invoice engine's completeness gate uses.
+    // Trial bookings across this coach's classes. A booked child is expected at
+    // ONE lesson and is not enrolled, so without these an unmarked trial never
+    // reaches the coach's backlog — while the invoice engine refuses to close
+    // the month over it. The two must agree (§7.18).
+    const { data: bookingRows } = await supabase
+      .from("trial_bookings")
+      .select("class_id, student_id, session_date")
+      .is("cancelled_at", null);
+
+    const bookedByClassDate = new Map<string, Map<string, string[]>>();
+    for (const b of bookingRows ?? []) {
+      const perClass =
+        bookedByClassDate.get(b.class_id as string) ?? new Map<string, string[]>();
+      const list = perClass.get(b.session_date as string) ?? [];
+      list.push(b.student_id as string);
+      perClass.set(b.session_date as string, list);
+      bookedByClassDate.set(b.class_id as string, perClass);
+    }
+
     const items: BacklogItem[] = [];
     for (const cls of coachClasses as any[]) {
       const enrolments = cls.student_class_enrolments ?? [];
       const activeStudentIds = enrolments
         .filter((e: any) => e.is_active)
         .map((e: any) => e.student_id);
-      if (activeStudentIds.length === 0) continue;
+      const bookedHere =
+        bookedByClassDate.get(cls.id) ?? new Map<string, string[]>();
+      // Nothing enrolled AND nothing booked means nothing to mark. Checking
+      // enrolments alone would skip a class whose only attendee is a trial.
+      if (activeStudentIds.length === 0 && bookedHere.size === 0) continue;
 
       // Bound by the earliest enrolment (active or not) so we never ask about
       // lessons from before the class had anyone in it.
@@ -180,14 +206,21 @@ export default function TodayScreen() {
         .sort()[0];
       const from = backlogWindowStart(todayDate, earliest ?? null);
 
-      for (const date of expectedLessonDates(
-        cls.day_of_week as DayOfWeek,
-        from,
-        todayDate
-      )) {
+      // Booking dates join the expected list: a trial on a date with no session
+      // would otherwise never appear here.
+      const dates = [
+        ...new Set([
+          ...expectedLessonDates(cls.day_of_week as DayOfWeek, from, todayDate),
+          ...[...bookedHere.keys()].filter((d) => d <= todayDate),
+        ]),
+      ];
+
+      for (const date of dates) {
         if (date === todayDate) continue; // today already has its own card
         const sess = sessionByClassDate.get(`${cls.id}:${date}`);
-        if (!isLessonFullyMarked(activeStudentIds, sess?.markedStudentIds)) {
+        const expected = expectedStudentsOn(date, activeStudentIds, bookedHere);
+        if (expected.length === 0) continue;
+        if (!isLessonFullyMarked(expected, sess?.markedStudentIds)) {
           items.push({
             class_id: cls.id,
             class_title: cls.title,

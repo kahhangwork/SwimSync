@@ -73,13 +73,22 @@ export function unmarkedStudents(
 export function unmarkedDates(
   expectedDates: readonly string[],
   markedBySessionDate: Map<string, Set<string>>,
-  activeStudentIds: readonly string[]
+  activeStudentIds: readonly string[],
+  /** Trial bookings by date. Omit when the caller has none to consider. */
+  bookedByDate: Map<string, readonly string[]> = new Map()
 ): string[] {
-  if (activeStudentIds.length === 0) return [];
+  // Nobody enrolled AND nobody booked means nothing to mark. Checking only
+  // enrolments here would hide a class whose sole attendee this month is a
+  // trial — and an unmarked trial is exactly what must be surfaced.
+  if (activeStudentIds.length === 0 && bookedByDate.size === 0) return [];
   return expectedDates
-    .filter(
-      (date) => !isLessonFullyMarked(activeStudentIds, markedBySessionDate.get(date))
-    )
+    .filter((date) => {
+      const expected = expectedStudentsOn(date, activeStudentIds, bookedByDate);
+      return (
+        expected.length > 0 &&
+        !isLessonFullyMarked(expected, markedBySessionDate.get(date))
+      );
+    })
     .sort();
 }
 
