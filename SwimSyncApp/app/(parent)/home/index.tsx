@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import { waitingSince } from "@/lib/claimCandidates";
+import { todayInSg, formatSgDate } from "@/lib/lessonDates";
 
 type Child = {
   id: string;
@@ -25,6 +26,8 @@ type Child = {
   coach_name: string | null;
   class_day: string | null;
   class_time: string | null;
+  /** An upcoming, uncancelled trial: the class title and the date. */
+  trial: { class_title: string; session_date: string } | null;
   class_location: string | null;
 };
 
@@ -123,6 +126,7 @@ export default function ParentHomeScreen() {
           assignment_status: s.assignment_status,
           is_active: s.is_active,
           coach_name: coachProfile?.full_name ?? null,
+          trial: null, // filled below
           class_day: cls?.day_of_week ?? null,
           class_time: cls
             ? `${formatTime(cls.start_time)} – ${formatTime(cls.end_time)}`
@@ -130,6 +134,34 @@ export default function ParentHomeScreen() {
           class_location: cls?.location_name ?? null,
         };
       });
+
+      // ⚠ A TRIAL IS NOT AN ENROLMENT, so a child who only has one booked reads
+      // as "unassigned" — and the card then told the family "the admin will
+      // assign your child soon", which is false and unhelpful: their lesson is
+      // already booked, at a known class on a known date, and the app was the
+      // only thing that knew. Reported from production 2026-07-26.
+      const ids = mapped.map((c) => c.id);
+      if (ids.length > 0) {
+        const { data: trials } = await supabase
+          .from("trial_bookings")
+          .select("student_id, session_date, classes(title)")
+          .in("student_id", ids)
+          .is("cancelled_at", null)
+          .gte("session_date", todayInSg())
+          .order("session_date");
+
+        const byStudent = new Map<string, { class_title: string; session_date: string }>();
+        for (const b of (trials ?? []) as any[]) {
+          // Earliest first from the query, so the first one wins.
+          if (!byStudent.has(b.student_id)) {
+            byStudent.set(b.student_id, {
+              class_title: b.classes?.title ?? "their class",
+              session_date: b.session_date,
+            });
+          }
+        }
+        for (const c of mapped) c.trial = byStudent.get(c.id) ?? null;
+      }
 
       setChildren(mapped);
 
@@ -395,6 +427,22 @@ export default function ParentHomeScreen() {
                       <Text className="text-xs text-gray-600">
                         No longer attending. Their attendance and invoices are
                         still here. Contact your coach if this looks wrong.
+                      </Text>
+                    </View>
+                  ) : child.trial ? (
+                    /* Booked for one lesson. Says WHEN, which is the whole
+                       question a family has about a trial. */
+                    <View className="bg-sky-50 rounded-xl p-3">
+                      <Text className="text-xs font-semibold text-sky-800">
+                        Trial lesson booked
+                      </Text>
+                      <Text className="mt-0.5 text-xs text-sky-700">
+                        {child.trial.class_title} ·{" "}
+                        {formatSgDate(child.trial.session_date, {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        })}
                       </Text>
                     </View>
                   ) : (

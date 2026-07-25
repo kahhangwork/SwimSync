@@ -49,6 +49,9 @@ export default function UnassignedPage() {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
+  // Two-press confirm for the one case that can silently block a billing
+  // month. Reset whenever the modal closes or a different child is chosen.
+  const [confirmedTrialEnrol, setConfirmedTrialEnrol] = useState(false);
 
   useEffect(() => {
     loadStudents();
@@ -66,8 +69,38 @@ export default function UnassignedPage() {
         .eq("is_active", true)
       .order("full_name");
 
+    // ⚠ A CHILD WITH AN UPCOMING TRIAL IS NOT WAITING FOR YOU.
+    // A trial is a BOOKING, not an enrolment, so a booked child sits at
+    // assignment_status = 'unassigned' and used to appear here as though they
+    // needed placing. They do not: they are already expected at one specific
+    // lesson, the coach already sees them, and the invoice engine already
+    // counts them.
+    //
+    // Worse, the prompt was actively harmful. "Assign" inserts an ACTIVE
+    // ENROLMENT, which makes the child expected at EVERY lesson of that class
+    // from then on — so a child who tries one lesson and never returns would
+    // silently block that class's month from being billed, because unmarked
+    // attendance stops generation outright with no override.
+    //
+    // Their trial having PASSED is a different matter, and they stay listed:
+    // that is the real decision point — did they convert? This page means
+    // "children waiting on you", not "children with a blank field".
+    const todaySg = new Date().toLocaleDateString("en-CA", {
+      timeZone: "Asia/Singapore",
+    });
+    const { data: upcoming } = await supabase
+      .from("trial_bookings")
+      .select("student_id")
+      .is("cancelled_at", null)
+      .gte("session_date", todaySg);
+    const awaitingTrial = new Set(
+      (upcoming ?? []).map((b: any) => b.student_id as string)
+    );
+
     setStudents(
-      (data ?? []).map((s: any) => ({
+      (data ?? [])
+        .filter((s: any) => !awaitingTrial.has(s.id))
+        .map((s: any) => ({
         id: s.id,
         full_name: s.full_name,
         parent_name:
@@ -119,6 +152,40 @@ export default function UnassignedPage() {
     setAssigning(true);
     setAssignError(null);
 
+    // ⚠ ENROLLING IS FOREVER; A TRIAL IS ONE LESSON. An active enrolment makes
+    // this child expected at EVERY lesson of the class from now on, and
+    // unmarked attendance blocks invoice generation outright with no override
+    // — so enrolling a child who is only trying one lesson can silently stop
+    // the business billing that class's month.
+    //
+    // The list above already excludes children with an upcoming trial, so this
+    // should be unreachable from a fresh page. It is here because a page
+    // loaded BEFORE the trial was booked still holds the old list, and the
+    // cost of being wrong is a blocked billing month.
+    const todaySg = new Date().toLocaleDateString("en-CA", {
+      timeZone: "Asia/Singapore",
+    });
+    const { data: liveTrial } = await supabase
+      .from("trial_bookings")
+      .select("session_date")
+      .eq("student_id", assignModal.id)
+      .is("cancelled_at", null)
+      .gte("session_date", todaySg)
+      .order("session_date")
+      .limit(1);
+
+    if ((liveTrial ?? []).length > 0 && !confirmedTrialEnrol) {
+      setAssignError(
+        `${assignModal.full_name} already has a trial booked for ${liveTrial![0].session_date}. ` +
+          `They are expected at that lesson only — you do not need to assign them. ` +
+          `Enrolling makes them expected EVERY week, and an unmarked lesson blocks invoicing. ` +
+          `Press Assign again if you really mean to enrol them permanently.`
+      );
+      setConfirmedTrialEnrol(true);
+      setAssigning(false);
+      return;
+    }
+
     const { error: enrolError } = await supabase
       .from("student_class_enrolments")
       .insert({
@@ -141,6 +208,7 @@ export default function UnassignedPage() {
     setAssignModal(null);
     setSelectedCoachId("");
     setSelectedClassId("");
+    setConfirmedTrialEnrol(false);
     setAssigning(false);
     loadStudents();
   }
@@ -216,7 +284,11 @@ export default function UnassignedPage() {
       <Modal
         title={`Assign ${assignModal?.full_name ?? ""} to a Class`}
         open={!!assignModal}
-        onClose={() => setAssignModal(null)}
+        onClose={() => {
+          setAssignModal(null);
+          setConfirmedTrialEnrol(false);
+          setAssignError(null);
+        }}
       >
         <div className="space-y-4">
           {assignModal && (
@@ -278,7 +350,11 @@ export default function UnassignedPage() {
             <Button
               variant="outline"
               className="flex-1"
-              onClick={() => setAssignModal(null)}
+              onClick={() => {
+                setAssignModal(null);
+                setConfirmedTrialEnrol(false);
+                setAssignError(null);
+              }}
             >
               Cancel
             </Button>

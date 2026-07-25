@@ -79,6 +79,13 @@ export default function ClassRosterScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [classInfo, setClassInfo] = useState<ClassInfo | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
+  // ⚠ Guests, not members. A booked child is expected at ONE lesson and is not
+  // enrolled, so they never appear in the roster below — and the coach had no
+  // way to know a trial was coming until the child turned up at the poolside.
+  // The counts already accounted for them; only the coach didn't.
+  const [upcomingTrials, setUpcomingTrials] = useState<
+    { id: string; full_name: string; session_date: string }[]
+  >([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [markTarget, setMarkTarget] = useState<{
     date: string;
@@ -187,6 +194,32 @@ export default function ClassRosterScreen() {
       .select("student_id, session_date")
       .eq("class_id", id)
       .is("cancelled_at", null);
+
+    // The same rows, read the other way: who is coming, and when.
+    const today = todayInSg();
+    const upcoming = (bookingRows ?? [])
+      .filter((b: any) => (b.session_date as string) >= today)
+      .sort((a: any, b: any) =>
+        (a.session_date as string).localeCompare(b.session_date as string)
+      );
+    if (upcoming.length > 0) {
+      const { data: guestRows } = await supabase
+        .from("students")
+        .select("id, full_name")
+        .in("id", upcoming.map((b: any) => b.student_id));
+      const nameById = new Map(
+        (guestRows ?? []).map((s: any) => [s.id as string, s.full_name as string])
+      );
+      setUpcomingTrials(
+        upcoming.map((b: any) => ({
+          id: b.student_id as string,
+          full_name: nameById.get(b.student_id as string) ?? "A trial student",
+          session_date: b.session_date as string,
+        }))
+      );
+    } else {
+      setUpcomingTrials([]);
+    }
 
     const bookedByDate = new Map<string, string[]>();
     for (const b of bookingRows ?? []) {
@@ -372,6 +405,33 @@ export default function ClassRosterScreen() {
             </Card>
           )}
         </View>
+
+        {/* ── Trials coming up ─────────────────────────────────────────────
+            Listed ABOVE the roster because it is the thing the coach does not
+            already know. They are guests for one lesson, not members, so they
+            are deliberately a separate list rather than mixed into the roster —
+            mixing them would imply a weekly student. */}
+        {upcomingTrials.length > 0 && (
+          <View className="mb-5 bg-sky-50 rounded-2xl p-4 border border-sky-100">
+            <Text className="text-sm font-bold text-sky-900">
+              Trial{upcomingTrials.length === 1 ? "" : "s"} coming up
+            </Text>
+            {upcomingTrials.map((tr) => (
+              <View
+                key={`${tr.id}-${tr.session_date}`}
+                className="mt-2 flex-row items-center justify-between"
+              >
+                <Text className="text-sm text-sky-900">{tr.full_name}</Text>
+                <Text className="text-xs font-medium text-sky-700">
+                  {formatSgDate(tr.session_date)}
+                </Text>
+              </View>
+            ))}
+            <Text className="mt-2 text-[11px] text-sky-700">
+              Trying one lesson — mark them like anyone else on the day.
+            </Text>
+          </View>
+        )}
 
         {/* Enrolled Students */}
         <View className="flex-row items-center justify-between mb-3">
