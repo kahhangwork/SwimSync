@@ -1281,6 +1281,30 @@ An ongoing student is enrolled **from the day they are added**, so lessons taugh
 that are neither expected of them nor billed. Capturing earlier weeks means the coach
 marking those dates.
 
+##### Who can see a booked trial *(added 2026-07-26)*
+
+Because a trial is a booking and not an enrolment, a booked child has no class attached —
+and every screen that reads "which class is this child in?" used to describe them as a
+child **waiting to be placed in one**. That was false in three places at once, and the
+admin one was actively dangerous:
+
+- **The parent** was told *"the admin will assign your child soon."* Their lesson was
+  already booked, at a known class on a known date, and the app was the only thing that
+  knew. The child's card now reads **"Trial lesson booked — TestClass · Sat 2 Aug"**.
+- **The coach** could not see a trial coming at all until the child arrived at the
+  poolside. The class roster now lists **trials coming up**, deliberately as a separate
+  panel rather than mixed into the roster: they are a guest for one lesson, and listing
+  them among the enrolled would imply a weekly student.
+- **The admin** was being *prompted* to break billing. Unassigned Children listed booked
+  children as needing placement, and its Assign action creates an **active enrolment** —
+  which makes the child expected at **every** lesson of that class from then on. A child
+  who tries one lesson and never returns would then silently stop that class's month being
+  billed, because unmarked attendance blocks generation with no override.
+  Children with an **upcoming** trial are now excluded from that page; children whose
+  trial has **passed** remain, because that is the real decision point — did they convert?
+  Assigning a child who still has a live booking now explains the consequence and requires
+  a second press.
+
 ##### A trial is a booking, not attendance *(corrected 2026-07-25)*
 
 Booking says one thing: **this child is expected at this lesson.** Nothing about the
@@ -1391,8 +1415,10 @@ accumulated nothing, and nothing in the product mentioned either fact. The remed
 
 #### What the parent sees
 
-Add Child now checks the roster **before it creates anything**. If a child there looks
-like the one being added, the parent is asked — not told:
+Add Child confirms the details back first — name, date of birth, gender — because a
+child's profile **cannot be deleted**, only set inactive (§7.14), so a typo is something
+the family lives with. It then checks the roster **before it creates anything**. If a
+child there looks like the one being added, the parent is asked — not told:
 
 > **Is this your child?**
 > Your coach may have already added your child.
@@ -1412,10 +1438,39 @@ like the one being added, the parent is asked — not told:
   Save again would walk straight round the question. Their home screen shows how long it
   has been waiting and what to do about it.
 
-A candidate is only ever offered when a signal already points at it: a matching phone
-number, or a matching **given name** (or two matching name parts). A shared surname alone
-matches nothing — in Singapore that would turn the prompt into a directory of the
-business's unclaimed children.
+#### What counts as a match *(revised 2026-07-26, after live testing)*
+
+A candidate is only ever offered when a signal already points at it, and the signals are
+**ranked alternatives** — the first that fires wins, and a missing one never blocks the
+next:
+
+| Rank | Signal | Why it is where it is |
+|---|---|---|
+| 1 | The parent's **email** matches the address the coach recorded | Exact and unique — it is the address they sign in with |
+| 2 | The parent's **phone** matches the number the coach recorded | Independent of how the name is written; compared on the last 8 digits, so `+65` is irrelevant |
+| 3 | **Name + date of birth** both match | |
+| 4 | **Name** alone — the given name, or two matching name parts | Last resort |
+
+**The contact number is required when a coach books a trial or adds a student**, precisely
+so ranks 1–2 do the work. A name is written many ways — "Ethan Tan Ah Beng" and "Tan Ah
+Beng Ethan" are one child, as are a nickname and a full name — and matching on it is
+guessing at a string. A contact detail is not a guess.
+
+Name matching **stays** as the fallback, because every child added before this has no
+contact details recorded at all, and removing it would strand exactly the records that
+most need claiming.
+
+Two refinements that stop the fallback being too eager:
+
+- **A shared surname alone matches nothing.** In Singapore that would turn the prompt into
+  a directory of the business's unclaimed children.
+- **A conflicting date of birth disqualifies a name match** — two children called "Ethan
+  Tan" born on different days are namesakes, not one child. A *missing* date is not a
+  conflict, which matters because the coach-added child usually has none.
+- **A conflicting phone does NOT disqualify it** — it only demotes it, and warns the
+  admin. A phone is a fact about whoever brought the child, and a family has several: the
+  mother's number taken at the poolside while the *father* registers is the ordinary case.
+  Blocking there would mean a father could never claim his own child, silently.
 
 #### What the admin sees
 
@@ -1425,7 +1480,12 @@ cannot be answered from either alone — plus the parent's name, email and phone
 many lessons the candidate already has. Approving is a two-step confirm naming both
 parties, and it silently closes any competing request on that child.
 
-Every approval can be **undone**, until the child has been invoiced to that parent.
+Every approval can be **undone**, until the child has been invoiced to that parent — and
+undoing also **reverses what the approval wrote onto the child**. Approving fills a
+missing date of birth, gender or notes from what the parent typed; an undo means the admin
+decided this is *not* their child, so leaving that behind would keep a stranger's data on
+another family's record — and would block the real parent, whose child now collides with
+it on name + date of birth.
 
 #### Duplicates that already exist
 

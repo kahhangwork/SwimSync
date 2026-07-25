@@ -1,6 +1,6 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-25 (eleventh session — categories are mandatory and a TRIAL IS A
+_Last updated: 2026-07-26 (twelfth session — categories are mandatory and a TRIAL IS A
 BOOKING, superseding the trial half of the tenth session on the user's correction. Built
 AND deployed the same evening; **dormant until the first trial is booked**)_
 
@@ -157,9 +157,17 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   gets a queue with a sidebar badge, a two-step confirm naming both parties, and — because
   nothing else in the product can unlink a parent from a child (§7.47) — an **undo**.
   Duplicates that already exist are detected on the Students page and folded together by
-  `merge_students()`. PRD §7.18, `PARENT_CLAIM_PLAN.md`, §8.12.
-- **Automated tests** — backend **354 pgTAP + 108 Deno**, plus frontend suites
-  (`SwimSyncAdmin` vitest 120, `SwimSyncApp` jest-expo 89); all run in CI on push to `main`. See §5.
+  `merge_students()`. Matching is **ranked email > phone > name+dob > name**, and the
+  parent's contact number is **required** when a coach books a trial or adds a student —
+  a name is written too many ways to be the primary signal. PRD §7.18,
+  `PARENT_CLAIM_PLAN.md`, §8.12.
+- **A booked trial is visible to everyone who needs it (verified local: UI driver — LIVE
+  2026-07-26)** — the parent's card says *when* their trial is, the coach's roster lists
+  trials coming up, and children with an **upcoming** trial are excluded from Unassigned
+  Children, where Assign would have enrolled them permanently and blocked billing.
+  PRD §7.17.
+- **Automated tests** — backend **366 pgTAP + 108 Deno**, plus frontend suites
+  (`SwimSyncAdmin` vitest 122, `SwimSyncApp` jest-expo 91); all run in CI on push to `main`. See §5.
 
 > **§3's old "clean slate" claim was WRONG and is corrected here (2026-07-25).** It said
 > production held "only the superadmin + the real coach/classes". Reading the actual dump:
@@ -274,16 +282,16 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 299 tests across 19 files
+supabase test db                                  # 366 tests across 21 files
 
 # Backend — Function tests (Deno): billing math, credit + package ledgers, emails
 supabase/functions/generate-invoices/test.sh      # 108 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
-cd SwimSyncAdmin && npm test                       # 106 tests
+cd SwimSyncAdmin && npm test                       # 122 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
-cd SwimSyncApp && npm test                         # 79 tests
+cd SwimSyncApp && npm test                         # 91 tests
 ```
 
 **Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
@@ -310,11 +318,11 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `lesson_packages.test.sql` (30) | prepaid packages: RLS on all four tables, $0-rate/0-lesson products refused, product money terms immutable, request snapshots come from the PRODUCT (a parent cannot claim a price or an active status), only non-client roles move a balance, `package_live_balances()` draws locked-rate/in-scope/FIFO and leaves the stored balance alone |
 | `tenant_provisioning.test.sql` (21) | creating a business: parent, coach, **tenant admin** and anon all REFUSED (each in an explicit transaction, 7.16) and `tenants` does not grow after any of them; slug derivation incl. a **non-ASCII name** that would otherwise violate NOT NULL; join-code shape + uniqueness; a fresh tenant reports `admin_status = none`. The two ACL assertions are near-vacuous locally by construction (7.39) |
 | `package_corrections.test.sql` (12) | a correction on a package-funded line restores the package (even expired) and mints NO cash credit note; flip-flops refund at most once; ad-hoc lines keep the credit-note path byte-identical |
-| `student_claims.test.sql` (35) | parents claiming their own child: the disclosure surface (a surname-only overlap returns **nothing**; an unjoined tenant is **refused**, not handed an empty set; a claimed child is never a candidate; masking happens in SQL), the phone signal matching across `+65` vs 8 digits, the **tripwire** that a non-matching child is created exactly as before, Confirm **not** linking, the pending block **with a NULL dob on both sides** (fails on `=`), claim RLS both ways, approve auto-declining competing claims, the dob enrichment, **undo**, `list_student_claims()` seeing a parent `profiles_select` hides (§7.48), and the contract: a parent can no longer INSERT a student directly while the admin still can |
+| `student_claims.test.sql` (47) | parents claiming their own child: the disclosure surface (a surname-only overlap returns **nothing**; an unjoined tenant is **refused**, not handed an empty set; a claimed child is never a candidate; masking happens in SQL), the phone signal matching across `+65` vs 8 digits, the **tripwire** that a non-matching child is created exactly as before, Confirm **not** linking, the pending block **with a NULL dob on both sides** (fails on `=`), claim RLS both ways, approve auto-declining competing claims, the dob enrichment, **undo**, `list_student_claims()` seeing a parent `profiles_select` hides (§7.48), and the contract: a parent can no longer INSERT a student directly while the admin still can |
 | `student_merge.test.sql` (20) | folding a duplicate into the row with the history: five refusals (cross-tenant, both-marked, **wrong direction**, invoiced duplicate, same row) each asserting `students` did not shrink; the move of parent links, trial bookings and settlements with **global counts unchanged** — a merge moves rows, never destroys them; and §7.46's guard, proved by **creating a cascading FK at runtime** and asserting the merge refuses |
 | `trial_onboarding.test.sql` (32) | a child before their parent: THREE refusal shapes for `add_unclaimed_student()` (parent, cross-tenant coach, anon) each asserting `students` did not grow, the **tenant derived from the class** (nothing downstream would catch a wrong one — §7.42), `created_by` = the calling coach, a trial enrolment closed on its own date, **session idempotency** (two walk-ins on one date share ONE session — §7.43), the plain-English duplicate name+DOB error, settlement RLS, and `link_invited_parent()` incl. same-parent idempotency vs a different parent refused |
 
-**Total: 354 across 21 files** — verified by `supabase test db` 2026-07-26 (the previous
+**Total: 366 across 21 files** — verified by `supabase test db` 2026-07-26 (the previous
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
@@ -405,6 +413,12 @@ window (§8b) across coach + parent — the roster button targets the most recen
 lesson (not raw "today"), the "no lessons to mark yet" placeholder shows for a class with
 nothing due, and the parent screen distinguishes "no lessons have taken place yet" from
 "no lessons marked yet";
+`verify-trial-visibility.mjs` (+ `fixtures-trial-visibility.sql`) drives a booked trial from
+all three sides — the parent is told WHEN, the coach's roster lists trials coming up, and
+Unassigned Children **excludes** an upcoming trial while **keeping** a past one; its last
+two checks book a trial *while the admin page is already open* and prove the enrolment
+guard refuses the first press **and wrote nothing** (11 checks). **It found two RLS gaps
+that would have shipped the parent card completely dead** — see §7.48;
 `verify-parent-claim.mjs` (+ `fixtures-parent-claim.sql`) drives the whole claim + merge
 loop across both real UIs — the popup OPENS (slice 1 shipped an invisible modal, §8.10),
 the candidate is masked, Confirm is inert until one is chosen, the parent is **blocked**
@@ -1151,6 +1165,18 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     RLS; test the read path as the actual role.** Only the UI driver caught it. The fix is a
     narrow `SECURITY DEFINER` reader (`list_student_claims()`), not a sixth branch on the
     most load-bearing policy in the schema.
+    **IT HAPPENED TWICE MORE THE NEXT DAY, and the shape is worth memorising: A POLICY GAP
+    IS INDISTINGUISHABLE FROM A FEATURE NOBODY WROTE.** The parent's "your trial is on
+    Saturday" card read the right table, rendered the right component, and showed the old
+    text — because `trial_bookings_select` had no parent branch at all
+    (`current_tenant_id()` is NULL for a parent; they are not a coach). Fixed, it then
+    rendered "their class", because `classes_select` asks `parent_has_child_in_class()`,
+    which only knew about ENROLMENTS and a trial is a booking. Two policies, one feature,
+    each failing silently and neither raising anything.
+    **So: when a new screen reads a table its audience has never read before, probe the
+    policy AS THAT ROLE before writing the UI** —
+    `SET LOCAL ROLE authenticated; SET LOCAL "request.jwt.claims" TO '{"sub":"<id>"}'; SELECT count(*) FROM <table>;`
+    A count of 0 there is the whole bug, and it takes ten seconds.
 
 49. **NUMBER A CONTRACT MIGRATION *LAST*, OR STAGING THE DEPLOY LEAVES IT OUT OF ORDER.**
     `supabase db push` applies **everything** pending — there is no "up to migration X"
@@ -1165,6 +1191,32 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     but the cleaner fix is upstream: **give the contract migration the highest timestamp
     in the batch**, so holding it back never creates a gap. Expand/contract is now the
     normal shape for this codebase (§6), so this will recur.
+
+50. **`audit_log.actor_id` STOPS YOU DELETING A PROFILE, AND CANNOT BE CASCADED OR
+    BLANKED.** It is `NOT NULL` and `NO ACTION` against `profiles`, so any account that
+    has ever *done* something — filed a claim, added a child, marked attendance — cannot
+    be deleted until its audit rows go first. Hit while writing the production
+    test-data cleanup: five throwaway accounts had authored six rows between them, and the
+    delete failed with a bare FK error naming a UUID.
+    Delete audit rows **authored by** the doomed accounts only. Rows written by someone
+    else *about* a deleted entity are fine and should be kept — `entity_id` has no foreign
+    key, so they dangle harmlessly and they are the business's own record.
+    This also means **an account can never be fully deleted without losing part of the
+    audit trail** — a real tension worth knowing before promising anyone a clean deletion.
+    Audit:
+    `SELECT count(*) FROM audit_log al JOIN profiles p ON p.id = al.actor_id WHERE p.email = '<addr>';`
+
+51. **A MINIFIED BUNDLE ONLY PROVES WHAT USER-VISIBLE STRINGS SURVIVE — GREPPING FOR AN
+    IDENTIFIER OR A SPLIT LITERAL PROVES NOTHING.** Verifying a Vercel deploy by fetching
+    `/_expo/static/js/web/entry-*.js` and grepping is genuinely necessary (§7.23's
+    app-lags-admin problem needs it), but it lies in two directions:
+    - **Identifiers are renamed.** `upcomingTrials` and `awaitingTrial` both return 0 in a
+      live bundle that contains the feature.
+    - **JSX splits literals.** `Trial{n === 1 ? "" : "s"} coming up` never appears as
+      `"Trials coming up"` anywhere — only `" coming up"` does.
+    Both read as "the deploy failed", and the second nearly sent this session chasing a
+    problem that did not exist. **Grep only for a contiguous user-visible string you can
+    see verbatim in the source**, and sanity-check with one you know was already live.
 ---
 
 ## 8.12 Twelfth session (2026-07-26) — PARENTS CAN CLAIM THEIR OWN CHILD — BUILT **AND DEPLOYED**
@@ -1224,6 +1276,60 @@ and declined — *the admin confirms every claim* stands.
   `CURRENT_DATE` (the **server's** UTC date) while package coverage starts on the SGT
   confirmation date — so the suite went red for **eight hours a day**, 00:00–08:00 SGT,
   and had done since 2026-07-20. §7.7 in a test rather than in product code.
+
+### Then it met production, and ten things came back
+
+The user tested the whole thing live the same evening. **Everything on the original test
+list passed** — normal child creation, the claim flow end to end, the block, approve,
+undo, duplicate detection, merge, and the invite modal. What follows is what testing
+*found*, all of it fixed and deployed the same night. It is a good argument for testing
+on real data: **five of these were invisible to 366 automated tests.**
+
+**Two would have shipped a feature that could never work:**
+- **A parent could not read `trial_bookings` at all** — no parent branch in the policy.
+  The "your trial is on Saturday" card would have gone live still showing the old text.
+- **Then `classes_select`** refused the class it named, because
+  `parent_has_child_in_class()` only knew about enrolments. Now §7.48's second and third
+  instances: *a policy gap is indistinguishable from a feature nobody wrote.*
+
+**Three were wrong data or a wrong decision:**
+- **Undo left the approval's enrichment behind.** Approving fills a missing date of birth
+  from what the parent typed; undoing removed only the link — so a stranger's data stayed
+  on another family's child, *and* dead-ended the real parent, whose child then collided
+  on name + date of birth. Proved from the audit log (`dob_filled: true`), not guessed.
+- **Duplicate detection flagged records the admin had already retired** by marking them
+  inactive — which is how you resolve a duplicate with no merge tool. The banner has no
+  dismiss, so that was permanent noise on real data.
+- **The declined-claim notice never disappeared**, and its wording conflated the name the
+  parent *typed* with the record they *pointed at*.
+
+**Two were the invite path, untouched since slice 1:**
+- **An invited parent had no name and no phone, and no screen could set either** —
+  `invite-parent` sent `full_name: ""` and `/accept-invite` only asked for a password. So
+  the admin's roster showed a blank parent (reads as "no parent"), and the phone signal
+  could never fire for them. Fixed at all three points.
+- **The invite modal's second press sent nothing and said otherwise.** Sending creates the
+  auth user, so a second press hit the "already has an account" branch, returned
+  `emailed: true`, and mailed nothing — precisely the wrong answer for an admin whose
+  email had not arrived.
+
+**And the biggest one was a question, not a bug report.** *"When I book a trial I've
+already chosen a class — why isn't the child assigned?"* The answer is that a trial is
+deliberately not an enrolment — but three screens said otherwise, and the admin one
+**prompted the harmful action**: Assign inserts an active enrolment, making the child
+expected every week, which would silently stop that class's month being billed. Now
+PRD §7.17's *Who can see a booked trial*. Production was one assignment away from it;
+no trial child had an enrolment when checked.
+
+**Matching was rebuilt on the user's argument, and they were right.** A name is written
+too many ways to be the primary signal — *"Ethan Tan Ah Beng"* and *"Tan Ah Beng Ethan"*
+are one child. The contact number is now **required** when a coach books a trial or adds a
+student, the **email** the form already collected became the top-ranked signal, and name
+matching dropped to a documented last resort (kept, because every pre-existing child has
+no contact details at all). Two refinements followed: a conflicting **date of birth**
+disqualifies a name match, while a conflicting **phone** only demotes it and warns the
+admin — a phone belongs to whoever brought the child, and blocking there would mean a
+father could never claim his own child.
 
 **Still unverified, and only the user can do it:** creating a child through the **real
 parent app on production**. Everything short of that is checked, but step 6 removed the
@@ -2907,65 +3013,59 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### Outstanding from 2026-07-26 — ONE unverified path, and only the user can walk it
+### FIRST: production still holds the test data, and one row of it is harmful
 
-Parents claiming their own child is **deployed** (§8.12's deploy record) and, like packages
-and provisioning before it, **dormant until used**: no parent has a claim, so every family
-behaves exactly as before.
+A **tested cleanup script** exists and had **NOT been run** when this session ended. It
+lives outside the repo — `scratchpad/cleanup/cleanup-test-data.sql`, alongside a
+`data-before.sql` backup — because a data-cleanup migration would re-run on every
+`db reset` and on any future environment. Full reasoning lives on `BACKLOG.md` →
+*Production data cleanup*.
 
-One thing is **not** verified, and it is the important one:
+**Why it is the first item and not housekeeping:** `Peter Zztest` was left **active and
+enrolled in TestClass**. An active enrolment makes a child expected at *every* lesson of
+that class, and unmarked attendance blocks invoice generation with no override — so a test
+record is currently positioned to stop a real month being billed.
 
-**Add Child, through the real parent app on production.** The deploy's last migration
-removed the parent branch from `students_insert`, so a parent now creates a child *only*
-through `add_child_or_claim()`. Everything short of the real path is checked — the RPC is
-live, refuses `anon`, and the deployed bundle calls it — but **no production parent has
-actually added a child since**. If it is wrong, the failure looks like *"Failed to add your
-child. Please try again."* forever.
+It deletes **12 students and 5 parent accounts by exact name**, ends in `ROLLBACK` so the
+first run only prints its plan, and was executed against a restored copy of the real data:
+**21 → 9 students, 12 → 7 parents, attendance and sessions to 0**, nobody left parentless,
+the 7 surviving families all real. Run it in the Supabase dashboard; change the last line
+to `COMMIT` when the output looks right.
 
-**A two-minute check:** sign in as a parent on `swimsync.sg` → Add Child → save a child
-whose name matches nothing. It should be created exactly as before. *(Not done from here on
-purpose: it leaves a test child in a database with real families and no delete UI.)*
+**⚠ When it is committed, this section's own "first attendance ever recorded" paragraph
+below becomes FALSE** — that one row is `TestChild1`'s trial and the script removes it.
+Rewrite that paragraph rather than deleting it: the loop *was* proven end to end, and then
+the evidence was cleaned up. Do not let it silently rot into a claim the database
+contradicts.
 
-**If it fails:** `supabase/rollback/20260726_parent_claim_DOWN.sql` restores the old policy
-in one statement, and it was executed forward and back locally before the deploy.
+### The parent-claim work is live and PROVEN on production
 
-### Outstanding from 2026-07-25 — ONE unverified path
+Everything from §8.12 was walked by hand on production the same evening — normal child
+creation, the claim flow, the block, approve, undo, duplicate detection, merge, and the
+invite modal. Ten defects came back and were all fixed and deployed (§8.12). Nothing about
+it is outstanding.
 
-Trial onboarding is **deployed and smoked** (§8.10's deploy record), and like packages and
-provisioning it is **dormant until used**: production has no unclaimed students, so every
-family still bills exactly as before.
+Two things remain untested only because they need a second real family:
+**two parents claiming the same child** (the queue warns and approving one auto-declines
+the other — covered by pgTAP), and the **email** match signal.
 
-One thing was **not** verified end to end, because it needs a real mailbox:
+### Outstanding from 2026-07-21 — ONE left, and it is now narrow
 
-**The parent invite link's landing page.** `https://swimsync.sg/accept-invite` was added
-to the production allow-list and `NEXT_PUBLIC_APP_URL` was set before the build, but no
-invite has actually been sent on production. If either is wrong the invite **still
-arrives and the link still works** — it just lands on the wrong site (§7.41), which is
-precisely why this cannot be inferred from "the flow worked".
+**`RESEND_API_KEY` is proven.** It was unexercised for five days; parent invites were sent
+and received on production 2026-07-26 (and re-sent, after the resend path was fixed), so
+that half is closed. Removed from this list rather than left as a caveat.
 
-**A five-minute check, and only the user can run it:** Admin → Students → any student →
-*Invite parent* → a throwaway address. Confirm the email arrives and that the link's
-`redirect_to` is `https://swimsync.sg/accept-invite`. **Read the URL**, don't just follow
-it. (This also exercises `RESEND_API_KEY` on the admin's Vercel project for the second
-time — the first was tenant provisioning, still itself unused.)
+**What remains: the production redirect allow-list, for `/reset-password` only.**
+`/accept-invite` is now proven — invited parents have landed on it and set passwords. The
+reset-password entry has still never been exercised on production, and §7.41 is the reason
+to care: an unlisted redirect is **not rejected**, it is silently replaced with `site_url`,
+so the email arrives, the link works, and the user lands on the wrong page.
 
-### Outstanding from 2026-07-21 — two things, both first-use
+**A two-minute check:** use *Forgot password?* on `swimsync.sg` with a real address and
+**read the URL** in the email before following it.
 
-Tenant provisioning is **built, deployed and smoked** (§8.9's deploy record), and like
-packages it is **dormant until used**: no business has been provisioned in production.
-That means two paths have never run for real, and both fail *quietly* rather than loudly:
-
-1. **`RESEND_API_KEY` on the admin's Vercel project.** The user added it during the
-   deploy; it has not been exercised. If it is missing or wrong, provisioning still
-   "succeeds" and shows a copyable invite link instead of sending — deliberate (§8.9), but
-   easy to mistake for the intended flow. The first real provision is the test.
-2. **The production redirect allow-list.** `/accept-invite` + `/reset-password` were added
-   to the Supabase dashboard during the deploy. If either is wrong, the invite email still
-   arrives and the link still works — it just lands on the wrong page (§7.41).
-
-**A check only the user can run:** provision the school (Platform → New business) and
-watch that the invite **arrives** and lands on `/accept-invite`. That single action
-exercises both of the above and is the natural next step anyway — see below.
+**Tenant provisioning itself is still dormant** — no business has been created through
+Platform → New business since `Epic Swim` was provisioned by hand on 2026-07-21.
 
 ### The one thing blocking everything else — moved for the first time on 2026-07-25
 
@@ -3023,18 +3123,21 @@ Two things still depend on that not staying true much longer:
 ### If you would rather build than onboard
 
 **`BACKLOG.md` → `## Build order` is EMPTY** and has been since 2026-07-19. Pick from the
-themed sections below it, or from the clusters. The nearest candidates with no dependencies:
-**credit-note emails** (the other half of the notification work), **parents claiming their
-own child** (slice 2 of §8.10 — the design is fully settled in `BACKLOG.md`, only the build
-remains, and it closes the one known gap in what just shipped), or **an upcoming-lessons
-view for parents** (small, and the building block already exists).
+themed sections below it. The nearest candidates with no dependencies:
+**credit-note emails** (the other half of the notification work), an **upcoming-lessons
+view for parents** (small, and the building block already exists), or — both raised by
+this session's testing and both small — **convert a trial into an enrolled student** and
+**editing a student's contact details**. The second matters more than it sounds: the phone
+is now the primary matching signal and is required going forward, but every child added
+before 2026-07-26 has none and no screen can supply one.
 
-*(Coach-created student profiles shipped 2026-07-25 — it was the friction the onboarding
-push had been feeling, and it is now a button on the attendance screen.)*
+*(Parents claiming their own child shipped 2026-07-26 — PRD §7.18. Coach-created student
+profiles shipped 2026-07-25. Both were the last of the trial-onboarding cluster.)*
 
-**One small security-hygiene item arrived this session:** *revoke `anon` EXECUTE from the
-remaining SECURITY DEFINER functions* (S). Not urgent — every body gate holds — but it is
-the second layer that §7.39 showed was missing, and it is an afternoon.
+**Two hygiene items, neither urgent:** *revoke `anon` EXECUTE from the remaining SECURITY
+DEFINER functions* (§7.39's missing second layer), and *a business cannot read its own
+audit trail* — 13 of 19 writers never set `audit_log.tenant_id`, and the parent-claim work
+made that column **half**-populated, which fails more quietly than empty did.
 
 ### Small, concrete, and outstanding
 
@@ -3072,6 +3175,7 @@ email **has still never fired in production**.
 | `SwimSyncApp/lib/landing.ts` | Where a signed-in user lands. Routes on **extension rows**, not the role enum (§7.19) |
 | `SwimSyncApp/lib/attendanceCompleteness.ts` | The completeness rule, shared. **Twin in SwimSyncAdmin; a third copy in the Deno engine — three edits** |
 | `TRIAL_ONBOARDING_PLAN.md` | A child before their parent: the plan, its ranked risks inlined as mitigations, and the pre-commit gate. **Read before merging §8.10** |
+| `PARENT_CLAIM_PLAN.md` | **The parent-claiming design of record** — the settled decisions (including the two the user reversed mid-planning), seven ranked risks with mitigations inlined beside the step each governs, and the pre-commit gate. Read before changing matching, the claim queue, or `merge_students()` |
 | `SwimSyncApp/lib/attendanceRoster.ts` | Who appears on Mark Attendance: enrolled **∪** already-marked-on-this-session. Why a closed trial enrolment doesn't hide the child it marked |
 | `supabase/migrations/20260725000100…000300` | `student_settlements`, `add_unclaimed_student()`, `link_invited_parent()` |
 | `SwimSyncAdmin/app/(admin)/wages/page.tsx` | Coach payroll: rates, policy, run, mark paid |

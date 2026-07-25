@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-26 (parents claiming their own child — LIVE)_
+_Last updated: 2026-07-26 (parent claiming live; trial visibility fixed; cleanup script written, NOT yet run)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -111,7 +111,9 @@ package notifications, in-app refunds.
   **Coach-created student profiles** sat behind this and **shipped 2026-07-25** as part
   of trial onboarding (PRD §7.17) — a coach adds a walk-in or an unregistered student
   into their own class. **What remained — *Parents claiming their own child* — SHIPPED
-  2026-07-26** (PRD §7.18). This cluster is now complete.
+  2026-07-26** (PRD §7.18, `PARENT_CLAIM_PLAN.md`). This cluster is now complete, and its
+  item is removed from this document rather than left marked done — the reasoning lives in
+  the plan and the PRD.
 - **The platform chain.** Native store builds (M) → Push notifications (M) — push can't
   work on the current static web app, so it can't precede native builds.
 - **The reminder chain.** Invoice emails **shipped** (HANDOVER §8c); the rest sequences after
@@ -124,7 +126,9 @@ package notifications, in-app refunds.
 Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-history view
 (S), Export to CSV (S), Disable a staff account (M), Student-move loose ends (S), Better
 filtering/search (S), More polished
-dashboards (S), Deeper component-render tests (M), Production data cleanup (S),
+dashboards (S), Deeper component-render tests (M), Production data cleanup (S — script
+written and tested, not yet run), Convert a trial into an enrolled student (S),
+Editing a student's contact details (S),
 Email-confirmation copy/templates (S), Audit trail invisible to its own business (S), Revoke `anon` EXECUTE from the remaining
 SECURITY DEFINER functions (S), Revenue reporting (M — *decide accrual-vs-cash first*).
 
@@ -182,90 +186,37 @@ out of a text blob. What makes it an M rather than an S:
 - Watch the read cost: a roster of six children each with six skills is 36 rows, so fetch
   it per class rather than per student.
 
-### ~~Parents claiming their own child~~ — **SHIPPED 2026-07-26**
-Let a parent who registers independently find the child their coach already added,
-instead of creating a duplicate.
+### Convert a trial into an enrolled student — **S**
+After a trial is marked, give the Trials page a **"Convert to enrolled"** action instead
+of sending the admin to Unassigned Children to do it.
 
-> **SHIPPED as PRD §7.18** — see `PARENT_CLAIM_PLAN.md` and HANDOVER §8.12. The matching
-> happens at **Add Child** (not at join-code time: the only signal available there is a
-> phone that is optional on both paths that create an unclaimed child, so for most
-> children it would never fire). Three answers — Confirm / Not Sure / No — and **both
-> claim answers go to the admin queue**; the rule that the admin confirms every claim
-> held. Merge and duplicate detection shipped with it.
->
-> The notes below are kept because they were the design, and every one of them survived
-> the build. Two things they got WRONG are corrected in place: the FK cascade list, and
-> the assumption that a merge only ever pairs an unclaimed row with a claimed one.
+**Why:** converting is the whole point of running a trial, and it currently has no home.
+Since 2026-07-26 a child with an *upcoming* trial is deliberately hidden from Unassigned
+Children (they need no decision yet), so the conversion path is: wait for the trial date
+to pass, then find them on a page named after a different problem. The decision belongs
+where the trial does.
 
-**Why:** slice 1 of trial onboarding (PRD §7.17) ships the **invite** path — the admin
-emails the parent and the child is attached with no ambiguity. But a parent can always
-register on their own first, and today that produces a second student record with none
-of the attendance. The admin has no in-app way to merge them; the remedy is SQL.
+**Notes:** the enrolment is the dangerous half — an active enrolment makes the child
+expected at **every** lesson, and unmarked attendance blocks billing outright. So this is
+a relabelling of an existing guarded action, not a new capability: reuse the same insert
+Unassigned Children performs, and keep the "this makes them expected every week" wording.
+The natural trigger is the Trials page's *past — needs marking* list, once the lesson has
+been marked.
 
-**Notes — the design is settled, only the build remains:**
+### Editing a student's contact details — **S**
+There is no way to change `provisional_contact_phone` / `_email` on an existing student.
 
-- **Don't reach for fuzzy name matching.** The candidate pool is tiny: the parent must
-  already hold the business's join code, so matching happens within ONE business, against
-  only its *unclaimed* students — realistically a handful. The system should rank a very
-  short list, the parent picks, and the admin confirms. It never decides.
-- **Phone first.** `students.provisional_contact_phone` is captured at the poolside for
-  exactly this, and `profiles.phone` is already collected at registration. That pair is a
-  far stronger signal than any name logic. Name-token overlap is the fallback.
-- **Disclosure is the risk.** Showing a parent a list of unclaimed children shows one
-  customer other customers' kids. Surface a candidate only when a signal already points
-  at it, and mask it ("E— T—, trial on Sat 12 Jul") — the real parent recognises their
-  own child and a stranger learns nothing.
-- **The admin confirms every claim** (the user's explicit call). A wrong link exposes a
-  family's attendance and billing history.
-- **Merge is required, not optional**, because name-only matching will miss — nicknames,
-  Chinese vs English names, "Ethan" vs "Ethan Tan Wei Ming". Constrain it to
-  *unclaimed ↔ claimed* and refuse when both rows carry attendance; that case needs a
-  human. The survivor is the row with the HISTORY (repointing attendance is the dangerous
-  operation; repointing a parent link is trivial), and the duplicate's better fields —
-  full name, DOB, gender, notes — are copied onto it first.
-- **Hard-delete the emptied duplicate, don't tombstone it.** `students_identity_uniq` is
-  on `(tenant_id, lower(trim(full_name)), date_of_birth)`, so after the merge a tombstone
-  would collide with the survivor. Write the deleted row into `audit_log` instead.
-  - ⚠ **CORRECTED 2026-07-26 — the earlier version of this bullet was wrong, and it was
-    the one the merge design leaned on.** It said "of five FKs into `students`, only
-    `parent_students` cascades … so a mis-aimed merge cannot destroy anything." There are
-    now **seven FKs and THREE cascade**: `parent_students`, plus **`student_settlements`**
-    (`20260725000100`) and **`trial_bookings`** (`20260725000700`) — both added by the
-    trial work *in the same session that wrote the old sentence*. Enrolments, attendance,
-    `invoice_items` and `credit_notes` are still `NO ACTION`, so the guarantee that
-    matters holds: the DB still refuses to delete a student carrying **attendance or
-    money**. But a delete now silently takes that row's **trial bookings and settlements**
-    with it, and a settlement is *recorded revenue* (see Revenue reporting below). A merge
-    must therefore MOVE those rows before deleting, and verify it did.
-- Until this ships, the fix is SQL.
+**Why:** those two fields are now how a child is matched to their parent's account
+(PRD §7.18), and the phone is **required** when a child is created — but only *going
+forward*. Every child added before 2026-07-26 has no contact details at all, so they can
+only ever be matched by name, which is the weakest signal. There is no screen that can fix
+that, and on production several real children are in exactly that state.
 
-**What slice 1 actually shipped, and what it proved (2026-07-25).** Read this before
-planning slice 2 — it is the difference between what exists and what does not:
-
-- The **invite path works end to end on production.** Verified by the user: a trial child
-  with no parent → admin sends an invite from Students → the parent sets a password → the
-  child is attached to their account automatically. `parent_students` went 11 → 12. This
-  is the happy path and it needs nothing further.
-- **`link_invited_parent()` already does the linking** (`20260725000300`): it writes
-  `parent_tenants` + `parent_students` in one transaction, refuses a child who already has
-  a DIFFERENT parent, and is a no-op for the SAME parent. Slice 2's approval step should
-  call it rather than re-implement linking.
-- **What does NOT exist:** any path for a parent to find their own child. A parent who
-  self-registers *before* being invited types their child's name into Add Child and gets a
-  second student record with none of the attendance.
-- **Nothing detects that today.** Slice 1 was planned with a detection-only duplicate
-  warning on the admin Students page; **it was not built.** Do not assume it is there.
-
-**The pieces slice 2 needs, and where the seams already are:**
-
-| Need | Where it stands |
-|---|---|
-| Match signal | `students.provisional_contact_phone` is captured at booking/creation; `profiles.phone` exists on the parent. Neither is used for matching yet. |
-| Candidate lookup | Must be `SECURITY DEFINER` — a registering parent matches no branch of `students_select`, so they cannot see an unclaimed child at all. |
-| Identity of the child | `students_identity_uniq` is `(tenant_id, lower(trim(full_name)), date_of_birth)`, and **NULL DOB never collides** — which is exactly why a coach-added child (often no DOB) and a parent-added one silently become two rows. |
-| Linking | `link_invited_parent()` — reuse it. |
-| Deleting the emptied duplicate | Partly safe: of **seven** FKs into `students`, enrolments, attendance, `invoice_items` and `credit_notes` are `NO ACTION`, so a mis-aimed merge cannot destroy **history or money**. But `parent_students`, `student_settlements` and `trial_bookings` **CASCADE** — those must be moved first. See the corrected bullet above. |
-| Where the parent adds a child | `SwimSyncApp` Add Child — that is where the match must be offered, before the duplicate exists. |
+**Notes:** one of them has `964` stored as a phone, which `normalize_phone()` correctly
+rejects as too short to be a signal — so bad data is already there and unfixable through
+the UI. The admin's edit-student path is the obvious home. Coaches must not get it:
+granting them `UPDATE` on `students` also exposes names, DOBs and notes, because RLS is
+row-level, not column-level.
 
 ### Attendance edit history view — **S** `[Phase 2]`
 Surface the existing audit trail in the UI.
@@ -916,15 +867,35 @@ this comes along free. Until then: **edit both.** Recorded so the decision isn't
 re-litigated from scratch every time someone notices the duplication.
 
 ### Production data cleanup — **S**
-Two leftovers from pre-launch verification may still be in the cloud project: an
-**orphaned PayNow QR file** (from the demo coach "Marcus") in Storage, and a throwaway
-test parent **`kahhangg+swimrt1@gmail.com`** in auth.
+Leftovers from verification in the cloud project: an **orphaned PayNow QR file** in
+Storage, and — much larger since 2026-07-26 — the accounts and children created while
+testing trial onboarding and parent claiming.
 
-**Why:** harmless, but the production DB is otherwise a genuine clean slate, and this is
-the only known exception. It's recorded **only in Claude's project memory** right now —
-which ages out. Writing it down here is most of the value.
+**Why:** harmless to billing while everything is inactive, but it makes the roster
+unreadable and one leftover was *not* harmless — `Peter Zztest` was left **active and
+enrolled**, which makes a child expected at every lesson and blocks that class's month
+from being billed.
 
-**Notes:** both are dashboard operations (no service key locally).
+**Notes — a tested script exists, and had NOT been run as of 2026-07-26:**
+
+- The script lives outside the repo (scratchpad), because a data-cleanup migration would
+  re-run on every `db reset` and on any future environment. It deletes **12 students and
+  5 parent accounts by exact name/email**, ends in `ROLLBACK` so the first run only shows
+  its plan, and was **executed against a restored copy of the production data**: 21 → 9
+  students, 12 → 7 parents, attendance and sessions to 0, no survivor left parentless.
+- **Never match test data by pattern.** `LIKE '%test%'` works today and deletes a real
+  child called *Justin* later. Name them.
+- **`audit_log.actor_id` blocks deleting a profile** — it is `NOT NULL` and `NO ACTION`,
+  so it can be neither cascaded nor blanked. Audit rows *authored by* a doomed account
+  must be deleted first; rows written by the real admin *about* a deleted child dangle
+  harmlessly (`entity_id` has no FK) and should be kept.
+- Deleting `auth.users` cascades `profiles → parents → parent_students`. It does **not**
+  remove students — those belong to the business, not the account.
+- **Still deliberately excluded:** `TestClass` (empty afterwards, but a class carries
+  effective-dated `class_rates` and `trial_bookings.class_id` is `RESTRICT`), and the
+  `jj test` coach in the **Epic Swim** tenant, which is that business's data, not ours.
+- Running it takes production's `attendance` back to **0**, so HANDOVER §9's "first
+  attendance ever recorded" note goes stale the moment it is committed.
 
 ### Email confirmation copy and templates — **S** `[handover]`
 Confirmation emails still use Supabase defaults.
