@@ -32,7 +32,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(37);
+SELECT plan(38);
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -72,6 +72,7 @@ VALUES
 -- this assertion failed and the strongest non-name signal never fired at all.
 UPDATE profiles SET phone = '+65 9111 2222' WHERE id = 'c1000000-0000-0000-0000-0000000000d1';
 
+
 INSERT INTO parent_tenants (parent_id, tenant_id)
 SELECT p.id, 'c1a11111-0000-0000-0000-000000000001'
   FROM parents p JOIN profiles pr ON pr.id = p.profile_id
@@ -99,6 +100,7 @@ INSERT INTO students (id, full_name, date_of_birth, tenant_id, assignment_status
 VALUES
   ('c1a99999-0000-0000-0000-000000000001','Ethan Tan Wei Ming', NULL,
    'c1a11111-0000-0000-0000-000000000001','unassigned', TRUE, '91112222'),
+  -- Carries the parent's EMAIL as the coach wrote it down at the poolside.
   ('c1a99999-0000-0000-0000-000000000002','Sophia Lim','2019-03-04',
    'c1a11111-0000-0000-0000-000000000001','unassigned', TRUE, NULL),
   -- Shares ONLY a surname with Ethan. Must never surface on a "Tan" search.
@@ -107,6 +109,15 @@ VALUES
   -- Already has a parent, so never a candidate.
   ('c1a99999-0000-0000-0000-000000000004','Claimed Child','2017-01-02',
    'c1a11111-0000-0000-0000-000000000001','unassigned', TRUE, NULL);
+
+-- The coach recorded P1's email against Sophia. An email is exact and unique —
+-- it is the address the parent signs in with — so it outranks every name rule.
+-- ⚠ ON P1, NOT P2, and for the same reason the phone is: a contact match is
+-- NAME-INDEPENDENT, so it fires on every search that parent makes. P2 must
+-- stay free of contact details or the zero-count name assertions measure this
+-- instead. The first draft put it on P2 and broke assertions 8 and 9.
+UPDATE students SET provisional_contact_email = 'CLAIM-P1@Test.Local'
+ WHERE id = 'c1a99999-0000-0000-0000-000000000002';
 
 INSERT INTO parent_students (parent_id, student_id)
 SELECT p.id, 'c1a99999-0000-0000-0000-000000000004'
@@ -169,6 +180,17 @@ SELECT is(
      'c1a11111-0000-0000-0000-000000000001','Completely Different Name',NULL)
     WHERE student_id = 'c1a99999-0000-0000-0000-000000000001'),
   'phone', 'a matching phone number finds the child even when the name does not');
+
+-- ⚠ THE EMAIL SIGNAL. Stored mixed-case on the student and compared
+-- case-insensitively, because a coach writes an address however they like.
+-- Like the phone it is NAME-INDEPENDENT: a totally unrelated name still finds
+-- the child, which is the entire point — "Ethan Tan Ah Beng" and
+-- "Tan Ah Beng Ethan" are the same child, and no string rule reliably knows.
+SELECT is(
+  (SELECT match_reason FROM find_student_candidates(
+     'c1a11111-0000-0000-0000-000000000001','Nothing Like The Name', NULL)
+    WHERE student_id = 'c1a99999-0000-0000-0000-000000000002'),
+  'email', 'a matching parent EMAIL finds the child whatever the name says');
 
 -- 9. The card carries the lesson date the parent will recognise.
 SELECT is(

@@ -50,6 +50,8 @@ type Claim = {
 
 function reasonLabel(reason: string): string {
   switch (reason) {
+    case "email":
+      return "Their registered email matches the address recorded on this child";
     case "phone":
       return "Their registered phone matches the contact number on this child";
     case "name_dob":

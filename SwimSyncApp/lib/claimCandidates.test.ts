@@ -50,6 +50,12 @@ describe("matchReasonLabel", () => {
     expect(label).not.toMatch(/\d/);
   });
 
+  it("explains an email match without echoing the address back", () => {
+    const label = matchReasonLabel("email");
+    expect(label).toBe("This matches the email address your coach has on file.");
+    expect(label).not.toContain("@");
+  });
+
   it("distinguishes a full identity match from a name-only one", () => {
     expect(matchReasonLabel("name_dob")).toBe(
       "The name and date of birth both match."

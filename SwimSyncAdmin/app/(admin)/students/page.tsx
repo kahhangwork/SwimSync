@@ -767,7 +767,7 @@ export default function StudentsPage() {
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="text-xs font-semibold text-gray-600">
-                Parent&apos;s phone
+                Parent&apos;s phone <span className="text-red-500">*</span>
               </span>
               <input
                 value={addPhone}
@@ -800,7 +800,11 @@ export default function StudentsPage() {
 
           <Button
             className="w-full"
-            disabled={addBusy || !addName.trim() || !addClassId}
+            // Phone required for the same reason as a trial booking: it is the
+            // only signal that survives how a name gets written.
+            disabled={
+              addBusy || !addName.trim() || !addClassId || !addPhone.trim()
+            }
             onClick={handleAddStudent}
           >
             {addBusy ? "Adding…" : "Add student"}

@@ -191,6 +191,16 @@ export default function TrialsPage() {
   async function handleBook() {
     setBookError(null);
     if (!bookClass || !bookDate) return;
+    // ⚠ THE PHONE IS REQUIRED FOR A NEW CHILD, AND IT IS THE POINT.
+    // It is the only signal that survives how a name is actually written:
+    // "Ethan Tan Ah Beng" vs "Tan Ah Beng Ethan", English vs dialect, nickname
+    // vs full name. Without it, matching this child to their parent later falls
+    // back to name guessing. A trial booking is also the one moment the coach
+    // certainly has the number — they need to reach the family anyway.
+    if (!bookExisting && !bookPhone.trim()) {
+      setBookError("A contact number is needed so this child can be matched to their parent's account later.");
+      return;
+    }
     if (!bookExisting && !bookName.trim()) {
       setBookError("Enter a name, or choose a child already in SwimSync.");
       return;
@@ -499,7 +509,7 @@ export default function TrialsPage() {
                   <input
                     value={bookPhone}
                     onChange={(e) => setBookPhone(e.target.value)}
-                    placeholder="Parent's phone"
+                    placeholder="Parent's phone *"
                     className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   />
                   <input
@@ -511,7 +521,10 @@ export default function TrialsPage() {
                   />
                 </div>
                 <p className="mt-1 text-[11px] text-gray-400">
-                  Both optional. The email is where an invite goes if they join.
+                  The phone number is how we match this child to their
+                  parent&apos;s account later — names get written many
+                  different ways. The email is where an invite goes if they
+                  join.
                 </p>
               </>
             )}

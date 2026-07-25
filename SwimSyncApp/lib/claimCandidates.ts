@@ -17,7 +17,7 @@ import { formatSgDate } from "./lessonDates";
 export type ClaimCandidate = {
   student_id: string;
   masked_name: string;
-  match_reason: "phone" | "name_dob" | "name_only" | string;
+  match_reason: "email" | "phone" | "name_dob" | "name_only" | string;
   last_lesson: string | null;
   class_title: string | null;
 };
@@ -48,6 +48,8 @@ export function describeCandidate(c: ClaimCandidate): string {
  */
 export function matchReasonLabel(reason: string): string {
   switch (reason) {
+    case "email":
+      return "This matches the email address your coach has on file.";
     case "phone":
       return "This matches the contact number your coach has on file.";
     case "name_dob":
