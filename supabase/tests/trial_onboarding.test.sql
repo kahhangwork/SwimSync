@@ -49,14 +49,27 @@ VALUES
    '{"full_name":"TRIAL Parent Two","role":"parent"}', now(), now(), '', '', '', '');
 
 -- Class A belongs to business A and its coach; class B to business B.
-INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson)
+-- classes.category_id is NOT NULL (20260725000400). A test creates its own
+-- tenants inside this transaction, so they have none of the categories the
+-- migration backfilled onto pre-existing ones — give every tenant a Default
+-- Group to hang classes off. Idempotent, and deliberately tenant-agnostic so
+-- this block is identical in every fixture.
+INSERT INTO class_categories (tenant_id, name)
+SELECT t.id, 'Default Group' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM class_categories c
+    WHERE c.tenant_id = t.id AND lower(trim(c.name)) = 'default group');
+
+INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
 VALUES
   ('66666666-1111-0000-0000-000000000001','66666666-0000-0000-0000-000000000001',
    (SELECT id FROM coaches WHERE profile_id='66000000-0000-0000-0000-0000000000c1'),
-   'TRIAL Class A','saturday','10:00','11:00','Pool A', 30),
+   'TRIAL Class A','saturday','10:00','11:00','Pool A', 30,
+   (SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000001' AND lower(trim(name))='default group')),
   ('66666666-1111-0000-0000-000000000002','66666666-0000-0000-0000-000000000002',
    (SELECT id FROM coaches WHERE profile_id='66000000-0000-0000-0000-0000000000c2'),
-   'TRIAL Class B','saturday','10:00','11:00','Pool B', 30);
+   'TRIAL Class B','saturday','10:00','11:00','Pool B', 30,
+   (SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000002' AND lower(trim(name))='default group'));
 
 CREATE TEMP TABLE trial_baseline AS SELECT COUNT(*)::INT AS n FROM students;
 

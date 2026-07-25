@@ -315,7 +315,9 @@ Deno.test("category scope: only classes IN the category draw; others bill ad-hoc
   try {
     const groupCat = await addCategory(s, "Group");
     await setClassCategory(s, s.classId, groupCat); // class 1 = Group
-    // class 2 stays uncategorized — outside every scoped package.
+    // Class 2 keeps the scenario's OTHER category, so it is outside this
+    // package's scope. It used to be uncategorized; categories are mandatory
+    // now (20260725000400) and "outside the scope" is a different category.
 
     const productId = await addProduct(s, { lessons: 10, rate: 25, categoryId: groupCat });
     const pkgId = await buyPackage(s, productId, "2026-12-01T04:00:00Z");

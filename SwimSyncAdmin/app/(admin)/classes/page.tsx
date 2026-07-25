@@ -92,8 +92,10 @@ export default function ClassesPage() {
   });
   const [correctInPlace, setCorrectInPlace] = useState(false);
 
-  // Class categories scope prepaid packages (see /packages). Optional on a
-  // class; a class with none is outside every scoped package and bills ad-hoc.
+  // A category says what KIND of class this is. REQUIRED since 20260725000400:
+  // it scopes prepaid packages and decides the trial price, so "no category"
+  // would mean "this trial has no price". Every business has at least the two
+  // defaults, created with it.
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [categoryId, setCategoryId] = useState("");
 
@@ -197,6 +199,13 @@ export default function ClassesPage() {
       setSaveError("Please fill in all fields.");
       return;
     }
+    // Checked separately so the message names the field. category_id is NOT
+    // NULL in the database; without this the admin would get a raw constraint
+    // error naming a column the form calls something else.
+    if (!categoryId) {
+      setSaveError("Please choose a category.");
+      return;
+    }
     setSaving(true);
     setSaveError(null);
 
@@ -208,7 +217,7 @@ export default function ClassesPage() {
       end_time: endTime,
       location_name: location,
       price_per_lesson: parseFloat(rate),
-      category_id: categoryId || null,
+      category_id: categoryId,
     };
 
     // Editing goes through set_class_terms, never a bare UPDATE. Price and
@@ -405,30 +414,37 @@ export default function ClassesPage() {
             </select>
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Category
-              </label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
-              >
-                <option value="">— None —</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Which prepaid packages can pay for this class (see Packages).
-                A class with no category is outside every category-scoped
-                package.
-              </p>
-            </div>
-          )}
+          {/* Rendered unconditionally now: a category is REQUIRED, so hiding
+              the field when a business has none would leave no way to satisfy
+              it. Every business has at least the two defaults. */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+            >
+              {/* No "— None —": classes.category_id is NOT NULL
+                  (20260725000400), and an option the database refuses is not
+                  an option. The empty value is an unmade choice, not a
+                  selectable one — the same reason the day-of-week picker
+                  stopped defaulting (§8e). */}
+              <option value="">Choose a category…</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              What kind of class this is. It decides which prepaid packages can
+              pay for it, and what a <strong>trial</strong> of this class costs.
+              It does <em>not</em> set the lesson price — that is per class,
+              above.
+            </p>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <Field

@@ -56,11 +56,28 @@ VALUES
    '{"full_name":"Platform Owner","role":"platform_admin"}', now(), now(), '', '', '', '');
 
 -- ── A class per tenant (tenant_id filled by the class_tenant_fill trigger) ──
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson)
-SELECT '30000000-0000-0000-0000-0000000000a1', c.id, 'Class A', 'saturday','10:00','11:00','Pool A', 25
+-- classes.category_id is NOT NULL (20260725000400). A test creates its own
+-- tenants inside this transaction, so they have none of the categories the
+-- migration backfilled onto pre-existing ones — give every tenant a Default
+-- Group to hang classes off. Idempotent, and deliberately tenant-agnostic so
+-- this block is identical in every fixture.
+INSERT INTO class_categories (tenant_id, name)
+SELECT t.id, 'Default Group' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM class_categories c
+    WHERE c.tenant_id = t.id AND lower(trim(c.name)) = 'default group');
+
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+SELECT '30000000-0000-0000-0000-0000000000a1', c.id, 'Class A', 'saturday','10:00','11:00','Pool A', 25,
+       (SELECT cc.id FROM class_categories cc
+         WHERE cc.tenant_id = c.tenant_id
+           AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id = '20000000-0000-0000-0000-0000000000a2';
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson)
-SELECT '30000000-0000-0000-0000-0000000000b1', c.id, 'Class B', 'sunday','10:00','11:00','Pool B', 40
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+SELECT '30000000-0000-0000-0000-0000000000b1', c.id, 'Class B', 'sunday','10:00','11:00','Pool B', 40,
+       (SELECT cc.id FROM class_categories cc
+         WHERE cc.tenant_id = c.tenant_id
+           AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id = '20000000-0000-0000-0000-0000000000b2';
 
 -- ── A student per tenant, linked to that tenant's parent and class ──────────

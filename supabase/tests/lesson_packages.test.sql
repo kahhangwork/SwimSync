@@ -71,17 +71,37 @@ INSERT INTO package_products (id, tenant_id, name, category_id, lesson_count,
   ('dd000000-0000-0000-0000-000000000002','aa000000-0000-0000-0000-000000000002',
    'B''s Package','cc000000-0000-0000-0000-000000000002',10,35.00,12);
 
--- A categorized class and an uncategorized one, both tenant A (coach = admin A).
+-- Two classes in tenant A (coach = admin A): one IN the package's category,
+-- one in a different category and therefore outside its scope.
+-- classes.category_id is NOT NULL (20260725000400). A test creates its own
+-- tenants inside this transaction, so they have none of the categories the
+-- migration backfilled onto pre-existing ones — give every tenant a Default
+-- Group to hang classes off. Idempotent, and deliberately tenant-agnostic so
+-- this block is identical in every fixture.
+INSERT INTO class_categories (tenant_id, name)
+SELECT t.id, 'Default Group' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM class_categories c
+    WHERE c.tenant_id = t.id AND lower(trim(c.name)) = 'default group');
+
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
                      location_name, price_per_lesson, category_id)
 SELECT 'ee000000-0000-0000-0000-000000000001', co.id, 'Group Sat', 'saturday',
        '10:00','11:00','Test Pool', 50.00, 'cc000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'pkg-admin-a@test.local';
+
+-- A class OUTSIDE the package's category, which must therefore bill ad hoc.
+-- It used to be UNcategorized; categories became mandatory (20260725000400),
+-- so "outside the scope" is now expressed as a DIFFERENT category rather than
+-- no category. The assertion is unchanged — only the way the fixture says it.
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
                      location_name, price_per_lesson, category_id)
-SELECT 'ee000000-0000-0000-0000-000000000002', co.id, 'Uncat Sun', 'sunday',
-       '10:00','11:00','Test Pool', 50.00, NULL
+SELECT 'ee000000-0000-0000-0000-000000000002', co.id, 'Other Cat Sun', 'sunday',
+       '10:00','11:00','Test Pool', 50.00,
+       (SELECT cc.id FROM class_categories cc
+         WHERE cc.tenant_id = co.tenant_id
+           AND lower(trim(cc.name)) = 'default group')
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'pkg-admin-a@test.local';
 
@@ -257,7 +277,7 @@ SELECT is(
 -- ── 24-28. package_live_balances(): the one derivation of pending draws ─────
 RESET ROLE;
 
--- One PRESENT lesson in the Group class (in scope), one in the uncategorized
+-- One PRESENT lesson in the Group class (in scope), one in the other-category
 -- class (out of scope). Neither is invoiced.
 INSERT INTO lesson_sessions (id, class_id, session_date) VALUES
   ('66000000-0000-0000-0000-000000000001','ee000000-0000-0000-0000-000000000001', CURRENT_DATE),

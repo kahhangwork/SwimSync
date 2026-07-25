@@ -26,8 +26,22 @@ VALUES
    '{"full_name":"Wage Parent","role":"parent"}', now(), now(), '', '', '', '');
 
 -- A 90-minute class, so pro-rata is actually exercised (60 would hide it).
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson)
-SELECT '66000000-0000-0000-0000-000000000001', c.id, 'Long Lane', 'saturday','10:00','11:30','Pool', 40
+-- classes.category_id is NOT NULL (20260725000400). A test creates its own
+-- tenants inside this transaction, so they have none of the categories the
+-- migration backfilled onto pre-existing ones — give every tenant a Default
+-- Group to hang classes off. Idempotent, and deliberately tenant-agnostic so
+-- this block is identical in every fixture.
+INSERT INTO class_categories (tenant_id, name)
+SELECT t.id, 'Default Group' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM class_categories c
+    WHERE c.tenant_id = t.id AND lower(trim(c.name)) = 'default group');
+
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+SELECT '66000000-0000-0000-0000-000000000001', c.id, 'Long Lane', 'saturday','10:00','11:30','Pool', 40,
+       (SELECT cc.id FROM class_categories cc
+         WHERE cc.tenant_id = c.tenant_id
+           AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id = '77000000-0000-0000-0000-000000000002';
 
 INSERT INTO students (id, full_name, assignment_status, tenant_id) VALUES
@@ -320,9 +334,12 @@ SELECT is(
 
 -- ── A lesson with no terms in force must refuse, not vanish ────────────────
 RESET ROLE;
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, tenant_id)
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, tenant_id, category_id)
 SELECT '66000000-0000-0000-0000-000000000009', c.id, 'Rateless', 'sunday','10:00','11:00','Pool', 40,
-       '88888888-0000-0000-0000-000000000001'
+       '88888888-0000-0000-0000-000000000001',
+       (SELECT cc.id FROM class_categories cc
+         WHERE cc.tenant_id = c.tenant_id
+           AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id='77000000-0000-0000-0000-000000000002';
 INSERT INTO lesson_sessions (id, class_id, session_date, status)
 VALUES ('44000000-0000-0000-0000-0000000000c1','66000000-0000-0000-0000-000000000009','2027-02-07','completed');

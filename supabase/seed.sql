@@ -61,13 +61,23 @@ INSERT INTO auth.users (
   NOW(), NOW(), '', '', '', ''
 );
 
+-- ---- The seed tenant's starting categories ----
+-- Every business has these: provision_tenant() creates them for a new one
+-- (20260725000500) and a migration backfilled every existing one
+-- (20260725000400). classes.category_id is NOT NULL, so a tenant without them
+-- cannot create a class at all.
+INSERT INTO class_categories (id, tenant_id, name) VALUES
+  ('7c000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'Default Private'),
+  ('7c000000-0000-0000-0000-000000000002', '70000000-0000-0000-0000-000000000001', 'Default Group');
+
 -- ---- A class owned by the coach (Saturday 10-11am) ----
 -- tenant_id is filled by the class_tenant_fill trigger from the coach.
 INSERT INTO classes (
   coach_id, title, day_of_week, start_time, end_time,
-  location_name, location_address, price_per_lesson
+  location_name, location_address, price_per_lesson, category_id
 )
 SELECT co.id, 'Saturday Beginners', 'saturday', '10:00', '11:00',
-       'Buona Vista Swimming Complex', '76 Holland Dr, Singapore', 25.00
+       'Buona Vista Swimming Complex', '76 Holland Dr, Singapore', 25.00,
+       '7c000000-0000-0000-0000-000000000002'
 FROM coaches co
 WHERE co.profile_id = 'c0000000-0000-0000-0000-000000000001';

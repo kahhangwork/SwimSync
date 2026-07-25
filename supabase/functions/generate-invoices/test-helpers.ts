@@ -123,6 +123,11 @@ export type Scenario = {
   coachProfileId: string;
   tenantId: string;
   classId: string;
+  /** The scenario's "Default Group" — the category classId is in. */
+  categoryId: string;
+  /** "Default Private" — a DIFFERENT category, which classId2 uses. Lets a
+   *  test put a lesson outside another category's scope. */
+  categoryId2: string;
   parentId: string;
   parentProfileId: string;
   studentId: string;
@@ -298,6 +303,23 @@ export async function newScenario(
     .single();
   const coachId = coachRow!.id as string;
 
+  // The scenario's own categories. classes.category_id is NOT NULL
+  // (20260725000400) and this tenant was created inside the test, so it has
+  // none of the ones the migration backfilled onto pre-existing tenants.
+  // Two, matching what provision_tenant() gives a real business — the second
+  // exists so a test can put a class OUTSIDE another's scope.
+  const { data: cats } = await db
+    .from("class_categories")
+    .insert([
+      { tenant_id: tenantId, name: "Default Group" },
+      { tenant_id: tenantId, name: "Default Private" },
+    ])
+    .select("id, name");
+  const categoryId = (cats ?? []).find((c) => c.name === "Default Group")!
+    .id as string;
+  const categoryId2 = (cats ?? []).find((c) => c.name === "Default Private")!
+    .id as string;
+
   // Class owned by the coach
   const { data: cls } = await db
     .from("classes")
@@ -309,6 +331,7 @@ export async function newScenario(
       end_time: "11:00",
       location_name: "Test Pool",
       price_per_lesson: price,
+      category_id: categoryId,
     })
     .select("id")
     .single();
@@ -371,6 +394,11 @@ export async function newScenario(
         end_time: "11:00",
         location_name: "Test Pool",
         price_per_lesson: opts.secondClass.price ?? price,
+        // A DIFFERENT category from class 1, deliberately. Class 2 exists so a
+        // test can put a lesson outside a scoped package — that used to be
+        // expressed as "no category", which categories being mandatory
+        // (20260725000400) no longer allows. Different category, same meaning.
+        category_id: categoryId2,
       })
       .select("id")
       .single();
@@ -759,6 +787,8 @@ export async function newScenario(
     coachProfileId,
     tenantId,
     classId,
+    categoryId,
+    categoryId2,
     parentId,
     parentProfileId,
     studentId,

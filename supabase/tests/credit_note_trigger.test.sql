@@ -30,9 +30,23 @@ VALUES
    now(), '{"provider":"email"}','{"full_name":"TAP Parent","role":"parent"}',
    now(), now(), '', '', '', '');
 
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson)
+-- classes.category_id is NOT NULL (20260725000400). A test creates its own
+-- tenants inside this transaction, so they have none of the categories the
+-- migration backfilled onto pre-existing ones — give every tenant a Default
+-- Group to hang classes off. Idempotent, and deliberately tenant-agnostic so
+-- this block is identical in every fixture.
+INSERT INTO class_categories (tenant_id, name)
+SELECT t.id, 'Default Group' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM class_categories c
+    WHERE c.tenant_id = t.id AND lower(trim(c.name)) = 'default group');
+
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
 SELECT 'b0000000-0000-0000-0000-000000000001', co.id, 'TAP Class', 'saturday',
-       '10:00','11:00','Pool', 30.00
+       '10:00','11:00','Pool', 30.00,
+       (SELECT cc.id FROM class_categories cc
+         WHERE cc.tenant_id = co.tenant_id
+           AND lower(trim(cc.name)) = 'default group')
 FROM coaches co WHERE co.profile_id = 'a0000000-0000-0000-0000-0000000000c1';
 
 INSERT INTO students (id, full_name, assignment_status, is_active, tenant_id)

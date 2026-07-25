@@ -32,8 +32,12 @@ INSERT INTO auth.users (
 );
 
 -- A Sunday class under the seed coach (coach@swimsync.test).
-INSERT INTO classes (coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson)
-SELECT co.id, 'Sunday Newbies', 'sunday', '09:00', '10:00', 'Test Pool', 40
+-- category_id is NOT NULL (20260725000400); the seed tenant's Default Group.
+INSERT INTO classes (coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+SELECT co.id, 'Sunday Newbies', 'sunday', '09:00', '10:00', 'Test Pool', 40,
+       (SELECT cc.id FROM class_categories cc
+         WHERE cc.tenant_id = co.tenant_id
+           AND lower(trim(cc.name)) = 'default group')
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'coach@swimsync.test';
 
