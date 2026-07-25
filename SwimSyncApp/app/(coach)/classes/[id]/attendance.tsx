@@ -7,7 +7,6 @@ import {
   Pressable,
   SafeAreaView,
   ActivityIndicator,
-  TextInput,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,9 +29,11 @@ type DBStatus =
 type StudentRow = {
   id: string;
   full_name: string;
-  /** On this roster only because they have an attendance row on this session —
-   *  a trial walk-in, or someone since removed from the class. */
+  /** On this roster because of an attendance row or a trial booking, not an
+   *  enrolment. */
   attendedOnly?: boolean;
+  /** Booked for a trial on this date specifically. */
+  isTrial?: boolean;
 };
 
 type AttState = {
@@ -107,12 +108,6 @@ export default function MarkAttendanceScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [walkInOpen, setWalkInOpen] = useState(false);
-  const [walkInName, setWalkInName] = useState("");
-  const [walkInPhone, setWalkInPhone] = useState("");
-  const [walkInStatus, setWalkInStatus] =
-    useState<"trial_free" | "trial_paid">("trial_free");
-  const [addingWalkIn, setAddingWalkIn] = useState(false);
 
   useEffect(() => {
     load();
@@ -173,10 +168,24 @@ export default function MarkAttendanceScreen() {
           .eq("lesson_session_id", sid)
       : { data: [] as any[] };
 
+    // Children booked for a TRIAL on this date. They are not enrolled — a trial
+    // is a visit, not a standing arrangement — so without this they would never
+    // appear, never be marked, and the billing month could never close.
+    const { data: booked } = await supabase
+      .from("trial_bookings")
+      .select("student_id, students(id, full_name)")
+      .eq("class_id", id)
+      .eq("session_date", date)
+      .is("cancelled_at", null);
+
     const roster = mergeRoster(
       activeStudents,
       (attData ?? [])
         .map((a: any) => a.students)
+        .filter(Boolean)
+        .map((s: any) => ({ id: s.id, full_name: s.full_name })),
+      (booked ?? [])
+        .map((b: any) => b.students)
         .filter(Boolean)
         .map((s: any) => ({ id: s.id, full_name: s.full_name }))
     );
@@ -250,43 +259,6 @@ export default function MarkAttendanceScreen() {
     } else {
       apply();
     }
-  }
-
-  async function handleAddWalkIn() {
-    const name = walkInName.trim();
-    if (!name) return;
-    setAddingWalkIn(true);
-
-    // `date` is the screen's SGT date string, passed straight through. The RPC
-    // deliberately takes it as a parameter rather than deriving it: Postgres
-    // runs UTC, which is the previous day in SGT before 08:00 (§7.7), and a
-    // session on the wrong date double-bills.
-    const { error } = await supabase.rpc("add_unclaimed_student", {
-      p_class_id: id,
-      p_full_name: name,
-      p_kind: "trial",
-      p_session_date: date,
-      p_status: walkInStatus,
-      p_contact_phone: walkInPhone.trim() || null,
-    });
-
-    setAddingWalkIn(false);
-
-    if (error) {
-      // The RPC returns a plain sentence for the duplicate-child case; show it
-      // rather than a generic failure (PRD §5.1).
-      showToast(error.message, "error");
-      return;
-    }
-
-    setWalkInName("");
-    setWalkInPhone("");
-    setWalkInStatus("trial_free");
-    setWalkInOpen(false);
-    // Reload rather than patching state: the RPC created the session and the
-    // attendance row, so the screen's idea of both is now stale.
-    await load();
-    showToast(`${name} added to this lesson`, "success");
   }
 
   async function handleSave() {
@@ -453,11 +425,20 @@ export default function MarkAttendanceScreen() {
                     {student.full_name}
                   </Text>
                   {student.attendedOnly && (
-                    // They are not enrolled weekly — say so, or the coach reads
-                    // them as a regular student who has stopped turning up.
-                    <View className="px-2 py-0.5 rounded-full bg-amber-100">
-                      <Text className="text-[10px] font-semibold text-amber-700">
-                        Not enrolled
+                    // Not a weekly regular — say which kind, because a TRIAL is
+                    // someone the coach is meeting for the first time and the
+                    // status they pick decides what the family is charged.
+                    <View
+                      className={`px-2 py-0.5 rounded-full ${
+                        student.isTrial ? "bg-sky-100" : "bg-amber-100"
+                      }`}
+                    >
+                      <Text
+                        className={`text-[10px] font-semibold ${
+                          student.isTrial ? "text-sky-700" : "text-amber-700"
+                        }`}
+                      >
+                        {student.isTrial ? "Trial" : "Not enrolled"}
                       </Text>
                     </View>
                   )}
@@ -559,91 +540,6 @@ export default function MarkAttendanceScreen() {
               </View>
             );
           })
-        )}
-
-        {/* ── Add a walk-in ──────────────────────────────────────────────────
-            A parent who turns up with a child SwimSync has never seen. Adding
-            them here writes the trial attendance in the same call, because at
-            the poolside "add" and "mark" are one action — and their enrolment
-            closes on this date, so a one-off visitor never blocks a later
-            lesson's completeness check. */}
-        {walkInOpen ? (
-          <View className="bg-white rounded-2xl p-4 border border-amber-200 gap-3">
-            <Text className="text-sm font-semibold text-gray-800">
-              Add a walk-in for this lesson
-            </Text>
-            <TextInput
-              value={walkInName}
-              onChangeText={setWalkInName}
-              placeholder="Child's name"
-              autoCapitalize="words"
-              className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-            />
-            <TextInput
-              value={walkInPhone}
-              onChangeText={setWalkInPhone}
-              placeholder="Parent's phone (optional)"
-              keyboardType="phone-pad"
-              className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-            />
-            <Text className="text-[11px] text-gray-400 -mt-1">
-              The number you arranged the trial on. It is how we match them when
-              the parent registers.
-            </Text>
-            <View className="flex-row gap-2">
-              {([
-                { key: "trial_free", label: "Free trial" },
-                { key: "trial_paid", label: "Paid trial" },
-              ] as const).map((opt) => (
-                <TouchableOpacity
-                  key={opt.key}
-                  onPress={() => setWalkInStatus(opt.key)}
-                  className={`flex-1 items-center rounded-xl border px-3 py-2.5 ${
-                    walkInStatus === opt.key
-                      ? "bg-blue-500 border-blue-500"
-                      : "bg-white border-gray-300"
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-semibold ${
-                      walkInStatus === opt.key ? "text-white" : "text-gray-600"
-                    }`}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View className="flex-row gap-2">
-              <TouchableOpacity
-                onPress={() => setWalkInOpen(false)}
-                className="flex-1 items-center rounded-xl border border-gray-300 px-3 py-3"
-              >
-                <Text className="text-sm text-gray-600">Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleAddWalkIn}
-                disabled={addingWalkIn || !walkInName.trim()}
-                className={`flex-1 items-center rounded-xl px-3 py-3 ${
-                  addingWalkIn || !walkInName.trim() ? "bg-gray-300" : "bg-sky-600"
-                }`}
-              >
-                <Text className="text-sm font-semibold text-white">
-                  {addingWalkIn ? "Adding…" : "Add & mark"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <TouchableOpacity
-            onPress={() => setWalkInOpen(true)}
-            className="flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-3"
-          >
-            <Ionicons name="add-circle-outline" size={18} color="#0284c7" />
-            <Text className="text-sm font-semibold text-sky-600">
-              Add a walk-in / trial
-            </Text>
-          </TouchableOpacity>
         )}
 
         <PrimaryButton

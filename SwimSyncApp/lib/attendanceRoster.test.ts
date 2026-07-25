@@ -57,3 +57,37 @@ describe("mergeRoster", () => {
     expect(mergeRoster(reversed, []).map((s) => s.id)).toEqual(["b", "a"]);
   });
 });
+
+describe("mergeRoster — trial bookings", () => {
+  // Without this the booked child never appears, is never marked, and the
+  // billing month can never close.
+  it("includes a child booked for a trial on this date", () => {
+    const out = mergeRoster(enrolled, [], [{ id: "t", full_name: "Tara Trial" }]);
+    expect(out.map((s) => s.id)).toEqual(["a", "b", "t"]);
+    expect(out.find((s) => s.id === "t")?.isTrial).toBe(true);
+  });
+
+  it("does not label an enrolled student as a trial", () => {
+    const out = mergeRoster(enrolled, [], []);
+    expect(out.every((s) => s.isTrial === false)).toBe(true);
+  });
+
+  // A booked child the coach has already marked appears in both sources.
+  it("shows a booked-and-marked child once, still flagged as a trial", () => {
+    const out = mergeRoster(
+      enrolled,
+      [{ id: "t", full_name: "Tara Trial" }],
+      [{ id: "t", full_name: "Tara Trial" }]
+    );
+    expect(out.filter((s) => s.id === "t")).toHaveLength(1);
+    expect(out.find((s) => s.id === "t")?.isTrial).toBe(true);
+  });
+
+  // Someone removed from the class mid-month: on the roster because they were
+  // marked, but NOT a trial.
+  it("distinguishes a since-removed student from a trial", () => {
+    const out = mergeRoster(enrolled, [{ id: "z", full_name: "Zoe Gone" }], []);
+    expect(out.find((s) => s.id === "z")?.attendedOnly).toBe(true);
+    expect(out.find((s) => s.id === "z")?.isTrial).toBe(false);
+  });
+});
