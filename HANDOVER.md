@@ -1,8 +1,8 @@
 # SwimSync — Session Handover
 
 _Last updated: 2026-07-25 (eleventh session — categories are mandatory and a TRIAL IS A
-BOOKING, superseding the trial half of the tenth session on the user's correction.
-**Built and verified locally; NOT deployed and NOT merged** — branch `feat/trial-bookings`)_
+BOOKING, superseding the trial half of the tenth session on the user's correction. Built
+AND deployed the same evening; **dormant until the first trial is booked**)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -174,8 +174,9 @@ superadmin + the real coach/classes). See §11.
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
 > **As of 2026-07-25 production is fully caught up**: every migration through
-> `20260725000300` is applied (`supabase migration list --linked` shows nothing pending),
-> `generate-invoices` is at **v15** (the unclaimed-attendance seal condition, on top of
+> `20260725000800` is applied (`supabase migration list --linked` shows nothing pending),
+> `generate-invoices` is at **v16** (trial bookings + category trial pricing, on top of
+> the unclaimed-attendance seal condition,
 > package drawdown, the completed-month guard and effective-dated pricing), and a SECOND
 > function exists: **`package-emails` v1** (verify_jwt ON — deployed separately, and a
 > deploy of generate-invoices does NOT touch it). *(The previous version of this line went stale for two sessions —
@@ -1088,9 +1089,10 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     prices by category.
 ---
 
-## 8.11 Eleventh session (2026-07-25) — CATEGORIES ARE MANDATORY, AND A TRIAL IS A BOOKING — BUILT, **NOT DEPLOYED**
+## 8.11 Eleventh session (2026-07-25) — CATEGORIES ARE MANDATORY, AND A TRIAL IS A BOOKING — BUILT **AND DEPLOYED**
 
-Branch **`feat/trial-bookings`**, nine commits, **not merged and not deployed**. Planned
+Branch **`feat/trial-bookings`**, eight commits, merged to `main` and **deployed the same
+evening**. Planned
 with `/plan-with-confidence` + `/plan-review` twice; the plan and its 22 inlined
 mitigations are in **`TRIAL_BOOKINGS_PLAN.md`**.
 
@@ -1125,6 +1127,32 @@ booked children per-date and pricing `trial_paid` from the booking's category; a
 **79**, all typecheck, `verify-trials.mjs` **9/9** through both real UIs. The rollback in
 `supabase/rollback/` was **executed and verified**, forward and back — this is the first
 migration since tenancy to write to live rows.
+
+**Deploy record (2026-07-25):** backup (schema + data, outside the repo) →
+`db push --dry-run` showed **exactly the five expected files and nothing else** → pushed →
+**`migration list --linked` confirms all five applied, nothing pending** → RISK Q verified
+against the remote dump: **5 categories** (Kah Hang's stray "Group" + two defaults × two
+businesses) and **5 classes, none untagged**, each in its OWN tenant's Default Group →
+`generate-invoices` **v15 → v16**, `package-emails` untouched at v1 → merge + push →
+admin `/trials` 200 (a route only the new build has), app bundle greps for the new roster
+strings (the app finished after the admin, §7.23) → CI green.
+
+**⚠ `db push` PRINTED A SCARY SSL ERROR AND SUCCEEDED ANYWAY.** The output ended with a
+`pg-delta` stack trace — `Failed to read certificate file … pgdelta-target-ca.crt` —
+followed by "Finished supabase db push." That is a secondary diff-preview path failing,
+not the migration. **Do not infer either outcome from it**: `supabase migration list
+--linked` is the fact, and it showed all five applied. Worth remembering, because the
+instinct on seeing that trace mid-deploy is to re-run, which on a non-idempotent migration
+would be the wrong move.
+
+**§7.39 verified on production and held.** `book_trial`, `cancel_trial_booking` and
+`trial_rate_on` all return `42501 permission denied` to `anon` through the live REST API,
+and `trial_rates` returns `[]` under RLS. Probing through PostgREST with the real
+signature remains the better check than reading `pg_proc` — it tests the reachable
+surface.
+
+**Live but dormant:** no trials are booked and no trial rates are set, so every family
+bills exactly as before. The feature activates the day the admin books one.
 
 **Deliberately not done:** a class-deactivation warning (RISK U) — there is no
 deactivation UI to attach one to, so it is recorded on the BACKLOG item that owns it.

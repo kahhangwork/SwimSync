@@ -4,7 +4,9 @@ _Written 2026-07-25. Every class belongs to a category; a category carries a tri
 a trial is a child **expected at one lesson**, booked ahead by the admin and marked by the
 coach like anyone else._
 
-> **STATUS: BUILT AND VERIFIED LOCALLY — NOT MERGED, NOT DEPLOYED.** pgTAP **299**, Deno
+> **STATUS: BUILT, DEPLOYED AND SMOKED (2026-07-25).** Live and dormant — no trials
+> booked, no rates set, so nothing bills differently yet. Deploy record in `HANDOVER.md`
+> §8.11. pgTAP **299**, Deno
 > **108** (run twice), admin vitest **106**, app jest **79**, all typecheck, and
 > `verify-trials.mjs` **9/9** through both real UIs. The rollback in `supabase/rollback/`
 > was **executed and verified**, forward and back. RISK U was NOT mitigated in code —
