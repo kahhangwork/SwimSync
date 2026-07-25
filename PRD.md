@@ -90,7 +90,9 @@ SwimSync supports four user types *(implemented — the original three, with `su
 
 - Support multiple children under one parent account
 - Support multiple coaches in future
-- Support separate PayNow QR codes per coach
+- Support a separate PayNow QR code per **business** *(implemented — changed from
+  per-coach: a school has one bank account, so an individual coach's QR would send the
+  payment to the wrong person. See §7.10)*
 - Provide a foundation for future WhatsApp reminders and more advanced billing logic
 
 ---
@@ -432,7 +434,9 @@ uniqueness rule is therefore `(parent, tenant, billing month)`.
 
 #### Payment Tracking
 
-- Parents pay externally via PayNow using the coach's QR code
+- Parents pay externally via PayNow using the **business's** QR code — the one belonging
+  to the business that *issued that invoice* *(implemented — changed from the coach's QR;
+  see §7.10)*
 - Coach manually checks bank account and marks invoice as paid in SwimSync
 - No automatic reconciliation in MVP
 
@@ -507,6 +511,8 @@ SwimSync served a single business and became wrong the moment it served two.
 - As a parent, I want to view monthly invoices so that I know how much I owe
 - As a parent, I want to know whether payment is outstanding or paid
 - As a parent, I want to see the coach's PayNow QR code so that I can make payment
+  *(implemented — the QR shown is the **business's**, belonging to whoever issued that
+  invoice; see §7.10)*
 - As a parent, I want to view any credit notes issued to my account so that I understand adjustments to my billing
 
 ### 6.2 Coach User Stories
@@ -528,6 +534,9 @@ SwimSync served a single business and became wrong the moment it served two.
 #### PayNow
 
 - As a coach, I want to upload my PayNow QR code so that parents can pay me easily
+  *(implemented — the QR is the **business's**, so only a coach who is also their
+  business's admin can set it; a private coach is, a school's coach sees it read-only.
+  See §4.2, §7.10)*
 
 ### 6.3 Superadmin User Stories
 
@@ -1304,7 +1313,7 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 |-------|------|----------|-------------|
 | **id** | UUID | Yes | Primary key |
 | **profile_id** | UUID (FK) | Yes | References Profiles.id |
-| **paynow_qr_url** | String | No | Stored PayNow QR image URL |
+| ~~**paynow_qr_url**~~ | ~~String~~ | — | *(implemented — **removed** 2026-07-19)* The payee is the **business's**, not the coach's: a school has one bank account, so an individual coach's QR would send the payment to the wrong person (§7.10). Copied to **`tenants.paynow_qr_url`** by the tenancy backfill (`20260718000600`) and dropped once the readers moved (`20260719000300`) |
 | **bio** | Text | No | Optional coach bio or notes |
 | **created_at** | Timestamp | Yes | Record creation timestamp |
 
@@ -1801,7 +1810,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | **Invoices** | Monthly invoice list with status; tap for detail | Show gross, credit applied, net amount; red = outstanding |
 | **Invoice Detail** | Line items per lesson; credit notes applied; total | PayNow QR button to open payment view |
 | **Credit Notes** | List of credit notes with reference number and amount | Linked to original invoice; show applied/pending status |
-| **PayNow QR** | Coach's QR code image; invoice amount display | Correct QR per coach; amount shown for reference |
+| **PayNow QR** | The QR of the business that issued the invoice; invoice amount display | Correct QR per **business** *(implemented — changed from per-coach, §7.10)*; amount shown for reference |
 
 ### 14.2 Coach App — Screen Flow
 
@@ -1832,7 +1841,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | **Attendance** | Filter by class, coach, date range; per-student records | Read-only view; audit trail visible |
 | **Invoices** | All invoices with filters; mark as paid; view line items | Show gross, credit, net columns |
 | **Credit Notes** | All credit notes; filter by parent, status, date | Read-only; linked to invoices and lessons |
-| **Coaches** | Coach list; create/edit accounts; view assigned classes | Manage PayNow QR per coach |
+| **Coaches** | Coach list; create/edit accounts; view assigned classes | Shows the **business's** PayNow QR *(implemented — read-only here; it is set by the business's admin, §7.10)* |
 
 ### 14.4 Key Navigation Patterns
 
@@ -1917,7 +1926,8 @@ SwimSync MVP is successful if:
 - Enforce access control using Supabase Row Level Security policies
 - Store invoices and credit notes as generated records, not just as dynamic queries
 - Store invoice line items so historical bills remain auditable even if class rates change later
-- Store separate coach PayNow QR assets in Supabase Storage
+- Store separate PayNow QR assets in Supabase Storage *(implemented — keyed by
+  **business**, at `paynow-qr/<tenant_id>/paynow-qr`, not per coach; §7.10)*
 - Prefer invoice generation from attendance records rather than class schedule count
 - Add an explicit student assignment status: **Unassigned, Assigned, Inactive**
 - Use Supabase Edge Functions for monthly invoice generation triggered by pg_cron

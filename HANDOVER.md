@@ -275,7 +275,6 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `coach_wages.test.sql` (36) | effective-dated wage rates, the pay-decision table (§7.13), pro-rata duration maths, flat rates, draft→frozen payouts, and next-period adjustments carried **once** (see (c)) |
 | `class_terms.test.sql` (14) | effective-dated class terms — a lesson priced and attributed by **its own date**, correct-vs-change, and the settled-money guard. Runs on **its own tenant** (see §7.26) |
 | `active_inactive.test.sql` (20) | per-business active/inactive for families and children (§7.14), incl. the load-bearing one: **reactivating is not undone by the family having no active children** (§8) |
-
 | `student_identity.test.sql` (9) | name + DOB identifies a child within a business; whitespace/case cannot defeat the expression index; NULL DOB is exempt (what made it safe on live data); `age` is gone |
 | `student_tenant_pin.test.sql` (6) | a parent or admin **cannot move a child to another business** (§8a), while ordinary edits and the platform admin's RPC still work |
 | `document_name_snapshot.test.sql` (7) | renaming a child does not rewrite an issued invoice or an immutable credit note; the note carries the name from the item it credits |
