@@ -341,7 +341,18 @@ Pre-existing, but the hard block makes the asymmetry sharper: everything else ab
 half-finished month now refuses loudly, and this one case stays quiet.
 
 **Notes:** no UI deactivates a class today (the admin Classes page edits but doesn't
-deactivate), which is why it has never bitten. Fix before adding one. Probably: bill from
+deactivate), which is why it has never bitten — **re-confirmed 2026-07-25**: `is_active` is
+only ever set `true`, on create.
+
+**TRIAL BOOKINGS SHARPEN THIS (2026-07-25).** A booked trial on a deactivated class is
+worse than a dropped enrolled lesson: the child is expected there and nowhere else, so
+deactivating the class makes that trial neither billable nor blocking — invisible in
+exactly the way this whole feature exists to prevent. Whoever builds class deactivation
+must therefore ALSO refuse, or at least warn with a count, when the class has live
+`trial_bookings`. Recorded here rather than mitigated in the trial work, because there is
+no deactivation path to attach a warning to.
+
+Probably: bill from
 classes that had sessions in the month regardless of `is_active`, and keep `is_active` for
 *scheduling* only.
 

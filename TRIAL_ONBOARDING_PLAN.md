@@ -4,6 +4,12 @@ _Written 2026-07-25. A coach or admin can put a child on the roster before that 
 parent has a SwimSync account; the parent is later invited by link and adopts the
 existing record. Money taken outside SwimSync is recorded rather than lost._
 
+> ⚠ **THE TRIAL HALF OF THIS PLAN IS SUPERSEDED by `TRIAL_BOOKINGS_PLAN.md`
+> (2026-07-25, one day later).** A trial is no longer coach-created, enrolment-shaped or
+> attendance-pre-written — it is a BOOKING the admin makes ahead, which the coach marks
+> like any other student. The ongoing-student path, the invite/claim path and the
+> settlement machinery described below are **unchanged and still current**.
+>
 > **STATUS: BUILT, DEPLOYED AND SMOKED (2026-07-25).** All seven phases complete, merged
 > to `main`, live in production and **dormant until the first walk-in**. pgTAP **297**
 > (19 files, +32), Deno **99** (+8, run twice), admin vitest **100** (+12), app jest **75**

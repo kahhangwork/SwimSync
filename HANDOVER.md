@@ -1,8 +1,8 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-25 (tenth session — a child can exist before their parent does:
-the coach adds a trial walk-in, the admin invites the parent, and the parent adopts the
-existing record. Built AND deployed the same day; **dormant until the first walk-in**)_
+_Last updated: 2026-07-25 (eleventh session — categories are mandatory and a TRIAL IS A
+BOOKING, superseding the trial half of the tenth session on the user's correction.
+**Built and verified locally; NOT deployed and NOT merged** — branch `feat/trial-bookings`)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -148,8 +148,14 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   bill **holds the month open** instead of being silently dropped and sealed over, released
   by inviting the parent or recording a settlement. PRD §7.17,
   `TRIAL_ONBOARDING_PLAN.md`, §8.10.
-- **Automated tests** — backend **297 pgTAP + 99 Deno**, plus frontend suites
-  (`SwimSyncAdmin` vitest 100, `SwimSyncApp` jest-expo 75); all run in CI on push to `main`. See §5.
+- **Automated tests** — backend **299 pgTAP + 108 Deno**, plus frontend suites
+  (`SwimSyncAdmin` vitest 106, `SwimSyncApp` jest-expo 79); all run in CI on push to `main`. See §5.
+
+> **§3's old "clean slate" claim was WRONG and is corrected here (2026-07-25).** It said
+> production held "only the superadmin + the real coach/classes". Reading the actual dump:
+> **2 tenants, 9 parents, 11 students, 7 enrolments, 5 classes** — real families who
+> registered. What IS still empty is attendance: **zero `lesson_sessions`, zero
+> `attendance` rows**, which is the fact §9 is about. Don't repeat the clean-slate line.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
 **https://swimsync.sg**, admin at **https://admin.swimsync.sg**, real email via
@@ -257,16 +263,16 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 297 tests across 19 files
+supabase test db                                  # 299 tests across 19 files
 
 # Backend — Function tests (Deno): billing math, credit + package ledgers, emails
-supabase/functions/generate-invoices/test.sh      # 99 tests; needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 108 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
-cd SwimSyncAdmin && npm test                       # 100 tests
+cd SwimSyncAdmin && npm test                       # 106 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
-cd SwimSyncApp && npm test                         # 75 tests
+cd SwimSyncApp && npm test                         # 79 tests
 ```
 
 **Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
@@ -295,7 +301,7 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `package_corrections.test.sql` (12) | a correction on a package-funded line restores the package (even expired) and mints NO cash credit note; flip-flops refund at most once; ad-hoc lines keep the credit-note path byte-identical |
 | `trial_onboarding.test.sql` (32) | a child before their parent: THREE refusal shapes for `add_unclaimed_student()` (parent, cross-tenant coach, anon) each asserting `students` did not grow, the **tenant derived from the class** (nothing downstream would catch a wrong one — §7.42), `created_by` = the calling coach, a trial enrolment closed on its own date, **session idempotency** (two walk-ins on one date share ONE session — §7.43), the plain-English duplicate name+DOB error, settlement RLS, and `link_invited_parent()` incl. same-parent idempotency vs a different parent refused |
 
-**Total: 297 across 19 files** — verified by `supabase test db` 2026-07-25 (the previous
+**Total: 299 across 19 files** — verified by `supabase test db` 2026-07-25 (the previous
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
@@ -1046,15 +1052,14 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     halves matter — the first is what lets `created_by = auth.uid()` record the real coach,
     the second is what disables the pin.
 
-43. **`lesson_sessions` HAS A SECOND WRITER NOW.** §6 said the coach's attendance save was
-    "the only writer in the codebase"; `add_unclaimed_student()` also creates one, because
-    adding a walk-in and marking them is one action at the poolside. §7.7 records that a
-    duplicate `(class_id, session_date)` row **double-billed a whole class**, so any new
-    writer must resolve with
-    `INSERT … ON CONFLICT ON CONSTRAINT lesson_sessions_class_id_session_date_key DO NOTHING`
-    then `SELECT` — never check-then-insert, which races — and must take the date as a
-    **parameter**. Postgres runs UTC on Supabase, so `now()::date` is the previous day
-    before 08:00 SGT. Pinned by an idempotency assertion in `trial_onboarding.test.sql`.
+43. **~~`lesson_sessions` HAS A SECOND WRITER NOW.~~ RETIRED 2026-07-25.** It briefly
+    did — `add_unclaimed_student()`'s trial mode created one — and that is why this
+    gotcha existed. Trials became BOOKINGS (§8.11), which write no session at all, so
+    the attendance save is once again **the only writer in the codebase**, as §6 says.
+    The underlying rule still stands and is why the change was safe: a duplicate
+    `(class_id, session_date)` row double-bills a whole class (§7.7), so any future
+    second writer needs `ON CONFLICT … DO NOTHING` and a date **parameter**, never
+    `now()`.
 
 44. **`supabase db reset` LEAVES KONG POINTING AT A DEAD AUTH CONTAINER.** The reset
     recreates `supabase_auth_*` but not `supabase_kong_*`, which holds the old upstream —
@@ -1068,6 +1073,61 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     its tenant, every failed run leaks one. 91 tests × a few runs left **177 orphan
     tenants**, and `SWIM-` + 4 hex is only 65k codes — so the next run started failing on
     `tenants_join_code_key` duplicates, a completely unrelated-looking symptom.
+
+
+45. **`classes.category_id` IS MUTABLE, AND MONEY NOW DEPENDS ON IT.** Every other input
+    to a price in this schema is effective-dated — `class_rates`, `coach_rates`,
+    `trial_rates`. A class's **category** is a plain column anyone can change. Since a
+    trial is priced through it, re-tagging a class would silently re-value every unbilled
+    trial in it across the five-week gap between a lesson and its invoice run — §7.7's bug
+    through a new door, and exactly what §6 forbids: *a fact about a past lesson is never
+    a live lookup.*
+    **So anything that prices by category must SNAPSHOT it at the moment of sale.**
+    `trial_bookings.category_id` is that snapshot, and the engine is prohibited from
+    joining `classes` to price a trial. The same trap waits for any future feature that
+    prices by category.
+---
+
+## 8.11 Eleventh session (2026-07-25) — CATEGORIES ARE MANDATORY, AND A TRIAL IS A BOOKING — BUILT, **NOT DEPLOYED**
+
+Branch **`feat/trial-bookings`**, nine commits, **not merged and not deployed**. Planned
+with `/plan-with-confidence` + `/plan-review` twice; the plan and its 22 inlined
+mitigations are in **`TRIAL_BOOKINGS_PLAN.md`**.
+
+**This SUPERSEDES the trial half of §8.10**, one day later, on the user's correction. The
+ongoing-student path, the invite/claim path and settlements are unchanged.
+
+**What was wrong:** a trial was coach-created, enrolment-shaped, with attendance
+pre-written. All three failed — booking ahead was impossible (the ordinary case), the
+attendance write asserted an outcome nobody had observed, and an enrolment was being used
+to mean "here once". I had also argued *against* an admin trial form on the grounds that
+booking ahead would mean marking a child present at a lesson that had not happened. That
+was reasoning from my own implementation rather than the problem.
+
+**What shipped:** `classes.category_id` NOT NULL with two default categories per business;
+`trial_rates` (per category, effective-dated, insert-only); `trial_bookings` with the
+category **snapshotted**; `book_trial()` + `cancel_trial_booking()`; the engine expecting
+booked children per-date and pricing `trial_paid` from the booking's category; an admin
+**Trials** page with the unpriced-category reminder; the coach's walk-in form removed.
+
+**Three findings worth keeping:**
+- **§7.40 fired again.** A hand-reconstructed `provision_tenant()` silently replaced the
+  slug's counter loop with a random suffix, changed an error message and dropped two
+  declared variables. Only `pg_get_functiondef()` on the live DB caught it.
+- **`classes.category_id` is MUTABLE and money now depends on it** — the only such input
+  in the schema; class rates, wage rates and trial rates are all effective-dated. Without
+  a snapshot, re-tagging a class would reprice unbilled trials. Now §7.45.
+- **A locale bug nearly shipped:** the non-class-day check first used
+  `to_char(…,'day')`, which renders through `lc_time` — on a non-English server *every*
+  booking would have been refused. `EXTRACT(DOW)` now.
+
+**Verification:** pgTAP **299**, Deno **108** (run twice), admin vitest **106**, app jest
+**79**, all typecheck, `verify-trials.mjs` **9/9** through both real UIs. The rollback in
+`supabase/rollback/` was **executed and verified**, forward and back — this is the first
+migration since tenancy to write to live rows.
+
+**Deliberately not done:** a class-deactivation warning (RISK U) — there is no
+deactivation UI to attach one to, so it is recorded on the BACKLOG item that owns it.
 
 ---
 
@@ -2735,7 +2795,10 @@ Two things now depend on that not staying true much longer:
 2. **Then bill a real month**, following `INVOICE_RUNBOOK.md`. Expect the gate to refuse
    until every lesson is marked — working as designed; mark them (or mark them cancelled),
    never override.
-3. **Then onboard the school as tenant 2 — which is now a button, not a SQL script**
+3. **~~Then onboard the school as tenant 2~~ — DONE.** `Epic Swim` was provisioned
+   2026-07-21 and has its own admin and a separate coach. The rest of this item is kept
+   for the reasoning; the action is complete.
+   ~~**Then onboard the school as tenant 2 — which is now a button, not a SQL script**~~
    (§8.9, PRD §4.4). Platform → New business. Cross-tenant isolation is proven in pgTAP
    across two tenants and driven through both UIs, but **production has only ever had one
    tenant**, so the school's arrival is the first time any of it is load-bearing on real

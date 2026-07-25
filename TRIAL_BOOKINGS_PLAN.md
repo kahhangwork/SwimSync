@@ -4,7 +4,14 @@ _Written 2026-07-25. Every class belongs to a category; a category carries a tri
 a trial is a child **expected at one lesson**, booked ahead by the admin and marked by the
 coach like anyone else._
 
-> **STATUS: PLANNED — NOT BUILT.** Requirements settled with the user across two rounds of
+> **STATUS: BUILT AND VERIFIED LOCALLY — NOT MERGED, NOT DEPLOYED.** pgTAP **299**, Deno
+> **108** (run twice), admin vitest **106**, app jest **79**, all typecheck, and
+> `verify-trials.mjs` **9/9** through both real UIs. The rollback in `supabase/rollback/`
+> was **executed and verified**, forward and back. RISK U was NOT mitigated in code —
+> there is no class-deactivation UI to attach a warning to, so it is recorded on the
+> BACKLOG item that owns it.
+>
+> _(originally: PLANNED — NOT BUILT.)_ Requirements settled with the user across two rounds of
 > `/plan-with-confidence` (~97%).
 >
 > **SUPERSEDES the trial half of `TRIAL_ONBOARDING_PLAN.md`.** The ongoing-student path,

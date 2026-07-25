@@ -1271,26 +1271,61 @@ one you use depends on whether the child is *visiting* or *attending*:
 
 | | Who | Where | What it records |
 |---|---|---|---|
-| **A trial** | The coach | Mark Attendance → *Add a walk-in* | The child **and** their attendance for that one lesson, in a single action — at the poolside those are one thing |
-| **An ongoing student** | The business's admin | Students → *Add student* | The child and an open enrolment in a class. No attendance: the coach marks them from then on, like anyone else |
+| **A trial** | The business's admin | Trials → *Book a trial* | A **booking**: this child is expected at this one lesson. No enrolment, no attendance |
+| **An ongoing student** | The business's admin | Students → *Add student* | The child and an open enrolment in a class. No attendance: the coach marks them from then on |
 
 Nobody else can do either: a parent cannot put a child on someone's roster, and neither
 can a coach from another business.
-
-The split follows the existing division of labour. A trial is an *attendance* event and
-belongs to the coach, who is standing there; an ongoing student is an *enrolment*, and
-enrolment is the admin's (§5.2). A trial the coach forgot needs no separate feature —
-the attendance screen already opens any past date, and adding a walk-in there records it
-against that lesson.
 
 An ongoing student is enrolled **from the day they are added**, so lessons taught before
 that are neither expected of them nor billed. Capturing earlier weeks means the coach
 marking those dates.
 
-**A trial is not an enrolment.** A walk-in is recorded as attending *that lesson*, not as
-joining the class — otherwise they would be expected every week forever, and the
-attendance check would report a missing child at every future lesson. They still appear on
-that lesson's roster afterwards, so the coach can correct what they entered.
+##### A trial is a booking, not attendance *(corrected 2026-07-25)*
+
+Booking says one thing: **this child is expected at this lesson.** Nothing about the
+outcome is claimed, because nothing is known yet — they may turn up, not turn up, or the
+lesson may be rained off. On the day the coach marks them **exactly like any other
+student**, and the status they choose is what decides whether anything is charged.
+
+The first version of this got all three parts wrong: the *coach* created the trial, it was
+recorded as an enrolment, and it wrote an attendance row saying "paid trial" in advance.
+That made booking ahead impossible — which is the ordinary case, since trials are arranged
+days beforehand — and asserted an outcome nobody had observed.
+
+**A trial is not an enrolment**, and the child is expected at that one lesson only. They
+appear on the coach's roster for that date and no other, and a booking can be cancelled if
+the trial falls through.
+
+**Trials are arranged by the business's admin, not the coach.** At a school they always
+were; a private coach is their own admin, so nothing changes for them. The coach's job is
+marking.
+
+**A child already in a class cannot be booked for a trial**, nor one whose family holds a
+prepaid package — a trial is for someone who has not started. A family who *left* can
+trial again, possibly in a different class.
+
+**An unmarked trial holds the billing month open**, like any unmarked lesson (§7.7). A
+paid trial nobody recorded is lost money, so the remedy is the usual one: mark it —
+including *absent* if they did not come — or cancel the booking.
+
+##### What a paid trial costs *(implemented 2026-07-25)*
+
+Each **class category** (§7.16) carries its own trial price, so a private trial can cost
+more than a group one. A category with no price set charges the class's own lesson price,
+which is what happened before this existed — so a business that never sets one is
+unaffected. A *free* trial is free: it is an attendance status, not a price.
+
+Trial prices are **effective-dated**: changing one applies from that day forward and never
+re-values a lesson already taught. This matters because invoices are generated up to five
+weeks after a lesson (§5.5), so a price edited on the 3rd would otherwise silently change
+what was owed for the whole previous month — the same failure §7.3 and §7.7 record.
+
+*(Known limit: two classes in the same category cannot trial at different prices. The
+categories are the business's own, so the answer is usually another category.)*
+
+*(Deliberately not built: booking a trial for someone with no class in mind. A trial is
+of a specific lesson — that is what makes it markable and what gives it a price.)*
 
 #### Claiming: the parent adopts the record, nothing is transferred
 
