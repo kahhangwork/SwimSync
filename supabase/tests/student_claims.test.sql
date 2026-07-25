@@ -32,7 +32,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(44);
+SELECT plan(47);
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -511,5 +511,55 @@ SELECT lives_ok(
           AND sc.status = 'declined' LIMIT 1)) $$,
   'a parent can clear their own decided notice');
 
+-- ══ A parent can see their OWN child's trial booking ══════════════════════
+-- ⚠ trial_bookings_select originally covered the platform admin, the
+-- business's admin and the class's coach — a PARENT matched none of them
+-- (current_tenant_id() is NULL for them, and they are not a coach), so the app
+-- could not tell a family when their own trial was. The parent home card would
+-- have shipped silently dead, still showing "the admin will assign your child
+-- soon" to every family with a booked lesson.
+--
+-- Built so it CANNOT pass vacuously: two bookings exist, one belonging to this
+-- parent's child and one to an unclaimed child, and the parent must see
+-- exactly one.
+RESET ROLE;
+INSERT INTO trial_bookings (tenant_id, student_id, class_id, session_date,
+                            category_id, booked_by)
+VALUES
+  -- Claimed Child belongs to P1 (linked in the fixture above).
+  ('c1a11111-0000-0000-0000-000000000001','c1a99999-0000-0000-0000-000000000004',
+   'c1a55555-0000-0000-0000-000000000001','2026-08-01',
+   (SELECT id FROM class_categories WHERE tenant_id='c1a11111-0000-0000-0000-000000000001'
+     AND lower(trim(name))='default group'),
+   'c1000000-0000-0000-0000-0000000000a1'),
+  -- Bernice belongs to nobody.
+  ('c1a11111-0000-0000-0000-000000000001','c1a99999-0000-0000-0000-000000000003',
+   'c1a55555-0000-0000-0000-000000000001','2026-08-08',
+   (SELECT id FROM class_categories WHERE tenant_id='c1a11111-0000-0000-0000-000000000001'
+     AND lower(trim(name))='default group'),
+   'c1000000-0000-0000-0000-0000000000a1');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" TO '{"sub":"c1000000-0000-0000-0000-0000000000d1","role":"authenticated"}';
+
+SELECT is(
+  (SELECT count(*)::INT FROM trial_bookings),
+  1, '⚠ a parent sees their OWN child''s trial booking (not the other family''s)');
+
+SELECT is(
+  (SELECT student_id FROM trial_bookings),
+  'c1a99999-0000-0000-0000-000000000004'::uuid,
+  'and it is the right one — their child, not somebody else''s');
+
+-- ⚠ AND THE CLASS IT POINTS AT. Reading the booking is useless if the class it
+-- names is invisible: the home card rendered "their class" because the
+-- embedded classes(title) came back NULL under classes_select, which asked
+-- only about ENROLMENTS. Two policies, one feature, each failing silently.
+SELECT is(
+  (SELECT count(*)::INT FROM classes
+    WHERE id = 'c1a55555-0000-0000-0000-000000000001'),
+  1, '⚠ ...and can read the CLASS their child is trialling in');
+
+RESET ROLE;
 SELECT * FROM finish();
 ROLLBACK;
