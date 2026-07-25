@@ -20,6 +20,12 @@ export function Sidebar() {
   // platform admin): rendering the business nav while we still don't know
   // flashes eleven links at a platform admin before removing them.
   const [tenantId, setTenantId] = useState<string | null | undefined>(undefined);
+  // Claims waiting on this business. A parent who files one is BLOCKED from
+  // adding that child until it is decided, and nothing emails the admin about
+  // it (PARENT_CLAIM_PLAN decision 7) — so this count is the only thing that
+  // tells them a family is stuck. Re-read on navigation, since deciding a
+  // claim should drop the badge without a page reload.
+  const [pendingClaims, setPendingClaims] = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -34,6 +40,17 @@ export function Sidebar() {
       setTenantId((profile?.tenant_id as string | null) ?? null);
     });
   }, []);
+
+  useEffect(() => {
+    // No tenant filter needed: student_claims_select already scopes this to the
+    // caller's own business, and adding a second copy of that rule here would
+    // be one more place for it to drift.
+    supabase
+      .from("student_claims")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .then(({ count }) => setPendingClaims(count ?? 0));
+  }, [pathname]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -75,6 +92,16 @@ export function Sidebar() {
                 )}
               />
               {label}
+              {href === "/claims" && pendingClaims > 0 && (
+                <span
+                  className="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white"
+                  title={`${pendingClaims} parent${
+                    pendingClaims === 1 ? " is" : "s are"
+                  } waiting — they cannot add that child until you decide`}
+                >
+                  {pendingClaims}
+                </span>
+              )}
             </Link>
           );
         })}

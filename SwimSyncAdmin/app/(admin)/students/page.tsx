@@ -13,6 +13,7 @@ import {
   familyActiveChildren,
   type FamilyChild,
 } from "@/lib/studentStatus";
+import { findDuplicatePairs, type DupPair } from "@/lib/duplicateStudents";
 
 type StudentRow = {
   id: string;
@@ -27,6 +28,8 @@ type StudentRow = {
   parent_name: string;
   class_title: string | null;
   coach_name: string | null;
+  /** Attendance rows. Decides which of a duplicate pair must survive a merge. */
+  lessons: number;
 };
 
 const STATUS_FILTERS = ["All", "Assigned", "Unassigned", "Inactive"];
@@ -52,6 +55,35 @@ export default function StudentsPage() {
   const [family, setFamily] = useState<FamilyChild[]>([]);
   const [takeSiblings, setTakeSiblings] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [merging, setMerging] = useState<DupPair | null>(null);
+  const [mergeBusy, setMergeBusy] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+
+  /**
+   * Fold the emptied duplicate into the row holding the history.
+   *
+   * All the safety lives in merge_students(): it refuses when both rows carry
+   * attendance, when the direction is wrong, when money is already documented
+   * against the duplicate, and when an unknown cascading foreign key has
+   * appeared that it has not been taught to move. So this handler does not
+   * re-check any of that — it surfaces the refusal verbatim, because those
+   * messages are written for the admin to act on.
+   */
+  async function doMerge(pair: DupPair) {
+    setMergeBusy(true);
+    setMergeError(null);
+    const { error } = await supabase.rpc("merge_students", {
+      p_survivor_id: pair.survivor.id,
+      p_duplicate_id: pair.duplicate.id,
+    });
+    setMergeBusy(false);
+    if (error) {
+      setMergeError(error.message);
+      return;
+    }
+    setMerging(null);
+    await load();
+  }
 
   async function openInactive(student: StudentRow) {
     setTakeSiblings(false);
@@ -314,6 +346,15 @@ export default function StudentsPage() {
       `)
       .order("full_name");
 
+    // Lessons per child, for duplicate detection: a merge must keep the row
+    // holding the history, and merge_students() refuses the other direction
+    // outright — so offering it would be offering a refusal.
+    const { data: att } = await supabase.from("attendance").select("student_id");
+    const lessonCount = new Map<string, number>();
+    for (const a of (att ?? []) as { student_id: string }[]) {
+      lessonCount.set(a.student_id, (lessonCount.get(a.student_id) ?? 0) + 1);
+    }
+
     setStudents(
       (data ?? []).map((s: any) => {
         const activeEnrolment = (s.student_class_enrolments ?? []).find(
@@ -341,6 +382,7 @@ export default function StudentsPage() {
           class_title: activeEnrolment?.classes?.title ?? null,
           coach_name:
             activeEnrolment?.classes?.coaches?.profiles?.full_name ?? null,
+          lessons: lessonCount.get(s.id) ?? 0,
         };
       })
     );
@@ -376,6 +418,19 @@ export default function StudentsPage() {
     const matchUnclaimed = !unclaimedOnly || isUnclaimed(s);
     return matchSearch && matchStatus && matchLow && matchUnclaimed;
   });
+
+  // Derived on read, never stored: nothing would maintain a "possible
+  // duplicate" flag, and a stored value nothing maintains is not a fact
+  // (§7.37). A business has a few dozen students, so this is cheap.
+  const dupPairs = findDuplicatePairs(
+    students.map((s) => ({
+      id: s.id,
+      full_name: s.full_name,
+      date_of_birth: s.date_of_birth,
+      claimed: s.parent_id !== null,
+      lessons: s.lessons,
+    }))
+  );
 
   const unclaimedCount = students.filter(
     (s) => s.is_active && isUnclaimed(s)
@@ -469,6 +524,49 @@ export default function StudentsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Two rows that look like the same child ───────────────────────────
+          The claim flow stops NEW duplicates. This is for the ones already
+          here — every child added before it shipped, and every child a parent
+          created by answering "no, that's a different child". Without this
+          nothing in the app ever mentions that a duplicate exists. */}
+      {dupPairs.length > 0 && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800">
+            {dupPairs.length === 1
+              ? "Two records may be the same child"
+              : `${dupPairs.length} pairs of records may be the same child`}
+          </p>
+          <div className="mt-2 space-y-2">
+            {dupPairs.map((p) => (
+              <div
+                key={`${p.survivor.id}:${p.duplicate.id}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2"
+              >
+                <p className="text-sm text-gray-700">
+                  <span className="font-medium">{p.survivor.full_name}</span>{" "}
+                  ({p.survivor.lessons} lesson
+                  {p.survivor.lessons === 1 ? "" : "s"}) and{" "}
+                  <span className="font-medium">{p.duplicate.full_name}</span>{" "}
+                  ({p.duplicate.lessons} lesson
+                  {p.duplicate.lessons === 1 ? "" : "s"})
+                </p>
+                {p.needsHuman ? (
+                  // merge_students() refuses this outright. Say so here rather
+                  // than offering a button that only produces an error.
+                  <span className="text-xs font-medium text-red-700">
+                    Both have lessons recorded — sort this one out by hand
+                  </span>
+                ) : (
+                  <Button variant="outline" onClick={() => setMerging(p)}>
+                    Review &amp; merge
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Table>
         <Thead>
@@ -827,6 +925,87 @@ export default function StudentsPage() {
           {actionError}
         </p>
       )}
+
+      {/* ── Merge: the one action that repoints a child's records ─────────── */}
+      <Modal
+        open={merging !== null}
+        onClose={() => {
+          setMerging(null);
+          setMergeError(null);
+        }}
+        title="Merge these two records?"
+      >
+        {merging && (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-gray-200 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Kept
+              </p>
+              <p className="mt-1 font-medium text-gray-900">
+                {merging.survivor.full_name}
+              </p>
+              <p className="text-sm text-gray-500">
+                {merging.survivor.lessons} lesson
+                {merging.survivor.lessons === 1 ? "" : "s"} recorded
+                {merging.survivor.date_of_birth
+                  ? ` · born ${merging.survivor.date_of_birth}`
+                  : " · no date of birth"}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Deleted
+              </p>
+              <p className="mt-1 font-medium text-gray-900">
+                {merging.duplicate.full_name}
+              </p>
+              <p className="text-sm text-gray-500">
+                {merging.duplicate.lessons} lesson
+                {merging.duplicate.lessons === 1 ? "" : "s"} recorded
+                {merging.duplicate.date_of_birth
+                  ? ` · born ${merging.duplicate.date_of_birth}`
+                  : " · no date of birth"}
+              </p>
+            </div>
+
+            <p className="text-sm text-gray-600">
+              The parent account, any trial bookings and any settlements move
+              across to the record being kept, along with a date of birth or
+              gender it is missing. Nothing already recorded on the kept record
+              is overwritten. This cannot be undone.
+            </p>
+
+            {merging.eitherWay && (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Neither record has any lessons, so it does not matter much which
+                survives — but check the spelling of the name you are keeping.
+              </p>
+            )}
+
+            {mergeError && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {mergeError}
+              </p>
+            )}
+
+            <div className="flex gap-2">
+              <Button disabled={mergeBusy} onClick={() => doMerge(merging)}>
+                {mergeBusy ? "Merging…" : "Merge them"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setMerging(null);
+                  setMergeError(null);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

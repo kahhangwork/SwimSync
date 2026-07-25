@@ -32,7 +32,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(31);
+SELECT plan(33);
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -349,6 +349,30 @@ SELECT is(
   (SELECT count(*)::INT FROM parent_students
     WHERE student_id = 'c1a99999-0000-0000-0000-000000000001'),
   0, 'undo detaches the child again');
+
+-- ══ The contract: a parent has no direct INSERT any more ══════════════════
+-- ⚠ THIS IS WHAT MAKES THE WHOLE SLICE REAL. add_child_or_claim() checks for
+-- an existing roster entry before creating a child; if a parent could still
+-- INSERT into `students` directly, that check would live only in the client,
+-- and §7.8 is unambiguous — a safety gate the only live caller can bypass is
+-- not a gate. If this assertion ever fails, the duplicate prevention is
+-- decorative.
+SET LOCAL "request.jwt.claims" TO '{"sub":"c1000000-0000-0000-0000-0000000000d2","role":"authenticated"}';
+SELECT throws_ok(
+  $$ INSERT INTO students (full_name, date_of_birth, tenant_id, assignment_status, is_active)
+     VALUES ('Sneaked Past The Check','2020-01-01',
+             'c1a11111-0000-0000-0000-000000000001','unassigned', TRUE) $$,
+  '42501', NULL,
+  '⚠ a parent can no longer INSERT a child directly — the check cannot be skipped');
+
+-- ...and the admin's own path is untouched, which is the half a careless
+-- narrowing would have broken.
+SET LOCAL "request.jwt.claims" TO '{"sub":"c1000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
+SELECT lives_ok(
+  $$ INSERT INTO students (full_name, date_of_birth, tenant_id, assignment_status, is_active)
+     VALUES ('Admin Added Child','2020-02-02',
+             'c1a11111-0000-0000-0000-000000000001','unassigned', TRUE) $$,
+  'the business''s admin can still add a child directly');
 
 SELECT * FROM finish();
 ROLLBACK;
