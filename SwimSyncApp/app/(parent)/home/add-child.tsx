@@ -151,8 +151,20 @@ export default function AddChildScreen() {
       // A child is identified by name + date of birth within a business
       // (students_identity_uniq). Hitting it almost always means this child is
       // already registered — a parent tapping Save twice, or re-adding a child
-      // they forgot they had. The RPC raises that message already worded for a
-      // parent, so pass it through rather than inventing a second copy.
+      // they forgot they had.
+      //
+      // ⚠ BUT AFTER "no, a different child" IT IS A DEAD END, and the bare
+      // "already registered" message gives no way out: the parent has just
+      // been shown that record and said it was not theirs, and now cannot
+      // create their own. Say what the two ways forward actually are. Reported
+      // from production 2026-07-26.
+      if (error.code === "23505" && mode === "create_anyway") {
+        showToast(
+          `A child called ${name.trim()} with that date of birth is already registered here. If that IS the child your coach showed you, go back and choose "Yes, that's my child" — otherwise check the spelling or the date of birth.`,
+          "error"
+        );
+        return;
+      }
       showToast(
         error.code === "23505"
           ? error.message

@@ -32,7 +32,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(42);
+SELECT plan(44);
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -406,6 +406,24 @@ SELECT is(
   (SELECT count(*)::INT FROM parent_students
     WHERE student_id = 'c1a99999-0000-0000-0000-000000000001'),
   0, 'undo detaches the child again');
+
+-- ⚠ AND IT PUTS THE CHILD BACK. Approval fills a MISSING date of birth from
+-- what the parent typed; an undo means the admin decided this is NOT their
+-- child, so that date was supplied by a stranger about another family's child.
+-- Leaving it also dead-ends the real parent: the record then carries exactly
+-- the identity they are about to type, and students_identity_uniq refuses to
+-- let them create their own child. Found in production testing 2026-07-26 —
+-- the audit log showed dob_filled:true and the date still sitting there.
+SELECT is(
+  (SELECT date_of_birth FROM students WHERE id = 'c1a99999-0000-0000-0000-000000000001'),
+  NULL::date,
+  '⚠ undo also REVERSES the date of birth the approval wrote');
+
+SELECT is(
+  (SELECT filled_dob FROM student_claims
+    WHERE student_id = 'c1a99999-0000-0000-0000-000000000001'
+      AND status = 'declined' AND decided_by IS NOT NULL),
+  FALSE, 'and the claim no longer claims to have filled anything');
 
 -- ══ The queue reader, and the RLS hole it exists to close ═════════════════
 -- ⚠ REGRESSION PIN. The admin page originally embedded
