@@ -1266,11 +1266,26 @@ In both cases the lesson was **invisible**: unbillable, absent from the coach's 
 and not counted by the attendance check. The only remedy was to chase the parent before
 teaching anyone.
 
-**A child can now exist before their parent does.** The coach adds them from the
-attendance screen — a name, optionally the parent's phone — and marks them in the same
-action, because at the poolside adding and marking are one thing. The business's admin
-can do the same. Nobody else can: a parent cannot put a child on someone's roster, and
-neither can a coach from another business.
+**A child can now exist before their parent does**, by either of two routes — and which
+one you use depends on whether the child is *visiting* or *attending*:
+
+| | Who | Where | What it records |
+|---|---|---|---|
+| **A trial** | The coach | Mark Attendance → *Add a walk-in* | The child **and** their attendance for that one lesson, in a single action — at the poolside those are one thing |
+| **An ongoing student** | The business's admin | Students → *Add student* | The child and an open enrolment in a class. No attendance: the coach marks them from then on, like anyone else |
+
+Nobody else can do either: a parent cannot put a child on someone's roster, and neither
+can a coach from another business.
+
+The split follows the existing division of labour. A trial is an *attendance* event and
+belongs to the coach, who is standing there; an ongoing student is an *enrolment*, and
+enrolment is the admin's (§5.2). A trial the coach forgot needs no separate feature —
+the attendance screen already opens any past date, and adding a walk-in there records it
+against that lesson.
+
+An ongoing student is enrolled **from the day they are added**, so lessons taught before
+that are neither expected of them nor billed. Capturing earlier weeks means the coach
+marking those dates.
 
 **A trial is not an enrolment.** A walk-in is recorded as attending *that lesson*, not as
 joining the class — otherwise they would be expected every week forever, and the
