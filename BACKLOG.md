@@ -123,7 +123,7 @@ Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-histo
 filtering/search (S), More polished
 dashboards (S), Deeper component-render tests (M), Production data cleanup (S),
 Email-confirmation copy/templates (S), Revoke `anon` EXECUTE from the remaining
-SECURITY DEFINER functions (S).
+SECURITY DEFINER functions (S), Revenue reporting (M — *decide accrual-vs-cash first*).
 
 ### Later — big features carrying their own dependencies
 
@@ -261,6 +261,34 @@ already **many-to-many**, so a student can have two parents. What's missing is a
 rule and a decision about which parent's credit balance a correction lands in. Credit is
 pooled **per parent** (HANDOVER §6), so splitting invoices without splitting credit
 would produce a ledger nobody can explain.
+
+### Revenue reporting — **M**
+Tell a business what it actually earned in a month.
+
+**Why:** SwimSync has **no revenue ledger at all.** It tracks obligations (`invoices`),
+whether they were settled (`status`/`paid_at`), and outgoings (`coach_payouts`) — but
+nothing sums income. The only money aggregate in the whole admin panel is
+`totalOutstanding` (`SwimSyncAdmin/app/(admin)/invoices/page.tsx:389`), which is money
+*owed*, not money *received*. A coach asking "how did July go?" has to add it up by hand
+from the invoice list, which is the same spreadsheet-rebuilt-monthly problem that coach
+wages (§7.13) existed to close on the payroll side.
+
+**Notes — decide this FIRST, before any code:** is revenue **accrual** (invoices issued
+in the month) or **cash** (payments received in the month)? They diverge exactly when it
+matters — an invoice generated on 7 Aug for July, paid 20 Aug, belongs to a different
+month under each. Everything else follows from that answer.
+
+Two sources must be summed once trial onboarding ships, not one:
+`invoices` (paid) **plus** `student_settlements.amount` where `kind = 'paid_outside'` —
+money taken for a trial by a walk-in whose parent never registered, which cannot ride the
+invoice rails at all (`invoices.parent_id` and `payment_records.invoice_id` are both NOT
+NULL). See `TRIAL_ONBOARDING_PLAN.md`.
+
+**Do not ship a partial figure.** A revenue number that counts invoices but silently omits
+settlements — or vice versa — is worse than no number, because it reads as authoritative.
+That is precisely the mistake PRD §4.4 records about the platform pages, which showed
+several businesses' figures added together and labelled as one; the fix there was to show
+nothing rather than something wrong.
 
 ### A session added AFTER a month is invoiced is never billed — **S**
 The hard block (HANDOVER §8) guarantees every lesson is marked *at generation time*. It does
