@@ -176,6 +176,20 @@ export type Scenario = {
       reversed?: boolean;
     }
   ) => Promise<string>;
+  /** Book a child into ONE lesson as a trial. Creates no enrolment and no
+   *  attendance — the coach marks it on the day. Snapshots the class's
+   *  category, which is what the engine prices from. */
+  bookTrial: (
+    studentId: string,
+    date: string,
+    opts?: { classId?: string; categoryId?: string }
+  ) => Promise<string>;
+  /** Set a trial price for a category, effective from a date. Insert-only. */
+  setTrialRate: (
+    categoryId: string,
+    rate: number,
+    effectiveFrom: string
+  ) => Promise<void>;
   /** Current pooled credit balance for the parent. */
   creditBalance: () => Promise<number>;
   /** Per-tenant credit balance (the source of truth). */
@@ -614,6 +628,13 @@ export async function newScenario(
    * another scenario's parent inside this tenant.
    */
   async function teardown(): Promise<void> {
+    // Trials first. trial_bookings.class_id and trial_rates.category_id are
+    // both ON DELETE RESTRICT — deliberately, so a class or category cannot be
+    // deleted out from under bookings that price past lessons — which means
+    // they must go before the classes and categories they point at.
+    await db.from("trial_bookings").delete().eq("tenant_id", tenantId);
+    await db.from("trial_rates").delete().eq("tenant_id", tenantId);
+
     // 1. Billing first — invoice_items reference lesson_sessions.
     const { data: tNotes } = await db
       .from("credit_notes").select("id").eq("tenant_id", tenantId);
@@ -778,6 +799,47 @@ export async function newScenario(
     return data.id as string;
   }
 
+  async function bookTrial(
+    studentId: string,
+    date: string,
+    opts: { classId?: string; categoryId?: string } = {}
+  ): Promise<string> {
+    const cid = opts.classId ?? classId;
+    // Written directly rather than through book_trial(): the RPC gates on
+    // auth.uid(), and these tests run as service_role with no JWT. The row
+    // shape is what the engine reads, and that is what is under test here —
+    // the RPC's own refusals are pinned in pgTAP where a caller identity exists.
+    const { data, error } = await db
+      .from("trial_bookings")
+      .insert({
+        tenant_id: tenantId,
+        student_id: studentId,
+        class_id: cid,
+        session_date: date,
+        category_id: opts.categoryId ?? categoryId,
+        booked_by: coachProfileId,
+      })
+      .select("id")
+      .single();
+    if (error || !data) throw new Error(`bookTrial failed: ${error?.message}`);
+    return data.id as string;
+  }
+
+  async function setTrialRate(
+    catId: string,
+    rate: number,
+    effectiveFrom: string
+  ): Promise<void> {
+    const { error } = await db.from("trial_rates").insert({
+      tenant_id: tenantId,
+      category_id: catId,
+      rate,
+      effective_from: effectiveFrom,
+      created_by: coachProfileId,
+    });
+    if (error) throw new Error(`setTrialRate failed: ${error.message}`);
+  }
+
   return {
     db,
     tag,
@@ -798,6 +860,8 @@ export async function newScenario(
     mark,
     addUnclaimedStudent,
     settle,
+    bookTrial,
+    setTrialRate,
     setRate,
     creditBalance,
     tenantCreditBalance,

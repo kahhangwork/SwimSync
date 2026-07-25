@@ -35,6 +35,9 @@ import {
   previousBillingMonth,
 } from "./dates.ts";
 import { rateOn } from "./rates.ts";
+// The ONE definition of who is expected at a lesson. Duplicated byte-identically
+// in both apps (§6) — three edits, diffable. Do not inline the union here.
+import { expectedStudentsOn } from "./attendanceCompleteness.ts";
 
 // Attendance statuses that result in a charge to the parent.
 // Per PRD 5.4: only Present and Paid Trial are billable.
@@ -359,6 +362,32 @@ async function generateForTenant(
 
   if (rateErr) throw new Error(rateErr.message);
 
+  // ── Trial rates, per class category, effective-dated ──────────────────────
+  // Loaded once for the tenant and resolved in memory, exactly like classRates.
+  // A category with no rate is a REAL answer — "this business has not priced
+  // trials" — and the caller falls back to the class rate. That is deliberately
+  // unlike a missing CLASS rate, which is a hard failure (§6), because there the
+  // only alternative would be silently charging 0.
+  const { data: trialRates, error: trialRateErr } = await supabase
+    .from("trial_rates")
+    .select("category_id, rate, effective_from")
+    .eq("tenant_id", tenantId);
+
+  if (trialRateErr) throw new Error(trialRateErr.message);
+
+  /** The rate in force for a category on a date, or null. */
+  const trialRateFor = (categoryId: string, on: string): number | null => {
+    const inForce = (trialRates ?? [])
+      .filter(
+        (r) => r.category_id === categoryId && String(r.effective_from) <= on
+      )
+      // String compare is correct and deliberate: both sides are YYYY-MM-DD,
+      // which sorts lexicographically, so no Date is constructed and there is
+      // no timezone to get wrong (§7.7).
+      .sort((a, b) => String(b.effective_from).localeCompare(String(a.effective_from)));
+    return inForce.length ? Number(inForce[0].rate) : null;
+  };
+
   type InvoiceItem = {
     student_id: string;
     lesson_session_id: string;
@@ -422,6 +451,33 @@ async function generateForTenant(
     const sessionByDate = new Map<string, string>(
       (sessions ?? []).map((s) => [s.session_date as string, s.id as string])
     );
+
+    // ── Trial bookings: a child expected at ONE lesson ──────────────────────
+    // Not enrolled, so activeStudentIds does not contain them — but they must
+    // be marked on their own date, and an unmarked one blocks the month like
+    // anyone else. Cancelled bookings expect nobody.
+    //
+    // category_id comes from the BOOKING, never from classes.category_id: that
+    // column is mutable, and re-tagging a class must not reprice a trial
+    // already taught (see trial_bookings.category_id).
+    const { data: bookings } = await supabase
+      .from("trial_bookings")
+      .select("student_id, session_date, category_id")
+      .eq("class_id", cls.id)
+      .is("cancelled_at", null)
+      .gte("session_date", monthStart)
+      .lte("session_date", monthEnd);
+
+    const bookedByDate = new Map<string, string[]>();
+    /** (student, date) → the category the trial was SOLD under. */
+    const bookedCategory = new Map<string, string>();
+    for (const b of bookings ?? []) {
+      const d = b.session_date as string;
+      const list = bookedByDate.get(d) ?? [];
+      list.push(b.student_id as string);
+      bookedByDate.set(d, list);
+      bookedCategory.set(`${b.student_id}:${d}`, b.category_id as string);
+    }
 
     // Enrolments. `is_active` answers "who must be marked" (the gate);
     // `enrolled_at` floors the expected-lesson window so a class is never asked
@@ -492,15 +548,25 @@ async function generateForTenant(
       (attRows ?? []).map((a) => `${a.lesson_session_id}:${a.student_id}`)
     );
     const datesToCheck = [
-      ...new Set<string>([...expectedDates, ...sessionByDate.keys()]),
+      ...new Set<string>([
+        ...expectedDates,
+        ...sessionByDate.keys(),
+        // A trial booked on a date with no session yet would otherwise be
+        // invisible here — and an unmarked trial is exactly what must block.
+        ...bookedByDate.keys(),
+      ]),
     ].sort();
 
     /** Active students with no attendance row on `date`. No session at all
      *  means nobody is marked, which is the whole point of this gate. */
     const unmarkedOn = (date: string): string[] => {
+      // Per DATE now, not per month: a trial booking is expected at exactly one
+      // lesson. expectedStudentsOn() is the shared definition — do not inline
+      // the union (§7.18: four hand-written copies caused a live underbill).
+      const expected = expectedStudentsOn(date, activeStudentIds, bookedByDate);
       const sessId = sessionByDate.get(date);
-      if (!sessId) return activeStudentIds;
-      return activeStudentIds.filter((s) => !attSet.has(`${sessId}:${s}`));
+      if (!sessId) return expected;
+      return expected.filter((s) => !attSet.has(`${sessId}:${s}`));
     };
 
     const complete = datesToCheck.every((d) => unmarkedOn(d).length === 0);
@@ -570,6 +636,32 @@ async function generateForTenant(
     // genuinely reckoned with, whether or not it yields a billable item.
     classesComplete++;
 
+    // ── What one billable lesson costs ─────────────────────────────────────
+    // A PAID TRIAL is priced by the category the trial was SOLD under, on the
+    // lesson's own date. Everything else — including a trial child marked
+    // `present` — is the class's own effective-dated rate. The STATUS chooses
+    // the price and the coach chooses the status.
+    //
+    // ⚠ `??`, NEVER `||`. An unpriced category returns NULL, which means "this
+    // business has not priced trials" and must fall back to the class rate. With
+    // `||` a rate of 0 would slip through to the fallback — and CHECK (rate > 0)
+    // on trial_rates is the second layer that makes 0 unreachable at all. The
+    // opposite failure matters just as much: NULL must not THROW, or a business
+    // that never set a trial price could not bill anything.
+    const priceFor = (
+      status: string,
+      studentId: string,
+      sessionDate: string,
+      c: { id: string; title: string }
+    ): number => {
+      const classPrice = rateOn(classRates ?? [], c.id, sessionDate, c.title).price;
+      if (status !== "trial_paid") return classPrice;
+      // The BOOKING's category, not the class's current one.
+      const cat = bookedCategory.get(`${studentId}:${sessionDate}`);
+      if (!cat) return classPrice;
+      return trialRateFor(cat, sessionDate) ?? classPrice;
+    };
+
     // ── Tally this class's billable items into the cross-class map ──────────
     const attByKey: Record<string, string> = Object.fromEntries(
       (attRows ?? []).map((a) => [
@@ -595,7 +687,7 @@ async function generateForTenant(
             student_id: ps.student_id,
             lesson_session_id: sessId,
             attendance_status: status,
-            amount: rateOn(classRates ?? [], cls.id, sessionDate, cls.title).price,
+            amount: priceFor(status, ps.student_id, sessionDate, cls),
             class_title: cls.title,
             session_date: sessionDate,
             student_name: studentNameById.get(ps.student_id) ?? null,
