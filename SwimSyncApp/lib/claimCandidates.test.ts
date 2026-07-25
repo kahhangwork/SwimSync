@@ -63,6 +63,17 @@ describe("matchReasonLabel", () => {
     expect(matchReasonLabel("name_only")).toBe("The name is similar.");
   });
 
+  // The parent sees an ordinary name match. Telling them the number on file
+  // differs would disclose another family's record to someone unapproved.
+  it("does NOT reveal a phone discrepancy to the parent", () => {
+    expect(matchReasonLabel("name_only_phone_differs")).toBe(
+      matchReasonLabel("name_only")
+    );
+    expect(matchReasonLabel("name_only_phone_differs")).not.toMatch(
+      /number|phone|differ/i
+    );
+  });
+
   it("degrades to something harmless for an unknown reason", () => {
     expect(matchReasonLabel("something_new")).toBe(
       "This may be the same child."

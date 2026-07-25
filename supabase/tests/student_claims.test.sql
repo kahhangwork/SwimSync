@@ -32,7 +32,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(38);
+SELECT plan(39);
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -227,6 +227,22 @@ SELECT is(
   (SELECT count(*)::INT FROM find_student_candidates(
      'c1a11111-0000-0000-0000-000000000001','Bernice Tan', NULL)),
   1, 'a MISSING date of birth still matches — it is not a disagreement');
+
+UPDATE profiles SET phone = '+65 7000 0001' WHERE id = 'c1000000-0000-0000-0000-0000000000d2';
+
+-- ⚠ A DIFFERING PHONE DEMOTES A NAME MATCH, IT DOES NOT KILL IT.
+-- P2 has no phone at all, so use the roster child that DOES have one
+-- (Ethan, 91112222) against a parent whose number differs. Ethan is still
+-- offered — he may be this parent's child by their OTHER parent, which is the
+-- common two-parent case — but the reason marks the discrepancy so the admin
+-- queue can warn about it. Hard-blocking here would mean a father can never
+-- claim his own child, silently.
+SELECT is(
+  (SELECT match_reason FROM find_student_candidates(
+     'c1a11111-0000-0000-0000-000000000001','Ethan', NULL)
+    WHERE student_id = 'c1a99999-0000-0000-0000-000000000001'),
+  'name_only_phone_differs',
+  '⚠ a name match with a DIFFERENT phone is still offered, but marked');
 
 -- 7. A child who already has a parent is never offered.
 SELECT is(

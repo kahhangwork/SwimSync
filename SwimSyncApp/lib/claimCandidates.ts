@@ -17,7 +17,13 @@ import { formatSgDate } from "./lessonDates";
 export type ClaimCandidate = {
   student_id: string;
   masked_name: string;
-  match_reason: "email" | "phone" | "name_dob" | "name_only" | string;
+  match_reason:
+    | "email"
+    | "phone"
+    | "name_dob"
+    | "name_only"
+    | "name_only_phone_differs"
+    | string;
   last_lesson: string | null;
   class_title: string | null;
 };
@@ -54,7 +60,12 @@ export function matchReasonLabel(reason: string): string {
       return "This matches the contact number your coach has on file.";
     case "name_dob":
       return "The name and date of birth both match.";
+    // ⚠ DELIBERATELY THE SAME COPY AS name_only. The parent must NOT be told
+    // that the number held for this child differs from theirs — that discloses
+    // something about another family's record to someone who has not been
+    // approved for it. The discrepancy goes to the ADMIN, who is deciding.
     case "name_only":
+    case "name_only_phone_differs":
       return "The name is similar.";
     default:
       return "This may be the same child.";

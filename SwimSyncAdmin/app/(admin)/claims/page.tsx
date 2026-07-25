@@ -58,6 +58,8 @@ function reasonLabel(reason: string): string {
       return "Name and date of birth both match";
     case "name_only":
       return "Name is similar — no date of birth to check against";
+    case "name_only_phone_differs":
+      return "⚠ Name is similar, but the contact number on this child is DIFFERENT from the parent's. Could be the child's other parent — check before approving.";
     default:
       return reason;
   }
