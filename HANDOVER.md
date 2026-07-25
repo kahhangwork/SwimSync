@@ -2,8 +2,7 @@
 
 _Last updated: 2026-07-25 (tenth session — a child can exist before their parent does:
 the coach adds a trial walk-in, the admin invites the parent, and the parent adopts the
-existing record. **Built and verified locally; NOT deployed and NOT merged** — branch
-`feat/trial-onboarding`)_
+existing record. Built AND deployed the same day; **dormant until the first walk-in**)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -141,7 +140,8 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   the new owner from email to signed-in. The overview shows each business's admin as
   `no admin` / `invited` / `active`. **Dormant in production** — nothing provisioned yet.
   PRD §4.4, `TENANT_PROVISIONING_PLAN.md`, §8.9.
-- **A child before their parent (verified local: pgTAP + Deno + UI driver — NOT DEPLOYED)** —
+- **A child before their parent (verified local: pgTAP + Deno + UI driver — LIVE in
+  production 2026-07-25, dormant until the first walk-in)** —
   a coach adds a trial walk-in or an unregistered student from the attendance screen and
   marks them in one action; the admin invites the parent, who **adopts the existing record**
   (nothing is transferred — same `student_id` throughout). A billable lesson with nobody to
@@ -167,12 +167,12 @@ superadmin + the real coach/classes). See §11.
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **As of 2026-07-21 production is fully caught up**: every migration through
-> `20260721000300` is applied (`supabase migration list` shows nothing pending),
-> `generate-invoices` is at **v14** (package drawdown, on top of the completed-month
-> guard and effective-dated pricing), and a SECOND function exists: **`package-emails`
-> v1** (verify_jwt ON — deployed separately, and a deploy of generate-invoices does NOT
-> touch it). *(The previous version of this line went stale for two sessions —
+> **As of 2026-07-25 production is fully caught up**: every migration through
+> `20260725000300` is applied (`supabase migration list --linked` shows nothing pending),
+> `generate-invoices` is at **v15** (the unclaimed-attendance seal condition, on top of
+> package drawdown, the completed-month guard and effective-dated pricing), and a SECOND
+> function exists: **`package-emails` v1** (verify_jwt ON — deployed separately, and a
+> deploy of generate-invoices does NOT touch it). *(The previous version of this line went stale for two sessions —
 > `supabase functions list` and `supabase migration list` are the honest answers; treat
 > this sentence as a hint, not a fact.)*
 > Backups were taken before each production migration (scratchpad, not committed).
@@ -1071,11 +1071,31 @@ See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
 
-## 8.10 Tenth session (2026-07-25) — A CHILD CAN EXIST BEFORE THEIR PARENT — BUILT, **NOT DEPLOYED**
+## 8.10 Tenth session (2026-07-25) — A CHILD CAN EXIST BEFORE THEIR PARENT — BUILT **AND DEPLOYED**
 
-Branch **`feat/trial-onboarding`**, seven commits, **not yet merged and not deployed**.
-Planned with `/plan-with-confidence` + `/plan-review`; the plan, its ranked risks and what
-each mitigation actually caught are in **`TRIAL_ONBOARDING_PLAN.md`**.
+Branch **`feat/trial-onboarding`**, eight commits, merged to `main` and **deployed the
+same day**. Planned with `/plan-with-confidence` + `/plan-review`; the plan, its ranked
+risks and what each mitigation actually caught are in **`TRIAL_ONBOARDING_PLAN.md`**.
+
+**Deploy record (2026-07-25, EXPAND order — config → migrate → function → push):** the
+two **silent-failure** config items went FIRST, deliberately — `NEXT_PUBLIC_APP_URL` on
+Vercel (a `NEXT_PUBLIC_*` var is **inlined at build time**, so setting it after the merge
+would have baked `localhost:8081` into the build) and the production redirect allow-list
+(§7.41). Then: backups (schema + data, outside the repo) → `db push --dry-run` confirmed
+exactly the three expected → pushed → `migration list --linked` clean → remote schema
+re-verified → **`generate-invoices` v14 → v15**, `package-emails` untouched at v1 →
+merge + push → both Vercel projects confirmed (admin `/api/invite-parent` 401s rather
+than 404s; the app bundle greps for the new UI strings — the app finished after the
+admin, §7.23) → CI green.
+
+**§7.39 was verified on production this time, and held.** Both new functions return
+`42501 permission denied for function` when called as `anon` against the live REST API —
+the explicit `REVOKE … FROM anon, service_role` in the migrations did on cloud what
+`REVOKE FROM PUBLIC` failed to do last session. Worth keeping the method: probing the
+RPC **through PostgREST with the real signature** is a better check than reading
+`pg_proc`, because it tests the reachable surface. (A wrong signature returns `PGRST202`
+"not found in the schema cache", which looks like a permission failure and is not —
+that false negative cost a round trip.)
 
 **The gap:** onboarding was the bottleneck (§9 — still zero attendance in production). A
 trial walk-in or a student whose parent hadn't registered simply did not exist, so the
@@ -2649,29 +2669,25 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### FIRST: this branch is not merged and not deployed
+### Outstanding from 2026-07-25 — ONE unverified path
 
-**`feat/trial-onboarding` is built and verified locally, and that is all** (§8.10). Seven
-commits, all suites green, 13/13 through both real UIs — but nothing is on `main`, no
-migration is on production, and `generate-invoices` is still at its previous version.
+Trial onboarding is **deployed and smoked** (§8.10's deploy record), and like packages and
+provisioning it is **dormant until used**: production has no unclaimed students, so every
+family still bills exactly as before.
 
-Before merging, walk the **pre-commit gate at the bottom of `TRIAL_ONBOARDING_PLAN.md`**;
-most boxes are ticked in the commits, but three need doing at deploy time:
+One thing was **not** verified end to end, because it needs a real mailbox:
 
-1. **The deploy is EXPAND — migrate first, push last.** Three migrations
-   (`20260725000100`/`000200`/`000300`), all additive, plus a `generate-invoices` deploy.
-   The app must not go out before the engine that reports `unclaimed_billable`, or the
-   invoice page will read an absent field and fall through to its fail-safe.
-2. **§7.39 — re-verify the new functions' grants against the REMOTE `pg_proc`,** not the
-   local one. `add_unclaimed_student` and `link_invited_parent` both `REVOKE … FROM anon,
-   service_role` explicitly, and locally read `{postgres, authenticated}` — but that check
-   passes vacuously on a local stack.
-3. **§7.41 — add the parent app's accept URL to the PRODUCTION Supabase dashboard**
-   (`https://swimsync.sg/accept-invite`) and set **`NEXT_PUBLIC_APP_URL=https://swimsync.sg`**
-   on the admin's Vercel project. `config.toml` covers local only. If either is missed the
-   invite still arrives and still works — it just lands on the wrong site, silently.
-   Then **read a generated link** and confirm `redirect_to`; that assertion is the only
-   reason this was caught locally.
+**The parent invite link's landing page.** `https://swimsync.sg/accept-invite` was added
+to the production allow-list and `NEXT_PUBLIC_APP_URL` was set before the build, but no
+invite has actually been sent on production. If either is wrong the invite **still
+arrives and the link still works** — it just lands on the wrong site (§7.41), which is
+precisely why this cannot be inferred from "the flow worked".
+
+**A five-minute check, and only the user can run it:** Admin → Students → any student →
+*Invite parent* → a throwaway address. Confirm the email arrives and that the link's
+`redirect_to` is `https://swimsync.sg/accept-invite`. **Read the URL**, don't just follow
+it. (This also exercises `RESEND_API_KEY` on the admin's Vercel project for the second
+time — the first was tenant provisioning, still itself unused.)
 
 ### Outstanding from 2026-07-21 — two things, both first-use
 

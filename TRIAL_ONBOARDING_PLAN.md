@@ -4,13 +4,15 @@ _Written 2026-07-25. A coach or admin can put a child on the roster before that 
 parent has a SwimSync account; the parent is later invited by link and adopts the
 existing record. Money taken outside SwimSync is recorded rather than lost._
 
-> **STATUS: BUILT AND VERIFIED LOCALLY — NOT MERGED, NOT DEPLOYED.** All seven phases
-> complete on `feat/trial-onboarding`. pgTAP **297** (19 files, +32), Deno **99** (+8, run
-> twice), admin vitest **100** (+12), app jest **75** (+6), both apps typecheck, and
-> `verify-trial-onboarding.mjs` **13/13** against both running UIs. The loop was confirmed
-> end to end: settle → re-run → `unclaimed_billable: 0, sealed: true`.
-> **The Deploy section below has NOT been executed.** Slice 2 (self-serve claiming,
-> duplicate merge) remains out of scope — its design is recorded in `BACKLOG.md`.
+> **STATUS: BUILT, DEPLOYED AND SMOKED (2026-07-25).** All seven phases complete, merged
+> to `main`, live in production and **dormant until the first walk-in**. pgTAP **297**
+> (19 files, +32), Deno **99** (+8, run twice), admin vitest **100** (+12), app jest **75**
+> (+6), both apps typecheck, and `verify-trial-onboarding.mjs` **13/13** against both
+> running UIs. The loop was confirmed end to end: settle → re-run →
+> `unclaimed_billable: 0, sealed: true`. The deploy record is in `HANDOVER.md` §8.10; the
+> one path still unverified on production (an invite's landing page, which needs a real
+> mailbox) is in §9. Slice 2 (self-serve claiming, duplicate merge) remains out of
+> scope — its design is recorded in `BACKLOG.md`.
 >
 > **What the mitigations actually caught** — the value was front-loaded and unevenly
 > distributed, which is worth knowing next time:
