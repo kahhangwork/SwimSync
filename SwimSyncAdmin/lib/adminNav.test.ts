@@ -22,9 +22,9 @@ describe("hasTenant", () => {
 });
 
 describe("navFor", () => {
-  it("gives a business admin the twelve business pages and NOT Platform", () => {
+  it("gives a business admin the thirteen business pages and NOT Platform", () => {
     const hrefs = navFor(A_TENANT).map((n) => n.href);
-    expect(hrefs).toHaveLength(12); // 11 + Packages (2026-07-20)
+    expect(hrefs).toHaveLength(13); // 11 + Packages (2026-07-20) + Trials (2026-07-25)
     expect(hrefs).toContain("/dashboard");
     expect(hrefs).toContain("/wages");
     expect(hrefs).toContain("/packages");
@@ -99,5 +99,17 @@ describe("scopeForPath", () => {
   it("does not let a prefix collision steal another route", () => {
     // "/platformish" must not match "/platform".
     expect(scopeForPath("/platformish")).toBe("tenant");
+  });
+});
+
+describe("Trials", () => {
+  // Booking a trial is a one-business action, and a platform admin belongs to
+  // no business — the page would have nothing to be about (PRD §4.4).
+  it("is offered to a business admin", () => {
+    expect(navFor(A_TENANT).map((i) => i.href)).toContain("/trials");
+  });
+
+  it("is NOT offered to the platform admin", () => {
+    expect(navFor(null).map((i) => i.href)).not.toContain("/trials");
   });
 });
