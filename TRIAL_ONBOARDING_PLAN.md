@@ -4,9 +4,32 @@ _Written 2026-07-25. A coach or admin can put a child on the roster before that 
 parent has a SwimSync account; the parent is later invited by link and adopts the
 existing record. Money taken outside SwimSync is recorded rather than lost._
 
-> **STATUS: IN BUILD.** Requirements settled with the user (`/plan-with-confidence`, ~97%),
-> hardened with `/plan-review` — **mitigations are inlined under the steps they govern**,
-> marked `⚠ RISK n`. Slice 2 (self-serve claiming, duplicate merge) is out of scope.
+> **STATUS: BUILT AND VERIFIED LOCALLY — NOT MERGED, NOT DEPLOYED.** All seven phases
+> complete on `feat/trial-onboarding`. pgTAP **297** (19 files, +32), Deno **99** (+8, run
+> twice), admin vitest **100** (+12), app jest **75** (+6), both apps typecheck, and
+> `verify-trial-onboarding.mjs` **13/13** against both running UIs. The loop was confirmed
+> end to end: settle → re-run → `unclaimed_billable: 0, sealed: true`.
+> **The Deploy section below has NOT been executed.** Slice 2 (self-serve claiming,
+> duplicate merge) remains out of scope — its design is recorded in `BACKLOG.md`.
+>
+> **What the mitigations actually caught** — the value was front-loaded and unevenly
+> distributed, which is worth knowing next time:
+> - **RISK 10 fired in phase 0, before any code**, exactly as written. The link came back
+>   pointing at the admin root. "Read the actual link" was the whole mitigation and it was
+>   the only thing that would have caught it.
+> - **RISK 3 was confirmed real, not theoretical**, by the same spike — `current_user` is
+>   `postgres` inside SECURITY DEFINER, so the tenant pin does not fire. Now §7.42.
+> - **RISK 2's structural form worked.** Writing the engine tests first and proving them
+>   red meant the create path could not land ahead of the block.
+> - **RISK 1's tripwire stayed green throughout** — 145 insertions, 0 deletions in
+>   `core.ts`, and claimed families bill byte-identically.
+> - **The UI driver found two bugs the unit tests structurally could not**, both in wiring:
+>   the refusal rendering through the fail-safe branch, and the settle buttons passing a
+>   null amount into a CHECK that correctly refused it. Neither was a logic error; both
+>   were invisible below the integration level.
+> - **§7.44 was discovered the hard way** and cost the most time of anything here: after
+>   `supabase db reset`, Kong holds a dead auth upstream and the entire Deno suite fails
+>   with an empty error object. Now a gotcha.
 
 ## Phase 0 spike results (2026-07-25) — both PASS, and one risk fired immediately
 

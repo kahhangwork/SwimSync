@@ -159,6 +159,38 @@ success panel shows a warning with the **one-time invite link**; open it to land
 `verify-tenant-provisioning.mjs` drives this whole loop, including the new admin signing
 in and their status flipping `invited` → `active`.
 
+### A child before their parent — trials and walk-ins (PRD §7.17)
+
+1. Coach app → **Classes** → a class → **Mark Attendance** → **Add a walk-in / trial** →
+   a name, optionally the parent's phone, Free or Paid trial → **Add & mark**.
+   Their enrolment is opened *and closed* on that date, so they never appear as expected
+   at a later lesson — but they stay on **this** lesson's roster, labelled *Not enrolled*.
+2. Admin → **Students** → they show as **No parent account**, with a filter chip counting
+   them.
+3. Admin → **Invoices** → **Generate Invoices** for a completed month. If a walk-in has a
+   **paid** trial in that month, generation creates everyone else's invoices but
+   **refuses to close the month**, names the child, and offers *Paid outside SwimSync*
+   (an amount is required) or *Write off* inline.
+4. Either settle, or Admin → **Students** → **Invite parent**. The invite lands on the
+   **mobile app's** `/accept-invite` — locally there is no `RESEND_API_KEY`, so the link
+   is shown on screen instead of emailed, which is expected.
+5. Generate again → the month closes.
+
+> **Reset the DB and the auth calls start failing?** `supabase db reset` recreates the
+> auth container but not Kong, which keeps the dead upstream — every `/auth/v1` call
+> 502s and the whole Deno suite dies with `createUser(coach) failed: {}`. Run
+> `docker restart supabase_kong_SwimSync`. See HANDOVER §7.44.
+
+There's a driver for the whole loop:
+`.claude/skills/run-ui-playwright/drivers/verify-trial-onboarding.mjs`
+(+ `fixtures-trial-onboarding.sql`, which builds a billable previous month — the UI half
+necessarily marks *today*, which generation correctly refuses to bill).
+
+**Known gap (slice 1):** a parent who self-registers before being invited creates a
+duplicate child. There is no in-app merge yet — see `BACKLOG.md` → *Parents claiming their
+own child*. Fix in SQL: repoint `parent_students` at the coach-created row (the one with
+the attendance) and delete the empty duplicate.
+
 ### Prepaid packages flow (PRD §7.16)
 Packages are **dormant until a product exists** — with no category or product, every
 family bills ad hoc exactly as before. To switch them on locally:

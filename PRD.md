@@ -9,7 +9,7 @@
 | **Version** | 1.0 |
 | **Date** | March 2026 |
 
-> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). The **entire MVP core loop works and is verified end to end across the UI + backend**: parent self-registration, joining a business by code, child creation, admin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), the **credit-note correction flow** (auto-issue on attendance edit + FIFO application incl. partial carry-forward — see §5.6), and **PayNow QR** (coach upload → parent display → admin view). A partial-application ledger bug found during credit-note verification was fixed via a `credit_applications` allocation table (see §9.17). An **automated test suite** now covers the billing/credit engine (Deno) and DB triggers/RLS/constraints (pgTAP). **Password reset** is implemented on the mobile app (self-service recovery flow via `resetPasswordForEmail` → in-app reset screen → `updateUser`, working across Expo web and native deep links), and login/register errors are mapped to friendly copy — see §7.1. The code lives on GitHub (public, `kahhangwork/SwimSync`). **Now live in production on its own domain (web-first, free tier):** the mobile app at **https://swimsync.sg** and the admin at **https://admin.swimsync.sg** (Vercel), backend on Supabase, real transactional email via **Resend** (`noreply@swimsync.sg`, e.g. password-reset). A real coach + 4 classes are onboarded on a clean-slate production DB. Automated tests (pgTAP + Deno + frontend vitest/jest-expo suites — counts live in HANDOVER §5, whose own rule applies: the test runner is the fact, prose is the hint) run in CI on every push. Swimming ability is no longer a parent-entered field (see §5.1). Invoice generation is **manual** — cron is built and per-tenant but **not yet enabled**, a decision now open rather than blocked (both original blockers — the UTC-derived billing month and the fixed run day — are fixed); see `INVOICE_RUNBOOK.md` and `HANDOVER.md` §9. **SwimSync is now MULTI-TENANT** *(July 2026)*: a **tenant is a business**, a **private coach is a tenant of one**, and the old global `superadmin` has split into a **tenant admin** (one business) and a **platform admin** (cross-tenant support) — see §4.3; the platform admin now has **their own panel** and the single-business pages are closed to them (§4.4). Parents join a business with a **join code** (§5.1); there is no public directory. Invoices, credit, month-sealing, the completeness block and the billing schedule are all **per business**, credit **never crosses** businesses (§5.6), invoice emails and the PayNow payee are **the business's** (§7.10), and **coach wages** are computed from attendance with effective-dated rates (§7.13). **A lesson is priced and attributed by its OWN date** *(2026-07-19)*: a class's price and its paid coach are effective-dated, so editing a price no longer reprices the previous month and handing a class to another coach no longer moves the outgoing coach's pay — and a payout correction is carried once rather than every month thereafter (§7.3, §7.7, §7.13). Cross-tenant isolation is enforced in RLS *and*, because the billing engine bypasses RLS, in engine code. **Each parent gets one invoice per business covering every class their children attend there**, a billing month must have **ENDED before it can be billed** *(2026-07-19 — live; billing a month still in progress used to seal it and strand its remaining lessons permanently, §7.7)*, generation is **blocked until all of the month's attendance is marked** (no override — a lesson that didn't run is marked *cancelled*), a finished month is **sealed** so it is never reprocessed (but a month with **nothing recorded** is never sealed — that vacuous seal locked a month out of billing entirely until it was fixed 2026-07-18), and the automatic path waits until a **configurable day of the month** (default the 7th) — see §7.7. Removing a child from a class, or marking them inactive, is available to the **business's admin and their coach** (§7.4). **Families and children carry an active/inactive state per business** *(2026-07-19)*, with the date they left; deactivating the last child marks the family inactive too, and a departed family returns by re-entering the join code (§7.14). Generation also **emails the parent** a branded, itemized invoice on creation (best-effort, isolated from billing; live in production since 2026-07-16 — see §7.7). **Lesson sessions are created lazily, not pre-generated, and the lessons that *should* have happened are derived from each class's weekday at read time** — surfacing unmarked lessons to the coach and reporting attendance gaps to the admin before invoices are generated (see §7.5 and §7.7), which closes a hole where a forgotten lesson was silently unbillable and invisible to everyone. The only remaining gate to real billing is **real usage**: no attendance has yet been marked in production, so the engine has never processed a real lesson. Parents self-register at `swimsync.sg`, enter their coach's join code, add children, and the business's admin assigns classes. Native App/Play Store builds are deferred. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. **Child identity, levels and family address** *(2026-07-19 — live)*: a child is identified by **name + date of birth** rather than name alone, with age **derived** from that date rather than stored (§5.1); each business defines **its own swimming-level ladder** (§7.15); families have an **address and postal code** (§5.1); and a **parent can edit their child's profile** — which the spec had claimed since the original draft while nothing implemented it (§7.4). Making that editable surfaced two pre-existing defects that had been unreachable only because nothing in the app could write to a student: a parent could **move their own child into another business**, defeating the join code, and **renaming a child rewrote invoices already sent** and credit notes §7.8 calls immutable. Both are fixed; invoices and credit notes now record the name they were issued with (§7.7). **Prepaid lesson packages** *(2026-07-20)*: a business can sell N lessons at a locked rate, valid M months, scoped to its own class categories — a prepaid dollar balance drawn down by the same invoice engine at the package's rate, displayed everywhere as an always-exact lesson counter that is live to the day (§7.16). Ad-hoc after-the-fact billing is unchanged and remains the default; §3.2's "package-based pricing" exclusion is hereby retired. **A business can now be created from inside SwimSync** *(2026-07-21 — live)*: the platform admin provisions a business and emails its first admin a link to set their password (§4.4). Until this shipped every tenant had been inserted by hand — seed file, backfill migration, or dashboard SQL — and there was no way to create a tenant admin at all; onboarding a second business meant a database console. There is deliberately **no public signup**. See `HANDOVER.md` for the current working state and next steps.
+> **Build status (July 2026):** Backend rebuilt as reproducible Supabase CLI migrations with full RLS; runs on a local Supabase stack (Docker). The **entire MVP core loop works and is verified end to end across the UI + backend**: parent self-registration, joining a business by code, child creation, admin assignment, coach attendance marking, invoice generation (automatic *and* manual on-demand, with an on/off switch), the **credit-note correction flow** (auto-issue on attendance edit + FIFO application incl. partial carry-forward — see §5.6), and **PayNow QR** (coach upload → parent display → admin view). A partial-application ledger bug found during credit-note verification was fixed via a `credit_applications` allocation table (see §9.17). An **automated test suite** now covers the billing/credit engine (Deno) and DB triggers/RLS/constraints (pgTAP). **Password reset** is implemented on the mobile app (self-service recovery flow via `resetPasswordForEmail` → in-app reset screen → `updateUser`, working across Expo web and native deep links), and login/register errors are mapped to friendly copy — see §7.1. The code lives on GitHub (public, `kahhangwork/SwimSync`). **Now live in production on its own domain (web-first, free tier):** the mobile app at **https://swimsync.sg** and the admin at **https://admin.swimsync.sg** (Vercel), backend on Supabase, real transactional email via **Resend** (`noreply@swimsync.sg`, e.g. password-reset). A real coach + 4 classes are onboarded on a clean-slate production DB. Automated tests (pgTAP + Deno + frontend vitest/jest-expo suites — counts live in HANDOVER §5, whose own rule applies: the test runner is the fact, prose is the hint) run in CI on every push. Swimming ability is no longer a parent-entered field (see §5.1). Invoice generation is **manual** — cron is built and per-tenant but **not yet enabled**, a decision now open rather than blocked (both original blockers — the UTC-derived billing month and the fixed run day — are fixed); see `INVOICE_RUNBOOK.md` and `HANDOVER.md` §9. **SwimSync is now MULTI-TENANT** *(July 2026)*: a **tenant is a business**, a **private coach is a tenant of one**, and the old global `superadmin` has split into a **tenant admin** (one business) and a **platform admin** (cross-tenant support) — see §4.3; the platform admin now has **their own panel** and the single-business pages are closed to them (§4.4). Parents join a business with a **join code** (§5.1); there is no public directory. Invoices, credit, month-sealing, the completeness block and the billing schedule are all **per business**, credit **never crosses** businesses (§5.6), invoice emails and the PayNow payee are **the business's** (§7.10), and **coach wages** are computed from attendance with effective-dated rates (§7.13). **A lesson is priced and attributed by its OWN date** *(2026-07-19)*: a class's price and its paid coach are effective-dated, so editing a price no longer reprices the previous month and handing a class to another coach no longer moves the outgoing coach's pay — and a payout correction is carried once rather than every month thereafter (§7.3, §7.7, §7.13). Cross-tenant isolation is enforced in RLS *and*, because the billing engine bypasses RLS, in engine code. **Each parent gets one invoice per business covering every class their children attend there**, a billing month must have **ENDED before it can be billed** *(2026-07-19 — live; billing a month still in progress used to seal it and strand its remaining lessons permanently, §7.7)*, generation is **blocked until all of the month's attendance is marked** (no override — a lesson that didn't run is marked *cancelled*), a finished month is **sealed** so it is never reprocessed (but a month with **nothing recorded** is never sealed — that vacuous seal locked a month out of billing entirely until it was fixed 2026-07-18), and the automatic path waits until a **configurable day of the month** (default the 7th) — see §7.7. Removing a child from a class, or marking them inactive, is available to the **business's admin and their coach** (§7.4). **Families and children carry an active/inactive state per business** *(2026-07-19)*, with the date they left; deactivating the last child marks the family inactive too, and a departed family returns by re-entering the join code (§7.14). Generation also **emails the parent** a branded, itemized invoice on creation (best-effort, isolated from billing; live in production since 2026-07-16 — see §7.7). **Lesson sessions are created lazily, not pre-generated, and the lessons that *should* have happened are derived from each class's weekday at read time** — surfacing unmarked lessons to the coach and reporting attendance gaps to the admin before invoices are generated (see §7.5 and §7.7), which closes a hole where a forgotten lesson was silently unbillable and invisible to everyone. The only remaining gate to real billing is **real usage**: no attendance has yet been marked in production, so the engine has never processed a real lesson. Parents self-register at `swimsync.sg`, enter their coach's join code, add children, and the business's admin assigns classes. Native App/Play Store builds are deferred. Sections marked *(implemented)* reflect build decisions that extend or refine the original spec. **Child identity, levels and family address** *(2026-07-19 — live)*: a child is identified by **name + date of birth** rather than name alone, with age **derived** from that date rather than stored (§5.1); each business defines **its own swimming-level ladder** (§7.15); families have an **address and postal code** (§5.1); and a **parent can edit their child's profile** — which the spec had claimed since the original draft while nothing implemented it (§7.4). Making that editable surfaced two pre-existing defects that had been unreachable only because nothing in the app could write to a student: a parent could **move their own child into another business**, defeating the join code, and **renaming a child rewrote invoices already sent** and credit notes §7.8 calls immutable. Both are fixed; invoices and credit notes now record the name they were issued with (§7.7). **Prepaid lesson packages** *(2026-07-20)*: a business can sell N lessons at a locked rate, valid M months, scoped to its own class categories — a prepaid dollar balance drawn down by the same invoice engine at the package's rate, displayed everywhere as an always-exact lesson counter that is live to the day (§7.16). Ad-hoc after-the-fact billing is unchanged and remains the default; §3.2's "package-based pricing" exclusion is hereby retired. **A business can now be created from inside SwimSync** *(2026-07-21 — live)*: the platform admin provisions a business and emails its first admin a link to set their password (§4.4). Until this shipped every tenant had been inserted by hand — seed file, backfill migration, or dashboard SQL — and there was no way to create a tenant admin at all; onboarding a second business meant a database console. There is deliberately **no public signup**. **A child can now exist before their parent does** *(2026-07-25)*: a coach adds a trial walk-in or an unregistered student from the attendance screen and marks them in the same action, the admin later invites the parent by email, and the parent **adopts the existing record** rather than anything being transferred — so the attendance marked before they had an account is simply theirs. A billable lesson with nobody to bill **holds the billing month open** rather than being silently dropped and sealed over, released either by inviting the parent or by recording the money as settled outside SwimSync (§7.17). See `HANDOVER.md` for the current working state and next steps.
 
 ---
 
@@ -152,7 +152,7 @@ SwimSync supports four user types *(implemented — the original three, with `su
 |---------|---------|
 | Makeup lessons | Package-based pricing |
 | Parent self-enrolment into classes | Multiple classes per child |
-| Multiple coaches per class | Coach-created student profiles |
+| Multiple coaches per class | ~~Coach-created student profiles~~ *(shipped 2026-07-25, §7.17)* |
 | Auto-detection of PayNow payment | In-app payment gateway integration |
 | Export to Excel or CSV | Maps integration |
 | Multi-language support | Push notifications |
@@ -160,7 +160,7 @@ SwimSync supports four user types *(implemented — the original three, with `su
 
 > *(This table is the historical record of the MVP scope decision — items leave it by
 > shipping, not by deletion. Shipped since: **package-based pricing**, as prepaid lesson
-> packages, 2026-07-20 — see §7.16.)*
+> packages, 2026-07-20 (§7.16); **coach-created student profiles**, 2026-07-25 (§7.17).)*
 
 ---
 
@@ -200,7 +200,10 @@ A coach uses SwimSync to manage attendance and payment tracking for students ass
 
 #### Coach Restrictions
 
-- Cannot create student profiles in MVP
+- ~~Cannot create student profiles in MVP~~ *(implemented 2026-07-25 — a coach **can**
+  now add a child who is not yet in SwimSync: a trial walk-in, or a student whose parent
+  has not registered. Only into their **own** class, and the child stays unclaimed until
+  a parent account is linked. See §7.17)*
 - Cannot assign children to classes in MVP
 - Cannot view children not assigned to their own classes
 - *(implemented)* Cannot see a **colleague's** classes either. Cross-class visibility
@@ -1249,6 +1252,79 @@ cash paid always equals value granted — nothing to reconcile.
 the money settles offline, see `BACKLOG.md`; arbitrary-amount top-ups — buying another
 package is the top-up; and parent-facing low-balance notifications — the admin-facing
 filter shipped first, the parent nudge is backlogged behind cron.)*
+
+### 7.17 A Child Before Their Parent *(implemented 2026-07-25)*
+
+Two everyday situations had no answer in SwimSync, and both stalled onboarding:
+
+- **A trial walk-in.** A parent brings a child to the pool to try a lesson. That child
+  does not exist in SwimSync, so the coach cannot mark them.
+- **A student whose parent hasn't registered.** The child has been attending for weeks;
+  the parent has not got round to signing up. Same problem, every lesson.
+
+In both cases the lesson was **invisible**: unbillable, absent from the coach's payout,
+and not counted by the attendance check. The only remedy was to chase the parent before
+teaching anyone.
+
+**A child can now exist before their parent does.** The coach adds them from the
+attendance screen — a name, optionally the parent's phone — and marks them in the same
+action, because at the poolside adding and marking are one thing. The business's admin
+can do the same. Nobody else can: a parent cannot put a child on someone's roster, and
+neither can a coach from another business.
+
+**A trial is not an enrolment.** A walk-in is recorded as attending *that lesson*, not as
+joining the class — otherwise they would be expected every week forever, and the
+attendance check would report a missing child at every future lesson. They still appear on
+that lesson's roster afterwards, so the coach can correct what they entered.
+
+#### Claiming: the parent adopts the record, nothing is transferred
+
+When the parent finally has an account, the child they already have **is** their child —
+the attendance, the class history and any invoicing all stay attached to the same record.
+Nothing is copied or migrated, which is what makes this safe.
+
+The admin invites them by email from the Students page. The parent sets a password and
+finds their child already there, with everything the coach has recorded. If the parent
+already has a SwimSync account (a second child at the same school, say) the child is
+simply added to it.
+
+*(Deliberately not built in this release: parents finding their own child by registering
+independently. That needs matching one family's details against another's, and a way to
+prove the child is theirs — see `BACKLOG.md`. Until then a parent who registers on their
+own may create a duplicate, which the admin resolves.)*
+
+#### A lesson nobody can be billed for holds the month open
+
+A billable lesson attended by a child with no parent account **cannot be invoiced** —
+there is nobody to invoice. SwimSync therefore refuses to **close** that billing month
+(§7.7), names the children responsible, and offers the remedy on the same screen.
+
+Without this the month would close over those lessons and they could never be billed at
+all — not even after the parent registered, because a closed month is never reopened. It
+is the same silent, permanent underbill that §7.7 records twice before.
+
+The month is released in one of two ways:
+
+| | What it means |
+|---|---|
+| **Invite the parent** | The preferred one. The lessons then bill normally and nothing is lost. |
+| **Record it as settled** | The money was taken outside SwimSync (a PayNow transfer straight to the business), or is not being collected. |
+
+A settlement records **how much** and **up to which date**, so a lesson taught afterwards
+still has to be decided on its own merits rather than being covered by an earlier
+decision. It can be reversed, because a family who reappears two months after being
+written off must be recoverable. Recording one is the **admin's** decision, not the
+coach's — though a coach marking a lesson as a *paid* trial is what tells the admin there
+is money to account for.
+
+*(That money is recorded, but does not yet appear in any revenue total — SwimSync has no
+revenue reporting at all today. See `BACKLOG.md`.)*
+
+#### A trial that doesn't convert
+
+The child is marked **inactive** (§7.14), exactly like any student who leaves. They are
+**not deleted**: the coach was paid for teaching that lesson (§7.13), and deleting the
+attendance would destroy the basis for a payout that may already have been made.
 
 ---
 

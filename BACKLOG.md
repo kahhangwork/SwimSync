@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-21 (tenant provisioning session)_
+_Last updated: 2026-07-25 (trial onboarding session)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -108,7 +108,10 @@ package notifications, in-app refunds.
   never became an authorization concept, so no rule branches on it and wages needed no
   private-vs-school check at all. The "built twice" risk this entry warned about was
   real, and was avoided by reframing rather than by building carefully.
-  **Coach-created student profiles** (M) still sits behind this and is now unblocked.
+  **Coach-created student profiles** sat behind this and **shipped 2026-07-25** as part
+  of trial onboarding (PRD §7.17) — a coach adds a walk-in or an unregistered student
+  into their own class. What remains of the idea is *Parents claiming their own child*
+  below.
 - **The platform chain.** Native store builds (M) → Push notifications (M) — push can't
   work on the current static web app, so it can't precede native builds.
 - **The reminder chain.** Invoice emails **shipped** (HANDOVER §8c); the rest sequences after
@@ -179,19 +182,43 @@ out of a text blob. What makes it an M rather than an S:
 - Watch the read cost: a roster of six children each with six skills is 36 rows, so fetch
   it per class rather than per student.
 
-### Coach-created student profiles — **M** `[MVP-excluded]`
-Let a coach create a student directly, instead of only parents creating them.
+### Parents claiming their own child — **M**
+Let a parent who registers independently find the child their coach already added,
+instead of creating a duplicate.
 
-**Why:** students are parent-created only, so a coach who signs up a family poolside
-can't enter them — the parent must go home, self-register, and add the child before the
-coach can mark a single lesson. That's the friction being felt right now during the
-first real onboarding push. It also blocks the trial-lesson case: a walk-in trial can't
-be marked at all until the parent has an account.
+**Why:** slice 1 of trial onboarding (PRD §7.17) ships the **invite** path — the admin
+emails the parent and the child is attached with no ambiguity. But a parent can always
+register on their own first, and today that produces a second student record with none
+of the attendance. The admin has no in-app way to merge them; the remedy is SQL.
 
-**Notes:** needs care with the parent-link model (`parent_students`) and RLS — a
-coach-created student has no parent account to link to yet, so it needs either a
-placeholder parent or a claim flow where a parent later takes ownership. The claim flow
-is the better shape but the bigger build.
+**Notes — the design is settled, only the build remains:**
+
+- **Don't reach for fuzzy name matching.** The candidate pool is tiny: the parent must
+  already hold the business's join code, so matching happens within ONE business, against
+  only its *unclaimed* students — realistically a handful. The system should rank a very
+  short list, the parent picks, and the admin confirms. It never decides.
+- **Phone first.** `students.provisional_contact_phone` is captured at the poolside for
+  exactly this, and `profiles.phone` is already collected at registration. That pair is a
+  far stronger signal than any name logic. Name-token overlap is the fallback.
+- **Disclosure is the risk.** Showing a parent a list of unclaimed children shows one
+  customer other customers' kids. Surface a candidate only when a signal already points
+  at it, and mask it ("E— T—, trial on Sat 12 Jul") — the real parent recognises their
+  own child and a stranger learns nothing.
+- **The admin confirms every claim** (the user's explicit call). A wrong link exposes a
+  family's attendance and billing history.
+- **Merge is required, not optional**, because name-only matching will miss — nicknames,
+  Chinese vs English names, "Ethan" vs "Ethan Tan Wei Ming". Constrain it to
+  *unclaimed ↔ claimed* and refuse when both rows carry attendance; that case needs a
+  human. The survivor is the row with the HISTORY (repointing attendance is the dangerous
+  operation; repointing a parent link is trivial), and the duplicate's better fields —
+  full name, DOB, gender, notes — are copied onto it first.
+- **Hard-delete the emptied duplicate, don't tombstone it.** `students_identity_uniq` is
+  on `(tenant_id, lower(trim(full_name)), date_of_birth)`, so after the merge a tombstone
+  would collide with the survivor. Write the deleted row into `audit_log` instead. The
+  database already refuses to delete a student carrying history — only `parent_students`
+  cascades; enrolments, attendance, invoice_items and credit_notes are all `NO ACTION` —
+  so a mis-aimed merge cannot destroy anything.
+- Until this ships, slice 1 shows a **detection-only** warning and the fix is SQL.
 
 ### Attendance edit history view — **S** `[Phase 2]`
 Surface the existing audit trail in the UI.

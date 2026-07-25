@@ -1,8 +1,9 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-21 (ninth session — a business can now be created in-app: the
-platform admin provisions a tenant and invites its first admin. Built AND deployed the
-same day; dormant until the first business is provisioned)_
+_Last updated: 2026-07-25 (tenth session — a child can exist before their parent does:
+the coach adds a trial walk-in, the admin invites the parent, and the parent adopts the
+existing record. **Built and verified locally; NOT deployed and NOT merged** — branch
+`feat/trial-onboarding`)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -140,8 +141,15 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   the new owner from email to signed-in. The overview shows each business's admin as
   `no admin` / `invited` / `active`. **Dormant in production** — nothing provisioned yet.
   PRD §4.4, `TENANT_PROVISIONING_PLAN.md`, §8.9.
-- **Automated tests** — backend **265 pgTAP + 91 Deno**, plus frontend suites
-  (`SwimSyncAdmin` vitest 88, `SwimSyncApp` jest-expo 69); all run in CI on push to `main`. See §5.
+- **A child before their parent (verified local: pgTAP + Deno + UI driver — NOT DEPLOYED)** —
+  a coach adds a trial walk-in or an unregistered student from the attendance screen and
+  marks them in one action; the admin invites the parent, who **adopts the existing record**
+  (nothing is transferred — same `student_id` throughout). A billable lesson with nobody to
+  bill **holds the month open** instead of being silently dropped and sealed over, released
+  by inviting the parent or recording a settlement. PRD §7.17,
+  `TRIAL_ONBOARDING_PLAN.md`, §8.10.
+- **Automated tests** — backend **297 pgTAP + 99 Deno**, plus frontend suites
+  (`SwimSyncAdmin` vitest 100, `SwimSyncApp` jest-expo 75); all run in CI on push to `main`. See §5.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
 **https://swimsync.sg**, admin at **https://admin.swimsync.sg**, real email via
@@ -249,16 +257,16 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 265 tests across 18 files
+supabase test db                                  # 297 tests across 19 files
 
 # Backend — Function tests (Deno): billing math, credit + package ledgers, emails
-supabase/functions/generate-invoices/test.sh      # 91 tests; needs deno (brew install deno)
+supabase/functions/generate-invoices/test.sh      # 99 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
-cd SwimSyncAdmin && npm test                       # 88 tests
+cd SwimSyncAdmin && npm test                       # 100 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
-cd SwimSyncApp && npm test                         # 69 tests
+cd SwimSyncApp && npm test                         # 75 tests
 ```
 
 **Full test catalog** (all suites are hermetic — self-seed + roll back / tear down):
@@ -285,8 +293,9 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `lesson_packages.test.sql` (30) | prepaid packages: RLS on all four tables, $0-rate/0-lesson products refused, product money terms immutable, request snapshots come from the PRODUCT (a parent cannot claim a price or an active status), only non-client roles move a balance, `package_live_balances()` draws locked-rate/in-scope/FIFO and leaves the stored balance alone |
 | `tenant_provisioning.test.sql` (21) | creating a business: parent, coach, **tenant admin** and anon all REFUSED (each in an explicit transaction, 7.16) and `tenants` does not grow after any of them; slug derivation incl. a **non-ASCII name** that would otherwise violate NOT NULL; join-code shape + uniqueness; a fresh tenant reports `admin_status = none`. The two ACL assertions are near-vacuous locally by construction (7.39) |
 | `package_corrections.test.sql` (12) | a correction on a package-funded line restores the package (even expired) and mints NO cash credit note; flip-flops refund at most once; ad-hoc lines keep the credit-note path byte-identical |
+| `trial_onboarding.test.sql` (32) | a child before their parent: THREE refusal shapes for `add_unclaimed_student()` (parent, cross-tenant coach, anon) each asserting `students` did not grow, the **tenant derived from the class** (nothing downstream would catch a wrong one — §7.42), `created_by` = the calling coach, a trial enrolment closed on its own date, **session idempotency** (two walk-ins on one date share ONE session — §7.43), the plain-English duplicate name+DOB error, settlement RLS, and `link_invited_parent()` incl. same-parent idempotency vs a different parent refused |
 
-**Total: 265 across 18 files** — verified by `supabase test db` 2026-07-21 (the previous
+**Total: 297 across 19 files** — verified by `supabase test db` 2026-07-25 (the previous
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
@@ -1021,6 +1030,101 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     forgot-password flow was likely landing wrong in production too. Remember it is read only
     at **boot** (§4): `supabase stop && supabase start`. Production keeps its own copy in the
     Supabase dashboard, which no migration touches.
+
+42. **A `SECURITY DEFINER` WRITER IS EXEMPT FROM `pin_student_tenant()` — AND FROM EVERY
+    TRIGGER THAT USES THE `current_user` SEAM.** §6 records that the tenant boundary on
+    `students` is a trigger rather than a policy, and that the seam is `current_user`
+    "so any new SECURITY DEFINER writer inherits the exemption automatically". That
+    sentence reads like a convenience. It is also a **hole**: such a function can write a
+    student into *any* tenant and nothing downstream will stop it.
+    **So every SECURITY DEFINER function that writes a tenanted row must derive
+    `tenant_id` itself — from the class, the student, the invoice — and must NOT accept it
+    as a parameter.** `add_unclaimed_student()` and `link_invited_parent()`
+    (`20260725000200`/`000300`) both do; copy that shape.
+    Confirmed empirically rather than reasoned: inside a `postgres`-owned SECURITY DEFINER
+    function, `auth.uid()` is the **caller** while `current_user` is **`postgres`**. Both
+    halves matter — the first is what lets `created_by = auth.uid()` record the real coach,
+    the second is what disables the pin.
+
+43. **`lesson_sessions` HAS A SECOND WRITER NOW.** §6 said the coach's attendance save was
+    "the only writer in the codebase"; `add_unclaimed_student()` also creates one, because
+    adding a walk-in and marking them is one action at the poolside. §7.7 records that a
+    duplicate `(class_id, session_date)` row **double-billed a whole class**, so any new
+    writer must resolve with
+    `INSERT … ON CONFLICT ON CONSTRAINT lesson_sessions_class_id_session_date_key DO NOTHING`
+    then `SELECT` — never check-then-insert, which races — and must take the date as a
+    **parameter**. Postgres runs UTC on Supabase, so `now()::date` is the previous day
+    before 08:00 SGT. Pinned by an idempotency assertion in `trial_onboarding.test.sql`.
+
+44. **`supabase db reset` LEAVES KONG POINTING AT A DEAD AUTH CONTAINER.** The reset
+    recreates `supabase_auth_*` but not `supabase_kong_*`, which holds the old upstream —
+    so **every** call through `/auth/v1` returns **502** while `docker ps` shows both
+    containers "Up (healthy)". In the Deno suite this surfaces as
+    `createUser(coach) failed: {}` — an **empty error object** — on all 91 tests at once,
+    which reads like a catastrophic code regression and is not one.
+    **Fix: `docker restart supabase_kong_SwimSync` after any `db reset`.** Cost most of an
+    hour before it was diagnosed by curling the auth endpoint directly.
+    A second-order effect worth knowing: because `newScenario()` throws *after* inserting
+    its tenant, every failed run leaks one. 91 tests × a few runs left **177 orphan
+    tenants**, and `SWIM-` + 4 hex is only 65k codes — so the next run started failing on
+    `tenants_join_code_key` duplicates, a completely unrelated-looking symptom.
+
+---
+
+## 8.10 Tenth session (2026-07-25) — A CHILD CAN EXIST BEFORE THEIR PARENT — BUILT, **NOT DEPLOYED**
+
+Branch **`feat/trial-onboarding`**, seven commits, **not yet merged and not deployed**.
+Planned with `/plan-with-confidence` + `/plan-review`; the plan, its ranked risks and what
+each mitigation actually caught are in **`TRIAL_ONBOARDING_PLAN.md`**.
+
+**The gap:** onboarding was the bottleneck (§9 — still zero attendance in production). A
+trial walk-in or a student whose parent hadn't registered simply did not exist, so the
+coach could not mark them and the lesson was invisible to billing, payout and the gate.
+
+**What shipped (slice 1):** `add_unclaimed_student()` (coach or admin, trial or ongoing),
+`student_settlements`, the engine's **fifth seal condition**, `link_invited_parent()`,
+`/api/invite-parent` + a business-branded email, the app's `/accept-invite`, the coach's
+**Add a walk-in** control + roster union, and the admin's unclaimed filter, invite button
+and inline settle dialog. PRD §7.17.
+
+**Planning found a live latent bug before a line was written.** `core.ts:487` resolves
+attendance→parent with a plain `.in()` on `parent_students`, so a student with no parent
+link yields no rows and their billable attendance was **silently dropped** — then the
+month sealed and those lessons became permanently unbillable. Fourth appearance of the
+§7.8/§7.13/§7.32 family. Any version of this feature would have walked into it, which is
+why the engine block (phase 2) was ordered before the create path (phase 3) and its tests
+were **proven red first**.
+
+**Two risks fired for real:**
+- **RISK 10 fired in the phase 0 spike**, before any code. `generateLink` was asked for
+  `redirect_to=localhost:8081/accept-invite` and returned `127.0.0.1:3000` — the *admin*
+  root, silently substituted from `site_url` (§7.41). The mitigation was "read the actual
+  link, don't trust that the flow worked", and it is the only reason this was caught.
+- **RISK 3 was confirmed real rather than theoretical** by the same spike: inside SECURITY
+  DEFINER, `current_user` is `postgres`, so `pin_student_tenant()` does not fire. Now §7.42.
+
+**The UI driver earned its place — it found two wiring bugs no unit test could.** (1) A run
+blocked only by unclaimed attendance has the *exact* signature of the invoice page's
+fail-safe branch (`invoices_created: 0`, `!sealed`, `parents_deferred: 0`), so a correct,
+actionable refusal rendered as "generation did not complete" and the modal naming the child
+never opened. (2) The settle buttons passed `amount: null` and the DB CHECK refused it —
+the constraint was right, the UI was wrong — and the error went to state rendered *behind*
+the open modal, so a failing write looked like a silent no-op.
+
+**Verification:** pgTAP **297** (+32, gate mutation-tested — deleting it fails three
+assertions, one proving the ungated function wrote rows), Deno **99** (+8, run twice),
+admin vitest **100** (+12), app jest **75** (+6), both apps typecheck, and
+`verify-trial-onboarding.mjs` **13/13** through both real UIs. The loop was then confirmed
+end to end: settle → re-run → `unclaimed_billable: 0, sealed: true`.
+
+**Deliberately not done:** parent self-serve claiming and duplicate merge (slice 2 — the
+matcher design is settled and recorded in `BACKLOG.md`); revenue reporting (there is no
+revenue ledger at all — backlogged with accrual-vs-cash named as the first decision);
+cash handling; coach-recorded settlements.
+
+**Known gap in slice 1:** a parent who self-registers before being invited creates a
+duplicate with no in-app remedy. Accepted with eyes open — the invite is the happy path —
+but it is the first thing slice 2 closes.
 
 ---
 
@@ -2545,6 +2649,30 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
+### FIRST: this branch is not merged and not deployed
+
+**`feat/trial-onboarding` is built and verified locally, and that is all** (§8.10). Seven
+commits, all suites green, 13/13 through both real UIs — but nothing is on `main`, no
+migration is on production, and `generate-invoices` is still at its previous version.
+
+Before merging, walk the **pre-commit gate at the bottom of `TRIAL_ONBOARDING_PLAN.md`**;
+most boxes are ticked in the commits, but three need doing at deploy time:
+
+1. **The deploy is EXPAND — migrate first, push last.** Three migrations
+   (`20260725000100`/`000200`/`000300`), all additive, plus a `generate-invoices` deploy.
+   The app must not go out before the engine that reports `unclaimed_billable`, or the
+   invoice page will read an absent field and fall through to its fail-safe.
+2. **§7.39 — re-verify the new functions' grants against the REMOTE `pg_proc`,** not the
+   local one. `add_unclaimed_student` and `link_invited_parent` both `REVOKE … FROM anon,
+   service_role` explicitly, and locally read `{postgres, authenticated}` — but that check
+   passes vacuously on a local stack.
+3. **§7.41 — add the parent app's accept URL to the PRODUCTION Supabase dashboard**
+   (`https://swimsync.sg/accept-invite`) and set **`NEXT_PUBLIC_APP_URL=https://swimsync.sg`**
+   on the admin's Vercel project. `config.toml` covers local only. If either is missed the
+   invite still arrives and still works — it just lands on the wrong site, silently.
+   Then **read a generated link** and confirm `redirect_to`; that assertion is the only
+   reason this was caught locally.
+
 ### Outstanding from 2026-07-21 — two things, both first-use
 
 Tenant provisioning is **built, deployed and smoked** (§8.9's deploy record), and like
@@ -2604,9 +2732,13 @@ Two things now depend on that not staying true much longer:
 
 **`BACKLOG.md` → `## Build order` is EMPTY** and has been since 2026-07-19. Pick from the
 themed sections below it, or from the clusters. The nearest candidates with no dependencies:
-**credit-note emails** (the other half of the notification work), **coach-created student
-profiles** (unblocked by tenancy, and the friction the onboarding push is feeling right now),
-or **an upcoming-lessons view for parents** (small, and the building block already exists).
+**credit-note emails** (the other half of the notification work), **parents claiming their
+own child** (slice 2 of §8.10 — the design is fully settled in `BACKLOG.md`, only the build
+remains, and it closes the one known gap in what just shipped), or **an upcoming-lessons
+view for parents** (small, and the building block already exists).
+
+*(Coach-created student profiles shipped 2026-07-25 — it was the friction the onboarding
+push had been feeling, and it is now a button on the attendance screen.)*
 
 **One small security-hygiene item arrived this session:** *revoke `anon` EXECUTE from the
 remaining SECURITY DEFINER functions* (S). Not urgent — every body gate holds — but it is
@@ -2647,6 +2779,9 @@ email **has still never fired in production**.
 | `supabase/tests/coach_wages.test.sql` | The pay-decision table, pro-rata, effective dating, draft→freeze, adjustments |
 | `SwimSyncApp/lib/landing.ts` | Where a signed-in user lands. Routes on **extension rows**, not the role enum (§7.19) |
 | `SwimSyncApp/lib/attendanceCompleteness.ts` | The completeness rule, shared. **Twin in SwimSyncAdmin; a third copy in the Deno engine — three edits** |
+| `TRIAL_ONBOARDING_PLAN.md` | A child before their parent: the plan, its ranked risks inlined as mitigations, and the pre-commit gate. **Read before merging §8.10** |
+| `SwimSyncApp/lib/attendanceRoster.ts` | Who appears on Mark Attendance: enrolled **∪** already-marked-on-this-session. Why a closed trial enrolment doesn't hide the child it marked |
+| `supabase/migrations/20260725000100…000300` | `student_settlements`, `add_unclaimed_student()`, `link_invited_parent()` |
 | `SwimSyncAdmin/app/(admin)/wages/page.tsx` | Coach payroll: rates, policy, run, mark paid |
 | `SwimSyncAdmin/app/(admin)/platform/page.tsx` | Platform admin: every business + the student rescue tool |
 | `supabase/migrations/` | Schema, RLS, triggers, grants (ordered, source of truth) |
