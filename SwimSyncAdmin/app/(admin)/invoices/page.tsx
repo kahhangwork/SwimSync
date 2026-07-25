@@ -82,6 +82,13 @@ export default function InvoicesPage() {
   // an admin who does not come back.
   const [unclaimed, setUnclaimed] = useState<UnclaimedStudent[]>([]);
   const [settling, setSettling] = useState<string | null>(null);
+  // Amount per student for the "paid outside SwimSync" path. Required by the
+  // DB, deliberately: student_settlements CHECKs that a paid_outside row
+  // carries an amount, so "the money arrived" can never be recorded without
+  // saying how much. That is what makes these rows summable later
+  // (BACKLOG → Revenue reporting).
+  const [settleAmount, setSettleAmount] = useState<Record<string, string>>({});
+  const [settleError, setSettleError] = useState<string | null>(null);
   // Lessons the server refused to generate around. Non-empty = blocked.
   const [blockedLessons, setBlockedLessons] = useState<
     {
@@ -301,6 +308,26 @@ export default function InvoicesPage() {
         // picker below is capped to prevent this, but the cap is an affordance
         // and the engine is the guard — so this branch must exist.
         setGenResult(`Error: ${json.message ?? "That month has not ended yet."}`);
+      } else if (Number(json.unclaimed_billable ?? 0) > 0) {
+        // ── Everything is marked; some of it just has nobody to bill ──────
+        // MUST sit above the fail-safe. A run blocked only by unclaimed
+        // attendance reports invoices_created: 0, sealed: false and
+        // parents_deferred: 0 — which is precisely the fail-safe's signature,
+        // so without this branch a correct, actionable refusal rendered as
+        // "generation did not complete" and the modal naming the child never
+        // opened. Caught by verify-trial-onboarding.mjs, not by any unit test:
+        // the engine's response was right the whole time and only the wiring
+        // was wrong.
+        setUnclaimed(json.unclaimed_students ?? []);
+        const n = Number(json.unclaimed_billable);
+        setGenResult(
+          `Created ${json.invoices_created ?? 0} invoice(s) for ${formatBillingMonth(
+            genMonth
+          )}. Month left open — ${n} billable lesson${
+            n === 1 ? "" : "s"
+          } have no parent account to bill.`
+        );
+        await loadInvoices();
       } else if (
         // ── FAIL SAFE ON ANYTHING UNRECOGNISED ────────────────────────────
         // Everything below assumes a successful run. Without this, a refusal
@@ -391,9 +418,13 @@ export default function InvoicesPage() {
 
     setSettling(null);
     if (error) {
-      setGenResult(`Error recording settlement: ${error.message}`);
+      // Shown INSIDE the modal. genResult renders on the page behind it, so an
+      // error surfaced there is invisible while the dialog is open — which is
+      // how a failing insert first looked like a silent no-op.
+      setSettleError(error.message);
       return;
     }
+    setSettleError(null);
     setUnclaimed((prev) => prev.filter((x) => x.student_id !== u.student_id));
     setGenResult(
       `Recorded for ${u.student_name ?? "that student"}. Generate again to close ` +
@@ -649,11 +680,36 @@ export default function InvoicesPage() {
                         u.latest_session_date
                       )}`}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1 text-xs text-gray-600">
+                    S$
+                    <input
+                      value={settleAmount[u.student_id] ?? ""}
+                      onChange={(e) =>
+                        setSettleAmount((prev) => ({
+                          ...prev,
+                          [u.student_id]: e.target.value,
+                        }))
+                      }
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      aria-label={`Amount received for ${u.student_name ?? "student"}`}
+                      className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs"
+                    />
+                  </div>
                   <Button
                     variant="outline"
-                    disabled={settling === u.student_id}
-                    onClick={() => handleSettle(u, "paid_outside", null)}
+                    disabled={
+                      settling === u.student_id ||
+                      !(Number(settleAmount[u.student_id]) > 0)
+                    }
+                    onClick={() =>
+                      handleSettle(
+                        u,
+                        "paid_outside",
+                        Number(settleAmount[u.student_id])
+                      )
+                    }
                   >
                     Paid outside SwimSync
                   </Button>
@@ -668,6 +724,12 @@ export default function InvoicesPage() {
               </li>
             ))}
           </ul>
+
+          {settleError && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {settleError}
+            </p>
+          )}
 
           <p className="text-xs text-gray-600">
             The better fix is usually to <strong>invite the parent</strong> from
