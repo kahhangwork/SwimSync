@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   // below. Using RLS here as well would be a second, weaker copy of that rule.
   const { data: student } = await adminClient
     .from("students")
-    .select("id, full_name, tenant_id, tenants(display_name)")
+    .select("id, full_name, tenant_id, provisional_contact_name, tenants(display_name)")
     .eq("id", student_id)
     .maybeSingle();
 
@@ -114,7 +114,17 @@ export async function POST(req: NextRequest) {
         // role=parent is what makes handle_new_user create profiles + parents.
         // It deliberately does NOT create parent_tenants — parents are global
         // and normally join by code — which is exactly what the RPC below adds.
-        data: { role: "parent", full_name: "" },
+        // Seeded from the contact name the coach wrote down at the poolside
+        // (students.provisional_contact_name), which is exactly this person.
+        // It used to be "" unconditionally, so an invited parent's profile
+        // name was blank until they fixed it themselves — and the admin's own
+        // roster then showed a child with no parent name, which reads as
+        // "unclaimed" when it is not. /accept-invite asks for the real name and
+        // overwrites this; it is a sensible starting value, not the last word.
+        data: {
+          role: "parent",
+          full_name: (student.provisional_contact_name ?? "").trim(),
+        },
         // ⚠ §7.41: this URL must be listed EXACTLY in
         // [auth].additional_redirect_urls. An unlisted redirect is not
         // rejected — site_url is silently substituted — so the link works and

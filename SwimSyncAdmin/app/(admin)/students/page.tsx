@@ -431,6 +431,10 @@ export default function StudentsPage() {
       // the same family is the commonest duplicate, and a boolean hid it.
       parentId: s.parent_id,
       lessons: s.lessons,
+      // A child who has left is never flagged as a duplicate — the banner has
+      // no dismiss, so a pair the admin has already retired would be permanent
+      // noise. Reported from production 2026-07-26.
+      isActive: s.is_active,
     }))
   );
 

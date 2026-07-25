@@ -10,6 +10,7 @@ const kid = (over: Partial<DupStudent> & { id: string; full_name: string }): Dup
   date_of_birth: null,
   parentId: null,
   lessons: 0,
+  isActive: true,
   ...over,
 });
 
@@ -113,6 +114,28 @@ describe("findDuplicatePairs", () => {
     ]);
     expect(pairs[0].eitherWay).toBe(true);
     expect(pairs[0].needsHuman).toBe(false);
+  });
+
+  // Reported from production 2026-07-26: the banner flagged a live record
+  // against a test record the admin had already RETIRED by marking it
+  // inactive — which is how you resolve a duplicate when there is no merge
+  // tool. The banner has no dismiss, so that would have been permanent noise.
+  it("never flags a record the business has marked INACTIVE", () => {
+    expect(
+      findDuplicatePairs([
+        kid({ id: "live", full_name: "TestParent", parentId: "p1" }),
+        kid({ id: "retired", full_name: "TestParent", isActive: false }),
+      ])
+    ).toEqual([]);
+  });
+
+  it("ignores a pair where BOTH have left", () => {
+    expect(
+      findDuplicatePairs([
+        kid({ id: "a", full_name: "TestParent", isActive: false }),
+        kid({ id: "b", full_name: "TestParent", isActive: false }),
+      ])
+    ).toEqual([]);
   });
 
   it("does not pair a row with itself", () => {

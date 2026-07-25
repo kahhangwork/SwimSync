@@ -25,6 +25,21 @@ import PrimaryButton from "@/components/PrimaryButton";
 // Address lives on `parents`, not `profiles`: profiles is shared with coaches
 // and admins, and a home address is a parent-shaped fact.
 export default function ContactDetailsScreen() {
+  // ⚠ NAME AND PHONE LIVE ON `profiles`, ADDRESS ON `parents` — two tables, one
+  // screen, deliberately. profiles is shared with coaches and admins (it is
+  // the account), while a home address is a parent-shaped fact.
+  //
+  // WHY THEY ARE EDITABLE HERE AT ALL. An INVITED parent never fills in the
+  // registration form — /accept-invite only ever asked for a password — so
+  // their name and phone were blank with NO screen anywhere in the app able to
+  // set them. The admin's Students page then showed a blank parent, which
+  // reads as "this child has no parent" when it has one. Reported from
+  // production 2026-07-26.
+  // It also disabled a feature: the parent's phone is one of the two signals
+  // that matches a family to a child their coach already added, so an invited
+  // parent could never match on it.
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [postal, setPostal] = useState("");
   const [ready, setReady] = useState(false);
@@ -37,14 +52,23 @@ export default function ContactDetailsScreen() {
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const { data } = await supabase
-          .from("parents")
-          .select("address, postal_code")
-          .eq("profile_id", session?.id)
-          .single();
+        const [{ data }, { data: prof }] = await Promise.all([
+          supabase
+            .from("parents")
+            .select("address, postal_code")
+            .eq("profile_id", session?.id)
+            .single(),
+          supabase
+            .from("profiles")
+            .select("full_name, phone")
+            .eq("id", session?.id)
+            .single(),
+        ]);
         if (cancelled) return;
         setAddress(data?.address ?? "");
         setPostal(data?.postal_code ?? "");
+        setFullName(prof?.full_name ?? "");
+        setPhone(prof?.phone ?? "");
         setReady(true);
       })();
       return () => {
@@ -60,18 +84,33 @@ export default function ContactDetailsScreen() {
       showToast("Postal code should be 6 digits.", "error");
       return;
     }
+    // Required, unlike everything else here: a blank name is what made an
+    // invited family look like no family at all on the coach's roster.
+    if (!fullName.trim()) {
+      showToast("Please enter your name.", "error");
+      return;
+    }
 
     setSaving(true);
-    const { error } = await supabase
-      .from("parents")
-      .update({
-        address: address.trim() || null,
-        postal_code: postal.trim() || null,
-      })
-      .eq("profile_id", session?.id);
+    const [{ error }, { error: profErr }] = await Promise.all([
+      supabase
+        .from("parents")
+        .update({
+          address: address.trim() || null,
+          postal_code: postal.trim() || null,
+        })
+        .eq("profile_id", session?.id),
+      supabase
+        .from("profiles")
+        .update({
+          full_name: fullName.trim(),
+          phone: phone.trim() || null,
+        })
+        .eq("id", session?.id),
+    ]);
     setSaving(false);
 
-    if (error) {
+    if (error || profErr) {
       showToast("Could not save your details. Please try again.", "error");
       return;
     }
@@ -103,9 +142,39 @@ export default function ContactDetailsScreen() {
       >
         <View className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 gap-4">
           <Text className="text-sm text-gray-600">
-            Your coach uses this to know which pools are convenient for you. It
-            is not shown to other families.
+            Your coach uses this to reach you and to know which pools are
+            convenient. It is not shown to other families.
           </Text>
+
+          <View>
+            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+              Your name <Text className="text-red-500">*</Text>
+            </Text>
+            <TextInput
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Sarah Lim"
+              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
+              placeholderTextColor="#9ca3af"
+            />
+          </View>
+
+          <View>
+            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+              Phone number
+            </Text>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="9123 4567"
+              keyboardType="phone-pad"
+              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
+              placeholderTextColor="#9ca3af"
+            />
+            <Text className="mt-1 text-xs text-gray-400">
+              Helps your coach match you to a child they have already added.
+            </Text>
+          </View>
 
           <View>
             <Text className="text-sm font-medium text-gray-700 mb-1.5">Address</Text>

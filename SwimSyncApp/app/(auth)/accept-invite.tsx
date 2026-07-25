@@ -27,6 +27,13 @@ import { useAppStore } from "@/store/useAppStore";
  * own /accept-invite (TENANT_PROVISIONING_PLAN.md phase 5).
  */
 export default function AcceptInviteScreen() {
+  // ⚠ THE NAME IS COLLECTED HERE, AND IT MUST BE. An invited parent never sees
+  // the registration form, so before this screen asked, their profile name was
+  // permanently blank — and the coach's roster then showed a child with no
+  // parent name against it, which reads as "nobody has claimed this child"
+  // when somebody has. Reported from production 2026-07-26.
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -60,6 +67,10 @@ export default function AcceptInviteScreen() {
 
   async function handleSetPassword() {
     setError(null);
+    if (!fullName.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
     if (!password || !confirm) {
       setError("Please enter and confirm a password.");
       return;
@@ -79,6 +90,23 @@ export default function AcceptInviteScreen() {
       setLoading(false);
       setError(friendlyAuthError(updErr));
       return;
+    }
+
+    // Written while the invite session is still valid — this is the only moment
+    // we are certainly signed in as them. Best-effort: a failure here must not
+    // strand someone who has just set a password, and Profile → Contact Details
+    // can fix it afterwards. The phone is optional but worth asking for: it is
+    // one of the two signals that matches a family to a child their coach
+    // already put on the roster.
+    const { data: me } = await supabase.auth.getUser();
+    if (me.user) {
+      await supabase
+        .from("profiles")
+        .update({
+          full_name: fullName.trim(),
+          phone: phone.trim() || null,
+        })
+        .eq("id", me.user.id);
     }
 
     // Sign out and back in, exactly as the reset flow does: the invite session
@@ -120,6 +148,37 @@ export default function AcceptInviteScreen() {
         </View>
 
         <View className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 gap-4">
+          {/* Asked BEFORE the password, because it is about them rather than
+              about security, and because a blank name is what made an invited
+              family look like no family at all on the coach's roster. */}
+          <View>
+            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+              Your name <Text className="text-red-500">*</Text>
+            </Text>
+            <TextInput
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Sarah Lim"
+              autoCapitalize="words"
+              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
+              placeholderTextColor="#9ca3af"
+            />
+          </View>
+
+          <View>
+            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+              Phone number
+            </Text>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="9123 4567"
+              keyboardType="phone-pad"
+              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
+              placeholderTextColor="#9ca3af"
+            />
+          </View>
+
           <View>
             <Text className="text-sm font-medium text-gray-700 mb-1.5">
               Password

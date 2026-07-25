@@ -38,6 +38,28 @@ export type DupStudent = {
   parentId: string | null;
   /** How many attendance rows — decides which row must survive a merge. */
   lessons: number;
+  /**
+   * Still a customer of this business.
+   *
+   * ⚠ AN INACTIVE RECORD IS NEVER FLAGGED, AND THE REASONING CUTS BOTH WAYS.
+   * Marking one of two records inactive is precisely how an admin resolves a
+   * duplicate TODAY, with no merge tool — so inactive rows are, if anything,
+   * *more* likely to be duplicates than active ones, and excluding them means
+   * this never offers to tidy them up.
+   *
+   * Excluded anyway, for three reasons that win:
+   *   • Inactive is a deliberate "this one is done" statement. Re-raising it is
+   *     second-guessing a decision the admin already made.
+   *   • The banner has no dismiss and no "seen" flag — by design, since the
+   *     data is the state (§7.37) — so a pair the admin does not intend to
+   *     merge is PERMANENT noise. That is what a real business hit on day one.
+   *   • The case this feature exists for is unaffected: a coach-added walk-in
+   *     and a parent-added duplicate are both ACTIVE.
+   * `merge_students()` itself stays permissive — an admin who genuinely wants
+   * to merge an inactive pair reactivates one and merges. The detector is a
+   * suggestion; the function is the tool.
+   */
+  isActive: boolean;
 };
 
 export type DupPair = {
@@ -96,6 +118,8 @@ export function findDuplicatePairs(students: DupStudent[]): DupPair[] {
       const a = students[i];
       const b = students[j];
 
+      // A child who has left is not a duplicate to be tidied — see isActive.
+      if (!a.isActive || !b.isActive) continue;
       if (a.parentId && b.parentId && a.parentId !== b.parentId) continue;
       if (!namesMatch(a.full_name, b.full_name)) continue;
       if (a.date_of_birth && b.date_of_birth && a.date_of_birth !== b.date_of_birth) {
