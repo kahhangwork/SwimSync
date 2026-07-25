@@ -32,7 +32,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(39);
+SELECT plan(42);
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -451,6 +451,47 @@ SELECT lives_ok(
      VALUES ('Admin Added Child','2020-02-02',
              'c1a11111-0000-0000-0000-000000000001','unassigned', TRUE) $$,
   'the business''s admin can still add a child directly');
+
+-- ══ Dismissing a decided notice ═══════════════════════════════════════════
+-- ⚠ A PENDING claim cannot be dismissed: it is the live state that explains
+-- why this parent is blocked from re-adding that child. Hiding it would leave
+-- them blocked with nothing on screen saying so.
+SET LOCAL "request.jwt.claims" TO '{"sub":"c1000000-0000-0000-0000-0000000000d2","role":"authenticated"}';
+SELECT throws_ok(
+  $$ SELECT dismiss_student_claim(
+       (SELECT id FROM student_claims WHERE status = 'pending' LIMIT 1)) $$,
+  'that request is still being checked by your coach',
+  'a PENDING claim cannot be dismissed — it is what explains the block');
+
+-- Another parent's claim is not theirs to clear.
+-- ⚠ The id is captured as SUPERUSER first, on purpose. Selecting it inline
+-- while acting as P2 returns NULL — RLS already hides P1's claims from them —
+-- so the function would refuse with "claim not found" and this assertion would
+-- be measuring the POLICY rather than the function's own gate. Both matter;
+-- this one is the gate.
+RESET ROLE;
+CREATE TEMP TABLE p1_claim AS
+SELECT sc.id FROM student_claims sc
+  JOIN parents p ON p.id = sc.parent_id
+  JOIN profiles pr ON pr.id = p.profile_id
+ WHERE pr.email = 'claim-p1@test.local' LIMIT 1;
+GRANT SELECT ON p1_claim TO authenticated;
+SET LOCAL ROLE authenticated;
+
+SELECT throws_ok(
+  $$ SELECT dismiss_student_claim((SELECT id FROM p1_claim)) $$,
+  'that is not your request',
+  'a parent cannot dismiss someone else''s request');
+
+-- Their own DECIDED claim clears, and the home screen filters on this.
+SELECT lives_ok(
+  $$ SELECT dismiss_student_claim(
+       (SELECT sc.id FROM student_claims sc
+         JOIN parents p ON p.id = sc.parent_id
+         JOIN profiles pr ON pr.id = p.profile_id
+        WHERE pr.email = 'claim-p2@test.local'
+          AND sc.status = 'declined' LIMIT 1)) $$,
+  'a parent can clear their own decided notice');
 
 SELECT * FROM finish();
 ROLLBACK;

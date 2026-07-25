@@ -58,6 +58,13 @@ export default function ParentHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [claims, setClaims] = useState<PendingClaim[]>([]);
 
+  /** Clear a decided notice. Only ever offered on a DECLINED claim — a pending
+   *  one is what explains why this parent cannot re-add that child. */
+  async function dismissClaim(id: string) {
+    setClaims((cs) => cs.filter((c) => c.id !== id)); // optimistic
+    await supabase.rpc("dismiss_student_claim", { p_claim_id: id });
+  }
+
   const loadData = useCallback(async () => {
     if (!session) return;
     setLoading(true);
@@ -150,6 +157,10 @@ export default function ParentHomeScreen() {
         .select("id, claimed_name, status, created_at")
         .eq("parent_id", parent.id)
         .in("status", ["pending", "declined"])
+        // Without this a declined claim's notice is PERMANENT — there was no
+        // dismissal and no time bound, so "your coach checked" became a fixture
+        // of the home screen forever. Reported from production 2026-07-26.
+        .is("dismissed_at", null)
         .order("created_at", { ascending: false });
 
       setClaims((claims ?? []) as PendingClaim[]);
@@ -251,14 +262,35 @@ export default function ParentHomeScreen() {
               </>
             ) : (
               <>
-                <View className="flex-row items-center gap-2">
-                  <Ionicons name="information-circle-outline" size={18} color="#64748b" />
-                  <Text className="font-semibold text-gray-900">
-                    {c.claimed_name} wasn&rsquo;t on your coach&rsquo;s roster
-                  </Text>
+                {/* ⚠ THE CLAIM WAS ABOUT A RECORD ALREADY ON THE ROSTER, NOT
+                    ABOUT THE NAME THEY TYPED. The old copy said
+                    "<typed name> wasn't on your coach's roster", which
+                    conflated the two: the typed name was never on the roster —
+                    it is what they want to CREATE. What the coach actually
+                    decided is that the existing record they pointed at is not
+                    their child. Reported from production 2026-07-26. */}
+                <View className="flex-row items-start justify-between gap-2">
+                  <View className="flex-row items-center gap-2 flex-1">
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={18}
+                      color="#64748b"
+                    />
+                    <Text className="font-semibold text-gray-900 flex-1">
+                      Your coach checked — that wasn&rsquo;t {c.claimed_name}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => dismissClaim(c.id)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="close" size={18} color="#9ca3af" />
+                  </TouchableOpacity>
                 </View>
                 <Text className="mt-1 text-sm text-gray-600">
-                  You can add them yourself now.
+                  The child already on their roster turned out to be someone
+                  else. If you think that&rsquo;s wrong, check with your coach —
+                  otherwise you can add {c.claimed_name} yourself now.
                 </Text>
                 <TouchableOpacity
                   onPress={() => router.push("/(parent)/home/add-child")}
