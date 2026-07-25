@@ -515,16 +515,16 @@ export default function TrialsPage() {
                   <input
                     value={bookEmail}
                     onChange={(e) => setBookEmail(e.target.value)}
-                    placeholder="Parent's email"
+                    placeholder="Parent's email (optional)"
                     type="email"
                     className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   />
                 </div>
                 <p className="mt-1 text-[11px] text-gray-400">
-                  The phone number is how we match this child to their
-                  parent&apos;s account later — names get written many
-                  different ways. The email is where an invite goes if they
-                  join.
+                  The phone is required: it is how this child is matched to
+                  their parent&apos;s account later, because names get written
+                  many different ways. The email is optional — it makes that
+                  match certain, and it is where an invite goes if they join.
                 </p>
               </>
             )}

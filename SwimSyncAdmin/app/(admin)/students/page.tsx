@@ -777,7 +777,7 @@ export default function StudentsPage() {
             </label>
             <label className="block">
               <span className="text-xs font-semibold text-gray-600">
-                Parent&apos;s email
+                Parent&apos;s email <span className="font-normal">(optional)</span>
               </span>
               <input
                 type="email"
@@ -835,7 +835,7 @@ export default function StudentsPage() {
           </p>
           <label className="block">
             <span className="text-xs font-semibold text-gray-600">
-              Parent&apos;s email
+              Parent&apos;s email <span className="font-normal">(optional)</span>
             </span>
             <input
               type="email"
