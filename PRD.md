@@ -1378,7 +1378,7 @@ attendance would destroy the basis for a payout that may already have been made.
 
 ---
 
-### 7.18 Parents Claiming Their Own Child *(built 2026-07-26 — not yet live)*
+### 7.18 Parents Claiming Their Own Child *(implemented 2026-07-26)*
 
 §7.17 covers the case where the **admin invites** the parent: the link is asserted by
 someone who knows it is right, and there is nothing to get wrong. This covers the other

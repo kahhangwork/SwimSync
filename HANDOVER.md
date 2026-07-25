@@ -149,7 +149,8 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   by inviting the parent or recording a settlement. PRD §7.17,
   `TRIAL_ONBOARDING_PLAN.md`, §8.10.
 - **A parent can claim the child their coach already added (verified local: pgTAP + vitest +
-  jest + UI driver — BUILT 2026-07-26, ⚠ NOT YET DEPLOYED)** — Add Child checks the roster
+  jest + UI driver — LIVE in production 2026-07-26, dormant until a parent adds a matching
+  child)** — Add Child checks the roster
   before it creates anything: a matching child produces a masked candidate card and three
   answers (Confirm / Not Sure / No), both claim answers file a request for the **admin to
   decide**, and a pending request blocks that parent from re-adding that child. The admin
@@ -1150,20 +1151,54 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     RLS; test the read path as the actual role.** Only the UI driver caught it. The fix is a
     narrow `SECURITY DEFINER` reader (`list_student_claims()`), not a sixth branch on the
     most load-bearing policy in the schema.
+
+49. **NUMBER A CONTRACT MIGRATION *LAST*, OR STAGING THE DEPLOY LEAVES IT OUT OF ORDER.**
+    `supabase db push` applies **everything** pending — there is no "up to migration X"
+    flag — so an expand/contract deploy is staged by physically **moving the contract file
+    out of `supabase/migrations/`**, pushing, then moving it back. That works, but if the
+    held-back file has an **earlier** timestamp than something you did push, the CLI then
+    refuses it as *"local migration files to be inserted before the last migration on
+    remote"* and demands `--include-all`.
+    That happened here: `20260726000600` (the contract) was held while `20260726000700`
+    (an additive function) went out. `--include-all` is correct and safe when the two are
+    independent — verify with `--dry-run` that it would push **only** the intended file —
+    but the cleaner fix is upstream: **give the contract migration the highest timestamp
+    in the batch**, so holding it back never creates a gap. Expand/contract is now the
+    normal shape for this codebase (§6), so this will recur.
 ---
 
-## 8.12 Twelfth session (2026-07-26) — PARENTS CAN CLAIM THEIR OWN CHILD — BUILT, **NOT YET DEPLOYED**
+## 8.12 Twelfth session (2026-07-26) — PARENTS CAN CLAIM THEIR OWN CHILD — BUILT **AND DEPLOYED**
 
 Branch **`feat/parent-claim`**, six commits. Planned with `/plan-with-confidence` +
 `/plan-review`; the plan and its 7 inlined mitigations are in **`PARENT_CLAIM_PLAN.md`**.
 Slice 2 of trial onboarding — slice 1 shipped the **invite** path (the admin asserts the
 link); this is the other direction, where the parent gets there first.
 
-**⚠ NOT DEPLOYED. The deploy has an ordering constraint — see §12 of the plan.** Five
-migrations are additive and go first; **`20260726000600` is a CONTRACT** (it removes the
-parent branch from `students_insert`) and must be pushed **after** the app is live, or
-every family loses Add Child. `supabase/rollback/20260726_parent_claim_DOWN.sql` was
-**executed forward, back and forward again**, not merely written.
+**Deploy record (2026-07-26) — the first EXPAND-THEN-CONTRACT deploy this project has
+done in one sitting**, and the ordering was the whole job:
+
+1. Backup (schema + data, scratchpad, not committed).
+2. **Held `20260726000600` out of `supabase/migrations/` on the filesystem** and pushed
+   the other six. `db push` applies *everything* pending — there is no "up to migration
+   X" flag — so holding the file back is the only way to stage this.
+3. `migration list --linked` confirmed the six; a remote dump confirmed **`students_insert`
+   still carried the parent branch** — the safe overlap, where the old app still works.
+4. §7.39 checked on the remote: **all ten new functions show zero `anon`/`service_role`
+   grants.**
+5. Merged to `main` and pushed → Vercel. Waited for `admin.swimsync.sg/claims` to 200 (a
+   route only the new build has) **and then for the APP bundle to actually carry
+   `add_child_or_claim`** — it did not, for several minutes (§7.23: the app finishes after
+   the admin). Pushing the contract in that window would have broken Add Child for every
+   family.
+6. Only then pushed the contract, and re-dumped: the parent branch is gone.
+7. Probed the live REST surface as `anon`: all seven RPCs return **42501**, and
+   `student_claims` returns `[]` under RLS.
+
+`supabase/rollback/20260726_parent_claim_DOWN.sql` was **executed forward, back and
+forward again** locally before any of this, not merely written.
+
+**⚠ `db push` printed the `pg-delta` SSL stack trace again** (§8.11) and succeeded anyway.
+`migration list --linked` is the fact.
 
 **The shape.** Matching happens at **Add Child**, on the name and DOB the parent has just
 typed. The join-code trigger the first planning round chose was dropped on the user's
@@ -1189,6 +1224,12 @@ and declined — *the admin confirms every claim* stands.
   `CURRENT_DATE` (the **server's** UTC date) while package coverage starts on the SGT
   confirmation date — so the suite went red for **eight hours a day**, 00:00–08:00 SGT,
   and had done since 2026-07-20. §7.7 in a test rather than in product code.
+
+**Still unverified, and only the user can do it:** creating a child through the **real
+parent app on production**. Everything short of that is checked, but step 6 removed the
+only path every new family walks, and no production parent has walked it since. Not done
+here deliberately — it would leave a test child in a database that has real families and
+no delete UI (see `BACKLOG.md` → *Production data cleanup*).
 
 **Verification:** pgTAP **299 → 354**, Deno **108** (unchanged — the engine is untouched),
 admin vitest **106 → 120**, app jest **79 → 89**, both typecheck, and
@@ -2866,30 +2907,27 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### ⚠ FIRST: slice 2 is BUILT AND UNDEPLOYED, and its deploy is ORDER-SENSITIVE
+### Outstanding from 2026-07-26 — ONE unverified path, and only the user can walk it
 
-`feat/parent-claim` is merged to nothing yet. Six migrations exist; **five are additive
-and one is a contract**, and getting the order wrong breaks the single path every new
-family walks:
+Parents claiming their own child is **deployed** (§8.12's deploy record) and, like packages
+and provisioning before it, **dormant until used**: no parent has a claim, so every family
+behaves exactly as before.
 
-1. `supabase db push` the **additive five** (`20260726000100`–`000500`, `000700`).
-2. Push `main` → Vercel builds both apps. **Verify Add Child still works** — at this
-   point the app uses the RPC but the old policy is still in place, which is the safe
-   overlap.
-3. **Then** push `20260726000600`, which removes the parent branch from
-   `students_insert`.
-4. `supabase migration list --linked` — nothing pending. A `pg-delta` SSL stack trace
-   from `db push` means nothing either way (§8.11); the list is the fact.
-5. Dump the remote and check the six new functions' grants (§7.39 — local `pg_proc`
-   cannot confirm this).
-6. **Create a child through the real parent app on production.** The deploy is not
-   finished until that has happened; step 3 removed the only path every family uses.
+One thing is **not** verified, and it is the important one:
 
-Rollback if step 3 goes wrong: `supabase/rollback/20260726_parent_claim_DOWN.sql`,
-already executed forward and back locally.
+**Add Child, through the real parent app on production.** The deploy's last migration
+removed the parent branch from `students_insert`, so a parent now creates a child *only*
+through `add_child_or_claim()`. Everything short of the real path is checked — the RPC is
+live, refuses `anon`, and the deployed bundle calls it — but **no production parent has
+actually added a child since**. If it is wrong, the failure looks like *"Failed to add your
+child. Please try again."* forever.
 
-**The Edge Function is untouched** — do not redeploy `generate-invoices`. Its 108 tests
-are unchanged for that reason.
+**A two-minute check:** sign in as a parent on `swimsync.sg` → Add Child → save a child
+whose name matches nothing. It should be created exactly as before. *(Not done from here on
+purpose: it leaves a test child in a database with real families and no delete UI.)*
+
+**If it fails:** `supabase/rollback/20260726_parent_claim_DOWN.sql` restores the old policy
+in one statement, and it was executed forward and back locally before the deploy.
 
 ### Outstanding from 2026-07-25 — ONE unverified path
 
