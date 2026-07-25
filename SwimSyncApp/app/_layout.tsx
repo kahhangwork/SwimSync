@@ -9,12 +9,18 @@ import { landingFor } from "@/lib/landing";
 import { useAppStore } from "@/store/useAppStore";
 import Toast from "@/components/Toast";
 
-// Pull the recovery tokens out of a Supabase deep link
-// (swimsync://reset-password#access_token=…&refresh_token=…&type=recovery).
-// Returns null unless this is a recovery link with both tokens present.
-function parseRecoveryTokens(
+// Pull the tokens out of a Supabase deep link
+// (swimsync://reset-password#access_token=…&refresh_token=…&type=recovery, or
+// swimsync://accept-invite#…&type=invite).
+//
+// BOTH kinds land here and both carry a real session, but they go to DIFFERENT
+// screens: a recovery is someone who forgot a password, an invite is a parent
+// whose coach created their account and who has never had one. Routing an
+// invite to /reset-password would offer them "request a new reset link" and,
+// on failure, a /forgot-password dead end.
+function parseAuthTokens(
   url: string | null
-): { access_token: string; refresh_token: string } | null {
+): { access_token: string; refresh_token: string; type: "recovery" | "invite" } | null {
   if (!url) return null;
   const fragment = url.split("#")[1];
   if (!fragment) return null;
@@ -25,10 +31,15 @@ function parseRecoveryTokens(
     if (k) params[k] = decodeURIComponent(v ?? "");
   }
 
-  if (params.type === "recovery" && params.access_token && params.refresh_token) {
+  if (
+    (params.type === "recovery" || params.type === "invite") &&
+    params.access_token &&
+    params.refresh_token
+  ) {
     return {
       access_token: params.access_token,
       refresh_token: params.refresh_token,
+      type: params.type,
     };
   }
   return null;
@@ -50,17 +61,21 @@ export default function RootLayout() {
   const clearSession = useAppStore((s) => s.clearSession);
 
   useEffect(() => {
-    // Shared flag: once we know this launch is a password-recovery flow, the
-    // session-restore below must land on the reset screen, not the home tab.
+    // Shared flag: once we know this launch is a password-recovery or invite
+    // flow, the session-restore below must land on the matching screen rather
+    // than the home tab.
     const recovery = { current: false };
+    const invite = { current: false };
 
-    // On web, supabase-js parses the recovery token from the URL hash during
-    // init. Detect it synchronously so getSession() doesn't bounce to home
-    // before the PASSWORD_RECOVERY event fires.
+    // On web, supabase-js parses the token from the URL hash during init.
+    // Detect it synchronously so getSession() doesn't bounce to home before
+    // the PASSWORD_RECOVERY event fires.
     if (Platform.OS === "web" && typeof window !== "undefined") {
       const url = window.location.hash + window.location.search;
       if (url.includes("type=recovery")) {
         recovery.current = true;
+      } else if (url.includes("type=invite")) {
+        invite.current = true;
       }
     }
 
@@ -95,6 +110,14 @@ export default function RootLayout() {
       // A recovery session must go to the reset screen regardless of role.
       if (recovery.current) {
         router.replace("/(auth)/reset-password");
+        return;
+      }
+
+      // An invited parent has a session but no password of their own yet.
+      // Landing them on the home tab would leave an account nobody can sign
+      // back into once this one-time session expires.
+      if (invite.current) {
+        router.replace("/(auth)/accept-invite");
         return;
       }
 
@@ -134,12 +157,19 @@ export default function RootLayout() {
     // detectSessionInUrl off on native). setSession fires SIGNED_IN, not
     // PASSWORD_RECOVERY, so route to the reset screen explicitly.
     async function handleDeepLink(url: string | null) {
-      const tokens = parseRecoveryTokens(url);
+      const tokens = parseAuthTokens(url);
       if (!tokens) return;
-      recovery.current = true;
-      const { error } = await supabase.auth.setSession(tokens);
+      const isInvite = tokens.type === "invite";
+      if (isInvite) invite.current = true;
+      else recovery.current = true;
+      const { error } = await supabase.auth.setSession({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+      });
       if (!error) {
-        router.replace("/(auth)/reset-password");
+        router.replace(
+          isInvite ? "/(auth)/accept-invite" : "/(auth)/reset-password"
+        );
       }
     }
 

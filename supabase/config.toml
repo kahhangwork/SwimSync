@@ -177,6 +177,15 @@ additional_redirect_urls = [
   "http://localhost:8081",
   "http://localhost:8081/reset-password",
   "swimsync://reset-password",
+  # Parent app — a parent invited by their coach, whose child was already on
+  # the roster (TRIAL_ONBOARDING_PLAN.md phase 6). This lands in the MOBILE
+  # APP, not the admin panel: it was the phase 0 spike returning
+  # redirect_to=127.0.0.1:3000 that proved the omission, exactly as §7.41
+  # warns — an unlisted redirect is silently replaced by site_url, so the link
+  # works and simply arrives at the wrong product.
+  "http://localhost:8081/accept-invite",
+  "swimsync://accept-invite",
+  "https://swimsync.sg/accept-invite",
   # Admin panel — password reset and first-time invite acceptance.
   "http://localhost:3000/reset-password",
   "http://localhost:3000/accept-invite",

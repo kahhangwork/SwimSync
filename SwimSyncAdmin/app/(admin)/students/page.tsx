@@ -31,6 +31,11 @@ type StudentRow = {
 
 const STATUS_FILTERS = ["All", "Assigned", "Unassigned", "Inactive"];
 
+// A child added by a coach before their parent registered. Derived from the
+// ABSENCE of a parent_students row rather than a stored flag — the join table
+// is the fact, and a flag beside it would only ever go stale.
+const isUnclaimed = (s: { parent_id: string | null }) => s.parent_id === null;
+
 export default function StudentsPage() {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +103,11 @@ export default function StudentsPage() {
   // the business's call, not a constant SwimSync picks for everyone.
   // Families with NO package are never "running low" — they are ad-hoc.
   const [lowOnly, setLowOnly] = useState(false);
+  const [unclaimedOnly, setUnclaimedOnly] = useState(false);
+  const [inviting, setInviting] = useState<StudentRow | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteResult, setInviteResult] = useState<string | null>(null);
   const [threshold, setThreshold] = useState("2");
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [liveLessonsByParent, setLiveLessonsByParent] = useState<
@@ -179,6 +189,48 @@ export default function StudentsPage() {
     load();
   }
 
+  async function handleInviteParent() {
+    if (!inviting) return;
+    setInviteBusy(true);
+    setInviteResult(null);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    try {
+      const res = await fetch("/api/invite-parent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+        },
+        body: JSON.stringify({
+          student_id: inviting.id,
+          email: inviteEmail.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setInviteResult(`Error: ${json.error ?? "invite failed"}`);
+      } else if (json.emailed) {
+        setInviteResult(`Invite sent to ${inviteEmail.trim()}.`);
+        await load();
+      } else {
+        // No RESEND_API_KEY (local, or a misconfigured deploy). Showing the
+        // link is deliberate — it keeps the flow usable — but it must be
+        // clearly NOT the intended outcome, or a broken key looks like success.
+        setInviteResult(
+          `No email was sent (no mail key configured). Send them this link yourself: ${json.invite_link}`
+        );
+        await load();
+      }
+    } catch (e) {
+      setInviteResult(`Error: ${String(e)}`);
+    }
+    setInviteBusy(false);
+  }
+
   async function load() {
     const { data } = await supabase
       .from("students")
@@ -252,8 +304,13 @@ export default function StudentsPage() {
     const label = statusLabel(s);
     const matchStatus = statusFilter === "All" || label === statusFilter;
     const matchLow = !lowOnly || runningLow(s);
-    return matchSearch && matchStatus && matchLow;
+    const matchUnclaimed = !unclaimedOnly || isUnclaimed(s);
+    return matchSearch && matchStatus && matchLow && matchUnclaimed;
   });
+
+  const unclaimedCount = students.filter(
+    (s) => s.is_active && isUnclaimed(s)
+  ).length;
 
   return (
     <div>
@@ -292,6 +349,21 @@ export default function StudentsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Only offered when there ARE any: a permanently-visible filter that
+              always returns nothing reads as a broken feature. */}
+          {unclaimedCount > 0 && (
+            <button
+              onClick={() => setUnclaimedOnly(!unclaimedOnly)}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                unclaimedOnly
+                  ? "bg-amber-500 text-white"
+                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+              }`}
+              title="Children a coach added before the family registered. Their billable lessons cannot be invoiced, and they hold the billing month open until the parent is invited or the money is recorded as settled."
+            >
+              No parent account ({unclaimedCount})
+            </button>
+          )}
           <button
             onClick={() => setLowOnly(!lowOnly)}
             className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
@@ -367,7 +439,16 @@ export default function StudentsPage() {
                   </select>
                 </Td>
                 <Td className="text-gray-500">
-                  {s.parent_name}
+                  {isUnclaimed(s) ? (
+                    <span
+                      className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700"
+                      title="Added by a coach before this family registered. Their billable lessons cannot be invoiced until the parent has an account."
+                    >
+                      No parent account
+                    </span>
+                  ) : (
+                    s.parent_name
+                  )}
                   {s.parent_id !== null &&
                     liveLessonsByParent.has(s.parent_id) && (
                       <span
@@ -387,6 +468,22 @@ export default function StudentsPage() {
                 <Td className="text-gray-500">{s.coach_name ?? "—"}</Td>
                 <Td>
                   <div className="flex gap-2">
+                    {s.is_active && isUnclaimed(s) && (
+                      // The BETTER remedy than settling: once the parent has an
+                      // account the lessons bill normally and no money is
+                      // written off.
+                      <button
+                        onClick={() => {
+                          setInviting(s);
+                          setInviteEmail("");
+                          setInviteResult(null);
+                        }}
+                        disabled={busyId === s.id}
+                        className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-50"
+                      >
+                        Invite parent
+                      </button>
+                    )}
                     {s.is_active && s.class_title && (
                       <button
                         onClick={() => setPending({ student: s, mode: "remove" })}
@@ -412,6 +509,50 @@ export default function StudentsPage() {
           )}
         </Tbody>
       </Table>
+
+      {/* ── Invite the parent of an unclaimed child ─────────────────────────
+          The happy path for a child a coach added. Unlike self-registration
+          there is no matching to get wrong: the admin asserts the link, so the
+          parent lands with this child already on their account and every
+          lesson already marked for them becomes billable. */}
+      <Modal
+        title={`Invite ${inviting?.full_name ?? ""}'s parent`}
+        open={inviting !== null}
+        onClose={() => setInviting(null)}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            We&apos;ll email them a link to set a password.{" "}
+            {inviting?.full_name} will already be on their account, along with
+            the attendance already marked — so the lessons can be invoiced
+            normally.
+          </p>
+          <label className="block">
+            <span className="text-xs font-semibold text-gray-600">
+              Parent&apos;s email
+            </span>
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="parent@example.com"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </label>
+          {inviteResult && (
+            <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-700 break-all">
+              {inviteResult}
+            </p>
+          )}
+          <Button
+            className="w-full"
+            disabled={inviteBusy || !inviteEmail.trim()}
+            onClick={handleInviteParent}
+          >
+            {inviteBusy ? "Sending…" : "Send invite"}
+          </Button>
+        </div>
+      </Modal>
 
       <Modal
         title={

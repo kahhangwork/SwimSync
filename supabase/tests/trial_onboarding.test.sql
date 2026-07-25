@@ -21,7 +21,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(24);
+SELECT plan(32);
 
 -- ── Two businesses, so the tenant boundary can be probed ───────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -43,7 +43,10 @@ VALUES
    '{"full_name":"TRIAL Coach B","role":"coach","tenant_id":"66666666-0000-0000-0000-000000000002"}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000','66000000-0000-0000-0000-0000000000d1',
    'authenticated','authenticated','trial-parent@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
-   '{"full_name":"TRIAL Parent","role":"parent"}', now(), now(), '', '', '', '');
+   '{"full_name":"TRIAL Parent","role":"parent"}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000','66000000-0000-0000-0000-0000000000d2',
+   'authenticated','authenticated','trial-parent2@test.local', crypt('x', gen_salt('bf')), now(), '{"provider":"email"}',
+   '{"full_name":"TRIAL Parent Two","role":"parent"}', now(), now(), '', '', '', '');
 
 -- Class A belongs to business A and its coach; class B to business B.
 INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson)
@@ -229,5 +232,74 @@ SELECT is(
   (SELECT COUNT(*)::INT FROM pg_policies
     WHERE tablename = 'student_settlements' AND cmd = 'DELETE'),
   0, 'settlements have no DELETE policy — reversal is an UPDATE');
+
+-- ══ CLAIMING — link_invited_parent() ════════════════════════════════════════
+-- The claim is what makes "adopt, don't merge" true: it moves nothing. The
+-- coach's student row IS the student row; this only makes it visible, and
+-- billable, to a parent who now exists.
+
+-- 19. A COACH cannot link a parent to a child, even their own student. This
+--     decides who can see a family's attendance and billing history.
+SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000c1","role":"authenticated"}';
+SELECT throws_ok(
+  $$ SELECT link_invited_parent('66000000-0000-0000-0000-0000000000d1'::uuid,
+       (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
+  'only this business''s admin may link a parent to this child',
+  'a COACH cannot link a parent to a child');
+
+-- 20. The owning admin can, and it writes BOTH links in one transaction.
+SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
+SELECT lives_ok(
+  $$ SELECT link_invited_parent('66000000-0000-0000-0000-0000000000d1'::uuid,
+       (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
+  'the owning business admin CAN link a parent');
+
+SELECT is(
+  (SELECT COUNT(*)::INT FROM parent_students ps
+     JOIN students s ON s.id = ps.student_id
+    WHERE s.full_name = 'Ongoing Kid'),
+  1, 'the child now has a parent — they are CLAIMED');
+
+-- 21. Membership too. handle_new_user() does not create parent_tenants (parents
+--     are global and normally redeem a join code), so an invited parent would
+--     otherwise hold a child in a business they are not a member of.
+SELECT is(
+  (SELECT COUNT(*)::INT FROM parent_tenants pt
+     JOIN parents p ON p.id = pt.parent_id
+    WHERE p.profile_id = '66000000-0000-0000-0000-0000000000d1'
+      AND pt.tenant_id = '66666666-0000-0000-0000-000000000001'),
+  1, 'the parent is also made a MEMBER of the business');
+
+-- 22. THE ADOPTION PROPERTY: nothing moved. The attendance marked before the
+--     parent existed still points at the same student, and is now theirs.
+SELECT is(
+  (SELECT COUNT(*)::INT FROM attendance a
+     JOIN students s ON s.id = a.student_id
+     JOIN parent_students ps ON ps.student_id = s.id
+     JOIN parents p ON p.id = ps.parent_id
+    WHERE p.profile_id = '66000000-0000-0000-0000-0000000000d1'
+      AND s.full_name = 'Walk In Kid'),
+  0, 'linking one child does not sweep in another coach-added child');
+
+-- 23. Re-linking the SAME parent is a no-op. An invite resent, or an admin
+--     clicking twice, must not error — nothing about the desired state differs.
+SELECT lives_ok(
+  $$ SELECT link_invited_parent('66000000-0000-0000-0000-0000000000d1'::uuid,
+       (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
+  'linking the SAME parent twice is idempotent');
+SELECT is(
+  (SELECT COUNT(*)::INT FROM parent_students ps
+     JOIN students s ON s.id = ps.student_id WHERE s.full_name = 'Ongoing Kid'),
+  1, 'and it did not create a second link');
+
+-- 24. A DIFFERENT parent is REFUSED. These two cases are deliberately split:
+--     collapsing them into one "already has a parent" refusal breaks the
+--     harmless case above, and collapsing them the other way would silently
+--     attach a stranger to an existing family.
+SELECT throws_ok(
+  $$ SELECT link_invited_parent('66000000-0000-0000-0000-0000000000d2'::uuid,
+       (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
+  'that child is already linked to a different parent account',
+  'a DIFFERENT parent cannot be attached to a claimed child');
 
 ROLLBACK;
