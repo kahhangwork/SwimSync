@@ -97,11 +97,68 @@ export async function POST(req: NextRequest) {
     if (linkErr) {
       return NextResponse.json({ error: linkErr.message }, { status: 400 });
     }
+
+    // ⚠ HAVE THEY EVER ACTUALLY SIGNED IN? This branch used to answer "yes"
+    // for everyone, and that made the button LIE. Sending an invite creates
+    // the auth user, so the second press landed here, sent NOTHING, and still
+    // returned emailed:true with a reassuring message — meaning an admin whose
+    // email never arrived pressed "Send invite" again and was told it was
+    // fine. Reported from production 2026-07-26.
+    //
+    // Never signed in  → the invite was never accepted, so this is a RESEND
+    //                    and it must actually send.
+    // Has signed in    → a live account. Linking the child is the whole job,
+    //                    and we deliberately do NOT mail a fresh invite link:
+    //                    that is a password-reset vector wearing onboarding
+    //                    clothes. Same rule as /api/resend-invite.
+    const { data: authUser } = await adminClient.auth.admin.getUserById(
+      existingProfile.id
+    );
+    const hasSignedIn = Boolean(authUser?.user?.last_sign_in_at);
+
+    if (hasSignedIn) {
+      return NextResponse.json({
+        success: true,
+        emailed: false,
+        alreadyRegistered: true,
+        message: `${email} already has a SwimSync account — ${student.full_name} has been added to it. No invite was sent; they can sign in as usual.`,
+      });
+    }
+
+    const { data: relink, error: relinkErr } =
+      await adminClient.auth.admin.generateLink({
+        type: "invite",
+        email,
+        options: {
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:8081"}/accept-invite`,
+        },
+      });
+
+    if (relinkErr || !relink?.properties?.action_link) {
+      return NextResponse.json(
+        { error: relinkErr?.message ?? "Could not generate a fresh invite link" },
+        { status: 500 }
+      );
+    }
+
+    const resent = await sendParentInviteEmail({
+      apiKey: process.env.RESEND_API_KEY,
+      to: email,
+      businessName,
+      studentName: student.full_name,
+      actionLink: relink.properties.action_link,
+      lessonsRecorded: lessonsRecorded ?? 0,
+    });
+
     return NextResponse.json({
       success: true,
-      emailed: true,
-      alreadyRegistered: true,
-      message: `${email} already has a SwimSync account — ${student.full_name} has been added to it.`,
+      resent: true,
+      emailed: resent.sent,
+      emailReason: resent.reason ?? null,
+      invite_link: resent.sent ? null : relink.properties.action_link,
+      message: resent.sent
+        ? `Invite re-sent to ${email}.`
+        : `No email was sent (no mail key configured).`,
     });
   }
 

@@ -157,6 +157,10 @@ export default function StudentsPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteResult, setInviteResult] = useState<string | null>(null);
+  // Separate from the message, because the modal's ACTIONS change once the
+  // invite has gone: re-pressing a primary "Send invite" is how an admin
+  // double-sends, or worse, believes they have re-sent when they have not.
+  const [inviteSent, setInviteSent] = useState(false);
   const [threshold, setThreshold] = useState("2");
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [liveLessonsByParent, setLiveLessonsByParent] = useState<
@@ -294,6 +298,7 @@ export default function StudentsPage() {
     if (!inviting) return;
     setInviteBusy(true);
     setInviteResult(null);
+    setInviteSent(false);
 
     const {
       data: { session },
@@ -315,7 +320,16 @@ export default function StudentsPage() {
       if (!res.ok) {
         setInviteResult(`Error: ${json.error ?? "invite failed"}`);
       } else if (json.emailed) {
-        setInviteResult(`Invite sent to ${inviteEmail.trim()}.`);
+        setInviteResult(
+          json.message ?? `Invite sent to ${inviteEmail.trim()}.`
+        );
+        setInviteSent(true);
+        await load();
+      } else if (json.alreadyRegistered) {
+        // A live account: the child was linked, nothing was mailed, and saying
+        // so plainly matters — this used to claim an email had been sent.
+        setInviteResult(json.message);
+        setInviteSent(true);
         await load();
       } else {
         // No RESEND_API_KEY (local, or a misconfigured deploy). Showing the
@@ -802,7 +816,11 @@ export default function StudentsPage() {
       <Modal
         title={`Invite ${inviting?.full_name ?? ""}'s parent`}
         open={inviting !== null}
-        onClose={() => setInviting(null)}
+        onClose={() => {
+          setInviting(null);
+          setInviteSent(false);
+          setInviteResult(null);
+        }}
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
@@ -824,17 +842,53 @@ export default function StudentsPage() {
             />
           </label>
           {inviteResult && (
-            <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-700 break-all">
+            <p
+              className={`rounded-lg px-3 py-2 text-xs break-all ${
+                inviteSent
+                  ? "bg-green-50 text-green-800"
+                  : "bg-gray-50 text-gray-700"
+              }`}
+            >
+              {inviteSent ? "✓ " : ""}
               {inviteResult}
             </p>
           )}
-          <Button
-            className="w-full"
-            disabled={inviteBusy || !inviteEmail.trim()}
-            onClick={handleInviteParent}
-          >
-            {inviteBusy ? "Sending…" : "Send invite"}
-          </Button>
+
+          {/* ⚠ ONCE IT HAS GONE, "SEND INVITE" IS NO LONGER THE PRIMARY ACTION.
+              Leaving it as the big blue button invites a second press — and the
+              second press used to send NOTHING while reporting success, because
+              the first one had created the auth user and the route then took
+              the "already has an account" branch. Done is now the primary act;
+              Resend is deliberately secondary, and genuinely re-sends. */}
+          {inviteSent ? (
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  setInviting(null);
+                  setInviteSent(false);
+                  setInviteResult(null);
+                }}
+              >
+                Done
+              </Button>
+              <Button
+                variant="outline"
+                disabled={inviteBusy}
+                onClick={handleInviteParent}
+              >
+                {inviteBusy ? "Sending…" : "Resend email"}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              className="w-full"
+              disabled={inviteBusy || !inviteEmail.trim()}
+              onClick={handleInviteParent}
+            >
+              {inviteBusy ? "Sending…" : "Send invite"}
+            </Button>
+          )}
         </div>
       </Modal>
 
