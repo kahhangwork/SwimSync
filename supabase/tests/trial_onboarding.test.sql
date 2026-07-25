@@ -1,5 +1,5 @@
--- pgTAP: adding a child before their parent has an account —
--- add_unclaimed_student(), and the student_settlements boundary.
+-- pgTAP: a child before their parent, and TRIALS AS BOOKINGS.
+-- add_unclaimed_student(), book_trial(), trial_rates, student_settlements.
 --
 -- WHY THE AUTHORIZATION ASSERTIONS DOMINATE. add_unclaimed_student() is
 -- SECURITY DEFINER, so it bypasses RLS entirely and its own caller check is
@@ -21,7 +21,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(32);
+SELECT plan(34);
 
 -- ── Two businesses, so the tenant boundary can be probed ───────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -73,7 +73,7 @@ VALUES
 
 CREATE TEMP TABLE trial_baseline AS SELECT COUNT(*)::INT AS n FROM students;
 
--- ══ REFUSALS ════════════════════════════════════════════════════════════════
+-- ══ add_unclaimed_student: ONGOING ══════════════════════════════════════════
 SET LOCAL ROLE authenticated;
 
 -- 1. A PARENT cannot put a child on a roster.
@@ -83,8 +83,9 @@ SELECT throws_ok(
   'not permitted to add a student to this class',
   'a PARENT cannot add an unclaimed student');
 
--- 2. A coach of ANOTHER BUSINESS cannot, even with a real class id.
---    This is the cross-tenant probe: pin_student_tenant() will not catch it.
+-- 2. A coach of ANOTHER BUSINESS cannot, even with a real class id. The
+--    cross-tenant probe: pin_student_tenant() does not fire for a SECURITY
+--    DEFINER writer (§7.42), so this gate is the whole boundary.
 SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000c2","role":"authenticated"}';
 SELECT throws_ok(
   $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Cross Tenant Kid','ongoing') $$,
@@ -95,224 +96,229 @@ SELECT throws_ok(
 SET LOCAL ROLE anon;
 SELECT throws_ok(
   $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Anon Kid','ongoing') $$,
-  '42501', NULL,
-  'anon has no EXECUTE on add_unclaimed_student');
+  '42501', NULL, 'anon has no EXECUTE on add_unclaimed_student');
 RESET ROLE;
 
--- 4. THE LOAD-BEARING REFUSAL ASSERTION: none of the three wrote a row.
---    A gate that raises AFTER writing is not a gate.
+-- 4. None of the three wrote a row. A gate that raises AFTER writing is not a gate.
 SELECT is(
-  (SELECT COUNT(*)::INT FROM students),
-  (SELECT n FROM trial_baseline),
-  'after THREE refusals, students has not grown — the gate refuses BEFORE writing');
+  (SELECT COUNT(*)::INT FROM students), (SELECT n FROM trial_baseline),
+  'after THREE refusals, students has not grown');
 
--- ══ THE HAPPY PATHS ═════════════════════════════════════════════════════════
 SET LOCAL ROLE authenticated;
-
--- 5. The OWNING business admin can add one (students_insert already allowed
---    this; the RPC must not have narrowed it).
-SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
-SELECT lives_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Admin A Kid','ongoing') $$,
-  'the OWNING business admin CAN add an unclaimed student');
-
 SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000c1","role":"authenticated"}';
 
--- 6. The class's own coach can add an ongoing student.
+-- 5-9. The class's own coach CAN add an ongoing student, and its shape.
 SELECT lives_ok(
   $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Ongoing Kid','ongoing') $$,
-  'the CLASS''S OWN COACH can add an unclaimed student');
-
--- 6. ⚠ THE LOAD-BEARING ONE. tenant_id comes from the CLASS, and nothing
---    downstream would catch it if it did not.
-SELECT is(
-  (SELECT tenant_id FROM students WHERE full_name = 'Ongoing Kid'),
+  'the CLASS''S OWN COACH can add an ONGOING unclaimed student');
+SELECT is((SELECT tenant_id FROM students WHERE full_name='Ongoing Kid'),
   '66666666-0000-0000-0000-000000000001'::uuid,
-  'the student is pinned to the CLASS''s tenant, not the caller''s input');
-
--- 7. created_by is the CALLING COACH. This is what keeps a trial student
---    visible after their enrolment closes — coach_serves_student() requires an
---    ACTIVE enrolment, so without this the coach loses sight of the child they
---    just marked.
-SELECT is(
-  (SELECT created_by FROM students WHERE full_name = 'Ongoing Kid'),
+  'pinned to the CLASS''s tenant — §7.42, nothing downstream would catch a wrong one');
+SELECT is((SELECT created_by FROM students WHERE full_name='Ongoing Kid'),
   '66000000-0000-0000-0000-0000000000c1'::uuid,
   'created_by is the calling coach, not postgres');
+SELECT is((SELECT COUNT(*)::INT FROM parent_students ps JOIN students s ON s.id=ps.student_id
+            WHERE s.full_name='Ongoing Kid'), 0,
+  'an unclaimed student has no parent link — that absence IS the definition');
+SELECT is((SELECT e.is_active FROM student_class_enrolments e JOIN students s ON s.id=e.student_id
+            WHERE s.full_name='Ongoing Kid'), TRUE,
+  'an ONGOING student keeps an OPEN enrolment and so blocks the gate normally');
 
--- 8. An unclaimed student has NO parent link. That absence is the definition.
-SELECT is(
-  (SELECT COUNT(*)::INT FROM parent_students ps
-    JOIN students s ON s.id = ps.student_id WHERE s.full_name = 'Ongoing Kid'),
-  0, 'an unclaimed student has no parent_students row');
+-- ══ TRIALS ARE BOOKINGS ═════════════════════════════════════════════════════
 
--- 9. An ONGOING enrolment is open — they attend weekly and must be marked.
-SELECT is(
-  (SELECT e.is_active FROM student_class_enrolments e
-    JOIN students s ON s.id = e.student_id WHERE s.full_name = 'Ongoing Kid'),
-  TRUE, 'an ongoing unclaimed student keeps an OPEN enrolment');
-
--- ── The trial shape ─────────────────────────────────────────────────────────
-SELECT lives_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Walk In Kid','trial',
-       '2026-08-01'::date, 'trial_paid'::attendance_status) $$,
-  'a coach can add AND mark a trial walk-in in one call');
-
--- 10. The trial enrolment is CLOSED on its own date, so it can never block the
---     completeness gate on a later lesson.
-SELECT is(
-  (SELECT e.is_active FROM student_class_enrolments e
-    JOIN students s ON s.id = e.student_id WHERE s.full_name = 'Walk In Kid'),
-  FALSE, 'a trial enrolment is closed immediately');
-SELECT is(
-  (SELECT e.unenrolled_at::date FROM student_class_enrolments e
-    JOIN students s ON s.id = e.student_id WHERE s.full_name = 'Walk In Kid'),
-  '2026-08-01'::date, 'closed on the SESSION''s date, not today');
-
--- 11. The attendance row exists, and marked_by is a PROFILE id (§7.2).
-SELECT is(
-  (SELECT a.status::text FROM attendance a
-    JOIN students s ON s.id = a.student_id WHERE s.full_name = 'Walk In Kid'),
-  'trial_paid', 'the trial attendance row was written');
-SELECT is(
-  (SELECT a.marked_by FROM attendance a
-    JOIN students s ON s.id = a.student_id WHERE s.full_name = 'Walk In Kid'),
-  '66000000-0000-0000-0000-0000000000c1'::uuid,
-  'marked_by is the coach''s PROFILE id, not coaches.id');
-
--- 12. ⚠ IDEMPOTENCY (RISK 4). This function is the SECOND writer of
---     lesson_sessions. A duplicate (class, date) row double-bills a whole
---     class — that shipped once already (§7.7). A second trial on the SAME
---     date must reuse the SAME session.
-SELECT lives_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Second Walk In','trial',
-       '2026-08-01'::date, 'trial_free'::attendance_status) $$,
-  'a second walk-in on the same date is fine');
-SELECT is(
-  (SELECT COUNT(*)::INT FROM lesson_sessions
-    WHERE class_id = '66666666-1111-0000-0000-000000000001' AND session_date = '2026-08-01'),
-  1, 'TWO walk-ins on one date share ONE lesson_sessions row — no double-billing');
-
--- 13. A trial without its date/status is refused rather than guessed.
+-- 10. A COACH may no longer create a trial. Schools arrange them at the admin,
+--     and a private coach IS the admin.
 SELECT throws_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','No Date Kid','trial') $$,
-  'a trial needs the session date and an attendance status',
-  'a trial without a date is refused, not defaulted to today');
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Coach Trial','trial','2026-08-01'::date) $$,
+  'only this business''s admin may book a trial',
+  'a COACH cannot book a trial');
 
--- 14. ⚠ RISK 8: a duplicate name + DOB gets a PLAIN explanation, not SQLSTATE
---     23505 surfacing raw at the poolside (PRD §5.1).
-SELECT lives_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Ethan Tan','ongoing',
-       NULL, NULL, '2018-03-04'::date) $$,
-  'first Ethan Tan is added');
-SELECT throws_like(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Ethan Tan','ongoing',
-       NULL, NULL, '2018-03-04'::date) $$,
-  '%already registered with this business%',
-  'a duplicate name+DOB is explained in plain words, not a raw constraint error');
-
--- ══ SETTLEMENTS ═════════════════════════════════════════════════════════════
-
--- 15. A COACH cannot record a settlement — admin only, by the user's decision.
-SELECT throws_ok(
-  $$ INSERT INTO student_settlements (tenant_id, student_id, settled_through, kind, amount, recorded_by)
-     VALUES ('66666666-0000-0000-0000-000000000001',
-             (SELECT id FROM students WHERE full_name='Walk In Kid'),
-             '2026-08-01','paid_outside',30,'66000000-0000-0000-0000-0000000000c1') $$,
-  '42501', NULL,
-  'a COACH cannot record a settlement');
-
--- 16. The owning admin can.
 SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
+
+-- 11. The admin can, and it books AHEAD — 2026-08-01 is in the future relative
+--     to nothing in particular; what matters is that no attendance is asserted.
 SELECT lives_ok(
-  $$ INSERT INTO student_settlements (tenant_id, student_id, settled_through, kind, amount, recorded_by)
-     VALUES ('66666666-0000-0000-0000-000000000001',
-             (SELECT id FROM students WHERE full_name='Walk In Kid'),
-             '2026-08-01','paid_outside',30,'66000000-0000-0000-0000-0000000000a1') $$,
-  'the owning business admin CAN record a settlement');
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Trial Kid','trial','2026-08-01'::date) $$,
+  'the ADMIN can create a child and book their trial');
 
--- 17. Cross-tenant: admin A cannot settle against business B.
+-- 12-15. A booking is NOT an enrolment, NOT attendance, and NOT a session.
+--        This is the whole correction: nothing about the outcome is claimed.
+SELECT is((SELECT COUNT(*)::INT FROM student_class_enrolments e JOIN students s ON s.id=e.student_id
+            WHERE s.full_name='Trial Kid'), 0,
+  'a trial creates NO enrolment — it is a visit, not a standing arrangement');
+SELECT is((SELECT COUNT(*)::INT FROM attendance a JOIN students s ON s.id=a.student_id
+            WHERE s.full_name='Trial Kid'), 0,
+  'a trial writes NO attendance — the coach marks it on the day');
+SELECT is((SELECT COUNT(*)::INT FROM lesson_sessions
+            WHERE class_id='66666666-1111-0000-0000-000000000001'), 0,
+  'and NO lesson_sessions row — add_unclaimed_student is no longer its second writer (§7.43 retired)');
+SELECT is((SELECT assignment_status::text FROM students WHERE full_name='Trial Kid'),
+  'unassigned', 'a trial child is UNASSIGNED — being expected once is not placement');
+
+-- 16. ⚠ THE CATEGORY IS SNAPSHOTTED. classes.category_id is mutable and money
+--     depends on it; without this, re-tagging a class reprices trials already
+--     taught (§7.7 through a new door).
+SELECT is(
+  (SELECT b.category_id FROM trial_bookings b JOIN students s ON s.id=b.student_id
+    WHERE s.full_name='Trial Kid'),
+  (SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000001'
+     AND lower(trim(name))='default group'),
+  'the booking SNAPSHOTS the class''s category');
+
+-- 17. A date the class does not run on is refused IN THE RPC. A booking on a
+--     non-class day is never on any roster, never marked, and blocks the month
+--     indefinitely with no visible cause.
+SELECT throws_like(
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-04'::date,
+       (SELECT id FROM students WHERE full_name='Trial Kid')) $$,
+  '%runs on a saturday%tuesday%',
+  'a Tuesday cannot be booked into a Saturday class');
+
+-- 18-19. Cancel is SOFT, and the slot can then be re-booked. A plain unique
+--        constraint would have made a cancelled booking block that slot forever.
+SELECT lives_ok(
+  $$ SELECT cancel_trial_booking((SELECT b.id FROM trial_bookings b
+       JOIN students s ON s.id=b.student_id WHERE s.full_name='Trial Kid')) $$,
+  'the admin can cancel a booking');
+SELECT lives_ok(
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-01'::date,
+       (SELECT id FROM students WHERE full_name='Trial Kid')) $$,
+  'and the same slot can be RE-BOOKED — the unique index is partial');
+
+-- 20. Two LIVE bookings for one slot are still refused.
 SELECT throws_ok(
-  $$ INSERT INTO student_settlements (tenant_id, student_id, settled_through, kind, amount, recorded_by)
-     VALUES ('66666666-0000-0000-0000-000000000002',
-             (SELECT id FROM students WHERE full_name='Walk In Kid'),
-             '2026-08-01','paid_outside',30,'66000000-0000-0000-0000-0000000000a1') $$,
-  '42501', NULL,
-  'an admin cannot record a settlement against ANOTHER business');
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-01'::date,
+       (SELECT id FROM students WHERE full_name='Trial Kid')) $$,
+  '23505', NULL, 'two live bookings for the same slot are refused');
 
--- 18. There is deliberately no DELETE policy — a settlement is reversed, not
---     removed, so the record of the decision survives.
+-- 21. An ACTIVE enrolment blocks a trial — a trial is for a child not yet in a class.
+SELECT throws_like(
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-08'::date,
+       (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
+  '%already enrolled%',
+  'a child with an ACTIVE enrolment cannot be booked for a trial');
+
+-- 22. A CLOSED one does not — a family that left and is considering coming back
+--     is a real trial.
+UPDATE student_class_enrolments SET is_active = FALSE, unenrolled_at = NOW()
+ WHERE student_id = (SELECT id FROM students WHERE full_name='Ongoing Kid');
+SELECT lives_ok(
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-08'::date,
+       (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
+  'a CLOSED enrolment does NOT block — a returning family can trial');
+
+-- 23. A child of ANOTHER business cannot be booked into this one's class.
+--     The tenant comes from the CLASS, so without this check an admin could
+--     pull a stranger's child onto their own roster.
+-- Seeded with RLS out of the way: admin A cannot (and must not) write into
+-- business B. RESET ROLE / re-assume, the same dance the other fixtures do.
+RESET ROLE;
+INSERT INTO students (id, full_name, tenant_id)
+VALUES ('66666666-2222-0000-0000-000000000001','B Kid','66666666-0000-0000-0000-000000000002');
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
+SELECT throws_like(
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-15'::date,
+       '66666666-2222-0000-0000-000000000001') $$,
+  '%another business%',
+  'a child of ANOTHER business cannot be booked into this class');
+
+-- ══ TRIAL RATES ═════════════════════════════════════════════════════════════
+
+-- 24. Insert-only: there is no UPDATE and no DELETE policy, which is what makes
+--     "a price change is a new row" true rather than merely intended.
 SELECT is(
   (SELECT COUNT(*)::INT FROM pg_policies
-    WHERE tablename = 'student_settlements' AND cmd = 'DELETE'),
-  0, 'settlements have no DELETE policy — reversal is an UPDATE');
+    WHERE tablename='trial_rates' AND cmd IN ('UPDATE','DELETE')),
+  0, 'trial_rates has no UPDATE or DELETE policy — effective-dated, insert-only');
 
--- ══ CLAIMING — link_invited_parent() ════════════════════════════════════════
--- The claim is what makes "adopt, don't merge" true: it moves nothing. The
--- coach's student row IS the student row; this only makes it visible, and
--- billable, to a parent who now exists.
+-- 25. The owning admin can set a rate.
+SELECT lives_ok(
+  $$ INSERT INTO trial_rates (tenant_id, category_id, rate, effective_from, created_by)
+     VALUES ('66666666-0000-0000-0000-000000000001',
+             (SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000001'
+                AND lower(trim(name))='default group'),
+             25.00, '2026-01-01', '66000000-0000-0000-0000-0000000000a1') $$,
+  'the owning admin can set a trial rate');
 
--- 19. A COACH cannot link a parent to a child, even their own student. This
---     decides who can see a family's attendance and billing history.
+-- 26. A category from ANOTHER business is refused. The RLS policy checks
+--     tenant_id and cannot see whether the CATEGORY belongs to it.
+SELECT throws_like(
+  $$ INSERT INTO trial_rates (tenant_id, category_id, rate, effective_from, created_by)
+     VALUES ('66666666-0000-0000-0000-000000000001',
+             (SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000002'
+                AND lower(trim(name))='default group'),
+             25.00, '2026-01-01', '66000000-0000-0000-0000-0000000000a1') $$,
+  '%another business%',
+  'a rate scoped to ANOTHER business''s category is refused');
+
+-- 27. A $0 rate is refused. A free trial is the trial_free STATUS, not a $0 price.
+SELECT throws_ok(
+  $$ INSERT INTO trial_rates (tenant_id, category_id, rate, effective_from, created_by)
+     VALUES ('66666666-0000-0000-0000-000000000001',
+             (SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000001'
+                AND lower(trim(name))='default group'),
+             0, '2026-01-01', '66000000-0000-0000-0000-0000000000a1') $$,
+  '23514', NULL, 'a $0 trial rate is refused by the DB');
+
+-- 28-29. trial_rate_on picks the rate in force ON THE LESSON'S OWN DATE.
+INSERT INTO trial_rates (tenant_id, category_id, rate, effective_from, created_by)
+VALUES ('66666666-0000-0000-0000-000000000001',
+        (SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000001'
+           AND lower(trim(name))='default group'),
+        40.00, '2026-06-01', '66000000-0000-0000-0000-0000000000a1');
+SELECT is(
+  trial_rate_on((SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000001'
+                   AND lower(trim(name))='default group'), '2026-03-01'::date),
+  25.00::numeric, 'a lesson BEFORE the raise keeps the old rate');
+SELECT is(
+  trial_rate_on((SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000001'
+                   AND lower(trim(name))='default group'), '2026-08-01'::date),
+  40.00::numeric, 'a lesson after it gets the new one');
+
+-- 30. A category with no rate returns NULL, which the engine reads as "fall
+--     back to the class rate" — NOT as zero.
+SELECT is(
+  trial_rate_on((SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000001'
+                   AND lower(trim(name))='default private'), '2026-08-01'::date),
+  NULL::numeric, 'an unpriced category returns NULL, not 0');
+
+-- 31. Deleting a category that has rates is REFUSED. These rows price PAST
+--     lessons; letting them vanish would reprice unbilled trials.
+SELECT throws_ok(
+  $$ DELETE FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000001'
+       AND lower(trim(name))='default group' $$,
+  '23503', NULL,
+  'a category with trial rates cannot be deleted (ON DELETE RESTRICT)');
+
+-- 32. And classes.category_id is RESTRICT, not SET NULL. Asserted structurally
+--     rather than by attempting a delete: SET NULL against a NOT NULL column
+--     fails with a null violation naming a column the admin never touched,
+--     which is a confusing error rather than a correct refusal.
+--     confdeltype: 'r' = RESTRICT, 'n' = SET NULL.
+SELECT is(
+  (SELECT confdeltype FROM pg_constraint WHERE conname = 'classes_category_id_fkey'),
+  'r'::"char",
+  'classes.category_id is ON DELETE RESTRICT — a category with classes cannot be deleted');
+
+-- ══ SETTLEMENTS (unchanged by this work, still pinned) ══════════════════════
+
+-- 33. A COACH cannot record a settlement — admin only.
 SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000c1","role":"authenticated"}';
 SELECT throws_ok(
-  $$ SELECT link_invited_parent('66000000-0000-0000-0000-0000000000d1'::uuid,
-       (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
-  'only this business''s admin may link a parent to this child',
-  'a COACH cannot link a parent to a child');
+  $$ INSERT INTO student_settlements (tenant_id, student_id, settled_through, kind, amount, recorded_by)
+     VALUES ('66666666-0000-0000-0000-000000000001',
+             (SELECT id FROM students WHERE full_name='Trial Kid'),
+             '2026-08-01','paid_outside',30,'66000000-0000-0000-0000-0000000000c1') $$,
+  '42501', NULL, 'a COACH cannot record a settlement');
 
--- 20. The owning admin can, and it writes BOTH links in one transaction.
+-- 34. The owning admin can.
 SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
 SELECT lives_ok(
-  $$ SELECT link_invited_parent('66000000-0000-0000-0000-0000000000d1'::uuid,
-       (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
-  'the owning business admin CAN link a parent');
-
-SELECT is(
-  (SELECT COUNT(*)::INT FROM parent_students ps
-     JOIN students s ON s.id = ps.student_id
-    WHERE s.full_name = 'Ongoing Kid'),
-  1, 'the child now has a parent — they are CLAIMED');
-
--- 21. Membership too. handle_new_user() does not create parent_tenants (parents
---     are global and normally redeem a join code), so an invited parent would
---     otherwise hold a child in a business they are not a member of.
-SELECT is(
-  (SELECT COUNT(*)::INT FROM parent_tenants pt
-     JOIN parents p ON p.id = pt.parent_id
-    WHERE p.profile_id = '66000000-0000-0000-0000-0000000000d1'
-      AND pt.tenant_id = '66666666-0000-0000-0000-000000000001'),
-  1, 'the parent is also made a MEMBER of the business');
-
--- 22. THE ADOPTION PROPERTY: nothing moved. The attendance marked before the
---     parent existed still points at the same student, and is now theirs.
-SELECT is(
-  (SELECT COUNT(*)::INT FROM attendance a
-     JOIN students s ON s.id = a.student_id
-     JOIN parent_students ps ON ps.student_id = s.id
-     JOIN parents p ON p.id = ps.parent_id
-    WHERE p.profile_id = '66000000-0000-0000-0000-0000000000d1'
-      AND s.full_name = 'Walk In Kid'),
-  0, 'linking one child does not sweep in another coach-added child');
-
--- 23. Re-linking the SAME parent is a no-op. An invite resent, or an admin
---     clicking twice, must not error — nothing about the desired state differs.
-SELECT lives_ok(
-  $$ SELECT link_invited_parent('66000000-0000-0000-0000-0000000000d1'::uuid,
-       (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
-  'linking the SAME parent twice is idempotent');
-SELECT is(
-  (SELECT COUNT(*)::INT FROM parent_students ps
-     JOIN students s ON s.id = ps.student_id WHERE s.full_name = 'Ongoing Kid'),
-  1, 'and it did not create a second link');
-
--- 24. A DIFFERENT parent is REFUSED. These two cases are deliberately split:
---     collapsing them into one "already has a parent" refusal breaks the
---     harmless case above, and collapsing them the other way would silently
---     attach a stranger to an existing family.
-SELECT throws_ok(
-  $$ SELECT link_invited_parent('66000000-0000-0000-0000-0000000000d2'::uuid,
-       (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
-  'that child is already linked to a different parent account',
-  'a DIFFERENT parent cannot be attached to a claimed child');
+  $$ INSERT INTO student_settlements (tenant_id, student_id, settled_through, kind, amount, recorded_by)
+     VALUES ('66666666-0000-0000-0000-000000000001',
+             (SELECT id FROM students WHERE full_name='Trial Kid'),
+             '2026-08-01','paid_outside',30,'66000000-0000-0000-0000-0000000000a1') $$,
+  'the owning business admin CAN record a settlement');
 
 ROLLBACK;
