@@ -427,7 +427,9 @@ export default function StudentsPage() {
       id: s.id,
       full_name: s.full_name,
       date_of_birth: s.date_of_birth,
-      claimed: s.parent_id !== null,
+      // The parent's IDENTITY, not just whether there is one: two rows under
+      // the same family is the commonest duplicate, and a boolean hid it.
+      parentId: s.parent_id,
       lessons: s.lessons,
     }))
   );

@@ -32,7 +32,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(33);
+SELECT plan(35);
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -349,6 +349,27 @@ SELECT is(
   (SELECT count(*)::INT FROM parent_students
     WHERE student_id = 'c1a99999-0000-0000-0000-000000000001'),
   0, 'undo detaches the child again');
+
+-- ══ The queue reader, and the RLS hole it exists to close ═════════════════
+-- ⚠ REGRESSION PIN. The admin page originally embedded
+-- parents(profiles(...)) and showed "—" for the name, email and phone of
+-- EVERY requester: profiles_select reaches a parent through
+-- tenant_serves_parent(), which goes via their children's enrolments, and a
+-- parent who has joined by code but has no child yet is served by nobody —
+-- exactly the parent who files a claim. Every RPC was correct; the hole was in
+-- the page's read path, and only the UI driver found it.
+SET LOCAL "request.jwt.claims" TO '{"sub":"c1000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
+SELECT is(
+  (SELECT parent_email FROM list_student_claims()
+    WHERE student_id = 'c1a99999-0000-0000-0000-000000000002'),
+  'claim-p2@test.local',
+  '⚠ the admin can see WHO is asking — a plain profiles join returns NULL here');
+
+-- ...and it is still scoped per claim, so another business sees nothing.
+SET LOCAL "request.jwt.claims" TO '{"sub":"c1000000-0000-0000-0000-0000000000a2","role":"authenticated"}';
+SELECT is(
+  (SELECT count(*)::INT FROM list_student_claims()),
+  0, 'another business''s admin gets no rows from the queue reader');
 
 -- ══ The contract: a parent has no direct INSERT any more ══════════════════
 -- ⚠ THIS IS WHAT MAKES THE WHOLE SLICE REAL. add_child_or_claim() checks for

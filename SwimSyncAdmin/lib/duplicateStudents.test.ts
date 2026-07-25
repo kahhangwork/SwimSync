@@ -8,7 +8,7 @@ import {
 
 const kid = (over: Partial<DupStudent> & { id: string; full_name: string }): DupStudent => ({
   date_of_birth: null,
-  claimed: false,
+  parentId: null,
   lessons: 0,
   ...over,
 });
@@ -48,7 +48,7 @@ describe("findDuplicatePairs", () => {
   it("pairs a coach-added row with the parent-added one", () => {
     const pairs = findDuplicatePairs([
       kid({ id: "coach", full_name: "Ethan Tan", lessons: 3 }),
-      kid({ id: "parent", full_name: "Ethan Tan Wei Ming", date_of_birth: "2019-01-01", claimed: true }),
+      kid({ id: "parent", full_name: "Ethan Tan Wei Ming", date_of_birth: "2019-01-01", parentId: "p1" }),
     ]);
     expect(pairs).toHaveLength(1);
     // The row with the history must survive — merge_students refuses the
@@ -57,13 +57,25 @@ describe("findDuplicatePairs", () => {
     expect(pairs[0].duplicate.id).toBe("parent");
   });
 
-  it("ignores two children who each already have their own parent", () => {
+  it("ignores two children belonging to DIFFERENT families", () => {
     expect(
       findDuplicatePairs([
-        kid({ id: "a", full_name: "Ethan Tan", claimed: true }),
-        kid({ id: "b", full_name: "Ethan Tan Wei Ming", claimed: true }),
+        kid({ id: "a", full_name: "Ethan Tan", parentId: "p1" }),
+        kid({ id: "b", full_name: "Ethan Tan Wei Ming", parentId: "p2" }),
       ])
     ).toEqual([]);
+  });
+
+  // ⚠ The commonest duplicate of all, and an earlier `claimed: boolean`
+  // version silently hid it: the parent claims the coach's record, then adds
+  // the child again by hand. Both rows are claimed — by the SAME family.
+  it("DOES pair two rows belonging to the same parent", () => {
+    const pairs = findDuplicatePairs([
+      kid({ id: "coach", full_name: "Ethan Tan Wei Ming", date_of_birth: "2019-01-01", parentId: "p1", lessons: 1 }),
+      kid({ id: "typed", full_name: "Ethan Tan", date_of_birth: "2019-01-01", parentId: "p1" }),
+    ]);
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0].survivor.id).toBe("coach");
   });
 
   it("ignores namesakes with genuinely different birthdays", () => {
@@ -80,7 +92,7 @@ describe("findDuplicatePairs", () => {
   it("still pairs when one side has no date of birth at all", () => {
     const pairs = findDuplicatePairs([
       kid({ id: "a", full_name: "Ethan Tan", date_of_birth: null, lessons: 2 }),
-      kid({ id: "b", full_name: "Ethan Tan", date_of_birth: "2019-01-01", claimed: true }),
+      kid({ id: "b", full_name: "Ethan Tan", date_of_birth: "2019-01-01", parentId: "p1" }),
     ]);
     expect(pairs).toHaveLength(1);
     expect(pairs[0].survivor.id).toBe("a");
@@ -89,7 +101,7 @@ describe("findDuplicatePairs", () => {
   it("flags a pair that BOTH carry attendance as needing a human", () => {
     const pairs = findDuplicatePairs([
       kid({ id: "a", full_name: "Ethan Tan", lessons: 2 }),
-      kid({ id: "b", full_name: "Ethan Tan Wei Ming", lessons: 1, claimed: true }),
+      kid({ id: "b", full_name: "Ethan Tan Wei Ming", lessons: 1, parentId: "p1" }),
     ]);
     expect(pairs[0].needsHuman).toBe(true);
   });
@@ -97,7 +109,7 @@ describe("findDuplicatePairs", () => {
   it("marks a pair with no attendance either side as direction-agnostic", () => {
     const pairs = findDuplicatePairs([
       kid({ id: "a", full_name: "Ethan Tan" }),
-      kid({ id: "b", full_name: "Ethan Tan Wei Ming", claimed: true }),
+      kid({ id: "b", full_name: "Ethan Tan Wei Ming", parentId: "p1" }),
     ]);
     expect(pairs[0].eitherWay).toBe(true);
     expect(pairs[0].needsHuman).toBe(false);

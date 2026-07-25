@@ -24,8 +24,18 @@ export type DupStudent = {
   id: string;
   full_name: string;
   date_of_birth: string | null;
-  /** Has a parent account attached. */
-  claimed: boolean;
+  /**
+   * The parent account attached to this row, or null if nobody has claimed it.
+   *
+   * ⚠ THE IDENTITY MATTERS, NOT JUST THE PRESENCE. An earlier version stored a
+   * boolean `claimed` and skipped any pair where both sides had one — which
+   * silently hid the commonest duplicate of all: the SAME parent, having
+   * claimed the coach's record, then adding the child again by hand. Two rows
+   * belonging to one family is exactly a duplicate; two rows belonging to two
+   * families is two families. Found by the UI driver, which built that pair and
+   * then found nothing flagged.
+   */
+  parentId: string | null;
   /** How many attendance rows — decides which row must survive a merge. */
   lessons: number;
 };
@@ -68,9 +78,10 @@ export function namesMatch(a: string, b: string): boolean {
 /**
  * Pairs worth showing the admin.
  *
- * Only pairs where AT LEAST ONE side is unclaimed: two children who each have
- * their own parent account are two families, and suggesting a merge there is
- * both wrong and alarming.
+ * Skipped only when the two rows belong to DIFFERENT families: two children
+ * who each have their own parent account are two customers, and suggesting a
+ * merge there is both wrong and alarming. Two rows under the SAME parent are
+ * kept — that is the commonest duplicate there is.
  *
  * A conflicting date of birth is disqualifying. Two children genuinely called
  * "Ethan Tan" born on different days are siblings or namesakes, not a
@@ -85,7 +96,7 @@ export function findDuplicatePairs(students: DupStudent[]): DupPair[] {
       const a = students[i];
       const b = students[j];
 
-      if (a.claimed && b.claimed) continue;
+      if (a.parentId && b.parentId && a.parentId !== b.parentId) continue;
       if (!namesMatch(a.full_name, b.full_name)) continue;
       if (a.date_of_birth && b.date_of_birth && a.date_of_birth !== b.date_of_birth) {
         continue;

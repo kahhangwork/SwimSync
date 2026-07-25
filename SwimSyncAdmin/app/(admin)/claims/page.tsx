@@ -72,18 +72,22 @@ export default function ClaimsPage() {
   async function loadAll() {
     setLoading(true);
 
-    // student_claims_select already scopes to this business, so no tenant
-    // filter is needed or wanted — a second copy of that rule is a second
-    // thing to keep in step with the policy.
-    const { data, error } = await supabase
-      .from("student_claims")
-      .select(
-        `id, status, certainty, match_reason, created_at, decided_at,
-         claimed_name, claimed_dob, student_id,
-         students ( full_name, date_of_birth ),
-         parents ( profiles ( full_name, email, phone ) )`
-      )
-      .order("created_at", { ascending: false });
+    // ⚠ AN RPC, NOT A JOIN, AND THE REASON IS NOT PERFORMANCE.
+    // This page first read student_claims and embedded
+    // `parents(profiles(full_name, email, phone))`. That returns the parent's
+    // details under service role and NULL under the admin's own RLS, so every
+    // requester showed as "—" on the one screen whose job is "who is asking?".
+    //
+    // profiles_select reaches a parent through tenant_serves_parent(), which
+    // goes via their CHILDREN'S ENROLMENTS — and a parent who has redeemed the
+    // join code but has no child yet is served by nobody. That is exactly the
+    // parent who files a claim.
+    //
+    // list_student_claims() is SECURITY DEFINER and filters each row by
+    // is_tenant_admin() against that claim's own tenant, so it exposes this
+    // screen's data and nothing else. Caught by the UI driver; every RPC
+    // underneath was already correct.
+    const { data, error } = await supabase.rpc("list_student_claims");
 
     if (error) {
       setError(error.message);
@@ -91,41 +95,7 @@ export default function ClaimsPage() {
       return;
     }
 
-    const rows = (data ?? []) as any[];
-
-    // How many lessons each candidate already has. This is the number that
-    // makes a wrong approval expensive, so it is worth a second query.
-    const ids = Array.from(new Set(rows.map((r) => r.student_id)));
-    const counts = new Map<string, number>();
-    if (ids.length > 0) {
-      const { data: att } = await supabase
-        .from("attendance")
-        .select("student_id")
-        .in("student_id", ids);
-      for (const a of (att ?? []) as { student_id: string }[]) {
-        counts.set(a.student_id, (counts.get(a.student_id) ?? 0) + 1);
-      }
-    }
-
-    setClaims(
-      rows.map((r) => ({
-        id: r.id,
-        status: r.status,
-        certainty: r.certainty,
-        match_reason: r.match_reason,
-        created_at: r.created_at,
-        decided_at: r.decided_at,
-        claimed_name: r.claimed_name,
-        claimed_dob: r.claimed_dob,
-        student_id: r.student_id,
-        student_name: r.students?.full_name ?? "—",
-        student_dob: r.students?.date_of_birth ?? null,
-        lessons: counts.get(r.student_id) ?? 0,
-        parent_name: r.parents?.profiles?.full_name ?? "—",
-        parent_email: r.parents?.profiles?.email ?? "—",
-        parent_phone: r.parents?.profiles?.phone ?? null,
-      }))
-    );
+    setClaims((data ?? []) as Claim[]);
     setLoading(false);
   }
 
