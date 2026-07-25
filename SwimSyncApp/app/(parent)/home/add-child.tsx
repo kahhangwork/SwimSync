@@ -39,6 +39,12 @@ export default function AddChildScreen() {
   // appears at all, so there is no client-side rule here to get out of step.
   const [candidates, setCandidates] = useState<ClaimCandidate[] | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
+  // A last look before the record exists. Creating a child is close to
+  // irreversible in this product — there is no delete, only "set inactive"
+  // (PRD §7.14), because attendance and invoices hang off the row. So a typo
+  // in a name or a date is something the family lives with, and the cost of
+  // one extra tap is far below the cost of a permanent wrong record.
+  const [reviewing, setReviewing] = useState(false);
 
   const session = useAppStore((s) => s.session);
   const showToast = useAppStore((s) => s.showToast);
@@ -101,7 +107,10 @@ export default function AddChildScreen() {
       return;
     }
 
-    await submit("check");
+    // Confirm the details BEFORE anything is written. The duplicate check runs
+    // after this, on the server — the two are separate questions: "is this what
+    // you meant to type?" then "does your coach already have this child?".
+    setReviewing(true);
   }
 
   /**
@@ -124,6 +133,7 @@ export default function AddChildScreen() {
     candidateId?: string
   ) {
     setLoading(true);
+    setReviewing(false);
 
     const { data, error } = await supabase.rpc("add_child_or_claim", {
       p_tenant_id: tenantId,
@@ -346,6 +356,46 @@ export default function AddChildScreen() {
           />
         </View>
       </ScrollView>
+
+      {/* ── One last look before the record exists ──────────────────────── */}
+      {reviewing && candidates === null && (
+        <View className="absolute inset-0 bg-black/40 items-center justify-center px-5">
+          <View className="bg-white rounded-2xl p-5 w-full max-w-md">
+            <Text className="text-lg font-bold text-gray-900">
+              Is this right?
+            </Text>
+            <Text className="mt-1 text-sm text-gray-600">
+              Check the spelling and the date of birth. A child&rsquo;s profile
+              can&rsquo;t be deleted afterwards — if it&rsquo;s wrong,
+              you&rsquo;ll need to ask your coach to sort it out.
+            </Text>
+
+            <View className="mt-4 bg-gray-50 rounded-xl p-4 gap-1">
+              <Text className="text-base font-semibold text-gray-900">
+                {name.trim()}
+              </Text>
+              <Text className="text-sm text-gray-600">
+                Born {dob.trim()} · {gender}
+              </Text>
+              {notes.trim() !== "" && (
+                <Text className="mt-1 text-sm text-gray-500">{notes.trim()}</Text>
+              )}
+            </View>
+
+            <View className="mt-5 gap-2">
+              <PrimaryButton
+                label={loading ? "Saving..." : "Yes, add this child"}
+                onPress={() => submit("check")}
+              />
+              <PrimaryButton
+                label="Go back and edit"
+                variant="ghost"
+                onPress={() => setReviewing(false)}
+              />
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* ── "Has your coach already added your child?" ──────────────────────
           An overlay rather than RN's Modal: no screen in this app uses Modal,

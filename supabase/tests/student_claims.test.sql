@@ -32,7 +32,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(35);
+SELECT plan(37);
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -186,6 +186,25 @@ SELECT is(
   (SELECT count(*)::INT FROM find_student_candidates(
      'c1a11111-0000-0000-0000-000000000001','Tan',NULL)),
   0, 'a SURNAME-ONLY overlap returns nothing — not a directory');
+
+-- ⚠ A CONFLICTING DATE OF BIRTH DISQUALIFIES A NAME MATCH (added 2026-07-26).
+-- Bernice Tan was born 2018-05-06. A parent typing that same name with a
+-- DIFFERENT birthday is describing a namesake, not this child — and before
+-- this rule the given name alone was enough to surface her. The admin's
+-- duplicate detector already refused this case, so the parent-facing matcher
+-- (the one a stranger with a join code reaches) was the LOOSER of the two.
+SELECT is(
+  (SELECT count(*)::INT FROM find_student_candidates(
+     'c1a11111-0000-0000-0000-000000000001','Bernice Tan','2011-11-11')),
+  0, '⚠ a name match is refused when both dates of birth are known and differ');
+
+-- ...but a MISSING date is not a conflicting one, and that is the whole
+-- feature: the coach-added child usually has no date at all, which is exactly
+-- why students_identity_uniq lets the duplicate through.
+SELECT is(
+  (SELECT count(*)::INT FROM find_student_candidates(
+     'c1a11111-0000-0000-0000-000000000001','Bernice Tan', NULL)),
+  1, 'a MISSING date of birth still matches — it is not a disagreement');
 
 -- 7. A child who already has a parent is never offered.
 SELECT is(
