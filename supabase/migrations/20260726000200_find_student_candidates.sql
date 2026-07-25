@@ -176,7 +176,9 @@ BEGIN
     -- matching name, so the given name is near enough to information they
     -- supplied; the family name is not.
     (
-      (name_tokens(sc.full_name))[1] || COALESCE(
+      -- initcap, because name_tokens() lowercases for comparison and this
+      -- string is shown to a parent: "ethan T. W. M." reads like a bug.
+      initcap((name_tokens(sc.full_name))[1]) || COALESCE(
         (SELECT string_agg(' ' || upper(left(t, 1)) || '.', '')
            FROM unnest((name_tokens(sc.full_name))[2:]) AS t),
         ''

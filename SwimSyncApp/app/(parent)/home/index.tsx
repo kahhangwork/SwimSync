@@ -13,6 +13,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
+import { waitingSince } from "@/lib/claimCandidates";
 
 type Child = {
   id: string;
@@ -25,6 +26,14 @@ type Child = {
   class_day: string | null;
   class_time: string | null;
   class_location: string | null;
+};
+
+/** A claim the coach has not decided yet, or has declined. */
+type PendingClaim = {
+  id: string;
+  claimed_name: string;
+  status: "pending" | "declined";
+  created_at: string;
 };
 
 function formatTime(time: string | null): string | null {
@@ -47,6 +56,7 @@ export default function ParentHomeScreen() {
   const [creditBalance, setCreditBalance] = useState(0);
   const [totalOutstanding, setTotalOutstanding] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [claims, setClaims] = useState<PendingClaim[]>([]);
 
   const loadData = useCallback(async () => {
     if (!session) return;
@@ -128,6 +138,21 @@ export default function ParentHomeScreen() {
         0
       );
       setTotalOutstanding(outstanding);
+
+      // Claims this family is waiting on. A parent who tapped "that's my
+      // child" is BLOCKED from adding that child again until the coach
+      // decides, so without this card they are left with a toast they saw once
+      // and an app that appears to have done nothing. There is deliberately no
+      // email chasing the admin (PARENT_CLAIM_PLAN decision 7), which makes
+      // this the only thing managing the wait.
+      const { data: claims } = await supabase
+        .from("student_claims")
+        .select("id, claimed_name, status, created_at")
+        .eq("parent_id", parent.id)
+        .in("status", ["pending", "declined"])
+        .order("created_at", { ascending: false });
+
+      setClaims((claims ?? []) as PendingClaim[]);
     }
 
     setLoading(false);
@@ -196,6 +221,57 @@ export default function ParentHomeScreen() {
             </Text>
           </Card>
         )}
+
+        {/* ── Claims awaiting the coach, and ones they turned down ─────────
+            A parent who claimed a child cannot re-add that child until this is
+            decided, so the wait has to be visible and it has to say what to do
+            about it. A declined claim explains itself and offers the way
+            forward, because "nothing happened" is what makes a parent call the
+            coach. */}
+        {claims.map((c) => (
+          <Card key={c.id} className="mb-3">
+            {c.status === "pending" ? (
+              <>
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="time-outline" size={18} color="#f59e0b" />
+                  <Text className="font-semibold text-gray-900">
+                    Waiting for your coach
+                  </Text>
+                </View>
+                <Text className="mt-1 text-sm text-gray-600">
+                  You asked about <Text className="font-medium">{c.claimed_name}</Text>.
+                  Your coach is checking whether they&rsquo;re already on their
+                  roster — we&rsquo;ll add them to your account once it&rsquo;s
+                  confirmed.
+                </Text>
+                <Text className="mt-1 text-xs text-gray-400">
+                  {waitingSince(c.created_at)} · Still waiting? Ask your coach to
+                  check their SwimSync admin.
+                </Text>
+              </>
+            ) : (
+              <>
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="information-circle-outline" size={18} color="#64748b" />
+                  <Text className="font-semibold text-gray-900">
+                    {c.claimed_name} wasn&rsquo;t on your coach&rsquo;s roster
+                  </Text>
+                </View>
+                <Text className="mt-1 text-sm text-gray-600">
+                  You can add them yourself now.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push("/(parent)/home/add-child")}
+                  className="mt-2"
+                >
+                  <Text className="text-sky-500 font-semibold text-sm">
+                    Add {c.claimed_name}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Card>
+        ))}
 
         {/* Children section */}
         <View className="flex-row items-center justify-between mb-3">

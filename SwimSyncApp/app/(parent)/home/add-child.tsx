@@ -12,6 +12,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
 import PrimaryButton from "@/components/PrimaryButton";
+import {
+  describeCandidate,
+  matchReasonLabel,
+  type ClaimCandidate,
+} from "@/lib/claimCandidates";
 
 const GENDER_OPTIONS = ["Male", "Female"];
 
@@ -29,6 +34,11 @@ export default function AddChildScreen() {
   const [gender, setGender] = useState("Male");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // The candidate popup. `null` = not showing; the server decides whether it
+  // appears at all, so there is no client-side rule here to get out of step.
+  const [candidates, setCandidates] = useState<ClaimCandidate[] | null>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
 
   const session = useAppStore((s) => s.session);
   const showToast = useAppStore((s) => s.showToast);
@@ -91,71 +101,79 @@ export default function AddChildScreen() {
       return;
     }
 
+    await submit("check");
+  }
+
+  /**
+   * The ONE write path for adding a child.
+   *
+   * This used to be a plain INSERT into `students` plus a second INSERT into
+   * `parent_students`. It is now a single RPC because the "has your coach
+   * already added this child?" check has to happen BEFORE the insert, and a
+   * check the client could skip is not a check — `students_insert` no longer
+   * admits parents at all, so this is the only door.
+   *
+   * `mode` is the parent's answer:
+   *   check           — first attempt; the server looks for candidates
+   *   claim_confirmed — "yes, that's my child"   ─┐ both file a claim; NEITHER
+   *   claim_unsure    — "not sure"               ─┘ attaches the child
+   *   create_anyway   — "no, that's a different child"
+   */
+  async function submit(
+    mode: "check" | "claim_confirmed" | "claim_unsure" | "create_anyway",
+    candidateId?: string
+  ) {
     setLoading(true);
 
-    // Get the parent record for the logged-in user
-    const { data: parentRecord, error: parentError } = await supabase
-      .from("parents")
-      .select("id")
-      .eq("profile_id", session!.id)
-      .single();
-
-    if (parentError || !parentRecord) {
-      setLoading(false);
-      showToast("Could not find your parent account. Please try again.", "error");
-      return;
-    }
-
-    // Insert the student record
-    const { data: student, error: studentError } = await supabase
-      .from("students")
-      .insert({
-        full_name: name.trim(),
-        date_of_birth: dob.trim(),
-        gender: gender.toLowerCase(),
-        notes: notes.trim() || null,
-        assignment_status: "unassigned",
-        is_active: true,
-        tenant_id: tenantId,
-      })
-      .select("id")
-      .single();
-
-    if (studentError || !student) {
-      setLoading(false);
-      // A child is identified by name + date of birth within a business
-      // (students_identity_uniq). Hitting it almost always means this child is
-      // already registered — a parent tapping Save twice, or re-adding a child
-      // they forgot they had. Say that, rather than surfacing a raw 23505.
-      if (studentError?.code === "23505") {
-        showToast(
-          `${name.trim()} is already registered with this coach or school.`,
-          "error"
-        );
-        return;
-      }
-      showToast("Failed to create child profile. Please try again.", "error");
-      return;
-    }
-
-    // Link student to parent
-    const { error: linkError } = await supabase
-      .from("parent_students")
-      .insert({
-        parent_id: parentRecord.id,
-        student_id: student.id,
-      });
+    const { data, error } = await supabase.rpc("add_child_or_claim", {
+      p_tenant_id: tenantId,
+      p_full_name: name.trim(),
+      p_date_of_birth: dob.trim(),
+      p_gender: gender.toLowerCase(),
+      p_notes: notes.trim() || null,
+      p_mode: mode,
+      p_candidate_id: candidateId ?? null,
+    });
 
     setLoading(false);
 
-    if (linkError) {
+    if (error) {
+      // A child is identified by name + date of birth within a business
+      // (students_identity_uniq). Hitting it almost always means this child is
+      // already registered — a parent tapping Save twice, or re-adding a child
+      // they forgot they had. The RPC raises that message already worded for a
+      // parent, so pass it through rather than inventing a second copy.
       showToast(
-        "Child profile created but could not be linked to your account. Please contact support.",
+        error.code === "23505"
+          ? error.message
+          : error.message || "Failed to add your child. Please try again.",
         "error"
       );
       return;
     }
 
+    // RETURNS TABLE, so supabase-js hands back an array of one row.
+    const result = Array.isArray(data) ? data[0] : data;
+
+    if (result?.outcome === "candidates") {
+      setCandidates((result.candidates ?? []) as ClaimCandidate[]);
+      setChosen(null);
+      return;
+    }
+
+    if (result?.outcome === "pending" || result?.outcome === "already_pending") {
+      setCandidates(null);
+      showToast(
+        result.outcome === "pending"
+          ? "Sent to your coach to confirm. We'll add your child once they do."
+          : "You've already asked about this child — your coach is still checking.",
+        "success"
+      );
+      router.back();
+      return;
+    }
+
+    setCandidates(null);
     showToast(
       `${name.trim()}'s profile has been created. The admin will assign them to a class shortly.`,
       "success"
@@ -328,6 +346,108 @@ export default function AddChildScreen() {
           />
         </View>
       </ScrollView>
+
+      {/* ── "Has your coach already added your child?" ──────────────────────
+          An overlay rather than RN's Modal: no screen in this app uses Modal,
+          and Alert.alert is a NO-OP on the web build (§12a) — which is the
+          build parents actually use.
+
+          ⚠ THE THREE BUTTONS CARRY EQUAL WEIGHT, DELIBERATELY. This popup
+          appears while a parent is trying to finish a task, offering a card
+          that looks like the answer — and a wrong "Yes" is what hands a
+          stranger a family's attendance and billing history. So there is no
+          primary/ghost hierarchy, nothing is pre-selected, and a single
+          candidate does NOT auto-advance (that is the case most likely to be
+          accepted without reading). The heading asks a QUESTION; it never
+          announces that we found their child. */}
+      {candidates !== null && (
+        <View className="absolute inset-0 bg-black/40 items-center justify-center px-5">
+          <View className="bg-white rounded-2xl p-5 w-full max-w-md">
+            <Text className="text-lg font-bold text-gray-900">
+              Is this your child?
+            </Text>
+            <Text className="mt-1 text-sm text-gray-600">
+              Your coach may have already added your child. If one of these is
+              them, we&rsquo;ll ask your coach to confirm rather than creating a
+              second profile.
+            </Text>
+
+            <View className="mt-4 gap-2">
+              {candidates.map((c) => (
+                <TouchableOpacity
+                  key={c.student_id}
+                  onPress={() => setChosen(c.student_id)}
+                  className={`py-3 px-4 rounded-xl border ${
+                    chosen === c.student_id
+                      ? "bg-sky-50 border-sky-500"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <Text className="font-medium text-sm text-gray-900">
+                    {describeCandidate(c)}
+                  </Text>
+                  <Text className="mt-0.5 text-xs text-gray-500">
+                    {matchReasonLabel(c.match_reason)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View className="mt-5 gap-2">
+              <TouchableOpacity
+                disabled={!chosen || loading}
+                onPress={() => submit("claim_confirmed", chosen!)}
+                className={`py-3 rounded-xl border items-center ${
+                  chosen ? "border-gray-300 bg-white" : "border-gray-200 bg-gray-100"
+                }`}
+              >
+                <Text
+                  className={`font-medium text-sm ${
+                    chosen ? "text-gray-900" : "text-gray-400"
+                  }`}
+                >
+                  Yes, that&rsquo;s my child
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                disabled={!chosen || loading}
+                onPress={() => submit("claim_unsure", chosen!)}
+                className={`py-3 rounded-xl border items-center ${
+                  chosen ? "border-gray-300 bg-white" : "border-gray-200 bg-gray-100"
+                }`}
+              >
+                <Text
+                  className={`font-medium text-sm ${
+                    chosen ? "text-gray-900" : "text-gray-400"
+                  }`}
+                >
+                  I&rsquo;m not sure
+                </Text>
+              </TouchableOpacity>
+
+              {/* "No" needs no selection — it is a statement about all of them. */}
+              <TouchableOpacity
+                disabled={loading}
+                onPress={() => submit("create_anyway")}
+                className="py-3 rounded-xl border border-gray-300 bg-white items-center"
+              >
+                <Text className="font-medium text-sm text-gray-900">
+                  No, add {name.trim() || "my child"} as a new child
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setCandidates(null)}
+              className="mt-3 items-center"
+              disabled={loading}
+            >
+              <Text className="text-sm text-gray-500">Go back</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

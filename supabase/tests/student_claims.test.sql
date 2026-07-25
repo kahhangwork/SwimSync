@@ -159,7 +159,7 @@ SELECT is(
   (SELECT masked_name FROM find_student_candidates(
      'c1a11111-0000-0000-0000-000000000001','Ethan',NULL)
     WHERE student_id = 'c1a99999-0000-0000-0000-000000000001'),
-  'ethan T. W. M.',
+  'Ethan T. W. M.',
   'the candidate is masked — the family name never leaves the database');
 
 -- 8. The phone signal finds the child even when the NAME matches nothing.
