@@ -279,9 +279,20 @@ RESET ROLE;
 
 -- One PRESENT lesson in the Group class (in scope), one in the other-category
 -- class (out of scope). Neither is invoiced.
+--
+-- ⚠ THE DATE IS DERIVED IN SGT, NOT `CURRENT_DATE` — §7.7 in a test fixture.
+-- `CURRENT_DATE` is the SERVER's date (UTC here), while a package's coverage
+-- starts on its SGT confirmation date. Between 00:00 and 08:00 SGT those are
+-- DIFFERENT DAYS, so a lesson dated CURRENT_DATE falls one day BEFORE coverage
+-- begins, draws nothing, and assertions 25-26 fail — a green suite that goes
+-- red for eight hours a day with no code change. Latent from 2026-07-20 until
+-- it fired at 00:12 SGT on 2026-07-26. The product was right; the fixture was
+-- reasoning in the wrong timezone.
 INSERT INTO lesson_sessions (id, class_id, session_date) VALUES
-  ('66000000-0000-0000-0000-000000000001','ee000000-0000-0000-0000-000000000001', CURRENT_DATE),
-  ('66000000-0000-0000-0000-000000000002','ee000000-0000-0000-0000-000000000002', CURRENT_DATE);
+  ('66000000-0000-0000-0000-000000000001','ee000000-0000-0000-0000-000000000001',
+   (now() AT TIME ZONE 'Asia/Singapore')::date),
+  ('66000000-0000-0000-0000-000000000002','ee000000-0000-0000-0000-000000000002',
+   (now() AT TIME ZONE 'Asia/Singapore')::date);
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
   ('66000000-0000-0000-0000-000000000001','55000000-0000-0000-0000-000000000001',
    'present','ad000000-0000-0000-0000-000000000001'),
