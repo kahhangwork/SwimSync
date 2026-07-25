@@ -146,6 +146,31 @@ export type Scenario = {
   setRate: (
     opts: { from: string; price?: number; paidCoachId?: string; classId?: string },
   ) => Promise<void>;
+  /** Add a student with NO parent_students row — an "unclaimed" child, the
+   *  shape a coach creates at the poolside before the parent has an account.
+   *
+   *  `enrolment: 'trial'` closes the enrolment on its own date (the walk-in
+   *  shape: billable via its attendance row, but absent from activeStudentIds
+   *  so it can never block a LATER lesson). `'ongoing'` leaves it open — the
+   *  existing-student-whose-parent-is-slow shape, which SHOULD block. */
+  addUnclaimedStudent: (opts?: {
+    name?: string;
+    classId?: string;
+    enrolment?: "trial" | "ongoing" | "none";
+    /** Date the trial enrolment opens and closes on. Required for 'trial'. */
+    on?: string;
+  }) => Promise<string>;
+  /** Record a settlement, the admin's "paid outside SwimSync" / "written off".
+   *  Attendance on or before `through` stops blocking the seal. */
+  settle: (
+    studentId: string,
+    opts: {
+      through: string;
+      kind?: "paid_outside" | "written_off";
+      amount?: number;
+      reversed?: boolean;
+    }
+  ) => Promise<string>;
   /** Current pooled credit balance for the parent. */
   creditBalance: () => Promise<number>;
   /** Per-tenant credit balance (the source of truth). */
@@ -646,6 +671,85 @@ export async function newScenario(
     }
   }
 
+  async function addUnclaimedStudent(
+    opts: {
+      name?: string;
+      classId?: string;
+      enrolment?: "trial" | "ongoing" | "none";
+      on?: string;
+    } = {}
+  ): Promise<string> {
+    const targetClass = opts.classId ?? classId;
+    const enrolment = opts.enrolment ?? "ongoing";
+
+    if (enrolment === "trial" && !opts.on) {
+      // Same spirit as newScenario throwing on a zero-lesson scenario: a trial
+      // enrolment without its date is meaningless, and defaulting to "today"
+      // would silently make the fixture's meaning drift with the real clock.
+      throw new Error("addUnclaimedStudent({enrolment:'trial'}) requires `on`");
+    }
+
+    const { data: student, error } = await db
+      .from("students")
+      .insert({
+        full_name: opts.name ?? `Unclaimed ${tag}`,
+        tenant_id: tenantId,
+        assignment_status: enrolment === "none" ? "unassigned" : "assigned",
+      })
+      .select("id")
+      .single();
+    if (error || !student) {
+      throw new Error(`addUnclaimedStudent failed: ${error?.message}`);
+    }
+    studentIds.push(student.id as string);
+
+    // Deliberately NO parent_students row. That absence is the whole fixture.
+
+    if (enrolment !== "none") {
+      const isTrial = enrolment === "trial";
+      const { error: eErr } = await db.from("student_class_enrolments").insert({
+        student_id: student.id,
+        class_id: targetClass,
+        ...(isTrial ? { enrolled_at: opts.on } : enrolExtra),
+        unenrolled_at: isTrial ? opts.on : null,
+        is_active: !isTrial,
+      });
+      if (eErr) throw new Error(`enrolling unclaimed student: ${eErr.message}`);
+    }
+
+    return student.id as string;
+  }
+
+  async function settle(
+    sid: string,
+    opts: {
+      through: string;
+      kind?: "paid_outside" | "written_off";
+      amount?: number;
+      reversed?: boolean;
+    }
+  ): Promise<string> {
+    const kind = opts.kind ?? "paid_outside";
+    const { data, error } = await db
+      .from("student_settlements")
+      .insert({
+        tenant_id: tenantId,
+        student_id: sid,
+        settled_through: opts.through,
+        kind,
+        amount: kind === "paid_outside" ? (opts.amount ?? 30) : null,
+        method: kind === "paid_outside" ? "PayNow" : null,
+        recorded_by: coachProfileId,
+        ...(opts.reversed
+          ? { reversed_at: new Date().toISOString(), reversed_by: coachProfileId }
+          : {}),
+      })
+      .select("id")
+      .single();
+    if (error || !data) throw new Error(`settle failed: ${error?.message}`);
+    return data.id as string;
+  }
+
   return {
     db,
     tag,
@@ -662,6 +766,8 @@ export async function newScenario(
     studentId2,
     addSession,
     mark,
+    addUnclaimedStudent,
+    settle,
     setRate,
     creditBalance,
     tenantCreditBalance,

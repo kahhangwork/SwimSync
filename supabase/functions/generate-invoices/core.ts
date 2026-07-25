@@ -97,6 +97,19 @@ export type BlockingLesson = {
   unmarked_student_count: number;
 };
 
+/** A student with no parent account who has billable, unsettled attendance in
+ *  the billing month. The admin resolves them by inviting the parent (so the
+ *  lessons bill normally) or by recording a settlement. */
+export type UnclaimedStudent = {
+  student_id: string;
+  student_name: string | null;
+  /** Billable lessons in this month that nobody can be invoiced for. */
+  lessons: number;
+  /** Earliest and latest such lesson, so the admin can date a settlement. */
+  earliest_session_date: string;
+  latest_session_date: string;
+};
+
 export type GenerateResult = {
   billing_month: string;
   status: string;
@@ -115,6 +128,14 @@ export type GenerateResult = {
   /** Present when status is "incomplete_attendance": the lessons to mark
    *  before generation can proceed. Empty/absent otherwise. */
   blocking?: BlockingLesson[];
+  /** Billable lessons attended by a student with NO parent account, and not
+   *  covered by a settlement. These cannot be invoiced — there is nobody to
+   *  bill — so they are REPORTED rather than silently dropped, and they hold
+   *  the month OPEN. See the seal block. */
+  unclaimed_billable?: number;
+  /** Who those lessons belong to, so the admin can act: invite the parent, or
+   *  record the money as settled outside SwimSync. */
+  unclaimed_students?: UnclaimedStudent[];
   message?: string;
   results?: unknown[];
   created?: CreatedInvoice[];
@@ -375,6 +396,9 @@ async function generateForTenant(
   // A month with a failed write must never be sealed — sealing would lock out
   // the very retry that would have fixed it.
   let invoiceWriteFailed = false;
+  // Billable lessons whose student has no parent account. Collected per class,
+  // then reduced against settlements after the loop.
+  const unclaimedAttendance: { student_id: string; session_date: string }[] = [];
 
   // Today in the APP timezone, not UTC — the clamp below decides whether a
   // lesson counts as "should already have happened", and the UTC date is the
@@ -580,7 +604,105 @@ async function generateForTenant(
         }
       }
     }
+
+    // ── Billable attendance with NOBODY TO BILL ─────────────────────────────
+    // The loop above walks parentStudents, so a student with no parent_students
+    // row is never visited and their lessons vanish from the run without a
+    // trace. That is fine for the INVOICE (there is genuinely no parent to bill)
+    // and fatal for the SEAL: a sealed month is never reprocessed, so when the
+    // parent finally registers those lessons can never be billed at all.
+    //
+    // Collected here as a REPORT. It must not — and does not — touch
+    // billableStudentIds, the item tally, or any invoice arithmetic; claimed
+    // families bill exactly as they did before this existed (pinned by the
+    // TRIPWIRE test in unclaimed.test.ts).
+    const claimedStudentIds = new Set(
+      (parentStudents ?? []).map((ps) => ps.student_id as string)
+    );
+    for (const a of attRows ?? []) {
+      if (!BILLABLE.has(a.status)) continue;
+      if (claimedStudentIds.has(a.student_id)) continue;
+      unclaimedAttendance.push({
+        student_id: a.student_id,
+        session_date: sessionDateMap[a.lesson_session_id],
+      });
+    }
   }
+
+  // ── Reduce unclaimed attendance against settlements ───────────────────────
+  // A settlement says money for this student was received outside SwimSync, or
+  // written off. It is EFFECTIVE-DATED: it covers attendance on or before
+  // settled_through and nothing after, so settling once cannot blanket-
+  // authorise every future lesson. A reversed settlement covers nothing —
+  // reversal exists because a parent who turns up two months after a write-off
+  // must be recoverable.
+  const unclaimedStudentIds = [
+    ...new Set(unclaimedAttendance.map((u) => u.student_id)),
+  ];
+
+  let unclaimedStudents: UnclaimedStudent[] = [];
+  if (unclaimedStudentIds.length) {
+    const { data: settlements } = await supabase
+      .from("student_settlements")
+      .select("student_id, settled_through")
+      .in("student_id", unclaimedStudentIds)
+      .is("reversed_at", null);
+
+    // Latest live settlement per student — the furthest date any of them covers.
+    const coveredThrough = new Map<string, string>();
+    for (const st of settlements ?? []) {
+      const prev = coveredThrough.get(st.student_id as string);
+      const through = st.settled_through as string;
+      if (!prev || through > prev) {
+        coveredThrough.set(st.student_id as string, through);
+      }
+    }
+
+    // String comparison is correct and deliberate: both sides are YYYY-MM-DD,
+    // which sorts lexicographically. No Date object is constructed, so there is
+    // no timezone to get wrong (§7.7).
+    const unsettled = unclaimedAttendance.filter((u) => {
+      const through = coveredThrough.get(u.student_id);
+      return !through || u.session_date > through;
+    });
+
+    if (unsettled.length) {
+      const { data: names } = await supabase
+        .from("students")
+        .select("id, full_name")
+        .in("id", [...new Set(unsettled.map((u) => u.student_id))]);
+      const nameById = new Map(
+        (names ?? []).map((n) => [n.id as string, n.full_name as string])
+      );
+
+      const byStudent = new Map<string, string[]>();
+      for (const u of unsettled) {
+        const dates = byStudent.get(u.student_id) ?? [];
+        dates.push(u.session_date);
+        byStudent.set(u.student_id, dates);
+      }
+
+      unclaimedStudents = [...byStudent.entries()]
+        .map(([student_id, dates]) => {
+          const sorted = [...dates].sort();
+          return {
+            student_id,
+            student_name: nameById.get(student_id) ?? null,
+            lessons: sorted.length,
+            earliest_session_date: sorted[0],
+            latest_session_date: sorted[sorted.length - 1],
+          };
+        })
+        .sort((a, b) =>
+          a.earliest_session_date.localeCompare(b.earliest_session_date)
+        );
+    }
+  }
+
+  const unclaimedBillable = unclaimedStudents.reduce(
+    (sum, u) => sum + u.lessons,
+    0
+  );
 
   // ── Hard stop: nothing generates while any lesson is unmarked ─────────────
   // All-or-nothing on purpose. Billing the classes that happen to be complete
@@ -603,6 +725,11 @@ async function generateForTenant(
       invoices_created: 0,
       classes_still_incomplete: classesIncomplete,
       parents_deferred: deferredParents.size,
+      // Reported even on the blocked path: an admin fixing unmarked lessons
+      // should learn about the unclaimed ones in the same trip, not discover
+      // them on the next run.
+      unclaimed_billable: unclaimedBillable,
+      ...(unclaimedStudents.length ? { unclaimed_students: unclaimedStudents } : {}),
       sealed: false,
       blocking,
       message:
@@ -1016,10 +1143,20 @@ async function generateForTenant(
   //
   // If a month is ever sealed wrongly, delete its billing_periods row — see
   // INVOICE_RUNBOOK.md.
+  // A FIFTH condition joins the four above: no billable lesson may be left
+  // with nobody to bill. Without it a trial walk-in or an un-registered
+  // family's lessons are dropped from the invoice AND the month closes over
+  // them, so they can never be billed even after the parent registers — the
+  // §7.8/§7.13/§7.32 permanent-underbill shape through a fourth door.
+  //
+  // The escape hatch is a SETTLEMENT, not an override: the admin records that
+  // the money arrived outside SwimSync, or writes it off. Same philosophy as
+  // the attendance gate — add a way to RECORD the thing, never a way to skip it.
   const monthFinished =
     classesComplete > 0 &&
     classesIncomplete === 0 &&
     deferredParents.size === 0 &&
+    unclaimedBillable === 0 &&
     !invoiceWriteFailed;
 
   if (monthFinished) {
@@ -1057,9 +1194,17 @@ async function generateForTenant(
     // so counting inside the phase-2 loop reported 0 while the whole month was
     // blocked, which is exactly the silent case this number exists to surface.
     parents_deferred: deferredParents.size,
+    unclaimed_billable: unclaimedBillable,
+    ...(unclaimedStudents.length ? { unclaimed_students: unclaimedStudents } : {}),
     sealed: monthFinished,
     status: monthFinished
       ? "complete — billing month sealed"
+      : // Everything else is done; the only thing holding the month open is
+      // attendance nobody can be invoiced for. Named distinctly so the admin
+      // is told to invite a parent or record a settlement, rather than being
+      // sent hunting for an unmarked lesson that does not exist.
+      classesIncomplete === 0 && deferredParents.size === 0 && unclaimedBillable > 0
+      ? `open — ${unclaimedBillable} billable lesson(s) have no parent account to bill`
       : // Nothing to reckon with at all. Called out as its own status because
       // it is NOT "attendance still incomplete" (there is no attendance to be
       // incomplete) and NOT a finished month — it usually means no lesson has

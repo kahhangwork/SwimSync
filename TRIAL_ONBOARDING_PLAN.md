@@ -4,11 +4,40 @@ _Written 2026-07-25. A coach or admin can put a child on the roster before that 
 parent has a SwimSync account; the parent is later invited by link and adopts the
 existing record. Money taken outside SwimSync is recorded rather than lost._
 
-> **STATUS: PLANNED — NOT BUILT.** Nothing here is implemented. Requirements settled with
-> the user in one session (`/plan-with-confidence`, ~97%), then hardened with
-> `/plan-review` — **mitigations are inlined under the steps they govern**, marked
-> `⚠ RISK n`. The ranked list lives in the review response; this file carries the
-> executable form. Slice 2 (self-serve claiming, duplicate merge) is out of scope.
+> **STATUS: IN BUILD.** Requirements settled with the user (`/plan-with-confidence`, ~97%),
+> hardened with `/plan-review` — **mitigations are inlined under the steps they govern**,
+> marked `⚠ RISK n`. Slice 2 (self-serve claiming, duplicate merge) is out of scope.
+
+## Phase 0 spike results (2026-07-25) — both PASS, and one risk fired immediately
+
+**0a — `auth.uid()` inside SECURITY DEFINER: PASS.** Called from a `SET LOCAL ROLE
+authenticated` transaction with JWT claims, a `postgres`-owned SECURITY DEFINER function
+sees `auth.uid()` = **the caller's uuid** while `current_user` = `postgres`.
+
+Both halves matter, and the second **confirms RISK 3 is real rather than theoretical**:
+`created_by = auth.uid()` will record the coach (so RISK 6's mitigation holds), *and* the
+function is genuinely exempt from `pin_student_tenant()`, whose seam is `current_user`.
+**Nothing will catch a wrong `tenant_id` in this RPC.** Derive it from the class.
+
+**0b — parent invite round-trip: PASS, with two findings.**
+
+1. `generateLink({type:'invite'})` returns `action_link` without sending; metadata survives;
+   `handle_new_user()` creates `profiles` (role=parent, `tenant_id` NULL, correct per its
+   own comment — parents are global) and `parents`.
+2. **`parent_tenants` is CONFIRMED ABSENT.** The trigger deliberately leaves membership to
+   join codes, so **the invite route must create it** — and, because the invite is *about a
+   specific child*, `parent_students` too. Both need the `parents.id` that only exists after
+   the auth user, so Phase 6 does: generate link → resolve parent → link membership + child.
+   **Do this in one SECURITY DEFINER RPC** (`link_invited_parent`), not two service-role
+   inserts, so the pair is atomic; gate it with the **caller's** token per §8.9, because
+   `is_tenant_admin()` resolves `auth.uid()`, which is NULL for service role.
+3. ⚠ **RISK 10 FIRED ON THE FIRST RUN.** The spike passed
+   `redirectTo: http://localhost:8081/accept-invite` and the returned link carried
+   **`redirect_to=http://127.0.0.1:3000`** — `site_url`, silently substituted, pointing at
+   the *admin panel root*. Exactly §7.41, exactly what bit the provisioning session.
+   `additional_redirect_urls` currently lists `:8081` and `:8081/reset-password` but **no
+   app accept URL**. Phase 6 must add `http://localhost:8081/accept-invite` and
+   `swimsync://accept-invite`, then restart the stack, then **re-read the link**.
 
 ---
 
