@@ -63,8 +63,9 @@ describes. **Retire §7.43 when this ships.**
 | **An unmarked booking BLOCKS the month** | §7.7's no-override rule. A paid trial nobody marked is lost money. |
 | **New child OR existing child** | 11 real students exist; retyping a name would create a duplicate. |
 | **Its own Trials page** | A booking you cannot see is one you forget — and a forgotten one blocks billing. |
-| **Trial rate is per-business and EFFECTIVE-DATED** | A mutable column would reprice unbilled trials when the price changed — §7.3/§7.7's bug, fixed three times. |
-| **Unset trial rate → the class rate** | Today's behaviour and a *defined* answer. Distinct from §6's "missing CLASS rate is a hard failure", where the alternative is silently charging 0. |
+| **Trial rate is per CLASS CATEGORY, and EFFECTIVE-DATED** | `class_categories` already means "what kind of class this is" (Group, Private, Squad…) and already scopes packages. A private trial costs more than a group trial *because it is a different kind of lesson* — so this is the axis. Pricing on any other would invent a second vocabulary beside an existing one. Effective-dated because a mutable price would reprice unbilled trials — §7.3/§7.7's bug, fixed three times. |
+| **A rate with NO category is the business-wide default** | Categories are OPTIONAL and production has **5 classes, none tagged** — a category-only rate would be unusable until every class was tagged. Scope-less-means-everything is exactly how packages already resolve scope. |
+| **Resolution: category rate → scope-less rate → class rate** | Most specific wins. The last tier is today's behaviour, so a business that sets no trial rate at all is unaffected. Distinct from §6's "missing CLASS rate is a hard failure", where the alternative is silently charging 0. |
 | **Soft cancel** | History survives; a cancelled booking expects nobody. |
 
 ---
@@ -87,13 +88,33 @@ Index `(class_id, session_date) WHERE cancelled_at IS NULL` — the roster's hot
 RLS: read = tenant admin + platform admin **+ the class's coach** (they must see who is
 expected); write = tenant admin only.
 
-**`tenant_trial_rates`** — `(tenant_id, rate, effective_from, created_by, created_at)`,
-INSERT-only, no UPDATE/DELETE policy.
+**`trial_rates`** — `(tenant_id, category_id NULL, rate, effective_from, created_by,
+created_at)`, INSERT-only, no UPDATE/DELETE policy. `category_id IS NULL` is the
+business-wide default.
 
 > ⚠ **RISK 1 MITIGATION (part 1) — a trial rate can never be zero or negative.**
 > **Step:** `CHECK (rate > 0)` on the table. A $0 trial rate would silently bill nothing
 > on a document that freezes when created (§11.6) — the same failure `CHECK` guards
 > against on package products.
+
+> ⚠ **RISK 7 MITIGATION — deleting a category must not reprice history.**
+> These rows price PAST lessons. If a category's rates vanished with the category,
+> every unbilled trial in the five-week window between lesson and invoice run would
+> quietly re-resolve to the default or the class rate — §7.7's bug through a new door.
+> **Step:** `category_id … REFERENCES class_categories(id) ON DELETE RESTRICT`, exactly
+> as `package_products.category_id` already does (`20260720000100:112`) and for the same
+> reason. **Named prohibition: do NOT use `SET NULL` here** — that would silently
+> reinterpret a category rate as the business default.
+> **Assertion (pgTAP):** deleting a category that has a trial rate is refused.
+
+> ⚠ **RISK 11 MITIGATION — a category from another business.**
+> `classes` already guards this with `enforce_class_category_tenant`
+> (`20260720000100:81-97`); a rate row needs the same or the tenant boundary has a hole
+> the RLS policy cannot see (the policy checks `tenant_id`, not whether the *category*
+> belongs to it).
+> **Step:** mirror that trigger for `trial_rates`.
+> **Assertion (pgTAP):** admin A inserting a rate scoped to business B's category is
+> refused, and `trial_rates` does not grow.
 
 **Rewrite `add_unclaimed_student()`'s trial mode** to create a booking and nothing else —
 no enrolment, no session, no attendance.
@@ -133,18 +154,30 @@ no enrolment, no session, no attendance.
    `expectedOn(date) = activeStudentIds ∪ live bookings on that date`, **deduped**, and
    booking dates join `datesToCheck` so a trial on a session-less date still registers as
    unmarked.
-2. **`trial_paid` prices at the tenant's trial rate in force on the lesson's date**,
-   falling back to `class_rate_on` when none is set.
+2. **`trial_paid` prices by resolving the trial rate for the lesson's class and date**,
+   falling back to `class_rate_on` when none applies.
 
 > ⚠ **RISK 1 MITIGATION (part 2) — the fallback must never produce 0, and must never
-> throw.** Two failure shapes, opposite and both bad: a NULL rate coerced to 0 silently
+> throw.** Two opposite failure shapes, both bad: a NULL rate coerced to 0 silently
 > under-bills a frozen document; a NULL rate that raises blocks **all** billing for a
-> tenant who simply never set a trial price — which is every tenant today.
-> **Step:** `const price = trialRateOn(tenant, date) ?? classRateOn(class, date)` —
-> `??`, never `||` (a 0 would slip through `||`, and `CHECK (rate > 0)` is the second
-> layer that makes 0 unreachable anyway).
-> **Assertions (Deno), all three:** unset trial rate → bills **exactly** the class rate;
-> set → bills the trial rate; a rate effective AFTER the lesson → still the class rate.
+> business that simply never set a trial price — which is both of them today.
+> **Step:** `const price = trialRateOn(tenant, categoryId, date) ?? classRateOn(class, date)`
+> — `??`, never `||` (a 0 slips through `||`; `CHECK (rate > 0)` is the second layer that
+> makes 0 unreachable anyway).
+
+> ⚠ **RISK 12 MITIGATION — the resolution ORDER is money, so pin every branch.**
+> `trialRateOn` picks the most specific match: the class's category first, then the
+> scope-less default, then nothing — each filtered to `effective_from <= lesson date` and
+> taking the latest. Get the precedence backwards and a business charges the wrong price
+> for every trial, invisibly, on documents that freeze when created.
+> **Assertions (Deno), all six:**
+> 1. category rate set → bills the **category** rate
+> 2. only a scope-less rate set → bills the **default**
+> 3. both set → **category wins**
+> 4. neither → bills the **class rate**
+> 5. a rate effective AFTER the lesson → ignored (the earlier one, or the class rate, applies)
+> 6. the class has **no category** and only a category rate exists → falls to the class rate,
+>    NOT to that category's rate
 
 > ⚠ **RISK 10 MITIGATION — `trial_free` must stay free.** It is one keystroke from being
 > swept into the new pricing branch.
@@ -182,7 +215,10 @@ no enrolment, no session, no attendance.
 
 New nav item. Book (existing child **or** a new name, class, date), an **Upcoming** list,
 a **Past — unmarked** list flagged as what holds the month open, and cancel per row.
-The trial rate is set here (an amount field that records a new effective-dated row).
+**Trial rates** are set here too — a small table of *category → price*, one row per
+category plus an "All other classes" row for the scope-less default. Each save records a
+new effective-dated row rather than overwriting, so the screen should say plainly that a
+price change applies from today and does not alter lessons already taught.
 
 - The date picker offers **only that class's lesson dates**, from `classes.day_of_week` via
   `lib/lessonDates.ts` — an affordance backing the RPC's refusal, not replacing it.
@@ -194,10 +230,11 @@ The trial rate is set here (an amount field that records a new effective-dated r
 > **Assertion (vitest, in the existing `adminNav.test.ts`):** Trials appears for
 > `tenant_admin` and **not** for `platform_admin`.
 
-> ⚠ **RISK 7 — KNOWN LIMIT, record it rather than solve it.** One trial price per business
-> covers a $30 group class and an $80 private class alike. The user chose per-business
-> deliberately. **Step:** state it in PRD §7.17 so it is a documented choice, not a
-> surprise — and note the seam (a per-class override is an added column, not a rewrite).
+> **The per-business-rate limit this plan first carried is GONE** — pricing moved to the
+> class category, which is the axis that already distinguishes a $30 group class from an
+> $80 private one. What remains is a much narrower limit worth stating in PRD §7.17: two
+> classes **in the same category** cannot trial at different prices. The seam if that ever
+> bites is a per-class override row, not a rewrite.
 
 ## Phase 5 — Coach: remove the walk-in form, keep the marking
 
@@ -216,7 +253,8 @@ Delete *Add a walk-in / trial* and its handler. The roster becomes
 **pgTAP:** booking RLS (coach reads, cannot write; cross-tenant refused); the partial
 unique index (RISK 5); non-class-day refusal (RISK 4); already-enrolled refusal (RISK 6);
 the trial-mode rewrite creating **no** enrolment, session or attendance; the old argument
-list still resolving (RISK 8); `tenant_trial_rates` insert-only and date selection.
+list still resolving (RISK 8); `trial_rates` insert-only, the cross-tenant category
+refusal (RISK 11), and `ON DELETE RESTRICT` on a category that has rates (RISK 7).
 
 > **Mutation-test the booking gate** to the `tenant_provisioning.test.sql` standard:
 > delete the admin check and at least one assertion must fail **proving the ungated
@@ -252,7 +290,10 @@ A box that cannot be ticked is a **blocker**, not a caveat.
 **The three that decide whether money stays correct:**
 
 - [ ] **RISK 1** — tripwire green (no bookings, no trial rate → byte-identical invoices);
-      `??` not `||`; `CHECK (rate > 0)`; unset/set/future-dated rate all asserted.
+      `??` not `||`; `CHECK (rate > 0)`.
+- [ ] **RISK 12** — all **six** resolution branches asserted: category wins over default,
+      default over class rate, class rate when neither, future-dated ignored, and an
+      untagged class never picks up a category's rate.
 - [ ] **RISK 2** — `expectedStudentsOn` lives in `attendanceCompleteness.ts`, the three
       copies `diff` clean, and classCoverage agrees with the engine on one fixture.
 - [ ] **RISK 8** — the OLD argument list still resolves after the migration.
@@ -265,6 +306,10 @@ A box that cannot be ticked is a **blocker**, not a caveat.
 - [ ] **RISK 3** — unclaimed-student count is **0** immediately before deleting the coach
       form; Trials in the tenant-admin nav and not the platform admin's.
 - [ ] **RISK 10** — `trial_free` contributes 0 with a trial rate set.
+- [ ] **RISK 7** — deleting a category that has trial rates is refused (`ON DELETE
+      RESTRICT`, never `SET NULL`).
+- [ ] **RISK 11** — a rate scoped to another business's category is refused and the table
+      does not grow.
 - [ ] Booking gate mutation-tested; Deno suite run twice; both apps typecheck under the
       §7.11 stubbed condition.
 
