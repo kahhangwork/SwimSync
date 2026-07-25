@@ -125,7 +125,7 @@ Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-histo
 (S), Export to CSV (S), Disable a staff account (M), Student-move loose ends (S), Better
 filtering/search (S), More polished
 dashboards (S), Deeper component-render tests (M), Production data cleanup (S),
-Email-confirmation copy/templates (S), Revoke `anon` EXECUTE from the remaining
+Email-confirmation copy/templates (S), Audit trail invisible to its own business (S), Revoke `anon` EXECUTE from the remaining
 SECURITY DEFINER functions (S), Revenue reporting (M — *decide accrual-vs-cash first*).
 
 ### Later — big features carrying their own dependencies
@@ -804,6 +804,55 @@ is a reasonable long-term answer for Singapore.
 
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
+
+### A business cannot read its own audit trail — **S**
+`audit_log.tenant_id` is nullable and **13 of the 19 writers never set it**. The read policy
+is `is_platform_admin() OR is_tenant_admin(tenant_id)`, and `is_tenant_admin()` opens with
+`p_tenant_id IS NOT NULL AND …` — so it returns **`false`**, not NULL, for a null tenant.
+A row with no tenant is readable by the platform admin and **nobody else**.
+
+**Why:** costless today — *nothing in the product reads `audit_log`* (verified 2026-07-26:
+the only references in either app are one insert and a test helper). It becomes a real
+problem the moment the **Attendance edit history view** item above is built, because that
+item's premise — *"the data is already there"* — is now **half true**:
+
+- **6 writers set it** — everything added by the parent-claim work (2026-07-26).
+- **13 do not** — `close_student_enrolment`, `join_tenant_by_code`, `set_class_terms`,
+  `add_unclaimed_student`, `link_invited_parent`, `book_trial` ×3, the active/inactive
+  RPCs ×3, one in `tenant_rls`, **and the coach's attendance screen**
+  (`SwimSyncApp/app/(coach)/classes/[id]/attendance.tsx` writes `attendance_saved`
+  directly from the client).
+
+So a history screen written the obvious way would show every claim, approval and merge —
+and **none** of the attendance saves, enrolment closures or trial bookings. A history that
+silently omits most of the history reads as authoritative and is wrong; the same failure
+this document already warns about for *Revenue reporting*. Before 2026-07-26 the column
+was uniformly empty, which fails obviously. It is now partly populated, which fails
+quietly — arguably a worse state, and one this project created.
+
+**Notes — decide the derivation FIRST, it is the whole design:**
+
+- **From the actor** (`current_tenant_id()`): right for a coach saving attendance and an
+  admin approving a claim. **Wrong for `join_tenant_by_code`**, where the actor is a
+  *parent* with no `tenant_id` at all and the row is about the tenant being joined.
+- **From the entity** (`entity_type` + `entity_id`): correct in every case, but needs a
+  `CASE` with a lookup per type — and a new entity type added later silently falls through
+  to NULL, which is the §7.37 disease again. **Preferred anyway, with a `RAISE` on an
+  unknown type** so the next one fails loudly instead of writing another invisible row.
+- **Do NOT just pass `tenant_id` from the client.** `audit_log_insert`'s `WITH CHECK` is
+  only `(actor_id = auth.uid())` — it does not constrain `tenant_id`, so a client could
+  attribute an audit row to any business. Derive it server-side, in a trigger.
+- **A trigger, not 13 edited call sites.** Editing them means redefining large functions
+  (`book_trial`, `add_unclaimed_student`) purely to add a column — exactly the §7.40 hazard
+  that has already fired twice here.
+- **Probably don't backfill.** Old rows *could* be attributed via `entity_id`, but that is
+  inventing history from today's data — the objection that made the
+  `invoice_items.student_name` backfill a deliberate no (HANDOVER §6). Fix forward.
+- Second-order: the Deno helper cleans up with `delete().eq("tenant_id", tenantId)`, which
+  matches nothing for null-tenant rows, so **every test run leaks audit rows**. Same shape
+  as the orphan tenants in §7.44.
+
+Settle the scale first: `SELECT tenant_id IS NULL AS invisible, count(*) FROM audit_log GROUP BY 1;`
 
 ### Enforce the attendance window at save time — **S** `[handover]`
 The coach attendance screen (`(coach)/classes/[id]/attendance.tsx`) writes whatever `date` it
