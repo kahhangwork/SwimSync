@@ -2795,31 +2795,44 @@ That means two paths have never run for real, and both fail *quietly* rather tha
 watch that the invite **arrives** and lands on `/accept-invite`. That single action
 exercises both of the above and is the natural next step anyway — see below.
 
-### The one thing blocking everything else — and it has been urgent for four sessions
+### The one thing blocking everything else — moved for the first time on 2026-07-25
 
-**No attendance has ever been marked in production.** Zero `lesson_sessions`, zero
-`attendance` rows. Invoicing, credit, the completeness gate, sealing, wages, effective-dated
-pricing, active/inactive, and now child identity and levels are all tested against fixtures
-and driven through the real UI — and **none of it has processed a single real lesson.**
+**The first attendance ever recorded in production was marked on 2026-07-25**, by the user,
+end to end through the real apps: a trial booked on the Trials page for 12 Jul, marked
+`trial_free` in the coach app, cleared from "needs marking", and the child then claimed by
+an invited parent. `lesson_sessions` **1**, `attendance` **1**, `parent_students` 11 → 12.
+The Platform page's *last attendance* column no longer reads **never**.
 
-**Eight** sessions of building have now stacked on top of that, which is itself the argument:
-each one adds surface that a first real lesson would exercise for the first time. The Platform
-page's *last attendance* column still reads **never**, in red — it has said so since it was
-built two sessions ago, and nothing has changed it.
+> ⚠ **This paragraph replaces four sessions of "no attendance has ever been marked."** That
+> line was true from 2026-07-13 to 2026-07-25 and led this section throughout. Do not
+> reinstate it — check the number instead:
+> `SELECT COUNT(*) FROM attendance;` on production is the fact.
 
-This session made the *next* step cheaper rather than moving this one: onboarding the school
-is now a button (§8.9). That is progress on step 3 below while step 1 stayed still, which is
-worth noticing rather than glossing.
+**It was a TEST TRIAL, not a real lesson**, and the distinction still matters:
 
-Two things now depend on that not staying true much longer:
+- **No real lesson has been taught and recorded.** The one attendance row is a free trial
+  the user created to exercise the path.
+- **No invoice has ever been generated.** `invoices` is still **0**, so the billing engine
+  has never processed anything real, and the completeness gate has never refused a real
+  month.
+- `auto_invoice_enabled` is still **false**, and **no coach rate is set**, so payroll would
+  compute nothing.
+- The `class_rates` backfill (§8.3) is still *correct by emptiness* — floor-dating every
+  class's terms stays vacuously right until there are lessons for it to be wrong about.
+
+So the shape of the remaining work is unchanged, but it is now "bill a real month" rather
+than "mark anything at all", which is a genuinely smaller gap.
+
+Two things still depend on that not staying true much longer:
 
 - The **`class_rates` backfill** (§8.3) is *correct by emptiness*. Floor-dating every class's
   terms is vacuously right while there is no attendance for it to be wrong about.
 - The **completeness gate** has never refused a real month, and the block-notification email
   has never fired in production.
 
-1. **Get the coach marking attendance.** An onboarding push, not a build task, and the gate
-   on everything below.
+1. **Get the coach marking a REAL lesson.** The mechanism is now proven end to end on
+   production (above); what has not happened is an actual class being recorded. An
+   onboarding push, not a build task.
 2. **Then bill a real month**, following `INVOICE_RUNBOOK.md`. Expect the gate to refuse
    until every lesson is marked — working as designed; mark them (or mark them cancelled),
    never override.

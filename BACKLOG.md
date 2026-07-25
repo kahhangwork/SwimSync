@@ -218,7 +218,35 @@ of the attendance. The admin has no in-app way to merge them; the remedy is SQL.
   database already refuses to delete a student carrying history — only `parent_students`
   cascades; enrolments, attendance, invoice_items and credit_notes are all `NO ACTION` —
   so a mis-aimed merge cannot destroy anything.
-- Until this ships, slice 1 shows a **detection-only** warning and the fix is SQL.
+- Until this ships, the fix is SQL.
+
+**What slice 1 actually shipped, and what it proved (2026-07-25).** Read this before
+planning slice 2 — it is the difference between what exists and what does not:
+
+- The **invite path works end to end on production.** Verified by the user: a trial child
+  with no parent → admin sends an invite from Students → the parent sets a password → the
+  child is attached to their account automatically. `parent_students` went 11 → 12. This
+  is the happy path and it needs nothing further.
+- **`link_invited_parent()` already does the linking** (`20260725000300`): it writes
+  `parent_tenants` + `parent_students` in one transaction, refuses a child who already has
+  a DIFFERENT parent, and is a no-op for the SAME parent. Slice 2's approval step should
+  call it rather than re-implement linking.
+- **What does NOT exist:** any path for a parent to find their own child. A parent who
+  self-registers *before* being invited types their child's name into Add Child and gets a
+  second student record with none of the attendance.
+- **Nothing detects that today.** Slice 1 was planned with a detection-only duplicate
+  warning on the admin Students page; **it was not built.** Do not assume it is there.
+
+**The pieces slice 2 needs, and where the seams already are:**
+
+| Need | Where it stands |
+|---|---|
+| Match signal | `students.provisional_contact_phone` is captured at booking/creation; `profiles.phone` exists on the parent. Neither is used for matching yet. |
+| Candidate lookup | Must be `SECURITY DEFINER` — a registering parent matches no branch of `students_select`, so they cannot see an unclaimed child at all. |
+| Identity of the child | `students_identity_uniq` is `(tenant_id, lower(trim(full_name)), date_of_birth)`, and **NULL DOB never collides** — which is exactly why a coach-added child (often no DOB) and a parent-added one silently become two rows. |
+| Linking | `link_invited_parent()` — reuse it. |
+| Deleting the emptied duplicate | Safe ONLY because the DB refuses otherwise: of five FKs into `students`, only `parent_students` cascades; enrolments, attendance, invoice_items and credit_notes are all `NO ACTION`. A merge cannot destroy history even if aimed wrongly. |
+| Where the parent adds a child | `SwimSyncApp` Add Child — that is where the match must be offered, before the duplicate exists. |
 
 ### Attendance edit history view — **S** `[Phase 2]`
 Surface the existing audit trail in the UI.
