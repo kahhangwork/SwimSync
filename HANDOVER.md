@@ -452,7 +452,13 @@ enrolment, a **past** trial and a **cancelled** future trial — appear nowhere.
 six checks are database checks that those three rows EXIST**, because an absence assertion
 against a row that was never created passes while proving nothing (32 checks). Admin-only:
 no Expo server needed. Run it on **port 3100**, not 3000 — the stack and ports are shared
-with other worktrees: `ADMIN_URL=http://localhost:3100 node drivers/verify-class-students.mjs`.
+with other worktrees: `ADMIN_URL=http://localhost:3100 node drivers/verify-class-students.mjs`;
+`verify-levels-table.mjs` (+ `fixtures-levels-table.sql` and its `-teardown.sql`) pins the
+Swimming Levels table's **column geometry** — it MEASURES each `th`'s rect against its
+column's `td` and fails if they diverge by more than 2px. Written because §7.54's bug was
+invisible to every text assertion: the labels were all correct and merely in the wrong
+place. **It fails on the pre-fix code with a worst offset of 488px, which is the point**
+(12 checks; admin-only, port 3100).
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
@@ -1266,6 +1272,30 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     is exactly the negative-control row a test is relying on being singular. Use an
     explicit `WHERE NOT EXISTS` keyed on what "already seeded" means. Caught by running
     the fixture twice and diffing the row counts — do that for any new fixture.
+54. **WHEN A SHARED COMPONENT STARTS EMITTING AN ELEMENT ITS CALLERS USED TO EMIT, THE
+    SWEEP IS NOT THE FIX — A TEST IS.** `42803db` made `Thead` own its `<tr>`, swept the
+    call sites, **missed `levels/page.tsx`**, and left a docblock asserting the broken
+    form was now "unrepresentable". It was not: that page kept its `<Tr>`, rendered
+    `<tr>` inside `<tr>`, collapsed all five headers into one cell in column 1, and
+    shipped a visibly broken table to production **for a week**. Prose in a component
+    cannot enforce a call-site contract. If a shared primitive takes over an element,
+    land a scan test over the call sites *in the same commit* —
+    `SwimSyncAdmin/components/Table.test.tsx` is the one for this contract, and it walks
+    every `app/(admin)/**/page.tsx` so a page that does not exist yet is already covered.
+    - **Every text assertion passes on a table whose columns are misaligned.** The
+      labels were all present, correctly spelled and in the right order — just in the
+      wrong place. That is why nothing caught it and why a human looking at the page is
+      what eventually did. Geometry must be **measured**, not read: §7.34 again, now
+      twice over. `verify-levels-table.mjs` compares each `th`'s rect against its
+      column's `td`.
+    - **React's own `validateDOMNesting` warning is NOT a usable signal here — tested.**
+      Run against the known-broken page React logged **nothing**, so a check on it went
+      green on a page that was plainly wrong. Count `thead tr tr` off the DOM instead.
+      A check that passes on known-broken code is worse than no check.
+    - **A driver that has never been seen to fail proves nothing.** Both new checks were
+      run against the unfixed tree first: the scan test failed naming the file, and the
+      geometry check failed with a worst offset of **488px** (fixed: **0px**). Those two
+      numbers are what set the 2px tolerance — calibrate it, never guess it.
 ---
 
 ## 8.12 Twelfth session (2026-07-26) — PARENTS CAN CLAIM THEIR OWN CHILD — BUILT **AND DEPLOYED**
