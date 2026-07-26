@@ -410,7 +410,7 @@ A box that cannot be ticked is a **blocker**, not a caveat.
 
 ---
 
-## Graduating to `HANDOVER.md` §7
+## Graduating to `docs/GOTCHAS.md` §7
 
 - **Retire §7.43** — `lesson_sessions` returns to a single writer.
 - **New:** *a PostgREST function signature is a contract.* Removing or renaming a

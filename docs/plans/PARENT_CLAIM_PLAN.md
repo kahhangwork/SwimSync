@@ -526,7 +526,7 @@ Walk this before committing. **A box that cannot be ticked is a blocker, not a c
 - [ ] `verify-parent-claim.mjs` green through both real UIs, including the merge half.
 - [ ] Both apps typecheck; `grep` audits clean for `toISOString().split|slice` (§7.7).
 
-### Graduating to HANDOVER §7
+### Graduating to `docs/GOTCHAS.md` §7
 
 Two findings here outlive this task and belong in §7, which `/session-start` mandates reading:
 

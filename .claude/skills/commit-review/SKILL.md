@@ -106,7 +106,7 @@ SHA, and whether it is on `main`.
 
 - If there are no changes to commit, stop and say so — nothing to review.
 - **Migrations do not follow this flow.** They land on `main` alone, one at a
-  time — see `HANDOVER.md` §7.55. Worktrees share one database.
+  time — see `docs/GOTCHAS.md` §7.55. Worktrees share one database.
 - The end-of-session documentation sweep is **`/update-docs`**, and shutting the
   session down is **`/session-close`**. See `01_SESSION_WORKFLOW.md`.
 - This is project-scoped (SwimSync). To use it in every repo, move this

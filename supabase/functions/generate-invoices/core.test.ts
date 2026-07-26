@@ -23,7 +23,7 @@ import {
 // the month, a clock at which it is billable, and an enrolment date early
 // enough for the whole month's lessons to derive — as one inseparable fact.
 // Pass `now: s.now` to generateInvoices; never re-derive a date at the call
-// site. See test-helpers.ts for why (short version: HANDOVER §7.25).
+// site. See test-helpers.ts for why (short version: `docs/GOTCHAS.md` §7.25).
 
 Deno.test("bills only billable attendance; gross = sum of billable rates", async () => {
   const s = await newScenario({ price: 30, billing: monthEnded("2026-01") });

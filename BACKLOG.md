@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-27 (the attendance window is a rule; password reset verified on production for both apps after the admin entry was found missing from the live allow-list — HANDOVER §7.41)_
+_Last updated: 2026-07-27 (the attendance window is a rule; password reset verified on production for both apps after the admin entry was found missing from the live allow-list — `docs/GOTCHAS.md` §7.41)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -67,7 +67,7 @@ bug**, plus the configurable **invoice run day**, **month sealing**, and the **h
 attendance block** — see PRD §7.7 and HANDOVER §8.
 
 _Shipped 2026-07-19 and removed:_ **extract the completeness-rule shared helper** (it was
-#1; done as tenanting phase 0, and it immediately exposed a live underbill — HANDOVER
+#1; done as tenanting phase 0, and it immediately exposed a live underbill — `docs/GOTCHAS.md`
 §7.18), and the whole **tenant/coach money cluster** including **coach wages**.
 
 _Shipped 2026-07-19 and removed:_ **address + postal code at parent signup** — optional at
@@ -326,7 +326,7 @@ off-platform.
 **Notes:** the data model is closer to ready than it looks — `parent_students` is
 already **many-to-many**, so a student can have two parents. What's missing is a split
 rule and a decision about which parent's credit balance a correction lands in. Credit is
-pooled **per parent** (HANDOVER §6), so splitting invoices without splitting credit
+pooled **per parent** (`docs/ARCHITECTURE.md` §6), so splitting invoices without splitting credit
 would produce a ledger nobody can explain.
 
 ### Revenue reporting — **M**
@@ -455,7 +455,7 @@ gap that makes an app feel like a billing tool rather than something you'd open 
 already exists — expected lesson dates are derived at read time from
 `classes.day_of_week` via `lib/lessonDates.ts`, which is exactly what the coach's
 unmarked-lessons backlog uses. Point it at the future instead of the past. **This does
-not require pre-generating sessions** — resist that; see HANDOVER §6.
+not require pre-generating sessions** — resist that; see `docs/ARCHITECTURE.md` §6.
 
 ### Child identification: NRIC last 4 — **S** — _considered and declined 2026-07-19_
 Capture the last 4 characters of a child's NRIC as part of their identity.
@@ -562,7 +562,7 @@ Native push to parents and coaches.
 **Notes:** **blocked on native store builds** — push doesn't work on the static web app
 that's currently deployed, so this can't precede the platform item below. Note that
 Notification Preferences buttons were **removed** from coach Settings and parent Profile
-as dead stubs; HANDOVER §12 has the restore notes. Don't re-add the button until there's
+as dead stubs; `docs/ARCHITECTURE.md` §12 has the restore notes. Don't re-add the button until there's
 a real feature behind it.
 
 ### Automated reminder workflows — **M** `[MVP-excluded]` `[Phase 3]`
@@ -623,7 +623,7 @@ or mis-written gate in a future function is the only thing between anonymous cal
 an RLS-bypassing routine, with no second layer behind it.
 
 **Notes:** found 2026-07-21 while deploying tenant provisioning, by dumping the **remote**
-schema after `db push` (HANDOVER §7.39). Two things conspire, and both will bite the next
+schema after `db push` (`docs/GOTCHAS.md` §7.39). Two things conspire, and both will bite the next
 RPC too:
 - **`REVOKE ... FROM PUBLIC` does not remove role-specific grants.** `PUBLIC` is its own
   grantee, not an umbrella over `anon`/`authenticated`/`service_role`. A migration ending
@@ -713,7 +713,7 @@ available in this codebase, and wants its own pgTAP coverage before any UI exist
 
 **Two traps, both already paid for elsewhere:**
 
-- **A private coach holds `tenant_admin` *and* a `coaches` row** (HANDOVER §6). "Disable
+- **A private coach holds `tenant_admin` *and* a `coaches` row** (`docs/ARCHITECTURE.md` §6). "Disable
   the coach" for them means locking the business owner out of their own business. Guard
   it as *"cannot disable the sole tenant admin of a tenant"* — and check **which extension
   rows exist**, never `role`. Branching on the role enum is exactly what locked the real
@@ -869,7 +869,7 @@ quietly — arguably a worse state, and one this project created.
   that has already fired twice here.
 - **Probably don't backfill.** Old rows *could* be attributed via `entity_id`, but that is
   inventing history from today's data — the objection that made the
-  `invoice_items.student_name` backfill a deliberate no (HANDOVER §6). Fix forward.
+  `invoice_items.student_name` backfill a deliberate no (`docs/ARCHITECTURE.md` §6). Fix forward.
 - Second-order: the Deno helper cleans up with `delete().eq("tenant_id", tenantId)`, which
   matches nothing for null-tenant rows, so **every test run leaks audit rows**. Same shape
   as the orphan tenants in §7.44.
@@ -886,7 +886,7 @@ all.**
 **Why:** contact details are not cosmetic. `provisional_contact_phone` and `_email` are
 the top two ranked signals in `find_student_candidates()` — they decide **which parent is
 offered which child**, and once a claim is approved nothing in the product can unlink them
-except that flow's own undo (HANDOVER §7.47). "Who changed the number, and when?" is
+except that flow's own undo (`docs/GOTCHAS.md` §7.47). "Who changed the number, and when?" is
 exactly the question a disputed claim raises, and today the answer does not exist. A level
 edit matters far less, which is why this sat unnoticed.
 
@@ -917,7 +917,7 @@ edit matters far less, which is why this sat unnoticed.
 if they diverge. Point the same check at the other 13 admin table pages.
 
 **Why:** the Levels table shipped with its header row nested inside another row and stayed
-broken in production for a week (HANDOVER §7.54). **Every text-based assertion passed** —
+broken in production for a week (`docs/GOTCHAS.md` §7.54). **Every text-based assertion passed** —
 the labels were all present, correctly spelled and in the right order, merely in the wrong
 place. Only a human eventually noticed. The geometry check catches that class of bug, and
 right now exactly one of fourteen tables has it.
@@ -998,13 +998,13 @@ RN screens with a mocked Supabase; admin table components.
 is well covered (34 pgTAP + 8 Deno), but the screens where a coach actually loses money
 by abandoning a task are covered only by hand-run Playwright drivers.
 
-**Notes:** named in HANDOVER §5 as "the natural next additions." The
+**Notes:** named in `docs/TESTING.md` §5 as "the natural next additions." The
 `run-ui-playwright` drivers show what's worth pinning.
 
 ### Shared `lessonDates.ts` package — **M**
 The file is duplicated **byte-identical** in both apps.
 
-**Why:** filed for visibility, **not recommended**. HANDOVER §6 makes the case
+**Why:** filed for visibility, **not recommended**. `docs/ARCHITECTURE.md` §6 makes the case
 deliberately: separate npm projects, no workspaces, different React majors, different
 bundlers and test runners. Sharing ~120 lines of pure date maths would need workspace +
 Metro `watchFolders` + `transpilePackages` surgery. The file has **zero imports**, so
@@ -1067,12 +1067,12 @@ Kept so the reasoning doesn't get re-litigated.
 
 | Idea | Why not |
 |---|---|
-| **Pre-generating lesson sessions** (a scheduled session generator) | PRD §7.5 is knowingly unimplemented and should stay that way. Sessions are created lazily by the coach's attendance save; which lessons *should* have happened is derived at read time from `classes.day_of_week`. Pre-generation adds a job, a schedule, and a pile of edge cases when classes change — for no gain the read-time derivation doesn't already deliver. **Don't "fix" this** without a reason the derivation genuinely can't serve. (HANDOVER §6.) |
+| **Pre-generating lesson sessions** (a scheduled session generator) | PRD §7.5 is knowingly unimplemented and should stay that way. Sessions are created lazily by the coach's attendance save; which lessons *should* have happened is derived at read time from `classes.day_of_week`. Pre-generation adds a job, a schedule, and a pile of edge cases when classes change — for no gain the read-time derivation doesn't already deliver. **Don't "fix" this** without a reason the derivation genuinely can't serve. (`docs/ARCHITECTURE.md` §6.) |
 | **A parent-facing swimming-ability picker** | Removed on purpose (PRD §5.1). Parents self-reporting ability isn't information anyone trusted; the class a child is in is the real signal. If levels return they should be **coach-defined** — see the backlog item above. |
-| **Re-adding Notification Preferences / Help & Support buttons** | Removed as dead stubs with empty handlers, not lost (HANDOVER §12). Build the feature first, then the button. |
-| **`Alert.alert` for user feedback** | A **no-op on RN-web**, so it silently does nothing on the deployed app. Use `confirmAction` / the global Toast / inline form errors instead (HANDOVER §12a). The only sanctioned use left is the native-only media-library permission prompt. |
+| **Re-adding Notification Preferences / Help & Support buttons** | Removed as dead stubs with empty handlers, not lost (`docs/ARCHITECTURE.md` §12). Build the feature first, then the button. |
+| **`Alert.alert` for user feedback** | A **no-op on RN-web**, so it silently does nothing on the deployed app. Use `confirmAction` / the global Toast / inline form errors instead (`docs/ARCHITECTURE.md` §12a). The only sanctioned use left is the native-only media-library permission prompt. |
 | **Invoicing a child immediately when they are set inactive** | Proposed as "settle up what they owe on the way out"; rejected 2026-07-18. Invoices are `UNIQUE(parent_id, billing_month)`, so an early partial-month invoice makes the regular run skip that parent via the `already_exists` guard — stranding their **siblings'** lessons for that month. That is exactly the multi-class underbilling bug the same session fixed, re-entered through a new door. It also breaks PRD §7.7's one-complete-calendar-month rule. The normal cycle already bills them correctly, because billing follows **attendance rows** rather than current enrolment (HANDOVER §8). |
-| **An override on the completed-month guard** | Considered and refused 2026-07-19 while building it. Billing a month that has not ended is never legitimate: the attendance gate ignores lessons that have not happened yet, so a mid-month run reads as **complete**, bills what exists and **seals** the month — after which the rest of that month can never be billed (a sealed month is skipped; the `already_exists` guard skips the parent even if reopened). An override could therefore only ever produce that loss. Same reasoning as the attendance-block row below, and `force` was deliberately kept to its single meaning — skip the sealed-month guard — rather than growing a second one. If someone wants to bill mid-month, the answer is to wait, not to override. (HANDOVER §7.32, §8.6.) |
+| **An override on the completed-month guard** | Considered and refused 2026-07-19 while building it. Billing a month that has not ended is never legitimate: the attendance gate ignores lessons that have not happened yet, so a mid-month run reads as **complete**, bills what exists and **seals** the month — after which the rest of that month can never be billed (a sealed month is skipped; the `already_exists` guard skips the parent even if reopened). An override could therefore only ever produce that loss. Same reasoning as the attendance-block row below, and `force` was deliberately kept to its single meaning — skip the sealed-month guard — rather than growing a second one. If someone wants to bill mid-month, the answer is to wait, not to override. (`docs/GOTCHAS.md` §7.32, §8.6.) |
 | **An override / "Generate anyway" on the attendance block** | Removed deliberately 2026-07-18 (PRD §7.7). The case it appeared to serve — a class that genuinely didn't run — is already handled *inside* the completeness rule by marking everyone `cancelled_rain`/`cancelled_coach`. So the bypass wasn't covering a legitimate case; it was letting an unrecorded lesson through into a **permanent** underbill, because a lesson can never be added to an invoice that already exists (§11.6). The escape hatch for a class that can't be completed is removing the student, not overriding the check. |
 | ~~**A per-tenant invoice run day**~~ **— NOW BUILT (2026-07-19)** | Kept as a record of the reasoning, which held up. It was correctly refused while there was one business, and shipped as a per-tenant column the moment tenanting arrived, exactly as this row predicted ("trivial next to the RLS rewrite that happens anyway"). A useful example of deferring a small generalisation until the thing that needs it exists. |
 | **Modelling level families and a progression graph** (Toddler/Beginner/Intermediate tiers, "T4 → B3" rules, milestone markers) | Considered 2026-07-19 from a real swim school's level table, and rejected by the user: **different schools and coaches have different ladders, and different mappings between them.** Modelling tiers and progression edges would bake one business's structure into the schema and make every other tenant bend to it — the opposite of what a per-tenant curriculum is for. The generic primitive already covers it: a school with 16 rungs across 5 tiers simply names them that way (`Toddler 1` … `Epic 2`) and orders them, and `tenant_levels.note` carries any progression rule *in that business's own words* ("Progress to B3 upon completing T4"). Free text is the right amount of structure here — human-readable, and no schema commitment to a shape only one customer has. Revisit only if something needs to *compute* over progression (auto-advancing a child, say), which nothing does. |
@@ -1088,4 +1088,4 @@ Kept so the reasoning doesn't get re-litigated.
 | **Deleting a business from the admin panel** | Rejected 2026-07-21 with provisioning. A tenant deletion cascades into its families, students, invoices, credit notes and attendance — so a destructive button sitting on a support panel is a bigger risk than the mis-typed name it would fix, and the mistake it fixes is rare and cheap to correct in SQL. A **failed** provision already cleans up after itself (the route deletes the tenant if the invite fails), which covers the only case that happens automatically. An "only if the tenant is empty" variant was considered and judged not worth its own RPC, guard and tests. |
 | **Sending the invite through Supabase Auth's own invite email** | Considered 2026-07-21 and rejected in favour of `generateLink({type:'invite'})` + our own Resend send. Supabase's path would need a `templates/invite.html` **pasted into the production dashboard**, where nothing in the repo can see it and no test can catch it drifting from the file — and resending to an already-invited user has uncertain semantics (it may 422 rather than re-send). Our own send makes the template code-owned and unit-tested, no-ops without `RESEND_API_KEY`, and makes Resend deterministic. Note the deliberate inversion of the invoice-email rule: an invoice email is best-effort because billing must not depend on delivery, whereas **the invite IS the deliverable**, so a failed send surfaces the link for the operator instead of being swallowed. |
 | **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8a.) |
-| **Typing `<Thead>`'s children so a `<Tr>` inside it fails typecheck** | Considered 2026-07-26 while fixing the Levels table (HANDOVER §7.54) and declined by the user in favour of a call-site scan test. It would be the stronger guard in principle — the mistake becomes unrepresentable rather than merely detected — but React's `children` typing does not express "only these element types" cleanly, so it needs casts or a wrapper at call sites, and it would put a fiddly type on the component that backs **all 14 admin tables**. `components/Table.test.tsx` catches the same mistake in CI, names the file and the exact fix, and risks nothing at runtime. Note the earlier failure this replaces: the previous attempt at prevention was a **docblock asserting the broken form was "unrepresentable"**, which it was not — the lesson is that the guard must be executable, not that it must be a type. |
+| **Typing `<Thead>`'s children so a `<Tr>` inside it fails typecheck** | Considered 2026-07-26 while fixing the Levels table (`docs/GOTCHAS.md` §7.54) and declined by the user in favour of a call-site scan test. It would be the stronger guard in principle — the mistake becomes unrepresentable rather than merely detected — but React's `children` typing does not express "only these element types" cleanly, so it needs casts or a wrapper at call sites, and it would put a fiddly type on the component that backs **all 14 admin tables**. `components/Table.test.tsx` catches the same mistake in CI, names the file and the exact fix, and risks nothing at runtime. Note the earlier failure this replaces: the previous attempt at prevention was a **docblock asserting the broken form was "unrepresentable"**, which it was not — the lesson is that the guard must be executable, not that it must be a type. |

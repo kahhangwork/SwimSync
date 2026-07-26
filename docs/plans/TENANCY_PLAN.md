@@ -28,7 +28,7 @@ Nothing here is tenanting; it is all removing hazards that make tenanting riskie
 > underbilled: it inspected only `lesson_sessions` rows that exist, so a lesson nobody
 > touched was invisible to it — the month reported **"complete — billing month sealed"** and
 > that lesson could never be billed afterwards. Proven with a failing test before any fix;
-> full write-up in `HANDOVER.md` §7.17. The engine now derives expected lesson dates like
+> full write-up in `docs/GOTCHAS.md` §7.17. The engine now derives expected lesson dates like
 > everything else, from one shared definition. **Deno 51 → 55; both frontends 38 → 49.**
 
 ### 0.1 Extract the completeness-rule helper — ✅ done
@@ -348,7 +348,7 @@ strings unique to the target screen, since a navigated-away screen stays in the 
 ### Original plan for reference
 
 - `tenants.display_name` / `logo_url` on invoices and invoice emails (`email.ts`). Keep
-  sending isolated from billing (`HANDOVER.md` §6) — no engine changes here.
+  sending isolated from billing (`docs/ARCHITECTURE.md` §6) — no engine changes here.
 - PayNow QR resolved from the invoice's **tenant**, not the coach (§3.8). Parent app +
   admin.
 - **Parent Billing tab grouped by tenant.** With "multiple kids, multiple private coaches"
@@ -404,7 +404,7 @@ tenants                + rain_pays_coach · wage_run_day
 ```
 
 **Rates are effective-dated, never mutated in place.** A rate change must not reprice a
-past month — same class of bug as the UTC billing month (`HANDOVER.md` §7.12). This is the
+past month — same class of bug as the UTC billing month (`docs/GOTCHAS.md` §7.12). This is the
 single most important line in the phase.
 
 ### 5.2 Computation

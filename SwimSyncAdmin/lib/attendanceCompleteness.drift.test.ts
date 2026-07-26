@@ -1,7 +1,7 @@
 // attendanceCompleteness.ts exists in THREE copies and they must stay
 // byte-identical. This test is why that is enforced rather than remembered.
 //
-// The copies are deliberate (HANDOVER §6): separate npm projects, no workspace,
+// The copies are deliberate (`docs/ARCHITECTURE.md` §6): separate npm projects, no workspace,
 // different bundlers, and no npm resolution at all inside an Edge Function. The
 // file has zero imports precisely so the duplication is cheap.
 //

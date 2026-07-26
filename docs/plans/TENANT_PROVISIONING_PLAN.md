@@ -318,7 +318,7 @@ precisely what the trigger refuses to do.
 
 ## Deploy
 
-**EXPAND order — migrations first, then push** (this only adds; HANDOVER §7.27).
+**EXPAND order — migrations first, then push** (this only adds; `docs/GOTCHAS.md` §7.27).
 
 > ⚠ **RISK 3 MITIGATION (deploy half) — the DROP window is real.**
 > `platform_tenant_overview()` is DROPped and recreated in one migration, so it is
@@ -389,7 +389,7 @@ Walk these before committing. **A box that cannot be ticked is a blocker, not a 
 3. **Docs:** PRD §4.4, HANDOVER §8.9 + §7 gotchas, BACKLOG, LOCAL_DEV_GUIDE.
 4. **Deploy** per the EXPAND order above — migrations first, push last.
 
-## Graduating to HANDOVER §7
+## Graduating to `docs/GOTCHAS.md` §7
 
 Two findings here outlive this task and belong in *Gotchas already hit*, which
 `/session-start` mandates reading every session:

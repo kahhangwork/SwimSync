@@ -4,7 +4,7 @@
 // can actually SIGN IN afterwards. A provisioning flow that creates rows but
 // leaves its admin locked out is the exact failure that hit production when the
 // tenancy backfill made the real coach a tenant_admin while login still branched
-// on role === "coach" — they were met with "Unrecognised role" (HANDOVER §7.19).
+// on role === "coach" — they were met with "Unrecognised role" (`docs/GOTCHAS.md` §7.19).
 // Capability follows which extension rows exist, not the enum, so this walks the
 // whole path rather than checking the database.
 //

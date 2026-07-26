@@ -208,4 +208,4 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 ---
 
 _Related: PRD §5.5–5.6 (billing & credit rules), §7.7 (invoice generation),
-§10 (calculation logic); HANDOVER §11 (cloud setup)._
+§10 (calculation logic); `docs/DEPLOYMENT.md` §11 (cloud setup)._

@@ -111,12 +111,16 @@ Two things it enforces that are easy to skip:
 
 ### `session-start` — get up to speed before touching code
 
-The mirror of `update-docs`. Reads the four orientation documents **in order** —
-`HANDOVER.md` (state you're inheriting) → `PRD.md` (what exists) → `BACKLOG.md`
-(what doesn't yet, and why) → `LOCAL_DEV_GUIDE.md` (exact run/test commands + seed
-logins) — then reports where things stand, what's next per HANDOVER §9, and any
-drift it spotted across the docs. The order is the fastest path from cold to
-productive.
+The mirror of `update-docs`. **Reads `HANDOVER.md` — the index — and then stops**,
+fetching `PRD.md`, `BACKLOG.md`, `LOCAL_DEV_GUIDE.md` or a `docs/` reference only when
+the task actually touches it. Reports where things stand, what's next per HANDOVER §9,
+and any drift it spotted.
+
+> **Changed 2026-07-26.** It used to read four documents cover to cover — about
+> **131,000 tokens** before any work began, half of it a session-by-session changelog.
+> `HANDOVER.md` is now ~11,000 tokens and points at everything else. Reading on demand is
+> both cheaper and more accurate: recall degrades as context grows, and stale material
+> sitting *near* the right answer competes with it.
 
 - **Invoke:** `/session-start`, or say "get up to speed" / "catch up" / "where were
   we" at the start of a session.
@@ -153,7 +157,7 @@ documents.
 **Writes no documentation.** It releases what the session was holding, which matters
 because the local environment is shared between every worktree: fixture rows torn out
 of the one database, dev servers stopped and ports released, nothing left uncommitted
-or unpushed (including an untracked migration — see HANDOVER §7.55), and the worktree
+or unpushed (including an untracked migration — see `docs/GOTCHAS.md` §7.55), and the worktree
 given an explicit keep-or-remove decision.
 
 Ends by handing back anything only *you* can do — production spot-checks needing your
@@ -217,7 +221,7 @@ login, decisions deliberately left open.
 
 ```
 # Workflow (project skills) — full order in 01_SESSION_WORKFLOW.md
-/session-start            read HANDOVER→PRD→BACKLOG→LOCAL_DEV_GUIDE, get oriented   [once]
+/session-start            read HANDOVER (the index); fetch the rest on demand       [once]
 /plan-with-confidence     don't plan until >96% sure (asks questions first)     [per change]
 /plan-review              rank a plan's product risk + add mitigations           [per plan]
 /commit-review            review, commit, AND push to main                     [per change]

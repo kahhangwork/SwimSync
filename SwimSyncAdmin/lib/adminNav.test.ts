@@ -4,7 +4,7 @@ import { NAV, navFor, hasTenant, landingRoute, scopeForPath } from "./adminNav";
 // The seeded production shape: the real coach holds tenant_admin AND a coaches
 // row (a tenant of one). These tests exist mostly to pin that they are treated
 // as an ordinary business admin — branching on role instead is what locked them
-// out of production once already (HANDOVER §7.19).
+// out of production once already (`docs/GOTCHAS.md` §7.19).
 const A_TENANT = "11111111-1111-1111-1111-111111111111";
 
 describe("hasTenant", () => {

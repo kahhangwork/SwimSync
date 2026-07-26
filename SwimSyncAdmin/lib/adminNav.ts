@@ -12,7 +12,7 @@
 // WHY tenant_id AND NOT role. A private coach holds `tenant_admin` *and* a
 // `coaches` row — they are a tenant of one. Gating on a role comparison is
 // exactly what shipped "Unrecognised role. Please contact support." to the only
-// real coach in production during the tenancy backfill (HANDOVER §7.19). The
+// real coach in production during the tenancy backfill (`docs/GOTCHAS.md` §7.19). The
 // question these pages actually ask is "do you have a business?", and
 // `profiles.tenant_id` answers it directly — so a renamed role, a new role, or
 // a second admin role all keep working, with no enum to fall out of sync with.

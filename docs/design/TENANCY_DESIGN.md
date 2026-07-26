@@ -126,7 +126,7 @@ invoices that month — one from each business. Today's constraint forbids it ou
 
 ### 3.2 Credit balance must be per (parent, tenant)
 
-`parents.credit_balance` is a single pooled number, and `HANDOVER.md` §6 documents the
+`parents.credit_balance` is a single pooled number, and `docs/ARCHITECTURE.md` §6 documents the
 pooling as deliberate. Under tenants it becomes **wrong, not just imprecise**: credit earned
 at the school would be spendable against a private coach's invoice, taking money from one
 business and giving it to another.
@@ -154,7 +154,7 @@ unrelated coach's billing. The all-or-nothing reasoning still holds *inside* a t
 `auto_invoice_enabled` and `invoice_run_day` are global key/value rows. One school changing
 its run day would change everyone's. These become per-tenant settings with a platform
 default. `APP_TIMEZONE` may stay global for now — every user is in SGT, and
-`HANDOVER.md` §6 already records that call.
+`docs/ARCHITECTURE.md` §6 already records that call.
 
 ### 3.6 The invoice engine runs as `service_role` and therefore bypasses RLS
 
@@ -354,7 +354,7 @@ it needs no coach-type branch: a wage is owed when the coach is **not** the tena
 - **Any individual class may override it with a flat per-class rate.** So a coach can teach
   classes 1–3 at their normal hourly rate and class 4 at a special flat rate.
 - **Rates are effective-dated, never mutated in place.** Recomputing an old month must not
-  reprice history — the same class of bug as the UTC billing month (`HANDOVER.md` §7.12).
+  reprice history — the same class of bug as the UTC billing month (`docs/GOTCHAS.md` §7.12).
   This is an engineering call, not a product one, and is not negotiable in the design.
 
 ### When a lesson pays
@@ -423,7 +423,7 @@ the draft window costs nothing and removes most adjustments entirely.
 - **Cross-tenant students.** A student belongs to one tenant; `one_active_enrolment_per_student`
   already enforces one active class. A child taking lessons at two businesses is out of scope.
   Note this *is* a real thing in Singapore — revisit only on demand.
-- **Per-tenant timezone.** `APP_TIMEZONE` stays global (`HANDOVER.md` §6, §8a).
+- **Per-tenant timezone.** `APP_TIMEZONE` stays global (`docs/ARCHITECTURE.md` §6, §8a).
 
 ---
 
@@ -462,7 +462,7 @@ existing coach and vice versa.
 | # | Question | Decision |
 |---|---|---|
 | 1 | §6 join flow | **Join codes, no links.** Parent registers, enters a per-tenant code, picks per child from joined tenants. `students.tenant_id` stays NOT NULL; platform admin **reassigns**. |
-| 2 | §3.2 credit across tenants | **Never crosses tenants; pools freely within one.** Explicitly reverses `HANDOVER.md` §6 ("credit is pooled per parent") with the user's go-ahead. |
+| 2 | §3.2 credit across tenants | **Never crosses tenants; pools freely within one.** Explicitly reverses `docs/ARCHITECTURE.md` §6 ("credit is pooled per parent") with the user's go-ahead. |
 | 3 | Tenant branding | **In, from the first migration** — name, logo, PayNow QR on `tenants`; invoices and emails render them (§7a). |
 | 4 | Tenant 1's admin | **The real coach owns their tenant** (`tenant_admin` + `coach`); the user steps back to `platform_admin`. Tenant 1 therefore exercises the real private-coach shape. |
 | 5 | Delivery | **Incremental merges**, each a no-op while only one tenant exists (§9). |

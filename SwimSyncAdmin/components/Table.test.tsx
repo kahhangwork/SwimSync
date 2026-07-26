@@ -14,7 +14,7 @@ import { Table, Thead, Th, Tbody, Tr, Td } from "./Table";
  * visibly broken table to production for a week with nothing going red.
  *
  * A comment describing a call-site contract is a wish. This is the contract.
- * See HANDOVER §7.54.
+ * See `docs/GOTCHAS.md` §7.54.
  */
 
 function adminPages(dir: string): string[] {
@@ -51,7 +51,7 @@ describe("Thead owns its <tr> — call-site scan", () => {
               `collapses into one column. Delete the <Tr> wrapper and pass ` +
               `<Th> directly. A table that genuinely needs a SECOND header ` +
               `row needs its own component — do not loosen this test. ` +
-              `See HANDOVER §7.54.`
+              `See docs/GOTCHAS.md §7.54.`
           );
         }
       });

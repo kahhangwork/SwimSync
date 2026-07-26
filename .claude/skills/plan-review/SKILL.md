@@ -78,7 +78,7 @@ cannot be ticked is a blocker, not a caveat.
 
 ### Let the durable ones graduate
 
-A mitigation that outlives this task belongs in `HANDOVER.md` §7 (*Gotchas
+A mitigation that outlives this task belongs in `docs/GOTCHAS.md` §7 (*Gotchas
 already hit*), not only in a plan file that is discarded when the work lands.
 §7 governs precisely because `/session-start` mandates reading it every session.
 

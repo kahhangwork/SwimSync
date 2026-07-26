@@ -93,7 +93,7 @@ export default function ClassesPage() {
   // these joins onto loadClasses()'s select would mean any of those blanks
   // every class from this page, rather than degrading one drawer. So the
   // class list keeps the query it has always had, and the roster lives here,
-  // defaulted to empty, free to fail on its own. See HANDOVER §7.52.
+  // defaulted to empty, free to fail on its own. See `docs/GOTCHAS.md` §7.52.
   const [enrolments, setEnrolments] = useState<RosterEnrolment[]>([]);
   const [bookings, setBookings] = useState<RosterBooking[]>([]);
   const [rosterError, setRosterError] = useState<string | null>(null);

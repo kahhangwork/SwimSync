@@ -407,7 +407,7 @@ A box that cannot be ticked is a **blocker**, not a caveat.
 
 ---
 
-## Graduating to `HANDOVER.md` §7
+## Graduating to `docs/GOTCHAS.md` §7
 
 Two findings outlive this task and belong in §7, which `/session-start` mandates reading:
 

@@ -242,7 +242,7 @@ Two sends, both the invoice-email pattern (business-branded, best-effort, isolat
     read the pending set — it must be exactly this feature's migrations.
 - Docs at session close: PRD gains the packages section (implemented-behaviour
   only, per lane rules), BACKLOG gains the refund item + parent expiry
-  notifications, HANDOVER §7 graduates any new gotchas hit during the build.
+  notifications, `docs/GOTCHAS.md` §7 graduates any new gotchas hit during the build.
 
 ---
 

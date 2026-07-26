@@ -92,9 +92,10 @@ often skipped. Both are quick when the session was small.
 
 ## If you are working in a worktree
 
-Read `HANDOVER.md` **§7.55** (worktrees share one database — migrations land on `main`
-alone, one at a time) and **§7.56** (a fresh worktree has no `.env` files, and the failure
-looks like your own bug) before you start.
+Read `docs/GOTCHAS.md` **§7.55** (worktrees share one database — migrations land on `main`
+alone, one at a time) and **§7.56** (a fresh worktree has no `.env` files, the failure looks
+like your own bug, and a sibling session can move `HEAD` between your checkout and your
+commit) before you start.
 
 Default to working in the **root checkout** on a short-lived branch. Use a worktree only
 when you deliberately want a second Claude session running at the same time.
@@ -107,8 +108,15 @@ when you deliberately want a second Claude session running at the same time.
 |---|---|---|
 | `01_SESSION_WORKFLOW.md` | **You** | What to type, and when. This file |
 | `AVAIL_SKILLS.md` | You + Claude | What each skill does in detail |
+| `CLAUDE.md` | Claude | Loaded **automatically** every session — commands, boundaries, the rules that bite. Under 200 lines |
+| `HANDOVER.md` | Claude | The state the next session inherits — **and the index to everything below** |
 | `PRD.md` | Claude | What the product **does** — only what is built |
 | `BACKLOG.md` | Claude | What it **doesn't do yet** — nothing here exists |
+| `docs/GOTCHAS.md` | Claude | §7 — traps that already cost real time. Read before touching an unfamiliar area |
+| `docs/ARCHITECTURE.md` · `docs/TESTING.md` · `docs/DEPLOYMENT.md` | Claude | §6/§10/§12, §5, §11 — reference, read on demand |
 | `docs/design/` · `docs/plans/` | Claude | Designs of record, and per-feature plans. Read the one for the area you're changing |
-| `HANDOVER.md` | Claude | The state the next session inherits |
 | `LOCAL_DEV_GUIDE.md` | Both | How to run and test it; seed logins |
+
+> **Read on demand, not up front.** `/session-start` reads `HANDOVER.md` and stops; it
+> fetches the rest only when the task needs them. Before 2026-07-26 it read four documents
+> cover to cover — ~131,000 tokens before any work began. It is now ~12,000.

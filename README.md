@@ -28,8 +28,24 @@ fact in the wrong one is how it goes stale without anyone noticing.
 |---|---|---|---|
 | **[PRD.md](PRD.md)** | How does SwimSync behave? | A **shipped** behaviour changes | Long — it's the spec |
 | **[BACKLOG.md](BACKLOG.md)** | What could we build, and why does it matter? | An idea arrives, or ships | Medium — items enter and leave |
-| **[HANDOVER.md](HANDOVER.md)** | What's the state right now, and what's next? | Every working session | Short — rewritten constantly |
+| **[HANDOVER.md](HANDOVER.md)** | What's the state right now, what's next, **and where everything else lives** | Every working session | Short — rewritten constantly |
 | **[LOCAL_DEV_GUIDE.md](LOCAL_DEV_GUIDE.md)** | How do I run and test it? | Setup changes | Long |
+
+Beneath those sit the **reference** documents — read on demand, when a task touches them,
+rather than up front. They were split out of `HANDOVER.md` on 2026-07-26, **keeping their
+section numbers**, because that file had grown to 3,972 lines and half of it was a session
+log:
+
+| Document | Answers | Section |
+|---|---|---|
+| **[docs/GOTCHAS.md](docs/GOTCHAS.md)** | What trap is waiting for me here? | §7 |
+| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Why is it built this way? Where do files live? | §6, §10, §12 |
+| **[docs/TESTING.md](docs/TESTING.md)** | What does each suite and UI driver cover? | §5 |
+| **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | What's live, and what config traps bit us? | §11 |
+
+And **[CLAUDE.md](CLAUDE.md)** — loaded automatically into every Claude Code session, so
+it holds only the commands, the boundaries, and the handful of rules whose violation is
+expensive. Keep it under 200 lines; a new gotcha belongs in `docs/GOTCHAS.md`.
 
 The distinction that does the real work:
 
@@ -61,8 +77,10 @@ categorised by what it *is*:
 | Path | What |
 |---|---|
 | `01_SESSION_WORKFLOW.md` | **Start here** — which skill to run when |
+| `CLAUDE.md` | Auto-loaded every session: commands, boundaries, the rules that bite |
 | `README.md` `PRD.md` `BACKLOG.md` `HANDOVER.md` `LOCAL_DEV_GUIDE.md` | The living documents |
 | `AVAIL_SKILLS.md` `INVOICE_RUNBOOK.md` | Reference and procedure |
+| **`docs/`** | `GOTCHAS.md` (§7), `ARCHITECTURE.md` (§6/§10/§12), `TESTING.md` (§5), `DEPLOYMENT.md` (§11) — split out of `HANDOVER.md`, section numbers preserved |
 | **`docs/design/`** | Designs of record — the settled decisions for a subsystem. `TENANCY_DESIGN.md`, `PACKAGES_DESIGN.md` |
 | **`docs/plans/`** | Per-feature plans, with their ranked risks and pre-commit gates. Read the one for the area you're changing |
 | **`docs/database/`** | `Database_AccessRuleSummary.md` — a historical artefact of the original build |
@@ -72,6 +90,12 @@ categorised by what it *is*:
 > under `docs/`. That was deliberate: **34 of those references live inside applied
 > migrations in `supabase/migrations/`**, which are the schema's history and are not
 > edited after the fact. Renaming the files would have stranded every one of them.
+>
+> **The same trick, applied again on 2026-07-26 to *section numbers*.** When §5–§7 and
+> §10–§12 left `HANDOVER.md` for `docs/`, they kept their numbers: `§7.41` still means
+> gotcha 41. **781 references cite them by bare number**, including from applied migrations
+> and Playwright drivers. Change the container, never the identifier — and never renumber a
+> gotcha.
 >
 > **Numeric prefixes were considered and rejected** for everything except
 > `01_SESSION_WORKFLOW.md`. Encoding a category into a filename makes recategorising a
@@ -131,7 +155,10 @@ All four run in CI on every push to `main`.
 
 ## New here?
 
-Read **HANDOVER.md** first for the current state, then **PRD.md** for the product
-spec. HANDOVER §6 (architecture decisions) and §7 (gotchas already hit) will save you
-the most time — several entries there exist because something shipped a real billing
-bug.
+Read **HANDOVER.md** first — it is the index, and it points at everything else. Then
+**PRD.md** for the product spec. The two that save the most time are
+**`docs/GOTCHAS.md`** (§7 — traps that already cost real time; several exist because
+something shipped a real billing bug) and **`docs/ARCHITECTURE.md`** (§6 — why the system
+is shaped this way).
+
+Don't read all of it up front. `HANDOVER.md` tells you which document the task needs.

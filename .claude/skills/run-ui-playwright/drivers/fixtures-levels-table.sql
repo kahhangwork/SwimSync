@@ -16,7 +16,7 @@
 -- Idempotency note: tenant_levels' uniqueness is an EXPRESSION index
 -- (tenant_id, lower(trim(label))), which `ON CONFLICT (tenant_id, label)` does
 -- not match — Postgres rejects the statement outright. Conflict on the primary
--- key instead. See HANDOVER §7.53 for the partial-index version of this trap.
+-- key instead. See `docs/GOTCHAS.md` §7.53 for the partial-index version of this trap.
 
 -- ---- Three rungs, mirroring the live ladder's shape ----
 INSERT INTO tenant_levels (id, tenant_id, label, sort_order)

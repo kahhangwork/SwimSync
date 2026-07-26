@@ -309,7 +309,7 @@ fails on save. The client keeps its existing **enrolment-aware** floor as UX —
 than the DB's calendar floor, which is the correct direction.
 
 > **⚠ RISK 10 MITIGATION — named prohibition.** Do NOT edit `lib/lessonDates.ts`. It is
-> duplicated byte-identical across two npm projects (HANDOVER §6) and `WORKTREE.md`
+> duplicated byte-identical across two npm projects (`docs/ARCHITECTURE.md` §6) and `WORKTREE.md`
 > forbids it in this worktree. If this phase appears to need a change to
 > `backlogWindowStart`, **stop and raise it** — it overlaps `../SwimSync-contact-details`.
 
@@ -343,7 +343,7 @@ explained by tests you added means a test was lost.
 | `tsc --noEmit` both apps | clean | clean |
 
 > **⚠ RISK 2 MITIGATION — step.** Measure the baseline by RUNNING each suite, not by
-> copying the table above. HANDOVER §5 records that its own "total" line was stale for
+> copying the table above. `docs/TESTING.md` §5 records that its own "total" line was stale for
 > several sessions — the command is the fact, the document is the hint (§7.37).
 
 > **⚠ RISK 9 MITIGATION — step.** Extend `verify-attendance-window.mjs` and run it
@@ -422,7 +422,7 @@ a caveat.**
 
 ## 9. Graduate at session close (do NOT edit those files in this worktree)
 
-Three findings here outlive this task and belong in **HANDOVER §7**, which
+Three findings here outlive this task and belong in **`docs/GOTCHAS.md` §7**, which
 `/session-start` mandates reading every session — a plan file is discarded when the work
 lands:
 

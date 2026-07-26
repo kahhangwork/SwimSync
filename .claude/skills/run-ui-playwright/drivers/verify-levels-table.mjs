@@ -11,7 +11,7 @@
 // page shipped visibly broken to production for a week for exactly this
 // reason. So this driver MEASURES rects from the DOM — the same
 // measure-don't-eyeball approach verify-invoice-controls.mjs uses for the
-// toggle knob (HANDOVER §7.34).
+// toggle knob (`docs/GOTCHAS.md` §7.34).
 //
 // CALIBRATION — measured, not guessed (1280px viewport, this machine):
 //   broken  → worst header/data offset  488 px   (Level 316, Skills 449,

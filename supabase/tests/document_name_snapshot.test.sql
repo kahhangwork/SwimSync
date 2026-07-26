@@ -6,7 +6,7 @@
 -- already sent and on credit notes PRD §7.8 calls immutable.
 --
 -- The rule the codebase already states: A FACT ABOUT A PAST LESSON IS NEVER A
--- LIVE LOOKUP (HANDOVER §6). class_title was snapshotted for exactly this
+-- LIVE LOOKUP (`docs/ARCHITECTURE.md` §6). class_title was snapshotted for exactly this
 -- reason; the student's name was missed.
 --
 -- Its own tenant, so nothing here depends on another fixture's state.

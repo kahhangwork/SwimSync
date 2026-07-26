@@ -35,7 +35,7 @@ export function svc(): SupabaseClient {
  * test's billing month and its notion of "now" are no longer independent — they
  * are one fact. Before this, tests hardcoded months (2026-07, 2027-11, 2028-02)
  * and ran against the REAL system clock, which meant a test's meaning changed
- * as the calendar advanced. That is HANDOVER §7.25 at suite scale: a test can
+ * as the calendar advanced. That is `docs/GOTCHAS.md` §7.25 at suite scale: a test can
  * pass for the wrong reason, and a green suite hides it.
  *
  * The months themselves are arbitrary — newScenario() gives every test its own

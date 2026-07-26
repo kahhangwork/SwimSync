@@ -73,7 +73,7 @@ Cases: `964` (the production value) · `+65 9123 4567` · `9123 4567` · `912345
 `61234567` · `31234567` · `12345678` (8 digits, not an SG prefix) · `""` · `"   "`.
 
 > **⚠ RISK 3 MITIGATION — assertion.** Record `npm test` count **before** touching
-> anything (expected **122**, per HANDOVER §5 — the runner is the fact). After this step
+> anything (expected **122**, per `docs/TESTING.md` §5 — the runner is the fact). After this step
 > it must be `122 + <new cases>`. A total that did not grow by exactly the number added
 > means a suite was lost.
 
@@ -198,7 +198,7 @@ which is a larger consequence than a level. Auditing needs a trigger or an RPC, 
 *"audit contact-detail edits"* as a `BACKLOG.md` item at `/session-close`, which is when
 that file is written from `main`.
 
-**Also for `/session-close`:** Risk 1 is durable and belongs in `HANDOVER.md` §7 —
+**Also for `/session-close`:** Risk 1 is durable and belongs in `docs/GOTCHAS.md` §7 —
 *editing a student's contact details under a pending claim strands the admin's queue on a
 snapshotted `match_reason`*. Do not add it here; `WORKTREE.md` forbids touching
 `HANDOVER.md` from this worktree.

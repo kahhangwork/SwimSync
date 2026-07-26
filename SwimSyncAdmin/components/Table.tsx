@@ -29,7 +29,7 @@ export function Table({ children, className }: { children: React.ReactNode; clas
  * stops them. Prose cannot enforce a call-site contract.
  * **components/Table.test.tsx scans every admin page and fails if one does.**
  * That test is the enforcement; this paragraph is only the reason.
- * See HANDOVER §7.54.
+ * See `docs/GOTCHAS.md` §7.54.
  */
 export function Thead({ children }: { children: React.ReactNode }) {
   return (

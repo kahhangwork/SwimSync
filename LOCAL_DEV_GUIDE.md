@@ -46,6 +46,13 @@ supabase functions serve package-emails --env-file supabase/functions/.env
 Emails are a **logged no-op unless `RESEND_API_KEY` is set** in
 `supabase/functions/.env`, so leaving it blank locally is expected and correct.
 
+> **`CRON_SECRET` is shared between two files** and they must match:
+> `supabase/functions/.env` and `SwimSyncAdmin/.env.local` both carry
+> `CRON_SECRET=local-dev-cron-secret`. The admin's Generate Invoices button sends it as the
+> `Authorization: Bearer …` header, so a mismatch reads as an auth failure from the
+> function rather than as a config problem. All `.env` files are git-ignored; the
+> `.env.example` files document the shape.
+
 ### Terminal 3 — Admin panel (web)
 ```bash
 cd /Users/kahhang/Documents/Code/SwimSync/SwimSyncAdmin
@@ -188,7 +195,7 @@ in and their status flipping `invited` → `active`.
 > **Reset the DB and the auth calls start failing?** `supabase db reset` recreates the
 > auth container but not Kong, which keeps the dead upstream — every `/auth/v1` call
 > 502s and the whole Deno suite dies with `createUser(coach) failed: {}`. Run
-> `docker restart supabase_kong_SwimSync`. See HANDOVER §7.44.
+> `docker restart supabase_kong_SwimSync`. See `docs/GOTCHAS.md` §7.44.
 
 There's a driver for the whole loop:
 `.claude/skills/run-ui-playwright/drivers/verify-trial-onboarding.mjs`
@@ -264,10 +271,10 @@ supabase/functions/generate-invoices/test.sh
 
 > **Run the Deno suite twice** after touching the engine. A completing run **seals** its
 > billing month, so leaked state makes a second run short-circuit on `already_complete` —
-> passing once proves nothing (HANDOVER §7.15).
+> passing once proves nothing (`docs/GOTCHAS.md` §7.15).
 
 The frontend suites need no stack: `cd SwimSyncAdmin && npm test` (vitest) and
-`cd SwimSyncApp && npm test` (jest-expo). Current counts live in HANDOVER §5 — and by
+`cd SwimSyncApp && npm test` (jest-expo). Current counts live in `docs/TESTING.md` §5 — and by
 its own rule, **the test runner is the fact and the prose is the hint**.
 
 Each test seeds its own data and rolls back / tears down, so they leave the DB as

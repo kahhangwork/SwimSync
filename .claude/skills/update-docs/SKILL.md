@@ -25,7 +25,18 @@ its own rule.
 |---|---|---|
 | `PRD.md` | Describes **only what exists** | A shipped behaviour changed |
 | `BACKLOG.md` | Describes **only what doesn't exist yet** | An idea arrived, or an item shipped |
-| `HANDOVER.md` | Written **for the next session** | Every session |
+| `HANDOVER.md` | An **index** + the state you're inheriting | Every session |
+
+Since 2026-07-26 the reference material lives in `docs/`, so there is a fourth rule that
+governs all of them — **Step 4, graduation**:
+
+| Reference document | Holds | Numbering |
+|---|---|---|
+| `docs/GOTCHAS.md` | §7 — traps that already cost time | **Append only. Never renumber.** |
+| `docs/ARCHITECTURE.md` | §6 decisions, §10 file map, §12 removed UI | stable |
+| `docs/TESTING.md` | §5 — what each suite and driver covers | stable |
+| `docs/DEPLOYMENT.md` | §11 — what's live and its config traps | stable |
+| `CLAUDE.md` | Always-loaded: commands, boundaries, the few rules that bite | **keep under 200 lines** |
 
 ## The failure mode to avoid
 
@@ -149,42 +160,83 @@ Update the `_Last updated:` date if you changed anything.
 
 ---
 
-## Step 4 — HANDOVER.md — every session
+## Step 4 — GRADUATE first — this is the step that keeps the docs small
 
-This one always runs. It's the only document allowed to be scrappy and dated, and it's
-written **for the next session**, not for posterity.
+**Do this BEFORE writing anything into `HANDOVER.md` §8.** It is the whole discipline;
+the rest of Step 5 is bookkeeping once this is done.
 
-1. **`_Last updated:`** → today's date.
-2. **Add a new "What changed this session" section** as the new §8, and **renumber the
-   previous one down** (§8 → §8b, §8b → §8c, …). Follow the existing style: lead with
-   the headline in bold, then what was found, what was fixed, and — crucially — **what
-   was deliberately not done and why**. Those "Not done (deliberate)" notes have
-   repeatedly stopped later sessions from undoing good decisions.
-3. **Rewrite §9 (Next steps).** This is the section that rots fastest.
-   - It should hold **the 2–3 things to actually pick up next**, no more. For the wider
-     queue, **point at `BACKLOG.md`** rather than restating it — restating is how the
-     two drift.
-   - Move anything finished this session out of the "open" list.
-   - §9 has a "record of already-DONE work" tail. It's growing and it competes with git
-     history. **Prune it** — drop entries whose reasoning is now in the PRD or captured
-     in a §8x session log.
-4. **§6 (Architecture & key decisions)** — add an entry if a decision was made that a
-   future session could accidentally undo. This is for *why*, not *what*.
-5. **§7 (Gotchas already hit)** — add an entry if the session hit something non-obvious
-   that cost real time. Several entries there exist because something shipped a real
-   billing bug; that bar is about right. Include the audit command if there is one.
-6. **§10 (File map)** — add a row for any significant new file.
-7. **§5 (Running the tests)** — update the counts if suites changed.
+Every durable thing the session produced gets a permanent home **outside** the session
+log. Walk the list and place each one:
 
-Keep §3 ("what works") and §11 (deployment) honest — if the session changed what's
-live, they're the first things a new session reads.
+| What you found | Where it goes |
+|---|---|
+| A trap that cost real time / could bite again | **`docs/GOTCHAS.md`** — append as the next §7.N |
+| A decision a future session could accidentally undo | **`docs/ARCHITECTURE.md`** (§6) |
+| A consequence you accepted deliberately | the feature's plan in **`docs/plans/`**, its "known consequences" section |
+| Something you chose *not* to build | **`BACKLOG.md`** — item, or *Deliberately not doing* |
+| A behaviour a user can now see | **`PRD.md`** (Step 2) |
+| A new significant file | **`docs/ARCHITECTURE.md`** (§10 file map) |
+| A suite/driver added or changed | **`docs/TESTING.md`** (§5) |
+| Something that changed what's live | **`docs/DEPLOYMENT.md`** (§11) |
+
+**Rules for `docs/GOTCHAS.md`:** append as the next number, **never renumber and never
+reuse a number** — 781 references cite these by bare number, including from **applied
+migrations** that can never be corrected. Retire an item by striking it in place. The bar
+is "cost real time or shipped a bug", not "was mildly surprising".
+
+**The test:** after this step, the session log entry you are about to write should contain
+**nothing that would be lost if you deleted it.** If it would, you haven't graduated
+everything — go back. An audit of all 29 historical entries found exactly four facts that
+had never graduated, and every one of them was a *prohibition* ("do not turn this into a
+trigger") — the highest-value, easiest-to-lose kind.
 
 ---
 
-## Step 5 — Check the other docs
+## Step 5 — HANDOVER.md — every session
+
+`HANDOVER.md` is an **index plus the current state**. It is not a changelog. Keep it under
+roughly **700 lines**; if it grows past that, something belongs in `docs/`.
+
+1. **`_Last updated:`** → today's date, with a one-line summary of the session.
+2. **Write the new session entry** at the top of §8, numbered as the next `§8.N`.
+   - **The two most recent entries stay in full. Everything older becomes a ledger line**
+     in the *Older sessions* table — one row: number, date, what shipped, and **where its
+     reasoning now lives**. So each session you demote the third-newest entry.
+   - Lead with the headline in bold, then what was found, what was fixed, and **what was
+     deliberately not done and why**. Keep it to what a reader needs *before* the pointers
+     take over; the reasoning itself is already in `docs/` by Step 4.
+   - **Never delete a ledger line.** They are cited by number from source files and applied
+     migrations (`core.ts` says `§8a`), so a missing row is a dangling reference. They cost
+     ~25 tokens. If the table passes ~100 rows, move it wholesale to `docs/SESSIONS.md` and
+     point at it from §8 — still one hop, no reference broken.
+3. **Rewrite §9 (Next steps).** This is the section that rots fastest.
+   - **The 2–3 things to actually pick up next**, no more. For the wider queue, **point at
+     `BACKLOG.md`** rather than restating it — restating is how the two drift.
+   - Move anything finished this session out of the "open" list, and delete DONE tails:
+     git history is the record of what shipped.
+4. **Keep §3 ("what works") honest.** If the session changed what is live or verified, §3
+   is the first thing a new session reads. It is also the largest section left in the file
+   — prefer editing a line to adding one.
+5. **Check the index table** at the top ("Where everything lives") if a document was added,
+   moved or retired.
+
+**The failure mode this shape exists to prevent:** §8 was once 49% of a 3,972-line file —
+29 narratives, of which 25 were fully redundant with `docs/` and the PRD. Stale content
+that is *topically adjacent* to the truth is worse than no content, because it competes
+with the right answer. Graduating first and demoting on schedule is what stops it
+re-accumulating.
+
+---
+
+## Step 6 — Check the other docs
 
 Quick pass, only if relevant:
 
+- **`CLAUDE.md`** — only if a *command*, a *boundary*, or one of the few always-on rules
+  changed. This file is loaded on **every** session, so it is the most expensive place to
+  add a line and the cheapest place to mislead. **Under 200 lines.** A new gotcha goes in
+  `docs/GOTCHAS.md`, not here — promote one up only if a session could plausibly break
+  something expensive *without* having read the gotchas file.
 - **`README.md`** — only if the document split itself changed, or the stack did.
 - **`LOCAL_DEV_GUIDE.md`** — if run/test commands or seed data changed.
 - **`INVOICE_RUNBOOK.md`** — if anything about invoice generation changed. This one is
@@ -193,7 +245,7 @@ Quick pass, only if relevant:
 
 ---
 
-## Step 6 — Commit
+## Step 7 — Commit
 
 **Stage explicitly — never `git add -A` or `git add .`.** List the paths you actually
 touched. If Step 1 turned up work in progress that isn't yours, `git add -A` sweeps it
@@ -233,6 +285,11 @@ Before declaring done, re-read what you wrote and ask:
   it — it belongs in `PRD.md`.
 - **Did you write the same thing in two documents?** Pick one and link from the other.
   Duplication between these files is the thing that eventually makes them disagree.
+- **Would your §8 entry lose anything if it were deleted tomorrow?** If yes, Step 4 isn't
+  finished — the durable part still needs a home in `docs/`, the PRD, or `BACKLOG.md`.
+- **Did you demote the third-newest §8 entry to a ledger line?** Two full entries, no more.
+- **Did `HANDOVER.md` grow past ~700 lines, or `CLAUDE.md` past 200?** Both are always-read
+  files; growth there is paid on every future session.
 
 Then tell the user plainly which documents you changed and which you deliberately
 didn't, and why. "PRD untouched — nothing shipped a behaviour change" is a useful
