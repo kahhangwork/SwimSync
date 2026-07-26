@@ -183,6 +183,19 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   joined date, and separately any child with a trial booked ahead. The Students column
   reads **`2+1`**, never `3` — a guest at one lesson is not a weekly student, and the
   admin acting on that confusion is what blocks a billing month (PRD §7.3, §7.17).
+- **A parent's contact details can be corrected (verified local: vitest + UI driver — LIVE
+  2026-07-26)** — every child on the admin Students page has a **Contact details** action,
+  and what it offers depends on the child: **unclaimed** → the three
+  `provisional_contact_*` columns are editable (and this is the *only* writer of
+  `_name` anywhere — neither create form asks for it); **claimed** → read-only, showing
+  **every** linked parent's own `profiles` row and saying the family maintains it in the
+  app, because a second editable copy would be the stale duplicate `students.age` was
+  removed for — and `is_tenant_admin(NULL)` refuses it anyway; **claim pending** → shown
+  but **locked**, since `student_claims.match_reason` is a snapshot and editing under it
+  makes the admin approve on a reason that stopped being true. `lib/sgPhone.ts` flags an
+  implausible Singapore number (8 digits, leading 6/8/9/3, `+65` optional) on this screen
+  **and both create forms** — always advisory, never blocking. No migration: `students_update`
+  already grants the tenant admin. PRD §7.19, `CONTACT_DETAILS_PLAN.md`.
 - **Automated tests** — backend **366 pgTAP + 108 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest 151, `SwimSyncApp` jest-expo 91); all run in CI on push to `main`. See §5.
 
@@ -389,14 +402,19 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
 _Frontend tests:_
-`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`,
-`components/StatusBadge.test.tsx`, `lib/lessonDates.test.ts`,
-`lib/classCoverage.test.ts`, `lib/duplicateStudents.test.ts`); `SwimSyncApp` uses
-**jest-expo** (`jest.config.js`, `lib/authErrors.test.ts`, `lib/lessonDates.test.ts`,
-`lib/attendanceBulk.test.ts`, `lib/claimCandidates.test.ts`, scoped to `lib/**` unit
-tests for now). Deeper
-component-render tests (RN screens with mocked Supabase, admin tables) are the natural
-next additions.
+`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **11 files**:
+`components/StatusBadge.test.tsx`, `components/Table.test.tsx`, `lib/adminNav.test.ts`,
+`lib/attendanceCompleteness.test.ts`, `lib/classCoverage.test.ts`,
+`lib/classRoster.test.ts`, `lib/duplicateStudents.test.ts`, `lib/inviteEmail.test.ts`,
+`lib/lessonDates.test.ts`, `lib/parentInviteEmail.test.ts`, `lib/sgPhone.test.ts`.
+`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **7 files**, scoped to `lib/**` unit
+tests for now: `attendanceBulk`, `attendanceCompleteness`, `attendanceRoster`,
+`authErrors`, `claimCandidates`, `landing`, `lessonDates`. Deeper component-render tests
+(RN screens with mocked Supabase, admin tables) are the natural next additions.
+
+> *This list had gone stale by six files before 2026-07-26 — it named five admin suites
+> when eleven existed. Per §7.37 the runner is the fact and this paragraph is the hint:
+> `find components lib -name "*.test.ts*"` in either app is the answer.*
 
 _Note:_ both apps now **typecheck clean** and CI enforces it — a **Typecheck (tsc)**
 step runs `tsc --noEmit` for `SwimSyncApp` and `SwimSyncAdmin` in the `frontend-tests`
@@ -464,7 +482,18 @@ Swimming Levels table's **column geometry** — it MEASURES each `th`'s rect aga
 column's `td` and fails if they diverge by more than 2px. Written because §7.54's bug was
 invisible to every text assertion: the labels were all correct and merely in the wrong
 place. **It fails on the pre-fix code with a worst offset of 488px, which is the point**
-(12 checks; admin-only, port 3100).
+(12 checks; admin-only, port 3100);
+`verify-contact-details.mjs` (+ `fixtures-contact-details.sql` and its `-teardown.sql`)
+drives all four states of the admin's parent-contact modal — an unclaimed child edits and
+persists (a cleared field lands as **NULL, not `''`**, matching the creation path); a
+claimed child is read-only and shows **both** of its parents' details, asserted as the
+**exact seeded strings** because the `any`-typed join renders blank when nested wrong
+(§7.28); a claimed child with **no enrolment**, whose parent has no other children, still
+resolves — the non-vacuous test that `tenant_serves_parent()` keys off `students.tenant_id`;
+and a child with a **pending claim** offers no Save at all. It also proves the phone check
+never blocks: `964` warns on *Add a student* and the child **is still created** (21 checks;
+admin-only). The driver **resets the fields it edits**, so a second run cannot fail in a way
+that looks like a regression (§7.53's lesson, applied at the driver rather than the fixture).
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
