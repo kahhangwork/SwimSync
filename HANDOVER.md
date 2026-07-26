@@ -3,8 +3,8 @@
 _Last updated: 2026-07-27 (**fifteenth** session — the attendance marking window is now
 enforced by the **database** rather than by the screen, and a **child who joins mid-month
 no longer blocks that month from being billed**. Both were one root cause: a date-scoped
-question answered with an un-dated set. **On branch `debt/attendance-window-guard`, not
-yet on `main`, not deployed** — production still runs the old code. §8.15)_
+question answered with an un-dated set. **On `main` and DEPLOYED** — migrations, engine
+(`generate-invoices` v16 → **v17**) and both web apps. §8.15)_
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.** The skills
 > were reworked on 2026-07-26: `/session-close` became `/update-docs`, a real shut-down
@@ -201,8 +201,8 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   **and both create forms** — always advisory, never blocking. No migration: `students_update`
   already grants the tenant admin. PRD §7.19, `CONTACT_DETAILS_PLAN.md`.
 - **The attendance window is a database rule, and a mid-month joiner no longer blocks a
-  month (verified local: pgTAP + Deno + a UI driver — **ON A BRANCH, NOT YET ON `main`,
-  NOT DEPLOYED** 2026-07-27)** — attendance may only be recorded for a lesson on the class's own weekday
+  month (verified local: pgTAP + Deno + a UI driver — **LIVE in production 2026-07-27**,
+  dormant until the first real lesson is marked)** — attendance may only be recorded for a lesson on the class's own weekday
   between the 1st of last month and today, enforced by triggers rather than by the screen,
   so a phantom lesson can no longer be created *and billed* by reaching the screen with a
   hand-typed date. A genuine makeup lesson is scheduled by the business's admin instead
@@ -210,9 +210,8 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   this lesson" is now answered **per date** from enrolment spans — a child who joined on
   the 20th used to be expected on the 6th, which blocked the whole month from billing with
   no override. PRD §7.5/§7.6, `ATTENDANCE_WINDOW_PLAN.md`, §8.15.
-  > ⚠ **Production still runs the old code.** This is the only line in §3 describing
-  > something that is not live. Deploy order is **migrations → engine → apps** and it is
-  > load-bearing — see §8.15.
+  > **Dormant until a real lesson is marked.** Production has 0 attendance rows, so
+  > neither the guard nor the joiner fix has been exercised on real data yet.
 - **Automated tests** — backend **397 pgTAP + 111 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest 162, `SwimSyncApp` jest-expo 109); all run in CI on push to `main`. See §5.
 
@@ -1482,6 +1481,23 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     (`pressByText()` in that driver). Prefer in-app navigation where you can; use this
     when a deep link is the point of the test.
 
+60. **`git push … :main` IS A DEPLOY STEP. IT IS THE *APP* DEPLOY.** Vercel builds both
+    web apps from `main`, so the moment a branch lands there the new frontend is going
+    live — before any `db push` or `functions deploy` you have not already run.
+    §7.27 says the expand/contract ordering "governs the **push**, not just the migration
+    command". That was written after getting it wrong once. It was got wrong again on
+    2026-07-27 (§8.15) by someone who had *written the deploy order into the plan an hour
+    earlier*: the branch went to `main` first because that felt like source control, and
+    the apps deployed ahead of the schema and the engine.
+    **The reason a note is not enough** is that "merge my branch" and "deploy the
+    frontend" feel like different categories of action, and only one of them sounds
+    risky. They are the same action.
+    **So: for a backend-first change, do `db push` and `functions deploy` BEFORE the push
+    to `main`** — the branch is already tested, and nothing is watching it. Landing on
+    `main` is the last step, not the first. Harmless on 2026-07-27 only because
+    production had zero attendance rows; on a live month it would have been the exact
+    deadlock the change existed to remove.
+
 59. **A `COUNT(*)` BASELINE IS ROLE-DEPENDENT UNDER RLS, SO "NOTHING WAS WRITTEN" CAN
     FAIL WHILE BEING TRUE.** A pgTAP fixture captured `SELECT COUNT(*) FROM lesson_sessions`
     as `postgres` (which sees every row) and compared it later under `SET LOCAL ROLE
@@ -1494,16 +1510,42 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     silently *changes between two reads*.
 ---
 
-## 8.15 Fifteenth session (2026-07-27) — THE ATTENDANCE WINDOW IS A RULE — **NOT YET ON `main`, NOT DEPLOYED**
+## 8.15 Fifteenth session (2026-07-27) — THE ATTENDANCE WINDOW IS A RULE — BUILT **AND DEPLOYED**
 
 Branch **`debt/attendance-window-guard`** (worktree `SwimSync-attendance-window`), one
 feature commit + two merges of `main` (it moved twice during the session). Planned with `/plan-with-confidence` +
 `/plan-review`; the plan, its inlined risk mitigations and three accepted consequences
 are in **`ATTENDANCE_WINDOW_PLAN.md`**.
 
-> ⚠ **NOT ON `main` AND NOT DEPLOYED. Production runs the old code.** No `db push`, no
-> `functions deploy`, no Vercel push. The deploy order is in the plan §7 and **one part
-> of it is load-bearing** — see below.
+**Deploy record (2026-07-27) — and I got the ordering wrong, which is the most useful
+thing in this section.** The plan said **migrations → engine → apps**, and I pushed the
+branch to `main` first. `main` *is* the app deploy: Vercel builds both sites from it. So
+for the minutes between that push and `db push`, the live apps ran the new code against a
+database with no triggers and an engine still at v16 — the exact inversion the plan calls
+load-bearing. Harmless only because production has **0 attendance rows**; on a live month
+it would have been the deadlock this work exists to remove.
+
+> **The rule that would have prevented it:** `git push … :main` **IS** a deploy step, not
+> a source-control step. Do the backend first, or push to `main` last. §7.27 says the
+> ordering governs "the push, not just the migration command" — this is that sentence
+> failing to be enough, twice.
+
+What then went right, in order: backup (schema + data, scratchpad) → `db push` (one
+migration; the `pg-delta` SSL trace printed again and succeeded, §8.11) →
+`migration list --linked` shows **0 pending** → **remote grant dump**, which caught §7.39
+live (below) → `functions deploy generate-invoices` → `functions list` confirms
+**v17**, `package-emails` untouched at v1 → app bundle greps for `That lesson is closed`
+(§7.51: a contiguous user-visible string, not an identifier) → production data
+**byte-identical before and after**, attendance/sessions/invoices still 0.
+
+**§7.39 fired again, and the audit is what caught it.** Three of the five new functions
+carried only `REVOKE ALL … FROM PUBLIC`, and the remote dump showed cloud's project-level
+default privileges had granted them to `anon`. **Nothing was exposed** — all three are
+plain STABLE functions returning a date or raising; the one that is SECURITY DEFINER and
+reads a table, and the one that writes, were both explicitly revoked and came back clean.
+Fixed by `20260727000200`, and the audit now returns nothing. The lesson is not "anon had
+a date function": it is that **a partially-applied recipe passes local `pg_proc` and only
+the remote dump can tell you**.
 
 **The backlog item was "reject a bad date in the save handler" (S). It grew, and the
 reason is the whole session.** Planning found the same un-dated set behind the missing
@@ -3577,31 +3619,17 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### FIRST: land and deploy the attendance-window work
+### FIRST: the deploy is DONE — what is not done is real usage
 
-§8.15 is **on `debt/attendance-window-guard`, not on `main`**, and production runs the old
-code. Take the branch to `main` first (`/commit-review` Step 5 — fetch, rebase, re-run the
-suites, `git push origin <branch>:main`), then deploy. Nothing about it is urgent
-(production has **0 attendance rows**, so neither bug can currently bite anyone), but a
-merged-and-undeployed migration is exactly what went unnoticed for six days once before
-(§3's deploy note).
+§8.15 is on `main` and live: migrations, `generate-invoices` **v17**, both web apps.
+Production has **0 attendance rows**, so neither the window guard nor the joiner fix has
+been exercised on real data. Nothing about §8.15 is outstanding.
 
-**The order is load-bearing — migrations → ENGINE → apps:**
-
-1. Back up, then `supabase db push`; confirm with `supabase migration list --linked` that
-   nothing has an empty `remote`. The `pg-delta` SSL stack trace is noise (§8.11).
-2. **Remote grant dump** (§7.39 — the only honest check):
-   `supabase db dump --file /tmp/p.sql && grep -E '(GRANT|REVOKE).*ON FUNCTION' /tmp/p.sql | grep '"anon"'`
-   → `schedule_extra_lesson` must not appear.
-3. `supabase functions deploy generate-invoices`, then assert `supabase functions list`
-   shows **v17** (it is at v16). A version that has not moved means the deploy did not land.
-4. **Only then** `git push` → Vercel, and verify the **app** bundle carries it, not just
-   the admin (§7.23, §7.51 — grep a contiguous user-visible string).
-
-**Push the apps before the engine and you recreate the deadlock this work removed:** the
-engine would name an unmarked lesson that the app correctly no longer offers any way to
-mark. `supabase/rollback/20260727_attendance_window_DOWN.sql` is two DROP TRIGGERs and has
-been rehearsed.
+**One gotcha it created for whoever bills first**, now also in `INVOICE_RUNBOOK.md`: the
+coach can only mark back to **the 1st of last month**, and the database enforces it. Bill
+July in August and every lesson is markable; leave it to September and the gate will name
+a gap **nobody can fill**. Bill promptly, or fix the floor (`BACKLOG.md` → *Tie the
+attendance-marking window to un-invoiced months*).
 
 ### THEN: the thing that has blocked everything since 2026-07-13
 
@@ -3611,10 +3639,11 @@ and the evidence then removed by the 2026-07-26 cleanup, so `attendance` reads 0
 reason that is not "it has never worked". Don't re-derive that; §8.12 and the banned-phrase
 note in §3 explain it.
 
-1. **Get the coach marking a REAL lesson.** An onboarding push, not a build task.
+1. **Get the coach marking a REAL lesson.** An onboarding push, not a build task. It is
+   also the first exercise of §8.15's guard on real data.
 2. **Then bill a real month**, following `INVOICE_RUNBOOK.md`. Expect the gate to refuse
    until every lesson is marked — working as designed. Mark them, or mark them cancelled;
-   **never override**.
+   **never override**. Do it in the month after, not two months after (above).
 
 Still true and worth knowing before that first run: `auto_invoice_enabled` is **false**,
 **no coach rate is set** (so payroll computes nothing), and the join code is **`SWIM-RVM9`**
