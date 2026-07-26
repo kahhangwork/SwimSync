@@ -123,6 +123,12 @@ _Frontend tests:_
 `SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **14 files, 198
 tests** (2026-07-26): the eleven above plus `lib/tableSort.test.ts`,
 `lib/studentCounts.test.ts`, and `components/Table.test.tsx` extended for sorting.
+`tableSort.test.ts` includes a case that runs in **four timezones**, pinning that sorting
+never constructs a `Date` (§7.7 by construction). `studentCounts.test.ts` has one named for
+the bug it prevents — *"NEVER says nobody when only inactive children hold the level"*
+(§7.69). `Table.test.tsx` gained sortable-header render tests (click, reverse, `firstDir`,
+`aria-sort`, non-sortable columns) plus width assertions, and keeps its `<Thead>`-owns-its-
+`<tr>` call-site scan.
 `SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **12 files, 174 tests**, scoped to
 `lib/**` unit tests: `attendanceBulk`, `attendanceCompleteness`, `attendancePayload`,
 `attendanceRoster`, `attendanceSession`, `attendanceSummary`, `attendanceWindow`,

@@ -916,4 +916,64 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     override. Nagging unnecessarily is annoying; going quiet wrongly costs money. When a
     default has an asymmetric cost, encode the asymmetry, don't rely on the next reader
     noticing it. (2026-07-26.)
+
+69. **A DISPLAY FILTER MUST NOT BE REUSED AS A DESTRUCTIVE-ACTION GUARD.**
+    Making the Swimming Levels *Students* column count only **active** children is right —
+    it answers a roster question. Reusing that same number in the level's **removal warning**
+    is not, and it was one line from shipping. `students.level_id` is `ON DELETE SET NULL`
+    (`20260719001800_tenant_levels.sql:70`), so removing a level never errors — it blanks the
+    level for **every** student pointing at it. A level with 0 active and 2 departed children
+    would have said *"No students are on this level."*, the admin deletes it, two children
+    lose a level nothing anywhere records, and reactivating one later cannot restore it.
+    **The rule: the filter that answers "what should I show?" is not the filter that answers
+    "what will this destroy?"** Check what the CONSTRAINT reads — here it does not read
+    `is_active`. `lib/studentCounts.ts` keeps both numbers side by side for this reason.
+    Caught by measuring the modal's text **before and after** the change: the pre-fix string
+    was *correct by accident* because it counted everyone, so only a before/after diff showed
+    a regression being introduced rather than fixed. (2026-07-26.)
+
+70. **A CLIENT-SIDE `.length` IS SILENTLY CAPPED AT `max_rows = 1000`, SO IT IS THE WRONG WAY
+    TO COUNT ANYTHING.**
+    PostgREST simply returns fewer rows — no error, no header, no warning. Counting a table
+    by fetching it and taking `.length` therefore under-reports past 1000 and looks perfect
+    until it doesn't. Use `.select("id", { count: "exact", head: true })`, which is exact at
+    any size and transfers no rows.
+    This was written up inside `platform/page.tsx`'s own comments, where nobody reads it.
+    The admin Dashboard now uses a head count; **the Students page still counts client-side
+    and deliberately inherits the ceiling**, because that whole page is an unpaginated
+    client-side list — which is why the two surfaces are implemented differently and must not
+    be "tidied" into consistency. (2026-07-26.)
+
+71. **`w-full` ON A TABLE CELL IS A *PREFERRED* WIDTH, NOT A FLOOR — SO THE COLUMN YOU GROW
+    IS THE COLUMN THAT GETS CRUSHED.**
+    Marking one column `w-full` while the rest are `w-px whitespace-nowrap` reads as "that
+    column takes the leftover space", and it does — until the columns over-subscribe the
+    table, at which point the percentage column is the only one that CAN shrink and it
+    absorbs the entire shortage. **Measured** on admin Classes at 1600px: seven hugging
+    columns took 1167px of a 1278px table and `Class Name` — the primary column, the one
+    being grown — rendered at **110px, narrower than `Day`**, its title broken mid-phrase.
+    Two consequences: keep such a column `nowrap` so its min-content becomes a floor and the
+    card scrolls instead; and prefer letting the **last** column take the slack via one
+    `[&_th:last-child]:w-full` on the table over a per-table prop, which additionally needs a
+    call-site test to catch a table that nominates none.
+    Found by measuring `getBoundingClientRect()` per column in a Playwright run. **Every
+    class name in the markup was correct**, so reading the diff or the DOM would not have
+    shown it — this is a class of bug only measurement finds. (2026-07-26.)
+
+72. **§7.31 REFINED: NEXT.JS CODE-SPLITS PER ROUTE, SO GREPPING THE WRONG PAGE'S CHUNKS
+    REPORTS "NOT DEPLOYED" FOR A BUILD THAT IS ALREADY LIVE.**
+    §7.31 is right that a 200 proves nothing and you must grep the served bundle for a string
+    only the new build has. It is incomplete for the admin panel: `/login`'s HTML never
+    references `/attendance`'s chunk. Cost: **eight consecutive wrong conclusions**, with the
+    tell in plain sight — the chunk hash never changed, because it was never the right chunk.
+    - Fetch **the route you changed** and grep
+      `_next/static/chunks/app/(admin)/<route>/page-*.js`.
+    - For a **shared** component or lib module, expect the string in a common chunk
+      (`582-*.js`, `789-*.js`) rather than any page chunk — so search every chunk the page
+      references, not just the page's own.
+    - A compiled **CSS** rule (`th:last-child{width:100%}`) is greppable in the stylesheet
+      and is stronger evidence than a class name in the markup, which proves only that the
+      source shipped, not that the rule applies.
+    The Expo app does not have this problem — it serves one `entry-*.js` bundle, which is why
+    §7.31's original recipe kept working there. (2026-07-26.)
 ---

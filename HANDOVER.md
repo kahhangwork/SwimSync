@@ -22,7 +22,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.68** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.72** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -399,6 +399,24 @@ it also fixed a latent `.order("id").limit(500)` that took an arbitrary 500 rows
 presented them as the most recent), and student counts that mean **active** students
 (`lib/studentCounts.ts`). Both are in PRD §14.3/§14.4 and the §10 file map. Their commits
 carry the reasoning: `737b446`, `38b4092`.
+
+**The `admin-ui` worktree's graduate list was nearly lost, and that is the process finding
+of this session.** `/worktree-close` never ran, so `WORKTREE.md` — which is **gitignored** —
+still held four ungraduated gotchas when `/update-docs` had already finished. They are now
+**§7.69–§7.72**: a display filter reused as a destructive-action guard, a client-side
+`.length` silently capped at `max_rows`, `w-full` on a table cell crushing the very column it
+grows, and a refinement to §7.31 (Next.js code-splits per route, so grepping the wrong page's
+chunks reports "not deployed" for a live build — eight wrong conclusions in a row). Caught
+only because `/session-close` step 5 lists the worktrees. **The ordering in
+`docs/WORKTREES.md` is load-bearing for a reason; it was skipped and it nearly cost four
+findings.**
+
+**And I broke the reset rule.** `supabase db reset` ran twice from the root checkout while
+that worktree was driving the UI — it caught `public` with 0 tables mid-flight. Harmless that
+time, and the durable half is now in `docs/WORKTREES.md` Phase 4: the root checkout is the
+one participant with **no brief**, so `git worktree list` belongs immediately before every
+reset rather than once at session start. Checking early and not again is exactly what
+happened.
 
 ### Not done (deliberate)
 

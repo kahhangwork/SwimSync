@@ -177,6 +177,25 @@ whichever branch happens to be running it — a sibling mid-flight loses their s
 not know why. If you genuinely need one, **announce it first**, and expect to re-seed
 afterwards.
 
+> ### ⚠ THIS RULE IS AIMED AT THE ROOT CHECKOUT TOO, AND THAT IS WHERE IT WAS BROKEN
+>
+> **Observed 2026-07-26, ~18:45:** `supabase db reset` ran **twice** from the root checkout
+> while a live worktree was driving the UI. The worktree caught it mid-flight — `public` had
+> 0 tables for a moment. It cost nothing that time, only because that worktree's fixture was
+> already torn down and its tests do not touch the database.
+>
+> **The root checkout is the one participant with no `WORKTREE.md`**, so it has no brief
+> telling it what a sibling owns, and `git worktree list` is the only thing that would have
+> said one existed. The session that did it *had* checked — early, before the worktree was
+> created — and never checked again.
+>
+> **So: `git worktree list` immediately before `db reset`, every time, from any checkout.**
+> Not once at session start. A worktree can appear while you work, and the root checkout is
+> exactly the participant least likely to notice.
+>
+> If a sibling IS live, the alternative is a scoped teardown of your own fixture by prefix.
+> A reset is never the cheapest way to clean up — see Phase 6.
+
 **Prefix every fixture row**, and have a teardown that deletes by that prefix. Without a
 prefix, two worktrees seeding "Test Parent" produce a passing test that should have failed.
 
