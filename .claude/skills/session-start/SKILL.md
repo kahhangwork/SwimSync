@@ -16,8 +16,9 @@ question, and the order is the fastest path from cold to productive.
 | 3 | `BACKLOG.md` | What's queued but not built yet — and *why*? |
 | 4 | `LOCAL_DEV_GUIDE.md` | How do I actually run and test it, and which logins do I use? |
 
-This is the mirror of `/session-close`, which writes these documents back at the end of a
-session. Read them the way it wrote them: each in its own lane.
+This is the mirror of `/update-docs`, which writes these documents back near the end of a
+session. (That skill was called `/session-close` until 2026-07-26; the name now belongs to
+the shut-down checklist.) For the full order of skills, see `01_SESSION_WORKFLOW.md`. Read them the way it wrote them: each in its own lane.
 
 ---
 

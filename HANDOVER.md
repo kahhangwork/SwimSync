@@ -1,10 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-26 (twelfth session — categories are mandatory and a TRIAL IS A
-BOOKING, superseding the trial half of the tenth session on the user's correction. Built
-AND deployed the same evening; **dormant until the first trial is booked**. Same day:
-the **production cleanup script was run** (§9), and a documentation sweep corrected the
-stale claim that a **coach** can add a walk-in — they cannot, and could not since §8.11)_
+_Last updated: 2026-07-26 (**thirteenth** session — two admin UI changes, both live: the
+Classes page now shows **who is in a class** with trials counted separately as `2+1`, and
+the Swimming Levels table's header row — nested inside another row since 2026-07-19 and
+visibly broken in production for a week — is fixed and pinned by a geometry check. §8.13.
+**Three worktrees ran in parallel today**; §8.13 ends with what the other two left
+undocumented, which is the first thing to settle next session)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -13,8 +14,9 @@ run/test commands and seed logins.
 > **This file is one of three living documents, split by how often each changes**
 > (see `README.md`): **PRD.md** = what exists · **BACKLOG.md** = what doesn't yet ·
 > **HANDOVER.md** (this file) = the state you're inheriting. Keep them in their lanes —
-> a feature idea belongs in `BACKLOG.md`, not §9 and not the PRD. The `/session-close`
-> skill walks all three at the end of a session and updates each by its own rule.
+> a feature idea belongs in `BACKLOG.md`, not §9 and not the PRD. The `/update-docs`
+> skill walks all three near the end of a session and updates each by its own rule
+> (it was called `/session-close` until 2026-07-26 — see `01_SESSION_WORKFLOW.md`).
 
 ---
 
@@ -177,8 +179,26 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   trials coming up, and children with an **upcoming** trial are excluded from Unassigned
   Children, where Assign would have enrolled them permanently and blocked billing.
   PRD §7.17.
+- **Who is in a class, at a glance (verified UI driver — LIVE 2026-07-26)** — the admin
+  Classes page has a **See students** panel per class: enrolled children with level and
+  joined date, and separately any child with a trial booked ahead. The Students column
+  reads **`2+1`**, never `3` — a guest at one lesson is not a weekly student, and the
+  admin acting on that confusion is what blocks a billing month (PRD §7.3, §7.17).
+- **A parent's contact details can be corrected (verified local: vitest + UI driver — LIVE
+  2026-07-26)** — every child on the admin Students page has a **Contact details** action,
+  and what it offers depends on the child: **unclaimed** → the three
+  `provisional_contact_*` columns are editable (and this is the *only* writer of
+  `_name` anywhere — neither create form asks for it); **claimed** → read-only, showing
+  **every** linked parent's own `profiles` row and saying the family maintains it in the
+  app, because a second editable copy would be the stale duplicate `students.age` was
+  removed for — and `is_tenant_admin(NULL)` refuses it anyway; **claim pending** → shown
+  but **locked**, since `student_claims.match_reason` is a snapshot and editing under it
+  makes the admin approve on a reason that stopped being true. `lib/sgPhone.ts` flags an
+  implausible Singapore number (8 digits, leading 6/8/9/3, `+65` optional) on this screen
+  **and both create forms** — always advisory, never blocking. No migration: `students_update`
+  already grants the tenant admin. PRD §7.19, `CONTACT_DETAILS_PLAN.md`.
 - **Automated tests** — backend **366 pgTAP + 108 Deno**, plus frontend suites
-  (`SwimSyncAdmin` vitest 122, `SwimSyncApp` jest-expo 91); all run in CI on push to `main`. See §5.
+  (`SwimSyncAdmin` vitest 151, `SwimSyncApp` jest-expo 91); all run in CI on push to `main`. See §5.
 
 > **"CLEAN SLATE" IS A BANNED PHRASE FOR THIS DATABASE — it has now been wrong twice.**
 > The first time (corrected 2026-07-25) it claimed production held "only the superadmin +
@@ -305,7 +325,7 @@ supabase test db                                  # 366 tests across 21 files
 supabase/functions/generate-invoices/test.sh      # 108 tests; needs deno (brew install deno)
 
 # Frontend — Admin (Next/React) component + logic tests (vitest)
-cd SwimSyncAdmin && npm test                       # 122 tests
+cd SwimSyncAdmin && npm test                       # 151 tests
 
 # Frontend — Mobile (Expo/RN) unit tests (jest-expo)
 cd SwimSyncApp && npm test                         # 91 tests
@@ -383,14 +403,19 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
 _Frontend tests:_
-`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`,
-`components/StatusBadge.test.tsx`, `lib/lessonDates.test.ts`,
-`lib/classCoverage.test.ts`, `lib/duplicateStudents.test.ts`); `SwimSyncApp` uses
-**jest-expo** (`jest.config.js`, `lib/authErrors.test.ts`, `lib/lessonDates.test.ts`,
-`lib/attendanceBulk.test.ts`, `lib/claimCandidates.test.ts`, scoped to `lib/**` unit
-tests for now). Deeper
-component-render tests (RN screens with mocked Supabase, admin tables) are the natural
-next additions.
+`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **11 files**:
+`components/StatusBadge.test.tsx`, `components/Table.test.tsx`, `lib/adminNav.test.ts`,
+`lib/attendanceCompleteness.test.ts`, `lib/classCoverage.test.ts`,
+`lib/classRoster.test.ts`, `lib/duplicateStudents.test.ts`, `lib/inviteEmail.test.ts`,
+`lib/lessonDates.test.ts`, `lib/parentInviteEmail.test.ts`, `lib/sgPhone.test.ts`.
+`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **7 files**, scoped to `lib/**` unit
+tests for now: `attendanceBulk`, `attendanceCompleteness`, `attendanceRoster`,
+`authErrors`, `claimCandidates`, `landing`, `lessonDates`. Deeper component-render tests
+(RN screens with mocked Supabase, admin tables) are the natural next additions.
+
+> *This list had gone stale by six files before 2026-07-26 — it named five admin suites
+> when eleven existed. Per §7.37 the runner is the fact and this paragraph is the hint:
+> `find components lib -name "*.test.ts*"` in either app is the answer.*
 
 _Note:_ both apps now **typecheck clean** and CI enforces it — a **Typecheck (tsc)**
 step runs `tsc --noEmit` for `SwimSyncApp` and `SwimSyncAdmin` in the `frontend-tests`
@@ -442,7 +467,34 @@ the candidate is masked, Confirm is inert until one is chosen, the parent is **b
 from re-adding, the admin queue shows who is asking, approve is a two-step confirm, undo
 is offered, and the "no, different child" branch produces a duplicate that the Students
 page flags and merges (21 checks). **It found two bugs no unit test could reach** — both
-read paths rather than RPCs (§7.48, and duplicate detection hiding same-parent pairs).
+read paths rather than RPCs (§7.48, and duplicate detection hiding same-parent pairs);
+`verify-class-students.mjs` (+ `fixtures-class-students.sql` and its
+`-teardown.sql`) drives the admin Classes page's **"See students" drawer** — the badge
+reads `2+1` (and is asserted *not* to read 3 / 2+2 / 2+3 / 3+1, each a specific way the
+rule could have been got wrong), the drawer lists the two enrolled children with level and
+joined date plus the one upcoming trial, and the three negative controls — a **closed**
+enrolment, a **past** trial and a **cancelled** future trial — appear nowhere. **Its first
+six checks are database checks that those three rows EXIST**, because an absence assertion
+against a row that was never created passes while proving nothing (32 checks). Admin-only:
+no Expo server needed. Run it on **port 3100**, not 3000 — the stack and ports are shared
+with other worktrees: `ADMIN_URL=http://localhost:3100 node drivers/verify-class-students.mjs`;
+`verify-levels-table.mjs` (+ `fixtures-levels-table.sql` and its `-teardown.sql`) pins the
+Swimming Levels table's **column geometry** — it MEASURES each `th`'s rect against its
+column's `td` and fails if they diverge by more than 2px. Written because §7.54's bug was
+invisible to every text assertion: the labels were all correct and merely in the wrong
+place. **It fails on the pre-fix code with a worst offset of 488px, which is the point**
+(12 checks; admin-only, port 3100);
+`verify-contact-details.mjs` (+ `fixtures-contact-details.sql` and its `-teardown.sql`)
+drives all four states of the admin's parent-contact modal — an unclaimed child edits and
+persists (a cleared field lands as **NULL, not `''`**, matching the creation path); a
+claimed child is read-only and shows **both** of its parents' details, asserted as the
+**exact seeded strings** because the `any`-typed join renders blank when nested wrong
+(§7.28); a claimed child with **no enrolment**, whose parent has no other children, still
+resolves — the non-vacuous test that `tenant_serves_parent()` keys off `students.tenant_id`;
+and a child with a **pending claim** offers no Save at all. It also proves the phone check
+never blocks: `964` warns on *Add a student* and the child **is still created** (21 checks;
+admin-only). The driver **resets the fields it edits**, so a second run cannot fail in a way
+that looks like a regression (§7.53's lesson, applied at the driver rather than the fixture).
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
@@ -1234,6 +1286,253 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     Both read as "the deploy failed", and the second nearly sent this session chasing a
     problem that did not exist. **Grep only for a contiguous user-visible string you can
     see verbatim in the source**, and sanity-check with one you know was already live.
+52. **A NEW EMBED ON A PAGE'S PRIMARY LIST QUERY PUTS THE WHOLE PAGE AT RISK — ADD A
+    SECOND QUERY INSTEAD.** PostgREST returns `null` for the **entire** select when one
+    embed fails — a policy gap, an ambiguous relationship, a typo in the nesting. So
+    bolting a nice-to-have join onto the query that renders the table means a failure
+    **blanks the table** rather than degrading the extra. Fetch supplementary data in its
+    own query, defaulted to empty, and let the page render without it.
+    - Hit while adding the Classes page's "See students" drawer (2026-07-26): the first draft
+      extended `loadClasses()`'s select with `enrolments → students → tenant_levels`, which
+      would have put every class on `/classes` behind a three-level embed resolving. It is
+      now a separate `loadRoster()`, **verified by breaking the roster query on purpose**
+      and confirming the class table still rendered while the drawer said why it could not.
+    - The corollary is a UI rule: a supplementary read that fails must say so. An empty
+      list where the fetch errored is indistinguishable from a class with nobody in it.
+53. **`ON CONFLICT DO NOTHING` DOES NOT MAKE A FIXTURE IDEMPOTENT WHEN THE ONLY UNIQUE
+    INDEX IS PARTIAL.** Two of this schema's uniqueness rules are deliberately partial —
+    `one_active_enrolment_per_student` (`WHERE is_active`) and
+    `trial_bookings_live_slot_uniq` (`WHERE cancelled_at IS NULL`) — precisely so that
+    closed enrolments and cancelled bookings may repeat. A fixture row that is *inactive*
+    or *cancelled* therefore conflicts with nothing and **re-inserts on every run**, which
+    is exactly the negative-control row a test is relying on being singular. Use an
+    explicit `WHERE NOT EXISTS` keyed on what "already seeded" means. Caught by running
+    the fixture twice and diffing the row counts — do that for any new fixture.
+54. **WHEN A SHARED COMPONENT STARTS EMITTING AN ELEMENT ITS CALLERS USED TO EMIT, THE
+    SWEEP IS NOT THE FIX — A TEST IS.** `42803db` made `Thead` own its `<tr>`, swept the
+    call sites, **missed `levels/page.tsx`**, and left a docblock asserting the broken
+    form was now "unrepresentable". It was not: that page kept its `<Tr>`, rendered
+    `<tr>` inside `<tr>`, collapsed all five headers into one cell in column 1, and
+    shipped a visibly broken table to production **for a week**. Prose in a component
+    cannot enforce a call-site contract. If a shared primitive takes over an element,
+    land a scan test over the call sites *in the same commit* —
+    `SwimSyncAdmin/components/Table.test.tsx` is the one for this contract, and it walks
+    every `app/(admin)/**/page.tsx` so a page that does not exist yet is already covered.
+    - **Every text assertion passes on a table whose columns are misaligned.** The
+      labels were all present, correctly spelled and in the right order — just in the
+      wrong place. That is why nothing caught it and why a human looking at the page is
+      what eventually did. Geometry must be **measured**, not read: §7.34 again, now
+      twice over. `verify-levels-table.mjs` compares each `th`'s rect against its
+      column's `td`.
+    - **React's own `validateDOMNesting` warning is NOT a usable signal here — tested.**
+      Run against the known-broken page React logged **nothing**, so a check on it went
+      green on a page that was plainly wrong. Count `thead tr tr` off the DOM instead.
+      A check that passes on known-broken code is worse than no check.
+    - **A driver that has never been seen to fail proves nothing.** Both new checks were
+      run against the unfixed tree first: the scan test failed naming the file, and the
+      geometry check failed with a worst offset of **488px** (fixed: **0px**). Those two
+      numbers are what set the 2px tolerance — calibrate it, never guess it.
+55. **GIT WORKTREES SPLIT THE CODE AND SHARE THE DATABASE — SO MIGRATIONS LAND ON `main`,
+    ALONE, ONE AT A TIME.** Every worktree's `supabase/config.toml` says
+    `project_id = "SwimSync"`, and the CLI names its containers from that — so N checkouts
+    address **one** `supabase_db_SwimSync`. Git isolates your files; nothing isolates the
+    schema. Two consequences, and the second is the one that reaches production:
+    - **`supabase db reset` rebuilds the shared DB from whichever worktree ran it.** A
+      migration living only on a feature branch ceases to exist in the running database
+      the moment anyone else resets — the file is still there, the code still looks right,
+      and nothing points at the cause. **Observed live 2026-07-26**: the shared DB held
+      **75** applied migrations while `main` had **74 files**, the extra one existing only
+      as an *untracked* file in one worktree.
+    - **Parallel migrations apply in FILENAME order locally and in MERGE order on
+      production.** Branch A writes `…000100`, branch B writes `…000200`, B merges first:
+      production runs `b → a`, every local `db reset` ran `a → b`. Where both touch the
+      same object the end states differ silently — and most migrations here are
+      `CREATE OR REPLACE FUNCTION` or `DROP POLICY; CREATE POLICY`, i.e. last-writer-wins.
+      The attendance trigger is on its seventh redefinition.
+56. **A FRESH WORKTREE HAS NO `.env` FILES, AND THE FAILURE LOOKS LIKE YOUR CHANGE.**
+    `SwimSyncApp/.env` and `SwimSyncAdmin/.env.local` are git-ignored, so a new worktree
+    gets neither — nor `node_modules`. The admin fails loudly (it will not start), but
+    **the Expo app starts fine and serves a 200**; it simply cannot reach Supabase, so the
+    login screen never renders its fields and any driver dies on
+    `getByPlaceholder('you@email.com')` after a 30s timeout. That reads exactly like "the
+    change under test broke the app."
+    - Cost real time this session: `verify-levels.mjs` failed this way and was initially
+      suspected as a regression in the Levels fix. **What settled it was running the driver
+      against the *unfixed* code and getting the identical failure** — do that before
+      diagnosing anything else, it is two minutes and it partitions the search space.
+    - Setup for a new worktree, before any driver:
+      `cp <root>/SwimSyncAdmin/.env.local <wt>/SwimSyncAdmin/ && cp <root>/SwimSyncApp/.env <wt>/SwimSyncApp/`
+      then `npm install` in both. **Check the copied file points at `127.0.0.1:54321`**
+      before using it — copying a cloud-pointed env into a worktree aims your drivers at
+      production.
+    - Related: run the admin on a **non-default port** (`npm run dev -- -p 3100`) when
+      siblings may hold 3000. `drivers/lib.mjs` already reads `ADMIN_URL`/`EXPO_URL`, so no
+      driver needs editing — and do not edit it, since it is shared with every worktree.
+    - **The rule:** write migrations in the `main` worktree on a short `db/…` branch, apply,
+      `supabase test db`, merge to `main` **before** anything depends on them; feature
+      branches then `git merge main` to *consume* the schema and never carry it. One in
+      flight at a time. Announce before `db reset` — it wipes every other worktree's
+      fixtures.
+    - **Do NOT give each worktree its own stack** by editing `project_id`/ports:
+      `config.toml` is **tracked**, so per-folder values are one `git add -A` from being
+      committed and one `git checkout` from being clobbered.
+    - **`WORKTREE.md` is per-worktree scratch and must stay gitignored** — two worktrees
+      cannot own one path, and committing it makes every sibling's `git merge main` fail
+      with *"untracked working tree files would be overwritten"*. Anything durable in it
+      belongs here or in `BACKLOG.md` **before** the worktree is retired.
+---
+
+## 8.14 Parallel worktree session (2026-07-26) — A PARENT'S CONTACT DETAILS CAN BE FIXED — **DEPLOYED**
+
+Worktree `../SwimSync-contact-details`, branch `feat/parent-contact-details`. **Ran
+alongside §8.13, not after it** — the numbering is bookkeeping, not sequence. Planned with
+`/plan-with-confidence` + `/plan-review`; the plan, its 7 inlined mitigations and the walked
+pre-commit gate are in **`CONTACT_DETAILS_PLAN.md`**. Behaviour: **PRD §7.19**.
+
+Frontend-only — **no migration**, so the push to `main` *was* the whole deploy.
+
+**What the planning changed, before any code was written.** The backlog item assumed one
+editable screen. Two questions reshaped it:
+
+- **What does editing a CLAIMED child's contact details actually achieve?** Nothing:
+  `find_student_candidates()` skips any child with a `parent_students` row, and the invite
+  path only runs for unclaimed children. So for a claimed child those columns are inert —
+  the *live* details are on `profiles`. The user settled it: **read-only, and the parent
+  maintains their own record in the app.** The database already agreed —
+  `is_tenant_admin(NULL)` is hard-false and a parent's `profiles.tenant_id` is NULL by
+  design, so the admin could never have written it.
+- **Should `provisional_contact_name` be collected at creation?** No — it is not a match
+  signal, and `/accept-invite` requires the parent's real name and overwrites it. The
+  create forms were left alone; the modal is its only writer.
+
+**What `/plan-review` caught that the build then avoided.** Highest-ranked risk was **not**
+in the feature: editing a phone while a claim is **pending** strands the Claims queue on
+`student_claims.match_reason`, which is snapshotted at claim time — the admin then approves
+a parent–child link on a justification that is silently false, and §7.47 means it cannot be
+undone once invoiced. Shipped as a **refusal, failing closed**. Risk 3 produced the
+structural call not to widen the Students page's primary select (§7.52, independently
+arrived at) — the modal fetches its own data, so a mistake costs one modal, not the page.
+
+**What the pre-commit review caught, which planning did not.** Seven findings; three real:
+
+1. the pending-claim guard **failed OPEN** — `const { count } = …` discarded the error, so
+   any failure of that query unlocked the fields it exists to lock;
+2. a failed load rendered a **blank editable form** over cleared state — one Save would
+   have erased a child's real contact details;
+3. only the **first** linked parent was shown, when *"the mother's number, not the
+   father's"* is the whole reason to open the screen.
+
+**Verified:** vitest **122 → 134** (+12, exactly the cases added), `tsc` clean,
+`verify-contact-details.mjs` **21/21** — and re-run green after merging `main`, after the
+shared stack was reset out from under the session, and twice consecutively (the driver
+resets what it edits, so a second run cannot fail in a way that looks like a regression).
+
+**Two things graduated out of this session rather than dying with its worktree:**
+**§7.55** (worktrees share one database; migrations land on `main` alone) and `BACKLOG.md`
+→ *Direct writes to `students` are audited by nobody*. That second one **supersedes**
+`CONTACT_DETAILS_PLAN.md`'s own recommendation: the plan proposed a `SECURITY DEFINER` RPC
+around the contact edit, which fixes one screen and leaves `setLevel()` and every future
+direct write unaudited. An `AFTER UPDATE` trigger on `students` is atomic for the same
+reason and covers all of them.
+
+**A mistake worth keeping:** this session committed `WORKTREE.md`, which would have made
+every sibling worktree's `git merge main` fail on an untracked-file collision. Caught and
+reverted in `12cf553` before the merge; the rule is in §7.55.
+
+---
+
+## 8.13 Thirteenth session (2026-07-26) — TWO ADMIN UI CHANGES, BOTH **DEPLOYED**
+
+Worktree `.claude/worktrees/UI-changes`, branch `ui-changes`, two commits — `ee7ad1b` and
+`6240a5e` — both pushed straight to `main` (branch-to-branch: `main` is checked out in the
+root repo, so `git checkout main` in a worktree is refused; `git push origin
+ui-changes:main` is a fast-forward-only push that **rejects** rather than merges if a
+sibling session got there first). Both verified on production by the user.
+
+**No migration, no RPC, no Edge Function, no write path in either change.** A push to
+`main` was the entire production deploy — the simplest deploy shape this project has.
+
+### (a) The Classes page shows who is in a class — `ee7ad1b`, PRD §7.3
+
+A **See students** panel per class row: enrolled children with level and joined date, and —
+separately — children with a trial booked for a future date. The Students column reads
+**`2+1`**, never `3`.
+
+**The `2+1` is the whole point, not a formatting choice.** §7.17 already forbids listing
+trials among the enrolled on the coach's roster, because a guest at one lesson is not a
+weekly student and an admin who confuses the two is one press from Assign — which creates
+an active enrolment and silently stops that class's month being invoiced. This applies the
+same rule to the number.
+
+**Not done (deliberate):**
+- **No Assign / Enrol / Remove control in the panel.** Read-only on purpose; the one action
+  an admin might reach for here is the one that breaks billing.
+- **The count's enrolled half still comes from the class query's own embed**, not from the
+  new roster query — so if the roster fails, the number survives and only the panel
+  degrades. See §7.52.
+- **The geometry/roster check was not generalised** to the other admin tables — backlogged.
+
+### (b) The Swimming Levels table had a row inside a row — `6240a5e`
+
+`levels/page.tsx` wrapped its `<Th>`s in a `<Tr>` while `Thead` already emits one, so the
+DOM read `<thead><tr><tr><th>`. All five headers collapsed into one anonymous cell in
+column 1, which then absorbed the table's slack width — producing both the clustered
+headers and the empty gap. **Broken by `42803db` on 2026-07-19 and live for a week.**
+
+Three findings, all in §7.54: prose in a docblock could not enforce a call-site contract
+(the guard is now `components/Table.test.tsx`, which scans every admin page); every
+**text** assertion passes on a table whose labels are correct and merely in the wrong
+place, so the check had to **measure** rects; and React's own `validateDOMNesting` warning
+was tried and **rejected** — it logged nothing on the known-broken page and went green.
+
+**Not done (deliberate):** typing `Thead`'s children so a `<Tr>` fails typecheck — the
+user's call, reasoning in `BACKLOG.md` → *Deliberately not doing*. `Table.tsx` itself was a
+**comment-only** diff, gated by grep: it backs all 14 admin tables and this change had no
+business altering it.
+
+### Both checks were run against the unfixed tree first
+
+A check never seen to fail proves nothing, and a cosmetic fix is the easiest kind to
+declare done on a run that was always green. Recorded: the scan test failed naming
+`levels/page.tsx`; the geometry driver failed at **488px** worst offset and passes at
+**0px**, which is where the 2px tolerance comes from. Likewise the class-students driver's
+first six checks assert the three negative-control rows **exist** before asserting they are
+absent from the screen.
+
+**A real bug the gates caught:** `ON CONFLICT DO NOTHING` did not make the class-students
+fixture idempotent, because the relevant unique indexes are **partial** — the inactive
+enrolment and the cancelled booking, i.e. exactly the negative controls, re-inserted on
+every run. Only running the fixture twice exposed it. §7.53.
+
+**A false alarm worth knowing about:** `verify-levels.mjs` failed in a way that looked like
+a regression in this change. It was not — this worktree had no `SwimSyncApp/.env` (§7.56),
+so Expo could not reach Supabase. Proved pre-existing by running the driver against the
+*unfixed* code and getting identical results, and only then diagnosed. Both drivers are
+9/9 and 14/14 now.
+
+### ⚠ What the parallel worktrees left, and what is NOT done here
+
+**Three worktrees ran against this repo and this one database today.** The read on `main`
+at the time of writing (`44e04a0`):
+
+- **`feat/parent-contact-details` shipped and is on `main`** (`3832670`) — the admin can fix
+  a parent's contact details. **~~It has not been session-closed.~~ Its own session closed
+  it the same day** (`5c3c561`, `32f5ef2`): **PRD §7.19**, §3, §5's driver catalog, the
+  backlog item struck through, and the missing teardown fixture added. The refusal below
+  was the right call and is kept as the reasoning — *this* session was right not to write a
+  PRD entry for behaviour it had never driven; the session that drove it wrote one instead.
+  `CONTACT_DETAILS_PLAN.md` stays at the repo root, matching `PARENT_CLAIM_PLAN.md`,
+  `TRIAL_ONBOARDING_PLAN.md` and `PACKAGES_DESIGN.md`; the opposite call for this session's
+  plan files was deliberate and both remain intact.
+  > **This section deliberately does not document it** — the user's call — because writing
+  > a PRD entry for a feature this session did not build and never drove is how the PRD
+  > starts lying. **Next session: close it out, or confirm its own session already will.**
+- **`debt/attendance-window-guard` is still in flight** — nothing on `main`, ~21 dirty
+  files at last look. Out of scope entirely.
+- The sibling session's own graduations are §7.55 (worktrees share one database) and
+  `12cf553` (WORKTREE.md is never versioned). Read §7.55 before running any migration from
+  a worktree.
+
 ---
 
 ## 8.12 Twelfth session (2026-07-26) — PARENTS CAN CLAIM THEIR OWN CHILD — BUILT **AND DEPLOYED**
@@ -2886,7 +3185,9 @@ that earns a PRD edit now.
     options, tagged `[MVP-excluded]` — the user's call, on the reasoning that SwimSync is
     moving past pure MVP-building. **§3.2 itself stays in the PRD as-written**: it's the
     historical record of the scope decision, not a to-do list.
-- **`/session-close` skill — new** (`.claude/skills/session-close/`). Walks all three docs
+- **`/session-close` skill — new** (`.claude/skills/session-close/`) — _renamed
+  **`/update-docs`** on 2026-07-26; the `/session-close` name now belongs to the shut-down
+  checklist. Historical entry, left as written._ Walks all three docs
   and updates each by its own rule. It **gates** each one rather than writing to all three —
   the failure mode of an auto-updater is bloat, which would collapse the split back into
   three copies of the same thing. A session touching only this file is the *correct*
@@ -3036,21 +3337,36 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### ~~FIRST: production still holds the test data~~ — **DONE 2026-07-26, the script was run**
+### ~~FIRST: a shipped feature is documented nowhere~~ — **CLOSED 2026-07-26, by its own session**
 
-The cleanup script (`scratchpad/cleanup/cleanup-test-data.sql`) was **executed against
-production** on 2026-07-26. `Peter Zztest` — left active and enrolled in TestClass, and
-therefore positioned to block a real month from billing — **is deleted.** The item is
-closed on `BACKLOG.md` too.
+**`feat/parent-contact-details` is live on `main`** (`3832670`, 2026-07-26): the admin can
+fix a parent's contact details, with SG phone validation (`lib/sgPhone.ts`) and a
+`ContactHint` component. The thirteenth session found it undocumented and **correctly
+refused to write the PRD entry itself** — documenting behaviour you have not driven is how
+the PRD starts lying (§8.13). Its own session then closed it, hours later:
 
-**What production holds now:** **9 students, 7 parents** — all real families — plus the
-real coach, 4 real classes, and a second tenant (`Epic Swim`). **`attendance`,
-`lesson_sessions` and `invoices` are all 0.** It is *not* a clean slate; see §3's banned-
-phrase note, which this cleanup is the second reason for.
+- `PRD.md` **§7.19** — the three states and why they differ
+- `HANDOVER.md` §3 (what works) and §5 (the driver catalog, plus the frontend test-file
+  list, which had gone stale by six files)
+- `BACKLOG.md` — *"Editing a student's PARENT contact details"* struck through as **DONE**,
+  with the two calls it left open recorded as settled
+- `fixtures-contact-details-teardown.sql` — the convention §8.13 established two commits
+  earlier and this feature had missed
 
-Still deliberately **not** deleted: `TestClass` (a class carries effective-dated
-`class_rates` and `trial_bookings.class_id` is `RESTRICT`) and the `jj test` coach in
-**Epic Swim**, which is that business's data rather than ours.
+`CONTACT_DETAILS_PLAN.md` stays at the repo root, matching every previous plan file.
+**The one thing genuinely still open** is in `BACKLOG.md`: *Direct writes to `students` are
+audited by nobody* — this screen and `setLevel()` both write with no `audit_log` row, and
+the fix is a trigger, i.e. a migration, i.e. it queues behind the attendance-window one
+(§7.55).
+
+This matters beyond tidiness: the phone is now the **primary parent-matching signal** for
+claims (§8.12), and every child added before 2026-07-26 has none. A screen that can supply
+one is load-bearing for that, and nobody reading the docs would know it exists.
+
+**Production data, for reference** (unchanged since the 2026-07-26 cleanup): **9 students,
+7 parents**, all real families, plus the real coach, 4 real classes, and a second tenant
+(`Epic Swim`). **`attendance`, `lesson_sessions` and `invoices` are all 0.** Not a clean
+slate — see §3's banned-phrase note.
 
 **⚠ The "first attendance ever recorded" paragraph below is now FALSE, and has been
 rewritten rather than deleted** — that one row was `TestChild1`'s trial and the script
@@ -3141,14 +3457,13 @@ not. The gap is "bill a real month", not "mark anything at all".
 **`BACKLOG.md` → `## Build order` is EMPTY** and has been since 2026-07-19. Pick from the
 themed sections below it. The nearest candidates with no dependencies:
 **credit-note emails** (the other half of the notification work), an **upcoming-lessons
-view for parents** (small, and the building block already exists), or — both raised by
-this session's testing and both small — **convert a trial into an enrolled student** and
-**editing a student's contact details**. The second matters more than it sounds: the phone
-is now the primary matching signal and is required going forward, but every child added
-before 2026-07-26 has none and no screen can supply one.
+view for parents** (small, and the building block already exists), or **convert a trial
+into an enrolled student** (small, raised by the trial-onboarding testing).
 
 *(Parents claiming their own child shipped 2026-07-26 — PRD §7.18. Coach-created student
-profiles shipped 2026-07-25. Both were the last of the trial-onboarding cluster.)*
+profiles shipped 2026-07-25. Both were the last of the trial-onboarding cluster.
+**Editing a parent's contact details also shipped 2026-07-26** and was removed from this
+list — but see the FIRST item above: it is still sitting in `BACKLOG.md` as unbuilt.)*
 
 **Two hygiene items, neither urgent:** *revoke `anon` EXECUTE from the remaining SECURITY
 DEFINER functions* (§7.39's missing second layer), and *a business cannot read its own
@@ -3194,6 +3509,9 @@ email **has still never fired in production**.
 | `PARENT_CLAIM_PLAN.md` | **The parent-claiming design of record** — the settled decisions (including the two the user reversed mid-planning), seven ranked risks with mitigations inlined beside the step each governs, and the pre-commit gate. Read before changing matching, the claim queue, or `merge_students()` |
 | `SwimSyncApp/lib/attendanceRoster.ts` | Who appears on Mark Attendance: enrolled **∪** already-marked-on-this-session. Why a closed trial enrolment doesn't hide the child it marked |
 | `supabase/migrations/20260725000100…000300` | `student_settlements`, `add_unclaimed_student()`, `link_invited_parent()` |
+| `SwimSyncAdmin/lib/classRoster.ts` | Who is in a class: active enrolments + **upcoming** trials, and the `2+1` count. **Takes `today` as a required parameter and touches no clock** — §7.7 made unreachable rather than discouraged |
+| `SwimSyncAdmin/components/Drawer.tsx` | Right-hand slide-over. Deliberately the same prop shape as `Modal.tsx` and no richer |
+| `SwimSyncAdmin/components/Table.test.tsx` | **The `<Thead>` call-site contract, enforced.** Scans every `app/(admin)/**/page.tsx` and fails if one wraps its `<Th>`s in a `<Tr>`. Walks the tree at test time, so pages that don't exist yet are covered. §7.54 |
 | `SwimSyncAdmin/app/(admin)/wages/page.tsx` | Coach payroll: rates, policy, run, mark paid |
 | `SwimSyncAdmin/app/(admin)/platform/page.tsx` | Platform admin: every business + the student rescue tool |
 | `supabase/migrations/` | Schema, RLS, triggers, grants (ordered, source of truth) |
@@ -3235,7 +3553,9 @@ email **has still never fired in production**.
 | `SwimSyncAdmin/lib/classCoverage.ts` | Expected-vs-marked coverage maths for the admin pre-generation check |
 | `SwimSyncAdmin/app/(admin)/` | Admin pages; `app/api/` server routes |
 | `.claude/skills/run-ui-playwright/` | Skill to launch + drive both UIs (Playwright/Chrome) |
-| `.claude/skills/session-close/` | Skill: update PRD/BACKLOG/HANDOVER by their own rules at session end |
+| `01_SESSION_WORKFLOW.md` | **Which skill to run when** — the user-facing one-page loop. Start here for workflow questions |
+| `.claude/skills/update-docs/` | Skill: reconcile PRD/BACKLOG/HANDOVER by their own rules (**was `/session-close`** until 2026-07-26) |
+| `.claude/skills/session-close/` | Skill: shut the session down — fixtures torn down, ports released, nothing unpushed, worktree settled |
 | `AVAIL_SKILLS.md` | Reference for all available skills |
 | `LOCAL_DEV_GUIDE.md` | Run/test commands, seed logins, service URLs |
 | `INVOICE_RUNBOOK.md` | Monthly manual invoice-generation procedure (superadmin) |

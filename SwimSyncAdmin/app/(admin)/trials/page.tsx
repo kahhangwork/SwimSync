@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
+import { ContactHint } from "@/components/ContactHint";
+import { checkSgPhone, checkEmail } from "@/lib/sgPhone";
 import {
   todayInSg,
   formatSgDate,
@@ -506,19 +508,29 @@ export default function TrialsPage() {
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  <input
-                    value={bookPhone}
-                    onChange={(e) => setBookPhone(e.target.value)}
-                    placeholder="Parent's phone *"
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                  <input
-                    value={bookEmail}
-                    onChange={(e) => setBookEmail(e.target.value)}
-                    placeholder="Parent's email (optional)"
-                    type="email"
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
+                  <div>
+                    <input
+                      value={bookPhone}
+                      onChange={(e) => setBookPhone(e.target.value)}
+                      placeholder="Parent's phone *"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                    {/* Advisory only. The phone stays required — that guard
+                        lives in handleBook() and is untouched — but a number
+                        we don't recognise is still saved, because it may be
+                        the only one the family gave. */}
+                    <ContactHint check={checkSgPhone(bookPhone)} />
+                  </div>
+                  <div>
+                    <input
+                      value={bookEmail}
+                      onChange={(e) => setBookEmail(e.target.value)}
+                      placeholder="Parent's email (optional)"
+                      type="email"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                    <ContactHint check={checkEmail(bookEmail)} />
+                  </div>
                 </div>
                 <p className="mt-1 text-[11px] text-gray-400">
                   The phone is required: it is how this child is matched to

@@ -3,7 +3,10 @@
 A reference to the **skills** available when working on SwimSync with Claude Code:
 what each one does, how to invoke it, and when it's useful here.
 
-_Last updated: 2026-07-16_
+_Last updated: 2026-07-26_
+
+> **New here? Read [01_SESSION_WORKFLOW.md](01_SESSION_WORKFLOW.md) first** — one page,
+> what to type and when. This file is the detail behind it.
 
 ## What a skill is & how to run it
 
@@ -47,12 +50,23 @@ the **real UI** across parent / coach / superadmin roles — not just tests.
   selectors, session rehydration, force-click, etc.).
 - **Details:** [.claude/skills/run-ui-playwright/SKILL.md](.claude/skills/run-ui-playwright/SKILL.md)
 
-### Workflow skills — plan → build → commit → close
+### Workflow skills — plan → build → ship → reconcile → close
 
-Four prompt-driven skills that enforce a disciplined workflow. All four are
-**explicit-invocation only** (type the slash command); they don't auto-fire.
-Chain them: `/plan-with-confidence` → `/plan-review` → build → `/commit-review`,
-then `/session-close` when the session ends.
+Prompt-driven skills that enforce a disciplined workflow.
+`/plan-with-confidence` and `/plan-review` are **explicit-invocation only** (type the
+slash command); the rest also respond to plain requests.
+
+> **The order, and where each one runs:** see **[01_SESSION_WORKFLOW.md](01_SESSION_WORKFLOW.md)**
+> — the one-page cheat sheet for what to type and when. The short version:
+> `/session-start` once → then, **per change**, `/plan-with-confidence` →
+> `/plan-review` → build → `/commit-review` (which also pushes to `main`) → then
+> once at the end, `/update-docs` → `/session-close`.
+
+> ⚠ **`/session-close` was renamed on 2026-07-26.** What used to be called
+> `/session-close` — the documentation pass — is now **`/update-docs`**. The name
+> `/session-close` now belongs to a genuinely different skill: shutting the session
+> down. The old name promised a lifecycle step and delivered a docs pass, so it got
+> deferred by anyone who "wasn't closing anything yet".
 
 #### `plan-with-confidence` — don't plan until you're sure
 
@@ -75,18 +89,29 @@ read at planning time and forgotten at implementation time.
 - **Invoke:** `/plan-review` (only fires when typed explicitly).
 - **Details:** [.claude/skills/plan-review/SKILL.md](.claude/skills/plan-review/SKILL.md)
 
-#### `commit-review` — Senior-Engineer review, then commit
+#### `commit-review` — Senior-Engineer review, then commit **and ship**
 
 Gates a commit behind a thorough self-review: finds errors / inconsistent
 logic / inefficiencies / bug risks, lists them most-critical-first, fixes them,
-then commits.
+then commits — **and carries the change through to `main`** (fetch → rebase →
+re-run the suites → fast-forward-only push).
+
+Two things it enforces that are easy to skip:
+
+- **The documentation gate.** If the change alters *what a user can do*, its
+  `PRD.md` and `BACKLOG.md` updates ship **in the same push as the code**, not
+  at session end. A feature once went live while the backlog still advertised it
+  as unbuilt, because its docs were deferred to a "later" that never came.
+- **Per change, not batched.** `main` moves under you when sibling worktrees are
+  running — it moved twice in one session on 2026-07-26 — and three small
+  rebases beat one large one.
 
 - **Invoke:** `/commit-review`, or ask to "review and commit".
 - **Details:** [.claude/skills/commit-review/SKILL.md](.claude/skills/commit-review/SKILL.md)
 
 ### `session-start` — get up to speed before touching code
 
-The mirror of `session-close`. Reads the four orientation documents **in order** —
+The mirror of `update-docs`. Reads the four orientation documents **in order** —
 `HANDOVER.md` (state you're inheriting) → `PRD.md` (what exists) → `BACKLOG.md`
 (what doesn't yet, and why) → `LOCAL_DEV_GUIDE.md` (exact run/test commands + seed
 logins) — then reports where things stand, what's next per HANDOVER §9, and any
@@ -95,16 +120,18 @@ productive.
 
 - **Invoke:** `/session-start`, or say "get up to speed" / "catch up" / "where were
   we" at the start of a session.
-- **Pairs with:** `/session-close` (writes these same documents back at session end)
+- **Pairs with:** `/update-docs` (writes these same documents back near session end)
   and `/run-ui-playwright` (uses the seed logins to drive the UI).
 - **Details:** [.claude/skills/session-start/SKILL.md](.claude/skills/session-start/SKILL.md)
 
-### `session-close` — update the three living documents, then commit
+### `update-docs` — reconcile the three living documents
+
+_Called `/session-close` before 2026-07-26._
 
 SwimSync splits its knowledge across three documents by how often each changes:
 **PRD.md** (what exists), **BACKLOG.md** (what doesn't yet), **HANDOVER.md**
 (the state the next session inherits) — see [README.md](README.md). This skill
-walks all three at the end of a session and updates each **by its own rule**,
+walks all three near the end of a session and updates each **by its own rule**,
 so the split doesn't quietly collapse back into three copies of the same thing.
 
 It gates each document rather than writing to all of them: the PRD is touched
@@ -112,8 +139,28 @@ only if a **shipped** behaviour changed, the backlog only if an idea arrived or
 shipped, and the handover every time. Most sessions won't pass all three gates —
 that's the intended outcome.
 
-- **Invoke:** `/session-close`, or say you're wrapping up / "update the docs".
-- **Pairs with:** `/commit-review`, which it hands off to at the end.
+**This is the *reconciliation* pass, not the only time documentation is written.**
+Per-change documentation is a shipping gate and belongs to `/commit-review`.
+What lands here is the session log, next steps, test counts, and drift *between*
+documents.
+
+- **Invoke:** `/update-docs`, or say you're wrapping up / "update the docs".
+- **Then run:** `/session-close`.
+- **Details:** [.claude/skills/update-docs/SKILL.md](.claude/skills/update-docs/SKILL.md)
+
+### `session-close` — shut the session down cleanly
+
+**Writes no documentation.** It releases what the session was holding, which matters
+because the local environment is shared between every worktree: fixture rows torn out
+of the one database, dev servers stopped and ports released, nothing left uncommitted
+or unpushed (including an untracked migration — see HANDOVER §7.55), and the worktree
+given an explicit keep-or-remove decision.
+
+Ends by handing back anything only *you* can do — production spot-checks needing your
+login, decisions deliberately left open.
+
+- **Invoke:** `/session-close`, or say you're done / closing the terminal.
+- **Run `/update-docs` first** — step 1 checks that you did.
 - **Details:** [.claude/skills/session-close/SKILL.md](.claude/skills/session-close/SKILL.md)
 
 ---
@@ -169,12 +216,13 @@ that's the intended outcome.
 ## Quick reference
 
 ```
-# Workflow (project skills, explicit-invocation only)
-/session-start            read HANDOVER→PRD→BACKLOG→LOCAL_DEV_GUIDE, get oriented
-/plan-with-confidence     don't plan until >96% sure (asks questions first)
-/plan-review              rank a plan's product risk + add mitigations
-/commit-review            Senior-Engineer review, then commit
-/session-close            update PRD/BACKLOG/HANDOVER by their own rules, then commit
+# Workflow (project skills) — full order in 01_SESSION_WORKFLOW.md
+/session-start            read HANDOVER→PRD→BACKLOG→LOCAL_DEV_GUIDE, get oriented   [once]
+/plan-with-confidence     don't plan until >96% sure (asks questions first)     [per change]
+/plan-review              rank a plan's product risk + add mitigations           [per plan]
+/commit-review            review, commit, AND push to main                     [per change]
+/update-docs              reconcile PRD/BACKLOG/HANDOVER  (was: /session-close)     [once]
+/session-close            shut down: fixtures, ports, unpushed work, worktree      [last]
 
 # Run & verify
 /run-ui-playwright        drive both SwimSync UIs in Chrome (project skill)

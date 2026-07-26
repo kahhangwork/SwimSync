@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-26 (parent claiming live; trial visibility fixed; **production cleanup script RUN**; docs corrected — a coach cannot add a walk-in and has not been able to since 2026-07-25)_
+_Last updated: 2026-07-26 (thirteenth session — the Classes page shows who is in a class; the Levels table header was nested inside a row and is fixed. Both live. **Note: the admin contact-details feature shipped from a parallel worktree and is NOT yet reflected here or in the PRD** — see HANDOVER §8.13)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -203,7 +203,29 @@ Unassigned Children performs, and keep the "this makes them expected every week"
 The natural trigger is the Trials page's *past — needs marking* list, once the lesson has
 been marked.
 
-### Editing a student's PARENT contact details — **S**
+### ~~Editing a student's PARENT contact details~~ — **S** — **DONE 2026-07-26**
+Shipped and deployed (`3832670`): every child on the admin Students page has a **Contact
+details** action. **PRD §7.19** describes the behaviour; `CONTACT_DETAILS_PLAN.md` has the
+plan, the risk review and the walked gate.
+
+The reasoning below is kept because two of its calls were **settled differently** than it
+proposed, and the differences are the design:
+
+- **A claimed child is READ-ONLY, not editable.** The item left this open. Settled: the
+  admin sees every linked parent's own `profiles` row, and the family maintains it in the
+  app. A second editable copy would be the stale duplicate `students.age` was removed for
+  — and `is_tenant_admin(NULL)` refuses the write anyway, since a parent is global.
+- **A pending claim LOCKS the fields**, which the item did not anticipate.
+  `student_claims.match_reason` is a snapshot, so editing under a live claim makes the
+  admin approve on a reason that stopped being true.
+- The phone check is **advisory everywhere and blocks nothing**; the `964` on production
+  is now fixable, which was the point.
+
+**Still outstanding, and split out above:** *Direct writes to `students` are audited by
+nobody* — this screen and `setLevel()` both write with no `audit_log` row.
+
+<details><summary>Original item (kept for the reasoning)</summary>
+
 There is no way to change `provisional_contact_name` / `_phone` / `_email` on an existing
 student.
 
@@ -235,6 +257,8 @@ claimed child keeps them indefinitely. The argument for read-only-after-claim: t
 contact details then live on `profiles`, and a second editable copy on the student row is a
 stale duplicate of exactly the kind `students.age` and `classes.price_per_lesson` were
 removed for — plus it feeds the matcher for a child who can no longer be a candidate.
+
+</details>
 
 ### Attendance edit history view — **S** `[Phase 2]`
 Surface the existing audit trail in the UI.
@@ -823,6 +847,42 @@ quietly — arguably a worse state, and one this project created.
 
 Settle the scale first: `SELECT tenant_id IS NULL AS invisible, count(*) FROM audit_log GROUP BY 1;`
 
+### Direct writes to `students` are audited by nobody — **S**
+Two admin paths update `students` straight from the client and record **nothing**: the
+level picker (`setLevel()`) and, since 2026-07-26, the **parent contact details** modal
+(`CONTACT_DETAILS_PLAN.md`). They are not among the 19 writers counted in the item above —
+that item is about writers whose audit row lacks a `tenant_id`. **These write no row at
+all.**
+
+**Why:** contact details are not cosmetic. `provisional_contact_phone` and `_email` are
+the top two ranked signals in `find_student_candidates()` — they decide **which parent is
+offered which child**, and once a claim is approved nothing in the product can unlink them
+except that flow's own undo (HANDOVER §7.47). "Who changed the number, and when?" is
+exactly the question a disputed claim raises, and today the answer does not exist. A level
+edit matters far less, which is why this sat unnoticed.
+
+**Notes — a TRIGGER on `students`, not an RPC per call site:**
+
+- **This supersedes what `CONTACT_DETAILS_PLAN.md` says.** That file proposes wrapping the
+  contact edit in a `SECURITY DEFINER` RPC so the write and the audit row share a
+  transaction. Correct but narrow: it fixes one screen and leaves `setLevel()` — and every
+  future direct write — unaudited. An `AFTER UPDATE` trigger on `students` is atomic for
+  the same reason, covers both paths at once, needs **no client change**, and is inherited
+  automatically by whatever writes next.
+- It also composes with the item above: derive `tenant_id` from the row (`students` has a
+  real `tenant_id` column), so this one starts life correctly attributed rather than
+  joining the 13.
+- **Do not audit from the browser.** It is *possible* — `authenticated` holds INSERT and
+  `audit_log_insert` permits `actor_id = auth.uid()` — and it is wrong twice over: it is a
+  second round trip that can be lost while the write lands, and everything except the
+  actor is self-reported. An audit trail with silent holes is worse than a known-absent
+  one, because it gets trusted.
+- Record the **old and new values** (`to_jsonb(OLD)` / `to_jsonb(NEW)`), not just "edited".
+  The dispute this exists for is *what the number used to be*.
+- Scope it: an `UPDATE` trigger firing on every column change includes the level picker,
+  which is fine, but check the volume before adding one to a table the invoice engine
+  touches under `service_role`.
+
 ### Enforce the attendance window at save time — **S** `[handover]`
 The coach attendance screen (`(coach)/classes/[id]/attendance.tsx`) writes whatever `date` it
 is handed, with no validation.
@@ -836,6 +896,36 @@ the exact phantom-lesson billing risk the UX fix closed, just via a different do
 **Notes:** defense-in-depth — reject a `date` outside `[backlogWindowStart(today, enrolment),
 today]` or whose weekday ≠ the class's `day_of_week`, in the save handler (and ideally mirror
 it in a DB check). Cheap, and it makes the window a real invariant rather than a UI convention.
+
+### Check column geometry on every admin table, not just Levels — **S**
+`verify-levels-table.mjs` measures each `<th>`'s rect against its column's `<td>` and fails
+if they diverge. Point the same check at the other 13 admin table pages.
+
+**Why:** the Levels table shipped with its header row nested inside another row and stayed
+broken in production for a week (HANDOVER §7.54). **Every text-based assertion passed** —
+the labels were all present, correctly spelled and in the right order, merely in the wrong
+place. Only a human eventually noticed. The geometry check catches that class of bug, and
+right now exactly one of fourteen tables has it.
+
+**Notes:** the assertion is ~15 lines and already written; the work is fixtures, because
+several admin tables are empty on the seed stack and a table with no body row has nothing
+to compare a header against. **Skip-and-log rather than silently pass** on an empty table —
+a page reported as "checked" when it had no rows is how this bug survives a second time.
+`components/Table.test.tsx` already covers the *static* form of the mistake (a `<Tr>` inside
+a `<Thead>`); this covers layouts that break for other reasons.
+
+### `verify-levels.mjs` is not hermetic — **S**
+It asserts an empty-ladder state as its first check, then creates levels and leaves them
+behind, so the second run of the day fails on the first run's data.
+
+**Why:** every other driver in the suite self-seeds and tears down. This one silently
+depends on being run against a clean `tenant_levels`, which cost real time this session:
+it failed, looked like a regression in the change under test, and needed a run against the
+*unfixed* code to prove it was pre-existing.
+
+**Notes:** it also drives Expo, so a fix should keep the admin half runnable alone — an
+admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
+and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`
@@ -958,3 +1048,4 @@ Kept so the reasoning doesn't get re-litigated.
 | **Deleting a business from the admin panel** | Rejected 2026-07-21 with provisioning. A tenant deletion cascades into its families, students, invoices, credit notes and attendance — so a destructive button sitting on a support panel is a bigger risk than the mis-typed name it would fix, and the mistake it fixes is rare and cheap to correct in SQL. A **failed** provision already cleans up after itself (the route deletes the tenant if the invite fails), which covers the only case that happens automatically. An "only if the tenant is empty" variant was considered and judged not worth its own RPC, guard and tests. |
 | **Sending the invite through Supabase Auth's own invite email** | Considered 2026-07-21 and rejected in favour of `generateLink({type:'invite'})` + our own Resend send. Supabase's path would need a `templates/invite.html` **pasted into the production dashboard**, where nothing in the repo can see it and no test can catch it drifting from the file — and resending to an already-invited user has uncertain semantics (it may 422 rather than re-send). Our own send makes the template code-owned and unit-tested, no-ops without `RESEND_API_KEY`, and makes Resend deterministic. Note the deliberate inversion of the invoice-email rule: an invoice email is best-effort because billing must not depend on delivery, whereas **the invite IS the deliverable**, so a failed send surfaces the link for the operator instead of being swallowed. |
 | **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8a.) |
+| **Typing `<Thead>`'s children so a `<Tr>` inside it fails typecheck** | Considered 2026-07-26 while fixing the Levels table (HANDOVER §7.54) and declined by the user in favour of a call-site scan test. It would be the stronger guard in principle — the mistake becomes unrepresentable rather than merely detected — but React's `children` typing does not express "only these element types" cleanly, so it needs casts or a wrapper at call sites, and it would put a fiddly type on the component that backs **all 14 admin tables**. `components/Table.test.tsx` catches the same mistake in CI, names the file and the exact fix, and risks nothing at runtime. Note the earlier failure this replaces: the previous attempt at prevention was a **docblock asserting the broken form was "unrepresentable"**, which it was not — the lesson is that the guard must be executable, not that it must be a type. |

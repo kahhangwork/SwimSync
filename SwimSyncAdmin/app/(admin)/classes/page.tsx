@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Pencil, CalendarPlus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Pencil, CalendarPlus, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
-import { todayInSg } from "@/lib/lessonDates";
+import { Drawer } from "@/components/Drawer";
+import { todayInSg, toSgDate, formatSgDate } from "@/lib/lessonDates";
+import {
+  buildClassRoster,
+  formatStudentCount,
+  describeStudentCount,
+  type RosterEnrolment,
+  type RosterBooking,
+} from "@/lib/classRoster";
 
 type ClassRow = {
   id: string;
@@ -78,6 +86,19 @@ export default function ClassesPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // ⚠ THE ROSTER IS FETCHED SEPARATELY FROM THE CLASS LIST, ON PURPOSE.
+  //
+  // PostgREST returns null for the ENTIRE select when one embed fails — a
+  // policy gap, an ambiguous relationship, a typo in the nesting. Bolting
+  // these joins onto loadClasses()'s select would mean any of those blanks
+  // every class from this page, rather than degrading one drawer. So the
+  // class list keeps the query it has always had, and the roster lives here,
+  // defaulted to empty, free to fail on its own. See HANDOVER §7.52.
+  const [enrolments, setEnrolments] = useState<RosterEnrolment[]>([]);
+  const [bookings, setBookings] = useState<RosterBooking[]>([]);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [drawerClass, setDrawerClass] = useState<ClassRow | null>(null);
+
   // Form state
   const [title, setTitle] = useState("");
   const [coachId, setCoachId] = useState("");
@@ -120,7 +141,70 @@ export default function ClassesPage() {
     loadClasses();
     loadCoaches();
     loadCategories();
+    loadRoster();
   }, []);
+
+  /**
+   * Who is in each class — the drawer's contents, and the "+1" on the badge.
+   *
+   * Two queries, neither of which the class table depends on. An error here
+   * leaves the table intact and shows an explicit message inside the drawer:
+   * a roster we could not read must never be indistinguishable from a class
+   * with nobody in it.
+   */
+  async function loadRoster() {
+    const today = todayInSg();
+    const [{ data: enr, error: enrErr }, { data: bk, error: bkErr }] =
+      await Promise.all([
+        supabase
+          .from("student_class_enrolments")
+          .select(
+            "class_id, is_active, enrolled_at, student_id, students(full_name, tenant_levels(label))"
+          )
+          .eq("is_active", true),
+        // Cancelled and past bookings are excluded here AND again in
+        // buildClassRoster — the count must not include a guest who is not
+        // coming, and one definition of "upcoming" (>= today, in SGT) is
+        // already shared with the coach roster and Unassigned Children.
+        supabase
+          .from("trial_bookings")
+          .select(
+            "class_id, session_date, student_id, cancelled_at, students(full_name, tenant_levels(label))"
+          )
+          .is("cancelled_at", null)
+          .gte("session_date", today),
+      ]);
+
+    if (enrErr || bkErr) {
+      setRosterError((enrErr ?? bkErr)!.message);
+      return;
+    }
+    setRosterError(null);
+
+    setEnrolments(
+      (enr ?? []).map((e: any) => ({
+        class_id: e.class_id,
+        is_active: e.is_active,
+        enrolled_at: e.enrolled_at,
+        student_id: e.student_id,
+        full_name: e.students?.full_name ?? "—",
+        // Read off the JOINED tenant_levels row, never off the student: the
+        // student carries only the id, and a level's label is the business's
+        // own vocabulary.
+        level_label: e.students?.tenant_levels?.label ?? null,
+      }))
+    );
+    setBookings(
+      (bk ?? []).map((b: any) => ({
+        class_id: b.class_id,
+        session_date: b.session_date,
+        student_id: b.student_id,
+        cancelled_at: b.cancelled_at ?? null,
+        full_name: b.students?.full_name ?? "—",
+        level_label: b.students?.tenant_levels?.label ?? null,
+      }))
+    );
+  }
 
   async function loadCategories() {
     const { data } = await supabase
@@ -329,6 +413,24 @@ export default function ClassesPage() {
       c.coach_name.toLowerCase().includes(search.toLowerCase())
   );
 
+  // One roster per class, derived once. The badge's "+N" and the drawer's
+  // list read the SAME object, so the number and the names it promises can
+  // never disagree. todayInSg() is read here — the caller's job — and passed
+  // down; classRoster.ts itself touches no clock (§7.7).
+  const rosterByClass = useMemo(() => {
+    const today = todayInSg();
+    const map = new Map<string, ReturnType<typeof buildClassRoster>>();
+    for (const c of classes) {
+      map.set(c.id, buildClassRoster(enrolments, bookings, c.id, today));
+    }
+    return map;
+  }, [classes, enrolments, bookings]);
+
+  const openRoster = rosterByClass.get(drawerClass?.id ?? "") ?? {
+    enrolled: [],
+    trials: [],
+  };
+
   return (
     <div>
       <PageHeader
@@ -395,12 +497,34 @@ export default function ClassesPage() {
                   S${cls.price_per_lesson.toFixed(2)}
                 </Td>
                 <Td>
-                  <span className="inline-flex items-center justify-center rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
-                    {cls.student_count}
-                  </span>
+                  {/* "2+1", never "3". The enrolled half comes from the class
+                      query's own embed, so this number survives even if the
+                      roster query failed; the "+1" is trials, and it is a
+                      separate number because a guest at one lesson is not a
+                      weekly student (PRD §7.17). */}
+                  <button
+                    onClick={() => setDrawerClass(cls)}
+                    title={describeStudentCount(
+                      cls.student_count,
+                      rosterByClass.get(cls.id)?.trials.length ?? 0
+                    )}
+                    className="inline-flex items-center justify-center rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                  >
+                    {formatStudentCount(
+                      cls.student_count,
+                      rosterByClass.get(cls.id)?.trials.length ?? 0
+                    )}
+                  </button>
                 </Td>
                 <Td>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setDrawerClass(cls)}
+                      className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      <Users className="h-3.5 w-3.5 shrink-0" />
+                      See students
+                    </button>
                     <button
                       onClick={() => openEdit(cls)}
                       className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
@@ -491,6 +615,92 @@ export default function ClassesPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Who is in this class — read-only, two groups, never merged.
+          DELIBERATELY NO WRITE CONTROLS. Not an oversight: the one action an
+          admin might reach for here is assigning a trial child to the class,
+          and that is precisely the action that breaks billing (PRD §7.17).
+          Do NOT add Assign / Enrol / Remove buttons to this drawer. */}
+      <Drawer
+        open={drawerClass !== null}
+        onClose={() => setDrawerClass(null)}
+        title={drawerClass?.title ?? ""}
+        subtitle={
+          drawerClass
+            ? `${capitalize(drawerClass.day_of_week)} · ${formatTime(
+                drawerClass.start_time
+              )} – ${formatTime(drawerClass.end_time)} · ${
+                drawerClass.location_name
+              }`
+            : undefined
+        }
+      >
+        {rosterError ? (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+            Couldn&apos;t load the roster: {rosterError}
+          </p>
+        ) : (
+          <div className="space-y-8">
+            <section>
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Enrolled ({openRoster.enrolled.length})
+              </h3>
+              {openRoster.enrolled.length === 0 ? (
+                <p className="text-sm text-gray-400">
+                  Nobody is enrolled in this class yet.
+                </p>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {openRoster.enrolled.map((s) => (
+                    <li key={s.student_id} className="py-2.5">
+                      <p className="text-sm font-medium text-gray-900">
+                        {s.full_name}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {s.level_label ?? "No level set"} · Joined{" "}
+                        {formatSgDate(toSgDate(s.enrolled_at), {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {openRoster.trials.length > 0 && (
+              <section>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Trials coming up ({openRoster.trials.length})
+                </h3>
+                <ul className="divide-y divide-gray-100">
+                  {openRoster.trials.map((t) => (
+                    <li key={t.student_id} className="py-2.5">
+                      <p className="text-sm font-medium text-gray-900">
+                        {t.full_name}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {t.level_label ?? "No level set"} · Trial on{" "}
+                        {formatSgDate(t.session_date)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+                {/* The consequence, in words. A reader who takes the "+1" for
+                    class membership is one click from breaking a billing
+                    month, so the screen says what would happen. */}
+                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  A guest for this one lesson — not part of the class. Adding
+                  them to it would make them expected every week, and a lesson
+                  nobody marks blocks the whole month from being invoiced.
+                </p>
+              </section>
+            )}
+          </div>
+        )}
+      </Drawer>
 
       {/* Create / Edit Class Modal */}
       <Modal

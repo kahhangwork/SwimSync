@@ -649,6 +649,27 @@ payout covering it has been paid: that money is settled, and the remedy is a cre
 a payout adjustment rather than rewriting the record. Terms also cannot be dated into the
 future.
 
+#### Seeing who is in a class — and the count reads `2+1` *(implemented 2026-07-26)*
+
+Each class row has a **See students** action opening a panel that lists the children
+**currently enrolled** in that class — name, swimming level, and the date they joined —
+and, in a **separate** list below it, children with a **trial booked for a future date**.
+The Students column reads **`2+1`**: two enrolled, one trial. Read-only; the panel offers
+no action.
+
+**The count is deliberately not `3`, and the two lists are deliberately not merged.** A
+trial is a booking, not an enrolment (§7.17), and an admin who reads a guest as a class
+member is one action away from assigning them — which creates an active enrolment, makes
+the child expected at **every** lesson, and silently stops that class's month being
+invoiced the first time one of those lessons goes unmarked. §7.17 already forbids
+listing trials among the enrolled on the coach's roster for the same reason; this applies
+the rule to the number as well as the list. The panel states the consequence in words and
+carries no *Assign* control at all.
+
+"Trial" here means a booking that is **not cancelled and dated today or later** — the same
+definition the coach's roster and Unassigned Children use. A trial drops out of the count
+the day after its lesson; chasing an unmarked past trial is the Trials page's job.
+
 ### 7.4 Student Management
 
 SwimSync shall allow **parents to create student profiles** and **superadmin to manage assignment** of those students.
@@ -1512,6 +1533,57 @@ merged. The record holding the **history** always survives; the other is deleted
 contents written to the audit log first. Merging **refuses** when both records have
 lessons recorded, or when the duplicate already appears on an invoice — those need a
 person, not a button.
+
+### 7.19 The Parent's Contact Details *(implemented 2026-07-26)*
+
+§7.18 makes a child's **contact number and email the two strongest signals** for matching
+them to their parent's account. Nothing could change them. A child added with a wrong
+number could never be matched by phone, and the remedy was SQL — while production already
+held a real child whose stored number was `964`, too short for `normalize_phone()` to use
+at all, with nobody told.
+
+The admin's **Students** page gives every child a **Contact details** action. What it shows
+depends on whether the child has been claimed, and the difference is the whole design.
+
+#### Nobody has claimed this child yet — editable
+
+The three details taken when the child was added — **the parent's name, phone and email** —
+are editable. They are the parent's details recorded on the child's row; a child has no
+phone or email of their own anywhere in this product.
+
+The name is worth recording even though nothing computes with it: it answers *whose* number
+this is — a parent, a grandparent, the helper who brought them. It is also the only place
+that value can be set, since neither *Add a student* nor *Book a trial* asks for it.
+
+#### The family has an account — read-only
+
+Once a parent holds an account, their real details live on their own profile, which **they
+maintain themselves** in the app under *Profile → Contact Details*. The admin sees those,
+labelled as such, and is told where the family changes them. **Every** linked parent is
+shown, not one: a child has two parents, and *"use the mother's number, not the father's"*
+is the ordinary reason to open this screen.
+
+They are not editable here on purpose. A second editable copy on the child's row would be a
+stale duplicate of the record that actually matters — the same fault that removed
+`students.age` and `classes.price_per_lesson`. It is also not the business's data to
+rewrite: a parent is global to SwimSync, not owned by one school.
+
+#### A claim is pending — locked
+
+When a parent is currently claiming this child, the details are **shown but frozen**, with a
+link to the Parent Requests queue. The claim records *why* the candidate was offered at the
+moment it was raised (§7.18). Editing the number underneath it would leave the admin
+approving on a reason that had quietly stopped being true — and an approved link cannot be
+undone once the child has been invoiced.
+
+#### Checking the number
+
+A number that is not a plausible Singapore one is **flagged, never refused** — 8 digits
+beginning 6 (landline), 8 or 9 (mobile), or 3 (VoIP), with `+65` optional. Too short to
+match at all is called out as exactly that. The same check appears under *Add a student*
+and *Book a trial*, where a phone is still **required**; only its *shape* is advisory. The
+admin is usually typing the only number a family gave them, and the product's job is to say
+the number looks wrong, not to withhold the record.
 
 ---
 
