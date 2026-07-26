@@ -649,6 +649,27 @@ payout covering it has been paid: that money is settled, and the remedy is a cre
 a payout adjustment rather than rewriting the record. Terms also cannot be dated into the
 future.
 
+#### Seeing who is in a class — and the count reads `2+1` *(implemented 2026-07-26)*
+
+Each class row has a **See students** action opening a panel that lists the children
+**currently enrolled** in that class — name, swimming level, and the date they joined —
+and, in a **separate** list below it, children with a **trial booked for a future date**.
+The Students column reads **`2+1`**: two enrolled, one trial. Read-only; the panel offers
+no action.
+
+**The count is deliberately not `3`, and the two lists are deliberately not merged.** A
+trial is a booking, not an enrolment (§7.17), and an admin who reads a guest as a class
+member is one action away from assigning them — which creates an active enrolment, makes
+the child expected at **every** lesson, and silently stops that class's month being
+invoiced the first time one of those lessons goes unmarked. §7.17 already forbids
+listing trials among the enrolled on the coach's roster for the same reason; this applies
+the rule to the number as well as the list. The panel states the consequence in words and
+carries no *Assign* control at all.
+
+"Trial" here means a booking that is **not cancelled and dated today or later** — the same
+definition the coach's roster and Unassigned Children use. A trial drops out of the count
+the day after its lesson; chasing an unmarked past trial is the Trials page's job.
+
 ### 7.4 Student Management
 
 SwimSync shall allow **parents to create student profiles** and **superadmin to manage assignment** of those students.

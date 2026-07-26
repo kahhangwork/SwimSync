@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-26 (parent claiming live; trial visibility fixed; **production cleanup script RUN**; docs corrected — a coach cannot add a walk-in and has not been able to since 2026-07-25)_
+_Last updated: 2026-07-26 (thirteenth session — the Classes page shows who is in a class; the Levels table header was nested inside a row and is fixed. Both live. **Note: the admin contact-details feature shipped from a parallel worktree and is NOT yet reflected here or in the PRD** — see HANDOVER §8.13)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -873,6 +873,36 @@ the exact phantom-lesson billing risk the UX fix closed, just via a different do
 today]` or whose weekday ≠ the class's `day_of_week`, in the save handler (and ideally mirror
 it in a DB check). Cheap, and it makes the window a real invariant rather than a UI convention.
 
+### Check column geometry on every admin table, not just Levels — **S**
+`verify-levels-table.mjs` measures each `<th>`'s rect against its column's `<td>` and fails
+if they diverge. Point the same check at the other 13 admin table pages.
+
+**Why:** the Levels table shipped with its header row nested inside another row and stayed
+broken in production for a week (HANDOVER §7.54). **Every text-based assertion passed** —
+the labels were all present, correctly spelled and in the right order, merely in the wrong
+place. Only a human eventually noticed. The geometry check catches that class of bug, and
+right now exactly one of fourteen tables has it.
+
+**Notes:** the assertion is ~15 lines and already written; the work is fixtures, because
+several admin tables are empty on the seed stack and a table with no body row has nothing
+to compare a header against. **Skip-and-log rather than silently pass** on an empty table —
+a page reported as "checked" when it had no rows is how this bug survives a second time.
+`components/Table.test.tsx` already covers the *static* form of the mistake (a `<Tr>` inside
+a `<Thead>`); this covers layouts that break for other reasons.
+
+### `verify-levels.mjs` is not hermetic — **S**
+It asserts an empty-ladder state as its first check, then creates levels and leaves them
+behind, so the second run of the day fails on the first run's data.
+
+**Why:** every other driver in the suite self-seeds and tears down. This one silently
+depends on being run against a clean `tenant_levels`, which cost real time this session:
+it failed, looked like a regression in the change under test, and needed a run against the
+*unfixed* code to prove it was pre-existing.
+
+**Notes:** it also drives Expo, so a fix should keep the admin half runnable alone — an
+admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
+and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
+
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`
 → `createClient<Database>(...)`) so query results are typed from the real schema instead
@@ -994,3 +1024,4 @@ Kept so the reasoning doesn't get re-litigated.
 | **Deleting a business from the admin panel** | Rejected 2026-07-21 with provisioning. A tenant deletion cascades into its families, students, invoices, credit notes and attendance — so a destructive button sitting on a support panel is a bigger risk than the mis-typed name it would fix, and the mistake it fixes is rare and cheap to correct in SQL. A **failed** provision already cleans up after itself (the route deletes the tenant if the invite fails), which covers the only case that happens automatically. An "only if the tenant is empty" variant was considered and judged not worth its own RPC, guard and tests. |
 | **Sending the invite through Supabase Auth's own invite email** | Considered 2026-07-21 and rejected in favour of `generateLink({type:'invite'})` + our own Resend send. Supabase's path would need a `templates/invite.html` **pasted into the production dashboard**, where nothing in the repo can see it and no test can catch it drifting from the file — and resending to an already-invited user has uncertain semantics (it may 422 rather than re-send). Our own send makes the template code-owned and unit-tested, no-ops without `RESEND_API_KEY`, and makes Resend deterministic. Note the deliberate inversion of the invoice-email rule: an invoice email is best-effort because billing must not depend on delivery, whereas **the invite IS the deliverable**, so a failed send surfaces the link for the operator instead of being swallowed. |
 | **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8a.) |
+| **Typing `<Thead>`'s children so a `<Tr>` inside it fails typecheck** | Considered 2026-07-26 while fixing the Levels table (HANDOVER §7.54) and declined by the user in favour of a call-site scan test. It would be the stronger guard in principle — the mistake becomes unrepresentable rather than merely detected — but React's `children` typing does not express "only these element types" cleanly, so it needs casts or a wrapper at call sites, and it would put a fiddly type on the component that backs **all 14 admin tables**. `components/Table.test.tsx` catches the same mistake in CI, names the file and the exact fix, and risks nothing at runtime. Note the earlier failure this replaces: the previous attempt at prevention was a **docblock asserting the broken form was "unrepresentable"**, which it was not — the lesson is that the guard must be executable, not that it must be a type. |

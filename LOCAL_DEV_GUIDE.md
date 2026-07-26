@@ -161,10 +161,19 @@ in and their status flipping `invited` → `active`.
 
 ### A child before their parent — trials and walk-ins (PRD §7.17)
 
-1. Coach app → **Classes** → a class → **Mark Attendance** → **Add a walk-in / trial** →
-   a name, optionally the parent's phone, Free or Paid trial → **Add & mark**.
-   Their enrolment is opened *and closed* on that date, so they never appear as expected
-   at a later lesson — but they stay on **this** lesson's roster, labelled *Not enrolled*.
+1. **Admin panel** (log in as `coach@swimsync.test`, who is also the tenant admin) →
+   **Trials** → *Book a trial*, or **Students** → *Add student*. A name and the parent's
+   **contact number — required**, not optional: the phone is the primary signal for
+   matching this child to their parent later, because a name is written too many ways.
+   A trial is a booking for **one** lesson: the child appears on that date's roster
+   labelled *Not enrolled* and on no other.
+
+   > **The COACH cannot do this, and this guide used to say they could.** An
+   > *"Add a walk-in"* form existed on the coach's attendance screen in slice 1 and was
+   > **removed** when a trial became a booking arranged ahead of time (HANDOVER §8.11).
+   > `grep -rn "rpc(" SwimSyncApp/app/\(coach\)` returns nothing — the coach app calls no
+   > RPCs at all; marking attendance is its only write path. A private coach arranges
+   > trials through their **tenant admin** account, which they hold anyway.
 2. Admin → **Students** → they show as **No parent account**, with a filter chip counting
    them.
 3. Admin → **Invoices** → **Generate Invoices** for a completed month. If a walk-in has a
@@ -186,10 +195,12 @@ There's a driver for the whole loop:
 (+ `fixtures-trial-onboarding.sql`, which builds a billable previous month — the UI half
 necessarily marks *today*, which generation correctly refuses to bill).
 
-**Known gap (slice 1):** a parent who self-registers before being invited creates a
-duplicate child. There is no in-app merge yet — see `BACKLOG.md` → *Parents claiming their
-own child*. Fix in SQL: repoint `parent_students` at the coach-created row (the one with
-the attendance) and delete the empty duplicate.
+**~~Known gap (slice 1): no in-app merge~~ — CLOSED 2026-07-26.** A parent who self-registers
+before being invited no longer strands a duplicate: Add Child checks the roster first and
+offers a masked candidate card, both claim answers file a request for the **admin** to
+decide, and duplicates that already exist are flagged on the Students page and folded
+together by `merge_students()`. See PRD §7.18 and `verify-parent-claim.mjs`. The old
+SQL workaround is no longer the answer.
 
 ### Prepaid packages flow (PRD §7.16)
 Packages are **dormant until a product exists** — with no category or product, every
