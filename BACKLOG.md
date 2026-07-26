@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-26 (parent claiming live; trial visibility fixed; cleanup script written, NOT yet run)_
+_Last updated: 2026-07-26 (parent claiming live; trial visibility fixed; **production cleanup script RUN**; docs corrected — a coach cannot add a walk-in and has not been able to since 2026-07-25)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -109,8 +109,9 @@ package notifications, in-app refunds.
   private-vs-school check at all. The "built twice" risk this entry warned about was
   real, and was avoided by reframing rather than by building carefully.
   **Coach-created student profiles** sat behind this and **shipped 2026-07-25** as part
-  of trial onboarding (PRD §7.17) — a coach adds a walk-in or an unregistered student
-  into their own class. **What remained — *Parents claiming their own child* — SHIPPED
+  of trial onboarding (PRD §7.17) — though the *coach-side* half of it was removed one
+  session later: trials are **arranged ahead of time by the business's admin**, and the
+  coach app has no write path but marking attendance (PRD §7.17). **What remained — *Parents claiming their own child* — SHIPPED
   2026-07-26** (PRD §7.18, `PARENT_CLAIM_PLAN.md`). This cluster is now complete, and its
   item is removed from this document rather than left marked done — the reasoning lives in
   the plan and the PRD.
@@ -126,8 +127,7 @@ package notifications, in-app refunds.
 Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-history view
 (S), Export to CSV (S), Disable a staff account (M), Student-move loose ends (S), Better
 filtering/search (S), More polished
-dashboards (S), Deeper component-render tests (M), Production data cleanup (S — script
-written and tested, not yet run), Convert a trial into an enrolled student (S),
+dashboards (S), Deeper component-render tests (M), Convert a trial into an enrolled student (S),
 Editing a student's contact details (S),
 Email-confirmation copy/templates (S), Audit trail invisible to its own business (S), Revoke `anon` EXECUTE from the remaining
 SECURITY DEFINER functions (S), Revenue reporting (M — *decide accrual-vs-cash first*).
@@ -203,10 +203,20 @@ Unassigned Children performs, and keep the "this makes them expected every week"
 The natural trigger is the Trials page's *past — needs marking* list, once the lesson has
 been marked.
 
-### Editing a student's contact details — **S**
-There is no way to change `provisional_contact_phone` / `_email` on an existing student.
+### Editing a student's PARENT contact details — **S**
+There is no way to change `provisional_contact_name` / `_phone` / `_email` on an existing
+student.
 
-**Why:** those two fields are now how a child is matched to their parent's account
+> **These are the PARENT's contact details, stored on the child's row — not the child's.**
+> A child has no phone or email of their own anywhere in the model, and should not. The
+> columns exist for the window before the adult who brought the child has an account:
+> `provisional_contact_phone`'s own `COMMENT` reads *"the number the coach arranged the
+> trial on"*. All three are load-bearing, not just record-keeping — `_email` and `_phone`
+> are the top two ranked signals in `find_student_candidates()`, and **`_name` is used as
+> the invited parent's `full_name`** (`invite-parent/route.ts`), which is why a blank one
+> showed an unnamed parent on the admin roster (HANDOVER §8.12).
+
+**Why:** those fields are now how a child is matched to their parent's account
 (PRD §7.18), and the phone is **required** when a child is created — but only *going
 forward*. Every child added before 2026-07-26 has no contact details at all, so they can
 only ever be matched by name, which is the weakest signal. There is no screen that can fix
@@ -214,9 +224,17 @@ that, and on production several real children are in exactly that state.
 
 **Notes:** one of them has `964` stored as a phone, which `normalize_phone()` correctly
 rejects as too short to be a signal — so bad data is already there and unfixable through
-the UI. The admin's edit-student path is the obvious home. Coaches must not get it:
-granting them `UPDATE` on `students` also exposes names, DOBs and notes, because RLS is
-row-level, not column-level.
+the UI. The admin's edit-student path is the obvious home, and **no migration is needed**:
+`students_update` already grants `is_tenant_admin(tenant_id)` (`20260718000900_tenant_rls`).
+Coaches must not get it: granting them `UPDATE` on `students` also exposes names, DOBs and
+notes, because RLS is row-level, not column-level.
+
+**Decide before building — should these stay editable once the child is CLAIMED?**
+Nothing clears them on claim, link or merge (`merge_students()` `COALESCE`s them), so a
+claimed child keeps them indefinitely. The argument for read-only-after-claim: the real
+contact details then live on `profiles`, and a second editable copy on the student row is a
+stale duplicate of exactly the kind `students.age` and `classes.price_per_lesson` were
+removed for — plus it feeds the matcher for a child who can no longer be a candidate.
 
 ### Attendance edit history view — **S** `[Phase 2]`
 Surface the existing audit trail in the UI.
@@ -866,23 +884,28 @@ drift is cheap to spot (`diff` the two), and each has its own test file.
 this comes along free. Until then: **edit both.** Recorded so the decision isn't
 re-litigated from scratch every time someone notices the duplication.
 
-### Production data cleanup — **S**
-Leftovers from verification in the cloud project: an **orphaned PayNow QR file** in
-Storage, and — much larger since 2026-07-26 — the accounts and children created while
-testing trial onboarding and parent claiming.
+### ~~Production data cleanup~~ — **S** — **DONE 2026-07-26**
+The script was **run against production**. `Peter Zztest` — active, enrolled, and
+positioned to block a real month from billing — is deleted. Production now holds
+**9 students and 7 parents, all real**, with `attendance`, `lesson_sessions` and
+`invoices` at **0**. HANDOVER §9 has the current state.
 
-**Why:** harmless to billing while everything is inactive, but it makes the roster
-unreadable and one leftover was *not* harmless — `Peter Zztest` was left **active and
-enrolled**, which makes a child expected at every lesson and blocks that class's month
-from being billed.
+**Still outstanding, and small:** the **orphaned PayNow QR file** in Storage, which the
+SQL script does not touch. Deliberately still excluded: `TestClass` (a class carries
+effective-dated `class_rates`, and `trial_bookings.class_id` is `RESTRICT`) and the
+`jj test` coach in **Epic Swim**, which is that business's data rather than ours.
 
-**Notes — a tested script exists, and had NOT been run as of 2026-07-26:**
+The notes below are kept because **the reasoning outlived the task** — the next data
+cleanup, on any environment, hits every one of these again.
+
+**Notes — from the script that ran on 2026-07-26:**
 
 - The script lives outside the repo (scratchpad), because a data-cleanup migration would
   re-run on every `db reset` and on any future environment. It deletes **12 students and
   5 parent accounts by exact name/email**, ends in `ROLLBACK` so the first run only shows
-  its plan, and was **executed against a restored copy of the production data**: 21 → 9
-  students, 12 → 7 parents, attendance and sessions to 0, no survivor left parentless.
+  its plan, and was rehearsed against a **restored copy** of the production data before
+  being run for real: 21 → 9 students, 12 → 7 parents, attendance and sessions to 0, no
+  survivor left parentless.
 - **Never match test data by pattern.** `LIKE '%test%'` works today and deletes a real
   child called *Justin* later. Name them.
 - **`audit_log.actor_id` blocks deleting a profile** — it is `NOT NULL` and `NO ACTION`,
@@ -891,11 +914,10 @@ from being billed.
   harmlessly (`entity_id` has no FK) and should be kept.
 - Deleting `auth.users` cascades `profiles → parents → parent_students`. It does **not**
   remove students — those belong to the business, not the account.
-- **Still deliberately excluded:** `TestClass` (empty afterwards, but a class carries
-  effective-dated `class_rates` and `trial_bookings.class_id` is `RESTRICT`), and the
-  `jj test` coach in the **Epic Swim** tenant, which is that business's data, not ours.
-- Running it takes production's `attendance` back to **0**, so HANDOVER §9's "first
-  attendance ever recorded" note goes stale the moment it is committed.
+- Running it took production's `attendance` back to **0**, which made HANDOVER §9's "first
+  attendance ever recorded" note false. **That note was rewritten, not deleted** — the loop
+  *was* proven end to end on 2026-07-25 and then the evidence was tidied away, and today's
+  zero must not be re-read as "the path has never been exercised."
 
 ### Email confirmation copy and templates — **S** `[handover]`
 Confirmation emails still use Supabase defaults.

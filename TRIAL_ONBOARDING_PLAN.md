@@ -1,7 +1,8 @@
 # Trial & Provisional Student Onboarding — Build Plan (Slice 1)
 
-_Written 2026-07-25. A coach or admin can put a child on the roster before that child's
-parent has a SwimSync account; the parent is later invited by link and adopts the
+_Written 2026-07-25. An admin can put a child on the roster before that child's
+parent has a SwimSync account (the plan said "a coach or admin"; the coach half was
+removed the next session — see the banner below); the parent is later invited by link and adopts the
 existing record. Money taken outside SwimSync is recorded rather than lost._
 
 > ⚠ **THE TRIAL HALF OF THIS PLAN IS SUPERSEDED by `TRIAL_BOOKINGS_PLAN.md`
@@ -11,7 +12,7 @@ existing record. Money taken outside SwimSync is recorded rather than lost._
 > settlement machinery described below are **unchanged and still current**.
 >
 > **STATUS: BUILT, DEPLOYED AND SMOKED (2026-07-25).** All seven phases complete, merged
-> to `main`, live in production and **dormant until the first walk-in**. pgTAP **297**
+> to `main`, live in production and **dormant until the first trial is booked**. pgTAP **297**
 > (19 files, +32), Deno **99** (+8, run twice), admin vitest **100** (+12), app jest **75**
 > (+6), both apps typecheck, and `verify-trial-onboarding.mjs` **13/13** against both
 > running UIs. The loop was confirmed end to end: settle → re-run →

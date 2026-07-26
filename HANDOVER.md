@@ -2,7 +2,9 @@
 
 _Last updated: 2026-07-26 (twelfth session — categories are mandatory and a TRIAL IS A
 BOOKING, superseding the trial half of the tenth session on the user's correction. Built
-AND deployed the same evening; **dormant until the first trial is booked**)_
+AND deployed the same evening; **dormant until the first trial is booked**. Same day:
+the **production cleanup script was run** (§9), and a documentation sweep corrected the
+stale claim that a **coach** can add a walk-in — they cannot, and could not since §8.11)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -141,13 +143,22 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   `no admin` / `invited` / `active`. **Dormant in production** — nothing provisioned yet.
   PRD §4.4, `TENANT_PROVISIONING_PLAN.md`, §8.9.
 - **A child before their parent (verified local: pgTAP + Deno + UI driver — LIVE in
-  production 2026-07-25, dormant until the first walk-in)** —
-  a coach adds a trial walk-in or an unregistered student from the attendance screen and
-  marks them in one action; the admin invites the parent, who **adopts the existing record**
+  production 2026-07-25, dormant until the first trial is booked)** —
+  the **business's admin** adds a child who is not yet in SwimSync, by either route:
+  Trials → *Book a trial* (a booking for one lesson) or Students → *Add student* (an open
+  enrolment). The admin then invites the parent, who **adopts the existing record**
   (nothing is transferred — same `student_id` throughout). A billable lesson with nobody to
   bill **holds the month open** instead of being silently dropped and sealed over, released
   by inviting the parent or recording a settlement. PRD §7.17,
   `TRIAL_ONBOARDING_PLAN.md`, §8.10.
+  > **The COACH cannot do either, and this line used to say they could.** Slice 1
+  > (§8.10) shipped an *"Add a walk-in"* form on the coach's attendance screen; §8.11
+  > **removed it** when a trial became a booking arranged ahead of time. Confirmed by the
+  > code (2026-07-26): `grep -rn "rpc(" SwimSyncApp/app/(coach)` returns **nothing** — the
+  > coach app calls no RPCs at all. The coach's only write path is marking attendance.
+  > `add_unclaimed_student()` still *accepts* a coach caller server-side (pgTAP pins it),
+  > but no UI reaches it. A private coach arranges trials through their **tenant admin**
+  > account, which they hold anyway (a private coach is a tenant of one — §6).
 - **A parent can claim the child their coach already added (verified local: pgTAP + vitest +
   jest + UI driver — LIVE in production 2026-07-26, dormant until a parent adds a matching
   child)** — Add Child checks the roster
@@ -169,18 +180,24 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 - **Automated tests** — backend **366 pgTAP + 108 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest 122, `SwimSyncApp` jest-expo 91); all run in CI on push to `main`. See §5.
 
-> **§3's old "clean slate" claim was WRONG and is corrected here (2026-07-25).** It said
-> production held "only the superadmin + the real coach/classes". Reading the actual dump:
-> **2 tenants, 9 parents, 11 students, 7 enrolments, 5 classes** — real families who
-> registered. What IS still empty is attendance: **zero `lesson_sessions`, zero
-> `attendance` rows**, which is the fact §9 is about. Don't repeat the clean-slate line.
+> **"CLEAN SLATE" IS A BANNED PHRASE FOR THIS DATABASE — it has now been wrong twice.**
+> The first time (corrected 2026-07-25) it claimed production held "only the superadmin +
+> the real coach/classes" while the dump showed **2 tenants, 9 parents, 11 students,
+> 7 enrolments, 5 classes** — real families who had registered. The second time was
+> 2026-07-26, when the cleanup script ran and "clean slate" was reached for again.
+> **The cleanup deletes named test records, not everything**: it took production from
+> 21 → **9 students** and 12 → **7 parents**, and those survivors are real families.
+> What the cleanup DID zero is **`attendance`, `lesson_sessions` and `invoices`**.
+> Say *"no attendance recorded"* — never *"clean slate"*. The fact is
+> `SELECT COUNT(*) FROM students;`, not this sentence.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
 **https://swimsync.sg**, admin at **https://admin.swimsync.sg**, real email via
 **Resend** (`noreply@swimsync.sg`). The full loop is verified end to end on cloud
 (incl. a live password-reset round-trip on `swimsync.sg`). A **real coach + 4 real
-classes** are onboarded and the production DB is a **clean slate** (only the
-superadmin + the real coach/classes). See §11.
+classes** are onboarded, alongside **7 real families and 9 real children** who
+self-registered. `attendance`, `lesson_sessions` and `invoices` are **empty** — see §9.
+See §11.
 
 > **`main` = what's live for the WEB APPS ONLY.** Vercel builds both sites from `main`, so a
 > push deploys them — but a push deploys **neither the Edge Function** (`supabase functions
@@ -1450,6 +1467,12 @@ coach could not mark them and the lesson was invisible to billing, payout and th
 `/api/invite-parent` + a business-branded email, the app's `/accept-invite`, the coach's
 **Add a walk-in** control + roster union, and the admin's unclaimed filter, invite button
 and inline settle dialog. PRD §7.17.
+
+> **⚠ HISTORICAL — the coach's "Add a walk-in" control was REMOVED by §8.11** one session
+> later, when a trial became a booking arranged ahead of time by the tenant admin. This
+> paragraph records what slice 1 shipped, not what exists. **The coach app calls no RPCs at
+> all today**; its only write path is marking attendance. Don't read this as a live
+> capability — §3 has the current shape.
 
 **Planning found a live latent bug before a line was written.** `core.ts:487` resolves
 attendance→parent with a plain `.in()` on `parent_students`, so a student with no parent
@@ -3013,29 +3036,26 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### FIRST: production still holds the test data, and one row of it is harmful
+### ~~FIRST: production still holds the test data~~ — **DONE 2026-07-26, the script was run**
 
-A **tested cleanup script** exists and had **NOT been run** when this session ended. It
-lives outside the repo — `scratchpad/cleanup/cleanup-test-data.sql`, alongside a
-`data-before.sql` backup — because a data-cleanup migration would re-run on every
-`db reset` and on any future environment. Full reasoning lives on `BACKLOG.md` →
-*Production data cleanup*.
+The cleanup script (`scratchpad/cleanup/cleanup-test-data.sql`) was **executed against
+production** on 2026-07-26. `Peter Zztest` — left active and enrolled in TestClass, and
+therefore positioned to block a real month from billing — **is deleted.** The item is
+closed on `BACKLOG.md` too.
 
-**Why it is the first item and not housekeeping:** `Peter Zztest` was left **active and
-enrolled in TestClass**. An active enrolment makes a child expected at *every* lesson of
-that class, and unmarked attendance blocks invoice generation with no override — so a test
-record is currently positioned to stop a real month being billed.
+**What production holds now:** **9 students, 7 parents** — all real families — plus the
+real coach, 4 real classes, and a second tenant (`Epic Swim`). **`attendance`,
+`lesson_sessions` and `invoices` are all 0.** It is *not* a clean slate; see §3's banned-
+phrase note, which this cleanup is the second reason for.
 
-It deletes **12 students and 5 parent accounts by exact name**, ends in `ROLLBACK` so the
-first run only prints its plan, and was executed against a restored copy of the real data:
-**21 → 9 students, 12 → 7 parents, attendance and sessions to 0**, nobody left parentless,
-the 7 surviving families all real. Run it in the Supabase dashboard; change the last line
-to `COMMIT` when the output looks right.
+Still deliberately **not** deleted: `TestClass` (a class carries effective-dated
+`class_rates` and `trial_bookings.class_id` is `RESTRICT`) and the `jj test` coach in
+**Epic Swim**, which is that business's data rather than ours.
 
-**⚠ When it is committed, this section's own "first attendance ever recorded" paragraph
-below becomes FALSE** — that one row is `TestChild1`'s trial and the script removes it.
-Rewrite that paragraph rather than deleting it: the loop *was* proven end to end, and then
-the evidence was cleaned up. Do not let it silently rot into a claim the database
+**⚠ The "first attendance ever recorded" paragraph below is now FALSE, and has been
+rewritten rather than deleted** — that one row was `TestChild1`'s trial and the script
+removed it. The loop *was* proven end to end, and then the evidence was cleaned up. Do
+not let it silently rot into a claim the database
 contradicts.
 
 ### The parent-claim work is live and PROVEN on production
@@ -3067,40 +3087,36 @@ so the email arrives, the link works, and the user lands on the wrong page.
 **Tenant provisioning itself is still dormant** — no business has been created through
 Platform → New business since `Epic Swim` was provisioned by hand on 2026-07-21.
 
-### The one thing blocking everything else — moved for the first time on 2026-07-25
+### The one thing blocking everything else — PROVEN once, then deliberately erased
 
-**The first attendance ever recorded in production was marked on 2026-07-25**, by the user,
-end to end through the real apps: a trial booked on the Trials page for 12 Jul, marked
-`trial_free` in the coach app, cleared from "needs marking", and the child then claimed by
-an invited parent. `lesson_sessions` **1**, `attendance` **1**, `parent_students` 11 → 12.
-The Platform page's *last attendance* column no longer reads **never**.
+**The whole loop was walked end to end on production on 2026-07-25**, by the user, through
+the real apps: a trial booked on the Trials page for 12 Jul, marked `trial_free` in the
+coach app, cleared from "needs marking", and the child then claimed by an invited parent.
+At that moment `lesson_sessions` was **1**, `attendance` **1**, `parent_students` 11 → 12,
+and the Platform page's *last attendance* column stopped reading **never**.
 
-> ⚠ **This paragraph replaces four sessions of "no attendance has ever been marked."** That
-> line was true from 2026-07-13 to 2026-07-25 and led this section throughout. Do not
-> reinstate it — check the number instead:
-> `SELECT COUNT(*) FROM attendance;` on production is the fact.
+> ⚠ **That row is GONE — the 2026-07-26 cleanup removed it**, because it was `TestChild1`'s
+> trial and the script deletes test records by exact name. So `attendance` is back to **0**
+> and *last attendance* reads **never** again. **This is not a regression and the mechanism
+> is not in doubt** — it ran, it worked, and then the evidence was tidied away on purpose.
+> Do not read today's zero as "the path has never been exercised", and do not reinstate the
+> older "no attendance has ever been marked" framing that led this section from 2026-07-13
+> to 2026-07-25. `SELECT COUNT(*) FROM attendance;` is the number; this paragraph is why it
+> reads the way it does.
 
-**It was a TEST TRIAL, not a real lesson**, and the distinction still matters:
+**What was proven was a TEST TRIAL, not a real lesson**, and that distinction is unchanged:
 
-- **No real lesson has been taught and recorded.** The one attendance row is a free trial
-  the user created to exercise the path.
-- **No invoice has ever been generated.** `invoices` is still **0**, so the billing engine
-  has never processed anything real, and the completeness gate has never refused a real
-  month.
+- **No real lesson has ever been taught and recorded.** The one attendance row that existed
+  was a free trial created to exercise the path, and it has since been deleted.
+- **No invoice has ever been generated.** `invoices` is **0**, so the billing engine has
+  never processed anything real, and the completeness gate has never refused a real month.
 - `auto_invoice_enabled` is still **false**, and **no coach rate is set**, so payroll would
   compute nothing.
 - The `class_rates` backfill (§8.3) is still *correct by emptiness* — floor-dating every
   class's terms stays vacuously right until there are lessons for it to be wrong about.
 
-So the shape of the remaining work is unchanged, but it is now "bill a real month" rather
-than "mark anything at all", which is a genuinely smaller gap.
-
-Two things still depend on that not staying true much longer:
-
-- The **`class_rates` backfill** (§8.3) is *correct by emptiness*. Floor-dating every class's
-  terms is vacuously right while there is no attendance for it to be wrong about.
-- The **completeness gate** has never refused a real month, and the block-notification email
-  has never fired in production.
+So the shape of the remaining work is unchanged: the *mechanism* is proven, the *usage* is
+not. The gap is "bill a real month", not "mark anything at all".
 
 1. **Get the coach marking a REAL lesson.** The mechanism is now proven end to end on
    production (above); what has not happened is an actual class being recorded. An
