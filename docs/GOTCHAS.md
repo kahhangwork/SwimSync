@@ -813,4 +813,32 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     fixed, the driver's "class A's lesson is untouched" check still passes while the
     navigation check fails — that split is the fastest way to tell which one you are
     looking at. (Found and fixed 2026-07-26, live the same day.)
+
+66. **A DUPLICATE IN ONE UPSERT MAKES POSTGRES REFUSE THE WHOLE STATEMENT, SO ONE
+    DOUBLY-ENROLLED CHILD BLOCKED ATTENDANCE FOR AN ENTIRE CLASS.**
+    The Mark Attendance screen saves the class in a single
+    `.upsert(rows, { onConflict: "lesson_session_id,student_id" })`. Two rows with the same
+    conflict key in one command is not a no-op and not a last-write-wins — it is an error:
+    `ON CONFLICT DO UPDATE command cannot affect row a second time`. The whole save fails,
+    reported to the coach as only *"Failed to save attendance. Please try again."*
+    **Where the duplicate came from.** The screen's roster is built from enrolment ROWS
+    matched by DATE SPAN, not by `is_active`, and a child can hold more than one row for the
+    same class — unenrol then re-enrol keeps history (PRD §11.5). Two spans covering one
+    date therefore listed the child twice. `mergeRoster` deduped the *extras* (attendance
+    rows, trial bookings) but passed `activeStudents` through untouched.
+    **`attendanceCompleteness.ts` had been right all along** — `studentsEnrolledOn` dedupes
+    and its comment says exactly why. The billing gate was correct and the screen was
+    wrong, which is the §7.18 asymmetry in miniature: two places answering "who is in this
+    lesson?" and only one of them careful.
+    **What exposed it:** backdating every *active* enrolment to a single earlier date, so an
+    open span started before an older closed one in the same class ended. Rare in normal
+    use, trivially reachable by a data fix — and a data fix is exactly when you least want
+    marking to break.
+    **The screens that filter on `is_active` cannot hit this**, because
+    `one_active_enrolment_per_student` is a unique partial index — at most one active
+    enrolment per child. Only a span-based reader can duplicate, and the attendance screen
+    is the only one. So the guard belongs in `mergeRoster`, which owns "who is on this
+    screen", not at the call site. Audit for the next span reader:
+    `grep -rn "enrolled_at" SwimSyncApp/app SwimSyncAdmin/app | grep -v is_active`
+    (Found and fixed 2026-07-26, live the same day.)
 ---

@@ -91,3 +91,49 @@ describe("mergeRoster — trial bookings", () => {
     expect(out.find((s) => s.id === "z")?.isTrial).toBe(false);
   });
 });
+
+// ── A CHILD WITH TWO ENROLMENT ROWS IN ONE CLASS ────────────────────────────
+// The caller builds `activeStudents` from enrolment ROWS, and unenrol/re-enrol
+// keeps history (PRD §11.5), so two spans can both cover one date. A duplicate
+// here is not cosmetic: the screen saves the whole class in ONE upsert, so two
+// rows with the same (lesson_session_id, student_id) make Postgres refuse the
+// entire statement — "ON CONFLICT DO UPDATE command cannot affect row a second
+// time" — and nobody in the class can be marked. Surfaced in production after
+// every active enrolment was backdated. §7.66.
+describe("mergeRoster — duplicate enrolment rows", () => {
+  const twice: RosterStudent[] = [
+    { id: "a", full_name: "Amy Enrolled" },
+    { id: "b", full_name: "Ben Enrolled" },
+    { id: "a", full_name: "Amy Enrolled" }, // re-enrolled; both spans cover the date
+  ];
+
+  it("lists a doubly-enrolled child exactly once", () => {
+    expect(mergeRoster(twice, []).map((s) => s.id)).toEqual(["a", "b"]);
+  });
+
+  it("keeps the FIRST occurrence, so the caller's order survives", () => {
+    const out = mergeRoster(twice, []);
+    expect(out.map((s) => s.full_name)).toEqual(["Amy Enrolled", "Ben Enrolled"]);
+    expect(out.every((s) => s.attendedOnly === false)).toBe(true);
+  });
+
+  it("still produces one row per student when they are also marked and booked", () => {
+    const out = mergeRoster(
+      twice,
+      [{ id: "a", full_name: "Amy Enrolled" }],
+      [{ id: "a", full_name: "Amy Enrolled" }]
+    );
+    expect(out.map((s) => s.id)).toEqual(["a", "b"]);
+  });
+
+  it("guarantees no id repeats, whatever the inputs overlap", () => {
+    const out = mergeRoster(
+      [...twice, { id: "b", full_name: "Ben Enrolled" }],
+      [{ id: "z", full_name: "Zoe WalkIn" }, { id: "z", full_name: "Zoe WalkIn" }],
+      [{ id: "z", full_name: "Zoe WalkIn" }]
+    );
+    const ids = out.map((s) => s.id);
+    expect(ids).toEqual([...new Set(ids)]);
+    expect(ids).toEqual(["a", "b", "z"]);
+  });
+});
