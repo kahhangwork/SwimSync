@@ -3,9 +3,11 @@
 _Last updated: 2026-07-26 (**thirteenth** session — two admin UI changes, both live: the
 Classes page now shows **who is in a class** with trials counted separately as `2+1`, and
 the Swimming Levels table's header row — nested inside another row since 2026-07-19 and
-visibly broken in production for a week — is fixed and pinned by a geometry check. §8.13.
-**Three worktrees ran in parallel today**; §8.13 ends with what the other two left
-undocumented, which is the first thing to settle next session)_
+visibly broken in production for a week — is fixed and pinned by a geometry check. Also
+**the skill workflow was reworked**: `/session-close` is now `/update-docs`, a real
+shut-down `/session-close` exists, shipping+docs coupled into `/commit-review`, and
+`01_SESSION_WORKFLOW.md` is the one-page map — **read that first if you are the human
+driving this**. §8.13)_
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -1441,7 +1443,7 @@ reverted in `12cf553` before the merge; the rule is in §7.55.
 
 ---
 
-## 8.13 Thirteenth session (2026-07-26) — TWO ADMIN UI CHANGES, BOTH **DEPLOYED**
+## 8.13 Thirteenth session (2026-07-26) — TWO ADMIN UI CHANGES, BOTH **DEPLOYED**, AND THE SKILL WORKFLOW REWORKED
 
 Worktree `.claude/worktrees/UI-changes`, branch `ui-changes`, two commits — `ee7ad1b` and
 `6240a5e` — both pushed straight to `main` (branch-to-branch: `main` is checked out in the
@@ -1509,6 +1511,39 @@ a regression in this change. It was not — this worktree had no `SwimSyncApp/.e
 so Expo could not reach Supabase. Proved pre-existing by running the driver against the
 *unfixed* code and getting identical results, and only then diagnosed. Both drivers are
 9/9 and 14/14 now.
+
+### (c) The skill workflow was reworked — `0ff9922`
+
+Triggered by the user asking whether their flow was right. It mostly was, with one
+correction: **shipping is per change, not per session.** Today's work went out in three
+pushes, not one — and `main` moved under this session twice, so batching would have meant
+one large rebase instead of three trivial ones.
+
+- **`/session-close` → `/update-docs`.** Same content, honest name. The old name promised
+  a lifecycle step and delivered a documentation pass, so it got deferred by anyone who
+  "wasn't closing anything yet".
+- **`/session-close` is now a real shut-down checklist** and writes no documentation:
+  fixtures torn out of the shared database, ports released, nothing uncommitted or
+  unpushed (including an untracked migration — §7.55), worktree given an explicit
+  keep-or-remove. Every item is something that had to be done by hand today.
+- **The docs-to-ship coupling moved into `/commit-review`**, where shipping happens: if a
+  change alters what a user can do, `PRD.md` and `BACKLOG.md` go out in the **same push**.
+  That is the fix for §8.13's contact-details hole. `/commit-review` now also carries the
+  change to `main` (fetch → rebase → **re-run the suites** → ff-only push).
+- **`01_SESSION_WORKFLOW.md` is new, and it is for the USER, not for Claude** — one page,
+  which skill to run when. `README.md` and `AVAIL_SKILLS.md` point at it; `AVAIL_SKILLS.md`
+  had been stale since 2026-07-16 and got a full pass.
+
+**Not done (deliberate): no skill scripts the merge.** The user asked for a `/session-close`
+that merges and pushes; it was built as a checklist instead. The git sequence is
+context-dependent — is `main` checked out elsewhere, did a sibling push mid-session — and a
+scripted recipe would be **confidently wrong in exactly the worktree case this repo is in**.
+The judgment lives in `/commit-review` Step 5. Don't "finish the job" by automating it
+without revisiting that reasoning.
+
+> **The rename does not take effect until Claude Code restarts** — the skill registry is
+> read at startup. This whole session had to read `.claude/skills/*/SKILL.md` by hand
+> because the registry was pinned to the worktree's pre-rename path.
 
 ### ⚠ What the parallel worktrees left, and what is NOT done here
 
