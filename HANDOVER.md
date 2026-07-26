@@ -4,7 +4,7 @@ _Last updated: 2026-07-27 (**fifteenth** session — the attendance marking wind
 enforced by the **database** rather than by the screen, and a **child who joins mid-month
 no longer blocks that month from being billed**. Both were one root cause: a date-scoped
 question answered with an un-dated set. **On `main` and DEPLOYED** — migrations, engine
-(`generate-invoices` v16 → **v17**) and both web apps. §8.15)_
+(`generate-invoices` v16 → **v17**) and both web apps. §8.15. Same day, §8.16: the repo root went 22 markdown files → **8** (`docs/design`, `docs/plans`, `docs/database`; filenames unchanged, so every reference still resolves), and the **auth redirect allow-list was found broken in production** — admin password reset had been silently landing on the wrong page, now fixed and verified (§7.41))_
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.** The skills
 > were reworked on 2026-07-26: `/session-close` became `/update-docs`, a real shut-down
@@ -1522,6 +1522,49 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     **Scope both sides to the same rows** (`WHERE class_id = …`), or take both counts as
     the same role. This is §7.16's sibling: there the role was silently *wrong*, here it
     silently *changes between two reads*.
+---
+
+## 8.16 (2026-07-27) — THE REPO ROOT HAS A SHAPE, AND THE AUTH ALLOW-LIST WAS BROKEN
+
+Same conversation as §8.13, continued after the two sibling sessions merged. No product
+code changed.
+
+**The root went from 22 markdown files to 8** (`a6322e1`). Designs of record moved to
+`docs/design/`, per-feature plans to `docs/plans/`, the historical artefact to
+`docs/database/`. **Filenames did not change, only directories** — which is the whole
+trick: all 379 prose references still name the right file, including **34 inside applied
+migrations** that could never have been corrected. Nine git renames, so blame follows.
+Zero markdown links pointed at a moved file with a path (checked before moving; every link
+in the repo re-validated after).
+
+**Numbered prefixes were considered and rejected** — the reasoning is in `README.md` →
+*Where everything lives*, not repeated here. Short version: encoding a category into a
+filename makes recategorising a rename, and a rename breaks references. `01_SESSION_WORKFLOW.md`
+keeps its number because sorting first is its entire job.
+
+> **A near-miss worth remembering.** The reorganisation was interrupted mid-flight and left
+> twelve numbered copies behind. Four were **stale snapshots** — `11_HANDOVER.md` was
+> missing **351 lines**, `02_AVAIL_SKILLS.md` was a week old — and two others went stale
+> *during* the cleanup, because a sibling session pushed six commits while it was running.
+> Finishing that rename by deleting the originals would have silently reverted two
+> sessions of work. Every copy was diffed against **HEAD at the moment of deletion**, not
+> against an earlier check. When `main` is moving, a verification is only true at the
+> instant you make it.
+
+**The auth redirect allow-list was wrong in two places** (`f845717`). `config.toml` was
+missing the parent app's `https://swimsync.sg/reset-password`; production's dashboard list
+was missing the **admin's**, so admin password reset had been silently landing on the wrong
+page. Both fixed and reset tested end to end on both apps by the user. **§7.41 carries the
+reasoning** — including the durable half, that production's list and `config.toml` are two
+separate lists nothing keeps in step.
+
+**Also filed:** `BACKLOG.md` → *`verify-attendance-window.mjs` guards nothing* — it scores
+0/4 against any clock outside 16–17 Jul 2026, verified pre-existing on both sides of §8.15.
+
+**Not done (deliberate):** the four living documents kept their names and their place at
+the root — they are referenced 281 times and opened by name from `/session-start`; moving
+them buys ordering nobody needs. And no skill scripts the merge (see §8.13(c)).
+
 ---
 
 ## 8.15 Fifteenth session (2026-07-27) — THE ATTENDANCE WINDOW IS A RULE — BUILT **AND DEPLOYED**
