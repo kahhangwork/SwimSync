@@ -21,6 +21,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
+import { describeLevelRemoval } from "@/lib/studentCounts";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 
@@ -31,7 +32,20 @@ type Level = {
   label: string;
   sort_order: number;
   note: string | null;
+  /** ACTIVE children on this level — what the Students column shows. */
   student_count: number;
+  /**
+   * Children who have LEFT but still hold this level.
+   *
+   * Tracked separately because the column and the removal warning answer
+   * different questions. `students.level_id` is ON DELETE SET NULL, so removing
+   * a level blanks it for everyone pointing at it — active or not — and a
+   * warning built from `student_count` alone would tell the admin "No students
+   * are on this level" about a level still held by departed children. They
+   * delete it, those children lose a level nothing records, and reactivating one
+   * later cannot restore it. See describeLevelRemoval() in lib/studentCounts.ts.
+   */
+  inactive_count: number;
   skills: Skill[];
 };
 
@@ -60,7 +74,7 @@ export default function LevelsPage() {
     // RLS scopes this to the caller's own business, so no tenant filter here.
     const { data } = await supabase
       .from("tenant_levels")
-      .select("id, label, sort_order, note, students(id), tenant_level_skills(id, label, sort_order)")
+      .select("id, label, sort_order, note, students(id, is_active), tenant_level_skills(id, label, sort_order)")
       .order("sort_order")
       .order("label");
 
@@ -73,7 +87,14 @@ export default function LevelsPage() {
         // Read off the JOINED students, not off the level — the select is
         // `any`, so the wrong nesting level would typecheck and silently
         // report every level as empty.
-        student_count: (l.students ?? []).length,
+        //
+        // Split in JS, deliberately NOT with `students!inner(...)` and a
+        // server-side filter: that would drop levels with no ACTIVE children out
+        // of the result entirely, so a level held only by departed children
+        // would VANISH from the ladder and read as deleted. The ladder is the
+        // business's curriculum (PRD §7.15) — it must list every rung.
+        student_count: (l.students ?? []).filter((s: any) => s.is_active).length,
+        inactive_count: (l.students ?? []).filter((s: any) => !s.is_active).length,
         // Ordered here rather than in the query: PostgREST cannot order an
         // embedded resource, so sorting server-side would silently do nothing.
         skills: [...(l.tenant_level_skills ?? [])].sort(
@@ -303,7 +324,26 @@ export default function LevelsPage() {
                       {expanded === l.id ? " \u25be" : " \u25b8"}
                     </button>
                   </Td>
-                  <Td className="text-gray-500">{l.student_count}</Td>
+                  <Td className="text-gray-500">
+                    {/* The number is ACTIVE children. A level can read 0 while
+                        departed children still hold it, and the Remove dialog
+                        will then say so — this title closes that gap on the page
+                        itself, so the two numbers never look like they disagree.
+                        On a <span> rather than a `title` prop on <Td>: widening
+                        a shared table primitive for one cell's tooltip would put
+                        the prop on all 22 tables. */}
+                    <span
+                      title={
+                        l.inactive_count > 0
+                          ? `${l.student_count} active. ${l.inactive_count} former student${
+                              l.inactive_count === 1 ? "" : "s"
+                            } still on this level.`
+                          : undefined
+                      }
+                    >
+                      {l.student_count}
+                    </span>
+                  </Td>
                   <Td>
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={() => openEdit(l)}>
@@ -465,11 +505,10 @@ export default function LevelsPage() {
         title="Remove this level?"
       >
         <p className="text-sm text-gray-600">
-          {removing?.student_count
-            ? `${removing.student_count} student${
-                removing.student_count === 1 ? "" : "s"
-              } will simply have no level. Nobody is removed from a class, and no history changes.`
-            : "No students are on this level."}
+          {/* Counts EVERYONE, not just the active — see Level.inactive_count. */}
+          {removing
+            ? describeLevelRemoval(removing.student_count, removing.inactive_count)
+            : null}
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" onClick={() => setRemoving(null)} disabled={busy}>

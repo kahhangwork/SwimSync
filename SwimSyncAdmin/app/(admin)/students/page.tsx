@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
+import { formatActiveStudents } from "@/lib/studentCounts";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import {
@@ -650,6 +651,17 @@ export default function StudentsPage() {
     (s) => s.is_active && isUnclaimed(s)
   ).length;
 
+  // `load()` deliberately still fetches inactive children — the All tab lists
+  // them. So the header describes a SUBSET of the rows on screen, and the
+  // "· N inactive" suffix is what explains the difference.
+  //
+  // `students.is_active` only. NOT the family's `parent_tenants.is_active`: a
+  // family can be inactive while still holding an active child, and §7.61 makes
+  // that deliberately unreconciled — cascading family status into this count
+  // would make a still-swimming child disappear from it.
+  const activeStudentCount = students.filter((s) => s.is_active).length;
+  const inactiveStudentCount = students.length - activeStudentCount;
+
   return (
     <div>
       {levelError && (
@@ -659,7 +671,7 @@ export default function StudentsPage() {
       )}
       <PageHeader
         title="Students"
-        subtitle={`${students.length} students total`}
+        subtitle={formatActiveStudents(activeStudentCount, inactiveStudentCount)}
         action={
           <Button
             onClick={() => {

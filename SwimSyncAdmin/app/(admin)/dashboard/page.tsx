@@ -5,12 +5,14 @@ import { Users, UserX, Receipt, FileText, UserCog, Layers } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { MetricCard } from "@/components/MetricCard";
+import { inactiveNote } from "@/lib/studentCounts";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
 
 type Metrics = {
-  totalStudents: number;
+  activeStudents: number;
+  inactiveStudents: number;
   unassignedCount: number;
   outstandingInvoices: number;
   totalCreditNotes: number;
@@ -98,15 +100,28 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
+      // ORDER IS THE CONTRACT: these are destructured POSITIONALLY, so a new
+      // query goes on the END of both lists. Insert one in the middle and every
+      // metric below it shifts by one — Outstanding Invoices would render the
+      // credit-note count, silently, because they are all small plausible
+      // integers on the first screen an admin sees.
       const [
-        { count: totalStudents },
+        { count: activeStudents },
         { count: unassignedCount },
         { count: outstandingInvoices },
         { count: totalCreditNotes },
         { count: totalCoaches },
         { count: totalClasses },
+        { count: inactiveStudents },
       ] = await Promise.all([
-        supabase.from("students").select("id", { count: "exact", head: true }),
+        // Active only. A child who has left is still a row — attendance and
+        // invoices reference them forever (PRD §7.14) — so an unfiltered count
+        // answers a bookkeeping question nobody asked and drifts upward as
+        // families come and go.
+        supabase
+          .from("students")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", true),
         supabase
           .from("students")
           .select("id", { count: "exact", head: true })
@@ -124,10 +139,22 @@ export default function DashboardPage() {
           .from("classes")
           .select("id", { count: "exact", head: true })
           .eq("is_active", true),
+        // Appended LAST, per the note above.
+        //
+        // A head count, NOT `select("is_active")` counted in the browser:
+        // PostgREST silently caps rows at max_rows = 1000, so a client-side
+        // count would under-report with no error once a business passes it —
+        // the trap already written up in platform/page.tsx. A head count is
+        // exact at any size.
+        supabase
+          .from("students")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", false),
       ]);
 
       setMetrics({
-        totalStudents: totalStudents ?? 0,
+        activeStudents: activeStudents ?? 0,
+        inactiveStudents: inactiveStudents ?? 0,
         unassignedCount: unassignedCount ?? 0,
         outstandingInvoices: outstandingInvoices ?? 0,
         totalCreditNotes: totalCreditNotes ?? 0,
@@ -284,11 +311,14 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <MetricCard
-          title="Total Students"
-          value={loading ? "—" : metrics?.totalStudents ?? 0}
+          title="Active Students"
+          value={loading ? "—" : metrics?.activeStudents ?? 0}
           icon={Users}
           color="blue"
-          subtitle="Across all coaches"
+          // "Across all coaches" is kept because it is real information — the
+          // count is business-wide, not per-coach. The inactive note APPENDS to
+          // it rather than replacing it, and is empty at zero.
+          subtitle={`Across all coaches${inactiveNote(metrics?.inactiveStudents ?? 0)}`}
         />
         <MetricCard
           title="Unassigned Children"
