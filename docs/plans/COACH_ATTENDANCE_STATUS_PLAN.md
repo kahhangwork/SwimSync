@@ -38,7 +38,23 @@ docker exec -i supabase_db_SwimSync psql -U postgres -d postgres \
 node .claude/skills/run-ui-playwright/drivers/verify-stale-screen.mjs   # expect 14/14
 ```
 
-**Baseline recorded:** _(fill in — app jest ___, admin vitest ___, pgTAP ___, driver ___/___)_
+**Baseline recorded 2026-07-26, and the outcome beside it:**
+
+| | Before | After |
+|---|---|---|
+| `SwimSyncApp` jest | 130 (10 suites) | **174** (12 suites) |
+| `SwimSyncAdmin` vitest | 186 (13 files) | 186 — unchanged, as intended |
+| pgTAP | 397 | 397 — unchanged, no DB work |
+| `verify-stale-screen.mjs` | 14/14 | **18/18** |
+| `verify-attendance-guard.mjs` | 14/14 | 14/14 |
+| `verify-bulk-setall.mjs` | 10/10 | 10/10 |
+| `verify-attendance-window.mjs` | 3/5 | 3/5 — same two failures |
+
+> **`verify-attendance-window.mjs` does NOT score 0/4.** HANDOVER §8.16 and §8.15 both say
+> it does. It has **five** checks and scores **3/5**, measured on both sides of this work by
+> stashing the two screens — the two failures (a roster placeholder, and a parent
+> empty-state) are pre-existing and identical. The "0/4" figure is stale prose; the runner is
+> the fact. Worth correcting in HANDOVER rather than carrying forward.
 
 ---
 

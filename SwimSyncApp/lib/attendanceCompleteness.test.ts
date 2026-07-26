@@ -160,3 +160,38 @@ describe("unmarkedDates", () => {
     expect(out).toEqual(["2026-01-03", "2026-01-24"]);
   });
 });
+
+// ── DO NOT "FIX" THIS. IT IS LOAD-BEARING FOR INVOICING. ────────────────────
+// A lesson nobody was expected at is FULLY MARKED. That reads wrong and is
+// right: there is nothing to collect, so it must not block a month from being
+// invoiced. unmarkedDates() relies on it to skip dates before a class had
+// anyone in it, and the billing engine relies on it to seal a month (§8a).
+//
+// It is also exactly the behaviour that tempts a change, because a coach's card
+// showing a green "Marked" on an empty class is a lie. That belongs to the
+// DISPLAY layer and is solved there — lib/attendanceSummary.ts returns a
+// distinct `no-students` state, and this file is deliberately untouched.
+//
+// Changing the assertion below changes which months can be invoiced, for every
+// tenant. If you are here because it failed, the fix is almost certainly in
+// attendanceSummary.ts instead.
+describe("an empty expected set is vacuously marked — invoicing depends on this", () => {
+  it("is marked when there is no session at all", () => {
+    expect(isLessonFullyMarked([], undefined)).toBe(true);
+  });
+
+  it("is marked when a session exists with no rows", () => {
+    expect(isLessonFullyMarked([], new Set())).toBe(true);
+  });
+
+  it("unmarkedDates skips a date nobody was expected at", () => {
+    // A class whose only enrolment starts later must not report its earlier
+    // weekday dates as unmarked — that blocked whole months (§8.15).
+    const dates = ["2026-07-05", "2026-07-12"];
+    expect(
+      unmarkedDates(dates, new Map(), [
+        { studentId: "late", from: "2026-07-10", until: null },
+      ])
+    ).toEqual(["2026-07-12"]);
+  });
+});

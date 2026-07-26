@@ -30,6 +30,15 @@ import {
   isNowInRange,
   hasEndedInSg,
 } from "@/lib/timeOfDay";
+import {
+  lessonProgress,
+  summariseStatuses,
+  formatSummary,
+  progressLabel,
+  isFinished,
+  type LessonProgress,
+  type DbStatus,
+} from "@/lib/attendanceSummary";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 
@@ -41,6 +50,10 @@ type TodayClass = {
   location_name: string;
   student_count: number;
   session_id: string | null; // null if no lesson session generated for today yet
+  /** Marked / partial / upcoming / not-marked / no-students. */
+  progress: LessonProgress;
+  /** "3 present · 2 cancelled (rain)", or "" when nothing is recorded. */
+  summary: string;
 };
 
 /** A past lesson that should have happened but has no complete attendance. */
@@ -49,6 +62,9 @@ type BacklogItem = {
   class_title: string;
   date: string;
   session_id: string | null; // non-null when the session exists but is partial
+  /** Only ever `partial` or `unmarked` — a complete lesson is not in the backlog. */
+  progress: LessonProgress;
+  summary: string;
 };
 
 function formatTime(time: string): string {
@@ -57,6 +73,36 @@ function formatTime(time: string): string {
   const ampm = hour >= 12 ? "PM" : "AM";
   const hour12 = hour % 12 || 12;
   return `${hour12}:${m} ${ampm}`;
+}
+
+/**
+ * The status pill. One component for both lists, so a state cannot be worded or
+ * coloured one way on a card and another way in the backlog.
+ *
+ * Colour carries no information the text does not — the label is always present
+ * — because a coach reading this outdoors on a phone is exactly the case where
+ * colour alone fails.
+ */
+function ProgressChip({ progress }: { progress: LessonProgress }) {
+  // `hex` as well as the Tailwind class: Ionicons takes a colour PROP and
+  // ignores className, so without it the glyph renders default black inside a
+  // coloured pill. Keep the two in step.
+  const tone = {
+    "no-students": { bg: "bg-gray-100",   fg: "text-gray-500",   hex: "#6b7280", icon: "remove-outline" },
+    upcoming:      { bg: "bg-gray-100",   fg: "text-gray-500",   hex: "#6b7280", icon: "time-outline" },
+    unmarked:      { bg: "bg-orange-100", fg: "text-orange-700", hex: "#c2410c", icon: "alert-circle-outline" },
+    partial:       { bg: "bg-amber-100",  fg: "text-amber-700",  hex: "#b45309", icon: "ellipse-outline" },
+    complete:      { bg: "bg-green-100",  fg: "text-green-700",  hex: "#15803d", icon: "checkmark-circle" },
+  }[progress.kind];
+
+  return (
+    <View className={`flex-row items-center gap-1 rounded-full px-2.5 py-1 ${tone.bg}`}>
+      <Ionicons name={tone.icon as any} size={12} color={tone.hex} />
+      <Text className={`text-xs font-semibold ${tone.fg}`}>
+        {progressLabel(progress)}
+      </Text>
+    </View>
+  );
 }
 
 export default function TodayScreen() {
@@ -130,7 +176,7 @@ export default function TodayScreen() {
     const { data: windowSessions } = classIds.length > 0
       ? await supabase
           .from("lesson_sessions")
-          .select("id, class_id, session_date, attendance(student_id)")
+          .select("id, class_id, session_date, attendance(student_id, status)")
           .in("class_id", classIds)
           .gte("session_date", windowStart)
           .lte("session_date", todayDate)
@@ -139,7 +185,12 @@ export default function TodayScreen() {
     // key: "<class_id>:<session_date>"
     const sessionByClassDate = new Map<
       string,
-      { id: string; markedStudentIds: Set<string> }
+      {
+        id: string;
+        markedStudentIds: Set<string>;
+        /** For the breakdown line. Same rows, one extra column. */
+        statusByStudent: Map<string, DbStatus>;
+      }
     >();
     // Dates that HAVE a session, per class. Needed because a lesson can exist
     // without being derivable from the class's weekday — an off-schedule lesson
@@ -154,28 +205,14 @@ export default function TodayScreen() {
         markedStudentIds: new Set(
           (s.attendance ?? []).map((a: any) => a.student_id)
         ),
+        statusByStudent: new Map(
+          (s.attendance ?? []).map((a: any) => [a.student_id, a.status])
+        ),
       });
       const dates = sessionDatesByClass.get(s.class_id as string) ?? [];
       dates.push(s.session_date as string);
       sessionDatesByClass.set(s.class_id as string, dates);
     });
-
-    const mapped: TodayClass[] = coachClasses
-      .filter((cls: any) => cls.day_of_week === todayDayOfWeek)
-      .map((cls: any) => ({
-        id: cls.id,
-        title: cls.title,
-        start_time: cls.start_time,
-        end_time: cls.end_time,
-        location_name: cls.location_name,
-        student_count: (cls.student_class_enrolments ?? []).filter(
-          (e: any) => e.is_active
-        ).length,
-        session_id:
-          sessionByClassDate.get(`${cls.id}:${todayDate}`)?.id ?? null,
-      }));
-
-    setClasses(mapped);
 
     // Lessons that should have happened but aren't fully marked. A lesson is
     // only "marked" once every active student has an attendance row — the same
@@ -200,6 +237,15 @@ export default function TodayScreen() {
     }
 
     const items: BacklogItem[] = [];
+    // Today's status per class, derived in the SAME loop as the backlog and from
+    // the SAME expected-set call. Two derivations of "who was expected here" is
+    // how the client became the only effective billing gate once before (§7.18),
+    // so there is exactly one `expectedStudentsOn` per (class, date) in this file.
+    const todayByClass = new Map<
+      string,
+      { progress: LessonProgress; summary: string }
+    >();
+
     for (const cls of coachClasses as any[]) {
       const enrolments = cls.student_class_enrolments ?? [];
       const activeStudentIds = enrolments
@@ -215,6 +261,32 @@ export default function TodayScreen() {
       }));
       const bookedHere =
         bookedByClassDate.get(cls.id) ?? new Map<string, string[]>();
+      // ── TODAY'S CARD ─────────────────────────────────────────────────────
+      // Computed BEFORE the skip below, deliberately: a class with nobody
+      // enrolled still gets a card, and it must read "No students" rather than
+      // silently showing the same blue button as a class that needs marking.
+      if (cls.day_of_week === todayDayOfWeek) {
+        const sessToday = sessionByClassDate.get(`${cls.id}:${todayDate}`);
+        const expectedToday = expectedStudentsOn(
+          todayDate,
+          enrolmentSpans,
+          bookedHere
+        );
+        todayByClass.set(cls.id, {
+          // Keyed to the class's END time: a coach marks at the end of a lesson,
+          // so one still running is "Upcoming", not overdue.
+          progress: lessonProgress(expectedToday, sessToday?.markedStudentIds, {
+            hasEnded: hasEndedInSg(cls.end_time, nowMins),
+          }),
+          summary: formatSummary(
+            summariseStatuses(
+              expectedToday,
+              sessToday?.statusByStudent ?? new Map()
+            )
+          ),
+        });
+      }
+
       // Nothing enrolled AND nothing booked means nothing to mark. Checking
       // enrolments alone would skip a class whose only attendee is a trial.
       if (activeStudentIds.length === 0 && bookedHere.size === 0) continue;
@@ -255,12 +327,46 @@ export default function TodayScreen() {
             class_title: cls.title,
             date,
             session_id: sess?.id ?? null,
+            // A past lesson has always ended, so this is `partial` or
+            // `unmarked` — never `upcoming`. MEMBERSHIP IS UNCHANGED by this:
+            // the isLessonFullyMarked test above still decides who is here.
+            progress: lessonProgress(expected, sess?.markedStudentIds, {
+              hasEnded: true,
+            }),
+            summary: formatSummary(
+              summariseStatuses(expected, sess?.statusByStudent ?? new Map())
+            ),
           });
         }
       }
     }
     items.sort((a, b) => b.date.localeCompare(a.date)); // most recent first
     setBacklog(items);
+
+    const mapped: TodayClass[] = coachClasses
+      .filter((cls: any) => cls.day_of_week === todayDayOfWeek)
+      .map((cls: any) => {
+        const today = todayByClass.get(cls.id);
+        return {
+          id: cls.id,
+          title: cls.title,
+          start_time: cls.start_time,
+          end_time: cls.end_time,
+          location_name: cls.location_name,
+          student_count: (cls.student_class_enrolments ?? []).filter(
+            (e: any) => e.is_active
+          ).length,
+          session_id:
+            sessionByClassDate.get(`${cls.id}:${todayDate}`)?.id ?? null,
+          // The loop above sets this for every class running today. The fallback
+          // is unreachable, and fails towards NAGGING rather than towards a
+          // quiet card — see isFinished in lib/attendanceSummary.ts.
+          progress: today?.progress ?? ({ kind: "unmarked" } as LessonProgress),
+          summary: today?.summary ?? "",
+        };
+      });
+
+    setClasses(mapped);
 
     // Count outstanding invoices for students in this coach's classes
     const { count } = await supabase
@@ -371,6 +477,14 @@ export default function TodayScreen() {
                       <Text className="text-xs text-orange-600">
                         {formatSgDate(item.date)}
                       </Text>
+                      {/* Tells a half-done lesson from an untouched one, which
+                          the date alone never could. `progress` here is only ever
+                          partial or unmarked — a complete lesson is not in this
+                          list, and MEMBERSHIP IS UNCHANGED by this work. */}
+                      <Text className="text-xs text-gray-500 mt-0.5">
+                        {progressLabel(item.progress)}
+                        {item.summary ? ` \u00b7 ${item.summary}` : ""}
+                      </Text>
                     </View>
                     <View className="flex-row items-center gap-1">
                       <Text className="text-xs font-semibold text-orange-600">
@@ -435,15 +549,25 @@ export default function TodayScreen() {
                         </Text>
                       </View>
                     </View>
-                    <View className="bg-sky-100 rounded-full px-3 py-1">
-                      <Text className="text-xs font-semibold text-sky-700">
-                        {cls.student_count} students
-                      </Text>
-                    </View>
+                    <ProgressChip progress={cls.progress} />
                   </View>
 
+                  {/* Option A: the count moved off the top-right to make room
+                      for the status, and reads as the total the breakdown adds
+                      up to. The breakdown itself is omitted entirely when
+                      nothing is recorded — never a dangling separator. */}
+                  <Text className="text-xs text-gray-500 mb-3 -mt-1">
+                    {cls.student_count} students
+                    {cls.summary ? ` \u00b7 ${cls.summary}` : ""}
+                  </Text>
+
+                  {/* isFinished, NOT `kind !== "unmarked"`. A card that stops
+                      asking for marks it still needs is a lesson that never gets
+                      marked, and that blocks the month with no override (§8a).
+                      Any state added later inherits the loud button. */}
                   <PrimaryButton
-                    label="Mark Attendance"
+                    label={isFinished(cls.progress) ? "Edit attendance" : "Mark Attendance"}
+                    variant={isFinished(cls.progress) ? "outline" : "primary"}
                     onPress={() =>
                       router.push(
                         `/(coach)/classes/${cls.id}/attendance?date=${todayDate}&from=today${cls.session_id ? `&sessionId=${cls.session_id}` : ""}`

@@ -97,6 +97,51 @@ async function pressByText(page, label, index = 0) {
   return ok;
 }
 
+/**
+ * Press the action button inside the card for a named class.
+ *
+ * Scoped to the CARD, not to an index into the whole page. An index broke the
+ * moment a finished class started saying "Edit attendance" instead of "Mark
+ * Attendance": class B's button moved from index 1 to index 0 and the driver
+ * pressed the wrong card. Selecting by the class title is stable under label
+ * changes, which is the whole point of a status feature.
+ */
+async function pressClassButton(page, classTitle) {
+  const ok = await page.evaluate((classTitle) => {
+    const visible = (e) =>
+      !e.closest('[aria-hidden="true"]') && e.getClientRects().length > 0;
+    const title = [...document.querySelectorAll("*")].find(
+      (e) =>
+        e.children.length === 0 &&
+        e.textContent.trim() === classTitle &&
+        visible(e)
+    );
+    if (!title) return false;
+    // Walk up to the card, then find its button by either label.
+    let card = title;
+    for (let i = 0; i < 8 && card; i++) {
+      const btn = [...card.querySelectorAll("*")].find(
+        (e) =>
+          e.children.length === 0 &&
+          /^(Mark Attendance|Edit attendance)$/.test(e.textContent.trim()) &&
+          visible(e)
+      );
+      if (btn) {
+        const target = btn.parentElement;
+        const o = { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, button: 0 };
+        target.dispatchEvent(new PointerEvent("pointerdown", o));
+        target.dispatchEvent(new PointerEvent("pointerup", o));
+        target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        return true;
+      }
+      card = card.parentElement;
+    }
+    return false;
+  }, classTitle);
+  console.log(`pressed card button: ${classTitle}${ok ? "" : " (NOT FOUND)"}`);
+  return ok;
+}
+
 const CLASS_ID = "e1000000-0000-0000-0000-0000000000c1";
 const CLASS_B  = "e1000000-0000-0000-0000-0000000000c2";
 const TODAY = sql("SELECT (now() AT TIME ZONE 'Asia/Singapore')::date");
@@ -140,7 +185,7 @@ try {
   );
 
   // ── 1. Mark TODAY's lesson, from Today's card ────────────────────────────
-  await pressByText(page, "Mark Attendance");
+  await pressClassButton(page, "Stale Screen Club");
   await page.waitForTimeout(2500);
   t = await dumpText(page);
   check(
@@ -228,6 +273,47 @@ try {
     t.match(/Unmarked Lessons \([0-9]+\)/)?.[0] ?? "(cleared)"
   );
 
+  // ══════════════ THE STATUS CHIPS AND BREAKDOWN ══════════════
+  // Class A's lesson today is now fully marked (both present, above) and class
+  // B's is partially marked (one of two, from the fixture). So one Today screen
+  // carries a `Marked` card, a `1 of 2 marked` card and a `Not marked` backlog
+  // row, which is every state a real screen can show at once.
+  t = await dumpText(page);
+
+  check(
+    "a fully marked class shows the Marked chip",
+    /Marked/.test(t) && /2 present/.test(t),
+    (t.match(/2 students · [^\n]*/) ?? ["(no breakdown)"])[0]
+  );
+
+  check(
+    "a partially marked class shows the fraction",
+    /1 of 2 marked/.test(t),
+    (t.match(/1 of 2 marked/) ?? ["(no fraction)"])[0]
+  );
+
+  // The status chip must NEVER be green on a class nobody is enrolled in. The
+  // billing gate calls an empty roster "fully marked" — correctly, there is
+  // nothing to collect — and showing that to a coach would say a class was done
+  // when nobody had touched it. §7.66-adjacent; the display layer owns this.
+  const seedEmpty = sql(
+    `SELECT count(*) FROM classes c WHERE c.day_of_week = (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 1]::day_of_week AND NOT EXISTS (SELECT 1 FROM student_class_enrolments e WHERE e.class_id = c.id AND e.is_active)`
+  );
+  check(
+    "no class with an empty roster is labelled Marked",
+    seedEmpty === "0" || /No students/.test(t),
+    `${seedEmpty} empty class(es) running today`
+  );
+
+  // The button must go quiet ONLY when the lesson is finished. A card that stops
+  // asking for marks it still needs is a lesson that never gets marked, and an
+  // unmarked lesson blocks the month with no override (§8a).
+  check(
+    "the finished class offers Edit attendance, the unfinished one still nags",
+    /Edit attendance/.test(t) && /Mark Attendance/.test(t),
+    `edit=${/Edit attendance/.test(t)} mark=${/Mark Attendance/.test(t)}`
+  );
+
   // ══════════════ THE NAVIGATION HALF ══════════════
   // Saving must return the coach to where they came FROM, not to whatever the
   // Classes stack happens to be holding. This screen lives in the Classes tab
@@ -246,7 +332,7 @@ try {
 
   // Now the second class, from Today — this is the push that used to stack on
   // top of the first one.
-  await pressByText(page, "Mark Attendance", 1);
+  await pressClassButton(page, "Stale Screen Second");
   await page.waitForTimeout(3000);
   t = await dumpText(page);
   await page.screenshot({ path: `${SHOT}/ss-5-second-class.png`, fullPage: true });

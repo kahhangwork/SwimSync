@@ -21,10 +21,18 @@ import {
   type DayOfWeek,
 } from "@/lib/lessonDates";
 import {
-  countMarked,
   type EnrolmentSpan,
   expectedStudentsOn,
 } from "@/lib/attendanceCompleteness";
+import {
+  lessonProgress,
+  summariseStatuses,
+  formatSummary,
+  progressLabel,
+  isFinished,
+  type LessonProgress,
+  type DbStatus,
+} from "@/lib/attendanceSummary";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 import { confirmAction } from "@/lib/confirm";
@@ -43,8 +51,9 @@ type Student = {
 type Session = {
   id: string | null; // null = the lesson should have happened but was never marked
   session_date: string;
-  marked_count: number;
-  total_count: number;
+  progress: LessonProgress;
+  /** "3 present · 2 cancelled (rain)", or "" when nothing is recorded. */
+  summary: string;
 };
 
 type ClassInfo = {
@@ -189,7 +198,7 @@ export default function ClassRosterScreen() {
       .select(`
         id,
         session_date,
-        attendance(id, student_id)
+        attendance(id, student_id, status)
       `)
       .eq("class_id", id)
       .lte("session_date", todayDate)
@@ -288,8 +297,17 @@ export default function ClassRosterScreen() {
       return {
         id: s.id,
         session_date: s.session_date,
-        marked_count: countMarked(expectedHere, markedIds),
-        total_count: expectedHere.length || totalStudents,
+        // Every past lesson has ended by definition — this list is bounded to
+        // `<= todayDate` — so `upcoming` is unreachable here.
+        progress: lessonProgress(expectedHere, markedIds, { hasEnded: true }),
+        summary: formatSummary(
+          summariseStatuses(
+            expectedHere,
+            new Map<string, DbStatus>(
+              (s.attendance ?? []).map((a: any) => [a.student_id, a.status])
+            )
+          )
+        ),
       };
     });
 
@@ -331,8 +349,16 @@ export default function ClassRosterScreen() {
         rows.push({
           id: null,
           session_date: date,
-          marked_count: 0,
-          total_count: totalStudents,
+          // Span-derived, like the rows above, rather than the class's CURRENT
+          // head-count. A synthesised row used `totalStudents`, so a lesson from
+          // before a child joined showed them in its denominator — the §8.15
+          // mid-month-joiner mistake, surviving on this one code path.
+          progress: lessonProgress(
+            expectedStudentsOn(date, enrolmentSpans, bookedByDate),
+            undefined,
+            { hasEnded: true }
+          ),
+          summary: "",
         });
       }
     }
@@ -354,7 +380,6 @@ export default function ClassRosterScreen() {
     }, [loadData])
   );
 
-  const isComplete = (s: Session) => s.marked_count >= s.total_count && s.total_count > 0;
 
   // Removing a student closes their enrolment; it never deletes anything.
   // Their past attendance still bills (the invoice engine reads attendance
@@ -634,7 +659,7 @@ export default function ClassRosterScreen() {
         ) : (
           <View className="gap-2">
             {sessions.map((session) => {
-              const complete = isComplete(session);
+              const complete = isFinished(session.progress);
               const unmarked = session.id === null;
               return (
                 <TouchableOpacity
@@ -672,12 +697,15 @@ export default function ClassRosterScreen() {
                           complete ? "text-green-600" : "text-orange-500"
                         }`}
                       >
-                        {complete
-                          ? "All attendance marked"
-                          : unmarked
-                          ? "Not marked"
-                          : `${session.marked_count}/${session.total_count} marked`}
+                        {progressLabel(session.progress)}
                       </Text>
+                      {/* Omitted entirely when nothing is recorded — never a
+                          dangling separator. */}
+                      {session.summary ? (
+                        <Text className="text-xs text-gray-500 mt-0.5">
+                          {session.summary}
+                        </Text>
+                      ) : null}
                     </View>
                     <View className="flex-row items-center gap-1">
                       <Text className="text-xs text-sky-500">
