@@ -23,8 +23,9 @@ INSERT INTO auth.users (
 WITH p AS (
   SELECT id FROM parents WHERE profile_id = 'b0000000-0000-0000-0000-000000000001'
 ), s AS (
-  INSERT INTO students (full_name, assignment_status, is_active)
-  VALUES ('Ana Tan', 'assigned', true), ('Ben Tan', 'assigned', true)
+  INSERT INTO students (full_name, assignment_status, is_active, tenant_id)
+  VALUES ('Ana Tan', 'assigned', true, '70000000-0000-0000-0000-000000000001'),
+         ('Ben Tan', 'assigned', true, '70000000-0000-0000-0000-000000000001')
   RETURNING id
 )
 INSERT INTO parent_students (parent_id, student_id)
@@ -56,8 +57,8 @@ FROM sess CROSS JOIN students st;
 WITH p AS (
   SELECT id FROM parents WHERE profile_id = 'b0000000-0000-0000-0000-000000000001'
 ), s AS (
-  INSERT INTO students (full_name, assignment_status, is_active)
-  VALUES ('Julia Tan', 'unassigned', true)
+  INSERT INTO students (full_name, assignment_status, is_active, tenant_id)
+  VALUES ('Julia Tan', 'unassigned', true, '70000000-0000-0000-0000-000000000001')
   RETURNING id
 )
 INSERT INTO parent_students (parent_id, student_id)

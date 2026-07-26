@@ -15,6 +15,21 @@ on:
     branches: [main]
 
 jobs:
+  # Cheap repo-wide invariants that need no toolchain. Kept as its own job so a
+  # failure names the rule rather than hiding inside a test run.
+  repo-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Every UI fixture seeds the ONE local database that all worktrees share,
+      # and /session-close forbids `supabase db reset` as cleanup. A fixture with
+      # no teardown therefore leaves a session no safe way to clean up. This kept
+      # being forgotten — 9 of 13 were missing on 2026-07-26.
+      - name: Every UI fixture has a teardown
+        run: .claude/skills/run-ui-playwright/drivers/check-teardowns.sh
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:

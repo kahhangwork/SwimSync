@@ -717,4 +717,23 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     The accepted consequence is that a family **can** be inactive while holding an active
     child; propagation is one-way and nothing reconciles the two. That is the design, not a
     gap. (Promoted from §8.4, 2026-07-19 — this reasoning existed nowhere else.)
+
+62. **A SCHEMA CHANGE CAN SILENTLY BREAK A UI FIXTURE, BECAUSE NO FIXTURE RUNS IN CI.**
+    `20260719000600_students_tenant_not_null.sql` made `students.tenant_id` NOT NULL.
+    `fixtures-attendance-window.sql` and `fixtures-unmarked-lessons.sql` insert students
+    without it, so **from that day both fixtures failed to load** — and nothing said so.
+    CI runs pgTAP, Deno and the two frontend suites; it has never applied a fixture.
+    **The damage is not that the driver fails, it is HOW it fails.** The fixture is a
+    plain `psql` script, so the failing statement aborts and *the rest still runs*: the
+    parent, the class and the sessions land, the children do not. The driver then reports
+    a low score that reads like a product regression, and a half-loaded fixture leaves
+    orphan rows that make the *next* run behave differently again.
+    This is the real reason `verify-attendance-window.mjs` scored **0/4** for a week —
+    not the stale clock assumption that was written down at the time. **A wrong diagnosis
+    in the backlog is worse than none**: it sends the next person to fix the dates.
+    **When a migration adds a NOT NULL column or a constraint, grep the fixtures:**
+    `grep -l "INSERT INTO <table>" .claude/skills/run-ui-playwright/drivers/fixtures-*.sql`
+    — and run each one it names. Until fixtures run in CI, that grep is the only guard.
+    (Found 2026-07-26 while writing the missing teardowns; the round-trip harness in
+    `docs/WORKTREES.md` Phase 4 is what surfaced it.)
 ---

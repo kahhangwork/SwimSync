@@ -167,13 +167,19 @@ afterwards.
 **Prefix every fixture row**, and have a teardown that deletes by that prefix. Without a
 prefix, two worktrees seeding "Test Parent" produce a passing test that should have failed.
 
-> ⚠ **Known gap, 2026-07-26: 9 of the 13 fixture files have no teardown script**
-> (`fixtures-active-inactive`, `-attendance-window`, `-packages`, `-parent-claim`,
-> `-phase4-billing`, `-student-identity`, `-trial-onboarding`, `-trial-visibility`,
-> `-unmarked-lessons`). For those, the only cleanup today is `db reset` — the one thing this
-> protocol forbids. **If your task uses one of them, write its teardown first**, or state
-> plainly in your summary which rows you are leaving and under what prefix. Filed in
-> `BACKLOG.md`.
+**Every fixture has a teardown, and CI keeps it that way.** All 13 are paired as of
+2026-07-26, and `drivers/check-teardowns.sh` fails the build if a new fixture arrives
+without one. Run it locally any time:
+
+```bash
+.claude/skills/run-ui-playwright/drivers/check-teardowns.sh
+```
+
+**If you write a new fixture**, prove its teardown round-trips rather than eyeballing it:
+snapshot every table's row count, apply the fixture, apply the teardown, and assert the
+counts are byte-identical. That harness is what caught two real defects in the first pass —
+a teardown that left a `parent_tenants` row behind, and one that could not reach a session
+the fixture deliberately left unmarked. Both looked correct by reading.
 
 **`git status` before `git commit`, not after.** A sibling merging to `main` can move `HEAD`
 between your checkout and your commit — it has put a commit on `main` that was meant for a

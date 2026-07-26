@@ -943,7 +943,21 @@ admin-only failure should not require port 8081. Delete the tenant's levels in a
 and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
 
 ### `verify-attendance-window.mjs` guards nothing — **S**
-It scores **0/4**. Its fixture header states the assumption outright — *"Assumes the machine
+It scores **0/4**.
+
+> **The diagnosis below was WRONG, and the correction is the useful part.** This entry
+> blamed the fixture's hard-coded clock. The actual cause, found 2026-07-26 by round-tripping
+> every fixture: **`fixtures-attendance-window.sql` could not load at all.**
+> `20260719000600_students_tenant_not_null.sql` made `students.tenant_id` NOT NULL and the
+> fixture inserted students without it, so both children failed to insert while the rest of
+> the script carried on — a driver with no students to assert on scores 0/4 no matter what
+> the clock says. **Fixed 2026-07-26** (the fixture now passes `tenant_id`); see
+> **§7.62** for the durable lesson, which is that no fixture runs in CI.
+>
+> The clock problem below is **real and still outstanding** — it was simply not what was
+> producing the 0/4. Re-measure before assuming the score is now what this entry predicts.
+
+Its fixture header states the assumption outright — *"Assumes the machine
 clock is Thu 16 – Fri 17 Jul 2026"* (`fixtures-attendance-window.sql:3`) — and hard-codes a
 week of dates around it. Off that week, every check misses.
 
@@ -967,27 +981,28 @@ Decide while fixing whether the older driver still earns its place at all, or wh
 unique cases should be folded into `verify-attendance-guard.mjs` and the file deleted —
 two drivers over one rule is the reason this went unnoticed.
 
-### Nine UI fixtures have no teardown, which blocks safe worktree use — **S**
-`fixtures-active-inactive`, `-attendance-window`, `-packages`, `-parent-claim`,
-`-phase4-billing`, `-student-identity`, `-trial-onboarding`, `-trial-visibility` and
-`-unmarked-lessons` seed the shared database and have no `-teardown.sql`. Only 4 of the 13
-fixtures have one.
+### `fixtures-unmarked-lessons.sql` enrols EVERY student into the seed class — **S**
+```sql
+INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
+SELECT st.id, c.id, '2026-07-01T02:00:00Z', true
+FROM students st CROSS JOIN classes c WHERE c.title = 'Saturday Beginners';
+```
+There is no filter on `st`. Every student **in the database** — other fixtures' children,
+a sibling worktree's, a real one — gets an active enrolment in Saturday Beginners.
 
-**Why:** `/session-close` requires tearing fixtures out of the **one** database every
-worktree shares, and explicitly forbids `supabase db reset` as the cleanup (it rebuilds the
-DB from whichever branch ran it, destroying a sibling's state — `docs/GOTCHAS.md` §7.55). For
-these nine there is currently **no third option**: a session either leaves rows behind, or
-does the forbidden thing. That makes parallel worktree sessions unsafe for any task touching
-those areas, which is most of them. Rows left behind are worse than clutter — a sibling's
-test can *pass because of them*.
+**Why:** an active enrolment makes a child *expected at every lesson*, and an unmarked
+expected lesson **blocks invoice generation outright, with no override** (PRD §7.7). So this
+fixture can silently make a billing test refuse for a reason that has nothing to do with the
+code under test. It also cannot be fully undone: once mixed in, a fixture-created enrolment
+is indistinguishable from a legitimate one, so `fixtures-unmarked-lessons-teardown.sql`
+removes only its own two children's enrolments and says so in its header.
 
-**Notes:** the four that exist (`-attendance-guard`, `-class-students`, `-contact-details`,
-`-levels-table`) are the shape to copy; both `-attendance-guard` and `-contact-details`
-teardowns were themselves written a session *after* the fixture shipped, so this is a known
-recurring miss rather than a one-off. Delete by a **prefix** the fixture owns, not by a
-hardcoded id list, so it survives the fixture growing rows. Worth pairing with a check that
-fails CI when a `fixtures-*.sql` has no sibling teardown — the rule is mechanical and keeps
-being forgotten. See `docs/WORKTREES.md` Phase 4.
+**Notes:** the fix is a `WHERE st.id IN (…)` naming the fixture's own children — the same
+shape every other fixture already uses. Do it in the same pass as **§7.62**'s wider point:
+no fixture runs in CI, so nothing catches this class of bug. Consider whether the round-trip
+harness described in `docs/WORKTREES.md` Phase 4 should become a CI job that applies each
+fixture and its teardown against a fresh stack — that would have caught both this and the
+NOT NULL breakage the day they landed.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`

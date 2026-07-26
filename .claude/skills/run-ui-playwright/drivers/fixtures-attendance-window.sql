@@ -43,8 +43,9 @@ WHERE pr.email = 'coach@swimsync.test';
 
 -- Child 1: Ana → Saturday Beginners since 1 July, no marks.
 WITH p AS (SELECT id FROM parents WHERE profile_id='b0000000-0000-0000-0000-0000000000aa'),
-     s AS (INSERT INTO students (full_name, assignment_status, is_active)
-           VALUES ('Ana Win','assigned',true) RETURNING id)
+     s AS (INSERT INTO students (full_name, assignment_status, is_active, tenant_id)
+           VALUES ('Ana Win','assigned',true,'70000000-0000-0000-0000-000000000001')
+           RETURNING id)
 INSERT INTO parent_students (parent_id, student_id) SELECT p.id, s.id FROM p CROSS JOIN s;
 
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
@@ -54,8 +55,9 @@ WHERE st.full_name='Ana Win' AND c.title='Saturday Beginners';
 
 -- Child 2: Newkid → Sunday Newbies since 16 July (no Sunday has fallen due since), no marks.
 WITH p AS (SELECT id FROM parents WHERE profile_id='b0000000-0000-0000-0000-0000000000aa'),
-     s AS (INSERT INTO students (full_name, assignment_status, is_active)
-           VALUES ('Newkid Win','assigned',true) RETURNING id)
+     s AS (INSERT INTO students (full_name, assignment_status, is_active, tenant_id)
+           VALUES ('Newkid Win','assigned',true,'70000000-0000-0000-0000-000000000001')
+           RETURNING id)
 INSERT INTO parent_students (parent_id, student_id) SELECT p.id, s.id FROM p CROSS JOIN s;
 
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
