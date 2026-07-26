@@ -1,4 +1,4 @@
--- Fixture for verify-stale-screen.mjs — §7.62, attendance written to the wrong
+-- Fixture for verify-stale-screen.mjs — §7.64, attendance written to the wrong
 -- lesson because the marking screen never reloaded.
 --
 -- DATES ARE COMPUTED FROM THE CLOCK, like fixtures-attendance-guard.sql and
@@ -51,7 +51,7 @@ SELECT
 FROM coaches co, ss
 WHERE co.profile_id = 'c0000000-0000-0000-0000-000000000001';
 
--- A SECOND class on the same weekday, because the navigation half of §7.62
+-- A SECOND class on the same weekday, because the navigation half (§7.65)
 -- needs two lessons to stack. The coach marks the first from Today, goes back,
 -- marks the second — and `router.back()` used to land them on the FIRST one.
 -- One class cannot express that.

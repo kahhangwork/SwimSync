@@ -16,7 +16,7 @@
 // "Attendance saved.", and the rows landed on the 26 Jul session. The 19 Jul
 // lesson stayed unmarked (correctly — nothing was written to it) while today's
 // lesson silently acquired statuses nobody had entered for it. A 200 and a
-// success toast the whole way. See §7.62.
+// success toast the whole way. See §7.64.
 //
 // The screen's effect deps are the root fix. This is the second layer, and it
 // is the one that holds even if the first is broken again: a session id is

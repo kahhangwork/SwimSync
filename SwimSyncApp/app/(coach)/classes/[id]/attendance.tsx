@@ -104,7 +104,7 @@ export default function MarkAttendanceScreen() {
     from?: string;
   }>();
 
-  // ── WHERE DOES LEAVING THIS SCREEN GO? ──────────────────────────────────
+  // ── WHERE DOES LEAVING THIS SCREEN GO? (§7.65) ──────────────────────────
   // Not `router.back()`, which trusts whatever happens to be underneath — and
   // what is underneath is frequently ANOTHER LESSON'S attendance screen.
   //
@@ -152,7 +152,7 @@ export default function MarkAttendanceScreen() {
   const loadToken = useRef(0);
 
   // ⚠ THESE DEPS ARE LOAD-BEARING — this was `[]`, and it wrote attendance to
-  // the wrong day (§7.62). One route serves every lesson, distinguished only
+  // the wrong day (§7.64). One route serves every lesson, distinguished only
   // by `?date=`, and Expo Router reuses the mounted screen when a search param
   // changes. A mount-only effect therefore never reloads, so the header showed
   // the new lesson over the previous lesson's roster and session id.
@@ -408,7 +408,7 @@ export default function MarkAttendanceScreen() {
     // if it was resolved for the date now on screen; anything else is treated
     // as unknown and re-resolved from (class_id, date) — the pair that
     // uniquely identifies a lesson. This is the layer that would have caught
-    // §7.62 even with the mount-only effect still in place.
+    // §7.64 even with the mount-only effect still in place.
     const decision = resolveSessionForDate(resolved, date);
     let finalSessionId =
       decision.kind === "use" ? decision.sessionId : null;

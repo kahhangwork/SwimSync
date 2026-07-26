@@ -1,4 +1,4 @@
-// §7.62 — ATTENDANCE MUST LAND ON THE LESSON THE COACH IS LOOKING AT.
+// §7.64 — ATTENDANCE MUST LAND ON THE LESSON THE COACH IS LOOKING AT.
 //
 // This is the one thing no unit test in this repo can reach, and the reason is
 // the bug itself: it lives in the ROUTER, not in any function. Every lesson is

@@ -758,4 +758,59 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     This is §7.62's sibling: there a *schema change* made a fixture statement fail, here a
     *sibling fixture* does. Both fail the same way — psql aborts the statement, the rest of
     the script runs, and the fixture half-loads without saying so. (Fixed 2026-07-26.)
+
+64. **EXPO ROUTER REUSES A MOUNTED SCREEN WHEN ONLY A SEARCH PARAM CHANGES, SO A
+    MOUNT-ONLY `useEffect` NEVER RELOADS — AND THIS WROTE ATTENDANCE TO THE WRONG DAY.**
+    Every lesson is marked at one route, `/(coach)/classes/[id]/attendance`, identified
+    only by `?date=`. Today's card, the Unmarked Lessons row and the roster all push that
+    same route with a different date. The screen's loader was `useEffect(() => { load() },
+    [])`, so it ran once per *mount* and never again. `date` comes from
+    `useLocalSearchParams` and IS reactive, so the header repainted to the new lesson while
+    `resolvedSessionId`, `students` and `attendance` still belonged to the previous one.
+    **Measured in production 2026-07-26:** the coach marked Sun 26 Jul, opened Sun 19 Jul
+    from the backlog, marked two children, and got *"Attendance saved."* — the rows landed
+    on the **26 Jul** session. 19 Jul stayed unmarked (correctly: nothing was written to
+    it), while today's lesson silently acquired statuses nobody had entered for it.
+    **Every signal said success.** The `attendance` upsert returned 200, `audit_log`
+    returned 201, the toast was green. The only tells were in DevTools: **no
+    `lesson_sessions` POST at all** (proving the screen held an already-resolved id), and a
+    `lesson_session_id` in the payload belonging to the other date. A billing-correctness
+    bug that reads as a UI annoyance.
+    **`[]` deps are not a style choice on a screen whose identity is a search param.** The
+    other five param-driven screens in the app all depend on theirs (`[id]`,
+    `[invoiceId, packageId]`, `[id, todayDate]`) or use `useFocusEffect`; this one was
+    alone. Audit:
+    `grep -rn -A3 "useLocalSearchParams" SwimSyncApp/app --include=*.tsx | grep -B1 "}, \[\])"`
+    **Two more layers, because the deps alone have already been got wrong once.**
+    `lib/attendanceSession.ts` makes a session id inseparable from the date it was
+    resolved FOR — anything not provably about the current date is `stale`, and the save
+    re-resolves from `(class_id, date)` rather than writing what it holds. And the spinner
+    covers the gap between a param change and the reload landing: the effect runs *after*
+    paint, and a tap is faster than a frame.
+    **Only an in-app-navigation driver can catch this.** A deep link mounts a fresh screen
+    and passes, which is why `verify-attendance-guard.mjs` — which navigates by URL
+    throughout — scored **14/14 against the broken build**. `verify-stale-screen.mjs`
+    clicks through Today's card then the backlog row: **4/8 before the fix, 12/12 after**
+    (with §7.65). (Found and fixed 2026-07-26, live the same day.)
+
+65. **`router.back()` ON THE ATTENDANCE SCREEN POPPED INTO A *DIFFERENT LESSON*, BECAUSE
+    THE SCREEN LIVES IN A TAB IT IS NOT ALWAYS PUSHED FROM.**
+    `classes/_layout.tsx` puts the attendance screen in the **Classes** tab's `Stack`, but
+    Today's class card and Unmarked Lessons row push it from the **Today** tab. Switching
+    tabs does not unwind the Classes stack — it only hides it — so the stack accumulates
+    one attendance screen per lesson visited:
+    `Today → 845am card` leaves `[classes-index, att(845)]`; the back chevron returns to
+    Today **without popping it**; `Today → 930am card` makes it
+    `[classes-index, att(845), att(930)]`; and saving the 9:30 class popped to the **8:45**
+    screen, its session id still in the URL. Pressing the back chevron first is the step
+    that makes it reproducible — that is what leaves a screen behind.
+    **The fix is to stop asking "what is underneath?".** The caller states where it came
+    from (`&from=today` / `&from=roster`) and the screen leaves with **`replace`, not
+    `back`** — which also drops it out of the history, so nothing can pop back into a
+    lesson the coach has finished.
+    **This compounded with §7.64 and the two are easy to confuse.** §7.64 made the rows
+    land on the wrong lesson; this made the *screen* the wrong lesson. With only §7.64
+    fixed, the driver's "class A's lesson is untouched" check still passes while the
+    navigation check fails — that split is the fastest way to tell which one you are
+    looking at. (Found and fixed 2026-07-26, live the same day.)
 ---

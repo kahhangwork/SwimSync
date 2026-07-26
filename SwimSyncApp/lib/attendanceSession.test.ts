@@ -7,7 +7,7 @@ import {
 // The bug this file exists for, stated as a test: the screen is holding the
 // session for 26 Jul because Expo Router reused it, and the coach is looking
 // at 19 Jul. Writing to what is held is what put two children's attendance on
-// the wrong lesson in production (§7.62).
+// the wrong lesson in production (§7.64).
 const HELD_FOR_26TH: ResolvedSession = {
   date: "2026-07-26",
   sessionId: "b6288a37-a677-443f-9ccc-091ca89f7fc8",
