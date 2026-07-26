@@ -15,6 +15,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { confirmAction } from "@/lib/confirm";
 import { applyBulkStatus, SET_ALL_OPTIONS, BulkOption } from "@/lib/attendanceBulk";
 import { mergeRoster } from "@/lib/attendanceRoster";
+import { buildAttendanceRows } from "@/lib/attendancePayload";
 import { checkMarkableDate, type MarkableCheck } from "@/lib/attendanceWindow";
 import {
   resolveSessionForDate,
@@ -46,8 +47,13 @@ type StudentRow = {
 type AttState = {
   top: TopStatus;
   sub: string | null; // "rain"|"coach" for cancelled; "paid"|"free" for trial
-  existingId: string | null;
 };
+
+// `existingId` used to live here, carrying the attendance row's primary key so
+// the save could "update in place". It never did that — onConflict on
+// (lesson_session_id, student_id) is what matches an existing row — and sending
+// the PK is what broke every partially-marked lesson (§7.67). Removed rather
+// than left unused, so nothing puts `id` back in the payload.
 
 function toDBStatus(top: TopStatus, sub: string | null): DBStatus | null {
   if (top === "unmarked") return null;
@@ -314,15 +320,14 @@ export default function MarkAttendanceScreen() {
           initAtt[student.id] = {
             top: parsed.top,
             sub: parsed.sub,
-            existingId: existing.id,
           };
         } else {
-          initAtt[student.id] = { top: "unmarked", sub: null, existingId: null };
+          initAtt[student.id] = { top: "unmarked", sub: null };
         }
       }
     } else {
       for (const student of roster) {
-        initAtt[student.id] = { top: "unmarked", sub: null, existingId: null };
+        initAtt[student.id] = { top: "unmarked", sub: null };
       }
     }
 
@@ -439,21 +444,30 @@ export default function MarkAttendanceScreen() {
       finalSessionId = newSession.id;
     }
 
+    // A real guard rather than `!`: everything below writes attendance against
+    // this id, and a null here would be the §7.64 class of mistake again.
+    if (!finalSessionId) {
+      showToast("Could not create session record.", "error");
+      setSaving(false);
+      return;
+    }
+
     setResolved({ date, sessionId: finalSessionId });
 
-    // Build upsert rows
-    const rows = students.map((student) => {
-      const state = attendance[student.id];
-      const dbStatus = toDBStatus(state.top, state.sub)!;
-      return {
-        ...(state.existingId ? { id: state.existingId } : {}),
-        lesson_session_id: finalSessionId,
-        student_id: student.id,
-        status: dbStatus,
-        marked_by: session!.id,
-        last_edited_by: session!.id,
-      };
-    });
+    // Built in lib/attendancePayload.ts, NOT inline — every row has to carry
+    // the same keys or PostgREST inserts NULL for the ones a row omits (§7.67).
+    // That is what made a partially-marked lesson permanently unsaveable.
+    const rows = buildAttendanceRows(
+      finalSessionId,
+      session!.id,
+      students.map((student) => ({
+        studentId: student.id,
+        status: toDBStatus(
+          attendance[student.id].top,
+          attendance[student.id].sub
+        )!,
+      }))
+    );
 
     const { error: upsertError } = await supabase
       .from("attendance")
@@ -579,7 +593,6 @@ export default function MarkAttendanceScreen() {
             const state = attendance[student.id] ?? {
               top: "unmarked",
               sub: null,
-              existingId: null,
             };
             return (
               <View

@@ -62,8 +62,25 @@ function sql(q) {
 async function pressByText(page, label, index = 0) {
   const ok = await page.evaluate(
     ({ label, index }) => {
+      // ⚠ ONLY THE VISIBLE SCREEN. React Navigation keeps the screens you left
+      // mounted, and this driver's whole subject is navigating between lessons
+      // — so a plain text search finds the PREVIOUS lesson's buttons first and
+      // presses those. It cost a false FAIL here: "Absent" landed on a stale
+      // screen, that screen's Save ran instead, and the run read as "the fix
+      // does not work" while a URL-navigated probe saved perfectly.
+      //
+      // React Navigation marks the inactive screen `aria-hidden="true"` — the
+      // same attribute Chrome warns about in the console on this app — so that
+      // is the seam, plus a non-zero box for anything display:none.
+      const visible = (e) =>
+        !e.closest('[aria-hidden="true"]') &&
+        e.getClientRects().length > 0;
+
       const hits = [...document.querySelectorAll("*")].filter(
-        (e) => e.children.length === 0 && e.textContent.trim() === label
+        (e) =>
+          e.children.length === 0 &&
+          e.textContent.trim() === label &&
+          visible(e)
       );
       const el = hits[index];
       if (!el) return false;
@@ -81,17 +98,18 @@ async function pressByText(page, label, index = 0) {
 }
 
 const CLASS_ID = "e1000000-0000-0000-0000-0000000000c1";
+const CLASS_B  = "e1000000-0000-0000-0000-0000000000c2";
 const TODAY = sql("SELECT (now() AT TIME ZONE 'Asia/Singapore')::date");
 const D_PREV = sql(`SELECT '${TODAY}'::date - 7`);
 
 /** Statuses on one lesson, as "Name=status" pairs, ordered. The ground truth. */
-function marksOn(date) {
+function marksOn(date, classId = CLASS_ID) {
   return sql(
     `SELECT COALESCE(string_agg(s.full_name || '=' || a.status, ', ' ORDER BY s.full_name), '(none)')
        FROM lesson_sessions ls
        LEFT JOIN attendance a ON a.lesson_session_id = ls.id
        LEFT JOIN students   s ON s.id = a.student_id
-      WHERE ls.class_id = '${CLASS_ID}' AND ls.session_date = '${date}'`
+      WHERE ls.class_id = '${classId}' AND ls.session_date = '${date}'`
   );
 }
 
@@ -233,18 +251,41 @@ try {
   t = await dumpText(page);
   await page.screenshot({ path: `${SHOT}/ss-5-second-class.png`, fullPage: true });
 
-  // "Second Only" is enrolled in the SECOND class alone, so its presence is
-  // proof of which lesson is on screen. The class TITLE is not proof — the
+  // "Second One/Two" are enrolled in the SECOND class alone, so their presence
+  // is proof of which lesson is on screen. The class TITLE is not proof — the
   // screen navigated away from is still mounted and still in innerText.
   check(
     "the second class's own lesson opens",
-    /Second Only/.test(t),
-    t.includes("Second Only") ? "" : "(wrong class on screen)"
+    /Second One/.test(t) && /Second Two/.test(t),
+    t.includes("Second One") ? "" : "(wrong class on screen)"
   );
 
-  await pressByText(page, "Present", 0);
+  // ── §7.67: A PARTIALLY-MARKED LESSON MUST SAVE ──────────────────────────
+  // This lesson arrives with ONE of its two children already marked (see the
+  // fixture). The screen used to attach the attendance PK to those rows only,
+  // so the key sets differed across the upsert body, `id` entered PostgREST's
+  // column list, and the UNMARKED child was inserted with id = NULL against a
+  // NOT NULL column — 23502, and the whole statement refused. The coach saw
+  // only "Failed to save attendance. Please try again." and the lesson could
+  // never be completed.
+  check(
+    "the fixture's lesson really is partially marked",
+    marksOn(TODAY, CLASS_B) === "Second One=present",
+    marksOn(TODAY, CLASS_B)
+  );
+
+  // Set BOTH: a correction to the marked child and a first mark for the other,
+  // which is the mixed insert/update the bug needed.
+  await pressByText(page, "Absent", 0);
+  await pressByText(page, "Absent", 1);
   await pressByText(page, "Save Attendance");
   await page.waitForTimeout(3500);
+
+  check(
+    "completing a partially-marked lesson saves BOTH children",
+    marksOn(TODAY, CLASS_B) === "Second One=absent, Second Two=absent",
+    marksOn(TODAY, CLASS_B)
+  );
   await page.screenshot({ path: `${SHOT}/ss-6-after-second.png`, fullPage: true });
 
   const landedOn = page.url().replace(EXPO, "");

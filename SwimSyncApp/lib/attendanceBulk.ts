@@ -21,23 +21,24 @@ export const SET_ALL_OPTIONS: BulkOption[] = [
 
 /**
  * Build a NEW attendance map with every student set to next.top/next.sub. Each student's
- * existingId is preserved so handleSave upserts/updates in place rather than duplicating.
+ * Statuses only. There is no attendance-row id to carry: the save matches an
+ * existing row on (lesson_session_id, student_id), and sending the primary key
+ * is what broke partially-marked lessons (§7.67).
  * Does not mutate the input.
  */
 export function applyBulkStatus(
   studentIds: string[],
-  current: Record<string, { existingId: string | null }>,
+  current: Record<string, unknown>,
   next: { top: BulkTop; sub: "rain" | "coach" | null }
-): Record<string, { top: BulkTop; sub: "rain" | "coach" | null; existingId: string | null }> {
+): Record<string, { top: BulkTop; sub: "rain" | "coach" | null }> {
   const result: Record<
     string,
-    { top: BulkTop; sub: "rain" | "coach" | null; existingId: string | null }
+    { top: BulkTop; sub: "rain" | "coach" | null }
   > = {};
   for (const id of studentIds) {
     result[id] = {
       top: next.top,
       sub: next.sub,
-      existingId: current[id]?.existingId ?? null,
     };
   }
   return result;

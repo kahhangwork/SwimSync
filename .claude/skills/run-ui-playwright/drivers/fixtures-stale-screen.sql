@@ -75,7 +75,9 @@ VALUES
    '70000000-0000-0000-0000-000000000001'),
   ('e1000000-0000-0000-0000-00000000a002', 'Stale Two', 'assigned', true,
    '70000000-0000-0000-0000-000000000001'),
-  ('e1000000-0000-0000-0000-00000000b001', 'Second Only', 'assigned', true,
+  ('e1000000-0000-0000-0000-00000000b001', 'Second One', 'assigned', true,
+   '70000000-0000-0000-0000-000000000001'),
+  ('e1000000-0000-0000-0000-00000000b002', 'Second Two', 'assigned', true,
    '70000000-0000-0000-0000-000000000001');
 
 -- The two-child class first, then the second class's single child. A distinct
@@ -92,8 +94,30 @@ SELECT s.id, s.class_id, (ss.today - s.days_ago)::timestamptz, true
 FROM (VALUES
   ('e1000000-0000-0000-0000-00000000a001'::uuid, 'e1000000-0000-0000-0000-0000000000c1'::uuid, 8),
   ('e1000000-0000-0000-0000-00000000a002'::uuid, 'e1000000-0000-0000-0000-0000000000c1'::uuid, 8),
-  ('e1000000-0000-0000-0000-00000000b001'::uuid, 'e1000000-0000-0000-0000-0000000000c2'::uuid, 3)
+  ('e1000000-0000-0000-0000-00000000b001'::uuid, 'e1000000-0000-0000-0000-0000000000c2'::uuid, 3),
+  ('e1000000-0000-0000-0000-00000000b002'::uuid, 'e1000000-0000-0000-0000-0000000000c2'::uuid, 3)
 ) AS s(id, class_id, days_ago), ss;
+
+-- ── CLASS B'S LESSON TODAY IS *PARTIALLY* MARKED ───────────────────────────
+-- One of its two children has an attendance row; the other does not. That
+-- asymmetry is the whole of §7.67: the screen sent the attendance PK only for
+-- rows that already existed, so the key sets differed, `id` entered PostgREST's
+-- column list, and the unmarked child was inserted with id = NULL against a
+-- NOT NULL column. Postgres refused the entire statement and the lesson became
+-- permanently unsaveable.
+--
+-- A fully unmarked lesson (class A's, above) cannot reproduce it, and neither
+-- can a fully marked one — which is exactly why this reached production looking
+-- like "only one date is broken".
+INSERT INTO lesson_sessions (id, class_id, session_date, status)
+SELECT 'e1000000-0000-0000-0000-0000000000d1',
+       'e1000000-0000-0000-0000-0000000000c2', ss.today, 'scheduled'
+FROM ss;
+
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
+VALUES ('e1000000-0000-0000-0000-0000000000d1',
+        'e1000000-0000-0000-0000-00000000b001', 'present',
+        'c0000000-0000-0000-0000-000000000001');
 
 -- NO lesson_sessions and NO attendance, deliberately. Both today's lesson and
 -- last week's are unmarked, which is what puts one on each list.

@@ -814,8 +814,8 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     navigation check fails — that split is the fastest way to tell which one you are
     looking at. (Found and fixed 2026-07-26, live the same day.)
 
-66. **A DUPLICATE IN ONE UPSERT MAKES POSTGRES REFUSE THE WHOLE STATEMENT, SO ONE
-    DOUBLY-ENROLLED CHILD BLOCKED ATTENDANCE FOR AN ENTIRE CLASS.**
+66. **A DUPLICATE IN ONE UPSERT MAKES POSTGRES REFUSE THE WHOLE STATEMENT, SO A
+    DOUBLY-ENROLLED CHILD WOULD BLOCK ATTENDANCE FOR AN ENTIRE CLASS.**
     The Mark Attendance screen saves the class in a single
     `.upsert(rows, { onConflict: "lesson_session_id,student_id" })`. Two rows with the same
     conflict key in one command is not a no-op and not a last-write-wins — it is an error:
@@ -830,15 +830,51 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     and its comment says exactly why. The billing gate was correct and the screen was
     wrong, which is the §7.18 asymmetry in miniature: two places answering "who is in this
     lesson?" and only one of them careful.
-    **What exposed it:** backdating every *active* enrolment to a single earlier date, so an
-    open span started before an older closed one in the same class ended. Rare in normal
-    use, trivially reachable by a data fix — and a data fix is exactly when you least want
-    marking to break.
+    **THIS IS A LATENT HAZARD, NOT AN OBSERVED INCIDENT — and the first version of this
+    entry got that wrong.** It was written while diagnosing a "Failed to save attendance"
+    report and asserted it was the cause. It was not: the check
+    `group by student_id, class_id having count(*) > 1` returned **zero rows** on
+    production, so no roster had ever duplicated. The real cause was §7.67. The dedupe is
+    still correct — the billing gate has always done it — but nothing has yet reached it.
+    Reaching it needs two enrolment rows for one child in one class with overlapping spans,
+    which no current write path creates; a hand-written data fix could.
     **The screens that filter on `is_active` cannot hit this**, because
     `one_active_enrolment_per_student` is a unique partial index — at most one active
     enrolment per child. Only a span-based reader can duplicate, and the attendance screen
     is the only one. So the guard belongs in `mergeRoster`, which owns "who is on this
     screen", not at the call site. Audit for the next span reader:
     `grep -rn "enrolled_at" SwimSyncApp/app SwimSyncAdmin/app | grep -v is_active`
+    (Found and fixed 2026-07-26, live the same day.)
+
+67. **A `.upsert()` WHOSE ROWS HAVE DIFFERENT KEYS SENDS `NULL` FOR THE MISSING ONES — NOT
+    THE COLUMN DEFAULT — SO ONE PARTIALLY-MARKED LESSON BECAME PERMANENTLY UNSAVEABLE.**
+    supabase-js derives PostgREST's `columns=` parameter from the **union** of keys across
+    every row in the body. PostgREST then runs the body through
+    `json_populate_recordset` against that column list, and a row that omits a key gets
+    **NULL** — the column DEFAULT never applies.
+    The attendance save attached the row's primary key conditionally:
+    `...(state.existingId ? { id: state.existingId } : {})`. On a lesson where SOME children
+    were already marked and others were not, the key sets differed, `id` joined the column
+    list, and the unmarked children were inserted with `id = NULL` against
+    `attendance.id uuid NOT NULL DEFAULT gen_random_uuid()`:
+    `23502 null value in column "id" of relation "attendance" violates not-null constraint`.
+    **Postgres refuses the whole statement**, and the screen saves a class in ONE upsert, so
+    the lesson could never be completed — and because `handleSave` returns early on the
+    error, the coach was also stranded on the screen. All they saw was "Failed to save
+    attendance. Please try again."
+    **The shape of the symptom is the diagnosis.** A fully unmarked lesson saved fine (no row
+    had `id`) and so did a fully marked one (every row did). Only the partial case failed —
+    which read as "just this one date is broken" and sent two investigations down the wrong
+    path (see §7.66). If one date fails and its neighbours do not, **compare what already
+    exists on those dates**, not what is different about the date.
+    **`id` was never needed.** `onConflict: "lesson_session_id,student_id"` is what matches
+    an existing row — that pair is UNIQUE. Verified against local PostgREST: omitting `id`
+    returns 201, the existing row KEEPS its id (absent from the payload, so absent from the
+    `DO UPDATE SET`), and a new row takes the default. The `existingId` plumbing was
+    removed entirely, including from `attendanceBulk.ts`, whose comment claimed it made the
+    save "update in place rather than duplicating" — it never did.
+    **The rule: build every upsert row from one object literal with no conditional keys.**
+    If a column is genuinely per-row optional, send it as explicit `null`.
+    `lib/attendancePayload.ts` owns this now, and `hasUniformKeys()` asserts it.
     (Found and fixed 2026-07-26, live the same day.)
 ---

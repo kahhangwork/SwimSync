@@ -10,23 +10,26 @@ describe("applyBulkStatus", () => {
     }
   });
 
-  it("preserves each student's existingId", () => {
-    const current = {
-      a: { top: "present", sub: null, existingId: "att-1" },
-      b: { top: "unmarked", sub: null, existingId: null },
-    };
+  // These three used to assert that `existingId` — the attendance row's primary
+  // key — was carried through. It has been removed: the save matches an
+  // existing row on (lesson_session_id, student_id), and sending the PK is what
+  // broke every partially-marked lesson (§7.67). What matters now is that the
+  // result carries STATUS ONLY, so no per-student key can differ.
+  it("emits status fields only, never a row id", () => {
+    const current = { a: { top: "present", sub: null } };
     const result = applyBulkStatus(["a", "b"], current, { top: "present", sub: null });
-    expect(result.a.existingId).toBe("att-1");
-    expect(result.b.existingId).toBe(null);
+    expect(Object.keys(result.a).sort()).toEqual(["sub", "top"]);
+    expect(Object.keys(result.b).sort()).toEqual(["sub", "top"]);
   });
 
-  it("yields existingId null for ids missing from current", () => {
-    const result = applyBulkStatus(["new"], {}, { top: "absent", sub: null });
-    expect(result.new.existingId).toBe(null);
+  it("gives every student the SAME key set, whether or not they were known", () => {
+    const result = applyBulkStatus(["known", "new"], { known: { top: "absent", sub: null } },
+      { top: "absent", sub: null });
+    expect(Object.keys(result.known).sort()).toEqual(Object.keys(result.new).sort());
   });
 
   it("does not mutate the input map", () => {
-    const current = { a: { top: "present", sub: null, existingId: "att-1" } };
+    const current = { a: { top: "present", sub: null } };
     const snapshot = JSON.stringify(current);
     applyBulkStatus(["a"], current, { top: "cancelled", sub: "coach" });
     expect(JSON.stringify(current)).toBe(snapshot);
