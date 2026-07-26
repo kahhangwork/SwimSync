@@ -823,6 +823,42 @@ quietly — arguably a worse state, and one this project created.
 
 Settle the scale first: `SELECT tenant_id IS NULL AS invisible, count(*) FROM audit_log GROUP BY 1;`
 
+### Direct writes to `students` are audited by nobody — **S**
+Two admin paths update `students` straight from the client and record **nothing**: the
+level picker (`setLevel()`) and, since 2026-07-26, the **parent contact details** modal
+(`CONTACT_DETAILS_PLAN.md`). They are not among the 19 writers counted in the item above —
+that item is about writers whose audit row lacks a `tenant_id`. **These write no row at
+all.**
+
+**Why:** contact details are not cosmetic. `provisional_contact_phone` and `_email` are
+the top two ranked signals in `find_student_candidates()` — they decide **which parent is
+offered which child**, and once a claim is approved nothing in the product can unlink them
+except that flow's own undo (HANDOVER §7.47). "Who changed the number, and when?" is
+exactly the question a disputed claim raises, and today the answer does not exist. A level
+edit matters far less, which is why this sat unnoticed.
+
+**Notes — a TRIGGER on `students`, not an RPC per call site:**
+
+- **This supersedes what `CONTACT_DETAILS_PLAN.md` says.** That file proposes wrapping the
+  contact edit in a `SECURITY DEFINER` RPC so the write and the audit row share a
+  transaction. Correct but narrow: it fixes one screen and leaves `setLevel()` — and every
+  future direct write — unaudited. An `AFTER UPDATE` trigger on `students` is atomic for
+  the same reason, covers both paths at once, needs **no client change**, and is inherited
+  automatically by whatever writes next.
+- It also composes with the item above: derive `tenant_id` from the row (`students` has a
+  real `tenant_id` column), so this one starts life correctly attributed rather than
+  joining the 13.
+- **Do not audit from the browser.** It is *possible* — `authenticated` holds INSERT and
+  `audit_log_insert` permits `actor_id = auth.uid()` — and it is wrong twice over: it is a
+  second round trip that can be lost while the write lands, and everything except the
+  actor is self-reported. An audit trail with silent holes is worse than a known-absent
+  one, because it gets trusted.
+- Record the **old and new values** (`to_jsonb(OLD)` / `to_jsonb(NEW)`), not just "edited".
+  The dispute this exists for is *what the number used to be*.
+- Scope it: an `UPDATE` trigger firing on every column change includes the level picker,
+  which is fine, but check the volume before adding one to a table the invoice engine
+  touches under `service_role`.
+
 ### Enforce the attendance window at save time — **S** `[handover]`
 The coach attendance screen (`(coach)/classes/[id]/attendance.tsx`) writes whatever `date` it
 is handed, with no validation.

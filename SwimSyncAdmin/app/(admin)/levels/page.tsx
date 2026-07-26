@@ -254,14 +254,16 @@ export default function LevelsPage() {
         </div>
       ) : (
         <Table>
+          {/* No <Tr> here — Thead emits its own. Wrapping these in one
+              renders <tr> inside <tr>, which collapses all five headers into a
+              single cell in column 1 and pushes every column out of line with
+              the header naming it. Enforced by components/Table.test.tsx. */}
           <Thead>
-            <Tr>
-              <Th>Order</Th>
-              <Th>Level</Th>
-              <Th>Skills</Th>
-              <Th>Students</Th>
-              <Th>&nbsp;</Th>
-            </Tr>
+            <Th>Order</Th>
+            <Th>Level</Th>
+            <Th>Skills</Th>
+            <Th>Students</Th>
+            <Th>Actions</Th>
           </Thead>
           <Tbody>
             {levels.map((l, li) => (
