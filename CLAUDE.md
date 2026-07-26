@@ -101,10 +101,11 @@ touching an unfamiliar subsystem.
 
 - **Single `main` branch.** Feature branch → implement → verify → merge → push → delete the
   branch. No PRs unless asked.
-- **Worktrees share one database and one set of documents.** Exactly one worktree may own
-  `supabase/`; no worktree edits `HANDOVER.md` / `PRD.md` / `BACKLOG.md` — findings are
-  collected and written from `main` at close; never `supabase db reset` while a sibling is
-  running. Full sequence: `docs/WORKTREES.md`.
+- **Worktrees share one database and one set of documents.** A worktree **never authors a
+  migration** — write it in the root checkout on a `db/…` branch, land it on `main`, then
+  merge to consume it. No worktree edits `HANDOVER.md` / `PRD.md` / `BACKLOG.md`; findings
+  are collected and written from `main` at close. Never `supabase db reset` while a sibling
+  is running. Full sequence and two worked examples: `docs/WORKTREES.md`.
 - **Tests must be proven to fail without the fix** before they count as coverage. (§7.25)
 - The **test runner is the fact**; any count written in prose is a hint that has drifted.
 - Documentation lanes: `PRD.md` = what exists · `BACKLOG.md` = what doesn't yet ·

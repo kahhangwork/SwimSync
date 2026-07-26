@@ -18,7 +18,7 @@ That is the entire idea. Everything in this guide follows from it.
 
 | Shared resource | Who may write it | How everyone else gets it |
 |---|---|---|
-| **Database schema** (`supabase/migrations/`) | **Exactly one** worktree at a time — declared in its `WORKTREE.md` | `git merge main` to *consume* the schema; never carry a migration on a feature branch |
+| **Database schema** (`supabase/migrations/`) | **The root checkout, on a short `db/…` branch — not a worktree at all.** One in flight at a time | `git merge main` to *consume* the schema; a worktree never authors a migration |
 | **Database rows** (fixtures) | Anyone, under a **unique prefix**, with a teardown script | Not shared — you clean up your own |
 | **Living documents** (`HANDOVER.md`, `PRD.md`, `BACKLOG.md`) | **No worktree.** Written from the **root checkout on `main`**, after the code lands | The worktree collects findings and *graduates* them at close |
 | **`main`** | Everyone, **one small change at a time**, fast-forward only | `git fetch && git rebase origin/main`, then re-run the suites |
@@ -49,16 +49,22 @@ git worktree list                      # who already exists
 cat .claude/worktrees/*/WORKTREE.md    # what do they own? (gitignored, so read them directly)
 ```
 
-- **Your task needs a migration, and nobody owns `supabase/`** → you may take it. Say so in
-  your `WORKTREE.md`.
-- **Your task needs a migration, and someone already owns `supabase/`** → **stop.** Either
-  wait, or do the schema change on `main` in the root checkout first, land it, and let both
-  worktrees `git merge main` to pick it up. Do not write a second migration in parallel:
-  locally they apply in **filename order**, on production in **merge order**, and most
-  migrations here are `CREATE OR REPLACE` / `DROP POLICY; CREATE POLICY` — last writer wins,
-  silently, differently in the two environments.
-- **Your task needs no migration** → proceed, and say `owns: nothing in supabase/` so the
-  next session knows the slot is free.
+- **Your task needs a migration, and no `db/…` branch is in flight** → **write it in the
+  root checkout first and land it on `main`**, *then* create the worktree, which will branch
+  from `origin/main` and already have the schema. Worked example B below. Declare
+  `supabase/` — **NO** in your `WORKTREE.md` anyway, so the next session can see the slot is
+  free again.
+- **Your task needs a migration, and one is already in flight** → **stop and wait.** Do not
+  write a second in parallel: locally they apply in **filename order**, on production in
+  **merge order**, and most migrations here are `CREATE OR REPLACE` / `DROP POLICY; CREATE
+  POLICY` — last writer wins, silently, and *differently in the two environments*.
+- **Your task needs no migration** → proceed. Worked example A below.
+
+> **A worktree never authors a migration.** Not "preferably not" — a migration on a feature
+> branch does not exist in the shared database, so the moment anyone runs `db reset` the file
+> is still there, the code still looks right, and the schema it needs is gone. That is how
+> the shared DB came to hold **75** applied migrations while `main` had **74 files**
+> (`docs/GOTCHAS.md` §7.55).
 
 ---
 
@@ -246,6 +252,207 @@ and its next occupant branches from a stale base.
 
 ---
 
+## Worked example A — a task with NO migration
+
+Task: **Upcoming lessons view for parents** (`BACKLOG.md` → *Parent experience*, **S**).
+Frontend only — it points the existing `lib/lessonDates.ts` derivation at the future instead
+of the past. No schema change, so this is the easy shape.
+
+**1. Check what else is running** *(Phase 0)*
+
+```bash
+cd /Users/kahhang/Documents/Code/SwimSync
+git worktree list
+cat .claude/worktrees/*/WORKTREE.md 2>/dev/null   # may be empty — that's fine
+```
+
+Nothing to negotiate: this task needs no migration, so the `supabase/` slot is irrelevant.
+
+**2. Create the worktree**
+
+Ask Claude to *"start a worktree called upcoming-lessons"* — it calls `EnterWorktree`, which
+branches from `origin/main` and moves the session into
+`.claude/worktrees/upcoming-lessons/`. The plain-git equivalent:
+
+```bash
+git worktree add .claude/worktrees/upcoming-lessons -b feat/upcoming-lessons origin/main
+```
+
+**3. Set it up — it has no `.env` and no `node_modules`** *(Phase 2)*
+
+```bash
+WT=.claude/worktrees/upcoming-lessons
+cp SwimSyncApp/.env        $WT/SwimSyncApp/
+cp SwimSyncAdmin/.env.local $WT/SwimSyncAdmin/
+grep -c '127.0.0.1:54321' $WT/SwimSyncApp/.env   # MUST be ≥1 — a cloud-pointed env
+                                                 # aims your drivers at production
+cd $WT/SwimSyncApp && npm install
+```
+
+**4. Write `WORKTREE.md`** at `.claude/worktrees/upcoming-lessons/WORKTREE.md`
+
+```markdown
+# Worktree — upcoming lessons for parents
+
+**Branch:** feat/upcoming-lessons · **Base:** main @ 229b984 · **Started:** 2026-07-27
+**Backlog:** Parent experience → Upcoming lessons view for parents (S)
+
+## I own
+- `supabase/` — **NO** (slot is free for someone else)
+- `SwimSyncApp/app/(parent)/`, `SwimSyncApp/lib/upcomingLessons.ts`
+
+## I must NOT touch
+- `HANDOVER.md`, `PRD.md`, `BACKLOG.md` — written from the root at close
+- `SwimSyncApp/lib/lessonDates.ts` — duplicated byte-identical in both apps
+  (`docs/ARCHITECTURE.md` §6). READ it, extend alongside it, do not edit it.
+- `drivers/lib.mjs`, `supabase/config.toml` — shared with every worktree
+
+## Fixture prefix
+`wt-upcoming-` — every row I insert uses it; teardown deletes by it.
+
+## To graduate at session close (from the ROOT checkout, on main)
+- (findings go here as I hit them)
+```
+
+**5. Build, on a non-default port**
+
+```bash
+cd $WT/SwimSyncApp && npx expo start --port 8082
+# if you need the admin too:
+cd $WT/SwimSyncAdmin && npm run dev -- -p 3100
+EXPO_URL=http://localhost:8082 node .claude/skills/run-ui-playwright/drivers/<driver>.mjs
+```
+
+If you add a fixture, write its teardown **in the same commit** — CI enforces it
+(`drivers/check-teardowns.sh`).
+
+**6. Ship it — per change, not at the end** *(Phase 5)*
+
+```bash
+cd $WT
+git status                              # BEFORE committing: a sibling may have moved HEAD
+git add <explicit paths>                # never -A
+git fetch origin && git rebase origin/main
+npm test && npm run typecheck           # the merged tree is not your tree — re-run
+git push origin feat/upcoming-lessons:main
+git -C /Users/kahhang/Documents/Code/SwimSync merge --ff-only origin/main
+```
+
+**7. Close down, in order** *(Phase 6)*
+
+```bash
+docker exec -i supabase_db_SwimSync psql -U postgres -d postgres \
+  < .claude/skills/run-ui-playwright/drivers/fixtures-<name>-teardown.sql
+pkill -f "expo start"; pkill -f "next dev"
+cat $WT/WORKTREE.md          # ← copy the "graduate" list somewhere you can still read it
+```
+
+Then `ExitWorktree` (`remove`, since it merged), and **only now**, from the root checkout on
+`main`, run `/update-docs` and write the graduate list into `docs/GOTCHAS.md`, `BACKLOG.md`
+and `PRD.md`. Finish with `/session-close`.
+
+---
+
+## Worked example B — a task that NEEDS a migration
+
+Task: **A business cannot read its own audit trail** (`BACKLOG.md` → *Foundations*, **S**).
+13 of the 19 `audit_log` writers never set `tenant_id`, so a business cannot read its own
+rows. Needs a migration **and** changes across those writers.
+
+> **The migration does NOT go in the worktree.** This is the one thing worth getting right,
+> and it is not obvious. Write it in the **root checkout** on a short `db/…` branch, land it
+> on `main`, *then* create the worktree — which, because `EnterWorktree` branches from
+> `origin/main`, already has the schema. `docs/GOTCHAS.md` **§7.55** is the reasoning: a
+> migration living only on a feature branch ceases to exist in the shared database the
+> moment anyone runs `db reset`, and parallel migrations apply in **filename order** locally
+> but **merge order** on production.
+
+**1. Claim the slot before writing anything** *(Phase 0)*
+
+```bash
+git worktree list
+grep -l 'supabase/. — \*\*YES\*\*' .claude/worktrees/*/WORKTREE.md 2>/dev/null
+```
+
+If that finds a worktree, **stop and wait** — one schema change in flight at a time. If it
+finds nothing, the slot is yours.
+
+**2. Do the migration FIRST, in the root checkout**
+
+```bash
+cd /Users/kahhang/Documents/Code/SwimSync
+git checkout -b db/audit-log-tenant-id
+
+# Name it YYYYMMDD + a 6-digit sequence, matching the existing files, and give it
+# the HIGHEST timestamp in the batch (§7.49).
+$EDITOR supabase/migrations/20260728000100_audit_log_tenant_id.sql
+```
+
+Apply it. **Announce before `db reset`** — it rebuilds the one database every worktree
+shares, and a sibling mid-flight loses their state:
+
+```bash
+supabase db reset          # ← tell anyone else running a session FIRST
+supabase test db           # pgTAP must be green before this leaves your machine
+```
+
+Land it on `main` before anything depends on it:
+
+```bash
+git add supabase/migrations/20260728000100_audit_log_tenant_id.sql supabase/tests/
+git commit -m "feat(db): audit_log rows carry their tenant"
+git fetch origin && git rebase origin/main
+supabase test db                        # re-run: the merged tree is not your tree
+git push origin db/audit-log-tenant-id:main
+git branch -d db/audit-log-tenant-id
+```
+
+**3. NOW create the worktree for the code half**
+
+```bash
+git worktree add .claude/worktrees/audit-trail -b feat/audit-trail origin/main
+```
+
+It branches from `origin/main`, so it already contains the migration you just landed. It
+never carries one of its own.
+
+**4. Set up + `WORKTREE.md`** — as in example A, but the ownership line differs:
+
+```markdown
+## I own
+- `supabase/` — **NO.** The migration (20260728000100) already landed on `main`
+  before this worktree existed. If this task turns out to need a SECOND schema
+  change, STOP: go back to the root checkout and repeat step 2 there. Do not
+  write a migration here.
+- the 13 writers listed in the backlog item
+```
+
+**5. Build the code half**, ship per change exactly as in example A steps 5–6.
+
+**6. If you discover mid-flight that you need another migration**
+
+This happens, and the answer is always the same:
+
+```bash
+# in the worktree — park what you have
+git add -u && git commit -m "wip: writers 1-6"
+# in the ROOT checkout — do the schema change there, land it on main
+cd /Users/kahhang/Documents/Code/SwimSync
+git checkout -b db/audit-log-followup
+# ...write, supabase db reset (ANNOUNCE), supabase test db, push to main...
+# back in the worktree — CONSUME it
+cd .claude/worktrees/audit-trail
+git fetch origin && git merge origin/main
+```
+
+The worktree **merges** the schema in; it never authors it.
+
+**7. Close down** exactly as in example A step 7. Note one extra thing for a schema change:
+deploying it is **migrations → engine → apps**, and `git push … :main` *is* the app deploy
+(§7.60), so land on `main` last when the backend has to move first.
+
+---
+
 ## If two worktrees finish at once
 
 They serialise on `main`, and the second one simply rebases and re-reads. The documentation
@@ -255,7 +462,8 @@ plus one ledger row**, not an edit buried in a 4,000-line file. If you do hit a 
 
 ## The five rules, if you remember nothing else
 
-1. **One worktree owns `supabase/`.** Everyone else merges `main` to consume the schema.
+1. **A worktree never authors a migration.** Write it in the root checkout on a `db/…`
+   branch, land it on `main`, then merge `main` to consume it. One in flight at a time.
 2. **Never `supabase db reset`** while a sibling is running.
 3. **No worktree edits `HANDOVER.md` / `PRD.md` / `BACKLOG.md`** — collect findings, write
    them from `main` at close.

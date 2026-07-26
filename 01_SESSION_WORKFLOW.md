@@ -98,7 +98,8 @@ documents, one `main`, one set of ports.
 
 The five rules it comes down to:
 
-1. **One worktree owns `supabase/`.** Everyone else `git merge main` to consume the schema.
+1. **A worktree never authors a migration.** Write it in the root checkout on a `db/…`
+   branch, land it on `main`, then `git merge main` to consume it. One in flight at a time.
 2. **Never `supabase db reset`** while a sibling is running.
 3. **No worktree edits `HANDOVER.md` / `PRD.md` / `BACKLOG.md`** — collect findings in
    `WORKTREE.md`, write them from `main` at close.
