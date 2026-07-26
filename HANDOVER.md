@@ -1,12 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-26 — **this file is now an index**, and parallel work has a protocol.
-The reference material it used to carry (§5 tests, §6 architecture, §7 gotchas, §10 file map,
-§11 deployment, §12 removed UI) moved to `docs/`, **keeping its section numbers**, and the
-session log collapsed from 29 narratives to 2 + a ledger (§8.17). Then `docs/WORKTREES.md`
-plus `/worktree-start` and `/worktree-close`, and the **nine UI fixtures that had no teardown
-got one**, guarded by CI — which turned up two pre-existing bugs, §7.62 and §7.63 (§8.18).
-**No product code changed in either.**_
+_Last updated: 2026-07-26 — **the coach recorded real attendance on production for the
+first time**, which took four bugs on the marking path to reach: §7.64 (rows landed on the
+wrong lesson), §7.65 (saving returned to a different lesson), §7.67 (a partially-marked
+lesson could never be saved) and §7.66 (a latent duplicate-roster hazard). All fixed and
+live. Every lesson list now states its marking status; the admin's tables became sortable
+and its student counts mean *active*. See §8.19._
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
 
@@ -232,6 +231,19 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   no override. PRD §7.5/§7.6, `ATTENDANCE_WINDOW_PLAN.md`, §8.15.
   > **Dormant until a real lesson is marked.** Production has 0 attendance rows, so
   > neither the guard nor the joiner fix has been exercised on real data yet.
+- **Every lesson list says whether it has been marked (verified UI driver — LIVE
+  2026-07-26)** — Today's class cards, the Unmarked Lessons rows and the class roster each
+  carry one of five states — **Upcoming** / **Not marked** / **N of M marked** / **Marked** /
+  **No students** — plus a breakdown of what was recorded (*"2 students · 3 present ·
+  1 cancelled (rain)"*), keeping *rain* and *coach* apart because they bill differently. A
+  finished lesson's button becomes a quiet **Edit attendance**; **only that state quietens
+  it**, so a lesson still needing marks never stops asking (§7.68 explains why the asymmetry
+  is deliberate). *"No students" is not "Marked"* — the billing gate calls an empty roster
+  complete and a card must not. PRD §7.6, `docs/plans/COACH_ATTENDANCE_STATUS_PLAN.md`.
+- **The admin's tables sort, and its student counts mean ACTIVE (LIVE 2026-07-26)** — one
+  comparison rule across all 22 tables (blanks last in both directions, numeric-aware,
+  weekdays in week order, stable), Attendance gained class and date-range filters, and
+  "Total Students" became **Active Students**. PRD §14.3/§14.4.
 - **Automated tests** — backend **397 pgTAP + 111 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest 162, `SwimSyncApp` jest-expo 109); all run in CI on push to `main`. See §5.
 
@@ -245,13 +257,28 @@ invoice generation → credit-note corrections → PayNow QR payment display.
 > What the cleanup DID zero is **`attendance`, `lesson_sessions` and `invoices`**.
 > Say *"no attendance recorded"* — never *"clean slate"*. The fact is
 > `SELECT COUNT(*) FROM students;`, not this sentence.
+>
+> **And as of 2026-07-26, "no attendance recorded" is ALSO out of date** — see the entry
+> below. The rule survives the change: the count is the fact, the sentence is a hint.
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
 **https://swimsync.sg**, admin at **https://admin.swimsync.sg**, real email via
 **Resend** (`noreply@swimsync.sg`). The full loop is verified end to end on cloud
 (incl. a live password-reset round-trip on `swimsync.sg`). A **real coach + 4 real
 classes** are onboarded, alongside **7 real families and 9 real children** who
-self-registered. `attendance`, `lesson_sessions` and `invoices` are **empty** — see §9.
+self-registered.
+
+> **REAL ATTENDANCE EXISTS NOW (2026-07-26) — the thing blocked since 2026-07-13.** The coach
+> marked live lessons through the app: rows exist for Sunday **12, 19 and 26 July** across at
+> least the Tanglin View classes, including `present`, `absent` and `cancelled_rain`. Getting
+> there took four bugs on the marking path (§8.19). **`invoices` is still empty** — nothing
+> has been billed.
+> **Do not read a count out of this paragraph.** How many lessons, and whether every class is
+> complete, is `SELECT count(*) FROM attendance;` and the per-class query in §9 — not this
+> sentence. Two prose counts have already gone stale in this file.
+> One production data change to know about: **all active enrolments were backdated to
+> 2026-07-08** so July's lessons fell inside the marking window. That is why children are
+> billable from the 8th, and it is not repeatable from the UI.
 See §11.
 
 > **`main` = what's live for the WEB APPS ONLY.** Vercel builds both sites from `main`, so a
@@ -328,6 +355,66 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.19 (2026-07-26) — A COACH MARKED A REAL LESSON, AND IT TOOK FOUR BUGS TO GET THERE
+
+**The headline is §3's, not this section's: production has real attendance rows for the
+first time.** The user drove it from the live app and hit a wall on each attempt; each wall
+was a different defect on the same screen. All four are fixed, deployed and verified in the
+served bundle. The durable lessons are in **§7.64–§7.68** — read those, not this.
+
+**What the four were, and why they were mistaken for one:**
+
+| | Symptom the user saw | Actually |
+|---|---|---|
+| **§7.64** | marked 19 Jul, "Attendance saved.", still unmarked | rows landed on the **26 Jul** session — Expo Router reuses the screen when only `?date=` changes, and the load effect had `[]` deps |
+| **§7.65** | saving the 9:30 class returned them to the 8:45 one | the screen lives in the Classes tab's stack but is pushed from Today; switching tabs doesn't unwind it, so `router.back()` popped into the previous **lesson** |
+| **§7.67** | "Failed to save attendance", only on 19 Jul | a **partially** marked lesson: `id` on some rows only made supabase-js put it in `columns=`, and PostgREST sends NULL for a key a row omits |
+| **§7.66** | — | a latent duplicate-roster hazard found while chasing §7.67. **Not the cause**; the check returned zero rows |
+
+**Two things about the process are worth more than the fixes.**
+
+*I diagnosed §7.67 wrong twice before getting it right,* and both times the shape of the
+symptom was the answer. "Only 19 July fails" reads as something about the date; it meant
+"only the dates that already have rows fail", and 19 Jul was where §7.64 had left partial
+attendance. **When one date fails and its neighbours don't, compare what already EXISTS on
+those dates, not what is different about the date.** The first wrong diagnosis was also
+written into §7.66 as fact and had to be corrected in place.
+
+*A driver that navigates by URL cannot catch a router bug.* `verify-attendance-guard.mjs`
+scored **14/14 against the broken build**, because a deep link mounts a fresh screen. The
+new `verify-stale-screen.mjs` clicks through instead — 4/8 → 18/18 across the three fixes.
+`docs/TESTING.md` §5 has what it pins.
+
+**Then the feature the user asked for:** every lesson list now states which of five states
+it is in (**Upcoming / Not marked / N of M marked / Marked / No students**) with a breakdown
+of what was recorded. Planned with `/plan-with-confidence` and `/plan-review`; the plan and
+its seven inlined risk mitigations are in **`docs/plans/COACH_ATTENDANCE_STATUS_PLAN.md`**,
+and the two that outlive it graduated to **§7.7** (a `getHours()` beside `todayInSg()` — a
+live second instance of the SGT bug, fixed first as its own commit) and **§7.68** (the
+display layer must not "fix" the billing gate's vacuous-true, and the button's asymmetry).
+
+**In parallel, in the same repo, the user shipped two admin changes** — sortable columns and
+content-sized widths on all 22 tables plus Attendance class/date filters (`lib/tableSort.ts`;
+it also fixed a latent `.order("id").limit(500)` that took an arbitrary 500 rows and
+presented them as the most recent), and student counts that mean **active** students
+(`lib/studentCounts.ts`). Both are in PRD §14.3/§14.4 and the §10 file map. Their commits
+carry the reasoning: `737b446`, `38b4092`.
+
+### Not done (deliberate)
+
+- **The July billing run.** Attendance exists now but has not been checked class-by-class,
+  and nothing has been invoiced. That is §9's first item.
+- **`verify-attendance-window.mjs` was re-measured at 3/5, not diagnosed.** Its own backlog
+  entry asked for the re-measure; the two remaining failures (a coach roster placeholder, a
+  parent empty-state) are named there and **may be real product bugs**. Nobody has looked.
+- **No "In progress" state** on a class card while its lesson runs — offered and declined;
+  reasoning in `BACKLOG.md` → *Deliberately not doing*.
+- **The enrolment backdate was a data fix, not a feature.** All active enrolments were moved
+  to 2026-07-08 so July's lessons were markable. It is not repeatable from the UI and there
+  is deliberately no button for it.
+
+---
+
 ## 8.18 (2026-07-26) — PARALLEL WORK GETS A PROTOCOL, AND THE FIXTURES GET THEIR CLEANUP
 
 Same conversation as §8.17, continued. **No product code changed.** Five commits: `5a04a50`
@@ -401,58 +488,11 @@ written.
 
 ---
 
-## 8.17 (2026-07-26) — THE DOCUMENTS BECAME AN INDEX
-
-No product code changed. `HANDOVER.md` went **3,972 lines → ~460**, and the four documents
-`/session-start` reads went from **~131,000 tokens to ~12,000**.
-
-**Why, in one line:** every model tested degrades as context grows, and *stale* content
-hurts more than irrelevant content — a topically-adjacent falsehood is the worst thing to
-put next to the truth. This file had 29 session narratives, 16 struck-through gotchas, and
-at least three claims that contradicted their own section.
-
-**What was actually wrong, found by auditing all 29 entries against §6/§7/§11/PRD/BACKLOG:**
-
-- **25 of 29 entries were fully redundant** — their durable content had already graduated
-  to §7, a plan's §10, `BACKLOG.md` or the PRD. The graduation discipline worked; nothing
-  was collecting the entries afterwards.
-- **Four facts had never graduated** and would have been lost by a bulk delete. Promoted
-  first: the prohibition on turning family/child status propagation into a trigger
-  (**§7.61** — it breaks re-activation), the concurrent-session `git status` lesson
-  (**§7.56**), and two deployment facts (**§11.5** an apex `A` record blocks an apex
-  `CNAME`; **§11.6** destructive production work runs in the dashboard SQL editor because
-  there is no local service key).
-- **Three stale claims corrected.** §8.15 said "**Not deployed**" directly beneath its own
-  deploy record. §11 said the engine was **v14**; it is **v17**. §8g described
-  `assignment_status` as a three-value enum, but `20260719001300` dropped `inactive`.
-- **§7.59 and §7.60 were out of numeric order** and are now ordered. Numbers unchanged.
-
-**The rule that keeps it this way** is in `/update-docs`: promote first, then write the
-entry; two entries stay in full, the rest are ledger lines.
-
-**Not done (deliberate):**
-
-- **The ledger is NOT capped by count, and FIFO was rejected as the primary rule.** The
-  plan going in was 20 lines, then roll off to git. The reference audit killed it: §8
-  entries are cited from **applied migrations and source code**, which can never be
-  edited, so a rolled-off entry is a dangling pointer. Age was the wrong axis anyway —
-  the orphans were scattered across all eras, and the *newest* entries were the most
-  redundant. Graduation-at-write-time is the real control; the ledger is just cheap.
-- **§3 was not trimmed** despite being the largest thing left (~4,400 tokens). It is the
-  verified-state list, which is what a new session actually reads, and the PRD's build
-  status is a spec-shaped duplicate rather than a substitute.
-- **Nothing was archived to a `docs/sessions/` folder.** A fully-graduated entry has no
-  unique content, so an archive file would be a farm of exactly the stale-but-adjacent
-  text that motivated this. `git log` is the archive.
-
----
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.17** | 2026-07-26 | The documents became an index: `HANDOVER.md` 3,972 lines → ~460, and the four `/session-start` documents ~131k → ~12k tokens. Four orphaned facts promoted first, and FIFO capping of the ledger was rejected — entries are cited from applied migrations | `docs/GOTCHAS.md` **§7.56, §7.61** · `docs/DEPLOYMENT.md` **§11.5, §11.6** |
 | **8.16** | 2026-07-26 | Repo root 22 markdown files → 8 (`docs/design`, `docs/plans`, `docs/database`); the auth redirect allow-list found **broken in production** — admin password reset had been landing on the wrong page | `README.md` → *Where everything lives* · **§7.41** |
 | **8.15** | 2026-07-26 | The attendance marking window became a **database rule**; a child who joins mid-month no longer blocks that month from billing. Engine **v16 → v17** | `docs/plans/ATTENDANCE_WINDOW_PLAN.md` · PRD §7.5, §7.6 · §7.57–§7.60 |
 | **8.14** | 2026-07-26 | A parent's contact details can be fixed — deployed | `docs/plans/CONTACT_DETAILS_PLAN.md` · PRD §7.19 |
@@ -491,29 +531,40 @@ entry; two entries stay in full, the rest are ledger lines.
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### FIRST — the thing that has blocked everything since 2026-07-13
+### FIRST — finish July's attendance, then bill it
 
-**No real lesson has ever been taught and recorded, and no invoice has ever been
-generated.** The mechanism is proven — the whole loop was walked on production 2026-07-25
-and the evidence then removed by the 2026-07-26 cleanup, so `attendance` reads 0 for a
-reason that is not "it has never worked". Don't re-derive that; §8.12 and the banned-phrase
-note in §3 explain it.
+**The long block is broken: real attendance exists (§3, §8.19).** What is left is the other
+half — nothing has been invoiced, and nobody has checked that July is *complete*.
 
-1. **Get the coach marking a REAL lesson.** An onboarding push, not a build task. It is
-   also the first exercise of §8.15's guard on real data.
-2. **Then bill a real month**, following `INVOICE_RUNBOOK.md`. Expect the gate to refuse
-   until every lesson is marked — working as designed. Mark them, or mark them cancelled;
-   **never override**. Do it in the month after, not two months after (above).
+1. **Audit July class by class.** The gate blocks generation outright with **no override**, so
+   find the gaps before running it, not from an error message:
 
-**The deadline nobody has hit yet, and it is now enforced by the database:** the coach can
-only mark back to **the 1st of last month** (§8.15, also in `INVOICE_RUNBOOK.md`). Bill July
-in August and every lesson is markable; leave it to September and the gate will name a gap
-**nobody can fill**. Bill promptly, or fix the floor (`BACKLOG.md` → *Tie the
-attendance-marking window to un-invoiced months*).
+   ```sql
+   select c.title, ls.session_date, count(a.id) as marked
+   from classes c
+   left join lesson_sessions ls on ls.class_id = c.id
+        and ls.session_date >= date '2026-07-01'
+   left join attendance a on a.lesson_session_id = ls.id
+   where c.is_active
+   group by c.title, ls.session_date
+   order by c.title, ls.session_date;
+   ```
 
-Still true before that first run: `auto_invoice_enabled` is **false**, **no coach rate is
-set** (so payroll computes nothing), and the join code is **`SWIM-RVM9`** — the only route in
-for a new family, and the re-entry route for one marked inactive.
+   Compare against each class's expected Sundays from **8 July** (enrolments were backdated
+   to the 8th). A lesson that did not run is marked **cancelled** — never skipped, never
+   overridden.
+2. **Then bill July, in August**, following `INVOICE_RUNBOOK.md`. This will be the **first
+   invoice this product has ever generated**, so expect to read the runbook rather than skim
+   it. `auto_invoice_enabled` is **false**, so it is the admin button.
+3. **Before payroll means anything, set a coach rate** — still none, so wages compute nothing.
+
+**The deadline, now enforced by the database:** the coach can only mark back to **the 1st of
+last month** (§8.15). Bill July in August and every lesson is markable; leave it to September
+and the gate will name a gap **nobody can fill**. Bill promptly, or fix the floor
+(`BACKLOG.md` → *Tie the attendance-marking window to un-invoiced months*).
+
+The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
+for one marked inactive.
 
 ### If you would rather build than onboard
 
@@ -521,6 +572,12 @@ for a new family, and the re-entry route for one marked inactive.
 themed sections below it. Nearest candidates with no dependencies: **credit-note emails**
 (the other half of the notification work), an **upcoming-lessons view for parents** (small,
 and the building block already exists), or **convert a trial into an enrolled student**.
+
+**One loose end from this session, and it may not be a test problem at all:**
+`verify-attendance-window.mjs` was re-measured at **3/5** (its backlog entry asked for that).
+The two failures — a coach roster placeholder, and a parent *"No lessons have taken place
+yet"* — were measured, **not diagnosed**. If they are genuine product bugs they matter more
+than the driver does; that is an hour's work to find out.
 
 **The highest-value engineering item is now *Run the fixtures in CI* (M).** Two classes of
 breakage shipped undetected because CI never applies a fixture — §7.62 (a NOT NULL migration

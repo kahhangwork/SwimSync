@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-26 (the nine missing fixture teardowns and the unscoped-write bug both shipped, so their items are gone; **Run the fixtures in CI** added in their place — it is the gap §7.62 and §7.63 both came through. The `verify-attendance-window.mjs` entry's diagnosis was **wrong** and is corrected in place)_
+_Last updated: 2026-07-26 (`verify-attendance-window.mjs` **re-measured at 3/5**, as its own entry asked — the two remaining failures are named but not yet diagnosed; *Better filtering and search* is **partly shipped** (sorting everywhere, Attendance filters); one rejected option added to *Deliberately not doing*)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -754,10 +754,19 @@ coach. RLS already has `coach_serves_parent()`-style helpers to build on. Relate
 parent self-enrolment — both attack the same bottleneck from different ends.
 
 ### Better filtering and search — **S** `[Phase 2]`
-Filters and search across the admin tables.
+Search across the admin tables, and per-table filters beyond Attendance.
 
 **Why:** fine at 17 students, painful at 100. Filing this as a scale problem, not a
 today problem.
+
+**Notes:** **partly shipped 2026-07-26** — every column on all 22 tables is now sortable
+and Attendance gained class and date-range filters (PRD §14.3, §14.4). What remains is
+*search*, and filters on the other tables. The sorting rules live in
+`SwimSyncAdmin/lib/tableSort.ts`; reuse them rather than writing a second comparison — the
+hard-won parts are that blanks stay last in **both** directions, that sorting is
+numeric-aware, and that columns sort by what is **on screen** rather than what the row
+stores. Attendance's filter deliberately keys on class **id, not title**, because two
+classes can share a name.
 
 ### More polished dashboards — **S** `[Phase 2]`
 Richer metrics on the admin dashboard.
@@ -942,8 +951,8 @@ it failed, looked like a regression in the change under test, and needed a run a
 admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
 and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
 
-### `verify-attendance-window.mjs` guards nothing — **S**
-It scores **0/4**.
+### `verify-attendance-window.mjs` guards half of what it claims — **S**
+It scores **3/5** (re-measured 2026-07-26).
 
 > **The diagnosis below was WRONG, and the correction is the useful part.** This entry
 > blamed the fixture's hard-coded clock. The actual cause, found 2026-07-26 by round-tripping
@@ -956,17 +965,26 @@ It scores **0/4**.
 >
 > The clock problem below is **real and still outstanding** — it was simply not what was
 > producing the 0/4. Re-measure before assuming the score is now what this entry predicts.
+>
+> **Re-measured 2026-07-26, as this entry asked: it now scores 3/5.** With the fixture
+> loading, three checks pass. The two that fail are a **coach roster placeholder** ("when
+> nothing has fallen due") and a **parent empty-state** ("a just-joined child reads *No
+> lessons have taken place yet*"). Measured identically on both sides of the
+> attendance-status work by stashing the two screens, so neither is a regression.
+> **What is NOT yet known is whether those two are clock-dependent or genuine product
+> bugs** — this was a measurement, not a diagnosis. Do that first: if they are product
+> bugs, they matter more than the driver does.
 
 Its fixture header states the assumption outright — *"Assumes the machine
 clock is Thu 16 – Fri 17 Jul 2026"* (`fixtures-attendance-window.sql:3`) — and hard-codes a
 week of dates around it. Off that week, every check misses.
 
 **Why:** it is the **older of the two drivers covering the attendance window**, so the
-directory listing implies that area is covered twice when it is covered once. A driver that
-scores 0/4 is worse than a missing one: a reader counts it as coverage, and the next person
-to change the window will believe they have a safety net that has not run a real assertion
-in weeks. **Verified pre-existing, not a regression from §8.15** — it scores 0/4 on both
-sides of the 2026-07-27 change.
+directory listing implies that area is covered twice when it is covered once. A partially
+failing driver is the worst kind: a reader counts it as coverage, and a permanently red
+check trains everyone to ignore its output — which is how a real failure hides among the
+expected ones. **Verified pre-existing, not a regression** — the same 3/5, with the same
+two failures, on both sides of the 2026-07-26 attendance-status work.
 
 **Notes:** the fix is to derive its dates from **one clock anchor**, the way
 `fixtures-attendance-guard.sql` now does. That is **deliberately the opposite of §7.33's
@@ -1104,6 +1122,7 @@ Kept so the reasoning doesn't get re-litigated.
 
 | Idea | Why not |
 |---|---|
+| **An "In progress" state on a class card while its lesson is running** | Offered 2026-07-26 while building the attendance-status chips and declined. A class shows **Upcoming** until its **end** time, because a coach marks at the end of a lesson — so one still running is not yet overdue and a fourth word for it buys nothing. The `Now` badge already says a class is happening. `hasEndedInSg()` is keyed to the end time deliberately; if this is revisited, that is the single place it changes. |
 | **Pre-generating lesson sessions** (a scheduled session generator) | PRD §7.5 is knowingly unimplemented and should stay that way. Sessions are created lazily by the coach's attendance save; which lessons *should* have happened is derived at read time from `classes.day_of_week`. Pre-generation adds a job, a schedule, and a pile of edge cases when classes change — for no gain the read-time derivation doesn't already deliver. **Don't "fix" this** without a reason the derivation genuinely can't serve. (`docs/ARCHITECTURE.md` §6.) |
 | **A parent-facing swimming-ability picker** | Removed on purpose (PRD §5.1). Parents self-reporting ability isn't information anyone trusted; the class a child is in is the real signal. If levels return they should be **coach-defined** — see the backlog item above. |
 | **Re-adding Notification Preferences / Help & Support buttons** | Removed as dead stubs with empty handlers, not lost (`docs/ARCHITECTURE.md` §12). Build the feature first, then the button. |

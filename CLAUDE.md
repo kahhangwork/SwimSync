@@ -74,6 +74,9 @@ touching an unfamiliar subsystem.
 - **`new Date().toISOString().split("T")[0]` is wrong in SGT** — that's the UTC date, a day
   behind before 08:00. Pairing it with a local `getDay()` lets weekday and date disagree.
   Use `todayInSg()` + `dayOfWeekOf()`. (§7.7)
+- **`getHours()` is the same bug on a different axis**, and it was live until 2026-07-26.
+  Time of day comes from `nowMinutesInSg()` (`SwimSyncApp/lib/timeOfDay.ts`); functions that
+  compare times take a plain number so they cannot read a clock at all. (§7.7)
 
 **Billing — the guards are load-bearing, not friction**
 - **Never add an override** to the unmarked-attendance block or the completed-month guard.

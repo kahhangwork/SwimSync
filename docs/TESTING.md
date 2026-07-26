@@ -120,15 +120,31 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
 _Frontend tests:_
-`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **11 files**:
-`components/StatusBadge.test.tsx`, `components/Table.test.tsx`, `lib/adminNav.test.ts`,
-`lib/attendanceCompleteness.test.ts`, `lib/classCoverage.test.ts`,
-`lib/classRoster.test.ts`, `lib/duplicateStudents.test.ts`, `lib/inviteEmail.test.ts`,
-`lib/lessonDates.test.ts`, `lib/parentInviteEmail.test.ts`, `lib/sgPhone.test.ts`.
-`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **7 files**, scoped to `lib/**` unit
-tests for now: `attendanceBulk`, `attendanceCompleteness`, `attendanceRoster`,
-`authErrors`, `claimCandidates`, `landing`, `lessonDates`. Deeper component-render tests
-(RN screens with mocked Supabase, admin tables) are the natural next additions.
+`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **14 files, 198
+tests** (2026-07-26): the eleven above plus `lib/tableSort.test.ts`,
+`lib/studentCounts.test.ts`, and `components/Table.test.tsx` extended for sorting.
+`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **12 files, 174 tests**, scoped to
+`lib/**` unit tests: `attendanceBulk`, `attendanceCompleteness`, `attendancePayload`,
+`attendanceRoster`, `attendanceSession`, `attendanceSummary`, `attendanceWindow`,
+`authErrors`, `claimCandidates`, `landing`, `lessonDates`, `timeOfDay`. Deeper
+component-render tests (RN screens with mocked Supabase, admin tables) are the natural next
+additions.
+
+Four of the app's suites exist because of bugs that reached production on 2026-07-26, and
+what each one *pins* is the point:
+- **`timeOfDay`** — `nowMinutesInSg()` returns the same number under four process
+  timezones. 12 of its 21 assertions fail against the `getHours()` expression it replaced
+  (§7.7).
+- **`attendanceSession`** — a session id is inseparable from the date it was resolved for;
+  anything else is `stale` and must be re-resolved (§7.64).
+- **`attendancePayload`** — every row of an upsert carries an identical key set, and
+  `hasUniformKeys()` catches the exact body shape that broke (§7.67).
+- **`attendanceSummary`** — an empty roster is `no-students`, never `complete`, and only
+  `complete` may quieten the Mark Attendance button. One test enumerates the whole state
+  union, so **adding a state fails it** until someone decides where it belongs (§7.68).
+- **`attendanceCompleteness`** also now pins the *opposite* rule deliberately: an empty
+  expected set IS vacuously marked, because invoicing depends on it. The comment above that
+  test explains why not to "fix" it.
 
 > *This list had gone stale by six files before 2026-07-26 — it named five admin suites
 > when eleven existed. Per §7.37 the runner is the fact and this paragraph is the hint:
@@ -238,6 +254,23 @@ by a correction round-trips through the real upsert path that §7.57 governs (14
 derives every date from ONE clock anchor rather than hardcoding — deliberately the opposite
 of §7.33's rule for unit suites, because the behaviour under test IS relative to now(). It
 carries `pressByText()` for §7.58; needs both servers.
+
+`verify-stale-screen.mjs` (+ `fixtures-stale-screen.sql`) is the only driver that can reach
+the three 2026-07-26 attendance bugs, **because all three live in the router or the wire
+format rather than in any function**. It navigates **in-app** — Today's card, then the
+backlog row — which is the whole reason it exists: a deep link mounts a fresh screen and
+passes cleanly, which is exactly how `verify-attendance-guard.mjs` scored 14/14 against a
+build that was silently writing attendance to the wrong day. **18 checks**: rows land on
+the lesson the coach is looking at (§7.64), saving leaves the attendance screen instead of
+popping into a different lesson (§7.65), a *partially* marked lesson can be completed at all
+(§7.67 — a fully marked or fully unmarked one cannot reproduce it), and the status chips read
+correctly with no empty roster ever labelled *Marked* (§7.68). Scores **4/8 → 18/18** across
+the three fixes; the two-class fixture is required because one class cannot express "marked
+two lessons in one sitting". Its fixture derives dates from one clock anchor, like the guard
+driver's. **It selects buttons by the card for a named class, never by page index** — an
+index broke the moment a finished class started saying *Edit attendance* — and its
+`pressByText` filters on `aria-hidden` so a press cannot land on a screen React Navigation
+has left mounted. Coach app only; no admin server needed.
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 

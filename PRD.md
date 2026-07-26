@@ -736,6 +736,20 @@ than materialising rows ahead of time. This is what makes a forgotten lesson vis
 - The **coach's Today tab** lists **Unmarked Lessons** (past lessons not fully marked)
   and links straight to marking them; the class roster shows expected-but-missing dates
   as a distinct *"Not marked"* state.
+- **Every lesson list states which of five states it is in, and what was recorded**
+  *(implemented)* — on Today's class cards, the Unmarked Lessons rows and the class
+  roster: **Upcoming** (nothing recorded, the class has not ended), **Not marked**
+  (nothing recorded, it has), **2 of 4 marked**, **Marked**, and **No students** for an
+  empty roster. A breakdown names what was entered — *"2 students · 3 present ·
+  1 cancelled (rain)"* — keeping *rain* and *coach* apart, because they read the same to
+  a person and bill differently. A fully marked lesson's button becomes a quiet
+  **Edit attendance** rather than a solid *Mark Attendance*; only that state quietens it,
+  so a lesson still needing marks always keeps asking.
+  **"No students" is not the same as "Marked", and the difference is load-bearing:** the
+  billing gate counts a lesson nobody was expected at as complete — correctly, there is
+  nothing to collect — while showing that as *Marked* would tell the coach a class was
+  done when nobody had touched it. The two questions are answered in different layers
+  (§7.68 in `docs/GOTCHAS.md`).
 - The **admin's invoice-generation dialog** reports, per class, `N of M lessons marked`
   and names any missing dates before invoices are created (see §7.7).
 - A lesson that legitimately didn't run is recorded with the existing non-billable
@@ -2201,7 +2215,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | Screen | Key Elements | Notes |
 |--------|-------------|-------|
 | **Login** | Email/password | Coach accounts created by superadmin |
-| **Today's Classes** | List of today's classes with student count; quick-action buttons | Default landing screen; highlight current/next class |
+| **Today's Classes** | List of today's classes with student count; quick-action buttons | Default landing screen; highlight current/next class. *(implemented — each card also carries its **attendance state** and a breakdown of what was recorded, §7.6)* |
 | **Class Roster** | Student list for selected class; attendance status per student | Tap student row to mark/edit attendance |
 | **Mark Attendance** | Status picker per student: Present, Absent, Cancelled, Trial | Minimal taps; if Trial, sub-prompt for Paid/Free; **"Set all ▾"** header shortcut to set every student at once (§7.6); batch save |
 | **Edit Past Attendance** | Calendar/date picker; select lesson; edit status | Warning shown if lesson already invoiced; confirm triggers credit note |
@@ -2215,7 +2229,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 
 | Screen | Key Elements | Notes |
 |--------|-------------|-------|
-| **Dashboard** | Key metrics: total students, unassigned count, outstanding invoices, total credit notes | Summary cards with drill-down links |
+| **Dashboard** | Key metrics: active students, unassigned count, outstanding invoices, total credit notes | Summary cards with drill-down links. *(implemented — the metric is **Active Students**, not "total": a departed child stays a row forever because attendance and invoices reference them (§7.14), so a total answered a bookkeeping question nobody asked. The card names the count business-wide, and an inactive tally is appended only when there is one.)* |
 | **Unassigned Children** | Filterable table of unassigned students with parent info | Assign button per row; batch assign option |
 | **Assign to Class** | Select coach → select class → confirm assignment | Modal or side panel; show class capacity info |
 | **Classes** | Table of all classes; CRUD operations; coach assignment | Create/edit class form with all fields |
@@ -2247,6 +2261,13 @@ The following section provides a screen-by-screen reference for each SwimSync us
 - Sidebar navigation with sections: Dashboard, Unassigned, Classes, Students, Attendance, Invoices, Credit Notes, Coaches
 - Persistent search bar and filter controls on all table views
 - Bulk action support where relevant (e.g. batch assign, batch mark paid)
+- **Every column is sortable and every cell hugs its content** *(implemented)* — one
+  comparison rule applied across all 22 tables. Blanks stay last in **both** directions
+  so reversing a half-empty column never fills the screen with rows nobody can act on;
+  sorting is numeric-aware (`Sun 845am` before `Sun 930am`, `Level 2` before `Level 10`),
+  weekdays sort in week order rather than alphabetically, and it is stable, so a second
+  key keeps the first one's grouping. Columns sort by **what is on screen** — a status by
+  its label, an amount by its number — not by what the row stores underneath.
 
 ---
 
