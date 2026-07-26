@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,11 @@ import { confirmAction } from "@/lib/confirm";
 import { applyBulkStatus, SET_ALL_OPTIONS, BulkOption } from "@/lib/attendanceBulk";
 import { mergeRoster } from "@/lib/attendanceRoster";
 import { checkMarkableDate, type MarkableCheck } from "@/lib/attendanceWindow";
+import {
+  resolveSessionForDate,
+  isShowingDate,
+  type ResolvedSession,
+} from "@/lib/attendanceSession";
 import { toSgDate, todayInSg, type DayOfWeek } from "@/lib/lessonDates";
 import PrimaryButton from "@/components/PrimaryButton";
 
@@ -104,9 +109,9 @@ export default function MarkAttendanceScreen() {
   const [classTitle, setClassTitle] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [attendance, setAttendance] = useState<Record<string, AttState>>({});
-  const [resolvedSessionId, setResolvedSessionId] = useState<string | null>(
-    sessionIdParam ?? null
-  );
+  // A session id is never held on its own — always with the date it belongs
+  // to. See lib/attendanceSession.ts for what that prevents.
+  const [resolved, setResolved] = useState<ResolvedSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -114,13 +119,33 @@ export default function MarkAttendanceScreen() {
   // this is so the coach is told why, before filling in a roster that cannot
   // be saved.
   const [blocked, setBlocked] = useState<MarkableCheck | null>(null);
+  // Which load() is the current one. Switching lessons quickly can leave an
+  // earlier fetch in flight; without this it lands last and repopulates the
+  // screen with the lesson the coach navigated AWAY from.
+  const loadToken = useRef(0);
 
+  // ⚠ THESE DEPS ARE LOAD-BEARING — this was `[]`, and it wrote attendance to
+  // the wrong day (§7.62). One route serves every lesson, distinguished only
+  // by `?date=`, and Expo Router reuses the mounted screen when a search param
+  // changes. A mount-only effect therefore never reloads, so the header showed
+  // the new lesson over the previous lesson's roster and session id.
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, date, sessionIdParam]);
 
   async function load() {
+    const token = ++loadToken.current;
     setLoading(true);
+
+    // Clear everything the PREVIOUS lesson put here before fetching. Leaving
+    // it in place is what let a stale roster be displayed, filled in and
+    // saved; `resolved` going null is also what holds the spinner up (below)
+    // until this date's data has actually arrived.
+    setResolved(null);
+    setBlocked(null);
+    setStudents([]);
+    setAttendance({});
 
     // Load class title + the students enrolled ON THIS DATE
     const { data: cls } = await supabase
@@ -138,7 +163,18 @@ export default function MarkAttendanceScreen() {
       .eq("id", id)
       .single();
 
+    if (token !== loadToken.current) return;
+
     if (!cls) {
+      // Not reachable from ordinary navigation, but an RLS denial looks like
+      // this. Say so rather than leaving the spinner up forever — the render
+      // guard below now keys off `resolved`, which this path never sets.
+      setBlocked({
+        ok: false,
+        title: "That class could not be loaded",
+        detail: "Go back and try again, or ask your admin to check the class.",
+      });
+      setResolved({ date, sessionId: null });
       setLoading(false);
       return;
     }
@@ -178,7 +214,11 @@ export default function MarkAttendanceScreen() {
       sid = existingSession?.id ?? null;
     }
 
-    setResolvedSessionId(sid);
+    if (token !== loadToken.current) return;
+
+    // Stamped with the date it was resolved FOR, so nothing downstream can
+    // mistake it for this screen's current lesson after a param change.
+    setResolved({ date, sessionId: sid });
 
     // ── Is this date markable at all? ──────────────────────────────────────
     // Checked AFTER the session lookup, because an existing session is itself
@@ -218,6 +258,8 @@ export default function MarkAttendanceScreen() {
       .eq("class_id", id)
       .eq("session_date", date)
       .is("cancelled_at", null);
+
+    if (token !== loadToken.current) return;
 
     const roster = mergeRoster(
       enrolledOnDate,
@@ -334,8 +376,26 @@ export default function MarkAttendanceScreen() {
       return;
     }
 
-    // Create session row if it doesn't exist yet
-    let finalSessionId = resolvedSessionId;
+    // ── WHICH LESSON AM I WRITING TO? ──────────────────────────────────────
+    // Never the bare id this screen happens to be holding. It is only usable
+    // if it was resolved for the date now on screen; anything else is treated
+    // as unknown and re-resolved from (class_id, date) — the pair that
+    // uniquely identifies a lesson. This is the layer that would have caught
+    // §7.62 even with the mount-only effect still in place.
+    const decision = resolveSessionForDate(resolved, date);
+    let finalSessionId =
+      decision.kind === "use" ? decision.sessionId : null;
+
+    if (decision.kind === "stale") {
+      const { data: existingSession } = await supabase
+        .from("lesson_sessions")
+        .select("id")
+        .eq("class_id", id)
+        .eq("session_date", date)
+        .maybeSingle();
+      finalSessionId = existingSession?.id ?? null;
+    }
+
     if (!finalSessionId) {
       const { data: newSession, error: sessionError } = await supabase
         .from("lesson_sessions")
@@ -350,8 +410,9 @@ export default function MarkAttendanceScreen() {
       }
 
       finalSessionId = newSession.id;
-      setResolvedSessionId(finalSessionId);
     }
+
+    setResolved({ date, sessionId: finalSessionId });
 
     // Build upsert rows
     const rows = students.map((student) => {
@@ -395,7 +456,11 @@ export default function MarkAttendanceScreen() {
     router.back();
   }
 
-  if (loading) {
+  // The spinner also covers the gap between a param change and the reload
+  // landing. The effect runs after paint, so without `isShowingDate` there is
+  // a frame where the header names the new lesson above the previous one's
+  // roster — and a tap is faster than a frame is long.
+  if (loading || !isShowingDate(resolved, date)) {
     return (
       <SafeAreaView className="flex-1 bg-sky-50 items-center justify-center">
         <ActivityIndicator size="large" color="#0ea5e9" />
