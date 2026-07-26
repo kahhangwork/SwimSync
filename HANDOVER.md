@@ -442,7 +442,17 @@ the candidate is masked, Confirm is inert until one is chosen, the parent is **b
 from re-adding, the admin queue shows who is asking, approve is a two-step confirm, undo
 is offered, and the "no, different child" branch produces a duplicate that the Students
 page flags and merges (21 checks). **It found two bugs no unit test could reach** — both
-read paths rather than RPCs (§7.48, and duplicate detection hiding same-parent pairs).
+read paths rather than RPCs (§7.48, and duplicate detection hiding same-parent pairs);
+`verify-class-students.mjs` (+ `fixtures-class-students.sql` and its
+`-teardown.sql`) drives the admin Classes page's **"See students" drawer** — the badge
+reads `2+1` (and is asserted *not* to read 3 / 2+2 / 2+3 / 3+1, each a specific way the
+rule could have been got wrong), the drawer lists the two enrolled children with level and
+joined date plus the one upcoming trial, and the three negative controls — a **closed**
+enrolment, a **past** trial and a **cancelled** future trial — appear nowhere. **Its first
+six checks are database checks that those three rows EXIST**, because an absence assertion
+against a row that was never created passes while proving nothing (32 checks). Admin-only:
+no Expo server needed. Run it on **port 3100**, not 3000 — the stack and ports are shared
+with other worktrees: `ADMIN_URL=http://localhost:3100 node drivers/verify-class-students.mjs`.
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
@@ -1234,6 +1244,28 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     Both read as "the deploy failed", and the second nearly sent this session chasing a
     problem that did not exist. **Grep only for a contiguous user-visible string you can
     see verbatim in the source**, and sanity-check with one you know was already live.
+52. **A NEW EMBED ON A PAGE'S PRIMARY LIST QUERY PUTS THE WHOLE PAGE AT RISK — ADD A
+    SECOND QUERY INSTEAD.** PostgREST returns `null` for the **entire** select when one
+    embed fails — a policy gap, an ambiguous relationship, a typo in the nesting. So
+    bolting a nice-to-have join onto the query that renders the table means a failure
+    **blanks the table** rather than degrading the extra. Fetch supplementary data in its
+    own query, defaulted to empty, and let the page render without it.
+    - Hit while adding the Classes page's "See students" drawer (2026-07-26): the first draft
+      extended `loadClasses()`'s select with `enrolments → students → tenant_levels`, which
+      would have put every class on `/classes` behind a three-level embed resolving. It is
+      now a separate `loadRoster()`, **verified by breaking the roster query on purpose**
+      and confirming the class table still rendered while the drawer said why it could not.
+    - The corollary is a UI rule: a supplementary read that fails must say so. An empty
+      list where the fetch errored is indistinguishable from a class with nobody in it.
+53. **`ON CONFLICT DO NOTHING` DOES NOT MAKE A FIXTURE IDEMPOTENT WHEN THE ONLY UNIQUE
+    INDEX IS PARTIAL.** Two of this schema's uniqueness rules are deliberately partial —
+    `one_active_enrolment_per_student` (`WHERE is_active`) and
+    `trial_bookings_live_slot_uniq` (`WHERE cancelled_at IS NULL`) — precisely so that
+    closed enrolments and cancelled bookings may repeat. A fixture row that is *inactive*
+    or *cancelled* therefore conflicts with nothing and **re-inserts on every run**, which
+    is exactly the negative-control row a test is relying on being singular. Use an
+    explicit `WHERE NOT EXISTS` keyed on what "already seeded" means. Caught by running
+    the fixture twice and diffing the row counts — do that for any new fixture.
 ---
 
 ## 8.12 Twelfth session (2026-07-26) — PARENTS CAN CLAIM THEIR OWN CHILD — BUILT **AND DEPLOYED**
