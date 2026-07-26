@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 
 /**
  * Coach wages — the other half of the billing loop.
@@ -206,6 +206,26 @@ export default function WagesPage() {
     await supabase.from("tenants").update(patch).eq("id", tenantId);
   }
 
+  // Above the `if (!tenantId)` return: these call useState, and a hook after a
+  // conditional return is a hook that sometimes does not run.
+  const rateSort = useTableSort<CoachRow>({
+    key: "name",
+    accessors: {
+      // The rate itself, so "Not on payroll" is blank and sorts last in both
+      // directions — a coach with no rate is the row to notice, not to bury in
+      // the middle of the alphabet.
+      rate: (c) => c.rate?.amount ?? null,
+      effective_from: (c) => c.rate?.effective_from ?? null,
+    },
+  });
+  const visibleCoaches = rateSort.apply(coaches);
+
+  const payoutSort = useTableSort<PayoutRow>({
+    key: "coach_name",
+    accessors: { status: (p) => (p.status === "paid" ? "Paid" : "Draft") },
+  });
+  const visiblePayouts = payoutSort.apply(payouts);
+
   if (!tenantId) {
     return (
       <div>
@@ -275,13 +295,13 @@ export default function WagesPage() {
         </p>
         <Table>
           <Thead>
-            <Th>Coach</Th>
-            <Th>Current rate</Th>
-            <Th>In effect from</Th>
+            <Th sort={rateSort} sortKey="name">Coach</Th>
+            <Th sort={rateSort} sortKey="rate" firstDir="desc">Current rate</Th>
+            <Th sort={rateSort} sortKey="effective_from">In effect from</Th>
             <Th>Actions</Th>
           </Thead>
           <Tbody>
-            {coaches.map((c) => (
+            {visibleCoaches.map((c) => (
               <Tr key={c.id}>
                 <Td>{c.name}</Td>
                 <Td>
@@ -385,14 +405,14 @@ export default function WagesPage() {
         ) : (
           <Table>
             <Thead>
-              <Th>Coach</Th>
-              <Th>Lessons</Th>
-              <Th>Amount</Th>
-              <Th>Status</Th>
+              <Th sort={payoutSort} sortKey="coach_name">Coach</Th>
+              <Th sort={payoutSort} sortKey="items" firstDir="desc">Lessons</Th>
+              <Th sort={payoutSort} sortKey="gross_amount" firstDir="desc">Amount</Th>
+              <Th sort={payoutSort} sortKey="status">Status</Th>
               <Th>Actions</Th>
             </Thead>
             <Tbody>
-              {payouts.map((p) => (
+              {visiblePayouts.map((p) => (
                 <Tr key={p.id}>
                   <Td>{p.coach_name}</Td>
                   <Td>{p.items}</Td>

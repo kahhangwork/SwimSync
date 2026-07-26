@@ -15,7 +15,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -136,6 +136,19 @@ export default function ParentsPage() {
 
   const activeChildCount = (f: FamilyRow) => f.children.filter((c) => c.is_active).length;
 
+  const sort = useTableSort<FamilyRow>({
+    key: "full_name",
+    accessors: {
+      // Sort by the count, not by "1 of 1 active" — as text, 10 sorts before 2.
+      children: (f) => activeChildCount(f),
+      // Active first when ascending: `true` sorts after `false`, and the rows
+      // an admin acts on are the active ones.
+      is_active: (f) => !f.is_active,
+    },
+  });
+
+  const visible = sort.apply(filtered);
+
   return (
     <div>
       <PageHeader
@@ -163,12 +176,12 @@ export default function ParentsPage() {
 
       <Table>
         <Thead>
-<Th>Parent</Th>
-            <Th>Contact</Th>
-            <Th>Status</Th>
-            <Th>Children here</Th>
-            <Th>Actions</Th>
-</Thead>
+          <Th sort={sort} sortKey="full_name">Parent</Th>
+          <Th sort={sort} sortKey="email">Contact</Th>
+          <Th sort={sort} sortKey="is_active">Status</Th>
+          <Th sort={sort} sortKey="children">Children here</Th>
+          <Th>Actions</Th>
+        </Thead>
         <Tbody>
           {loading ? (
             <Tr>
@@ -176,14 +189,14 @@ export default function ParentsPage() {
                 Loading…
               </Td>
             </Tr>
-          ) : filtered.length === 0 ? (
+          ) : visible.length === 0 ? (
             <Tr>
               <Td className="text-center text-gray-400 py-8" colSpan={5}>
                 No families found.
               </Td>
             </Tr>
           ) : (
-            filtered.map((f) => (
+            visible.map((f) => (
               <Tr key={`${f.parent_id}:${f.tenant_id}`}>
                 <Td className="font-medium text-gray-900">{f.full_name}</Td>
                 <Td className="text-gray-500">

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { UserCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 
@@ -219,6 +219,9 @@ export default function UnassignedPage() {
       s.parent_name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const sort = useTableSort<Student>({ key: "full_name" });
+  const visible = sort.apply(filtered);
+
   return (
     <div>
       <PageHeader
@@ -238,10 +241,10 @@ export default function UnassignedPage() {
 
       <Table>
         <Thead>
-<Th>Student</Th>
-            <Th>Parent</Th>
-            <Th>Action</Th>
-</Thead>
+          <Th sort={sort} sortKey="full_name">Student</Th>
+          <Th sort={sort} sortKey="parent_name">Parent</Th>
+          <Th>Action</Th>
+        </Thead>
         <Tbody>
           {loading ? (
             <Tr>
@@ -249,14 +252,14 @@ export default function UnassignedPage() {
                 Loading…
               </Td>
             </Tr>
-          ) : filtered.length === 0 ? (
+          ) : visible.length === 0 ? (
             <Tr>
               <Td className="text-center text-gray-400 py-8" colSpan={3}>
                 No unassigned children found.
               </Td>
             </Tr>
           ) : (
-            filtered.map((student) => (
+            visible.map((student) => (
               <Tr key={student.id}>
                 <Td className="font-medium text-gray-900">{student.full_name}</Td>
                 <Td className="text-gray-500">{student.parent_name}</Td>

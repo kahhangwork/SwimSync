@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, QrCode } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 
@@ -128,6 +128,17 @@ export default function CoachesPage() {
     loadCoaches();
   }
 
+  const sort = useTableSort<CoachRow>({
+    key: "full_name",
+    accessors: {
+      classes: (c) => c.class_titles.length,
+      // Missing QRs first when ascending: a business with no QR cannot be paid,
+      // which makes it the row worth surfacing, not the row worth hiding.
+      paynow_qr_url: (c) => Boolean(c.paynow_qr_url),
+    },
+  });
+  const visible = sort.apply(coaches);
+
   return (
     <div>
       <PageHeader
@@ -152,13 +163,13 @@ export default function CoachesPage() {
 
       <Table>
         <Thead>
-<Th>Name</Th>
-            <Th>Email</Th>
-            <Th>Phone</Th>
-            <Th>Classes</Th>
-            <Th>PayNow QR</Th>
-            <Th>Actions</Th>
-</Thead>
+          <Th sort={sort} sortKey="full_name">Name</Th>
+          <Th sort={sort} sortKey="email">Email</Th>
+          <Th sort={sort} sortKey="phone">Phone</Th>
+          <Th sort={sort} sortKey="classes">Classes</Th>
+          <Th sort={sort} sortKey="paynow_qr_url">PayNow QR</Th>
+          <Th>Actions</Th>
+        </Thead>
         <Tbody>
           {loading ? (
             <Tr>
@@ -166,14 +177,14 @@ export default function CoachesPage() {
                 Loading…
               </Td>
             </Tr>
-          ) : coaches.length === 0 ? (
+          ) : visible.length === 0 ? (
             <Tr>
               <Td className="text-center text-gray-400 py-8" colSpan={6}>
                 No coaches yet.
               </Td>
             </Tr>
           ) : (
-            coaches.map((coach) => (
+            visible.map((coach) => (
               <Tr key={coach.id}>
                 <Td>
                   <div className="flex items-center gap-3">

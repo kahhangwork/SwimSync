@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, CalendarPlus, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { Drawer } from "@/components/Drawer";
 import { todayInSg, toSgDate, formatSgDate } from "@/lib/lessonDates";
+import { dayOfWeekOrder } from "@/lib/tableSort";
 import {
   buildClassRoster,
   formatStudentCount,
@@ -426,6 +427,19 @@ export default function ClassesPage() {
     return map;
   }, [classes, enrolments, bookings]);
 
+  const sort = useTableSort<ClassRow>({
+    key: "title",
+    accessors: {
+      // Calendar order, not alphabetical — see dayOfWeekOrder.
+      day_of_week: (c) => dayOfWeekOrder(c.day_of_week),
+      // The enrolled count only. The badge reads "2+1"; sorting by the string
+      // would order it as text, and sorting by enrolled+trials would rank a
+      // class of 2 with a guest above a class of 3 weekly students.
+      student_count: (c) => c.student_count,
+    },
+  });
+  const visible = sort.apply(filtered);
+
   const openRoster = rosterByClass.get(drawerClass?.id ?? "") ?? {
     enrolled: [],
     trials: [],
@@ -461,15 +475,15 @@ export default function ClassesPage() {
 
       <Table>
         <Thead>
-<Th>Class Name</Th>
-            <Th>Coach</Th>
-            <Th>Day</Th>
-            <Th>Time</Th>
-            <Th>Location</Th>
-            <Th>Rate</Th>
-            <Th>Students</Th>
-            <Th>Actions</Th>
-</Thead>
+          <Th sort={sort} sortKey="title">Class Name</Th>
+          <Th sort={sort} sortKey="coach_name">Coach</Th>
+          <Th sort={sort} sortKey="day_of_week">Day</Th>
+          <Th sort={sort} sortKey="start_time">Time</Th>
+          <Th sort={sort} sortKey="location_name">Location</Th>
+          <Th sort={sort} sortKey="price_per_lesson" firstDir="desc">Rate</Th>
+          <Th sort={sort} sortKey="student_count" firstDir="desc">Students</Th>
+          <Th>Actions</Th>
+        </Thead>
         <Tbody>
           {loading ? (
             <Tr>
@@ -477,14 +491,14 @@ export default function ClassesPage() {
                 Loading…
               </Td>
             </Tr>
-          ) : filtered.length === 0 ? (
+          ) : visible.length === 0 ? (
             <Tr>
               <Td className="text-center text-gray-400 py-8" colSpan={8}>
                 No classes found.
               </Td>
             </Tr>
           ) : (
-            filtered.map((cls) => (
+            visible.map((cls) => (
               <Tr key={cls.id}>
                 <Td className="font-medium text-gray-900">{cls.title}</Td>
                 <Td className="text-gray-600">{cls.coach_name}</Td>

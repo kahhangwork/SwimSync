@@ -12,7 +12,7 @@ import {
 import { computeClassCoverage, type ClassCoverage } from "@/lib/classCoverage";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 
@@ -509,6 +509,20 @@ export default function InvoicesPage() {
     return matchSearch && matchStatus;
   });
 
+  const sort = useTableSort<InvoiceRow>({
+    // Newest billing month first, which is the order the query already returns
+    // and the one an admin chasing payment wants.
+    key: "billing_month",
+    dir: "desc",
+    accessors: {
+      // Sort the AMOUNTS, not the rendered "−S$40.00" strings — a currency
+      // string sorts by its leading character, so a minus sign and a dash would
+      // decide the order before the number did.
+      status: (inv) => (inv.status === "outstanding" ? "Outstanding" : "Paid"),
+    },
+  });
+  const visible = sort.apply(filtered);
+
   const totalOutstanding = invoices
     .filter((i) => i.status === "outstanding")
     .reduce((sum, i) => sum + i.net_amount, 0);
@@ -929,16 +943,16 @@ export default function InvoicesPage() {
 
       <Table>
         <Thead>
-<Th>Parent</Th>
-            <Th>Student(s)</Th>
-            <Th>Month</Th>
-            <Th>Gross</Th>
-            <Th>Package</Th>
-            <Th>Credit</Th>
-            <Th>Net</Th>
-            <Th>Status</Th>
-            <Th>Action</Th>
-</Thead>
+          <Th sort={sort} sortKey="parent_name">Parent</Th>
+          <Th sort={sort} sortKey="student_names">Student(s)</Th>
+          <Th sort={sort} sortKey="billing_month" firstDir="desc">Month</Th>
+          <Th sort={sort} sortKey="gross_amount" firstDir="desc">Gross</Th>
+          <Th sort={sort} sortKey="package_applied" firstDir="desc">Package</Th>
+          <Th sort={sort} sortKey="credit_applied" firstDir="desc">Credit</Th>
+          <Th sort={sort} sortKey="net_amount" firstDir="desc">Net</Th>
+          <Th sort={sort} sortKey="status">Status</Th>
+          <Th>Action</Th>
+        </Thead>
         <Tbody>
           {loading ? (
             <Tr>
@@ -946,14 +960,14 @@ export default function InvoicesPage() {
                 Loading…
               </Td>
             </Tr>
-          ) : filtered.length === 0 ? (
+          ) : visible.length === 0 ? (
             <Tr>
               <Td className="text-center text-gray-400 py-8" colSpan={9}>
                 No invoices found.
               </Td>
             </Tr>
           ) : (
-            filtered.map((inv) => (
+            visible.map((inv) => (
               <Tr key={inv.id}>
                 <Td className="font-medium text-gray-900">{inv.parent_name}</Td>
                 <Td className="text-gray-600 text-xs">{inv.student_names}</Td>

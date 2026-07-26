@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 
 type CreditNoteRow = {
   id: string;
@@ -65,6 +65,15 @@ export default function CreditNotesPage() {
     return matchSearch && matchStatus;
   });
 
+  const sort = useTableSort<CreditNoteRow>({
+    key: "created_at",
+    dir: "desc",
+    accessors: {
+      status: (cn) => (cn.status === "applied" ? "Applied" : "Available"),
+    },
+  });
+  const visible = sort.apply(filtered);
+
   return (
     <div>
       <PageHeader
@@ -99,15 +108,15 @@ export default function CreditNotesPage() {
 
       <Table>
         <Thead>
-<Th>Reference</Th>
-            <Th>Student</Th>
-            <Th>Parent</Th>
-            <Th>Amount</Th>
-            <Th>Reason</Th>
-            <Th>Linked Invoice</Th>
-            <Th>Date</Th>
-            <Th>Status</Th>
-</Thead>
+          <Th sort={sort} sortKey="reference_number">Reference</Th>
+          <Th sort={sort} sortKey="student_name">Student</Th>
+          <Th sort={sort} sortKey="parent_name">Parent</Th>
+          <Th sort={sort} sortKey="amount" firstDir="desc">Amount</Th>
+          <Th sort={sort} sortKey="reason" wrap>Reason</Th>
+          <Th sort={sort} sortKey="linked_invoice_id">Linked Invoice</Th>
+          <Th sort={sort} sortKey="created_at" firstDir="desc">Date</Th>
+          <Th sort={sort} sortKey="status">Status</Th>
+        </Thead>
         <Tbody>
           {loading ? (
             <Tr>
@@ -115,14 +124,14 @@ export default function CreditNotesPage() {
                 Loading…
               </Td>
             </Tr>
-          ) : filtered.length === 0 ? (
+          ) : visible.length === 0 ? (
             <Tr>
               <Td className="text-center text-gray-400 py-8" colSpan={8}>
                 No credit notes found.
               </Td>
             </Tr>
           ) : (
-            filtered.map((cn) => (
+            visible.map((cn) => (
               <Tr key={cn.id}>
                 <Td className="font-mono text-xs text-gray-700">
                   {cn.reference_number}
@@ -132,7 +141,7 @@ export default function CreditNotesPage() {
                 <Td className="font-semibold text-blue-600">
                   S${cn.amount.toFixed(2)}
                 </Td>
-                <Td className="text-gray-500 max-w-xs truncate">
+                <Td className="text-gray-500" wrap>
                   {cn.reason ?? "—"}
                 </Td>
                 <Td className="font-mono text-xs text-gray-500">

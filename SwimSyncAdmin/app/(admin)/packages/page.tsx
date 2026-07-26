@@ -21,7 +21,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -377,6 +377,26 @@ export default function PackagesPage() {
 
   const pending = purchases.filter((p) => p.status === "pending");
   const held = purchases.filter((p) => p.status !== "pending");
+
+  // Oldest request first: this queue is work waiting on the admin, and the
+  // parent who has been waiting longest is the one to serve next.
+  const pendingSort = useTableSort<Purchase>({ key: "requested_at" });
+  const visiblePending = pendingSort.apply(pending);
+
+  const productSort = useTableSort<Product>({
+    key: "name",
+    accessors: {
+      category_name: (p) => p.category_name ?? "All classes",
+      price: (p) => p.lesson_count * p.rate_per_lesson,
+    },
+  });
+  const visibleProducts = productSort.apply(products);
+
+  const heldSort = useTableSort<Purchase>({
+    key: "parent_name",
+    accessors: { remaining: (p) => p.live_lessons_remaining },
+  });
+  const visibleHeld = heldSort.apply(held);
   const activeProducts = products.filter((p) => p.is_active);
 
   return (
@@ -404,14 +424,14 @@ export default function PackagesPage() {
           </p>
           <Table>
             <Thead>
-              <Th>Parent</Th>
-              <Th>Package</Th>
-              <Th>Price</Th>
-              <Th>Requested</Th>
+              <Th sort={pendingSort} sortKey="parent_name">Parent</Th>
+              <Th sort={pendingSort} sortKey="name">Package</Th>
+              <Th sort={pendingSort} sortKey="total_value" firstDir="desc">Price</Th>
+              <Th sort={pendingSort} sortKey="requested_at">Requested</Th>
               <Th>&nbsp;</Th>
             </Thead>
             <Tbody>
-              {pending.map((p) => (
+              {visiblePending.map((p) => (
                 <Tr key={p.id}>
                   <Td className="font-medium text-gray-900">{p.parent_name}</Td>
                   <Td className="text-gray-600">
@@ -466,17 +486,17 @@ export default function PackagesPage() {
         ) : (
           <Table>
             <Thead>
-              <Th>Package</Th>
-              <Th>Valid for</Th>
-              <Th>Lessons</Th>
-              <Th>Rate</Th>
-              <Th>Price</Th>
-              <Th>Validity</Th>
-              <Th>Held by</Th>
+              <Th sort={productSort} sortKey="name">Package</Th>
+              <Th sort={productSort} sortKey="category_name">Valid for</Th>
+              <Th sort={productSort} sortKey="lesson_count" firstDir="desc">Lessons</Th>
+              <Th sort={productSort} sortKey="rate_per_lesson" firstDir="desc">Rate</Th>
+              <Th sort={productSort} sortKey="price" firstDir="desc">Price</Th>
+              <Th sort={productSort} sortKey="validity_months" firstDir="desc">Validity</Th>
+              <Th sort={productSort} sortKey="holder_count" firstDir="desc">Held by</Th>
               <Th>&nbsp;</Th>
             </Thead>
             <Tbody>
-              {products.map((p) => (
+              {visibleProducts.map((p) => (
                 <Tr key={p.id} className={p.is_active ? "" : "opacity-50"}>
                   <Td className="font-medium text-gray-900">
                     {p.name}
@@ -535,15 +555,15 @@ export default function PackagesPage() {
         ) : (
           <Table>
             <Thead>
-              <Th>Parent</Th>
-              <Th>Package</Th>
-              <Th>Remaining</Th>
-              <Th>Expires</Th>
-              <Th>Status</Th>
+              <Th sort={heldSort} sortKey="parent_name">Parent</Th>
+              <Th sort={heldSort} sortKey="name">Package</Th>
+              <Th sort={heldSort} sortKey="remaining">Remaining</Th>
+              <Th sort={heldSort} sortKey="expires_on">Expires</Th>
+              <Th sort={heldSort} sortKey="status">Status</Th>
               <Th>&nbsp;</Th>
             </Thead>
             <Tbody>
-              {held.map((p) => {
+              {visibleHeld.map((p) => {
                 // todayInSg(), never toISOString().slice — the UTC date is
                 // yesterday in SGT before 08:00 (§7.7).
                 const expired =

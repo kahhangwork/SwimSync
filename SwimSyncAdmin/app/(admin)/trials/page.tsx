@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { ContactHint } from "@/components/ContactHint";
@@ -276,6 +276,21 @@ export default function TrialsPage() {
 
   const unpriced = categories.filter((c) => c.rate === null);
 
+  // Declared above the `if (loading)` return below: these call useState, and a
+  // hook after a conditional return is a hook that sometimes does not run.
+  const trialSort = useTableSort<Booking>({
+    key: "session_date",
+    accessors: {
+      // "Awaiting the lesson" before "Marked" is the useful order: an unmarked
+      // trial is the one still needing something to happen.
+      marked: (b) => (b.marked ? "Marked" : "Awaiting the lesson"),
+    },
+  });
+  const visibleTrials = trialSort.apply(upcoming);
+
+  const categorySort = useTableSort<Category>({ key: "name" });
+  const visibleCategories = categorySort.apply(categories);
+
   if (loading) {
     return <p className="text-sm text-gray-500">Loading…</p>;
   }
@@ -340,10 +355,10 @@ export default function TrialsPage() {
       <h2 className="mb-2 text-sm font-semibold text-gray-700">Upcoming</h2>
       <Table>
         <Thead>
-          <Th>Child</Th>
-          <Th>Class</Th>
-          <Th>Date</Th>
-          <Th>Status</Th>
+          <Th sort={trialSort} sortKey="student_name">Child</Th>
+          <Th sort={trialSort} sortKey="class_title">Class</Th>
+          <Th sort={trialSort} sortKey="session_date">Date</Th>
+          <Th sort={trialSort} sortKey="marked">Status</Th>
           <Th>Actions</Th>
         </Thead>
         <Tbody>
@@ -353,7 +368,7 @@ export default function TrialsPage() {
               <Td>{""}</Td><Td>{""}</Td><Td>{""}</Td><Td>{""}</Td>
             </Tr>
           ) : (
-            upcoming.map((b) => (
+            visibleTrials.map((b) => (
               <Tr key={b.id}>
                 <Td className="font-medium text-gray-800">{b.student_name}</Td>
                 <Td className="text-gray-500">{b.class_title}</Td>
@@ -387,12 +402,12 @@ export default function TrialsPage() {
       </p>
       <Table>
         <Thead>
-          <Th>Class type</Th>
-          <Th>Trial price now</Th>
+          <Th sort={categorySort} sortKey="name">Class type</Th>
+          <Th sort={categorySort} sortKey="rate">Trial price now</Th>
           <Th>Change it</Th>
         </Thead>
         <Tbody>
-          {categories.map((c) => (
+          {visibleCategories.map((c) => (
             <Tr key={c.id}>
               <Td className="font-medium text-gray-800">{c.name}</Td>
               <Td className={c.rate === null ? "text-amber-600" : "text-gray-600"}>

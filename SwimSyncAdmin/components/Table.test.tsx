@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { Table, Thead, Th, Tbody, Tr, Td } from "./Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "./Table";
 
 /**
  * THE CONTRACT: <Thead> OWNS ITS <tr>. CALLERS PASS <Th> DIRECTLY.
@@ -58,6 +58,131 @@ describe("Thead owns its <tr> — call-site scan", () => {
     }
 
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("a sortable column", () => {
+  type Row = { name: string; count: number };
+
+  const rows: Row[] = [
+    { name: "Ruhaan", count: 1 },
+    { name: "aadi", count: 3 },
+    { name: "Neel", count: 2 },
+  ];
+
+  function Harness({ initialKey }: { initialKey?: string | null }) {
+    const sort = useTableSort<Row>({ key: initialKey ?? null });
+    const visible = sort.apply(rows);
+    return (
+      <Table>
+        <Thead>
+          <Th sort={sort} sortKey="name">
+            Student
+          </Th>
+          <Th sort={sort} sortKey="count" firstDir="desc">
+            Lessons
+          </Th>
+          <Th>Actions</Th>
+        </Thead>
+        <Tbody>
+          {visible.map((r) => (
+            <Tr key={r.name}>
+              <Td>{r.name}</Td>
+              <Td>{r.count}</Td>
+              <Td>—</Td>
+            </Tr>
+          ))}
+        </Tbody>
+      </Table>
+    );
+  }
+
+  const names = () =>
+    Array.from(document.querySelectorAll("tbody tr td:first-child")).map(
+      (td) => td.textContent
+    );
+
+  it("leaves the page's own order alone until a column is clicked", () => {
+    // The pages already order their queries — newest invoice, oldest request
+    // first. A table that re-sorted itself on mount would silently override the
+    // order the page deliberately asked the database for.
+    render(<Harness />);
+    expect(names()).toEqual(["Ruhaan", "aadi", "Neel"]);
+  });
+
+  it("sorts on click, and reverses on a second click", () => {
+    render(<Harness />);
+    const header = screen.getByRole("button", { name: /Student/ });
+
+    fireEvent.click(header);
+    expect(names()).toEqual(["aadi", "Neel", "Ruhaan"]);
+
+    fireEvent.click(header);
+    expect(names()).toEqual(["Ruhaan", "Neel", "aadi"]);
+  });
+
+  it("honours firstDir, so a count column opens on its largest value", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: /Lessons/ }));
+    expect(names()).toEqual(["aadi", "Neel", "Ruhaan"]); // counts 3, 2, 1
+  });
+
+  it("reports direction to screen readers via aria-sort", () => {
+    render(<Harness />);
+    const th = () => screen.getByRole("columnheader", { name: /Student/ });
+
+    // Sortable but inactive is "none", NOT absent — absent means "not sortable",
+    // and the arrow is the only other signal that the column can be clicked.
+    expect(th().getAttribute("aria-sort")).toBe("none");
+
+    fireEvent.click(screen.getByRole("button", { name: /Student/ }));
+    expect(th().getAttribute("aria-sort")).toBe("ascending");
+
+    fireEvent.click(screen.getByRole("button", { name: /Student/ }));
+    expect(th().getAttribute("aria-sort")).toBe("descending");
+  });
+
+  it("gives a non-sortable column no button and no aria-sort", () => {
+    render(<Harness />);
+    const actions = screen.getByRole("columnheader", { name: "Actions" });
+    expect(actions.getAttribute("aria-sort")).toBeNull();
+    expect(actions.querySelector("button")).toBeNull();
+  });
+
+  it("makes every column hug its content", () => {
+    render(<Harness />);
+    // `w-px` + `nowrap` is the mechanism: a width that small cannot be honoured,
+    // so the column falls back to min-content — and with no wrapping allowed,
+    // min-content IS the full text.
+    for (const th of Array.from(document.querySelectorAll("thead th"))) {
+      expect(th.className).toContain("w-px");
+      expect(th.className).toContain("whitespace-nowrap");
+    }
+  });
+
+  it("gives the last column the leftover width, from the table itself", () => {
+    // The rule is one descendant selector on the <table>, not a prop each table
+    // has to remember — so it cannot be forgotten, and there is no call-site
+    // scan to keep honest. A `grow` prop version needed one, and still put the
+    // gap mid-table on Attendance.
+    render(<Harness />);
+    const table = document.querySelector("table") as HTMLElement;
+    expect(table.className).toContain("[&_th:last-child]:w-full");
+    expect(table.className).toContain("[&_td:last-child]:w-full");
+  });
+
+  it("caps a `wrap` column instead of letting it push the table sideways", () => {
+    const { container } = render(
+      <table>
+        <Thead>
+          <Th wrap>Reason</Th>
+        </Thead>
+      </table>
+    );
+    const prose = container.querySelector("th") as HTMLElement;
+    expect(prose.className).toContain("whitespace-normal");
+    expect(prose.className).toContain("max-w-xs");
+    expect(prose.className).not.toContain("whitespace-nowrap");
   });
 });
 

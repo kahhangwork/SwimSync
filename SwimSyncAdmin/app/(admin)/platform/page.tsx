@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { formatSgDate, toSgDate } from "@/lib/lessonDates";
 
 /**
@@ -335,6 +335,44 @@ export default function PlatformPage() {
     );
   }
 
+  // All four declared above the two conditional returns below — a hook after a
+  // conditional return is a hook that sometimes does not run.
+  const tenantSort = useTableSort<TenantRow>({
+    key: "display_name",
+    accessors: {
+      // "no admin" first when ascending. A business with no admin is joinable
+      // by parents but operable by nobody, which is the fault this page exists
+      // to surface — so it sorts to the top, not into alphabetical order.
+      admin_status: (t) =>
+        t.admin_status === "none" ? 0 : t.admin_status === "invited" ? 1 : 2,
+    },
+  });
+  const visibleTenants = tenantSort.apply(tenants);
+
+  const strandedSort = useTableSort<StrandedParent>({ key: "joined_at", dir: "desc" });
+  const visibleStranded = strandedSort.apply(stranded);
+
+  const studentSort = useTableSort<StudentRow>({
+    key: "full_name",
+    accessors: {
+      // The business NAME, which is what the cell shows — the row holds only an
+      // id, and sorting by a uuid would look like no sort at all.
+      tenant: (s) =>
+        tenants.find((t) => t.tenant_id === s.tenant_id)?.display_name ?? null,
+      is_active: (s) => !s.is_active,
+    },
+  });
+  const visibleStudents = studentSort.apply(students);
+
+  const familySort = useTableSort<FamilyStatusRow>({
+    key: "parent_name",
+    accessors: {
+      family_active: (f) => !f.family_active,
+      children: (f) => f.children.length,
+    },
+  });
+  const visibleFamilies = familySort.apply(families);
+
   if (allowed === null) return <div className="p-6 text-gray-500">Loading…</div>;
 
   if (!allowed) {
@@ -567,17 +605,17 @@ export default function PlatformPage() {
         )}
         <Table>
           <Thead>
-            <Th>Name</Th>
-            <Th>Shape</Th>
-            <Th>Admin</Th>
-            <Th>Join code</Th>
-            <Th>Families</Th>
-            <Th>Students</Th>
-            <Th>Classes</Th>
-            <Th>Coaches</Th>
-            <Th>Last attendance</Th>
-            <Th>Sessions this month</Th>
-            <Th>Last month&apos;s billing</Th>
+            <Th sort={tenantSort} sortKey="display_name">Name</Th>
+            <Th sort={tenantSort} sortKey="shape">Shape</Th>
+            <Th sort={tenantSort} sortKey="admin_status">Admin</Th>
+            <Th sort={tenantSort} sortKey="join_code">Join code</Th>
+            <Th sort={tenantSort} sortKey="active_families" firstDir="desc">Families</Th>
+            <Th sort={tenantSort} sortKey="active_students" firstDir="desc">Students</Th>
+            <Th sort={tenantSort} sortKey="active_classes" firstDir="desc">Classes</Th>
+            <Th sort={tenantSort} sortKey="coaches" firstDir="desc">Coaches</Th>
+            <Th sort={tenantSort} sortKey="last_attendance_date" firstDir="desc">Last attendance</Th>
+            <Th sort={tenantSort} sortKey="sessions_this_month" firstDir="desc">Sessions this month</Th>
+            <Th sort={tenantSort} sortKey="last_month_billing">Last month&apos;s billing</Th>
           </Thead>
           <Tbody>
             {tenants.length === 0 && !loadError && (
@@ -585,7 +623,7 @@ export default function PlatformPage() {
                 <Td colSpan={11}>No businesses.</Td>
               </Tr>
             )}
-            {tenants.map((t) => (
+            {visibleTenants.map((t) => (
               <Tr key={t.tenant_id}>
                 <Td>{t.display_name}</Td>
                 <Td>{t.shape}</Td>
@@ -710,12 +748,12 @@ export default function PlatformPage() {
           </p>
           <Table>
             <Thead>
-              <Th>Parent</Th>
-              <Th>Email</Th>
-              <Th>Registered</Th>
+              <Th sort={strandedSort} sortKey="full_name">Parent</Th>
+              <Th sort={strandedSort} sortKey="email">Email</Th>
+              <Th sort={strandedSort} sortKey="joined_at" firstDir="desc">Registered</Th>
             </Thead>
             <Tbody>
-              {stranded.map((p) => (
+              {visibleStranded.map((p) => (
                 <Tr key={p.parent_id}>
                   <Td>{p.full_name ?? "—"}</Td>
                   <Td>{p.email ?? "—"}</Td>
@@ -762,13 +800,13 @@ export default function PlatformPage() {
         {students.length > 0 && (
           <Table>
             <Thead>
-              <Th>Child</Th>
-              <Th>Currently with</Th>
-              <Th>Active?</Th>
+              <Th sort={studentSort} sortKey="full_name">Child</Th>
+              <Th sort={studentSort} sortKey="tenant">Currently with</Th>
+              <Th sort={studentSort} sortKey="is_active">Active?</Th>
               <Th>Move to</Th>
             </Thead>
             <Tbody>
-              {students.map((s) => (
+              {visibleStudents.map((s) => (
                 <Tr key={s.id}>
                   <Td>{s.full_name}</Td>
                   <Td>
@@ -841,13 +879,13 @@ export default function PlatformPage() {
         {families.length > 0 && (
           <Table>
             <Thead>
-              <Th>Parent</Th>
-              <Th>Business</Th>
-              <Th>Family</Th>
-              <Th>Children there</Th>
+              <Th sort={familySort} sortKey="parent_name">Parent</Th>
+              <Th sort={familySort} sortKey="tenant_name">Business</Th>
+              <Th sort={familySort} sortKey="family_active">Family</Th>
+              <Th sort={familySort} sortKey="children">Children there</Th>
             </Thead>
             <Tbody>
-              {families.map((f, i) => (
+              {visibleFamilies.map((f, i) => (
                 <Tr key={`${f.email}:${f.tenant_name}:${i}`}>
                   <Td>
                     <div className="font-medium text-gray-900">{f.parent_name}</div>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import {
@@ -632,6 +632,20 @@ export default function StudentsPage() {
     }))
   );
 
+  const sort = useTableSort<StudentRow>({
+    key: "full_name",
+    accessors: {
+      // The badge, not the enum: what the Status column shows is
+      // Assigned/Unassigned/Inactive, so that is what A→Z has to order.
+      status: (s) => statusLabel(s),
+      // An unclaimed child's cell reads "No parent account" rather than a name.
+      // Sorting the literal text keeps those rows together — they are the ones
+      // holding a billing month open, so grouping them is the useful behaviour.
+      parent_name: (s) => (isUnclaimed(s) ? "No parent account" : s.parent_name),
+    },
+  });
+  const visible = sort.apply(filtered);
+
   const unclaimedCount = students.filter(
     (s) => s.is_active && isUnclaimed(s)
   ).length;
@@ -770,14 +784,14 @@ export default function StudentsPage() {
 
       <Table>
         <Thead>
-<Th>Student</Th>
-            <Th>Level</Th>
-            <Th>Parent</Th>
-            <Th>Status</Th>
-            <Th>Class</Th>
-            <Th>Coach</Th>
-            <Th>Actions</Th>
-</Thead>
+          <Th sort={sort} sortKey="full_name">Student</Th>
+          <Th sort={sort} sortKey="level_label">Level</Th>
+          <Th sort={sort} sortKey="parent_name">Parent</Th>
+          <Th sort={sort} sortKey="status">Status</Th>
+          <Th sort={sort} sortKey="class_title">Class</Th>
+          <Th sort={sort} sortKey="coach_name">Coach</Th>
+          <Th>Actions</Th>
+        </Thead>
         <Tbody>
           {loading ? (
             <Tr>
@@ -785,14 +799,14 @@ export default function StudentsPage() {
                 Loading…
               </Td>
             </Tr>
-          ) : filtered.length === 0 ? (
+          ) : visible.length === 0 ? (
             <Tr>
               <Td className="text-center text-gray-400 py-8" colSpan={7}>
                 No students found.
               </Td>
             </Tr>
           ) : (
-            filtered.map((s) => (
+            visible.map((s) => (
               <Tr key={s.id}>
                 <Td className="font-medium text-gray-900">{s.full_name}</Td>
                 <Td>

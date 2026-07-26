@@ -20,7 +20,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 
@@ -230,6 +230,16 @@ export default function LevelsPage() {
     load();
   }
 
+  // Defaults to `sort_order`, which is the order the ladder is already in — a
+  // level ladder means something in sequence, so the first render must not
+  // reshuffle it. Sorting by name is there to FIND a rung, not to reorder one:
+  // the ladder's real order is edited through the Order field.
+  const sort = useTableSort<Level>({
+    key: "sort_order",
+    accessors: { skills: (l) => l.skills.length },
+  });
+  const visible = sort.apply(levels);
+
   return (
     <div>
       <PageHeader
@@ -259,14 +269,14 @@ export default function LevelsPage() {
               single cell in column 1 and pushes every column out of line with
               the header naming it. Enforced by components/Table.test.tsx. */}
           <Thead>
-            <Th>Order</Th>
-            <Th>Level</Th>
-            <Th>Skills</Th>
-            <Th>Students</Th>
+            <Th sort={sort} sortKey="sort_order">Order</Th>
+            <Th sort={sort} sortKey="label">Level</Th>
+            <Th sort={sort} sortKey="skills">Skills</Th>
+            <Th sort={sort} sortKey="student_count">Students</Th>
             <Th>Actions</Th>
           </Thead>
           <Tbody>
-            {levels.map((l, li) => (
+            {visible.map((l, li) => (
               <React.Fragment key={l.id}>
                 <Tr>
                   <Td className="text-gray-500">{l.sort_order}</Td>
