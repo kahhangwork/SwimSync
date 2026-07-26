@@ -736,4 +736,26 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     — and run each one it names. Until fixtures run in CI, that grep is the only guard.
     (Found 2026-07-26 while writing the missing teardowns; the round-trip harness in
     `docs/WORKTREES.md` Phase 4 is what surfaced it.)
+
+63. **A FIXTURE MUST SCOPE EVERY WRITE TO ITS OWN ROWS — `FROM students` WITH NO FILTER
+    COLLIDES WITH EVERY OTHER FIXTURE, AND THE COLLISION ABORTS THE STATEMENT.**
+    `fixtures-unmarked-lessons.sql` wrote `FROM students st CROSS JOIN classes c` and
+    `FROM sess CROSS JOIN students st` with no filter on `st`, so it enrolled **and marked
+    present** every student in the database. Measured: 6 children enrolled and marked
+    instead of 2, four of them belonging to another fixture.
+    **The second-order failure is worse than the first.** Enrolling a student who already
+    has an enrolment violates `one_active_enrolment_per_student`, which aborts the whole
+    `INSERT` — so when any sibling fixture was loaded first, this fixture's *own* two
+    children were **never enrolled at all**. It silently produced the exact opposite of the
+    scenario it exists to build, and the driver's low score read as a product regression.
+    Attendance is worse still: those rows are what billing is derived from, so a stray
+    `present` is a **billable lesson attributed to someone else's child**.
+    **The rule: every `INSERT … SELECT` in a fixture must be scoped to identifiers the
+    fixture owns** — its own parent's family links, or its own UUID prefix. Never a bare
+    `FROM <table>`. Audit:
+    `grep -n "CROSS JOIN\|FROM students\|FROM classes" .claude/skills/run-ui-playwright/drivers/fixtures-*.sql`
+    and for each hit ask "would this pick up a row another fixture created?"
+    This is §7.62's sibling: there a *schema change* made a fixture statement fail, here a
+    *sibling fixture* does. Both fail the same way — psql aborts the statement, the rest of
+    the script runs, and the fixture half-loads without saying so. (Fixed 2026-07-26.)
 ---

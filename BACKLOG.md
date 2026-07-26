@@ -981,28 +981,28 @@ Decide while fixing whether the older driver still earns its place at all, or wh
 unique cases should be folded into `verify-attendance-guard.mjs` and the file deleted —
 two drivers over one rule is the reason this went unnoticed.
 
-### `fixtures-unmarked-lessons.sql` enrols EVERY student into the seed class — **S**
-```sql
-INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
-SELECT st.id, c.id, '2026-07-01T02:00:00Z', true
-FROM students st CROSS JOIN classes c WHERE c.title = 'Saturday Beginners';
-```
-There is no filter on `st`. Every student **in the database** — other fixtures' children,
-a sibling worktree's, a real one — gets an active enrolment in Saturday Beginners.
+### Run the fixtures in CI — **M**
+No UI fixture is ever applied by CI. It runs pgTAP, Deno and the two frontend suites; the
+thirteen `fixtures-*.sql` files that the Playwright drivers depend on are exercised only when
+a human runs a driver by hand.
 
-**Why:** an active enrolment makes a child *expected at every lesson*, and an unmarked
-expected lesson **blocks invoice generation outright, with no override** (PRD §7.7). So this
-fixture can silently make a billing test refuse for a reason that has nothing to do with the
-code under test. It also cannot be fully undone: once mixed in, a fixture-created enrolment
-is indistinguishable from a legitimate one, so `fixtures-unmarked-lessons-teardown.sql`
-removes only its own two children's enrolments and says so in its header.
+**Why:** two separate classes of breakage have now shipped undetected because of this, and
+both were found by accident. **§7.62** — `20260719000600` made `students.tenant_id` NOT NULL
+and two fixtures went unloadable for a week, which is what actually produced
+`verify-attendance-window.mjs`'s 0/4. **§7.63** — an unscoped `FROM students` in
+`fixtures-unmarked-lessons.sql` enrolled and marked every child in the database, and when a
+sibling fixture was loaded first the resulting constraint violation aborted the statement so
+the fixture's *own* children were never enrolled. In both cases psql aborted one statement,
+carried on, and the fixture half-loaded silently — so the driver's low score read as a
+product regression.
 
-**Notes:** the fix is a `WHERE st.id IN (…)` naming the fixture's own children — the same
-shape every other fixture already uses. Do it in the same pass as **§7.62**'s wider point:
-no fixture runs in CI, so nothing catches this class of bug. Consider whether the round-trip
-harness described in `docs/WORKTREES.md` Phase 4 should become a CI job that applies each
-fixture and its teardown against a fresh stack — that would have caught both this and the
-NOT NULL breakage the day they landed.
+**Notes:** the shape is already written and proven — the round-trip harness in
+`docs/WORKTREES.md` Phase 4: snapshot every table's row count, apply the fixture, apply its
+teardown, assert the counts are identical. It caught two teardown defects and both bugs above
+in one pass. A CI job would need a Supabase stack (the `backend-tests` job already boots one,
+so it could be a step there rather than a new job) and should apply each fixture **on top of
+another fixture**, not just a clean database — that ordering is what surfaced §7.63.
+`drivers/check-teardowns.sh` already guards the weaker invariant that a teardown *exists*.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`

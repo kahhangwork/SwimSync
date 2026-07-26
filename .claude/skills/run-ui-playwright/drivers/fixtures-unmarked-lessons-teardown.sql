@@ -6,22 +6,17 @@
 -- Run this instead of `supabase db reset` — one database serves every worktree
 -- (§7.55).
 --
--- ⚠ READ THIS BEFORE TRUSTING THE TEARDOWN. The fixture contains a bug that no
--- teardown can fully reverse:
+-- The fixture's two children are reached through the parent's family links
+-- rather than by name, so a child a sibling worktree happens to call 'Ana Tan'
+-- is never caught.
 --
---     INSERT INTO student_class_enrolments (student_id, class_id, ...)
---     SELECT st.id, c.id, ... FROM students st
---     CROSS JOIN classes c WHERE c.title = 'Saturday Beginners';
---
--- There is no filter on `st`. It enrols EVERY STUDENT IN THE DATABASE into
--- Saturday Beginners — including children belonging to other fixtures and to
--- sibling worktrees. Once mixed in, a fixture-created enrolment is
--- indistinguishable from a legitimate one, so this file removes only the
--- enrolments of the fixture's OWN two children and says so rather than guessing.
---
--- Practical advice until that is fixed (BACKLOG → Foundations): run this fixture
--- FIRST in a session, or on a database with no other fixture loaded. Its
--- blast radius is the reason it is worth fixing rather than working around.
+-- HISTORICAL NOTE, because the teardown is the thing that found it. Until
+-- 2026-07-26 this fixture wrote `FROM students st CROSS JOIN classes c` and
+-- `FROM sess CROSS JOIN students st` with no filter on `st`, so it enrolled and
+-- marked EVERY student in the database. Both are now scoped to its own children
+-- (§7.63). If you are looking at an older checkout and this teardown appears to
+-- under-clean, that is why: it removes its own children's rows, which is all it
+-- can honestly claim.
 
 BEGIN;
 
@@ -66,9 +61,9 @@ DELETE FROM auth.users WHERE id = 'b0000000-0000-0000-0000-000000000001';
 
 COMMIT;
 
--- Expect 0, 0, 0. `stray_enrolments` is NOT expected to be 0 — it counts every
--- enrolment on the seed class, and a non-zero value here after other fixtures
--- have run is the bug described in the header, not a failure of this teardown.
+-- Expect 0, 0, 0. `other_enrolments` counts every remaining enrolment on the
+-- seed class: it SHOULD be 0 when this fixture ran alone, and non-zero only
+-- when a sibling fixture is still loaded — those are its rows, not ours.
 SELECT
   (SELECT count(*) FROM students WHERE full_name IN ('Ana Tan', 'Ben Tan'))  AS um_students,
   (SELECT count(*) FROM auth.users
@@ -76,4 +71,4 @@ SELECT
   (SELECT count(*) FROM audit_log
     WHERE actor_id = 'b0000000-0000-0000-0000-000000000001')                 AS audit_rows,
   (SELECT count(*) FROM student_class_enrolments e JOIN classes c ON c.id = e.class_id
-    WHERE c.title = 'Saturday Beginners')                                    AS stray_enrolments;
+    WHERE c.title = 'Saturday Beginners')                                    AS other_enrolments;
