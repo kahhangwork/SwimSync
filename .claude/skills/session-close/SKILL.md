@@ -91,12 +91,17 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000  # 000 = free
 
 Leave nothing listening. Mention any long-running job you are deliberately leaving up.
 
-## 5. Settle the worktree
+## 5. Settle the worktree — **normally already done by `/worktree-close`**
 
-> Full sequence, including what must happen *before* you get here: **`docs/WORKTREES.md`**.
-> The ordering that matters: land all code → tear down fixtures → **copy your `WORKTREE.md`
-> "graduate" list out, it is about to become unreachable** → exit the worktree → *then* run
-> `/update-docs` from the root checkout on `main`. No worktree writes the living documents.
+> **`/worktree-close` owns this, and it runs BEFORE `/update-docs`.** That ordering is
+> load-bearing: `WORKTREE.md` is gitignored, so the *graduate list* — the findings that must
+> reach `docs/GOTCHAS.md`, `BACKLOG.md`, the plan and the PRD — disappears with the worktree.
+> Settling it after the documentation pass means writing the docs from a list that no longer
+> exists. Full sequence: **`docs/WORKTREES.md`**.
+>
+> **If you are reading this and a worktree is still live, that skill did not run.** Stop, run
+> `/worktree-close`, then `/update-docs`, then come back here. The steps below are the
+> fallback for a session that skipped it.
 
 If the session ran in a worktree, it needs an explicit disposition — **ask, don't assume**:
 

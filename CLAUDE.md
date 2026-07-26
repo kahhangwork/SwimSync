@@ -111,5 +111,6 @@ touching an unfamiliar subsystem.
 - Documentation lanes: `PRD.md` = what exists · `BACKLOG.md` = what doesn't yet ·
   `HANDOVER.md` = the state you're inheriting. A feature idea goes in `BACKLOG.md`, never
   in the PRD or in HANDOVER §9.
-- Run `/session-start` to orient, `/update-docs` near the end, `/commit-review` to ship.
-  See `01_SESSION_WORKFLOW.md`.
+- Run `/session-start` to orient, `/commit-review` to ship each change, `/update-docs` near
+  the end. Running two sessions in parallel: `/worktree-start` (after planning) and
+  `/worktree-close` (**before** `/update-docs`). See `01_SESSION_WORKFLOW.md`.

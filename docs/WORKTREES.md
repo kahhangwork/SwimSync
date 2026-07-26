@@ -10,6 +10,13 @@ here came from two sessions writing the same shared thing without deciding who o
 > deliberately want a *second Claude session running at the same time*. If you are working
 > alone in one session, a worktree buys you nothing and costs you the whole protocol below.
 
+> **Two skills run this for you:** **`/worktree-start`** (Phases 0–3) and
+> **`/worktree-close`** (Phase 6). This document is the reasoning behind them and the two
+> worked examples; the skills are the steps. Between them, ship with `/commit-review` as
+> normal — there is no separate worktree-commit step, its push is already the worktree-safe
+> form. And run planning **before** `/worktree-start`: the plan is what answers the migration
+> question.
+
 ---
 
 ## The model: one writer per shared resource

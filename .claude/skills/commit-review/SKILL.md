@@ -106,7 +106,14 @@ SHA, and whether it is on `main`.
 
 - If there are no changes to commit, stop and say so — nothing to review.
 - **Migrations do not follow this flow.** They land on `main` alone, one at a
-  time — see `docs/GOTCHAS.md` §7.55. Worktrees share one database.
+  time — see `docs/GOTCHAS.md` §7.55. Worktrees share one database, and **a
+  worktree never authors a migration**: write it in the root checkout on a short
+  `db/…` branch, land it, then `git merge main` to consume it. `/worktree-start`
+  walks that.
+- **Running in a worktree?** This skill is the whole of shipping — there is no
+  separate worktree-commit step. The branch-to-branch push above is already the
+  worktree-safe form. Starting and retiring the worktree are `/worktree-start`
+  and `/worktree-close`; see `docs/WORKTREES.md`.
 - The end-of-session documentation sweep is **`/update-docs`**, and shutting the
   session down is **`/session-close`**. See `01_SESSION_WORKFLOW.md`.
 - This is project-scoped (SwimSync). To use it in every repo, move this

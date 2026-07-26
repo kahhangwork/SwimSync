@@ -128,6 +128,39 @@ and any drift it spotted.
   and `/run-ui-playwright` (uses the seed logins to drive the UI).
 - **Details:** [.claude/skills/session-start/SKILL.md](.claude/skills/session-start/SKILL.md)
 
+### `worktree-start` — begin a parallel worktree without clashing
+
+Only for when you deliberately want a **second Claude session running at the same time**;
+a solo session should use the root checkout on a short branch. Checks what siblings already
+own, settles **the migration question** (and if the answer is yes, walks the migration in the
+**root checkout** and lands it on `main` *before* the worktree exists — a worktree never
+authors one), creates it under `.claude/worktrees/`, copies the `.env` files it does not
+have, claims a non-default port, and writes the `WORKTREE.md` ownership brief.
+
+**Run it AFTER `/plan-with-confidence` and `/plan-review`.** The plan is what answers the
+migration question and supplies the file list for the brief. §8.15 is the cautionary case: a
+backlog item sized **S** with no schema implied turned out, on planning, to need two DB
+triggers — discovering that inside a worktree means backing out to the root.
+
+- **Invoke:** `/worktree-start`, or ask to "start a worktree".
+- **Pairs with:** `/worktree-close`. Reasoning + two worked examples: `docs/WORKTREES.md`.
+- **Details:** [.claude/skills/worktree-start/SKILL.md](.claude/skills/worktree-start/SKILL.md)
+
+### `worktree-close` — retire it, and rescue the graduate list
+
+Confirms the code actually landed on `main`, tears the fixtures out of the shared database
+(never `db reset`), releases the ports, **extracts the graduate list from `WORKTREE.md`
+before the worktree is destroyed**, and settles it keep-or-remove.
+
+**It runs BEFORE `/update-docs`, and that ordering is the reason it exists.** `WORKTREE.md`
+is gitignored, so it dies with the worktree — and it holds the findings that still have to
+reach `docs/GOTCHAS.md`, `BACKLOG.md`, the plan and the PRD. The living documents are then
+written from the **root checkout on `main`**, because no worktree edits them.
+
+- **Invoke:** `/worktree-close`, or say the worktree's work is done.
+- **Pairs with:** `/update-docs` (next), `/session-close` (last).
+- **Details:** [.claude/skills/worktree-close/SKILL.md](.claude/skills/worktree-close/SKILL.md)
+
 ### `update-docs` — reconcile the three living documents
 
 _Called `/session-close` before 2026-07-26._
@@ -224,7 +257,10 @@ login, decisions deliberately left open.
 /session-start            read HANDOVER (the index); fetch the rest on demand       [once]
 /plan-with-confidence     don't plan until >96% sure (asks questions first)     [per change]
 /plan-review              rank a plan's product risk + add mitigations           [per plan]
+/worktree-start           start a parallel worktree safely (AFTER planning)  [per worktree]
 /commit-review            review, commit, AND push to main                     [per change]
+/worktree-close           retire it + carry the graduate list out (BEFORE      [per worktree]
+                          /update-docs)
 /update-docs              reconcile PRD/BACKLOG/HANDOVER  (was: /session-close)     [once]
 /session-close            shut down: fixtures, ports, unpushed work, worktree      [last]
 

@@ -23,6 +23,10 @@ _Last updated: 2026-07-26_
   /plan-review                        ← optional; for anything risky
         │
         ▼
+  /worktree-start                     ← ONLY if running a second session in
+        │                                parallel. Plan FIRST — the plan is what
+        │                                answers "does this need a migration?"
+        ▼
   ┌── build it ───────────────────────────────────────┐
   │                                                   │
   │   /run-ui-playwright   ← if it touches a screen   │
@@ -34,11 +38,19 @@ _Last updated: 2026-07-26_
   └───────────────────────────────────────────────────┘
         │
         ▼
-  /update-docs                        ← once, near the end
+  /worktree-close                     ← if you started one. MUST precede
+        │                                /update-docs — it carries the graduate
+        │                                list out before the worktree is destroyed
+        ▼
+  /update-docs                        ← once, near the end, FROM THE ROOT on main
         │
         ▼
   /session-close                      ← last thing. Then close the terminal.
 ```
+
+**Not using a worktree?** Skip both worktree steps — the loop is unchanged. Most sessions
+should: a worktree is for deliberately running two Claude sessions at once, and buys a solo
+session nothing.
 
 ---
 
@@ -49,14 +61,16 @@ _Last updated: 2026-07-26_
 | **`/session-start`** | Beginning of a session, or picking the repo back up | Once |
 | **`/plan-with-confidence`** | Before building anything non-trivial. It asks questions until it understands the task, *then* plans | Per change |
 | **`/plan-review`** | After a plan exists, before building. Ranks the plan's risks and folds mitigations into it | Per plan |
+| **`/worktree-start`** | Only when running a second session in parallel. **After** planning — the plan answers its migration question | Per worktree |
 | **`/run-ui-playwright`** | To see a change working in the real UI, not just in tests | As needed |
-| **`/commit-review`** | Every time a change is finished. Reviews it, commits it, **and pushes it to `main`** | **Per change** |
-| **`/update-docs`** | Near the end, after the code has shipped | Once |
+| **`/commit-review`** | Every time a change is finished. Reviews it, commits it, **and pushes it to `main`**. Already worktree-safe — there is no separate worktree-commit step | **Per change** |
+| **`/worktree-close`** | When the worktree's work is done — **before `/update-docs`** | Per worktree |
+| **`/update-docs`** | Near the end, after the code has shipped. **From the root checkout** | Once |
 | **`/session-close`** | Last thing before you close the terminal | Once |
 
 ---
 
-## Three things that are easy to get wrong
+## Four things that are easy to get wrong
 
 **① Shipping is per change, not per session.** `/commit-review` carries each change all the
 way to `main`. Do not save up three changes and push them together — `main` moves under you
@@ -75,6 +89,13 @@ the session log, next steps, test counts, drift between documents.
 out of the shared database, dev servers stopped, nothing left unpushed, worktree settled.
 Run `/update-docs` *before* it.
 
+**④ `/worktree-close` runs BEFORE `/update-docs`, not after.** `WORKTREE.md` is gitignored,
+so it dies with the worktree — and it holds the *graduate list*, the findings that still have
+to reach `docs/GOTCHAS.md`, `BACKLOG.md`, the plan and the PRD. `/worktree-close` carries
+that list out; `/update-docs` then writes it, **from the root checkout on `main`**, because no
+worktree edits the living documents. Reverse the two and you are documenting from a list that
+no longer exists.
+
 ---
 
 ## Skipping steps
@@ -92,9 +113,10 @@ often skipped. Both are quick when the session was small.
 
 ## If you are working in a worktree
 
-**Read [docs/WORKTREES.md](docs/WORKTREES.md) first — the whole sequence is there.** It
-exists because git separates your *files* and nothing else: one database, one set of living
-documents, one `main`, one set of ports.
+**Use `/worktree-start` and `/worktree-close`** — they run the sequence for you.
+**[docs/WORKTREES.md](docs/WORKTREES.md)** carries the reasoning and two full worked
+examples (one with a migration, one without). It exists because git separates your *files*
+and nothing else: one database, one set of living documents, one `main`, one set of ports.
 
 The five rules it comes down to:
 
