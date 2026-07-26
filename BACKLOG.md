@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-26 (thirteenth session — the Classes page shows who is in a class; the Levels table header was nested inside a row and is fixed. Both live. **Note: the admin contact-details feature shipped from a parallel worktree and is NOT yet reflected here or in the PRD** — see HANDOVER §8.13)_
+_Last updated: 2026-07-27 (attendance window enforced in the database and a mid-month joiner no longer blocks a month — both live; the two limits that work deliberately left behind are filed under Billing)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -396,20 +396,49 @@ Probably: bill from
 classes that had sessions in the month regardless of `is_active`, and keep `is_active` for
 *scheduling* only.
 
-### Tie the attendance-marking window to un-invoiced months — **S**
-The coach's marking window floor is a **calendar proxy** — `max(start of last month, earliest
-enrolment)` (`lib/lessonDates.ts:backlogWindowStart`) — not "the earliest month not yet
-invoiced."
+### Tie the attendance-marking window to un-invoiced months — **M** — _upgraded 2026-07-27_
+The marking window floor is a **calendar proxy** — the 1st of last month — rather than "the
+earliest month not yet invoiced". Since 2026-07-27 that proxy is **enforced by the database**
+(`assert_markable_date`, `20260727000100`), not merely offered by the UI, which turns a small
+seam into a hard one.
 
-**Why:** the moment a month is invoiced (say July, on 1 Aug), its lessons stay *in-window*
-until the calendar rolls over, but a lesson marked there now would **not** be added to the
-existing invoice — so it's markable yet unbillable, a small silent gap. The calendar rule is a
-fine default for the manual monthly cadence; this closes the seam if it ever matters.
+**Why — and this is much sharper than when it was first filed.** Two gaps, in opposite
+directions:
 
-**Notes:** would make `backlogWindowStart` consult `billing_periods`/existing invoices rather
-than a pure date rule. Minor; recorded so the limitation (noted in HANDOVER §8b) isn't
-re-derived. Related to the credit-note flow, which is the *correct* tool for changing an
-already-invoiced lesson.
+- **Markable yet unbillable** (the original). The moment a month is invoiced (July, on 1 Aug)
+  its lessons stay *in-window* until the calendar rolls over, but a record added there is
+  **not** added to the existing invoice. Small and silent.
+- **⚠ Billable yet unmarkable** (new, and why this is now **M**). The engine permits billing
+  **any** completed month, but the floor only reaches back to the 1st of last month. Bill
+  **July on 5 September** with one lesson unmarked and the gate names a lesson **nobody can
+  record any more** — not the coach, not the admin — so the month cannot be billed at all,
+  and there is no override by design (PRD §7.7). Before the database enforced the window this
+  was recoverable, because the window was a UI convention and the coach could still reach the
+  date.
+
+**Notes:** the fix is to floor at `min(1st of last month, first day of the earliest UNSEALED
+billing month)` — let the window follow `billing_periods` rather than the calendar — in
+`assert_markable_date()` **and** `backlogWindowStart` (`lib/lessonDates.ts`, **both apps**).
+The calendar rule was chosen deliberately over this on 2026-07-27: predictable, no cross-table
+lookup, never falsely refuses, and a fine default for the monthly cadence. **Revisit the first
+time a month is billed late** — that is the trigger, not a hypothetical. Full reasoning in
+`ATTENDANCE_WINDOW_PLAN.md` §10.1. Related to the credit-note flow, which is the *correct*
+tool for changing an already-invoiced lesson.
+
+### The attendance screen trusts a `sessionId` handed to it in the URL — **S**
+`(coach)/classes/[id]/attendance.tsx` takes `sessionId` from the query string and never checks
+that it belongs to the class or the date on screen.
+
+**Why:** supplying a real session id satisfies the screen's "this session already exists"
+branch, which skips the weekday check — so it renders a markable roster for a date it should
+refuse. **Not a billing hole:** records attach to the session that id names, and the database
+guard reads *that session's own* date, so every write is still inside the window. The defect is
+that the header can show a date the records do not belong to.
+
+**Notes:** pre-existing, and pre-dates the 2026-07-27 guard. Fix is one query — resolve the
+session by `(class_id, date)` and ignore the param, or verify it matches before trusting it.
+Not worth a migration on its own; do it the next time that screen is opened.
+`ATTENDANCE_WINDOW_PLAN.md` §10.3.
 
 ---
 
@@ -882,20 +911,6 @@ edit matters far less, which is why this sat unnoticed.
 - Scope it: an `UPDATE` trigger firing on every column change includes the level picker,
   which is fine, but check the volume before adding one to a table the invoice engine
   touches under `service_role`.
-
-### Enforce the attendance window at save time — **S** `[handover]`
-The coach attendance screen (`(coach)/classes/[id]/attendance.tsx`) writes whatever `date` it
-is handed, with no validation.
-
-**Why:** as of HANDOVER §8b every *entry point* (the roster button, Unmarked Lessons, Past
-Sessions) is bounded to the lesson window, so the UX no longer offers a bad date. But the
-screen itself has no guard — a hand-typed URL, or a future new entry point that forgets the
-window, could still create/bill a session **outside the window or on a non-lesson day**. That's
-the exact phantom-lesson billing risk the UX fix closed, just via a different door.
-
-**Notes:** defense-in-depth — reject a `date` outside `[backlogWindowStart(today, enrolment),
-today]` or whose weekday ≠ the class's `day_of_week`, in the save handler (and ideally mirror
-it in a DB check). Cheap, and it makes the window a real invariant rather than a UI convention.
 
 ### Check column geometry on every admin table, not just Levels — **S**
 `verify-levels-table.mjs` measures each `<th>`'s rect against its column's `<td>` and fails

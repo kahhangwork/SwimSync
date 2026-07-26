@@ -1,13 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-26 (**thirteenth** session — two admin UI changes, both live: the
-Classes page now shows **who is in a class** with trials counted separately as `2+1`, and
-the Swimming Levels table's header row — nested inside another row since 2026-07-19 and
-visibly broken in production for a week — is fixed and pinned by a geometry check. Also
-**the skill workflow was reworked**: `/session-close` is now `/update-docs`, a real
-shut-down `/session-close` exists, shipping+docs coupled into `/commit-review`, and
-`01_SESSION_WORKFLOW.md` is the one-page map — **read that first if you are the human
-driving this**. §8.13)_
+_Last updated: 2026-07-27 (**fifteenth** session — the attendance marking window is now
+enforced by the **database** rather than by the screen, and a **child who joins mid-month
+no longer blocks that month from being billed**. Both were one root cause: a date-scoped
+question answered with an un-dated set. **On branch `debt/attendance-window-guard`, not
+yet on `main`, not deployed** — production still runs the old code. §8.15)_
+
+> **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.** The skills
+> were reworked on 2026-07-26: `/session-close` became `/update-docs`, a real shut-down
+> `/session-close` now exists, and shipping+docs are coupled into `/commit-review`.
 
 Read this first to get up to speed, then `PRD.md` for the product spec,
 `BACKLOG.md` for what's queued but unbuilt, and `LOCAL_DEV_GUIDE.md` for the exact
@@ -199,8 +200,21 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   implausible Singapore number (8 digits, leading 6/8/9/3, `+65` optional) on this screen
   **and both create forms** — always advisory, never blocking. No migration: `students_update`
   already grants the tenant admin. PRD §7.19, `CONTACT_DETAILS_PLAN.md`.
-- **Automated tests** — backend **366 pgTAP + 108 Deno**, plus frontend suites
-  (`SwimSyncAdmin` vitest 151, `SwimSyncApp` jest-expo 91); all run in CI on push to `main`. See §5.
+- **The attendance window is a database rule, and a mid-month joiner no longer blocks a
+  month (verified local: pgTAP + Deno + a UI driver — **ON A BRANCH, NOT YET ON `main`,
+  NOT DEPLOYED** 2026-07-27)** — attendance may only be recorded for a lesson on the class's own weekday
+  between the 1st of last month and today, enforced by triggers rather than by the screen,
+  so a phantom lesson can no longer be created *and billed* by reaching the screen with a
+  hand-typed date. A genuine makeup lesson is scheduled by the business's admin instead
+  (`schedule_extra_lesson()`), and the coach records it. Separately, "who was expected at
+  this lesson" is now answered **per date** from enrolment spans — a child who joined on
+  the 20th used to be expected on the 6th, which blocked the whole month from billing with
+  no override. PRD §7.5/§7.6, `ATTENDANCE_WINDOW_PLAN.md`, §8.15.
+  > ⚠ **Production still runs the old code.** This is the only line in §3 describing
+  > something that is not live. Deploy order is **migrations → engine → apps** and it is
+  > load-bearing — see §8.15.
+- **Automated tests** — backend **397 pgTAP + 111 Deno**, plus frontend suites
+  (`SwimSyncAdmin` vitest 162, `SwimSyncApp` jest-expo 109); all run in CI on push to `main`. See §5.
 
 > **"CLEAN SLATE" IS A BANNED PHRASE FOR THIS DATABASE — it has now been wrong twice.**
 > The first time (corrected 2026-07-25) it claimed production held "only the superadmin +
@@ -321,7 +335,7 @@ tests are plain unit/component tests (no stack needed). All four suites — plus
 
 ```bash
 # Backend — Database tests (pgTAP): triggers, RLS, constraints, §11 edge cases
-supabase test db                                  # 366 tests across 21 files
+supabase test db                                  # 397 tests across 22 files
 
 # Backend — Function tests (Deno): billing math, credit + package ledgers, emails
 supabase/functions/generate-invoices/test.sh      # 108 tests; needs deno (brew install deno)
@@ -361,7 +375,8 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `student_merge.test.sql` (20) | folding a duplicate into the row with the history: five refusals (cross-tenant, both-marked, **wrong direction**, invoiced duplicate, same row) each asserting `students` did not shrink; the move of parent links, trial bookings and settlements with **global counts unchanged** — a merge moves rows, never destroys them; and §7.46's guard, proved by **creating a cascading FK at runtime** and asserting the merge refuses |
 | `trial_onboarding.test.sql` (32) | a child before their parent: THREE refusal shapes for `add_unclaimed_student()` (parent, cross-tenant coach, anon) each asserting `students` did not grow, the **tenant derived from the class** (nothing downstream would catch a wrong one — §7.42), `created_by` = the calling coach, a trial enrolment closed on its own date, **session idempotency** (two walk-ins on one date share ONE session — §7.43), the plain-English duplicate name+DOB error, settlement RLS, and `link_invited_parent()` incl. same-parent idempotency vs a different parent refused |
 
-**Total: 366 across 21 files** — verified by `supabase test db` 2026-07-26 (the previous
+| `attendance_window.test.sql` (31) | the marking window as a RULE: a coach refused off-weekday, below the floor and in the future (each asserting `lesson_sessions` did not grow), `off_schedule_reason` unwritable by a client, the **seam** (`service_role` and `postgres` exempt — they build the past the rule is about), the FOUR upsert assertions of §7.57 incl. a mixed multi-row statement proving the existing row is **unchanged**, and `schedule_extra_lesson()` refused for parent / coach / cross-tenant admin, idempotent on a second call, and markable by the coach afterwards |
+**Total: 397 across 22 files** — verified by `supabase test db` 2026-07-27 (the previous
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
@@ -496,7 +511,18 @@ resolves — the non-vacuous test that `tenant_serves_parent()` keys off `studen
 and a child with a **pending claim** offers no Save at all. It also proves the phone check
 never blocks: `964` warns on *Add a student* and the child **is still created** (21 checks;
 admin-only). The driver **resets the fields it edits**, so a second run cannot fail in a way
-that looks like a regression (§7.53's lesson, applied at the driver rather than the fixture).
+that looks like a regression (§7.53's lesson, applied at the driver rather than the fixture);
+`verify-attendance-guard.mjs` (+ `fixtures-attendance-guard.sql`) drives the marking window
+across both UIs — the admin schedules an extra lesson off the class's weekday (and a second
+identical press leaves exactly ONE session, §7.7), the coach is told it is coming and cannot
+mark it before the day, a past in-window lesson opens with **only the children enrolled on
+that date** (the late joiner is absent — the whole point), an out-of-window date and a
+non-lesson day are each refused **in English with no markable roster**, and a save followed
+by a correction round-trips through the real upsert path that §7.57 governs (14 checks).
+**Scores 6/12 on the pre-fix screen**, which is what makes it worth having. Its fixture
+derives every date from ONE clock anchor rather than hardcoding — deliberately the opposite
+of §7.33's rule for unit suites, because the behaviour under test IS relative to now(). It
+carries `pressByText()` for §7.58; needs both servers.
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 
@@ -641,6 +667,40 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     **three edits, not one**. Callers still own their own *window* (billing month vs coach
     backlog); only the meaning of "marked" is shared.
     - **They had already diverged, and it was a live underbill — see §7.17.**
+    - **Drift is now enforced, not remembered**: `attendanceCompleteness.drift.test.ts`
+      (admin vitest) reads all three copies off disk and fails if they differ. Verified
+      by deliberately diverging one — a guard nobody has proved will fail is decoration.
+
+- **WHO WAS EXPECTED AT A LESSON IS A QUESTION ABOUT THAT LESSON'S DATE** (2026-07-27,
+  PRD §7.5/§7.6, `ATTENDANCE_WINDOW_PLAN.md`). `expectedStudentsOn()` takes enrolment
+  **spans** (`{studentId, from, until}`, both ends inclusive), never a list of currently-
+  active ids. `is_active` describes **today**, and a past lesson is not today.
+  - **The inclusive end is load-bearing**: a trial walk-in's enrolment opens and closes on
+    its own date, so an exclusive end would expect them at no lesson at all.
+  - **Do NOT convert `billableStudentIds` or `deferrableParentIds` to spans**
+    (`core.ts`). Those answer a different question — §7.13: *who gets billed* follows
+    attendance rows, *who must be marked* follows enrolment. Collapsing them is the live
+    underbill where one tap of "remove from class" cost a month's revenue.
+  - **The screens must agree with the engine or the product deadlocks.** If the coach's
+    roster hides a child the engine still expects, the month names a lesson with no way
+    to mark it. Change all three copies and the engine together, or neither.
+
+- **THE MARKING WINDOW IS ENFORCED IN THE DATABASE, AND THE SEAM IS `current_user`**
+  (2026-07-27, `20260727000100`). RLS constrains *whose* class a caller may write, never
+  *which* date, so the app was never a boundary here.
+  - **Scoped to `authenticated` on purpose.** Fixtures are not clients — their job is to
+    construct the past the rule is about (an invoiced March, a sealed month). An absolute
+    rule would force every pgTAP fixture to date itself against the wall clock, which is
+    §7.33's trap and already cost this repo eight hours a day of red suite (§8.12).
+  - **The rule lives in `assert_markable_date()` / `assert_class_runs_on()`, not inline
+    in the triggers**, because §7.42 means a future SECURITY DEFINER writer inherits the
+    exemption silently — it must be able to call the same two functions.
+  - **Corrections are always allowed; only NEW charges are bounded.** See §7.57 for why
+    that distinction cannot be made by the trigger event alone.
+  - **`schedule_extra_lesson()` is the ONLY way past the weekday rule**, and it is the
+    second writer of `lesson_sessions` — so §7.43's rule is live again: date as a
+    **parameter**, never `now()`, and `ON CONFLICT DO NOTHING`, because a duplicate
+    `(class_id, session_date)` double-bills a whole class (§7.7).
 - **A PRIVATE COACH IS A TENANT OF ONE — never branch on "coach type".** They hold
   `tenant_admin` *and* a `coaches` row. This is why coach type is not an authorization
   concept anywhere, why wages needed no private-vs-school check, and why the app must
@@ -1382,6 +1442,151 @@ See LOCAL_DEV_GUIDE §"Running the tests".
       cannot own one path, and committing it makes every sibling's `git merge main` fail
       with *"untracked working tree files would be overwritten"*. Anything durable in it
       belongs here or in `BACKLOG.md` **before** the worktree is retired.
+      - **This bit immediately.** The 2026-07-27 worktree branched *before* that rule
+        landed and committed `WORKTREE.md`; it was caught at merge time and removed with
+        `git rm --cached`. If your branch predates `12cf553`, check before you commit.
+
+57. **A `BEFORE INSERT` TRIGGER ALSO FIRES FOR ROWS THAT RESOLVE TO AN *UPDATE*.**
+    PostgREST emits `.upsert(rows, { onConflict })` as `INSERT … ON CONFLICT DO UPDATE`,
+    and Postgres runs BEFORE INSERT triggers for **every candidate row, before the
+    conflict is detected**. So a guard written as "INSERT only" silently governs updates
+    too.
+    This was one review pass away from shipping: the attendance window guard
+    (`20260727000100`) would have refused **every correction to an already-invoiced
+    lesson** — the credit-note flow (PRD §7.8), which is the exact feature the
+    INSERT/UPDATE split was chosen to protect. Worse, the coach's save sends **every
+    student in ONE statement**, so a single refused row fails the whole class's save with
+    a generic error.
+    **The fix is to detect the update inside the trigger** — if a row already exists for
+    the conflict key, it is a correction, so return early. A client-side "split insert
+    from update" would not do: it leaves direct REST calls unguarded.
+    Confirmed empirically with a throwaway probe table before the guard was written, not
+    reasoned about. Audit: `grep -rn "BEFORE INSERT" supabase/migrations/` — for each, ask
+    whether its table is ever written by `.upsert()`.
+
+58. **A DEEP-LINKED RN-WEB SCREEN CAN BE PHYSICALLY OVERLAID BY THE ONE YOU LEFT, SO
+    `click({force:true})` PRESSES THE WRONG ELEMENT.** §7.10 records that the previous
+    screen stays mounted and pollutes `document.body.innerText`. Reaching a screen by
+    **deep link** is worse: the stale screen is also laid out on top, so
+    `document.elementFromPoint()` at a button's own centre returns a card belonging to the
+    *other* screen. `force: true` skips the actionability check but still clicks those
+    coordinates — the press lands on the overlay, nothing errors, the state never changes,
+    and the driver reads as "the feature is broken".
+    Cost an hour on `verify-attendance-guard.mjs`, where the two save checks failed while
+    the save worked fine by hand. **Diagnose by asking the DOM, not by screenshot:**
+    ```js
+    const r = el.getBoundingClientRect();
+    document.elementFromPoint(r.left + r.width/2, r.top + r.height/2) // is it your element?
+    ```
+    The fix is to dispatch `pointerdown`/`pointerup`/`click` on the element itself
+    (`pressByText()` in that driver). Prefer in-app navigation where you can; use this
+    when a deep link is the point of the test.
+
+59. **A `COUNT(*)` BASELINE IS ROLE-DEPENDENT UNDER RLS, SO "NOTHING WAS WRITTEN" CAN
+    FAIL WHILE BEING TRUE.** A pgTAP fixture captured `SELECT COUNT(*) FROM lesson_sessions`
+    as `postgres` (which sees every row) and compared it later under `SET LOCAL ROLE
+    authenticated`, where the coach sees only their own classes' sessions. The two numbers
+    count different things, so the assertion failed no matter what the code did — and the
+    failure looks like the guard leaking a write, which is the most alarming possible
+    misdiagnosis.
+    **Scope both sides to the same rows** (`WHERE class_id = …`), or take both counts as
+    the same role. This is §7.16's sibling: there the role was silently *wrong*, here it
+    silently *changes between two reads*.
+---
+
+## 8.15 Fifteenth session (2026-07-27) — THE ATTENDANCE WINDOW IS A RULE — **NOT YET ON `main`, NOT DEPLOYED**
+
+Branch **`debt/attendance-window-guard`** (worktree `SwimSync-attendance-window`), one
+feature commit + two merges of `main` (it moved twice during the session). Planned with `/plan-with-confidence` +
+`/plan-review`; the plan, its inlined risk mitigations and three accepted consequences
+are in **`ATTENDANCE_WINDOW_PLAN.md`**.
+
+> ⚠ **NOT ON `main` AND NOT DEPLOYED. Production runs the old code.** No `db push`, no
+> `functions deploy`, no Vercel push. The deploy order is in the plan §7 and **one part
+> of it is load-bearing** — see below.
+
+**The backlog item was "reject a bad date in the save handler" (S). It grew, and the
+reason is the whole session.** Planning found the same un-dated set behind the missing
+guard also drove the **billing gate**, so the work was really two faces of one bug:
+
+**(a) The window was a UI convention.** `(coach)/classes/[id]/attendance.tsx` wrote
+whatever `date` the URL handed it. `sessions_write` constrains *whose* class a caller may
+write, never *which* date — so a coach's own token against PostgREST could create, and
+bill, a session on any date at all. Every *entry point* had been windowed since §8c; the
+screen never was.
+
+**(b) A child who joined mid-month blocked that month from billing.** The gate asked "who
+is actively enrolled?" — one set for a whole month — and expected them at every lesson in
+it. A child enrolled on the 20th was expected on the 6th and 13th, had no rows, and the
+month reported `incomplete_attendance`, which blocks generation outright with **no
+override** (§8a). Clearing it meant marking a child at a lesson they were not enrolled
+for. **The user found this**, from the plan's own example: *"if Aisha joined in June and
+the coach goes back to March, she should not be in his roster."*
+
+**Fixing only the screen would have been WORSE than fixing neither** — the engine would
+still have named a lesson the app correctly no longer offered any way to mark: a month
+unbillable with no remedy in the product. That is §7.18's shape, and it is why the deploy
+order below is not negotiable.
+
+**What shipped**
+
+- **Two DB triggers** (`20260727000100`), gated on `current_user = 'authenticated'`: a
+  session must fall on the class's own weekday inside `[1st of last month, today]`; a
+  **new** attendance row must fall in that window. Corrections are always allowed.
+- **Enrolment is a SPAN** in `attendanceCompleteness.ts` (all three copies) and the
+  engine — "who was expected" is answered per date.
+- **The roster for a past lesson is the roster as it was then**, and a refused date shows
+  a plain explanation instead of a roster that cannot be saved.
+- **`schedule_extra_lesson()`** — the admin arranges a makeup (future dates allowed,
+  reason required); the coach marks it. Surfaced on the coach's roster *and* backlog.
+- **An admin control** on the Classes page. Still **no attendance-writing in the admin**.
+
+**Four findings worth keeping**
+
+- **§7.57 — a `BEFORE INSERT` trigger fires for rows that resolve to an UPDATE.** The
+  coach's save is `.upsert()`. An "INSERT only" guard would have refused every
+  credit-note correction, and failed the whole class's save on one row. Caught by
+  `/plan-review` *before* the trigger was written, then confirmed with a probe table.
+- **§7.58 — a stale RN-web screen can physically overlay the one you deep-linked to**, so
+  `click({force:true})` presses the wrong element and the run reads as "the save is
+  broken".
+- **§7.59 — a global `COUNT(*)` baseline is role-dependent under RLS.** A pgTAP fixture
+  counted as `postgres` and asserted as `authenticated`; the two count different rows.
+- **A pre-existing §7.7 instance left alone**: `core.ts` derives `earliestEnrolment` with
+  `String(...).slice(0,10)` — the UTC date. It only widens a window floor, and changing
+  it would move every existing test's expectations. New span code uses `dateInTimeZone`.
+
+**Verification.** pgTAP **366 → 397**, Deno **108 → 111**, admin vitest **122 → 162**
+(includes the sibling worktree's suites), app jest **91 → 109**; both apps typecheck;
+backend suites run twice (§7.15). **Every new test was proven to fail without the fix**
+(§7.25): dropping the triggers fails **12 of 31** pgTAP assertions; the mid-month-joiner
+test fails on the pre-fix engine; the new driver scores **6/12** on the pre-fix screen and
+**14/14** after. A **tripwire** pins that a month with no joiners bills byte-identically,
+and a **drift test** reads all three copies of `attendanceCompleteness.ts` off disk and
+fails if they diverge — verified by deliberately diverging one. Rollback SQL was
+**executed forward, back and forward again** locally.
+
+### Not done (deliberate)
+
+- **Not deployed.** Production has zero attendance and zero invoices, so nothing is
+  urgent, but the ordering is: **migrations → ENGINE → apps**. Pushing the apps first
+  recreates the exact deadlock this session removed. Assert `generate-invoices` moves
+  **v16 → v17** before the app push, and remember §7.39's remote grant dump.
+- **The window floor stays a calendar proxy.** Chosen over "refuse only already-invoiced
+  months". Its sharpest consequence is now filed: a month billed **two or more months
+  late** with an unmarked lesson **cannot be unblocked by anyone** — `BACKLOG.md` →
+  *Tie the attendance-marking window to un-invoiced months*, upgraded S→M with this as
+  the trigger to revisit.
+- **`sessionId` in the URL is still trusted** — filed in `BACKLOG.md`. Not a billing hole
+  (the DB guard reads the session's own date), only a cosmetic mismatch.
+- **A fully-departed class can now block a month it previously did not** — spans reinstate
+  leavers for the dates they *were* enrolled. More correct, and it has a remedy: those
+  same leavers appear on that date's roster, because spans drive both. **Check that
+  remedy still works before changing either side.**
+- **`verify-attendance-window.mjs` (the older driver) scores 0/4 — identically before and
+  after this work.** Its fixture header assumes a clock of 16–17 Jul 2026. Pre-existing
+  staleness, not a regression, but that driver currently guards nothing.
+
 ---
 
 ## 8.14 Parallel worktree session (2026-07-26) — A PARENT'S CONTACT DETAILS CAN BE FIXED — **DEPLOYED**
@@ -3372,155 +3577,69 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### ~~FIRST: a shipped feature is documented nowhere~~ — **CLOSED 2026-07-26, by its own session**
+### FIRST: land and deploy the attendance-window work
 
-**`feat/parent-contact-details` is live on `main`** (`3832670`, 2026-07-26): the admin can
-fix a parent's contact details, with SG phone validation (`lib/sgPhone.ts`) and a
-`ContactHint` component. The thirteenth session found it undocumented and **correctly
-refused to write the PRD entry itself** — documenting behaviour you have not driven is how
-the PRD starts lying (§8.13). Its own session then closed it, hours later:
+§8.15 is **on `debt/attendance-window-guard`, not on `main`**, and production runs the old
+code. Take the branch to `main` first (`/commit-review` Step 5 — fetch, rebase, re-run the
+suites, `git push origin <branch>:main`), then deploy. Nothing about it is urgent
+(production has **0 attendance rows**, so neither bug can currently bite anyone), but a
+merged-and-undeployed migration is exactly what went unnoticed for six days once before
+(§3's deploy note).
 
-- `PRD.md` **§7.19** — the three states and why they differ
-- `HANDOVER.md` §3 (what works) and §5 (the driver catalog, plus the frontend test-file
-  list, which had gone stale by six files)
-- `BACKLOG.md` — *"Editing a student's PARENT contact details"* struck through as **DONE**,
-  with the two calls it left open recorded as settled
-- `fixtures-contact-details-teardown.sql` — the convention §8.13 established two commits
-  earlier and this feature had missed
+**The order is load-bearing — migrations → ENGINE → apps:**
 
-`CONTACT_DETAILS_PLAN.md` stays at the repo root, matching every previous plan file.
-**The one thing genuinely still open** is in `BACKLOG.md`: *Direct writes to `students` are
-audited by nobody* — this screen and `setLevel()` both write with no `audit_log` row, and
-the fix is a trigger, i.e. a migration, i.e. it queues behind the attendance-window one
-(§7.55).
+1. Back up, then `supabase db push`; confirm with `supabase migration list --linked` that
+   nothing has an empty `remote`. The `pg-delta` SSL stack trace is noise (§8.11).
+2. **Remote grant dump** (§7.39 — the only honest check):
+   `supabase db dump --file /tmp/p.sql && grep -E '(GRANT|REVOKE).*ON FUNCTION' /tmp/p.sql | grep '"anon"'`
+   → `schedule_extra_lesson` must not appear.
+3. `supabase functions deploy generate-invoices`, then assert `supabase functions list`
+   shows **v17** (it is at v16). A version that has not moved means the deploy did not land.
+4. **Only then** `git push` → Vercel, and verify the **app** bundle carries it, not just
+   the admin (§7.23, §7.51 — grep a contiguous user-visible string).
 
-This matters beyond tidiness: the phone is now the **primary parent-matching signal** for
-claims (§8.12), and every child added before 2026-07-26 has none. A screen that can supply
-one is load-bearing for that, and nobody reading the docs would know it exists.
+**Push the apps before the engine and you recreate the deadlock this work removed:** the
+engine would name an unmarked lesson that the app correctly no longer offers any way to
+mark. `supabase/rollback/20260727_attendance_window_DOWN.sql` is two DROP TRIGGERs and has
+been rehearsed.
 
-**Production data, for reference** (unchanged since the 2026-07-26 cleanup): **9 students,
-7 parents**, all real families, plus the real coach, 4 real classes, and a second tenant
-(`Epic Swim`). **`attendance`, `lesson_sessions` and `invoices` are all 0.** Not a clean
-slate — see §3's banned-phrase note.
+### THEN: the thing that has blocked everything since 2026-07-13
 
-**⚠ The "first attendance ever recorded" paragraph below is now FALSE, and has been
-rewritten rather than deleted** — that one row was `TestChild1`'s trial and the script
-removed it. The loop *was* proven end to end, and then the evidence was cleaned up. Do
-not let it silently rot into a claim the database
-contradicts.
+**No real lesson has ever been taught and recorded, and no invoice has ever been
+generated.** The mechanism is proven — the whole loop was walked on production 2026-07-25
+and the evidence then removed by the 2026-07-26 cleanup, so `attendance` reads 0 for a
+reason that is not "it has never worked". Don't re-derive that; §8.12 and the banned-phrase
+note in §3 explain it.
 
-### The parent-claim work is live and PROVEN on production
-
-Everything from §8.12 was walked by hand on production the same evening — normal child
-creation, the claim flow, the block, approve, undo, duplicate detection, merge, and the
-invite modal. Ten defects came back and were all fixed and deployed (§8.12). Nothing about
-it is outstanding.
-
-Two things remain untested only because they need a second real family:
-**two parents claiming the same child** (the queue warns and approving one auto-declines
-the other — covered by pgTAP), and the **email** match signal.
-
-### Outstanding from 2026-07-21 — ONE left, and it is now narrow
-
-**`RESEND_API_KEY` is proven.** It was unexercised for five days; parent invites were sent
-and received on production 2026-07-26 (and re-sent, after the resend path was fixed), so
-that half is closed. Removed from this list rather than left as a caveat.
-
-**What remains: the production redirect allow-list, for `/reset-password` only.**
-`/accept-invite` is now proven — invited parents have landed on it and set passwords. The
-reset-password entry has still never been exercised on production, and §7.41 is the reason
-to care: an unlisted redirect is **not rejected**, it is silently replaced with `site_url`,
-so the email arrives, the link works, and the user lands on the wrong page.
-
-**A two-minute check:** use *Forgot password?* on `swimsync.sg` with a real address and
-**read the URL** in the email before following it.
-
-**Tenant provisioning itself is still dormant** — no business has been created through
-Platform → New business since `Epic Swim` was provisioned by hand on 2026-07-21.
-
-### The one thing blocking everything else — PROVEN once, then deliberately erased
-
-**The whole loop was walked end to end on production on 2026-07-25**, by the user, through
-the real apps: a trial booked on the Trials page for 12 Jul, marked `trial_free` in the
-coach app, cleared from "needs marking", and the child then claimed by an invited parent.
-At that moment `lesson_sessions` was **1**, `attendance` **1**, `parent_students` 11 → 12,
-and the Platform page's *last attendance* column stopped reading **never**.
-
-> ⚠ **That row is GONE — the 2026-07-26 cleanup removed it**, because it was `TestChild1`'s
-> trial and the script deletes test records by exact name. So `attendance` is back to **0**
-> and *last attendance* reads **never** again. **This is not a regression and the mechanism
-> is not in doubt** — it ran, it worked, and then the evidence was tidied away on purpose.
-> Do not read today's zero as "the path has never been exercised", and do not reinstate the
-> older "no attendance has ever been marked" framing that led this section from 2026-07-13
-> to 2026-07-25. `SELECT COUNT(*) FROM attendance;` is the number; this paragraph is why it
-> reads the way it does.
-
-**What was proven was a TEST TRIAL, not a real lesson**, and that distinction is unchanged:
-
-- **No real lesson has ever been taught and recorded.** The one attendance row that existed
-  was a free trial created to exercise the path, and it has since been deleted.
-- **No invoice has ever been generated.** `invoices` is **0**, so the billing engine has
-  never processed anything real, and the completeness gate has never refused a real month.
-- `auto_invoice_enabled` is still **false**, and **no coach rate is set**, so payroll would
-  compute nothing.
-- The `class_rates` backfill (§8.3) is still *correct by emptiness* — floor-dating every
-  class's terms stays vacuously right until there are lessons for it to be wrong about.
-
-So the shape of the remaining work is unchanged: the *mechanism* is proven, the *usage* is
-not. The gap is "bill a real month", not "mark anything at all".
-
-1. **Get the coach marking a REAL lesson.** The mechanism is now proven end to end on
-   production (above); what has not happened is an actual class being recorded. An
-   onboarding push, not a build task.
+1. **Get the coach marking a REAL lesson.** An onboarding push, not a build task.
 2. **Then bill a real month**, following `INVOICE_RUNBOOK.md`. Expect the gate to refuse
-   until every lesson is marked — working as designed; mark them (or mark them cancelled),
-   never override.
-3. **~~Then onboard the school as tenant 2~~ — DONE.** `Epic Swim` was provisioned
-   2026-07-21 and has its own admin and a separate coach. The rest of this item is kept
-   for the reasoning; the action is complete.
-   ~~**Then onboard the school as tenant 2 — which is now a button, not a SQL script**~~
-   (§8.9, PRD §4.4). Platform → New business. Cross-tenant isolation is proven in pgTAP
-   across two tenants and driven through both UIs, but **production has only ever had one
-   tenant**, so the school's arrival is the first time any of it is load-bearing on real
-   data. It is also what proves the two first-use paths above.
-   **Note the standing limit:** provisioning mints **exactly one admin** and there is no way
-   to add a second without SQL (`BACKLOG.md` → *Multiple admin accounts per tenant*). If the
-   school expects two people to run it, say so before onboarding rather than after.
+   until every lesson is marked — working as designed. Mark them, or mark them cancelled;
+   **never override**.
+
+Still true and worth knowing before that first run: `auto_invoice_enabled` is **false**,
+**no coach rate is set** (so payroll computes nothing), and the join code is **`SWIM-RVM9`**
+— the only route in for a new family, and the re-entry route for one marked inactive.
+
+### One narrow thing still unverified on production
+
+**The `/reset-password` redirect allow-list.** `/accept-invite` is proven; this entry has
+never been exercised. §7.41 is the reason to care: an unlisted redirect is **not rejected**,
+it is silently replaced with `site_url`, so the email arrives, the link works, and the user
+lands on the wrong page. **A two-minute check:** use *Forgot password?* on `swimsync.sg`
+with a real address and **read the URL** in the email before following it.
 
 ### If you would rather build than onboard
 
 **`BACKLOG.md` → `## Build order` is EMPTY** and has been since 2026-07-19. Pick from the
-themed sections below it. The nearest candidates with no dependencies:
-**credit-note emails** (the other half of the notification work), an **upcoming-lessons
-view for parents** (small, and the building block already exists), or **convert a trial
-into an enrolled student** (small, raised by the trial-onboarding testing).
-
-*(Parents claiming their own child shipped 2026-07-26 — PRD §7.18. Coach-created student
-profiles shipped 2026-07-25. Both were the last of the trial-onboarding cluster.
-**Editing a parent's contact details also shipped 2026-07-26** and was removed from this
-list — but see the FIRST item above: it is still sitting in `BACKLOG.md` as unbuilt.)*
+themed sections below it. Nearest candidates with no dependencies: **credit-note emails**
+(the other half of the notification work), an **upcoming-lessons view for parents** (small,
+and the building block already exists), or **convert a trial into an enrolled student**.
 
 **Two hygiene items, neither urgent:** *revoke `anon` EXECUTE from the remaining SECURITY
-DEFINER functions* (§7.39's missing second layer), and *a business cannot read its own
-audit trail* — 13 of 19 writers never set `audit_log.tenant_id`, and the parent-claim work
-made that column **half**-populated, which fails more quietly than empty did.
-
-### Small, concrete, and outstanding
-
-- **The join code is `SWIM-RVM9`.** The *only* route in — no directory, so a parent without
-  it cannot add a child at all. It is also now the **re-entry** route for a family that was
-  marked inactive (§8).
-- **`auto_invoice_enabled` is `false`** on the tenant. Automatic generation will not run
-  until it is turned on.
-- **Set a coach rate** if you want payroll to compute anything (Admin → Coach Wages). A
-  coach with no rate is deliberately not on payroll.
-- **Packages are live but dormant** — to switch them on: Admin → Packages → add a
-  category, tag the classes (Classes page), create a product. Parents then see it under
-  Billing → Packages. Until then, nothing anywhere changes for anyone.
-- **Business provisioning is live but unused** — Platform → New business. Creating one is
-  immediate and its **join code works straight away**, so don't create a test business in
-  production to "see how it looks": there is deliberately no delete button, and the remedy
-  is SQL (§8.9). Drive it locally instead — `verify-tenant-provisioning.mjs`.
+DEFINER functions* (§7.39's missing second layer), and *a business cannot read its own audit
+trail* — 13 of 19 writers never set `audit_log.tenant_id`, and the parent-claim work made
+that column **half**-populated, which fails more quietly than empty did. Both are migrations,
+so they queue behind each other; only one schema change should be in flight at a time (§7.55).
 
 ### Worth deciding, not urgent
 
@@ -3528,6 +3647,11 @@ made that column **half**-populated, which fails more quietly than empty did.
 month, configurable run day) and the engine is per-tenant. Before switching it on: a blocked
 month becomes a *silent stall* rather than a button that refuses, and the block-notification
 email **has still never fired in production**.
+
+**Dormant but live, so don't rediscover them as bugs:** prepaid packages (Admin → Packages),
+business provisioning (Platform → New business — creating one is immediate and its join code
+works straight away, and there is deliberately no delete button), trial bookings, and parent
+claiming. Each does nothing until first used.
 
 ## 10. File map
 
@@ -3543,6 +3667,11 @@ email **has still never fired in production**.
 | `TRIAL_ONBOARDING_PLAN.md` | A child before their parent: the plan, its ranked risks inlined as mitigations, and the pre-commit gate. **Read before merging §8.10** |
 | `PARENT_CLAIM_PLAN.md` | **The parent-claiming design of record** — the settled decisions (including the two the user reversed mid-planning), seven ranked risks with mitigations inlined beside the step each governs, and the pre-commit gate. Read before changing matching, the claim queue, or `merge_students()` |
 | `SwimSyncApp/lib/attendanceRoster.ts` | Who appears on Mark Attendance: enrolled **∪** already-marked-on-this-session. Why a closed trial enrolment doesn't hide the child it marked |
+| `ATTENDANCE_WINDOW_PLAN.md` | **The marking-window design of record** — the settled decisions, ranked risks with mitigations inlined beside the step each governs, the pre-commit gate, and **§10: three consequences accepted deliberately**. Read before changing the window, the completeness rule, or `schedule_extra_lesson()` |
+| `supabase/migrations/20260727000100_attendance_window_guard.sql` | The window as a rule: two `current_user`-seamed triggers, the four functions that hold it in one place, `off_schedule_reason`, and `schedule_extra_lesson()` |
+| `supabase/rollback/20260727_attendance_window_DOWN.sql` | Two DROP TRIGGERs and nothing clever — the guard is pure validation, so dropping them restores the old behaviour whatever the app is doing |
+| `SwimSyncApp/lib/attendanceWindow.ts` | The client's copy of the window rule. **An affordance, not the guard** — the database is the rule; this exists so a coach sees English instead of a Postgres error |
+| `.claude/skills/run-ui-playwright/drivers/verify-attendance-guard.mjs` | Drives the window across both UIs — the roster-as-it-was-then case, both refusals, the admin's extra lesson, and the save/correct round-trip that §7.57 governs. Carries `pressByText()` for §7.58 |
 | `supabase/migrations/20260725000100…000300` | `student_settlements`, `add_unclaimed_student()`, `link_invited_parent()` |
 | `SwimSyncAdmin/lib/classRoster.ts` | Who is in a class: active enrolments + **upcoming** trials, and the `2+1` count. **Takes `today` as a required parameter and touches no clock** — §7.7 made unreachable rather than discouraged |
 | `SwimSyncAdmin/components/Drawer.tsx` | Right-hand slide-over. Deliberately the same prop shape as `Modal.tsx` and no richer |

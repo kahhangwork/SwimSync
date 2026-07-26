@@ -116,6 +116,18 @@ Billing is based on **actual attendance**, so make sure last month is complete:
      - **A child has stopped coming** and is holding the class open → **Remove from
        class** on admin → Students (or the coach's roster). Lessons they already
        attended are still billed.
+     - **The lesson was on a day the class doesn't normally run** (a makeup, a holiday
+       shift) → it only exists if an admin scheduled it (Classes → **Extra lesson**),
+       and the coach marks it like any other. They cannot create one themselves.
+
+     > ⚠ **BILL THE MONTH PROMPTLY — the coach can only mark back to the 1st of LAST
+     > month, and that limit is enforced by the database.** Bill July in early August
+     > and every July lesson is markable. Leave it until **September** and July's
+     > lessons are closed: the dialog will name a gap that **nobody can now fill** —
+     > not the coach, not you — and the month cannot be billed at all. There is no
+     > override. If you ever reach that state, say so rather than working around it;
+     > the fix is a code change, filed in `BACKLOG.md` → *Tie the attendance-marking
+     > window to un-invoiced months*.
 
    Then confirm. Give it ~5–8 seconds (the billing function can cold-start).
    You'll see a toast like **"Created N invoice(s) for <month>."**
