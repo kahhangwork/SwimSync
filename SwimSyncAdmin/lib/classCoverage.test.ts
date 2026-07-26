@@ -20,12 +20,14 @@ const TWO_STUDENTS: CoverageEnrolment[] = [
     student_id: "s1",
     is_active: true,
     enrolled_at: "2026-06-01T02:00:00Z",
+        unenrolled_at: null,
   },
   {
     class_id: "c1",
     student_id: "s2",
     is_active: true,
     enrolled_at: "2026-06-01T02:00:00Z",
+        unenrolled_at: null,
   },
 ];
 
@@ -119,6 +121,7 @@ describe("computeClassCoverage", () => {
         student_id: "s1",
         is_active: true,
         enrolled_at: "2026-07-15T02:00:00Z",
+        unenrolled_at: null,
       },
     ];
     const sessions = [
@@ -153,6 +156,7 @@ describe("computeClassCoverage", () => {
         student_id: "s1",
         is_active: true,
         enrolled_at: "2026-07-03T18:00:00Z",
+        unenrolled_at: null,
       },
     ];
     const [cov] = computeClassCoverage(
@@ -181,6 +185,7 @@ describe("computeClassCoverage", () => {
         student_id: "s1",
         is_active: false,
         enrolled_at: "2026-06-01T02:00:00Z",
+        unenrolled_at: null,
       },
     ];
     expect(
@@ -208,6 +213,7 @@ describe("computeClassCoverage", () => {
         student_id: "s3",
         is_active: true,
         enrolled_at: "2026-06-01T02:00:00Z",
+        unenrolled_at: null,
       },
     ];
     const { sessions, attendance } = fullyMarked([4, 11, 18, 25]);
@@ -241,7 +247,7 @@ describe("computeClassCoverage", () => {
 describe("trial bookings", () => {
   const cls = [{ id: "c1", title: "Sat Group", day_of_week: "saturday" as const }];
   const enrolled = [
-    { class_id: "c1", student_id: "s1", is_active: true, enrolled_at: "2026-01-01" },
+    { class_id: "c1", student_id: "s1", is_active: true, enrolled_at: "2026-01-01", unenrolled_at: null },
   ];
   const sess1 = { id: "sess1", class_id: "c1", session_date: "2026-08-01" };
   const booking = [

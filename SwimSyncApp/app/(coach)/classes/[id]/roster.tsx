@@ -22,6 +22,7 @@ import {
 } from "@/lib/lessonDates";
 import {
   countMarked,
+  type EnrolmentSpan,
   expectedStudentsOn,
 } from "@/lib/attendanceCompleteness";
 import Card from "@/components/Card";
@@ -86,6 +87,15 @@ export default function ClassRosterScreen() {
   const [upcomingTrials, setUpcomingTrials] = useState<
     { id: string; full_name: string; session_date: string }[]
   >([]);
+  // Lessons the admin has SCHEDULED off the class's usual weekday — a makeup,
+  // a holiday shift. The session row exists ahead of time (unlike an ordinary
+  // lesson, which is created lazily when attendance is saved), and the sessions
+  // query below is bounded to today, so without this the coach would get no
+  // warning at all: the extra lesson would simply appear in their backlog on
+  // the day, unexplained.
+  const [upcomingExtras, setUpcomingExtras] = useState<
+    { id: string; session_date: string; reason: string }[]
+  >([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [markTarget, setMarkTarget] = useState<{
     date: string;
@@ -130,6 +140,8 @@ export default function ClassRosterScreen() {
         student_class_enrolments(
           is_active,
           enrolled_at,
+          unenrolled_at,
+          student_id,
           students(id, full_name, date_of_birth, tenant_levels(label, note, tenant_level_skills(label, sort_order)))
         )
       `)
@@ -183,8 +195,42 @@ export default function ClassRosterScreen() {
       .lte("session_date", todayDate)
       .order("session_date", { ascending: false });
 
+    // Extra lessons the admin has scheduled AHEAD. Deliberately a separate
+    // query rather than widening the one above: everything below treats
+    // `sessionData` as lessons that have already happened, and a future row in
+    // it would be counted as an unmarked backlog item the coach cannot yet act
+    // on.
+    const { data: extraData } = await supabase
+      .from("lesson_sessions")
+      .select("id, session_date, off_schedule_reason")
+      .eq("class_id", id)
+      .gt("session_date", todayDate)
+      .not("off_schedule_reason", "is", null)
+      .order("session_date", { ascending: true });
+
+    setUpcomingExtras(
+      (extraData ?? []).map((s: any) => ({
+        id: s.id as string,
+        session_date: s.session_date as string,
+        reason: s.off_schedule_reason as string,
+      }))
+    );
+
     const totalStudents = activeStudents.length;
     const activeStudentIds = activeStudents.map((s) => s.id);
+
+    // Who was expected at a lesson is a question about THAT LESSON'S date, so
+    // an enrolment is a span, not a flag. Built from every enrolment row (not
+    // just the active ones): a child who has since left was still expected at
+    // the lessons they were enrolled for, and their marked rows must keep
+    // counting. See EnrolmentSpan in lib/attendanceCompleteness.ts.
+    const enrolmentSpans: EnrolmentSpan[] = (
+      cls.student_class_enrolments ?? []
+    ).map((e: any) => ({
+      studentId: (e.student_id ?? e.students?.id) as string,
+      from: toSgDate(e.enrolled_at),
+      until: e.unenrolled_at ? toSgDate(e.unenrolled_at) : null,
+    }));
 
     // Trial bookings for this class. A booked child is expected at ONE lesson
     // and is not enrolled, so the counts below would read "3 of 3 marked" while
@@ -236,7 +282,7 @@ export default function ClassRosterScreen() {
       // rule, so this screen and the engine count the same people.
       const expectedHere = expectedStudentsOn(
         s.session_date,
-        activeStudentIds,
+        enrolmentSpans,
         bookedByDate
       );
       return {
@@ -429,6 +475,33 @@ export default function ClassRosterScreen() {
             ))}
             <Text className="mt-2 text-[11px] text-sky-700">
               Trying one lesson — mark them like anyone else on the day.
+            </Text>
+          </View>
+        )}
+
+        {/* ── Extra lessons coming up ──────────────────────────────────────
+            A lesson on a day this class does not normally run, arranged by the
+            business's admin. Shown here for the same reason trials are: it is
+            the thing the coach does not already know, and their weekday-based
+            expectation of this class will not produce it. */}
+        {upcomingExtras.length > 0 && (
+          <View className="mb-5 bg-amber-50 rounded-2xl p-4 border border-amber-100">
+            <Text className="text-sm font-bold text-amber-900">
+              Extra lesson{upcomingExtras.length === 1 ? "" : "s"} coming up
+            </Text>
+            {upcomingExtras.map((ex) => (
+              <View key={ex.id} className="mt-2">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm text-amber-900">{ex.reason}</Text>
+                  <Text className="text-xs font-medium text-amber-700">
+                    {formatSgDate(ex.session_date)}
+                  </Text>
+                </View>
+              </View>
+            ))}
+            <Text className="mt-2 text-[11px] text-amber-700">
+              Not this class's usual day — mark it as normal once it has taken
+              place.
             </Text>
           </View>
         )}

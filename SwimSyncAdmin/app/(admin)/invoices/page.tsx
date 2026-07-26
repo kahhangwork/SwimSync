@@ -219,7 +219,10 @@ export default function InvoicesPage() {
       const [enrolmentsRes, sessionsRes, bookingsRes] = await Promise.all([
         supabase
           .from("student_class_enrolments")
-          .select("class_id, student_id, is_active, enrolled_at")
+          // unenrolled_at is needed as well as enrolled_at: who must be marked
+          // is a question about the LESSON'S date, so an enrolment is a span,
+          // not a flag. See EnrolmentSpan in lib/attendanceCompleteness.ts.
+          .select("class_id, student_id, is_active, enrolled_at, unenrolled_at")
           .in("class_id", classIds),
         supabase
           .from("lesson_sessions")

@@ -15,6 +15,8 @@ import { useAppStore } from "@/store/useAppStore";
 import { confirmAction } from "@/lib/confirm";
 import { applyBulkStatus, SET_ALL_OPTIONS, BulkOption } from "@/lib/attendanceBulk";
 import { mergeRoster } from "@/lib/attendanceRoster";
+import { checkMarkableDate, type MarkableCheck } from "@/lib/attendanceWindow";
+import { toSgDate, todayInSg, type DayOfWeek } from "@/lib/lessonDates";
 import PrimaryButton from "@/components/PrimaryButton";
 
 type TopStatus = "unmarked" | "present" | "absent" | "cancelled" | "trial";
@@ -108,6 +110,10 @@ export default function MarkAttendanceScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Non-null when this date may not be marked. The database refuses it anyway;
+  // this is so the coach is told why, before filling in a roster that cannot
+  // be saved.
+  const [blocked, setBlocked] = useState<MarkableCheck | null>(null);
 
   useEffect(() => {
     load();
@@ -116,13 +122,16 @@ export default function MarkAttendanceScreen() {
   async function load() {
     setLoading(true);
 
-    // Load class title + enrolled students
+    // Load class title + the students enrolled ON THIS DATE
     const { data: cls } = await supabase
       .from("classes")
       .select(`
         title,
+        day_of_week,
         student_class_enrolments(
           is_active,
+          enrolled_at,
+          unenrolled_at,
           students(id, full_name)
         )
       `)
@@ -136,8 +145,22 @@ export default function MarkAttendanceScreen() {
 
     setClassTitle(cls.title);
 
-    const activeStudents: StudentRow[] = (cls.student_class_enrolments ?? [])
-      .filter((e: any) => e.is_active)
+    // ── THE ROSTER FOR A DATE IS THE ROSTER AS IT WAS ON THAT DATE ──────────
+    // This used to filter on `is_active` alone, with no reference to `date` at
+    // all — so opening any past lesson showed TODAY'S roster. A child who
+    // joined last month appeared on a lesson from before they existed here,
+    // and because the save refuses until every student on screen has a status,
+    // the coach was FORCED to record attendance for a child who was not there.
+    //
+    // Both ends inclusive, matching EnrolmentSpan: a trial walk-in's enrolment
+    // opens and closes on its own date, and an exclusive end would drop them
+    // from the very screen that is marking them.
+    const enrolledOnDate: StudentRow[] = (cls.student_class_enrolments ?? [])
+      .filter((e: any) => {
+        const from = toSgDate(e.enrolled_at);
+        const until = e.unenrolled_at ? toSgDate(e.unenrolled_at) : null;
+        return from <= date && (until === null || date <= until);
+      })
       .map((e: any) => ({
         id: e.students.id,
         full_name: e.students.full_name,
@@ -156,6 +179,24 @@ export default function MarkAttendanceScreen() {
     }
 
     setResolvedSessionId(sid);
+
+    // ── Is this date markable at all? ──────────────────────────────────────
+    // Checked AFTER the session lookup, because an existing session is itself
+    // the authorisation: an off-schedule lesson the admin scheduled is not on
+    // the class's weekday and must still be markable.
+    const check = checkMarkableDate({
+      date,
+      today: todayInSg(),
+      classDayOfWeek: cls.day_of_week as DayOfWeek,
+      classTitle: cls.title,
+      sessionExists: sid !== null,
+    });
+    if (!check.ok) {
+      setBlocked(check);
+      setLoading(false);
+      return;
+    }
+    setBlocked(null);
 
     // Attendance is fetched BEFORE the roster is set, because it partly
     // DEFINES the roster: a trial walk-in's enrolment closes on its own date,
@@ -179,7 +220,7 @@ export default function MarkAttendanceScreen() {
       .is("cancelled_at", null);
 
     const roster = mergeRoster(
-      activeStudents,
+      enrolledOnDate,
       (attData ?? [])
         .map((a: any) => a.students)
         .filter(Boolean)
@@ -358,6 +399,45 @@ export default function MarkAttendanceScreen() {
     return (
       <SafeAreaView className="flex-1 bg-sky-50 items-center justify-center">
         <ActivityIndicator size="large" color="#0ea5e9" />
+      </SafeAreaView>
+    );
+  }
+
+  // This date cannot be marked. Shown INSTEAD of the roster rather than as a
+  // toast over it: a roster the coach can fill in but never save is worse than
+  // no roster, and the reason belongs where the work would have happened.
+  if (blocked && !blocked.ok) {
+    return (
+      <SafeAreaView className="flex-1 bg-sky-50">
+        <View className="flex-row items-center px-5 pt-4 pb-3">
+          <TouchableOpacity onPress={() => router.back()} className="mr-3">
+            <Ionicons name="chevron-back" size={24} color="#0ea5e9" />
+          </TouchableOpacity>
+          <View className="flex-1">
+            <Text className="text-lg font-bold text-gray-900">
+              Mark Attendance
+            </Text>
+            <Text className="text-xs text-gray-500">
+              {classTitle} · {formatDate(date)}
+            </Text>
+          </View>
+        </View>
+
+        <View className="flex-1 items-center justify-center px-8">
+          <Ionicons name="lock-closed-outline" size={44} color="#cbd5e1" />
+          <Text className="text-base font-bold text-gray-900 mt-3 text-center">
+            {blocked.title}
+          </Text>
+          <Text className="text-sm text-gray-500 mt-2 text-center leading-5">
+            {blocked.detail}
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="mt-6 px-5 py-3 rounded-xl bg-sky-500"
+          >
+            <Text className="text-white font-semibold">Back to class</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }

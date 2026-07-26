@@ -37,7 +37,10 @@ import {
 import { rateOn } from "./rates.ts";
 // The ONE definition of who is expected at a lesson. Duplicated byte-identically
 // in both apps (§6) — three edits, diffable. Do not inline the union here.
-import { expectedStudentsOn } from "./attendanceCompleteness.ts";
+import {
+  type EnrolmentSpan,
+  expectedStudentsOn,
+} from "./attendanceCompleteness.ts";
 
 // Attendance statuses that result in a charge to the parent.
 // Per PRD 5.4: only Present and Paid Trial are billable.
@@ -479,13 +482,36 @@ async function generateForTenant(
       bookedCategory.set(`${b.student_id}:${d}`, b.category_id as string);
     }
 
-    // Enrolments. `is_active` answers "who must be marked" (the gate);
-    // `enrolled_at` floors the expected-lesson window so a class is never asked
-    // about lessons from before anyone joined it.
+    // Enrolments answer TWO different questions and the split matters.
+    //
+    //   enrolmentSpans  — "who must be marked ON THIS DATE" (the gate)
+    //   activeStudentIds — "who is a current customer" (deferral, below)
+    //   enrolled_at      — floors the expected-lesson window so a class is
+    //                      never asked about lessons from before it had anyone
+    //
+    // The gate used to use activeStudentIds, which describes TODAY and was then
+    // applied to every lesson in the month. A child who enrolled on the 20th
+    // was therefore expected at the lessons on the 6th and 13th, had no rows
+    // there, and blocked the whole month — with no override (§8a) and no way to
+    // clear it except marking them at a lesson they were not enrolled for. See
+    // attendanceCompleteness.ts and enrolmentSpans.test.ts.
     const { data: enrolments } = await supabase
       .from("student_class_enrolments")
-      .select("student_id, enrolled_at, is_active")
+      .select("student_id, enrolled_at, unenrolled_at, is_active")
       .eq("class_id", cls.id);
+
+    // Dates are Singapore-local. enrolled_at/unenrolled_at are TIMESTAMPTZ, so
+    // slicing the ISO string would take the UTC date — a day early for anything
+    // written between 00:00 and 08:00 SGT, which is §7.7's bug in a new place:
+    // it would start a child's span a day before they joined, and if that day
+    // is a lesson day the month blocks on a lesson they were never at.
+    const enrolmentSpans: EnrolmentSpan[] = (enrolments ?? []).map((e) => ({
+      studentId: e.student_id as string,
+      from: dateInTimeZone(new Date(String(e.enrolled_at)), APP_TIMEZONE),
+      until: e.unenrolled_at
+        ? dateInTimeZone(new Date(String(e.unenrolled_at)), APP_TIMEZONE)
+        : null,
+    }));
 
     const activeStudentIds = (enrolments ?? [])
       .filter((e) => e.is_active)
@@ -561,9 +587,11 @@ async function generateForTenant(
      *  means nobody is marked, which is the whole point of this gate. */
     const unmarkedOn = (date: string): string[] => {
       // Per DATE now, not per month: a trial booking is expected at exactly one
-      // lesson. expectedStudentsOn() is the shared definition — do not inline
-      // the union (§7.18: four hand-written copies caused a live underbill).
-      const expected = expectedStudentsOn(date, activeStudentIds, bookedByDate);
+      // lesson, and an enrolment covers only the span it covers — a child who
+      // joined on the 20th was never expected on the 6th.
+      // expectedStudentsOn() is the shared definition — do not inline the union
+      // (§7.18: four hand-written copies caused a live underbill).
+      const expected = expectedStudentsOn(date, enrolmentSpans, bookedByDate);
       const sessId = sessionByDate.get(date);
       if (!sessId) return expected;
       return expected.filter((s) => !attSet.has(`${sessId}:${s}`));

@@ -21,6 +21,7 @@ import {
   type DayOfWeek,
 } from "@/lib/lessonDates";
 import {
+  type EnrolmentSpan,
   isLessonFullyMarked,
   expectedStudentsOn,
 } from "@/lib/attendanceCompleteness";
@@ -106,7 +107,7 @@ export default function TodayScreen() {
         start_time,
         end_time,
         location_name,
-        student_class_enrolments(student_id, is_active, enrolled_at)
+        student_class_enrolments(student_id, is_active, enrolled_at, unenrolled_at)
       `)
       .eq("coach_id", coach.id)
       .eq("is_active", true)
@@ -139,6 +140,13 @@ export default function TodayScreen() {
       string,
       { id: string; markedStudentIds: Set<string> }
     >();
+    // Dates that HAVE a session, per class. Needed because a lesson can exist
+    // without being derivable from the class's weekday — an off-schedule lesson
+    // scheduled by the admin (schedule_extra_lesson) is exactly that. Without
+    // this the coach's backlog would never mention it, while the billing
+    // engine's gate DOES see it (its datesToCheck unions existing session
+    // dates), so the month would stall with nothing anywhere saying why.
+    const sessionDatesByClass = new Map<string, string[]>();
     (windowSessions ?? []).forEach((s: any) => {
       sessionByClassDate.set(`${s.class_id}:${s.session_date}`, {
         id: s.id,
@@ -146,6 +154,9 @@ export default function TodayScreen() {
           (s.attendance ?? []).map((a: any) => a.student_id)
         ),
       });
+      const dates = sessionDatesByClass.get(s.class_id as string) ?? [];
+      dates.push(s.session_date as string);
+      sessionDatesByClass.set(s.class_id as string, dates);
     });
 
     const mapped: TodayClass[] = coachClasses
@@ -193,6 +204,14 @@ export default function TodayScreen() {
       const activeStudentIds = enrolments
         .filter((e: any) => e.is_active)
         .map((e: any) => e.student_id);
+      // Who must be marked is a question about the LESSON'S date — a child who
+      // joined last week was not expected at last month's lessons. See
+      // EnrolmentSpan in lib/attendanceCompleteness.ts.
+      const enrolmentSpans: EnrolmentSpan[] = enrolments.map((e: any) => ({
+        studentId: e.student_id as string,
+        from: toSgDate(e.enrolled_at),
+        until: e.unenrolled_at ? toSgDate(e.unenrolled_at) : null,
+      }));
       const bookedHere =
         bookedByClassDate.get(cls.id) ?? new Map<string, string[]>();
       // Nothing enrolled AND nothing booked means nothing to mark. Checking
@@ -208,17 +227,26 @@ export default function TodayScreen() {
 
       // Booking dates join the expected list: a trial on a date with no session
       // would otherwise never appear here.
+      //
+      // So do dates that ALREADY HAVE A SESSION. A lesson the admin scheduled
+      // off the class's weekday is not derivable from day_of_week, so deriving
+      // alone would leave it out of the coach's backlog entirely — while the
+      // billing engine still blocks the month on it. The same union the engine
+      // makes (core.ts datesToCheck), for the same reason.
       const dates = [
         ...new Set([
           ...expectedLessonDates(cls.day_of_week as DayOfWeek, from, todayDate),
           ...[...bookedHere.keys()].filter((d) => d <= todayDate),
+          ...(sessionDatesByClass.get(cls.id) ?? []).filter(
+            (d) => d >= from && d <= todayDate
+          ),
         ]),
       ];
 
       for (const date of dates) {
         if (date === todayDate) continue; // today already has its own card
         const sess = sessionByClassDate.get(`${cls.id}:${date}`);
-        const expected = expectedStudentsOn(date, activeStudentIds, bookedHere);
+        const expected = expectedStudentsOn(date, enrolmentSpans, bookedHere);
         if (expected.length === 0) continue;
         if (!isLessonFullyMarked(expected, sess?.markedStudentIds)) {
           items.push({

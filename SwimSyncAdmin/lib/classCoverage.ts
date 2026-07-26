@@ -13,7 +13,7 @@ import {
   toSgDate,
   type DayOfWeek,
 } from "./lessonDates";
-import { unmarkedDates } from "./attendanceCompleteness";
+import { type EnrolmentSpan, unmarkedDates } from "./attendanceCompleteness";
 
 export type CoverageClass = {
   id: string;
@@ -26,6 +26,9 @@ export type CoverageEnrolment = {
   student_id: string;
   is_active: boolean;
   enrolled_at: string;
+  /** null while the enrolment is open. Both ends are inclusive — see
+   *  EnrolmentSpan in attendanceCompleteness.ts. */
+  unenrolled_at: string | null;
 };
 
 export type CoverageSession = {
@@ -78,9 +81,15 @@ export function computeClassCoverage(
   const bounds = monthBounds(billingMonth);
   if (!bounds.start) return [];
 
-  const attendanceKeys = new Set(
-    attendance.map((a) => `${a.lesson_session_id}:${a.student_id}`)
-  );
+  // Marked students per SESSION, built once. Scanning `attendance` per session
+  // per class instead would be O(classes × sessions × attendance) on the
+  // admin's pre-flight check, which runs on every invoice-dialog open.
+  const markedBySession = new Map<string, Set<string>>();
+  for (const a of attendance) {
+    const set = markedBySession.get(a.lesson_session_id) ?? new Set<string>();
+    set.add(a.student_id);
+    markedBySession.set(a.lesson_session_id, set);
+  }
 
   const coverage: ClassCoverage[] = [];
 
@@ -89,6 +98,17 @@ export function computeClassCoverage(
     const activeStudentIds = classEnrolments
       .filter((e) => e.is_active)
       .map((e) => e.student_id);
+
+    // WHO MUST BE MARKED is a question about the LESSON'S DATE, not about who
+    // is enrolled today: a child who joined on the 20th was never expected at
+    // the lesson on the 6th. Reporting that as a gap blocked the whole month
+    // (§8a — no override), and the only way to clear it was to mark them at a
+    // lesson they were not enrolled for.
+    const enrolmentSpans: EnrolmentSpan[] = classEnrolments.map((e) => ({
+      studentId: e.student_id,
+      from: toSgDate(e.enrolled_at),
+      until: e.unenrolled_at ? toSgDate(e.unenrolled_at) : null,
+    }));
 
     // Bookings for THIS class, by date. A trial is expected at one lesson, so
     // this is per-date rather than a single set for the month.
@@ -120,19 +140,20 @@ export function computeClassCoverage(
     // Marked students per lesson DATE — the shape the shared completeness rule
     // takes. A date absent from this map has no session at all, which the rule
     // treats as unmarked (that is what a forgotten lesson looks like).
+    //
+    // EVERYONE WITH A ROW, not a filtered subset. This used to intersect with
+    // the currently-active students, which was safe only while "expected" was
+    // that same set. Now that expectation is date-scoped, a child who was
+    // enrolled on the lesson's date but has since LEFT is legitimately expected
+    // there — and filtering them out of the marked set would report their
+    // already-recorded attendance as a gap, blocking the month over a lesson
+    // that was marked correctly months ago.
     const markedByDate = new Map<string, Set<string>>(
       sessions
         .filter((s) => s.class_id === cls.id)
         .map((s) => [
           s.session_date,
-          // Marked students on this session — enrolled OR booked. Filtering to
-          // active enrolments alone would report a marked trial as unmarked.
-          new Set(
-            [
-              ...activeStudentIds,
-              ...(bookedByDate.get(s.session_date) ?? []),
-            ].filter((studentId) => attendanceKeys.has(`${s.id}:${studentId}`))
-          ),
+          markedBySession.get(s.id) ?? new Set<string>(),
         ])
     );
 
@@ -145,7 +166,7 @@ export function computeClassCoverage(
     const missingDates = unmarkedDates(
       expectedWithTrials,
       markedByDate,
-      activeStudentIds,
+      enrolmentSpans,
       bookedByDate
     );
 
