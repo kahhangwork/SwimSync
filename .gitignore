@@ -33,3 +33,4 @@ supabase/.env
 
 # Agent worktrees — local scratch checkouts, never part of the repo.
 .claude/worktrees/
+WORKTREE.md
