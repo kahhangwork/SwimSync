@@ -1381,6 +1381,65 @@ See LOCAL_DEV_GUIDE §"Running the tests".
       belongs here or in `BACKLOG.md` **before** the worktree is retired.
 ---
 
+## 8.14 Parallel worktree session (2026-07-26) — A PARENT'S CONTACT DETAILS CAN BE FIXED — **DEPLOYED**
+
+Worktree `../SwimSync-contact-details`, branch `feat/parent-contact-details`. **Ran
+alongside §8.13, not after it** — the numbering is bookkeeping, not sequence. Planned with
+`/plan-with-confidence` + `/plan-review`; the plan, its 7 inlined mitigations and the walked
+pre-commit gate are in **`CONTACT_DETAILS_PLAN.md`**. Behaviour: **PRD §7.19**.
+
+Frontend-only — **no migration**, so the push to `main` *was* the whole deploy.
+
+**What the planning changed, before any code was written.** The backlog item assumed one
+editable screen. Two questions reshaped it:
+
+- **What does editing a CLAIMED child's contact details actually achieve?** Nothing:
+  `find_student_candidates()` skips any child with a `parent_students` row, and the invite
+  path only runs for unclaimed children. So for a claimed child those columns are inert —
+  the *live* details are on `profiles`. The user settled it: **read-only, and the parent
+  maintains their own record in the app.** The database already agreed —
+  `is_tenant_admin(NULL)` is hard-false and a parent's `profiles.tenant_id` is NULL by
+  design, so the admin could never have written it.
+- **Should `provisional_contact_name` be collected at creation?** No — it is not a match
+  signal, and `/accept-invite` requires the parent's real name and overwrites it. The
+  create forms were left alone; the modal is its only writer.
+
+**What `/plan-review` caught that the build then avoided.** Highest-ranked risk was **not**
+in the feature: editing a phone while a claim is **pending** strands the Claims queue on
+`student_claims.match_reason`, which is snapshotted at claim time — the admin then approves
+a parent–child link on a justification that is silently false, and §7.47 means it cannot be
+undone once invoiced. Shipped as a **refusal, failing closed**. Risk 3 produced the
+structural call not to widen the Students page's primary select (§7.52, independently
+arrived at) — the modal fetches its own data, so a mistake costs one modal, not the page.
+
+**What the pre-commit review caught, which planning did not.** Seven findings; three real:
+
+1. the pending-claim guard **failed OPEN** — `const { count } = …` discarded the error, so
+   any failure of that query unlocked the fields it exists to lock;
+2. a failed load rendered a **blank editable form** over cleared state — one Save would
+   have erased a child's real contact details;
+3. only the **first** linked parent was shown, when *"the mother's number, not the
+   father's"* is the whole reason to open the screen.
+
+**Verified:** vitest **122 → 134** (+12, exactly the cases added), `tsc` clean,
+`verify-contact-details.mjs` **21/21** — and re-run green after merging `main`, after the
+shared stack was reset out from under the session, and twice consecutively (the driver
+resets what it edits, so a second run cannot fail in a way that looks like a regression).
+
+**Two things graduated out of this session rather than dying with its worktree:**
+**§7.55** (worktrees share one database; migrations land on `main` alone) and `BACKLOG.md`
+→ *Direct writes to `students` are audited by nobody*. That second one **supersedes**
+`CONTACT_DETAILS_PLAN.md`'s own recommendation: the plan proposed a `SECURITY DEFINER` RPC
+around the contact edit, which fixes one screen and leaves `setLevel()` and every future
+direct write unaudited. An `AFTER UPDATE` trigger on `students` is atomic for the same
+reason and covers all of them.
+
+**A mistake worth keeping:** this session committed `WORKTREE.md`, which would have made
+every sibling worktree's `git merge main` fail on an untracked-file collision. Caught and
+reverted in `12cf553` before the merge; the rule is in §7.55.
+
+---
+
 ## 8.13 Thirteenth session (2026-07-26) — TWO ADMIN UI CHANGES, BOTH **DEPLOYED**
 
 Worktree `.claude/worktrees/UI-changes`, branch `ui-changes`, two commits — `ee7ad1b` and
@@ -1456,14 +1515,17 @@ so Expo could not reach Supabase. Proved pre-existing by running the driver agai
 at the time of writing (`44e04a0`):
 
 - **`feat/parent-contact-details` shipped and is on `main`** (`3832670`) — the admin can fix
-  a parent's contact details. **It has not been session-closed.** It is still listed in
-  `BACKLOG.md` as *unbuilt* ("Editing a student's PARENT contact details"), `PRD.md` does
-  not describe it, and it has no §8x entry. **This section deliberately does not document
-  it** — the user's call — because writing a PRD entry for a feature this session did not
-  build and never drove is how the PRD starts lying. **Next session: close it out, or
-  confirm its own session already will.** It also committed `CONTACT_DETAILS_PLAN.md` to
-  the repo root, which is the opposite of the call made for this session's plan files;
-  left alone deliberately.
+  a parent's contact details. **~~It has not been session-closed.~~ Its own session closed
+  it the same day** (`5c3c561`, `32f5ef2`): **PRD §7.19**, §3, §5's driver catalog, the
+  backlog item struck through, and the missing teardown fixture added. The refusal below
+  was the right call and is kept as the reasoning — *this* session was right not to write a
+  PRD entry for behaviour it had never driven; the session that drove it wrote one instead.
+  `CONTACT_DETAILS_PLAN.md` stays at the repo root, matching `PARENT_CLAIM_PLAN.md`,
+  `TRIAL_ONBOARDING_PLAN.md` and `PACKAGES_DESIGN.md`; the opposite call for this session's
+  plan files was deliberate and both remain intact.
+  > **This section deliberately does not document it** — the user's call — because writing
+  > a PRD entry for a feature this session did not build and never drove is how the PRD
+  > starts lying. **Next session: close it out, or confirm its own session already will.**
 - **`debt/attendance-window-guard` is still in flight** — nothing on `main`, ~21 dirty
   files at last look. Out of scope entirely.
 - The sibling session's own graduations are §7.55 (worktrees share one database) and
@@ -3272,23 +3334,27 @@ abandoned cancellation looks exactly like a forgotten lesson. Additive; ships se
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### FIRST: a shipped feature is documented nowhere — settle this before building
+### ~~FIRST: a shipped feature is documented nowhere~~ — **CLOSED 2026-07-26, by its own session**
 
 **`feat/parent-contact-details` is live on `main`** (`3832670`, 2026-07-26): the admin can
 fix a parent's contact details, with SG phone validation (`lib/sgPhone.ts`) and a
-`ContactHint` component. It shipped from a parallel worktree that **did not session-close**,
-so right now:
+`ContactHint` component. The thirteenth session found it undocumented and **correctly
+refused to write the PRD entry itself** — documenting behaviour you have not driven is how
+the PRD starts lying (§8.13). Its own session then closed it, hours later:
 
-- `BACKLOG.md` still lists *"Editing a student's PARENT contact details"* as **unbuilt** —
-  the backlog is advertising a feature that exists
-- `PRD.md` does not describe it — the PRD, which the next session trusts, is missing a live
-  behaviour
-- there is no §8x entry for it, and `CONTACT_DETAILS_PLAN.md` sits at the repo root
+- `PRD.md` **§7.19** — the three states and why they differ
+- `HANDOVER.md` §3 (what works) and §5 (the driver catalog, plus the frontend test-file
+  list, which had gone stale by six files)
+- `BACKLOG.md` — *"Editing a student's PARENT contact details"* struck through as **DONE**,
+  with the two calls it left open recorded as settled
+- `fixtures-contact-details-teardown.sql` — the convention §8.13 established two commits
+  earlier and this feature had missed
 
-**Either close it out or confirm its own session already did.** It is ~20 minutes: read
-`3832670` and `CONTACT_DETAILS_PLAN.md`, remove the backlog item, add a PRD §7.4
-subsection, add a §8x. The thirteenth session deliberately did **not** write that PRD entry
-— documenting behaviour you have not driven is how the PRD starts lying (§8.13).
+`CONTACT_DETAILS_PLAN.md` stays at the repo root, matching every previous plan file.
+**The one thing genuinely still open** is in `BACKLOG.md`: *Direct writes to `students` are
+audited by nobody* — this screen and `setLevel()` both write with no `audit_log` row, and
+the fix is a trigger, i.e. a migration, i.e. it queues behind the attendance-window one
+(§7.55).
 
 This matters beyond tidiness: the phone is now the **primary parent-matching signal** for
 claims (§8.12), and every child added before 2026-07-26 has none. A screen that can supply

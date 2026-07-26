@@ -203,7 +203,29 @@ Unassigned Children performs, and keep the "this makes them expected every week"
 The natural trigger is the Trials page's *past — needs marking* list, once the lesson has
 been marked.
 
-### Editing a student's PARENT contact details — **S**
+### ~~Editing a student's PARENT contact details~~ — **S** — **DONE 2026-07-26**
+Shipped and deployed (`3832670`): every child on the admin Students page has a **Contact
+details** action. **PRD §7.19** describes the behaviour; `CONTACT_DETAILS_PLAN.md` has the
+plan, the risk review and the walked gate.
+
+The reasoning below is kept because two of its calls were **settled differently** than it
+proposed, and the differences are the design:
+
+- **A claimed child is READ-ONLY, not editable.** The item left this open. Settled: the
+  admin sees every linked parent's own `profiles` row, and the family maintains it in the
+  app. A second editable copy would be the stale duplicate `students.age` was removed for
+  — and `is_tenant_admin(NULL)` refuses the write anyway, since a parent is global.
+- **A pending claim LOCKS the fields**, which the item did not anticipate.
+  `student_claims.match_reason` is a snapshot, so editing under a live claim makes the
+  admin approve on a reason that stopped being true.
+- The phone check is **advisory everywhere and blocks nothing**; the `964` on production
+  is now fixable, which was the point.
+
+**Still outstanding, and split out above:** *Direct writes to `students` are audited by
+nobody* — this screen and `setLevel()` both write with no `audit_log` row.
+
+<details><summary>Original item (kept for the reasoning)</summary>
+
 There is no way to change `provisional_contact_name` / `_phone` / `_email` on an existing
 student.
 
@@ -235,6 +257,8 @@ claimed child keeps them indefinitely. The argument for read-only-after-claim: t
 contact details then live on `profiles`, and a second editable copy on the student row is a
 stale duplicate of exactly the kind `students.age` and `classes.price_per_lesson` were
 removed for — plus it feeds the matcher for a child who can no longer be a candidate.
+
+</details>
 
 ### Attendance edit history view — **S** `[Phase 2]`
 Surface the existing audit trail in the UI.
