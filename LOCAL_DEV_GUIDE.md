@@ -292,6 +292,18 @@ Re-applies all migrations + `seed.sql`. **Wipes** the test data you created
 (parents/children/attendance/invoices) but always restores the two seed
 accounts and the seed class.
 
+> **Not if anyone else is working.** One Postgres serves every worktree on the machine
+> (`docs/GOTCHAS.md` §7.55), so a reset rebuilds it from whichever branch happens to run it —
+> a sibling session loses their state and will not know why, and a migration that exists only
+> on someone's feature branch is gone from the database while the file still sits on disk.
+> **To clean up after a driver, run that fixture's teardown instead:**
+> ```bash
+> docker exec -i supabase_db_SwimSync psql -U postgres -d postgres \
+>   < .claude/skills/run-ui-playwright/drivers/fixtures-<name>-teardown.sql
+> ```
+> Every fixture has one and CI enforces it (`drivers/check-teardowns.sh`). Reset only when
+> you are alone and want the migrations re-applied — and say so first if you are not sure.
+
 ---
 
 ## 6. Handy references

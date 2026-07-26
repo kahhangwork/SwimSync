@@ -141,6 +141,21 @@ matrix (§8d). The app's 5 long-standing `tsc` errors in
 cast. Run `npm run typecheck` in either app locally — but see §7.11: a local pass can
 still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 
+> **Every fixture has a `-teardown.sql`, and CI enforces it** (2026-07-26). `fixtures-*.sql`
+> seed the **one** local database that every worktree shares, and `/session-close` forbids
+> `supabase db reset` as the cleanup — so a fixture without a teardown leaves a session no
+> safe way to clean up. `drivers/check-teardowns.sh` fails the build if a new fixture arrives
+> without one; run it locally any time. Each teardown ends with a SELECT printing **0** for
+> what it removed and **1** for each seed identity that had to survive — read that output.
+>
+> **Writing a new fixture?** Prove the teardown round-trips instead of eyeballing it:
+> snapshot every table's row count, apply the fixture, apply the teardown, assert the counts
+> are identical — and do it **on top of another fixture**, not on a clean database. That
+> ordering is what surfaced §7.63. See `docs/WORKTREES.md` Phase 4.
+>
+> **No fixture is applied by CI at all** — that gap is filed (`BACKLOG.md` → *Run the
+> fixtures in CI*) and it is how §7.62 and §7.63 both shipped undetected.
+
 _UI drivers (`.claude/skills/run-ui-playwright/drivers/`, run by hand, not CI):_
 `verify-unmarked-lessons.mjs` + `fixtures-unmarked-lessons.sql` drive the whole
 unmarked-lesson loop (admin gap report → coach backlog → mark → both go green);

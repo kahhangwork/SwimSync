@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-27 (the attendance window is a rule; password reset verified on production for both apps after the admin entry was found missing from the live allow-list — `docs/GOTCHAS.md` §7.41)_
+_Last updated: 2026-07-26 (the nine missing fixture teardowns and the unscoped-write bug both shipped, so their items are gone; **Run the fixtures in CI** added in their place — it is the gap §7.62 and §7.63 both came through. The `verify-attendance-window.mjs` entry's diagnosis was **wrong** and is corrected in place)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the

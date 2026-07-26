@@ -1,10 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-26 — **this file is now an index.** The reference material it used to
-carry (§5 tests, §6 architecture, §7 gotchas, §10 file map, §11 deployment, §12 removed UI)
-moved to `docs/`, **keeping its section numbers**, and the session log collapsed from 29
-narratives to 2 + a ledger. Nothing durable was deleted; four orphaned facts were promoted
-first (§7.56, §7.61, §11.5, §11.6). See §8.17._
+_Last updated: 2026-07-26 — **this file is now an index**, and parallel work has a protocol.
+The reference material it used to carry (§5 tests, §6 architecture, §7 gotchas, §10 file map,
+§11 deployment, §12 removed UI) moved to `docs/`, **keeping its section numbers**, and the
+session log collapsed from 29 narratives to 2 + a ledger (§8.17). Then `docs/WORKTREES.md`
+plus `/worktree-start` and `/worktree-close`, and the **nine UI fixtures that had no teardown
+got one**, guarded by CI — which turned up two pre-existing bugs, §7.62 and §7.63 (§8.18).
+**No product code changed in either.**_
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
 
@@ -326,178 +328,76 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
-## 8.16 (2026-07-27) — THE REPO ROOT HAS A SHAPE, AND THE AUTH ALLOW-LIST WAS BROKEN
+## 8.18 (2026-07-26) — PARALLEL WORK GETS A PROTOCOL, AND THE FIXTURES GET THEIR CLEANUP
 
-Same conversation as §8.13, continued after the two sibling sessions merged. No product
-code changed.
+Same conversation as §8.17, continued. **No product code changed.** Five commits: `5a04a50`
+(worktree guide), `6bbcffe` (nine teardowns + a CI guard), `229b984` (fixture scoping),
+`68dd3fe` (worked examples), `ce92661` (two skills).
 
-**The root went from 22 markdown files to 8** (`a6322e1`). Designs of record moved to
-`docs/design/`, per-feature plans to `docs/plans/`, the historical artefact to
-`docs/database/`. **Filenames did not change, only directories** — which is the whole
-trick: all 379 prose references still name the right file, including **34 inside applied
-migrations** that could never have been corrected. Nine git renames, so blame follows.
-Zero markdown links pointed at a moved file with a path (checked before moving; every link
-in the repo re-validated after).
+**`docs/WORKTREES.md` — the protocol that was scattered across five files.** The material
+existed — §7.55, §7.56, `/session-close` §5, `/commit-review`'s branch-to-branch push — but
+only as *gotchas*, with no entry point: `grep "git worktree"` across every markdown file
+returned **zero hits**. The guide states the model those notes never did — **one writer per
+shared resource** — and walks six phases plus two worked examples, one with a migration and
+one without.
 
-**Numbered prefixes were considered and rejected** — the reasoning is in `README.md` →
-*Where everything lives*, not repeated here. Short version: encoding a category into a
-filename makes recategorising a rename, and a rename breaks references. `01_SESSION_WORKFLOW.md`
-keeps its number because sorting first is its entire job.
+**The rule the examples forced into the open: a worktree NEVER authors a migration.** The
+model table had said "one worktree owns `supabase/`" while the same row said "never carry a
+migration on a feature branch" — both cannot be true. §7.55 is the correct one: write it in
+the **root checkout** on a `db/…` branch, land it on `main`, *then* create the worktree, which
+branches from `origin/main` and already has the schema. Corrected in five places.
 
-> **A near-miss worth remembering.** The reorganisation was interrupted mid-flight and left
-> twelve numbered copies behind. Four were **stale snapshots** — `11_HANDOVER.md` was
-> missing **351 lines**, `02_AVAIL_SKILLS.md` was a week old — and two others went stale
-> *during* the cleanup, because a sibling session pushed six commits while it was running.
-> Finishing that rename by deleting the originals would have silently reverted two
-> sessions of work. Every copy was diffed against **HEAD at the moment of deletion**, not
-> against an earlier check. When `main` is moving, a verification is only true at the
-> instant you make it.
+**Nine of thirteen UI fixtures had no teardown**, so for those a session had to choose between
+leaving rows in the shared database and running the `db reset` that `/session-close` forbids.
+All nine written; `check-teardowns.sh` + a `repo-invariants` CI job now fail the build if a
+fixture arrives without one — proven to fail by removing one (§7.25).
 
-**The auth redirect allow-list was wrong in two places** (`f845717`). `config.toml` was
-missing the parent app's `https://swimsync.sg/reset-password`; production's dashboard list
-was missing the **admin's**, so admin password reset had been silently landing on the wrong
-page. Both fixed and reset tested end to end on both apps by the user. **§7.41 carries the
-reasoning** — including the durable half, that production's list and `config.toml` are two
-separate lists nothing keeps in step.
+**Verified by round-trip, not by reading.** Snapshot every table, apply fixture, apply
+teardown, assert counts identical: **9/9 clean**. That harness caught two defects that looked
+correct on the page (a stray `parent_tenants` row; a teardown that could not reach the session
+its fixture deliberately leaves unmarked) **and two pre-existing bugs**:
 
-**Also filed:** `BACKLOG.md` → *`verify-attendance-window.mjs` guards nothing* — it scores
-0/4 against any clock outside 16–17 Jul 2026, verified pre-existing on both sides of §8.15.
+- **§7.62 — two fixtures had been unloadable since 2026-07-19.** `20260719000600` made
+  `students.tenant_id` NOT NULL; they insert students without it. Nothing reported it because
+  **no fixture runs in CI**, and psql aborts the failing statement and carries on — so the
+  fixture half-loads and the driver's low score reads as a product regression. **This, not the
+  stale clock, is why `verify-attendance-window.mjs` scored 0/4.** That backlog entry's
+  diagnosis is corrected *in place*, because a wrong diagnosis sends the next person to fix
+  the wrong thing.
+- **§7.63 — `fixtures-unmarked-lessons.sql` enrolled and marked present every student in the
+  database** (two unscoped `CROSS JOIN`s). Measured: 6 children instead of 2. The second-order
+  failure is worse — the duplicate enrolment violates `one_active_enrolment_per_student`,
+  aborting the statement, so with any sibling fixture loaded the fixture's **own** children
+  were never enrolled at all.
 
-**Not done (deliberate):** the four living documents kept their names and their place at
-the root — they are referenced 281 times and opened by name from `/session-start`; moving
-them buys ordering nobody needs. And no skill scripts the merge (see §8.13(c)).
-
----
-
----
-
-## 8.15 Fifteenth session (2026-07-27) — THE ATTENDANCE WINDOW IS A RULE — BUILT **AND DEPLOYED**
-
-Branch **`debt/attendance-window-guard`** (worktree `SwimSync-attendance-window`), one
-feature commit + two merges of `main` (it moved twice during the session). Planned with `/plan-with-confidence` +
-`/plan-review`; the plan, its inlined risk mitigations and three accepted consequences
-are in **`ATTENDANCE_WINDOW_PLAN.md`**.
-
-**Deploy record (2026-07-27) — and I got the ordering wrong, which is the most useful
-thing in this section.** The plan said **migrations → engine → apps**, and I pushed the
-branch to `main` first. `main` *is* the app deploy: Vercel builds both sites from it. So
-for the minutes between that push and `db push`, the live apps ran the new code against a
-database with no triggers and an engine still at v16 — the exact inversion the plan calls
-load-bearing. Harmless only because production has **0 attendance rows**; on a live month
-it would have been the deadlock this work exists to remove.
-
-> **The rule that would have prevented it:** `git push … :main` **IS** a deploy step, not
-> a source-control step. Do the backend first, or push to `main` last. §7.27 says the
-> ordering governs "the push, not just the migration command" — this is that sentence
-> failing to be enough, twice.
-
-What then went right, in order: backup (schema + data, scratchpad) → `db push` (one
-migration; the `pg-delta` SSL trace printed again and succeeded, §8.11) →
-`migration list --linked` shows **0 pending** → **remote grant dump**, which caught §7.39
-live (below) → `functions deploy generate-invoices` → `functions list` confirms
-**v17**, `package-emails` untouched at v1 → app bundle greps for `That lesson is closed`
-(§7.51: a contiguous user-visible string, not an identifier) → production data
-**byte-identical before and after**, attendance/sessions/invoices still 0.
-
-**§7.39 fired again, and the audit is what caught it.** Three of the five new functions
-carried only `REVOKE ALL … FROM PUBLIC`, and the remote dump showed cloud's project-level
-default privileges had granted them to `anon`. **Nothing was exposed** — all three are
-plain STABLE functions returning a date or raising; the one that is SECURITY DEFINER and
-reads a table, and the one that writes, were both explicitly revoked and came back clean.
-Fixed by `20260727000200`, and the audit now returns nothing. The lesson is not "anon had
-a date function": it is that **a partially-applied recipe passes local `pg_proc` and only
-the remote dump can tell you**.
-
-**The backlog item was "reject a bad date in the save handler" (S). It grew, and the
-reason is the whole session.** Planning found the same un-dated set behind the missing
-guard also drove the **billing gate**, so the work was really two faces of one bug:
-
-**(a) The window was a UI convention.** `(coach)/classes/[id]/attendance.tsx` wrote
-whatever `date` the URL handed it. `sessions_write` constrains *whose* class a caller may
-write, never *which* date — so a coach's own token against PostgREST could create, and
-bill, a session on any date at all. Every *entry point* had been windowed since §8c; the
-screen never was.
-
-**(b) A child who joined mid-month blocked that month from billing.** The gate asked "who
-is actively enrolled?" — one set for a whole month — and expected them at every lesson in
-it. A child enrolled on the 20th was expected on the 6th and 13th, had no rows, and the
-month reported `incomplete_attendance`, which blocks generation outright with **no
-override** (§8a). Clearing it meant marking a child at a lesson they were not enrolled
-for. **The user found this**, from the plan's own example: *"if Aisha joined in June and
-the coach goes back to March, she should not be in his roster."*
-
-**Fixing only the screen would have been WORSE than fixing neither** — the engine would
-still have named a lesson the app correctly no longer offered any way to mark: a month
-unbillable with no remedy in the product. That is §7.18's shape, and it is why the deploy
-order below is not negotiable.
-
-**What shipped**
-
-- **Two DB triggers** (`20260727000100`), gated on `current_user = 'authenticated'`: a
-  session must fall on the class's own weekday inside `[1st of last month, today]`; a
-  **new** attendance row must fall in that window. Corrections are always allowed.
-- **Enrolment is a SPAN** in `attendanceCompleteness.ts` (all three copies) and the
-  engine — "who was expected" is answered per date.
-- **The roster for a past lesson is the roster as it was then**, and a refused date shows
-  a plain explanation instead of a roster that cannot be saved.
-- **`schedule_extra_lesson()`** — the admin arranges a makeup (future dates allowed,
-  reason required); the coach marks it. Surfaced on the coach's roster *and* backlog.
-- **An admin control** on the Classes page. Still **no attendance-writing in the admin**.
-
-**Four findings worth keeping**
-
-- **§7.57 — a `BEFORE INSERT` trigger fires for rows that resolve to an UPDATE.** The
-  coach's save is `.upsert()`. An "INSERT only" guard would have refused every
-  credit-note correction, and failed the whole class's save on one row. Caught by
-  `/plan-review` *before* the trigger was written, then confirmed with a probe table.
-- **§7.58 — a stale RN-web screen can physically overlay the one you deep-linked to**, so
-  `click({force:true})` presses the wrong element and the run reads as "the save is
-  broken".
-- **§7.59 — a global `COUNT(*)` baseline is role-dependent under RLS.** A pgTAP fixture
-  counted as `postgres` and asserted as `authenticated`; the two count different rows.
-- **A pre-existing §7.7 instance left alone**: `core.ts` derives `earliestEnrolment` with
-  `String(...).slice(0,10)` — the UTC date. It only widens a window floor, and changing
-  it would move every existing test's expectations. New span code uses `dateInTimeZone`.
-
-**Verification.** pgTAP **366 → 397**, Deno **108 → 111**, admin vitest **122 → 162**
-(includes the sibling worktree's suites), app jest **91 → 109**; both apps typecheck;
-backend suites run twice (§7.15). **Every new test was proven to fail without the fix**
-(§7.25): dropping the triggers fails **12 of 31** pgTAP assertions; the mid-month-joiner
-test fails on the pre-fix engine; the new driver scores **6/12** on the pre-fix screen and
-**14/14** after. A **tripwire** pins that a month with no joiners bills byte-identically,
-and a **drift test** reads all three copies of `attendanceCompleteness.ts` off disk and
-fails if they diverge — verified by deliberately diverging one. Rollback SQL was
-**executed forward, back and forward again** locally.
+**Two skills: `/worktree-start` and `/worktree-close`.** Start runs Phases 0–3 and goes
+**after** planning — the plan is what answers its migration question (§8.15 is the cautionary
+case: an **S** with no schema implied turned out to need two DB triggers). Close runs Phase 6
+and goes **before** `/update-docs`, which fixes a real ordering bug: `/session-close` §5
+settled the worktree *after* the documentation pass, but `WORKTREE.md` is gitignored and
+carries the **graduate list**, so the findings were already gone by the time the docs were
+written.
 
 ### Not done (deliberate)
 
-- ~~**Not deployed.**~~ **Superseded — it WAS deployed the same day**, and this bullet was
-  left behind saying otherwise. See the deploy record above: `generate-invoices` is at
-  **v17** and both apps are live. The ordering rule it carried (**migrations → ENGINE →
-  apps**) is durable and now lives in **§7.60**, which is where to read it. Kept struck
-  rather than deleted because it is the example §7.60 is about: the plan named the right
-  order, the session did it wrong, and then the write-up asserted the opposite of what
-  had happened.
-- **The window floor stays a calendar proxy.** Chosen over "refuse only already-invoiced
-  months". Its sharpest consequence is now filed: a month billed **two or more months
-  late** with an unmarked lesson **cannot be unblocked by anyone** — `BACKLOG.md` →
-  *Tie the attendance-marking window to un-invoiced months*, upgraded S→M with this as
-  the trigger to revisit.
-- **`sessionId` in the URL is still trusted** — filed in `BACKLOG.md`. Not a billing hole
-  (the DB guard reads the session's own date), only a cosmetic mismatch.
-- **A fully-departed class can now block a month it previously did not** — spans reinstate
-  leavers for the dates they *were* enrolled. More correct, and it has a remedy: those
-  same leavers appear on that date's roster, because spans drive both. **Check that
-  remedy still works before changing either side.**
-- **`verify-attendance-window.mjs` (the older driver) scores 0/4 — identically before and
-  after this work.** Its fixture header assumes a clock of 16–17 Jul 2026. Pre-existing
-  staleness, not a regression, but that driver currently guards nothing.
+- **No `/worktree-commit`.** `/commit-review` already ships correctly from a worktree
+  (`<branch>:main`, fast-forward only, then fast-forward the root). A second commit skill
+  would duplicate and drift from it; it got a pointer instead.
+- **No split into `/start-worktree-migration` and `-no-migration`** (the first sketch).
+  "Does this need a migration?" is the question the skill *answers*, not a prerequisite for
+  choosing it — and the migration path does not begin by making a worktree at all.
+- **Fixtures still do not run in CI.** The gap both §7.62 and §7.63 came through. Filed as
+  **M** with the proven harness as its shape, and the note that it must **stack** fixtures
+  rather than test each on a clean database — testing in isolation would have missed §7.63,
+  as the first pass here did.
+- **`fixtures-attendance-window.sql` still scopes by `full_name`**, not by an owned id.
+  Weaker than the house rule but functional and not broken; left rather than churned.
+- **The dates in §8.15/§8.16 read 2026-07-27; their commits are 2026-07-26.** The ledger rows
+  below use the git-true date.
 
 ---
 
----
-
-### 8.17 (2026-07-26) — THE DOCUMENTS BECAME AN INDEX
+## 8.17 (2026-07-26) — THE DOCUMENTS BECAME AN INDEX
 
 No product code changed. `HANDOVER.md` went **3,972 lines → ~460**, and the four documents
 `/session-start` reads went from **~131,000 tokens to ~12,000**.
@@ -543,10 +443,14 @@ entry; two entries stay in full, the rest are ledger lines.
 
 ---
 
+---
+
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.16** | 2026-07-26 | Repo root 22 markdown files → 8 (`docs/design`, `docs/plans`, `docs/database`); the auth redirect allow-list found **broken in production** — admin password reset had been landing on the wrong page | `README.md` → *Where everything lives* · **§7.41** |
+| **8.15** | 2026-07-26 | The attendance marking window became a **database rule**; a child who joins mid-month no longer blocks that month from billing. Engine **v16 → v17** | `docs/plans/ATTENDANCE_WINDOW_PLAN.md` · PRD §7.5, §7.6 · §7.57–§7.60 |
 | **8.14** | 2026-07-26 | A parent's contact details can be fixed — deployed | `docs/plans/CONTACT_DETAILS_PLAN.md` · PRD §7.19 |
 | **8.13** | 2026-07-26 | Two admin UI changes; the skill workflow reworked (`/session-close` → `/update-docs`) | `01_SESSION_WORKFLOW.md` · §7.54 |
 | **8.12** | 2026-07-26 | Parents can claim their own child — deployed | `docs/plans/PARENT_CLAIM_PLAN.md` · PRD §7.18 · §7.48 |
@@ -583,19 +487,7 @@ entry; two entries stay in full, the rest are ledger lines.
 > the reasoning for each — lives in **`BACKLOG.md`**. Don't restate it here; the two
 > will drift.
 
-### FIRST: the deploy is DONE — what is not done is real usage
-
-§8.15 is on `main` and live: migrations, `generate-invoices` **v17**, both web apps.
-Production has **0 attendance rows**, so neither the window guard nor the joiner fix has
-been exercised on real data. Nothing about §8.15 is outstanding.
-
-**One gotcha it created for whoever bills first**, now also in `INVOICE_RUNBOOK.md`: the
-coach can only mark back to **the 1st of last month**, and the database enforces it. Bill
-July in August and every lesson is markable; leave it to September and the gate will name
-a gap **nobody can fill**. Bill promptly, or fix the floor (`BACKLOG.md` → *Tie the
-attendance-marking window to un-invoiced months*).
-
-### THEN: the thing that has blocked everything since 2026-07-13
+### FIRST — the thing that has blocked everything since 2026-07-13
 
 **No real lesson has ever been taught and recorded, and no invoice has ever been
 generated.** The mechanism is proven — the whole loop was walked on production 2026-07-25
@@ -609,25 +501,15 @@ note in §3 explain it.
    until every lesson is marked — working as designed. Mark them, or mark them cancelled;
    **never override**. Do it in the month after, not two months after (above).
 
-Still true and worth knowing before that first run: `auto_invoice_enabled` is **false**,
-**no coach rate is set** (so payroll computes nothing), and the join code is **`SWIM-RVM9`**
-— the only route in for a new family, and the re-entry route for one marked inactive.
+**The deadline nobody has hit yet, and it is now enforced by the database:** the coach can
+only mark back to **the 1st of last month** (§8.15, also in `INVOICE_RUNBOOK.md`). Bill July
+in August and every lesson is markable; leave it to September and the gate will name a gap
+**nobody can fill**. Bill promptly, or fix the floor (`BACKLOG.md` → *Tie the
+attendance-marking window to un-invoiced months*).
 
-### ~~One narrow thing still unverified on production~~ — **CLOSED 2026-07-27, and it was broken**
-
-Password reset is now **verified end to end on production for both apps** —
-`https://swimsync.sg` and `https://admin.swimsync.sg`. Nothing here is outstanding.
-
-**It was not merely unverified; it was broken.** The production dashboard's allow-list was
-missing `https://admin.swimsync.sg/reset-password` entirely, so every admin password reset
-had been silently landing on the wrong page — exactly the failure §7.41 describes, in the
-place §7.41 suspected. The user found it, added it, and tested both apps. The full
-reasoning now lives in **§7.41**, which is the right home for it; this section is a
-pointer, not a second copy.
-
-`supabase/config.toml` was missing `https://swimsync.sg/reset-password` too and has been
-corrected — but note that **fixing the file does not fix production, and vice versa**
-(§7.41).
+Still true before that first run: `auto_invoice_enabled` is **false**, **no coach rate is
+set** (so payroll computes nothing), and the join code is **`SWIM-RVM9`** — the only route in
+for a new family, and the re-entry route for one marked inactive.
 
 ### If you would rather build than onboard
 
@@ -636,11 +518,19 @@ themed sections below it. Nearest candidates with no dependencies: **credit-note
 (the other half of the notification work), an **upcoming-lessons view for parents** (small,
 and the building block already exists), or **convert a trial into an enrolled student**.
 
-**Two hygiene items, neither urgent:** *revoke `anon` EXECUTE from the remaining SECURITY
+**The highest-value engineering item is now *Run the fixtures in CI* (M).** Two classes of
+breakage shipped undetected because CI never applies a fixture — §7.62 (a NOT NULL migration
+made two fixtures unloadable for a week) and §7.63 (an unscoped write enrolled every child in
+the database). Both were found by accident. The harness is written and proven; it needs
+wiring into the existing `backend-tests` job, and it must **stack** fixtures rather than test
+each on a clean database.
+
+**Two hygiene migrations, neither urgent:** *revoke `anon` EXECUTE from the remaining SECURITY
 DEFINER functions* (§7.39's missing second layer), and *a business cannot read its own audit
 trail* — 13 of 19 writers never set `audit_log.tenant_id`, and the parent-claim work made
-that column **half**-populated, which fails more quietly than empty did. Both are migrations,
-so they queue behind each other; only one schema change should be in flight at a time (§7.55).
+that column **half**-populated, which fails more quietly than empty did. They queue behind
+each other; **only one schema change in flight at a time** (§7.55), and a worktree never
+authors one (`docs/WORKTREES.md`).
 
 ### Worth deciding, not urgent
 
