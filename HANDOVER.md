@@ -1296,6 +1296,35 @@ See LOCAL_DEV_GUIDE §"Running the tests".
       run against the unfixed tree first: the scan test failed naming the file, and the
       geometry check failed with a worst offset of **488px** (fixed: **0px**). Those two
       numbers are what set the 2px tolerance — calibrate it, never guess it.
+55. **GIT WORKTREES SPLIT THE CODE AND SHARE THE DATABASE — SO MIGRATIONS LAND ON `main`,
+    ALONE, ONE AT A TIME.** Every worktree's `supabase/config.toml` says
+    `project_id = "SwimSync"`, and the CLI names its containers from that — so N checkouts
+    address **one** `supabase_db_SwimSync`. Git isolates your files; nothing isolates the
+    schema. Two consequences, and the second is the one that reaches production:
+    - **`supabase db reset` rebuilds the shared DB from whichever worktree ran it.** A
+      migration living only on a feature branch ceases to exist in the running database
+      the moment anyone else resets — the file is still there, the code still looks right,
+      and nothing points at the cause. **Observed live 2026-07-26**: the shared DB held
+      **75** applied migrations while `main` had **74 files**, the extra one existing only
+      as an *untracked* file in one worktree.
+    - **Parallel migrations apply in FILENAME order locally and in MERGE order on
+      production.** Branch A writes `…000100`, branch B writes `…000200`, B merges first:
+      production runs `b → a`, every local `db reset` ran `a → b`. Where both touch the
+      same object the end states differ silently — and most migrations here are
+      `CREATE OR REPLACE FUNCTION` or `DROP POLICY; CREATE POLICY`, i.e. last-writer-wins.
+      The attendance trigger is on its seventh redefinition.
+    - **The rule:** write migrations in the `main` worktree on a short `db/…` branch, apply,
+      `supabase test db`, merge to `main` **before** anything depends on them; feature
+      branches then `git merge main` to *consume* the schema and never carry it. One in
+      flight at a time. Announce before `db reset` — it wipes every other worktree's
+      fixtures.
+    - **Do NOT give each worktree its own stack** by editing `project_id`/ports:
+      `config.toml` is **tracked**, so per-folder values are one `git add -A` from being
+      committed and one `git checkout` from being clobbered.
+    - **`WORKTREE.md` is per-worktree scratch and must stay gitignored** — two worktrees
+      cannot own one path, and committing it makes every sibling's `git merge main` fail
+      with *"untracked working tree files would be overwritten"*. Anything durable in it
+      belongs here or in `BACKLOG.md` **before** the worktree is retired.
 ---
 
 ## 8.12 Twelfth session (2026-07-26) — PARENTS CAN CLAIM THEIR OWN CHILD — BUILT **AND DEPLOYED**
