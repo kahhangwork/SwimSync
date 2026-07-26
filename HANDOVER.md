@@ -23,7 +23,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.67** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.68** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -364,6 +364,10 @@ its fixture deliberately leaves unmarked) **and two pre-existing bugs**:
   stale clock, is why `verify-attendance-window.mjs` scored 0/4.** That backlog entry's
   diagnosis is corrected *in place*, because a wrong diagnosis sends the next person to fix
   the wrong thing.
+  > **Since that fix it scores 3/5** (measured 2026-07-26 on both sides of the
+  > attendance-status work). The two remaining failures — a coach roster placeholder and a
+  > parent empty-state — are genuine and still unfixed. So the driver guards *something*
+  > again; don't read "0/4" as its current state.
 - **§7.63 — `fixtures-unmarked-lessons.sql` enrolled and marked present every student in the
   database** (two unscoped `CROSS JOIN`s). Measured: 6 children instead of 2. The second-order
   failure is worse — the duplicate enrolment violates `one_active_enrolment_per_student`,

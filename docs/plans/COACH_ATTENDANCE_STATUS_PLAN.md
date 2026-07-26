@@ -50,11 +50,14 @@ node .claude/skills/run-ui-playwright/drivers/verify-stale-screen.mjs   # expect
 | `verify-bulk-setall.mjs` | 10/10 | 10/10 |
 | `verify-attendance-window.mjs` | 3/5 | 3/5 — same two failures |
 
-> **`verify-attendance-window.mjs` does NOT score 0/4.** HANDOVER §8.16 and §8.15 both say
-> it does. It has **five** checks and scores **3/5**, measured on both sides of this work by
-> stashing the two screens — the two failures (a roster placeholder, and a parent
-> empty-state) are pre-existing and identical. The "0/4" figure is stale prose; the runner is
-> the fact. Worth correcting in HANDOVER rather than carrying forward.
+> **`verify-attendance-window.mjs` now scores 3/5, and the docs were right about why it
+> used to be 0/4.** §7.62 records the cause: its fixture had been unloadable since
+> `20260719000600` made `students.tenant_id` NOT NULL, and psql aborts the failing statement
+> and carries on, so the fixture half-loaded and every check failed. **That was fixed earlier
+> the same day**, so the fixture now loads and three of its five checks pass. The two that
+> fail — a coach roster placeholder and a parent empty-state — are genuine and pre-existing,
+> measured on both sides of this work by stashing the two screens. Nothing here is a
+> regression, and "0/4" was an accurate historical reading, not stale prose.
 
 ---
 

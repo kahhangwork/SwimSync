@@ -42,6 +42,19 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
    that **double-billed everyone**. Use `todayInSg()` + `dayOfWeekOf()` (§6). Pinned by
    `verify-tz-saturday.mjs`; audit with
    `grep -rn --include="*.ts" --include="*.tsx" -e "toISOString()\.split" -e "toISOString()\.slice" SwimSyncApp SwimSyncAdmin`.
+   **THIS FAMILY INCLUDES TIME OF DAY, AND A SECOND INSTANCE WAS LIVE UNTIL 2026-07-26.**
+   The coach's Today screen computed "is this class happening now?" as
+   `now.getHours() * 60 + now.getMinutes()` — the DEVICE's clock — sitting directly beside a
+   date from `todayInSg()`. Same disagreement, new axis. It only drove a cosmetic "Now"
+   badge, which is why it survived; the moment a card's *status* depended on "has this class
+   ended yet", a device an hour behind SGT would have shown "Upcoming" on a finished lesson
+   and the coach would never have been told to mark it — the hole the Unmarked Lessons net
+   exists to close (§8i). Fixed by `lib/timeOfDay.ts`, whose **shape** is the guard: only
+   `nowMinutesInSg()` knows about timezones, and everything that compares times takes a
+   plain `nowMinutes: number`, so it cannot read a clock and therefore cannot read the wrong
+   one. **Extend the audit:**
+   `grep -rn "getHours()\|getMinutes()\|getDay()" SwimSyncApp/app SwimSyncAdmin/app`
+   — every hit is either a bug or needs a comment saying why not.
 8. **~~The engine's completeness gate never fires on the admin path.~~ FIXED 2026-07-18
    (§8a).** For months, `SwimSyncAdmin/app/api/generate-invoices/route.ts` hardcoded
    `force: true`, which bypassed the gate, the auto switch and the month seal — so the
@@ -877,4 +890,30 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     If a column is genuinely per-row optional, send it as explicit `null`.
     `lib/attendancePayload.ts` owns this now, and `hasUniformKeys()` asserts it.
     (Found and fixed 2026-07-26, live the same day.)
+
+68. **"FULLY MARKED" MEANS TWO DIFFERENT THINGS TO INVOICING AND TO A COACH'S SCREEN, AND
+    ONE OF THEM IS LOAD-BEARING FOR MONEY.**
+    `isLessonFullyMarked([], undefined)` returns **true** — a lesson nobody was expected at
+    is complete. That is correct for the billing gate: there is nothing to collect, so it
+    must not block a month. `unmarkedDates()` relies on it to skip dates before a class had
+    anyone in it (§8.15) and the engine relies on it to seal a month (§8a).
+    It is also a **lie on a card**. A class with an empty roster rendering a green "Marked"
+    tells the coach it is done when nobody has touched it — and if a student is added later,
+    that lesson is now silently unmarked behind a green chip.
+    **The tempting fix is to change the shared helper. Do not.** It is duplicated in
+    `SwimSyncAdmin` and in the engine's Deno copy, it has a drift test, and changing it
+    changes which months can be invoiced for every tenant — either blocking one that should
+    bill or sealing one with a lesson unbilled.
+    **The rule: a display concern gets solved in the display layer.**
+    `lib/attendanceSummary.ts` returns a distinct `no-students` state, checked FIRST so an
+    empty expected set cannot fall through to `complete`; `attendanceCompleteness.ts` is
+    untouched. A test in `attendanceCompleteness.test.ts` now pins the vacuous `true` and
+    says why, so the next person to "fix" it breaks something that argues back.
+    **The same asymmetry governs the button.** Only `complete` may quieten the
+    "Mark Attendance" CTA — written `kind === "complete"`, never `kind !== "unmarked"` — so
+    any state added later inherits the LOUD button. A card that stops asking for marks it
+    still needs is a lesson that never gets marked, and that blocks the month with no
+    override. Nagging unnecessarily is annoying; going quiet wrongly costs money. When a
+    default has an asymmetric cost, encode the asymmetry, don't rely on the next reader
+    noticing it. (2026-07-26.)
 ---
