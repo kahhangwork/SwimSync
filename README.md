@@ -42,6 +42,7 @@ log:
 | **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Why is it built this way? Where do files live? | §6, §10, §12 |
 | **[docs/TESTING.md](docs/TESTING.md)** | What does each suite and UI driver cover? | §5 |
 | **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | What's live, and what config traps bit us? | §11 |
+| **[docs/WORKTREES.md](docs/WORKTREES.md)** | How do I run two sessions at once without clashing? | — |
 
 And **[CLAUDE.md](CLAUDE.md)** — loaded automatically into every Claude Code session, so
 it holds only the commands, the boundaries, and the handful of rules whose violation is

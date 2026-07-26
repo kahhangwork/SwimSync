@@ -967,6 +967,28 @@ Decide while fixing whether the older driver still earns its place at all, or wh
 unique cases should be folded into `verify-attendance-guard.mjs` and the file deleted —
 two drivers over one rule is the reason this went unnoticed.
 
+### Nine UI fixtures have no teardown, which blocks safe worktree use — **S**
+`fixtures-active-inactive`, `-attendance-window`, `-packages`, `-parent-claim`,
+`-phase4-billing`, `-student-identity`, `-trial-onboarding`, `-trial-visibility` and
+`-unmarked-lessons` seed the shared database and have no `-teardown.sql`. Only 4 of the 13
+fixtures have one.
+
+**Why:** `/session-close` requires tearing fixtures out of the **one** database every
+worktree shares, and explicitly forbids `supabase db reset` as the cleanup (it rebuilds the
+DB from whichever branch ran it, destroying a sibling's state — `docs/GOTCHAS.md` §7.55). For
+these nine there is currently **no third option**: a session either leaves rows behind, or
+does the forbidden thing. That makes parallel worktree sessions unsafe for any task touching
+those areas, which is most of them. Rows left behind are worse than clutter — a sibling's
+test can *pass because of them*.
+
+**Notes:** the four that exist (`-attendance-guard`, `-class-students`, `-contact-details`,
+`-levels-table`) are the shape to copy; both `-attendance-guard` and `-contact-details`
+teardowns were themselves written a session *after* the fixture shipped, so this is a known
+recurring miss rather than a one-off. Delete by a **prefix** the fixture owns, not by a
+hardcoded id list, so it survives the fixture growing rows. Worth pairing with a check that
+fails CI when a `fixtures-*.sql` has no sibling teardown — the rule is mechanical and keeps
+being forgotten. See `docs/WORKTREES.md` Phase 4.
+
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`
 → `createClient<Database>(...)`) so query results are typed from the real schema instead

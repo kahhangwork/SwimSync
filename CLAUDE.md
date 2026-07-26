@@ -50,6 +50,7 @@ document when the task touches it; don't read them all up front.
 | Why is it built this way? | `docs/ARCHITECTURE.md` (§6, §10, §12) |
 | What do the tests cover? | `docs/TESTING.md` (§5) |
 | What's live, and how? | `docs/DEPLOYMENT.md` (§11) |
+| **Working in a worktree / two sessions at once** | **`docs/WORKTREES.md`** |
 | How do I bill a month? | `INVOICE_RUNBOOK.md` |
 
 **Section numbers are permanent identifiers.** `§7.41` means gotcha 41 wherever it lives —
@@ -100,6 +101,10 @@ touching an unfamiliar subsystem.
 
 - **Single `main` branch.** Feature branch → implement → verify → merge → push → delete the
   branch. No PRs unless asked.
+- **Worktrees share one database and one set of documents.** Exactly one worktree may own
+  `supabase/`; no worktree edits `HANDOVER.md` / `PRD.md` / `BACKLOG.md` — findings are
+  collected and written from `main` at close; never `supabase db reset` while a sibling is
+  running. Full sequence: `docs/WORKTREES.md`.
 - **Tests must be proven to fail without the fix** before they count as coverage. (§7.25)
 - The **test runner is the fact**; any count written in prose is a hint that has drifted.
 - Documentation lanes: `PRD.md` = what exists · `BACKLOG.md` = what doesn't yet ·

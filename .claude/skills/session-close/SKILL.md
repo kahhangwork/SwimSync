@@ -93,6 +93,11 @@ Leave nothing listening. Mention any long-running job you are deliberately leavi
 
 ## 5. Settle the worktree
 
+> Full sequence, including what must happen *before* you get here: **`docs/WORKTREES.md`**.
+> The ordering that matters: land all code → tear down fixtures → **copy your `WORKTREE.md`
+> "graduate" list out, it is about to become unreachable** → exit the worktree → *then* run
+> `/update-docs` from the root checkout on `main`. No worktree writes the living documents.
+
 If the session ran in a worktree, it needs an explicit disposition — **ask, don't assume**:
 
 - **Keep** — more work is queued here. Fast-forward it so the next session does not start

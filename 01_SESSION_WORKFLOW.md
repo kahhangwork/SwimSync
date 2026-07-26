@@ -92,10 +92,18 @@ often skipped. Both are quick when the session was small.
 
 ## If you are working in a worktree
 
-Read `docs/GOTCHAS.md` **§7.55** (worktrees share one database — migrations land on `main`
-alone, one at a time) and **§7.56** (a fresh worktree has no `.env` files, the failure looks
-like your own bug, and a sibling session can move `HEAD` between your checkout and your
-commit) before you start.
+**Read [docs/WORKTREES.md](docs/WORKTREES.md) first — the whole sequence is there.** It
+exists because git separates your *files* and nothing else: one database, one set of living
+documents, one `main`, one set of ports.
+
+The five rules it comes down to:
+
+1. **One worktree owns `supabase/`.** Everyone else `git merge main` to consume the schema.
+2. **Never `supabase db reset`** while a sibling is running.
+3. **No worktree edits `HANDOVER.md` / `PRD.md` / `BACKLOG.md`** — collect findings in
+   `WORKTREE.md`, write them from `main` at close.
+4. **Push per change, fast-forward only, `<branch>:main`.**
+5. **Prefix your fixture rows and tear them down.**
 
 Default to working in the **root checkout** on a short-lived branch. Use a worktree only
 when you deliberately want a second Claude session running at the same time.

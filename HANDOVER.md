@@ -25,6 +25,7 @@ there is no second index to go through.
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
+| **Running two sessions at once without clashing** | **`docs/WORKTREES.md`** | — |
 | How to bill a month | `INVOICE_RUNBOOK.md` | — |
 | The design/plan behind a shipped feature | `docs/design/`, `docs/plans/` | — |
 
