@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-27 (attendance window enforced in the database and a mid-month joiner no longer blocks a month — both live; the two limits that work deliberately left behind are filed under Billing)_
+_Last updated: 2026-07-27 (the attendance window is a rule; password reset verified on production for both apps after the admin entry was found missing from the live allow-list — HANDOVER §7.41)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -941,6 +941,31 @@ it failed, looked like a regression in the change under test, and needed a run a
 **Notes:** it also drives Expo, so a fix should keep the admin half runnable alone — an
 admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
 and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
+
+### `verify-attendance-window.mjs` guards nothing — **S**
+It scores **0/4**. Its fixture header states the assumption outright — *"Assumes the machine
+clock is Thu 16 – Fri 17 Jul 2026"* (`fixtures-attendance-window.sql:3`) — and hard-codes a
+week of dates around it. Off that week, every check misses.
+
+**Why:** it is the **older of the two drivers covering the attendance window**, so the
+directory listing implies that area is covered twice when it is covered once. A driver that
+scores 0/4 is worse than a missing one: a reader counts it as coverage, and the next person
+to change the window will believe they have a safety net that has not run a real assertion
+in weeks. **Verified pre-existing, not a regression from §8.15** — it scores 0/4 on both
+sides of the 2026-07-27 change.
+
+**Notes:** the fix is to derive its dates from **one clock anchor**, the way
+`fixtures-attendance-guard.sql` now does. That is **deliberately the opposite of §7.33's
+rule for unit suites** — there, a suite that reads the real clock is the bug, because the
+behaviour under test is timeless. Here the behaviour under test *is relative to `now()`*:
+the marking window is "the class's own weekday between the 1st of last month and today", so
+a fixture pinned to fixed calendar dates is the thing that goes stale. Anchor once, derive
+every date from it, and let the anchor move. See HANDOVER **§8.15** for the rule this driver
+should be exercising, and `verify-attendance-guard.mjs` for the shape that works.
+
+Decide while fixing whether the older driver still earns its place at all, or whether its
+unique cases should be folded into `verify-attendance-guard.mjs` and the file deleted —
+two drivers over one rule is the reason this went unnoticed.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`

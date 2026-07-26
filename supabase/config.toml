@@ -186,6 +186,12 @@ additional_redirect_urls = [
   "http://localhost:8081/accept-invite",
   "swimsync://accept-invite",
   "https://swimsync.sg/accept-invite",
+  # A parent resetting their own password. `forgot-password.tsx` asks for
+  # `window.location.origin + "/reset-password"`, which on production is exactly
+  # this. It was missing from this list until 2026-07-27 — and its ADMIN
+  # counterpart below was missing from the PRODUCTION dashboard too, which is
+  # what silently broke admin password reset until the same day (§7.41).
+  "https://swimsync.sg/reset-password",
   # Admin panel — password reset and first-time invite acceptance.
   "http://localhost:3000/reset-password",
   "http://localhost:3000/accept-invite",

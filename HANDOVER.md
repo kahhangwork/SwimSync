@@ -1196,11 +1196,25 @@ See LOCAL_DEV_GUIDE §"Running the tests".
     token is valid — the user just lands on the wrong page, which for a first-time invite is
     the admin root instead of the form that sets their password. **If an auth email lands
     somewhere unexpected, suspect the allow-list before the code.** Note it is an **exact**
-    match, so `localhost:3000` and `127.0.0.1:3000` are different entries — and the admin
-    panel's `/reset-password` had never been listed at all, meaning the existing
-    forgot-password flow was likely landing wrong in production too. Remember it is read only
-    at **boot** (§4): `supabase stop && supabase start`. Production keeps its own copy in the
-    Supabase dashboard, which no migration touches.
+    match, so `localhost:3000` and `127.0.0.1:3000` are different entries. Remember it is
+    read only at **boot** (§4): `supabase stop && supabase start`.
+    - **⚠ THE SUSPICION WAS CORRECT, AND IT WAS LIVE FOR WEEKS.** This entry used to say the
+      admin panel's `/reset-password` was unlisted and so the forgot-password flow was
+      "**likely** landing wrong in production too". On **2026-07-27** it was checked:
+      `https://admin.swimsync.sg/reset-password` was **missing from the production
+      dashboard's allow-list**, so every admin password reset had been silently landing on
+      the wrong page. Added, then reset was tested end to end on **both**
+      `https://swimsync.sg` and `https://admin.swimsync.sg` — both work. The parent app's
+      `https://swimsync.sg/reset-password` was also missing from `config.toml` and has been
+      added.
+    - **PRODUCTION AND `config.toml` ARE TWO SEPARATE LISTS AND NOTHING KEEPS THEM IN STEP.**
+      Production's copy lives in the **Supabase dashboard**; no migration touches it, no
+      test reads it, and `supabase db push` does not carry it. That asymmetry is why the
+      two drifted apart unnoticed for weeks, and it is the durable lesson here:
+      **fixing the file does not fix production, and fixing production does not fix the
+      file — do both, every time.** Audit production by hand:
+      `grep -rn "redirectTo\|resetRedirectTo" SwimSyncAdmin/app SwimSyncApp/app` lists every
+      URL an auth email can ask for; each one must appear in the dashboard list *and* here.
 
 42. **A `SECURITY DEFINER` WRITER IS EXEMPT FROM `pin_student_tenant()` — AND FROM EVERY
     TRIGGER THAT USES THE `current_user` SEAM.** §6 records that the tenant boundary on
@@ -3649,13 +3663,21 @@ Still true and worth knowing before that first run: `auto_invoice_enabled` is **
 **no coach rate is set** (so payroll computes nothing), and the join code is **`SWIM-RVM9`**
 — the only route in for a new family, and the re-entry route for one marked inactive.
 
-### One narrow thing still unverified on production
+### ~~One narrow thing still unverified on production~~ — **CLOSED 2026-07-27, and it was broken**
 
-**The `/reset-password` redirect allow-list.** `/accept-invite` is proven; this entry has
-never been exercised. §7.41 is the reason to care: an unlisted redirect is **not rejected**,
-it is silently replaced with `site_url`, so the email arrives, the link works, and the user
-lands on the wrong page. **A two-minute check:** use *Forgot password?* on `swimsync.sg`
-with a real address and **read the URL** in the email before following it.
+Password reset is now **verified end to end on production for both apps** —
+`https://swimsync.sg` and `https://admin.swimsync.sg`. Nothing here is outstanding.
+
+**It was not merely unverified; it was broken.** The production dashboard's allow-list was
+missing `https://admin.swimsync.sg/reset-password` entirely, so every admin password reset
+had been silently landing on the wrong page — exactly the failure §7.41 describes, in the
+place §7.41 suspected. The user found it, added it, and tested both apps. The full
+reasoning now lives in **§7.41**, which is the right home for it; this section is a
+pointer, not a second copy.
+
+`supabase/config.toml` was missing `https://swimsync.sg/reset-password` too and has been
+corrected — but note that **fixing the file does not fix production, and vice versa**
+(§7.41).
 
 ### If you would rather build than onboard
 
