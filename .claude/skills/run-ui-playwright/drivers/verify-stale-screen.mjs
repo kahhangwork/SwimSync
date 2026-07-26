@@ -209,6 +209,58 @@ try {
     !/Unmarked Lessons/.test(t),
     t.match(/Unmarked Lessons \([0-9]+\)/)?.[0] ?? "(cleared)"
   );
+
+  // ══════════════ THE NAVIGATION HALF ══════════════
+  // Saving must return the coach to where they came FROM, not to whatever the
+  // Classes stack happens to be holding. This screen lives in the Classes tab
+  // (classes/_layout.tsx) but is pushed from Today too, and switching tabs
+  // does not unwind that stack — so it accumulates one attendance screen per
+  // lesson visited, and router.back() popped into the previous LESSON.
+  //
+  // The coach's report: marked the 8:45 class, pressed the back chevron,
+  // marked the 9:30 class, and saving returned them to the 8:45 screen with
+  // its session id still in the URL.
+  check(
+    "saving leaves the attendance screen entirely",
+    !/\/attendance\?/.test(page.url()),
+    page.url().replace(EXPO, "")
+  );
+
+  // Now the second class, from Today — this is the push that used to stack on
+  // top of the first one.
+  await pressByText(page, "Mark Attendance", 1);
+  await page.waitForTimeout(3000);
+  t = await dumpText(page);
+  await page.screenshot({ path: `${SHOT}/ss-5-second-class.png`, fullPage: true });
+
+  // "Second Only" is enrolled in the SECOND class alone, so its presence is
+  // proof of which lesson is on screen. The class TITLE is not proof — the
+  // screen navigated away from is still mounted and still in innerText.
+  check(
+    "the second class's own lesson opens",
+    /Second Only/.test(t),
+    t.includes("Second Only") ? "" : "(wrong class on screen)"
+  );
+
+  await pressByText(page, "Present", 0);
+  await pressByText(page, "Save Attendance");
+  await page.waitForTimeout(3500);
+  await page.screenshot({ path: `${SHOT}/ss-6-after-second.png`, fullPage: true });
+
+  const landedOn = page.url().replace(EXPO, "");
+  check(
+    "saving the SECOND lesson does not land on the FIRST lesson's screen",
+    !/\/attendance\?/.test(landedOn),
+    landedOn
+  );
+
+  // And the first class's marks are still what they were — a save on class B
+  // must not touch class A.
+  check(
+    "class A's lesson is untouched by class B's save",
+    marksOn(TODAY) === "Stale One=present, Stale Two=present",
+    `${TODAY} class A: ${marksOn(TODAY)}`
+  );
 } finally {
   await browser.close();
   const passed = results.filter(Boolean).length;

@@ -51,19 +51,49 @@ SELECT
 FROM coaches co, ss
 WHERE co.profile_id = 'c0000000-0000-0000-0000-000000000001';
 
+-- A SECOND class on the same weekday, because the navigation half of §7.62
+-- needs two lessons to stack. The coach marks the first from Today, goes back,
+-- marks the second — and `router.back()` used to land them on the FIRST one.
+-- One class cannot express that.
+INSERT INTO classes (
+  id, coach_id, title, day_of_week, start_time, end_time,
+  location_name, price_per_lesson, category_id, tenant_id, is_active
+)
+SELECT
+  'e1000000-0000-0000-0000-0000000000c2',
+  co.id, 'Stale Screen Second', ss.today_dow, '09:30', '10:15',
+  'Tanglin View', 30.00,
+  '7c000000-0000-0000-0000-000000000002',
+  '70000000-0000-0000-0000-000000000001', true
+FROM coaches co, ss
+WHERE co.profile_id = 'c0000000-0000-0000-0000-000000000001';
+
 -- ── Two children, enrolled 8 days ago ──────────────────────────────────────
 INSERT INTO students (id, full_name, assignment_status, is_active, tenant_id)
 VALUES
   ('e1000000-0000-0000-0000-00000000a001', 'Stale One', 'assigned', true,
    '70000000-0000-0000-0000-000000000001'),
   ('e1000000-0000-0000-0000-00000000a002', 'Stale Two', 'assigned', true,
+   '70000000-0000-0000-0000-000000000001'),
+  ('e1000000-0000-0000-0000-00000000b001', 'Second Only', 'assigned', true,
    '70000000-0000-0000-0000-000000000001');
 
+-- The two-child class first, then the second class's single child. A distinct
+-- name per class is what lets the driver tell WHICH lesson it is looking at —
+-- the class title alone is not enough, because the screen it navigated away
+-- from stays mounted and its title is still in document.body.innerText (§7.58).
+-- Class A's children are 8 days in, so last week's lesson is expected of them
+-- and lands in the backlog. Class B's child is only 3 days in, so class B has
+-- NO past lesson — which keeps "Unmarked Lessons" at exactly one entry and the
+-- driver's press on it unambiguous. Class B exists to be marked TODAY, as the
+-- second lesson in one sitting.
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
-SELECT s.id, 'e1000000-0000-0000-0000-0000000000c1',
-       (ss.today - 8)::timestamptz, true
-FROM (VALUES ('e1000000-0000-0000-0000-00000000a001'::uuid),
-             ('e1000000-0000-0000-0000-00000000a002'::uuid)) AS s(id), ss;
+SELECT s.id, s.class_id, (ss.today - s.days_ago)::timestamptz, true
+FROM (VALUES
+  ('e1000000-0000-0000-0000-00000000a001'::uuid, 'e1000000-0000-0000-0000-0000000000c1'::uuid, 8),
+  ('e1000000-0000-0000-0000-00000000a002'::uuid, 'e1000000-0000-0000-0000-0000000000c1'::uuid, 8),
+  ('e1000000-0000-0000-0000-00000000b001'::uuid, 'e1000000-0000-0000-0000-0000000000c2'::uuid, 3)
+) AS s(id, class_id, days_ago), ss;
 
 -- NO lesson_sessions and NO attendance, deliberately. Both today's lesson and
 -- last week's are unmarked, which is what puts one on each list.

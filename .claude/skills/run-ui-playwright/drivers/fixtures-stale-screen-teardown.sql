@@ -12,22 +12,25 @@
 DELETE FROM attendance
  WHERE lesson_session_id IN (
    SELECT id FROM lesson_sessions
-    WHERE class_id = 'e1000000-0000-0000-0000-0000000000c1'
+    WHERE class_id = ANY(ARRAY['e1000000-0000-0000-0000-0000000000c1','e1000000-0000-0000-0000-0000000000c2']::uuid[])
  );
 
 DELETE FROM lesson_sessions
- WHERE class_id = 'e1000000-0000-0000-0000-0000000000c1';
+ WHERE class_id = ANY(ARRAY['e1000000-0000-0000-0000-0000000000c1','e1000000-0000-0000-0000-0000000000c2']::uuid[]);
 
 DELETE FROM student_class_enrolments
- WHERE class_id = 'e1000000-0000-0000-0000-0000000000c1';
+ WHERE class_id = ANY(ARRAY['e1000000-0000-0000-0000-0000000000c1','e1000000-0000-0000-0000-0000000000c2']::uuid[]);
 
 DELETE FROM audit_log
  WHERE entity_type = 'lesson_session'
-   AND new_value->>'class_id' = 'e1000000-0000-0000-0000-0000000000c1';
+   -- ::text[], not ::uuid[] — new_value->>'class_id' is TEXT, and comparing it
+   -- to a uuid array is a type error that aborts the whole teardown.
+   AND new_value->>'class_id' = ANY(ARRAY['e1000000-0000-0000-0000-0000000000c1','e1000000-0000-0000-0000-0000000000c2']::text[]);
 
 DELETE FROM classes
- WHERE id = 'e1000000-0000-0000-0000-0000000000c1';
+ WHERE id = ANY(ARRAY['e1000000-0000-0000-0000-0000000000c1','e1000000-0000-0000-0000-0000000000c2']::uuid[]);
 
 DELETE FROM students
  WHERE id IN ('e1000000-0000-0000-0000-00000000a001',
-              'e1000000-0000-0000-0000-00000000a002');
+              'e1000000-0000-0000-0000-00000000a002',
+              'e1000000-0000-0000-0000-00000000b001');

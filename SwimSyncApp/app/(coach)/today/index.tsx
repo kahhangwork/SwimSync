@@ -353,7 +353,7 @@ export default function TodayScreen() {
                   key={`${item.class_id}:${item.date}`}
                   onPress={() =>
                     router.push(
-                      `/(coach)/classes/${item.class_id}/attendance?date=${item.date}` +
+                      `/(coach)/classes/${item.class_id}/attendance?date=${item.date}&from=today` +
                         (item.session_id ? `&sessionId=${item.session_id}` : "")
                     )
                   }
@@ -445,7 +445,7 @@ export default function TodayScreen() {
                     label="Mark Attendance"
                     onPress={() =>
                       router.push(
-                        `/(coach)/classes/${cls.id}/attendance?date=${todayDate}${cls.session_id ? `&sessionId=${cls.session_id}` : ""}`
+                        `/(coach)/classes/${cls.id}/attendance?date=${todayDate}&from=today${cls.session_id ? `&sessionId=${cls.session_id}` : ""}`
                       )
                     }
                   />

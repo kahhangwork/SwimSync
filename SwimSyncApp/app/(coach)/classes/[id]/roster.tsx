@@ -422,7 +422,7 @@ export default function ClassRosterScreen() {
                 }`}
                 onPress={() =>
                   router.push(
-                    `/(coach)/classes/${id}/attendance?date=${markTarget.date}` +
+                    `/(coach)/classes/${id}/attendance?date=${markTarget.date}&from=roster` +
                       (markTarget.sessionId
                         ? `&sessionId=${markTarget.sessionId}`
                         : "")
@@ -641,7 +641,7 @@ export default function ClassRosterScreen() {
                   key={session.session_date}
                   onPress={() =>
                     router.push(
-                      `/(coach)/classes/${id}/attendance?date=${session.session_date}` +
+                      `/(coach)/classes/${id}/attendance?date=${session.session_date}&from=roster` +
                         (session.id ? `&sessionId=${session.id}` : "")
                     )
                   }

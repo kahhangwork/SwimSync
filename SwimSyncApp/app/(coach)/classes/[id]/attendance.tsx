@@ -98,10 +98,37 @@ export default function MarkAttendanceScreen() {
     date: string;
     sessionId?: string;
   }>();
-  const { date, sessionId: sessionIdParam } = useLocalSearchParams<{
+  const { date, sessionId: sessionIdParam, from } = useLocalSearchParams<{
     date: string;
     sessionId?: string;
+    from?: string;
   }>();
+
+  // ── WHERE DOES LEAVING THIS SCREEN GO? ──────────────────────────────────
+  // Not `router.back()`, which trusts whatever happens to be underneath — and
+  // what is underneath is frequently ANOTHER LESSON'S attendance screen.
+  //
+  // This screen lives in the CLASSES tab's Stack (classes/_layout.tsx) but is
+  // pushed from the TODAY tab as well. Switching tabs does not unwind the
+  // Classes stack, it only hides it, so the stack accumulates:
+  //
+  //   Today → tap 845am card       [classes-index, att(845, 26 Jul)]
+  //   back chevron → Today         [classes-index, att(845, 26 Jul)]  ← kept
+  //   Today → tap 930am card       [classes-index, att(845,26), att(930,26)]
+  //   Save → router.back()         → lands on att(845, 26 Jul)
+  //
+  // Which is what the coach reported: saving the 9:30 class returned them to
+  // the 8:45 one, and the URL still carried the 8:45 session id.
+  //
+  // So the caller says where it came from and we go there EXPLICITLY, with
+  // `replace` rather than `push` — that also drops this screen out of the
+  // history, so nothing can pop back into a lesson the coach has finished.
+  const exitHref =
+    from === "roster" ? `/(coach)/classes/${id}/roster` : "/(coach)/today";
+
+  function leaveScreen() {
+    router.replace(exitHref as any);
+  }
 
   const session = useAppStore((s) => s.session);
   const showToast = useAppStore((s) => s.showToast);
@@ -453,7 +480,7 @@ export default function MarkAttendanceScreen() {
 
     setSaving(false);
     showToast("Attendance saved.", "success");
-    router.back();
+    leaveScreen();
   }
 
   // The spinner also covers the gap between a param change and the reload
@@ -475,7 +502,7 @@ export default function MarkAttendanceScreen() {
     return (
       <SafeAreaView className="flex-1 bg-sky-50">
         <View className="flex-row items-center px-5 pt-4 pb-3">
-          <TouchableOpacity onPress={() => router.back()} className="mr-3">
+          <TouchableOpacity onPress={() => leaveScreen()} className="mr-3">
             <Ionicons name="chevron-back" size={24} color="#0ea5e9" />
           </TouchableOpacity>
           <View className="flex-1">
@@ -497,7 +524,7 @@ export default function MarkAttendanceScreen() {
             {blocked.detail}
           </Text>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => leaveScreen()}
             className="mt-6 px-5 py-3 rounded-xl bg-sky-500"
           >
             <Text className="text-white font-semibold">Back to class</Text>
@@ -511,7 +538,7 @@ export default function MarkAttendanceScreen() {
     <SafeAreaView className="flex-1 bg-sky-50">
       {/* Header */}
       <View className="flex-row items-center px-5 pt-4 pb-3">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3">
+        <TouchableOpacity onPress={() => leaveScreen()} className="mr-3">
           <Ionicons name="chevron-back" size={24} color="#0ea5e9" />
         </TouchableOpacity>
         <View className="flex-1">
