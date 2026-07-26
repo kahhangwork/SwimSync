@@ -1,0 +1,113 @@
+# SwimSync — Session Workflow
+
+**What to type, and when.** This is a cheat sheet for the *skills*, nothing else — it is
+deliberately the shortest document in the repo. What each skill does in detail lives in
+`AVAIL_SKILLS.md`; how the product works lives in `PRD.md`.
+
+_Last updated: 2026-07-26_
+
+---
+
+## The loop
+
+```
+  /session-start                      ← once, at the start
+        │
+        ▼
+  pick what to build
+        │
+        ▼
+  /plan-with-confidence               ← optional; for anything non-trivial
+        │
+        ▼
+  /plan-review                        ← optional; for anything risky
+        │
+        ▼
+  ┌── build it ───────────────────────────────────────┐
+  │                                                   │
+  │   /run-ui-playwright   ← if it touches a screen   │
+  │         │                                         │
+  │         ▼                                         │
+  │   /commit-review       ← reviews, commits,        │   ⟲ repeat this block
+  │                          AND pushes to main          once per change
+  │                                                   │
+  └───────────────────────────────────────────────────┘
+        │
+        ▼
+  /update-docs                        ← once, near the end
+        │
+        ▼
+  /session-close                      ← last thing. Then close the terminal.
+```
+
+---
+
+## When to use each
+
+| Skill | When | Runs |
+|---|---|---|
+| **`/session-start`** | Beginning of a session, or picking the repo back up | Once |
+| **`/plan-with-confidence`** | Before building anything non-trivial. It asks questions until it understands the task, *then* plans | Per change |
+| **`/plan-review`** | After a plan exists, before building. Ranks the plan's risks and folds mitigations into it | Per plan |
+| **`/run-ui-playwright`** | To see a change working in the real UI, not just in tests | As needed |
+| **`/commit-review`** | Every time a change is finished. Reviews it, commits it, **and pushes it to `main`** | **Per change** |
+| **`/update-docs`** | Near the end, after the code has shipped | Once |
+| **`/session-close`** | Last thing before you close the terminal | Once |
+
+---
+
+## Three things that are easy to get wrong
+
+**① Shipping is per change, not per session.** `/commit-review` carries each change all the
+way to `main`. Do not save up three changes and push them together — `main` moves under you
+when other worktrees are running, and a big rebase is far worse than three small ones.
+
+**② `/update-docs` is not the same as documenting a feature.** If a change alters *what a
+user can do*, its `PRD.md` and `BACKLOG.md` updates go out **in the same push as the code**
+— `/commit-review` asks you about this. `/update-docs` at the end is the *reconciliation*:
+the session log, next steps, test counts, drift between documents.
+
+> This is the one that has actually bitten. A feature once went live while `BACKLOG.md`
+> still listed it as unbuilt, because its docs were deferred to "later" and later never
+> came.
+
+**③ `/session-close` does not write documentation.** It shuts things down: fixtures torn
+out of the shared database, dev servers stopped, nothing left unpushed, worktree settled.
+Run `/update-docs` *before* it.
+
+---
+
+## Skipping steps
+
+`/plan-with-confidence` and `/plan-review` are optional and you should skip them for small,
+obvious changes — running them on a one-line fix is theatre.
+
+`/commit-review` is **not** optional: it is the only gate between a change and production,
+because a push to `main` deploys both web apps.
+
+`/update-docs` and `/session-close` are not optional either, and they are the two most
+often skipped. Both are quick when the session was small.
+
+---
+
+## If you are working in a worktree
+
+Read `HANDOVER.md` **§7.55** (worktrees share one database — migrations land on `main`
+alone, one at a time) and **§7.56** (a fresh worktree has no `.env` files, and the failure
+looks like your own bug) before you start.
+
+Default to working in the **root checkout** on a short-lived branch. Use a worktree only
+when you deliberately want a second Claude session running at the same time.
+
+---
+
+## The documents, and who they are for
+
+| Document | For | Rule |
+|---|---|---|
+| `01_SESSION_WORKFLOW.md` | **You** | What to type, and when. This file |
+| `AVAIL_SKILLS.md` | You + Claude | What each skill does in detail |
+| `PRD.md` | Claude | What the product **does** — only what is built |
+| `BACKLOG.md` | Claude | What it **doesn't do yet** — nothing here exists |
+| `HANDOVER.md` | Claude | The state the next session inherits |
+| `LOCAL_DEV_GUIDE.md` | Both | How to run and test it; seed logins |

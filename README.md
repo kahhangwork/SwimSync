@@ -57,9 +57,16 @@ and the `Database_*` files should not be edited.
 
 ### Keeping them honest
 
-The `/session-close` skill walks all three of the changing documents at the end of a
-working session and updates each by its own rule. See
-[AVAIL_SKILLS.md](AVAIL_SKILLS.md).
+Two skills keep them honest. **`/commit-review`** ships each change and asks, at that
+moment, whether `PRD.md` and `BACKLOG.md` move with it — per-change documentation is a
+shipping gate, not an end-of-session chore. **`/update-docs`** then walks all three near
+the end of a session and reconciles each by its own rule.
+
+**Which skill to run when: [01_SESSION_WORKFLOW.md](01_SESSION_WORKFLOW.md)** — one page.
+Full detail in [AVAIL_SKILLS.md](AVAIL_SKILLS.md).
+
+> `/update-docs` was called `/session-close` until 2026-07-26. That name now belongs to a
+> different skill — shutting the session down (fixtures, ports, unpushed work, worktree).
 
 ---
 

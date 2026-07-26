@@ -14,8 +14,9 @@ run/test commands and seed logins.
 > **This file is one of three living documents, split by how often each changes**
 > (see `README.md`): **PRD.md** = what exists · **BACKLOG.md** = what doesn't yet ·
 > **HANDOVER.md** (this file) = the state you're inheriting. Keep them in their lanes —
-> a feature idea belongs in `BACKLOG.md`, not §9 and not the PRD. The `/session-close`
-> skill walks all three at the end of a session and updates each by its own rule.
+> a feature idea belongs in `BACKLOG.md`, not §9 and not the PRD. The `/update-docs`
+> skill walks all three near the end of a session and updates each by its own rule
+> (it was called `/session-close` until 2026-07-26 — see `01_SESSION_WORKFLOW.md`).
 
 ---
 
@@ -3184,7 +3185,9 @@ that earns a PRD edit now.
     options, tagged `[MVP-excluded]` — the user's call, on the reasoning that SwimSync is
     moving past pure MVP-building. **§3.2 itself stays in the PRD as-written**: it's the
     historical record of the scope decision, not a to-do list.
-- **`/session-close` skill — new** (`.claude/skills/session-close/`). Walks all three docs
+- **`/session-close` skill — new** (`.claude/skills/session-close/`) — _renamed
+  **`/update-docs`** on 2026-07-26; the `/session-close` name now belongs to the shut-down
+  checklist. Historical entry, left as written._ Walks all three docs
   and updates each by its own rule. It **gates** each one rather than writing to all three —
   the failure mode of an auto-updater is bloat, which would collapse the split back into
   three copies of the same thing. A session touching only this file is the *correct*
@@ -3550,7 +3553,9 @@ email **has still never fired in production**.
 | `SwimSyncAdmin/lib/classCoverage.ts` | Expected-vs-marked coverage maths for the admin pre-generation check |
 | `SwimSyncAdmin/app/(admin)/` | Admin pages; `app/api/` server routes |
 | `.claude/skills/run-ui-playwright/` | Skill to launch + drive both UIs (Playwright/Chrome) |
-| `.claude/skills/session-close/` | Skill: update PRD/BACKLOG/HANDOVER by their own rules at session end |
+| `01_SESSION_WORKFLOW.md` | **Which skill to run when** — the user-facing one-page loop. Start here for workflow questions |
+| `.claude/skills/update-docs/` | Skill: reconcile PRD/BACKLOG/HANDOVER by their own rules (**was `/session-close`** until 2026-07-26) |
+| `.claude/skills/session-close/` | Skill: shut the session down — fixtures torn down, ports released, nothing unpushed, worktree settled |
 | `AVAIL_SKILLS.md` | Reference for all available skills |
 | `LOCAL_DEV_GUIDE.md` | Run/test commands, seed logins, service URLs |
 | `INVOICE_RUNBOOK.md` | Monthly manual invoice-generation procedure (superadmin) |
