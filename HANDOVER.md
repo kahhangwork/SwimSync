@@ -3686,17 +3686,17 @@ claiming. Each does nothing until first used.
 
 | Path | What |
 |------|------|
-| `TENANCY_DESIGN.md` | **The multi-tenancy design of record.** 10 settled decisions (§10). Read before changing anything tenant-shaped |
-| `TENANCY_PLAN.md` | The 6-phase build, its risks, and the definition of done |
+| `docs/design/TENANCY_DESIGN.md` | **The multi-tenancy design of record.** 10 settled decisions (§10). Read before changing anything tenant-shaped |
+| `docs/plans/TENANCY_PLAN.md` | The 6-phase build, its risks, and the definition of done |
 | `supabase/migrations/20260718000400…20260719000600` | The tenancy migrations: roles, tenants, backfill, RLS rewrite, billing constraints, join codes, wages, contract |
 | `supabase/tests/tenant_isolation.test.sql` | Cross-tenant isolation — two full tenants proving they cannot see each other |
 | `supabase/tests/coach_wages.test.sql` | The pay-decision table, pro-rata, effective dating, draft→freeze, adjustments |
 | `SwimSyncApp/lib/landing.ts` | Where a signed-in user lands. Routes on **extension rows**, not the role enum (§7.19) |
 | `SwimSyncApp/lib/attendanceCompleteness.ts` | The completeness rule, shared. **Twin in SwimSyncAdmin; a third copy in the Deno engine — three edits** |
-| `TRIAL_ONBOARDING_PLAN.md` | A child before their parent: the plan, its ranked risks inlined as mitigations, and the pre-commit gate. **Read before merging §8.10** |
-| `PARENT_CLAIM_PLAN.md` | **The parent-claiming design of record** — the settled decisions (including the two the user reversed mid-planning), seven ranked risks with mitigations inlined beside the step each governs, and the pre-commit gate. Read before changing matching, the claim queue, or `merge_students()` |
+| `docs/plans/TRIAL_ONBOARDING_PLAN.md` | A child before their parent: the plan, its ranked risks inlined as mitigations, and the pre-commit gate. **Read before merging §8.10** |
+| `docs/plans/PARENT_CLAIM_PLAN.md` | **The parent-claiming design of record** — the settled decisions (including the two the user reversed mid-planning), seven ranked risks with mitigations inlined beside the step each governs, and the pre-commit gate. Read before changing matching, the claim queue, or `merge_students()` |
 | `SwimSyncApp/lib/attendanceRoster.ts` | Who appears on Mark Attendance: enrolled **∪** already-marked-on-this-session. Why a closed trial enrolment doesn't hide the child it marked |
-| `ATTENDANCE_WINDOW_PLAN.md` | **The marking-window design of record** — the settled decisions, ranked risks with mitigations inlined beside the step each governs, the pre-commit gate, and **§10: three consequences accepted deliberately**. Read before changing the window, the completeness rule, or `schedule_extra_lesson()` |
+| `docs/plans/ATTENDANCE_WINDOW_PLAN.md` | **The marking-window design of record** — the settled decisions, ranked risks with mitigations inlined beside the step each governs, the pre-commit gate, and **§10: three consequences accepted deliberately**. Read before changing the window, the completeness rule, or `schedule_extra_lesson()` |
 | `supabase/migrations/20260727000100_attendance_window_guard.sql` | The window as a rule: two `current_user`-seamed triggers, the four functions that hold it in one place, `off_schedule_reason`, and `schedule_extra_lesson()` |
 | `supabase/rollback/20260727_attendance_window_DOWN.sql` | Two DROP TRIGGERs and nothing clever — the guard is pure validation, so dropping them restores the old behaviour whatever the app is doing |
 | `SwimSyncApp/lib/attendanceWindow.ts` | The client's copy of the window rule. **An affordance, not the guard** — the database is the rule; this exists so a coach sees English instead of a Postgres error |
@@ -3720,8 +3720,8 @@ claiming. Each does nothing until first used.
 | `supabase/migrations/20260719001300_drop_inactive_assignment_status.sql` | Enum contract, with the `pg_proc` guard that refuses if a function body still casts to the retired value (§7.21) |
 | `SwimSyncAdmin/app/(admin)/parents/page.tsx` | Families at this business — there was no Parents page before |
 | `supabase/tests/active_inactive.test.sql` | Family consequence both ways, the one-way property, the tenant boundary |
-| `TENANT_PROVISIONING_PLAN.md` | **The tenant-provisioning design of record** - the settled decisions, the eight ranked risks with their mitigations inline, and a *What actually happened* header recording which of them fired. Read before changing anything about creating a business |
-| `PACKAGES_DESIGN.md` | **The prepaid-packages design of record** — the locked decision table + the /plan-review risk mitigations, inline. Read before changing anything package-shaped |
+| `docs/plans/TENANT_PROVISIONING_PLAN.md` | **The tenant-provisioning design of record** - the settled decisions, the eight ranked risks with their mitigations inline, and a *What actually happened* header recording which of them fired. Read before changing anything about creating a business |
+| `docs/design/PACKAGES_DESIGN.md` | **The prepaid-packages design of record** — the locked decision table + the /plan-review risk mitigations, inline. Read before changing anything package-shaped |
 | `supabase/migrations/20260720000100_lesson_packages.sql` | The four package tables, CHECKs, lifecycle trigger (NOT definer — §7.38), RLS, `package_live_balances()` |
 | `supabase/migrations/20260720000200_package_correction_restore.sql` | `handle_attendance_update` 7th redefinition: restore-to-package, refund-at-most-once |
 | `supabase/tests/lesson_packages.test.sql` · `package_corrections.test.sql` | The package money rules + the correction paths (30 + 12) |

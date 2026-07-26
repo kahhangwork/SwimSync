@@ -51,9 +51,38 @@ invoice-generation procedure for the superadmin, and
 repo. **[brand/](brand/)** holds the logo — `mark.svg` is the source of truth, and
 every icon under `SwimSyncApp/assets/` and `SwimSyncAdmin/public/` is rasterised from
 it; `brand/README.md` covers regeneration and the places the mark deliberately does
-*not* go. The `Database_*` files at the root are historical artefacts from the original
-build — **the migrations in `supabase/migrations/` are the schema's source of truth**,
-and the `Database_*` files should not be edited.
+*not* go.
+
+### Where everything lives
+
+The root holds only what you read **regularly**. Everything else is one directory down,
+categorised by what it *is*:
+
+| Path | What |
+|---|---|
+| `01_SESSION_WORKFLOW.md` | **Start here** — which skill to run when |
+| `README.md` `PRD.md` `BACKLOG.md` `HANDOVER.md` `LOCAL_DEV_GUIDE.md` | The living documents |
+| `AVAIL_SKILLS.md` `INVOICE_RUNBOOK.md` | Reference and procedure |
+| **`docs/design/`** | Designs of record — the settled decisions for a subsystem. `TENANCY_DESIGN.md`, `PACKAGES_DESIGN.md` |
+| **`docs/plans/`** | Per-feature plans, with their ranked risks and pre-commit gates. Read the one for the area you're changing |
+| **`docs/database/`** | `Database_AccessRuleSummary.md` — a historical artefact of the original build |
+
+> **Filenames did not change, only directories.** A reference anywhere in the codebase to
+> `TENANCY_DESIGN.md` or `PARENT_CLAIM_PLAN.md` still names the right file — it is now
+> under `docs/`. That was deliberate: **34 of those references live inside applied
+> migrations in `supabase/migrations/`**, which are the schema's history and are not
+> edited after the fact. Renaming the files would have stranded every one of them.
+>
+> **Numeric prefixes were considered and rejected** for everything except
+> `01_SESSION_WORKFLOW.md`. Encoding a category into a filename makes recategorising a
+> rename, and a rename breaks references — the cost recurs forever. Directories carry the
+> category; the number survives on the one file whose whole job is to sort first. This
+> mirrors the ADR convention, where the number is an immutable *sequence*, never a
+> category.
+
+The `Database_*` artefacts from the original build are historical — **the migrations in
+`supabase/migrations/` are the schema's source of truth**, and `Database_*` should not be
+edited.
 
 ### Keeping them honest
 

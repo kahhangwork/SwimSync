@@ -109,5 +109,6 @@ when you deliberately want a second Claude session running at the same time.
 | `AVAIL_SKILLS.md` | You + Claude | What each skill does in detail |
 | `PRD.md` | Claude | What the product **does** — only what is built |
 | `BACKLOG.md` | Claude | What it **doesn't do yet** — nothing here exists |
+| `docs/design/` · `docs/plans/` | Claude | Designs of record, and per-feature plans. Read the one for the area you're changing |
 | `HANDOVER.md` | Claude | The state the next session inherits |
 | `LOCAL_DEV_GUIDE.md` | Both | How to run and test it; seed logins |
