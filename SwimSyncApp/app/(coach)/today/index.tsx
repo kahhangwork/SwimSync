@@ -25,6 +25,11 @@ import {
   isLessonFullyMarked,
   expectedStudentsOn,
 } from "@/lib/attendanceCompleteness";
+import {
+  nowMinutesInSg,
+  isNowInRange,
+  hasEndedInSg,
+} from "@/lib/timeOfDay";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 
@@ -54,14 +59,6 @@ function formatTime(time: string): string {
   return `${hour12}:${m} ${ampm}`;
 }
 
-function isNowInRange(start: string, end: string): boolean {
-  const now = new Date();
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  const nowMins = now.getHours() * 60 + now.getMinutes();
-  return nowMins >= sh * 60 + sm && nowMins <= eh * 60 + em;
-}
-
 export default function TodayScreen() {
   const session = useAppStore((s) => s.session);
   const [classes, setClasses] = useState<TodayClass[]>([]);
@@ -73,6 +70,10 @@ export default function TodayScreen() {
   // by can never disagree with the date we write attendance to.
   const todayDate = todayInSg();
   const todayDayOfWeek = dayOfWeekOf(todayDate);
+  // Read ONCE per render, in Singapore, and passed to every comparison below.
+  // The functions that use it take a number and cannot read a clock themselves,
+  // so the device's timezone has no way in (§7.7, lib/timeOfDay.ts).
+  const nowMins = nowMinutesInSg();
   const todayStr = formatSgDate(todayDate, {
     weekday: "long",
     year: "numeric",
@@ -401,7 +402,7 @@ export default function TodayScreen() {
         ) : (
           <View className="gap-3">
             {classes.map((cls) => {
-              const isActive = isNowInRange(cls.start_time, cls.end_time);
+              const isActive = isNowInRange(cls.start_time, cls.end_time, nowMins);
               return (
                 <Card
                   key={cls.id}
