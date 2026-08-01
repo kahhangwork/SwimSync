@@ -11,6 +11,18 @@
 -- unclaimed billable lesson: everything the seal needs except a parent to bill.
 --
 -- Idempotent — safe to re-run between driver runs.
+--
+-- roundtrip-exempt: cross-fixture-writes — a COMPLETE month is the scenario, so it must mark every child enrolled in the class, siblings' included.
+--
+-- Completeness is measured across the whole roster, so scoping this to its own
+-- walk-in would make the run refuse for the wrong reason and the assertion pass
+-- vacuously. The teardown compensates — it deletes every attendance row in that
+-- month on that class, for ANY student, not just its own.
+--
+-- This is a compensated hazard, not a safe pattern. The durable fix is for the
+-- fixture to own its own class instead of borrowing the seed one
+-- (`classes WHERE tenant_id = ... LIMIT 1` is also unordered, so which class it
+-- borrows is not even stable). Filed in BACKLOG.md.
 
 BEGIN;
 

@@ -73,10 +73,27 @@ UPDATE tenants SET paynow_qr_url = NULL
 
 DELETE FROM tenants WHERE slug = 'harbour-swim';
 
+-- The parent themselves. The fixture now seeds this auth user when it is absent
+-- (CI has no browser to register them through the UI), so the round-trip is only
+-- honest if the teardown removes them again.
+--
+-- BY EMAIL, NOT BY ID, and unconditionally: the user may have been created by
+-- the fixture (fixed uuid) or by the driver registering through the app (random
+-- uuid), and both must go. Leaving them behind also breaks the DRIVER — it
+-- registers this email on every run, and a second run against the same database
+-- would fail at "already registered".
+--
+-- audit_log BEFORE the profile: actor_id is NOT NULL / NO ACTION (§7.50).
+DELETE FROM audit_log
+ WHERE actor_id IN (SELECT id FROM auth.users WHERE email = 'phase4-parent@test.local');
+DELETE FROM auth.users WHERE email = 'phase4-parent@test.local';
+
 COMMIT;
 
--- Expect 0, 0, 0 — and seed_tenant_intact = 1.
+-- Expect 0, 0, 0, 0 — and seed_tenant_intact = 1.
 SELECT
+  (SELECT count(*) FROM auth.users
+    WHERE email = 'phase4-parent@test.local')                           AS p4_parent,
   (SELECT count(*) FROM tenants WHERE slug = 'harbour-swim')            AS second_tenant,
   (SELECT count(*) FROM students
     WHERE full_name IN ('Phase4 KidA', 'Phase4 KidB'))                  AS p4_students,

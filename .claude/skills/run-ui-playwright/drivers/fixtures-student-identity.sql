@@ -14,8 +14,20 @@
 DO $$
 DECLARE v_tenant UUID; v_parent UUID; v_class UUID;
 BEGIN
-  SELECT id INTO v_tenant FROM tenants LIMIT 1;
-  SELECT id INTO v_class FROM classes WHERE title = 'Saturday Beginners';
+  -- The tenant comes FROM THE CLASS, and that is the whole point of writing it
+  -- this way. It used to be `SELECT id INTO v_tenant FROM tenants LIMIT 1` —
+  -- unordered, so the moment a second business exists (fixtures-phase4-billing
+  -- creates 'Harbour Swim Club') it could pick that one while the class below
+  -- still came from the seed business. The children then landed in one tenant
+  -- and were enrolled into another's class, and enforce_enrolment_tenant() threw
+  -- `cross-tenant enrolment refused`. Derived from the class, the two cannot
+  -- disagree.
+  SELECT id, tenant_id INTO v_class, v_tenant
+    FROM classes WHERE title = 'Saturday Beginners';
+
+  IF v_class IS NULL THEN
+    RAISE EXCEPTION 'seed class "Saturday Beginners" is missing — is the database seeded?';
+  END IF;
 
   INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
     email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at,

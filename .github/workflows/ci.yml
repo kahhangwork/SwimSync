@@ -68,6 +68,23 @@ jobs:
       - name: Engine tests (Deno) — second run, proves no leaked state
         run: supabase/functions/generate-invoices/test.sh
 
+      # Loads every UI fixture, unloads it, and asserts the database came back.
+      # Until 2026-08-01 NO fixture was ever applied by CI, and two classes of
+      # breakage shipped through that gap — both found by accident:
+      #   §7.62  a NOT NULL migration made two fixtures unloadable for a week
+      #   §7.63  an unscoped CROSS JOIN enrolled every child in the database
+      # psql's default hides both: it aborts the ONE failing statement and
+      # carries on, so the fixture half-loads and the DRIVER's low score reads as
+      # a product regression. The script runs with ON_ERROR_STOP=1 and compares
+      # each fixture's row-count footprint alone vs stacked on its siblings.
+      #
+      # LAST, deliberately: it seeds and unseeds the whole database, so running
+      # it before the billing suites would make a fixture bug look like a billing
+      # failure. It restores what it found, so the ordering is a diagnosis
+      # concern, not a correctness one.
+      - name: UI fixtures load, own their own rows, and tear down clean
+        run: .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh
+
       - name: Stop Supabase stack
         if: always()
         run: supabase stop

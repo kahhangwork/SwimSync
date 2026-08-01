@@ -999,28 +999,26 @@ Decide while fixing whether the older driver still earns its place at all, or wh
 unique cases should be folded into `verify-attendance-guard.mjs` and the file deleted —
 two drivers over one rule is the reason this went unnoticed.
 
-### Run the fixtures in CI — **M**
-No UI fixture is ever applied by CI. It runs pgTAP, Deno and the two frontend suites; the
-thirteen `fixtures-*.sql` files that the Playwright drivers depend on are exercised only when
-a human runs a driver by hand.
+### Give `fixtures-trial-onboarding.sql` its own class — **S**
+The fixture borrows the seed business's class (`SELECT id FROM classes WHERE tenant_id = …
+LIMIT 1`) and then marks **every actively-enrolled child in it** present on every Saturday of
+the previous month — siblings' children included. Give it a class of its own and the write
+becomes self-scoped.
 
-**Why:** two separate classes of breakage have now shipped undetected because of this, and
-both were found by accident. **§7.62** — `20260719000600` made `students.tenant_id` NOT NULL
-and two fixtures went unloadable for a week, which is what actually produced
-`verify-attendance-window.mjs`'s 0/4. **§7.63** — an unscoped `FROM students` in
-`fixtures-unmarked-lessons.sql` enrolled and marked every child in the database, and when a
-sibling fixture was loaded first the resulting constraint violation aborted the statement so
-the fixture's *own* children were never enrolled. In both cases psql aborted one statement,
-carried on, and the fixture half-loaded silently — so the driver's low score read as a
-product regression.
+**Why:** it is the last declared `roundtrip-exempt` in the suite. The exemption is honest —
+a *complete* billing month is the scenario, and completeness is measured across the whole
+roster, so scoping to its own walk-in would make the run refuse for the wrong reason and the
+assertion pass vacuously — but it is a compensated hazard, not a safe pattern. Measured
+2026-08-01: **+1 attendance row alone, +5 stacked**. The compensation is a teardown that
+deletes every attendance row in that month on that class *for any student*, which is
+correct and also means the fixture can delete a sibling's marks. Separately, that `LIMIT 1`
+has no `ORDER BY`, so **which** class it borrows is not stable.
 
-**Notes:** the shape is already written and proven — the round-trip harness in
-`docs/WORKTREES.md` Phase 4: snapshot every table's row count, apply the fixture, apply its
-teardown, assert the counts are identical. It caught two teardown defects and both bugs above
-in one pass. A CI job would need a Supabase stack (the `backend-tests` job already boots one,
-so it could be a step there rather than a new job) and should apply each fixture **on top of
-another fixture**, not just a clean database — that ordering is what surfaced §7.63.
-`drivers/check-teardowns.sh` already guards the weaker invariant that a teardown *exists*.
+**Notes:** the fixture needs a class plus its `class_rates` row and a category, in the seed
+tenant, prefixed like everything else it owns. `verify-trial-onboarding.mjs` may navigate by
+class name — check before renaming anything. When it lands, delete the
+`-- roundtrip-exempt:` line from the fixture and `check-fixture-roundtrip.sh` starts
+enforcing the footprint comparison on it automatically; no change to the harness.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`
