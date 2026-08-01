@@ -1,12 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-01 — **a day of test infrastructure, plus one real admin bug.** CI now
-loads every UI fixture (§8.20 ledger); two rotted drivers were diagnosed and repaired, both
-turning out to be **stale setup, not product bugs** (§8.21, §8.22); and a question about coach
-rates uncovered a platform-page warning that had **never rendered in its life** (§8.22).
-**Four gotchas graduated, §7.73–§7.76, and they are one idea in four layers: never depend on
-a list, a row, a date, or a type you do not control.** There is no known undiagnosed test
-failure left, and no driver is knowingly red.
+_Last updated: 2026-08-01 (third session that day) — **every child's name now says how they
+are paid.** A per-child **payment-method chip** ("Package · N left" / "Ad-hoc", explicit both
+ways) shipped across ten admin surfaces and the parent app, backed by a new SQL verdict
+`student_package_coverage()` — and it **fixed the Students-page chip, which summed the
+family's lessons by parent while ignoring both category scope and expiry** (§8.23). Two
+migrations pushed to production, grant-dump gate clean, both apps deployed. Earlier that day:
+CI fixture loading + two driver repairs (§8.21 ledger, §8.22).
 The standing headline is unchanged: **real attendance exists on production**, and **July has
 still not been billed** — §9, and the marking window closes at the end of August._
 
@@ -166,6 +166,15 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   threshold). Request → PayNow → admin confirm; corrections restore the package, never
   mint cash credit. Ad-hoc billing byte-identical (tripwire-tested). PRD §7.16,
   `PACKAGES_DESIGN.md`, §8.8.
+- **Every child's name carries their payment method (verified local: pgTAP + vitest +
+  jest + UI driver — LIVE 2026-08-01, reads "Ad-hoc" everywhere on prod until a package
+  is sold)** — a **per-child, category-aware** chip ("Package · N left" / "Ad-hoc",
+  explicit both ways, count family-shared) on ten admin surfaces and the parent app's
+  home cards + child Balances card, from one SQL verdict `student_package_coverage()`.
+  The old Students-page chip — summed by parent, category- and expiry-blind — is gone,
+  and the "running low" filter follows the per-child rule. Family-grain surfaces
+  (Parents, Claims) label the family instead. Coaches deliberately see nothing.
+  PRD §7.16, §8.23.
 - **Creating a business (verified UI + backend, live 2026-07-21)** — the platform admin
   provisions a tenant and invites its first admin from `/platform`: `provision_tenant()` is
   the **only** INSERT path into `tenants`, the invite link is minted with
@@ -304,8 +313,8 @@ See §11.
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **As of 2026-07-25 production is fully caught up**: every migration through
-> `20260725000800` is applied (`supabase migration list --linked` shows nothing pending),
+> **As of 2026-08-01 production is fully caught up**: every migration through
+> `20260801000200` is applied (`supabase migration list --linked` shows nothing pending),
 > `generate-invoices` is at **v16** (trial bookings + category trial pricing, on top of
 > the unclaimed-attendance seal condition,
 > package drawdown, the completed-month guard and effective-dated pricing), and a SECOND
@@ -369,6 +378,46 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.23 (2026-08-01) — EVERY CHILD'S NAME NOW SAYS HOW THEY ARE PAID, AND THE ONE CHIP THAT ALREADY EXISTED WAS WRONG TWO WAYS
+
+Three commits, all deployed (two migrations pushed, grant-dump gate clean, both apps live —
+the app bundle greps for the new copy; the admin's authed chunks can't be fetched logged-out,
+so eyeball `/students` once). The durable material: **PRD §7.16** (the behaviour),
+`docs/TESTING.md` §5 (the suites and the driver), `docs/ARCHITECTURE.md` §10 (the new
+files), `BACKLOG.md` (the one surface deliberately skipped).
+
+**The feature:** a payment-method chip — **"Package · N left" / "Ad-hoc", explicit both
+ways** — beside every child's name: ten admin surfaces, the parent home cards, and the child
+profile's Balances card. One new SQL verdict, `student_package_coverage()` (SECURITY INVOKER;
+category matching over `package_live_balances()`, never a second balance derivation), so both
+apps ship only null-tolerant row-shapers and RLS does the scoping — a coach calling it gets
+nothing, which is the standing "coaches don't handle family money" decision, now pgTAP-pinned.
+
+**The bug it fixed:** the Students-page chip summed `live_lessons_remaining` **by parent**,
+so a family holding only a Private-scoped package read "N left" beside their child in a
+Group class — and date-expired `status='active'` packages inflated the count. The verdict is
+per child and category-aware; the "running low" filter follows it (an ad-hoc child is never
+"low"; an **exhausted** package is "Package · 0 left", never "Ad-hoc" — the engine's
+affordability rule is pinned OUT of the display predicate by a pg_proc-source assertion).
+The driver asserts the discriminating siblings **by name** in both UIs (16 → 21 checks).
+
+**Found while building:** `one_active_enrolment_per_student` means a child has at most one
+active class, so the `'mixed'` verdict (some classes covered, some not) is **structurally
+unreachable today** — the SQL arm and UI branches exist and are unit-tested, and a pgTAP pin
+on the index makes the day the constraint lifts loud instead of silently mislabelling.
+
+### Not done (deliberate)
+
+- **Invoice surfaces show no chip** (admin Invoices, dashboard outstanding mini-table,
+  parent invoice detail): an invoice is a *historic document* — `package_applied` records
+  how it **was** funded; a current-status chip beside it invites misreading. Per-line
+  marking via `package_applications` is filed in `BACKLOG.md` with that reasoning.
+- **No coach surfaces**, reaffirming the design decision rather than revisiting it.
+- **No new gotcha filed** — nothing cost real time; the two rules worth keeping (the label
+  rule, the 'mixed' unreachability) live in the migration header, the pgTAP pins and PRD §7.16.
+
+---
+
 ## 8.22 (2026-08-01) — A LATENT `LIMIT 1` BROKE CI, AND A USER'S QUESTION FOUND A WARNING THAT HAD NEVER RENDERED
 
 Four commits, two threads. **No product behaviour was removed that anyone was using**, and
@@ -421,59 +470,11 @@ only → no badge; add a staff coach → `1 unpaid`.
 
 ---
 
-## 8.21 (2026-08-01) — THE DRIVER THAT LOOKED LIKE A PRODUCT BUG WAS A STALE CALENDAR
-
-**§9 had flagged `verify-attendance-window.mjs`'s failures as possibly real product bugs
-that "matter more than the driver does". They were not.** Every failure was clock rot and
-the product rendered the correct state in all three cases. One commit, `057b8c5`. The
-durable material is in **§7.74**, **§7.75** and **`docs/TESTING.md` §5**; the plan and its
-walked gate are in **`docs/plans/ATTENDANCE_WINDOW_DRIVER_FOLD_PLAN.md`**.
-
-**It had rotted further than recorded — 2/5, not the 3/5 in the docs.** Its fixture pinned a
-child's enrolment to `2026-07-16` and needed *"no Sunday to have fallen due since"*, true for
-three days in July 2026. Proved by changing exactly one thing — that date to `now()` — which
-flipped both checks to PASS. The third failure was the same shape from the other side: the
-run happened to be on a Saturday, so the roster correctly read `Mark Attendance — Sat, 1 Aug
-2026 (Today)` while the driver hard-coded `Jul 2026` and forbade `(Today)`.
-
-Its three unique behaviours were folded into `verify-attendance-guard.mjs` (**14/14 →
-20/20**) and the driver, fixture and teardown deleted. The rebuild is anchored, not pinned:
-one class whose weekday is **tomorrow's** so its first lesson is always ahead, another whose
-weekday is **yesterday's** so a lesson is always overdue.
-
-**The finding worth carrying is the second bug, which was in the driver being folded INTO.**
-`verify-attendance-guard.mjs` opened the extra-lesson dialog with
-`getByText("Extra lesson").first()`. A second class in the fixture made it schedule against
-the wrong one — 14/14 → 10/14 — while the *"admin can schedule"* check kept **passing**,
-because it only asserted that *a* confirmation appeared. **A UI assertion that does not name
-the entity it acted on cannot tell "it worked" from "it worked on something else"** (§7.75).
-
-**Two process points, both cheap and both load-bearing:**
-- It was found at all because the fixture was changed **first** and the **unchanged** driver
-  re-run before any driver edit — leaving exactly one suspect. That split came from
-  `/plan-review` and cost one extra run.
-- The diagnosis started from **rendered output**, not from the driver's regexes. Dumping what
-  the two screens actually said is what turned "possibly a product bug" into "the calendar
-  moved" in one pass, against a backlog entry that was itself a corrected wrong diagnosis.
-
-### Not done (deliberate)
-
-- **Drivers still do not run in CI**, only their fixtures. Filed as **M** with the wall-clock
-  problem and three narrower options named, because this session is the evidence for it: a
-  driver sat at 2/5 for over a month and only a human running it by hand could tell.
-- **`fixtures-attendance-guard.sql` uses `SELECT INTO` on a class title with no `ORDER BY`.**
-  Unchanged in kind from the code it replaced and the seed title is unique; the bug that
-  mattered — picking an arbitrary *tenant* — is now structurally impossible (§7.73).
-- **The old driver's checks 1 and 2 were not carried over** (button targets the most recent
-  expected lesson; the "how far back" note). Both are already covered by the guard driver's
-  window assertions — the fold preserved what was unique, not what was duplicated.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.21** | 2026-08-01 | The "possibly real product bugs" in `verify-attendance-window.mjs` were **clock rot, product correct in all three cases** — its three unique behaviours folded into `verify-attendance-guard.mjs` (20/20), driver + fixture deleted; found the guard driver's own unnamed-entity bug on the way | **§7.74, §7.75** · `docs/TESTING.md` §5 · `docs/plans/ATTENDANCE_WINDOW_DRIVER_FOLD_PLAN.md` |
 | **8.20** | 2026-08-01 | **CI loads every UI fixture now** (`check-fixture-roundtrip.sh`, two passes: isolated round-trip, then stacked footprint comparison) — and it found three broken fixtures the first time it ran | `docs/TESTING.md` §5 · **§7.73** |
 | **8.19** | 2026-07-26 | **A coach marked a real lesson on production for the first time** — four bugs on the marking path to get there. Every lesson list gained a marking status; the admin's tables became sortable and its student counts mean *active* | **§7.64–§7.68** · `docs/plans/COACH_ATTENDANCE_STATUS_PLAN.md` · PRD §7.6, §14.3/§14.4 |
 | **8.18** | 2026-07-26 | Parallel work got a protocol (`docs/WORKTREES.md`), nine missing fixture teardowns written + a CI guard, and two skills (`/worktree-start`, `/worktree-close`). The round-trip harness it invented found §7.62 and §7.63; **§8.20 automated it** | `docs/WORKTREES.md` · `docs/TESTING.md` §5 · **§7.62, §7.63** |

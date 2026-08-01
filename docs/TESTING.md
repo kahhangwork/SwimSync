@@ -71,12 +71,13 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `lesson_packages.test.sql` (30) | prepaid packages: RLS on all four tables, $0-rate/0-lesson products refused, product money terms immutable, request snapshots come from the PRODUCT (a parent cannot claim a price or an active status), only non-client roles move a balance, `package_live_balances()` draws locked-rate/in-scope/FIFO and leaves the stored balance alone |
 | `tenant_provisioning.test.sql` (21) | creating a business: parent, coach, **tenant admin** and anon all REFUSED (each in an explicit transaction, 7.16) and `tenants` does not grow after any of them; slug derivation incl. a **non-ASCII name** that would otherwise violate NOT NULL; join-code shape + uniqueness; a fresh tenant reports `admin_status = none`. The two ACL assertions are near-vacuous locally by construction (7.39) |
 | `package_corrections.test.sql` (12) | a correction on a package-funded line restores the package (even expired) and mints NO cash credit note; flip-flops refund at most once; ad-hoc lines keep the credit-note path byte-identical |
-| `student_claims.test.sql` (47) | parents claiming their own child: the disclosure surface (a surname-only overlap returns **nothing**; an unjoined tenant is **refused**, not handed an empty set; a claimed child is never a candidate; masking happens in SQL), the phone signal matching across `+65` vs 8 digits, the **tripwire** that a non-matching child is created exactly as before, Confirm **not** linking, the pending block **with a NULL dob on both sides** (fails on `=`), claim RLS both ways, approve auto-declining competing claims, the dob enrichment, **undo**, `list_student_claims()` seeing a parent `profiles_select` hides (§7.48), and the contract: a parent can no longer INSERT a student directly while the admin still can |
+| `student_package_coverage.test.sql` (20) | the per-child payment-method verdict: the **discriminating case** (a Private-package family's Group-only child is `ad_hoc`, not "10 left"), NULL-category covers all, an **inactive** enrolment never covers, the no-enrolment tenant-scoped fallback, date-expired active packages excluded **in SQL**, an **exhausted package is `package · 0`, never `ad_hoc`** (the affordability rule pinned OUT of the predicate by a `pg_proc`-source grep), **RLS parity** (parent-role verdict == admin-role verdict for the same child — the silent-mislabel catcher), sibling counts shared, a coach gets no package verdict at all, anon refused, and the `one_active_enrolment_per_student` pin that documents why `'mixed'` is unreachable |
+| `student_claims.test.sql` (49) | parents claiming their own child: the disclosure surface (a surname-only overlap returns **nothing**; an unjoined tenant is **refused**, not handed an empty set; a claimed child is never a candidate; masking happens in SQL), the phone signal matching across `+65` vs 8 digits, the **tripwire** that a non-matching child is created exactly as before, Confirm **not** linking, the pending block **with a NULL dob on both sides** (fails on `=`), claim RLS both ways, approve auto-declining competing claims, the dob enrichment, **undo**, `list_student_claims()` seeing a parent `profiles_select` hides (§7.48), and the contract: a parent can no longer INSERT a student directly while the admin still can |
 | `student_merge.test.sql` (20) | folding a duplicate into the row with the history: five refusals (cross-tenant, both-marked, **wrong direction**, invoiced duplicate, same row) each asserting `students` did not shrink; the move of parent links, trial bookings and settlements with **global counts unchanged** — a merge moves rows, never destroys them; and §7.46's guard, proved by **creating a cascading FK at runtime** and asserting the merge refuses |
 | `trial_onboarding.test.sql` (32) | a child before their parent: THREE refusal shapes for `add_unclaimed_student()` (parent, cross-tenant coach, anon) each asserting `students` did not grow, the **tenant derived from the class** (nothing downstream would catch a wrong one — §7.42), `created_by` = the calling coach, a trial enrolment closed on its own date, **session idempotency** (two walk-ins on one date share ONE session — §7.43), the plain-English duplicate name+DOB error, settlement RLS, and `link_invited_parent()` incl. same-parent idempotency vs a different parent refused |
 
 | `attendance_window.test.sql` (31) | the marking window as a RULE: a coach refused off-weekday, below the floor and in the future (each asserting `lesson_sessions` did not grow), `off_schedule_reason` unwritable by a client, the **seam** (`service_role` and `postgres` exempt — they build the past the rule is about), the FOUR upsert assertions of §7.57 incl. a mixed multi-row statement proving the existing row is **unchanged**, and `schedule_extra_lesson()` refused for parent / coach / cross-tenant admin, idempotent on a second call, and markable by the coach afterwards |
-**Total: 397 across 22 files** — verified by `supabase test db` 2026-07-27 (the previous
+**Total: 419 across 23 files** — verified by `supabase test db` 2026-08-01 (the previous
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
@@ -120,19 +121,24 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
 _Frontend tests:_
-`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **14 files, 198
-tests** (2026-07-26): the eleven above plus `lib/tableSort.test.ts`,
-`lib/studentCounts.test.ts`, and `components/Table.test.tsx` extended for sorting.
+`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **16 files, 219
+tests** (2026-08-01): the eleven above plus `lib/tableSort.test.ts`,
+`lib/studentCounts.test.ts`, `components/Table.test.tsx` extended for sorting, and the
+payment-method pair `lib/packageCoverage.test.ts` + `components/PackageChip.test.tsx`
+(the null-input fail-safe, the never-flag-ad-hoc and exhausted-is-low rules of
+`isRunningLow`, the family-grain expiry filter, and the chip's three states incl.
+"Package · 0 left" tinted, never "Ad-hoc").
 `tableSort.test.ts` includes a case that runs in **four timezones**, pinning that sorting
 never constructs a `Date` (§7.7 by construction). `studentCounts.test.ts` has one named for
 the bug it prevents — *"NEVER says nobody when only inactive children hold the level"*
 (§7.69). `Table.test.tsx` gained sortable-header render tests (click, reverse, `firstDir`,
 `aria-sort`, non-sortable columns) plus width assertions, and keeps its `<Thead>`-owns-its-
 `<tr>` call-site scan.
-`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **12 files, 174 tests**, scoped to
+`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **13 files, 183 tests**, scoped to
 `lib/**` unit tests: `attendanceBulk`, `attendanceCompleteness`, `attendancePayload`,
 `attendanceRoster`, `attendanceSession`, `attendanceSummary`, `attendanceWindow`,
-`authErrors`, `claimCandidates`, `landing`, `lessonDates`, `timeOfDay`. Deeper
+`authErrors`, `claimCandidates`, `landing`, `lessonDates`, `packageCoverage` (the
+mapper's fail-safe and `describeCoverage`'s exact Balances-line copy), `timeOfDay`. Deeper
 component-render tests (RN screens with mocked Supabase, admin tables) are the natural next
 additions.
 
@@ -227,8 +233,13 @@ the day (required choice) and an existing class edits Saturday→Sunday and pers
 `verify-packages.mjs` (+ `fixtures-packages.sql`) drives prepaid packages across both
 UIs — the parent card shows the LIVE count (9 of 10, the un-invoiced lesson already
 subtracted), request → PayNow (the requested package's price, not the held one's) →
-pending → admin confirm → Active, and the students "running low" filter obeys its
-per-tenant threshold in both directions (16 checks);
+pending → admin confirm → Active, the students "running low" filter obeys its
+per-tenant threshold in both directions, and the **payment-method chip is asserted BY
+NAME on the discriminating siblings** (§7.75): Pablo (Group class, covered) wears
+"Package · 9 left" on the parent home / "· 14 left" on the admin Students row after the
+second purchase, while Pia (Private-only, same family) wears "Ad-hoc" on both — the pair
+the old by-parent sum labelled identically — plus the child profile's family-shared
+Balances line (21 checks);
 `verify-tenant-provisioning.mjs` drives creating a business end to end across the platform
 panel and a second browser context - mismatched confirmation email refused, join code shown,
 the delivery outcome stated explicitly, `invited` -> accept -> **the new admin signs in** ->

@@ -1326,6 +1326,26 @@ cash paid always equals value granted — nothing to reconcile.
   students-page **"running low" filter** (threshold per business, admin-set) all read
   one database derivation that subtracts lessons attended but not yet invoiced — the
   count drops the evening of the lesson, though the money settles monthly.
+- **Every child's name carries their payment method** *(implemented 2026-08-01)*:
+  a chip beside the child reads **"Package · N left"** or **"Ad-hoc"** — explicit both
+  ways, so a missing chip is never the signal — on the admin's Students, Classes
+  roster, Attendance, Trials, Credit Notes, Unassigned, Dashboard and Platform
+  surfaces, and in the parent app on each home child card and the child profile's
+  Balances card. The verdict is **per child and category-aware**: a family holding
+  only a "Private" package sees "Ad-hoc" beside their child in a "Group" class,
+  because that package cannot pay for it. *(The first-shipped chip summed the family's
+  lessons by parent, ignoring both category and expiry — the same family's every child
+  read "N left". Fixed with the per-child verdict; the "running low" filter follows the
+  same rule, and never flags an ad-hoc child: no pool is not an empty pool.)* The
+  count is **family-shared** — siblings read the same pool, and the copy says so. An
+  **exhausted but unexpired package reads "Package · 0 left", never "Ad-hoc"** — "buy
+  a top-up" and "you are not a package family" are different messages, so the engine's
+  can-it-fund-a-lesson rule deliberately plays no part in the label. Two family-grain
+  surfaces (admin **Parents** and the **claim queue**) label the *family* instead —
+  "does this family hold a live package here" — since a family's package exists even
+  when no currently-enrolled class is covered. An unclaimed child shows no chip; they
+  already carry "No parent account", and a family that doesn't exist has no payment
+  method.
 - **Purchase is PayNow + manual confirmation** (§7.9's model): the parent requests in
   the app, pays the business's QR, and the admin confirms receipt — which activates the
   package and starts its validity clock. Admins can also record offline sales directly.
