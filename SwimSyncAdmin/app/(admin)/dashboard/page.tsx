@@ -9,6 +9,8 @@ import { inactiveNote } from "@/lib/studentCounts";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
+import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
+import { PackageChip } from "@/components/PackageChip";
 
 type Metrics = {
   activeStudents: number;
@@ -50,6 +52,9 @@ function formatBillingMonth(ym: string): string {
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [unassigned, setUnassigned] = useState<UnassignedRow[]>([]);
+  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
+    new Map()
+  );
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
@@ -180,6 +185,12 @@ export default function DashboardPage() {
             s.parent_students?.[0]?.parents?.profiles?.full_name ?? "—",
         }))
       );
+
+      // Payment-method chip for the mini-table. Fire-and-forget: a failed RPC
+      // means no chips, never a broken dashboard.
+      supabase
+        .rpc("student_package_coverage")
+        .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
 
       const { data: invoiceData } = await supabase
         .from("invoices")
@@ -390,7 +401,12 @@ export default function DashboardPage() {
                 unassigned.map((s) => (
                   <Tr key={s.id}>
                     <Td className="font-medium">{s.full_name}</Td>
-                    <Td className="text-gray-500">{s.parent_name}</Td>
+                    <Td className="text-gray-500">
+                      {s.parent_name}
+                      <span className="ml-1.5">
+                        <PackageChip coverage={covMap.get(s.id)} />
+                      </span>
+                    </Td>
                   </Tr>
                 ))
               )}

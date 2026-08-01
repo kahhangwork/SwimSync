@@ -14,6 +14,11 @@ import { ageFromDob } from "@/lib/lessonDates";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
+import {
+  coverageByStudent,
+  describeCoverage,
+  type StudentCoverage,
+} from "@/lib/packageCoverage";
 
 type ChildDetail = {
   id: string;
@@ -63,10 +68,21 @@ function formatDate(dateStr: string | null): string {
 export default function ChildProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [child, setChild] = useState<ChildDetail | null>(null);
+  const [coverage, setCoverage] = useState<StudentCoverage | undefined>(
+    undefined
+  );
   const [loading, setLoading] = useState(true);
 
   const loadChild = useCallback(async () => {
     setLoading(true);
+
+    // Payment method for the Balances card. Fire-and-forget: a failed RPC
+    // only means the line is absent, never a broken screen.
+    supabase
+      .rpc("student_package_coverage")
+      .then(({ data: cov }) =>
+        setCoverage(coverageByStudent(cov ?? []).get(String(id)))
+      );
 
     const { data: student } = await supabase
       .from("students")
@@ -341,6 +357,25 @@ export default function ChildProfileScreen() {
               </Text>
             </View>
           </View>
+          {/* How this child's lessons are paid — package (with the family's
+              live count) or ad-hoc invoice. Absent only if the RPC failed. */}
+          {describeCoverage(coverage) && (
+            <View
+              className={`mt-3 rounded-xl p-3 ${
+                coverage?.coverage === "ad_hoc" ? "bg-gray-50" : "bg-emerald-50"
+              }`}
+            >
+              <Text
+                className={`text-xs font-semibold ${
+                  coverage?.coverage === "ad_hoc"
+                    ? "text-gray-500"
+                    : "text-emerald-700"
+                }`}
+              >
+                {describeCoverage(coverage)}
+              </Text>
+            </View>
+          )}
         </Card>
 
         {/* Quick actions */}

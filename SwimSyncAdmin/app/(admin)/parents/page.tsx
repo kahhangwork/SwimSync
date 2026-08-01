@@ -20,6 +20,9 @@ import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { setFamilyActive } from "@/lib/studentStatus";
+import { familyLessonsByParent, familyLabel } from "@/lib/packageCoverage";
+import { PackageChip } from "@/components/PackageChip";
+import { todayInSg } from "@/lib/lessonDates";
 
 type Child = { id: string; full_name: string; is_active: boolean };
 
@@ -43,6 +46,9 @@ export default function ParentsPage() {
   // first and the default flips once this page has been seen against real data.
   const [showInactive, setShowInactive] = useState(true);
   const [pending, setPending] = useState<FamilyRow | null>(null);
+  const [pkgByParent, setPkgByParent] = useState<Map<string, number>>(
+    new Map()
+  );
   const [takeChildren, setTakeChildren] = useState(true);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -64,6 +70,12 @@ export default function ParentsPage() {
 
     const rows = (data ?? []) as any[];
     const parentIds = rows.map((r) => r.parent_id);
+
+    // Family-grain payment method: this page's rows are parents, so the
+    // question is "does this family hold a live package here", not the
+    // per-child category match (that is the Students page's chip).
+    const { data: live } = await supabase.rpc("package_live_balances");
+    setPkgByParent(familyLessonsByParent(live ?? [], todayInSg()));
 
     const { data: kids } = await supabase
       .from("parent_students")
@@ -179,19 +191,20 @@ export default function ParentsPage() {
           <Th sort={sort} sortKey="full_name">Parent</Th>
           <Th sort={sort} sortKey="email">Contact</Th>
           <Th sort={sort} sortKey="is_active">Status</Th>
+          <Th>Payment</Th>
           <Th sort={sort} sortKey="children">Children here</Th>
           <Th>Actions</Th>
         </Thead>
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={5}>
+              <Td className="text-center text-gray-400 py-8" colSpan={6}>
                 Loading…
               </Td>
             </Tr>
           ) : visible.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={5}>
+              <Td className="text-center text-gray-400 py-8" colSpan={6}>
                 No families found.
               </Td>
             </Tr>
@@ -205,6 +218,16 @@ export default function ParentsPage() {
                 </Td>
                 <Td>
                   <StatusBadge status={f.is_active ? "Active" : "Inactive"} />
+                </Td>
+                <Td>
+                  <PackageChip
+                    coverage={familyLabel(pkgByParent, f.parent_id)}
+                    title={
+                      pkgByParent.has(f.parent_id)
+                        ? "The family's prepaid lessons remaining at your business, counting attended-but-uninvoiced lessons"
+                        : "No prepaid package — this family is billed per lesson by invoice"
+                    }
+                  />
                 </Td>
                 <Td className="text-gray-500">
                   {f.children.length === 0 ? (

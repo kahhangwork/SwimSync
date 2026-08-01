@@ -12,6 +12,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
 import StatusBadge from "@/components/StatusBadge";
+import PackageBadge from "@/components/PackageBadge";
+import {
+  coverageByStudent,
+  type StudentCoverage,
+} from "@/lib/packageCoverage";
 import Card from "@/components/Card";
 import { waitingSince } from "@/lib/claimCandidates";
 import { todayInSg, formatSgDate } from "@/lib/lessonDates";
@@ -56,6 +61,9 @@ function capitalize(str: string | null): string {
 export default function ParentHomeScreen() {
   const session = useAppStore((s) => s.session);
   const [children, setChildren] = useState<Child[]>([]);
+  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
+    new Map()
+  );
   const [creditBalance, setCreditBalance] = useState(0);
   const [totalOutstanding, setTotalOutstanding] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -71,6 +79,12 @@ export default function ParentHomeScreen() {
   const loadData = useCallback(async () => {
     if (!session) return;
     setLoading(true);
+
+    // Payment-method badges. Fire-and-forget: a failed RPC only means no
+    // badges, never a broken home screen. RLS scopes the rows to this family.
+    supabase
+      .rpc("student_package_coverage")
+      .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
 
     // Fetch parent record with children and their enrolments
     const { data: parent } = await supabase
@@ -386,6 +400,9 @@ export default function ParentHomeScreen() {
                         <Text className="text-base font-bold text-gray-900">
                           {child.full_name}
                         </Text>
+                        <View className="mt-0.5">
+                          <PackageBadge coverage={covMap.get(child.id)} />
+                        </View>
                       </View>
                     </View>
                     <StatusBadge

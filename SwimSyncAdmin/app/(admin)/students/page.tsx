@@ -18,6 +18,12 @@ import {
 import { findDuplicatePairs, type DupPair } from "@/lib/duplicateStudents";
 import { checkSgPhone, checkEmail, blankToNull } from "@/lib/sgPhone";
 import { ContactHint } from "@/components/ContactHint";
+import {
+  coverageByStudent,
+  isRunningLow,
+  type StudentCoverage,
+} from "@/lib/packageCoverage";
+import { PackageChip } from "@/components/PackageChip";
 
 type StudentRow = {
   id: string;
@@ -167,9 +173,9 @@ export default function StudentsPage() {
   const [inviteSent, setInviteSent] = useState(false);
   const [threshold, setThreshold] = useState("2");
   const [tenantId, setTenantId] = useState<string | null>(null);
-  const [liveLessonsByParent, setLiveLessonsByParent] = useState<
-    Map<string, number>
-  >(new Map());
+  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
+    new Map()
+  );
 
   async function loadPackages() {
     const { data: userRes } = await supabase.auth.getUser();
@@ -182,15 +188,12 @@ export default function StudentsPage() {
     const stored = (prof as any)?.tenants?.low_package_lessons;
     if (stored !== null && stored !== undefined) setThreshold(String(stored));
 
-    const { data: live } = await supabase.rpc("package_live_balances");
-    const byParent = new Map<string, number>();
-    for (const r of (live as any[]) ?? []) {
-      byParent.set(
-        r.parent_id,
-        (byParent.get(r.parent_id) ?? 0) + Number(r.live_lessons_remaining)
-      );
-    }
-    setLiveLessonsByParent(byParent);
+    // Per-child verdict, category- and expiry-aware, computed in SQL. The old
+    // code summed package_live_balances() by parent here, which said "10 left"
+    // beside a child whose class the package could never pay for, and counted
+    // date-expired packages too.
+    const { data: cov } = await supabase.rpc("student_package_coverage");
+    setCovMap(coverageByStudent(cov ?? []));
   }
 
   async function saveThreshold(value: string) {
@@ -597,11 +600,10 @@ export default function StudentsPage() {
       ? null
       : Number(threshold);
 
-  const runningLow = (s: StudentRow) =>
-    s.parent_id !== null &&
-    liveLessonsByParent.has(s.parent_id) && // no package ⇒ ad-hoc, never "low"
-    thresholdNum !== null &&
-    (liveLessonsByParent.get(s.parent_id) ?? 0) <= thresholdNum;
+  // Coverage is per CHILD now — a family whose package cannot pay for this
+  // child's class is not flagged on this child's row. Logic lives in
+  // lib/packageCoverage so it is unit-tested.
+  const runningLow = (s: StudentRow) => isRunningLow(covMap.get(s.id), thresholdNum);
 
   const filtered = students.filter((s) => {
     const matchSearch =
@@ -852,17 +854,12 @@ export default function StudentsPage() {
                   ) : (
                     s.parent_name
                   )}
-                  {s.parent_id !== null &&
-                    liveLessonsByParent.has(s.parent_id) && (
-                      <span
-                        className={`ml-1.5 text-xs font-medium ${
-                          runningLow(s) ? "text-amber-600" : "text-gray-400"
-                        }`}
-                        title="Prepaid lessons remaining across the family's packages, counting attended-but-uninvoiced lessons"
-                      >
-                        · {liveLessonsByParent.get(s.parent_id)} left
-                      </span>
-                    )}
+                  <span className="ml-1.5">
+                    <PackageChip
+                      coverage={covMap.get(s.id)}
+                      lowThreshold={thresholdNum}
+                    />
+                  </span>
                 </Td>
                 <Td>
                   <StatusBadge status={statusLabel(s)} />

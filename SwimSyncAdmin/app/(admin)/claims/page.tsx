@@ -5,7 +5,9 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
-import { formatSgDate } from "@/lib/lessonDates";
+import { formatSgDate, todayInSg } from "@/lib/lessonDates";
+import { familyLessonsByParent, familyLabel } from "@/lib/packageCoverage";
+import { PackageChip } from "@/components/PackageChip";
 
 /**
  * Parent Requests — a parent saying "I think that child on your roster is mine".
@@ -43,6 +45,7 @@ type Claim = {
   student_name: string;
   student_dob: string | null;
   lessons: number;
+  parent_id: string;
   parent_name: string;
   parent_email: string;
   parent_phone: string | null;
@@ -72,6 +75,9 @@ export default function ClaimsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<Claim | null>(null);
   const [showDecided, setShowDecided] = useState(false);
+  const [pkgByParent, setPkgByParent] = useState<Map<string, number>>(
+    new Map()
+  );
 
   async function loadAll() {
     setLoading(true);
@@ -101,6 +107,14 @@ export default function ClaimsPage() {
 
     setClaims((data ?? []) as Claim[]);
     setLoading(false);
+
+    // FAMILY-grain payment chip beside the claimant. The claimed child is not
+    // theirs yet, so there is no per-child verdict to show — the honest
+    // statement is "this family holds a live package at your business" (or
+    // doesn't). Fire-and-forget: a failed RPC only means no chip.
+    supabase.rpc("package_live_balances").then(({ data: live }) => {
+      setPkgByParent(familyLessonsByParent(live ?? [], todayInSg()));
+    });
   }
 
   useEffect(() => {
@@ -219,7 +233,19 @@ export default function ClaimsPage() {
                         })}`
                       : "No date of birth given"}
                   </p>
-                  <p className="mt-2 text-sm text-gray-700">{c.parent_name}</p>
+                  <p className="mt-2 text-sm text-gray-700">
+                    {c.parent_name}
+                    <span className="ml-1.5">
+                      <PackageChip
+                        coverage={familyLabel(pkgByParent, c.parent_id)}
+                        title={
+                          pkgByParent.has(c.parent_id)
+                            ? "The claimant family's prepaid balance at your business"
+                            : "The claimant family holds no prepaid package — billed per lesson by invoice"
+                        }
+                      />
+                    </span>
+                  </p>
                   <p className="text-sm text-gray-500">{c.parent_email}</p>
                   <p className="text-sm text-gray-500">
                     {c.parent_phone ?? "No phone on file"}

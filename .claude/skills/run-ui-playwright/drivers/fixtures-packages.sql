@@ -86,3 +86,33 @@ WITH sat AS (
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
 SELECT sess.id, 'c5000000-0000-0000-0000-000000000001', 'present', pr.id
 FROM sess, profiles pr WHERE pr.email = 'coach@swimsync.test';
+
+-- ── The DISCRIMINATING pair (payment-method chip) ──────────────────────────
+-- The family's package is scoped to "Group". A second child enrolled ONLY in
+-- a "Private" class must read AD-HOC on every child surface, while their
+-- sibling reads "Package · 9 left" — the case the old by-parent sum got
+-- wrong. The class is fixture-OWNED with a pinned id (§7.73: never pick a
+-- class you don't own with an unordered LIMIT 1).
+INSERT INTO class_categories (id, tenant_id, name)
+VALUES ('cc100000-0000-0000-0000-000000000002',
+        '70000000-0000-0000-0000-000000000001', 'Pkg Private');
+
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
+                     location_name, price_per_lesson, category_id)
+SELECT 'c1100000-0000-0000-0000-000000000001', co.id, 'Pkg Private Tue',
+       'tuesday', '17:00', '17:30', 'Test Pool', 70.00,
+       'cc100000-0000-0000-0000-000000000002'
+FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
+WHERE pr.email = 'coach@swimsync.test';
+
+INSERT INTO students (id, full_name, date_of_birth, assignment_status, is_active, tenant_id)
+VALUES ('c5000000-0000-0000-0000-000000000002', 'Pia Package', '2020-04-04',
+        'assigned', true, '70000000-0000-0000-0000-000000000001');
+
+INSERT INTO parent_students (parent_id, student_id)
+SELECT p.id, 'c5000000-0000-0000-0000-000000000002'
+FROM parents p WHERE p.profile_id = 'c9000000-0000-0000-0000-000000000001';
+
+INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
+VALUES ('c5000000-0000-0000-0000-000000000002',
+        'c1100000-0000-0000-0000-000000000001', NOW() - interval '30 days', true);

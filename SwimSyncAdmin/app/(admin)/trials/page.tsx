@@ -8,6 +8,8 @@ import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { ContactHint } from "@/components/ContactHint";
 import { checkSgPhone, checkEmail } from "@/lib/sgPhone";
+import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
+import { PackageChip } from "@/components/PackageChip";
 import {
   todayInSg,
   formatSgDate,
@@ -31,6 +33,7 @@ import {
 type Booking = {
   id: string;
   session_date: string;
+  student_id: string;
   student_name: string;
   class_title: string;
   marked: boolean;
@@ -64,6 +67,16 @@ export default function TrialsPage() {
   const [rateDraft, setRateDraft] = useState<Record<string, string>>({});
   const [rateBusy, setRateBusy] = useState<string | null>(null);
   const [rateError, setRateError] = useState<string | null>(null);
+  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
+    new Map()
+  );
+
+  // Payment-method chips: fire-and-forget, a failed RPC only means no chips.
+  useEffect(() => {
+    supabase
+      .rpc("student_package_coverage")
+      .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
+  }, []);
 
   useEffect(() => {
     loadAll();
@@ -139,6 +152,7 @@ export default function TrialsPage() {
     const rows: Booking[] = (books ?? []).map((b: any) => ({
       id: b.id,
       session_date: b.session_date,
+      student_id: b.student_id ?? "",
       student_name: b.students?.full_name ?? "—",
       class_title: b.classes?.title ?? "—",
       marked: markedKeys.has(`${b.student_id}:${b.session_date}`),
@@ -370,7 +384,12 @@ export default function TrialsPage() {
           ) : (
             visibleTrials.map((b) => (
               <Tr key={b.id}>
-                <Td className="font-medium text-gray-800">{b.student_name}</Td>
+                <Td className="font-medium text-gray-800">
+                  {b.student_name}
+                  <span className="ml-1.5">
+                    <PackageChip coverage={covMap.get(b.student_id)} />
+                  </span>
+                </Td>
                 <Td className="text-gray-500">{b.class_title}</Td>
                 <Td className="text-gray-500">{formatSgDate(b.session_date)}</Td>
                 <Td className="text-gray-500">

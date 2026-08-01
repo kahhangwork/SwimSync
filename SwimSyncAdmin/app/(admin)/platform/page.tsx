@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { formatSgDate, toSgDate } from "@/lib/lessonDates";
+import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
+import { PackageChip } from "@/components/PackageChip";
 
 /**
  * Platform admin — cross-tenant operations, for SwimSync itself.
@@ -118,6 +120,9 @@ export default function PlatformPage() {
   const [staffCountWarning, setStaffCountWarning] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);
+  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
+    new Map()
+  );
   const [moving, setMoving] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [stranded, setStranded] = useState<StrandedParent[]>([]);
@@ -392,6 +397,12 @@ export default function PlatformPage() {
       .ilike("full_name", `%${search.trim()}%`)
       .limit(25);
     setStudents((data ?? []) as StudentRow[]);
+    // Payment-method chips. Under a platform admin the RPC returns EVERY
+    // tenant's rows, each carrying its tenant_id — keyed per student here, so
+    // a cross-tenant mixup is structurally impossible. Fire-and-forget.
+    supabase
+      .rpc("student_package_coverage")
+      .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
   }
 
   async function handleMove(studentId: string, tenantId: string) {
@@ -894,7 +905,12 @@ export default function PlatformPage() {
             <Tbody>
               {visibleStudents.map((s) => (
                 <Tr key={s.id}>
-                  <Td>{s.full_name}</Td>
+                  <Td>
+                    {s.full_name}
+                    <span className="ml-1.5">
+                      <PackageChip coverage={covMap.get(s.id)} />
+                    </span>
+                  </Td>
                   <Td>
                     {tenants.find((t) => t.tenant_id === s.tenant_id)?.display_name ??
                       "—"}

@@ -5,10 +5,13 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
+import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
+import { PackageChip } from "@/components/PackageChip";
 
 type CreditNoteRow = {
   id: string;
   reference_number: string;
+  student_id: string;
   student_name: string;
   parent_name: string;
   amount: number;
@@ -25,13 +28,20 @@ export default function CreditNotesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
+    new Map()
+  );
 
   useEffect(() => {
+    // Payment-method chips: fire-and-forget, a failed RPC only means no chips.
+    supabase
+      .rpc("student_package_coverage")
+      .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
     async function load() {
       const { data } = await supabase
         .from("credit_notes")
         .select(
-          "id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, students(full_name), parents(profiles(full_name))"
+          "id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, students(id, full_name), parents(profiles(full_name))"
         )
         .order("issued_at", { ascending: false });
 
@@ -39,6 +49,7 @@ export default function CreditNotesPage() {
         (data ?? []).map((cn: any) => ({
           id: cn.id,
           reference_number: cn.reference_number,
+          student_id: cn.students?.id ?? "",
           student_name: cn.student_name ?? cn.students?.full_name ?? "—",
           parent_name: cn.parents?.profiles?.full_name ?? "—",
           amount: Number(cn.amount),
@@ -136,7 +147,12 @@ export default function CreditNotesPage() {
                 <Td className="font-mono text-xs text-gray-700">
                   {cn.reference_number}
                 </Td>
-                <Td className="font-medium text-gray-900">{cn.student_name}</Td>
+                <Td className="font-medium text-gray-900">
+                  {cn.student_name}
+                  <span className="ml-1.5">
+                    <PackageChip coverage={covMap.get(cn.student_id)} />
+                  </span>
+                </Td>
                 <Td className="text-gray-500">{cn.parent_name}</Td>
                 <Td className="font-semibold text-blue-600">
                   S${cn.amount.toFixed(2)}

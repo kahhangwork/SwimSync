@@ -5,9 +5,12 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
+import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
+import { PackageChip } from "@/components/PackageChip";
 
 type AttendanceRow = {
   id: string;
+  student_id: string;
   student_name: string;
   class_id: string;
   class_title: string;
@@ -48,6 +51,17 @@ export default function AttendancePage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
+    new Map()
+  );
+
+  // Payment-method chips. Separate from the row loads: a failed RPC means no
+  // chips, never an empty audit trail.
+  useEffect(() => {
+    supabase
+      .rpc("student_package_coverage")
+      .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
+  }, []);
 
   const sort = useTableSort<AttendanceRow>({
     key: "session_date",
@@ -111,7 +125,7 @@ export default function AttendancePage() {
       let query = supabase
         .from("attendance")
         .select(
-          "id, status, students!inner(full_name), lesson_sessions!inner(session_date, classes!inner(id, title, coaches(id, profiles(full_name))))"
+          "id, status, students!inner(id, full_name), lesson_sessions!inner(session_date, classes!inner(id, title, coaches(id, profiles(full_name))))"
         )
         // Ordering by the EMBEDDED date, not by `id`.
         //
@@ -141,6 +155,7 @@ export default function AttendancePage() {
       setRows(
         (data ?? []).map((a: any) => ({
           id: a.id,
+          student_id: a.students?.id ?? "",
           student_name: a.students?.full_name ?? "—",
           class_id: a.lesson_sessions?.classes?.id ?? "",
           class_title: a.lesson_sessions?.classes?.title ?? "—",
@@ -319,7 +334,12 @@ export default function AttendancePage() {
           ) : (
             visible.map((a) => (
               <Tr key={a.id}>
-                <Td className="font-medium text-gray-900">{a.student_name}</Td>
+                <Td className="font-medium text-gray-900">
+                  {a.student_name}
+                  <span className="ml-1.5">
+                    <PackageChip coverage={covMap.get(a.student_id)} />
+                  </span>
+                </Td>
                 <Td className="text-gray-600">{a.class_title}</Td>
                 <Td className="text-gray-500">{a.coach_name}</Td>
                 <Td className="text-gray-500">{a.session_date}</Td>

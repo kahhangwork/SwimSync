@@ -60,11 +60,24 @@ DELETE FROM class_categories
  WHERE id = 'cc100000-0000-0000-0000-000000000001';
 
 DELETE FROM student_class_enrolments
- WHERE student_id = 'c5000000-0000-0000-0000-000000000001';
+ WHERE student_id IN ('c5000000-0000-0000-0000-000000000001',
+                      'c5000000-0000-0000-0000-000000000002');
 DELETE FROM parent_students
- WHERE student_id = 'c5000000-0000-0000-0000-000000000001';
+ WHERE student_id IN ('c5000000-0000-0000-0000-000000000001',
+                      'c5000000-0000-0000-0000-000000000002');
 DELETE FROM students
- WHERE id = 'c5000000-0000-0000-0000-000000000001';
+ WHERE id IN ('c5000000-0000-0000-0000-000000000001',
+              'c5000000-0000-0000-0000-000000000002');
+
+-- The discriminating pair's OWN class and category — pinned ids, so no other
+-- fixture's rows can be touched. The class goes before its category
+-- (category_id is NOT NULL, ON DELETE RESTRICT).
+DELETE FROM lesson_sessions
+ WHERE class_id = 'c1100000-0000-0000-0000-000000000001';
+DELETE FROM classes
+ WHERE id = 'c1100000-0000-0000-0000-000000000001';
+DELETE FROM class_categories
+ WHERE id = 'cc100000-0000-0000-0000-000000000002';
 
 DELETE FROM audit_log WHERE actor_id = 'c9000000-0000-0000-0000-000000000001';
 DELETE FROM auth.users WHERE id = 'c9000000-0000-0000-0000-000000000001';
@@ -75,11 +88,11 @@ COMMIT;
 -- class came back to a real category rather than being left dangling.
 SELECT
   (SELECT count(*) FROM students
-    WHERE id = 'c5000000-0000-0000-0000-000000000001')                AS pkg_student,
+    WHERE id::text LIKE 'c5000000-%')                                 AS pkg_students,
   (SELECT count(*) FROM package_products
     WHERE id::text LIKE 'dd100000-%')                                 AS products,
   (SELECT count(*) FROM class_categories
-    WHERE id = 'cc100000-0000-0000-0000-000000000001')                AS category,
+    WHERE id::text LIKE 'cc100000-%')                                 AS categories,
   (SELECT count(*) FROM auth.users
     WHERE id = 'c9000000-0000-0000-0000-000000000001')                AS pkg_parent,
   (SELECT count(*) FROM classes

@@ -28,6 +28,28 @@ try {
   console.log("\n[parent] live balance card + request flow");
   await loginExpo(page, "parent-pkg@swimsync.test");
 
+  // ── Parent home: the payment-method badge, PER CHILD, BY NAME (§7.75) ─────
+  // The badge renders directly under the child's name inside the card, so
+  // adjacency in innerText ties each verdict to its child. Pablo's Group
+  // class is covered by the family's Group-scoped package (9 live lessons);
+  // Pia's Private-only class is NOT — the discriminating pair the old
+  // by-parent sum labelled identically.
+  await page.waitForTimeout(2500);
+  let text = await page.evaluate(() => document.body.innerText);
+  check(/Pablo Package\s*\n\s*Package · 9 left/.test(text),
+    "home: PABLO (Group class) wears 'Package · 9 left'", text.slice(0, 600));
+  check(/Pia Package\s*\n\s*Ad-hoc/.test(text),
+    "home: PIA (Private-only) wears 'Ad-hoc' — the package cannot pay for her class");
+
+  // ── Child profile: the Balances card says how lessons are paid ────────────
+  await tap(page.getByText("Pablo Package", { exact: true }).first(), "Pablo's card");
+  await page.waitForTimeout(2500);
+  text = await page.evaluate(() => document.body.innerText);
+  check(/Package — 9 lessons left · shared across the family/.test(text),
+    "child profile: Balances names the package AND that it is family-shared");
+  await page.goBack();
+  await page.waitForTimeout(2000);
+
   // In-app navigation, not a deep link — a protected route can bounce to
   // /login while the store rehydrates (lib.mjs gotcha).
   await tap(page.getByText("Billing", { exact: true }).last(), "Billing tab");
@@ -35,7 +57,7 @@ try {
   await tap(page.getByText("Packages", { exact: true }), "Packages tab");
   await page.waitForTimeout(2500);
 
-  let text = await page.evaluate(() => document.body.innerText);
+  text = await page.evaluate(() => document.body.innerText);
   check(/10 Group Lessons/.test(text), "the held package renders");
   // Assert on strings unique to this card (§7.10 — the stack keeps previous
   // screens mounted, so generic strings can pass against the wrong screen).
@@ -115,6 +137,23 @@ try {
   text = await page.evaluate(() => document.body.innerText);
   check(!/Pablo Package/.test(text) && /No students found/.test(text),
     "at threshold 2 nobody is flagged");
+
+  // ── Admin students: the chip is PER CHILD, BY NAME (§7.75) ────────────────
+  // Filter off, so both children are visible. The family now holds 9 + 5 = 14
+  // live Group lessons — Pablo's row must carry that count, and Pia's row must
+  // say Ad-hoc even though it is the SAME family: the Group-scoped packages
+  // cannot pay for her Private class. Under the old by-parent sum both rows
+  // read "14 left", which is the bug this pins shut.
+  await tap(page.getByRole("button", { name: "Package running low" }), "filter off");
+  await page.waitForTimeout(800);
+  const pabloRow = page.getByRole("row", { name: /Pablo Package/ });
+  check(/Package · 14 left/.test(await pabloRow.innerText()),
+    "students: PABLO's row carries 'Package · 14 left'",
+    await pabloRow.innerText().catch(() => "row not found"));
+  const piaRow = page.getByRole("row", { name: /Pia Package/ });
+  check(/Ad-hoc/.test(await piaRow.innerText()),
+    "students: PIA's row says 'Ad-hoc' — same family, uncovered class",
+    await piaRow.innerText().catch(() => "row not found"));
 
   // ── Admin: invoices table carries the package column ─────────────────────
   await page.goto(`${ADMIN}/invoices`, { waitUntil: "networkidle" });

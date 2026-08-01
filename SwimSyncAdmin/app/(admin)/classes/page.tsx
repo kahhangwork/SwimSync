@@ -17,6 +17,8 @@ import {
   type RosterEnrolment,
   type RosterBooking,
 } from "@/lib/classRoster";
+import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
+import { PackageChip } from "@/components/PackageChip";
 
 type ClassRow = {
   id: string;
@@ -99,6 +101,9 @@ export default function ClassesPage() {
   const [bookings, setBookings] = useState<RosterBooking[]>([]);
   const [rosterError, setRosterError] = useState<string | null>(null);
   const [drawerClass, setDrawerClass] = useState<ClassRow | null>(null);
+  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
+    new Map()
+  );
 
   // Form state
   const [title, setTitle] = useState("");
@@ -155,6 +160,11 @@ export default function ClassesPage() {
    */
   async function loadRoster() {
     const today = todayInSg();
+    // Payment-method chips for the drawer. Fire-and-forget: a failed RPC only
+    // means no chips, never a roster error.
+    supabase
+      .rpc("student_package_coverage")
+      .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
     const [{ data: enr, error: enrErr }, { data: bk, error: bkErr }] =
       await Promise.all([
         supabase
@@ -669,6 +679,9 @@ export default function ClassesPage() {
                     <li key={s.student_id} className="py-2.5">
                       <p className="text-sm font-medium text-gray-900">
                         {s.full_name}
+                        <span className="ml-1.5">
+                          <PackageChip coverage={covMap.get(s.student_id)} />
+                        </span>
                       </p>
                       <p className="mt-0.5 text-xs text-gray-500">
                         {s.level_label ?? "No level set"} · Joined{" "}
@@ -694,6 +707,9 @@ export default function ClassesPage() {
                     <li key={t.student_id} className="py-2.5">
                       <p className="text-sm font-medium text-gray-900">
                         {t.full_name}
+                        <span className="ml-1.5">
+                          <PackageChip coverage={covMap.get(t.student_id)} />
+                        </span>
                       </p>
                       <p className="mt-0.5 text-xs text-gray-500">
                         {t.level_label ?? "No level set"} · Trial on{" "}

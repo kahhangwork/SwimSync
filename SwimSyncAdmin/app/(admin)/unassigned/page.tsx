@@ -7,6 +7,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
+import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
+import { PackageChip } from "@/components/PackageChip";
 
 type Student = {
   id: string;
@@ -45,6 +47,9 @@ export default function UnassignedPage() {
   const [search, setSearch] = useState("");
 
   const [assignModal, setAssignModal] = useState<Student | null>(null);
+  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
+    new Map()
+  );
   const [selectedCoachId, setSelectedCoachId] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
   const [assigning, setAssigning] = useState(false);
@@ -60,6 +65,11 @@ export default function UnassignedPage() {
 
   async function loadStudents() {
     setLoading(true);
+    // Payment-method chip — an unassigned child has no class, so the verdict
+    // is the tenant-scoped fallback: family holds a live package here or not.
+    supabase
+      .rpc("student_package_coverage")
+      .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
     const { data } = await supabase
       .from("students")
       .select(
@@ -262,7 +272,12 @@ export default function UnassignedPage() {
             visible.map((student) => (
               <Tr key={student.id}>
                 <Td className="font-medium text-gray-900">{student.full_name}</Td>
-                <Td className="text-gray-500">{student.parent_name}</Td>
+                <Td className="text-gray-500">
+                  {student.parent_name}
+                  <span className="ml-1.5">
+                    <PackageChip coverage={covMap.get(student.id)} />
+                  </span>
+                </Td>
                 <Td>
                   <Button
                     size="sm"
