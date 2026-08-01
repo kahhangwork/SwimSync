@@ -96,6 +96,11 @@ export default function ClassRosterScreen() {
   const [upcomingTrials, setUpcomingTrials] = useState<
     { id: string; full_name: string; session_date: string }[]
   >([]);
+  // Make-up guests: enrolled children from ANOTHER same-category class,
+  // booked into one lesson here. Same shape and same stakes as trials.
+  const [upcomingMakeups, setUpcomingMakeups] = useState<
+    { id: string; full_name: string; session_date: string }[]
+  >([]);
   // Lessons the admin has SCHEDULED off the class's usual weekday — a makeup,
   // a holiday shift. The session row exists ahead of time (unlike an ordinary
   // lesson, which is created lazily when attendance is saved), and the sessions
@@ -241,14 +246,23 @@ export default function ClassRosterScreen() {
       until: e.unenrolled_at ? toSgDate(e.unenrolled_at) : null,
     }));
 
-    // Trial bookings for this class. A booked child is expected at ONE lesson
-    // and is not enrolled, so the counts below would read "3 of 3 marked" while
-    // the invoice engine refuses to close the month over an unmarked fourth.
-    const { data: bookingRows } = await supabase
-      .from("trial_bookings")
-      .select("student_id, session_date")
-      .eq("class_id", id)
-      .is("cancelled_at", null);
+    // Trial AND make-up bookings for this class. A booked child is expected at
+    // ONE lesson and is not enrolled here, so the counts below would read
+    // "3 of 3 marked" while the invoice engine refuses to close the month over
+    // an unmarked fourth.
+    const [{ data: bookingRows }, { data: makeupBookingRows }] =
+      await Promise.all([
+        supabase
+          .from("trial_bookings")
+          .select("student_id, session_date")
+          .eq("class_id", id)
+          .is("cancelled_at", null),
+        supabase
+          .from("makeup_bookings")
+          .select("student_id, session_date")
+          .eq("class_id", id)
+          .is("cancelled_at", null),
+      ]);
 
     // The same rows, read the other way: who is coming, and when.
     const today = todayInSg();
@@ -257,11 +271,22 @@ export default function ClassRosterScreen() {
       .sort((a: any, b: any) =>
         (a.session_date as string).localeCompare(b.session_date as string)
       );
-    if (upcoming.length > 0) {
+    const upcomingMk = (makeupBookingRows ?? [])
+      .filter((b: any) => (b.session_date as string) >= today)
+      .sort((a: any, b: any) =>
+        (a.session_date as string).localeCompare(b.session_date as string)
+      );
+    const guestIds = [
+      ...new Set([
+        ...upcoming.map((b: any) => b.student_id),
+        ...upcomingMk.map((b: any) => b.student_id),
+      ]),
+    ];
+    if (guestIds.length > 0) {
       const { data: guestRows } = await supabase
         .from("students")
         .select("id, full_name")
-        .in("id", upcoming.map((b: any) => b.student_id));
+        .in("id", guestIds);
       const nameById = new Map(
         (guestRows ?? []).map((s: any) => [s.id as string, s.full_name as string])
       );
@@ -272,12 +297,22 @@ export default function ClassRosterScreen() {
           session_date: b.session_date as string,
         }))
       );
+      setUpcomingMakeups(
+        upcomingMk.map((b: any) => ({
+          id: b.student_id as string,
+          full_name: nameById.get(b.student_id as string) ?? "A make-up student",
+          session_date: b.session_date as string,
+        }))
+      );
     } else {
       setUpcomingTrials([]);
+      setUpcomingMakeups([]);
     }
 
+    // One merged map: both kinds of booking mean "expected at this lesson",
+    // which is the contract expectedStudentsOn already has.
     const bookedByDate = new Map<string, string[]>();
-    for (const b of bookingRows ?? []) {
+    for (const b of [...(bookingRows ?? []), ...(makeupBookingRows ?? [])]) {
       const list = bookedByDate.get(b.session_date as string) ?? [];
       list.push(b.student_id as string);
       bookedByDate.set(b.session_date as string, list);
@@ -500,6 +535,34 @@ export default function ClassRosterScreen() {
             ))}
             <Text className="mt-2 text-[11px] text-sky-700">
               Trying one lesson — mark them like anyone else on the day.
+            </Text>
+          </View>
+        )}
+
+        {/* ── Make-ups coming up ───────────────────────────────────────────
+            An enrolled child from another class of the same kind, guesting
+            for one lesson. Separate from trials because the coach's job
+            differs: a make-up child is not new to the business, and the
+            ordinary statuses apply — there is nothing to sell. */}
+        {upcomingMakeups.length > 0 && (
+          <View className="mb-5 bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+            <Text className="text-sm font-bold text-emerald-900">
+              Make-up{upcomingMakeups.length === 1 ? "" : "s"} coming up
+            </Text>
+            {upcomingMakeups.map((mk) => (
+              <View
+                key={`${mk.id}-${mk.session_date}`}
+                className="mt-2 flex-row items-center justify-between"
+              >
+                <Text className="text-sm text-emerald-900">{mk.full_name}</Text>
+                <Text className="text-xs font-medium text-emerald-700">
+                  {formatSgDate(mk.session_date)}
+                </Text>
+              </View>
+            ))}
+            <Text className="mt-2 text-[11px] text-emerald-700">
+              Joining this one lesson as a make-up — mark them like anyone
+              else on the day.
             </Text>
           </View>
         )}

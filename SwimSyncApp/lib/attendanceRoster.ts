@@ -20,14 +20,19 @@
 export type RosterStudent = {
   id: string;
   full_name: string;
-  /** On this roster only because they have an attendance row or a trial
-   *  booking — not because they are enrolled. Lets the UI say so rather than
-   *  implying they attend every week. */
+  /** On this roster only because they have an attendance row or a booking —
+   *  not because they are enrolled. Lets the UI say so rather than implying
+   *  they attend every week. */
   attendedOnly?: boolean;
   /** Booked for a TRIAL on this date specifically. Shown as such, because the
    *  coach is meeting them for the first time and the status they choose
    *  decides what the family is charged. */
   isTrial?: boolean;
+  /** Booked for a MAKE-UP on this date specifically — an enrolled child from
+   *  another same-category class, guesting for one lesson. Ordinary statuses
+   *  apply (the trial statuses do not); a present make-up bills at the
+   *  child's own class rate, or draws from the family's package. */
+  isMakeup?: boolean;
 };
 
 /**
@@ -61,26 +66,41 @@ export type RosterStudent = {
 export function mergeRoster(
   activeStudents: readonly RosterStudent[],
   attendedStudents: readonly RosterStudent[],
-  bookedStudents: readonly RosterStudent[] = []
+  bookedStudents: readonly RosterStudent[] = [],
+  makeupStudents: readonly RosterStudent[] = []
 ): RosterStudent[] {
   const enrolledIds = new Set(activeStudents.map((s) => s.id));
   const bookedIds = new Set(bookedStudents.map((s) => s.id));
+  const makeupIds = new Set(makeupStudents.map((s) => s.id));
 
   // First occurrence wins, so the caller's ordering is preserved.
   const enrolledOnce = activeStudents.filter(
     (s, i, all) => all.findIndex((o) => o.id === s.id) === i
   );
 
-  const extras = [...bookedStudents, ...attendedStudents]
+  const extras = [...bookedStudents, ...makeupStudents, ...attendedStudents]
     .filter((s) => !enrolledIds.has(s.id))
     // The same student can appear once per attendance row in a naive join, and
-    // again from the booking list — a booked child who has since been marked.
+    // again from a booking list — a booked child who has since been marked.
     .filter((s, i, all) => all.findIndex((o) => o.id === s.id) === i)
-    .map((s) => ({ ...s, attendedOnly: true, isTrial: bookedIds.has(s.id) }))
+    .map((s) => ({
+      ...s,
+      attendedOnly: true,
+      isTrial: bookedIds.has(s.id),
+      // A trial booking wins the label if both somehow exist — a trial child
+      // cannot be enrolled, so a same-day make-up booking is a data error and
+      // "Trial" is the safer thing to tell the coach.
+      isMakeup: !bookedIds.has(s.id) && makeupIds.has(s.id),
+    }))
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
   return [
-    ...enrolledOnce.map((s) => ({ ...s, attendedOnly: false, isTrial: false })),
+    ...enrolledOnce.map((s) => ({
+      ...s,
+      attendedOnly: false,
+      isTrial: false,
+      isMakeup: false,
+    })),
     ...extras,
   ];
 }

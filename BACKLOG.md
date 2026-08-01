@@ -144,21 +144,34 @@ Supabase `Database` types (M — *do last*, needs a frozen schema; see the item)
 
 ## Coach workflow
 
-### Makeup lessons — **L** `[MVP-excluded]` `[Phase 3]`
-A student misses a lesson and attends a different session to make it up, without being
-billed twice.
+### ~~Makeup lessons~~ — SHIPPED 2026-08-02 as the guest-pass model (PRD §7.20)
+The two invariants it was expected to break held un-broken: a make-up is a **booking**
+(the trial_bookings shape), never a second enrolment, and billing still follows
+attendance rows — a guest's row bills at their home class's rate or draws the family's
+package by the booking's snapshotted category. No "makeup credit" ledger was needed
+because a missed lesson never billed in the first place. Three follow-ups filed below:
+*Book a make-up from the Attendance page*, *A different-coach PRIVATE make-up*, and the
+`book_trial` date-floor asymmetry.
 
-**Why:** this is the most-requested thing in every real coaching business, and the
-current model has no answer at all — a missed lesson is simply non-billable and gone.
-As soon as parents are paying real money, "I paid for a lesson we couldn't attend" is
-the conversation the coach will have to keep having by hand.
+### Book a make-up from the Attendance page — **S**
+The admin Attendance page can filter to `absent` / `cancelled_*` rows but has no action
+column — the most natural moment to offer "book a make-up" is while looking at the miss.
+The Make-ups page stays primary (a booking you cannot see is forgotten and holds the
+month open); this is an entry point, not a second home.
 
-**Notes:** genuinely hard, and the reason it's L rather than M. It breaks two invariants
-at once: one active class enrolment per student (§5.3) and billing straight from
-attendance (§5.5). A makeup means a student appears on a class they aren't enrolled in,
-and a lesson gets paid for on a date other than the one it happened. Worth designing on
-paper before touching code — probably a "makeup credit" concept distinct from the
-existing money-credit-note, so the two ledgers don't get confused with each other.
+### A different-coach PRIVATE make-up — **M**
+A private-category make-up today is an **Extra lesson of the child's own class** — same
+coach by construction. A school whose private coach is away wants the make-up taught by a
+*different* coach, which means a temporary one-off class (its own coach, rate, wage row,
+and cleanup) or a per-lesson coach override. Deliberately deferred from the guest-pass
+work: real complexity, no requester yet.
+
+### `book_trial` has no date floor; `book_makeup` does — **S**
+`book_makeup()` refuses a date before `session_window_start()` (a booking in a billed
+month can neither be marked nor bill — silently lost). `book_trial()` predates the floor
+and will happily book into an already-billed month, with the same silent-loss shape.
+Give it the same guard; one sentence of SQL. Recorded rather than fixed in the make-up
+work to keep that batch single-purpose.
 
 ### Tick off swimming skills per child — **M**
 Mark which of a level's skills a child has passed, so a coach can see "Ethan has 4 of 6
@@ -391,6 +404,12 @@ exactly the way this whole feature exists to prevent. Whoever builds class deact
 must therefore ALSO refuse, or at least warn with a count, when the class has live
 `trial_bookings`. Recorded here rather than mitigated in the trial work, because there is
 no deactivation path to attach a warning to.
+
+**MAKE-UP BOOKINGS WIDEN IT AGAIN (2026-08-02).** `makeup_bookings` has the same shape
+and the same consequence — a booked guest on a deactivated HOST class neither bills nor
+blocks (accepted in the make-up plan, the trials analog). `book_makeup()` at least
+refuses an already-inactive host; what nothing guards is deactivating a class that
+already holds live bookings. The future deactivation path must count BOTH tables.
 
 Probably: bill from
 classes that had sessions in the month regardless of `is_active`, and keep `is_active` for

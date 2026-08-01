@@ -40,6 +40,7 @@ import { rateOn } from "./rates.ts";
 import {
   type EnrolmentSpan,
   expectedStudentsOn,
+  studentsEnrolledOn,
 } from "./attendanceCompleteness.ts";
 
 // Attendance statuses that result in a charge to the parent.
@@ -354,14 +355,36 @@ async function generateForTenant(
 
   if (clsErr) throw new Error(clsErr.message);
 
+  // ── Make-up bookings: a child guests into ONE lesson of another class ─────
+  // Loaded ONCE for the tenant (not per class like trials) because the rates
+  // fetch below must also cover every booking's HOME class: an ad-hoc guest
+  // bills at their home class's rate, and that class can be deactivated (or
+  // the child transferred and it retired) between booking and generation —
+  // the active-classes scan above would then miss it and rateOn() would kill
+  // the whole run.
+  const { data: makeupRows, error: makeupErr } = await supabase
+    .from("makeup_bookings")
+    .select("student_id, class_id, session_date, category_id, home_class_id")
+    .eq("tenant_id", tenantId)
+    .is("cancelled_at", null)
+    .gte("session_date", monthStart)
+    .lte("session_date", monthEnd);
+
+  if (makeupErr) throw new Error(makeupErr.message);
+
   // Effective-dated terms for those classes, fetched once rather than per
   // lesson. Scoped transitively by class_id — the classes query above is
   // already tenant-filtered, and RLS does not apply to service_role, so this
-  // filter is the isolation.
+  // filter is the isolation. Make-up HOME classes are unioned in — see above.
   const { data: classRates, error: rateErr } = await supabase
     .from("class_rates")
     .select("class_id, price_per_lesson, paid_coach_id, effective_from")
-    .in("class_id", (classes ?? []).map((c) => c.id));
+    .in("class_id", [
+      ...new Set([
+        ...(classes ?? []).map((c) => c.id as string),
+        ...(makeupRows ?? []).map((m) => m.home_class_id as string),
+      ]),
+    ]);
 
   if (rateErr) throw new Error(rateErr.message);
 
@@ -482,6 +505,31 @@ async function generateForTenant(
       bookedCategory.set(`${b.student_id}:${d}`, b.category_id as string);
     }
 
+    // ── Make-up bookings for THIS class: same mechanism as trials ───────────
+    // A make-up guest is expected at exactly one lesson and, like a trial,
+    // an unmarked one must block the month — a booked child nobody marked is
+    // a lost lesson (a lost package draw or lost ad-hoc revenue). Both maps
+    // are merged into ONE bookingsByDate so expectedStudentsOn() and
+    // datesToCheck stay on their existing contract — no edit to
+    // attendanceCompleteness.ts, whose three copies are pinned byte-identical.
+    /** (student, date) → the booking's snapshots, for pricing and packages. */
+    const makeupInfo = new Map<
+      string,
+      { homeClassId: string; categoryId: string }
+    >();
+    const bookingsByDate = new Map<string, string[]>(bookedByDate);
+    for (const m of makeupRows ?? []) {
+      if (m.class_id !== cls.id) continue;
+      const d = m.session_date as string;
+      const list = bookingsByDate.get(d) ?? [];
+      list.push(m.student_id as string);
+      bookingsByDate.set(d, list);
+      makeupInfo.set(`${m.student_id}:${d}`, {
+        homeClassId: m.home_class_id as string,
+        categoryId: m.category_id as string,
+      });
+    }
+
     // Enrolments answer TWO different questions and the split matters.
     //
     //   enrolmentSpans  — "who must be marked ON THIS DATE" (the gate)
@@ -577,9 +625,10 @@ async function generateForTenant(
       ...new Set<string>([
         ...expectedDates,
         ...sessionByDate.keys(),
-        // A trial booked on a date with no session yet would otherwise be
-        // invisible here — and an unmarked trial is exactly what must block.
-        ...bookedByDate.keys(),
+        // A trial or make-up booked on a date with no session yet would
+        // otherwise be invisible here — and an unmarked booking is exactly
+        // what must block.
+        ...bookingsByDate.keys(),
       ]),
     ].sort();
 
@@ -591,7 +640,7 @@ async function generateForTenant(
       // joined on the 20th was never expected on the 6th.
       // expectedStudentsOn() is the shared definition — do not inline the union
       // (§7.18: four hand-written copies caused a live underbill).
-      const expected = expectedStudentsOn(date, enrolmentSpans, bookedByDate);
+      const expected = expectedStudentsOn(date, enrolmentSpans, bookingsByDate);
       const sessId = sessionByDate.get(date);
       if (!sessId) return expected;
       return expected.filter((s) => !attSet.has(`${sessId}:${s}`));
@@ -683,11 +732,31 @@ async function generateForTenant(
       c: { id: string; title: string }
     ): number => {
       const classPrice = rateOn(classRates ?? [], c.id, sessionDate, c.title).price;
-      if (status !== "trial_paid") return classPrice;
-      // The BOOKING's category, not the class's current one.
-      const cat = bookedCategory.get(`${studentId}:${sessionDate}`);
-      if (!cat) return classPrice;
-      return trialRateFor(cat, sessionDate) ?? classPrice;
+      if (status === "trial_paid") {
+        // The BOOKING's category, not the class's current one.
+        const cat = bookedCategory.get(`${studentId}:${sessionDate}`);
+        if (!cat) return classPrice;
+        return trialRateFor(cat, sessionDate) ?? classPrice;
+      }
+      // A MAKE-UP GUEST pays their HOME class's effective-dated rate on the
+      // lesson's own date — the make-up replaces their own missed lesson, so
+      // their usual price applies, not the host's. Guarded by presence in
+      // makeupInfo so no ordinary row can reach it, and by enrolment-wins: a
+      // child booked as a guest and later transferred INTO the host class is
+      // a member on that date and prices as one.
+      const mk = makeupInfo.get(`${studentId}:${sessionDate}`);
+      if (
+        mk &&
+        !studentsEnrolledOn(sessionDate, enrolmentSpans).includes(studentId)
+      ) {
+        return rateOn(
+          classRates ?? [],
+          mk.homeClassId,
+          sessionDate,
+          `the make-up guest's home class (booking into ${c.title})`
+        ).price;
+      }
+      return classPrice;
     };
 
     // ── Tally this class's billable items into the cross-class map ──────────
@@ -711,15 +780,28 @@ async function generateForTenant(
           // Throws if no rate is in force — see rates.ts for why that must
           // never degrade to 0 or to cls.price_per_lesson.
           const sessionDate = sessionDateMap[sessId];
+          // A make-up guest's line carries the BOOKING's snapshots: the
+          // category it was arranged under (so a package matches even if the
+          // host class is re-tagged afterwards — §7.45), and a title marker so
+          // the parent's invoice explains a host-class line at a home-class
+          // price. Enrolment wins, as in priceFor: a member is not a guest.
+          const mk = makeupInfo.get(`${ps.student_id}:${sessionDate}`);
+          const isGuest =
+            !!mk &&
+            !studentsEnrolledOn(sessionDate, enrolmentSpans).includes(
+              ps.student_id
+            );
           items.push({
             student_id: ps.student_id,
             lesson_session_id: sessId,
             attendance_status: status,
             amount: priceFor(status, ps.student_id, sessionDate, cls),
-            class_title: cls.title,
+            class_title: isGuest ? `${cls.title} (make-up)` : cls.title,
             session_date: sessionDate,
             student_name: studentNameById.get(ps.student_id) ?? null,
-            class_category_id: (cls.category_id as string | null) ?? null,
+            class_category_id: isGuest
+              ? mk!.categoryId
+              : ((cls.category_id as string | null) ?? null),
           });
         }
       }

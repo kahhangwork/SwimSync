@@ -33,6 +33,10 @@ type Child = {
   class_time: string | null;
   /** An upcoming, uncancelled trial: the class title and the date. */
   trial: { class_title: string; session_date: string } | null;
+  /** An upcoming, uncancelled make-up: one lesson in ANOTHER class of the
+   *  same kind. Rendered IN ADDITION to the class block — an enrolled child
+   *  keeps their weekly class, the make-up is extra. */
+  makeup: { class_title: string; session_date: string } | null;
   class_location: string | null;
 };
 
@@ -141,6 +145,7 @@ export default function ParentHomeScreen() {
           is_active: s.is_active,
           coach_name: coachProfile?.full_name ?? null,
           trial: null, // filled below
+          makeup: null, // filled below
           class_day: cls?.day_of_week ?? null,
           class_time: cls
             ? `${formatTime(cls.start_time)} – ${formatTime(cls.end_time)}`
@@ -156,13 +161,26 @@ export default function ParentHomeScreen() {
       // only thing that knew. Reported from production 2026-07-26.
       const ids = mapped.map((c) => c.id);
       if (ids.length > 0) {
-        const { data: trials } = await supabase
-          .from("trial_bookings")
-          .select("student_id, session_date, classes(title)")
-          .in("student_id", ids)
-          .is("cancelled_at", null)
-          .gte("session_date", todayInSg())
-          .order("session_date");
+        const [{ data: trials }, { data: makeups }] = await Promise.all([
+          supabase
+            .from("trial_bookings")
+            .select("student_id, session_date, classes(title)")
+            .in("student_id", ids)
+            .is("cancelled_at", null)
+            .gte("session_date", todayInSg())
+            .order("session_date"),
+          // Make-ups too: an enrolled child guesting one lesson in another
+          // class. WHEN and WHERE is the whole question the family has.
+          supabase
+            .from("makeup_bookings")
+            .select(
+              "student_id, session_date, classes!makeup_bookings_class_id_fkey(title)"
+            )
+            .in("student_id", ids)
+            .is("cancelled_at", null)
+            .gte("session_date", todayInSg())
+            .order("session_date"),
+        ]);
 
         const byStudent = new Map<string, { class_title: string; session_date: string }>();
         for (const b of (trials ?? []) as any[]) {
@@ -175,6 +193,17 @@ export default function ParentHomeScreen() {
           }
         }
         for (const c of mapped) c.trial = byStudent.get(c.id) ?? null;
+
+        const makeupByStudent = new Map<string, { class_title: string; session_date: string }>();
+        for (const b of (makeups ?? []) as any[]) {
+          if (!makeupByStudent.has(b.student_id)) {
+            makeupByStudent.set(b.student_id, {
+              class_title: b.classes?.title ?? "another class",
+              session_date: b.session_date,
+            });
+          }
+        }
+        for (const c of mapped) c.makeup = makeupByStudent.get(c.id) ?? null;
       }
 
       setChildren(mapped);
@@ -416,26 +445,46 @@ export default function ParentHomeScreen() {
                   </View>
 
                   {child.is_active && child.assignment_status === "assigned" ? (
-                    <View className="bg-sky-50 rounded-xl p-3 gap-1">
-                      <View className="flex-row items-center gap-1.5">
-                        <Ionicons name="person-outline" size={13} color="#0284c7" />
-                        <Text className="text-xs text-sky-700">
-                          {child.coach_name ?? "—"}
-                        </Text>
+                    <>
+                      <View className="bg-sky-50 rounded-xl p-3 gap-1">
+                        <View className="flex-row items-center gap-1.5">
+                          <Ionicons name="person-outline" size={13} color="#0284c7" />
+                          <Text className="text-xs text-sky-700">
+                            {child.coach_name ?? "—"}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-center gap-1.5">
+                          <Ionicons name="calendar-outline" size={13} color="#0284c7" />
+                          <Text className="text-xs text-sky-700">
+                            {capitalize(child.class_day)} · {child.class_time}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-center gap-1.5">
+                          <Ionicons name="location-outline" size={13} color="#0284c7" />
+                          <Text className="text-xs text-sky-700">
+                            {child.class_location ?? "—"}
+                          </Text>
+                        </View>
                       </View>
-                      <View className="flex-row items-center gap-1.5">
-                        <Ionicons name="calendar-outline" size={13} color="#0284c7" />
-                        <Text className="text-xs text-sky-700">
-                          {capitalize(child.class_day)} · {child.class_time}
-                        </Text>
-                      </View>
-                      <View className="flex-row items-center gap-1.5">
-                        <Ionicons name="location-outline" size={13} color="#0284c7" />
-                        <Text className="text-xs text-sky-700">
-                          {child.class_location ?? "—"}
-                        </Text>
-                      </View>
-                    </View>
+                      {child.makeup && (
+                        /* IN ADDITION to the class block — the weekly class
+                           stands; this one lesson is extra. Says WHEN and
+                           WHERE, the whole question a family has. */
+                        <View className="mt-2 bg-emerald-50 rounded-xl p-3">
+                          <Text className="text-xs font-semibold text-emerald-800">
+                            Make-up lesson booked
+                          </Text>
+                          <Text className="mt-0.5 text-xs text-emerald-700">
+                            {child.makeup.class_title} ·{" "}
+                            {formatSgDate(child.makeup.session_date, {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </Text>
+                        </View>
+                      )}
+                    </>
                   ) : !child.is_active ? (
                     // An inactive child is NOT waiting for placement — telling
                     // them "the admin will assign your child soon" promises

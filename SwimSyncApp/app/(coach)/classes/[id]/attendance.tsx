@@ -37,11 +37,14 @@ type DBStatus =
 type StudentRow = {
   id: string;
   full_name: string;
-  /** On this roster because of an attendance row or a trial booking, not an
+  /** On this roster because of an attendance row or a booking, not an
    *  enrolment. */
   attendedOnly?: boolean;
   /** Booked for a trial on this date specifically. */
   isTrial?: boolean;
+  /** Booked for a make-up on this date specifically — enrolled elsewhere,
+   *  guesting for one lesson. Ordinary statuses only. */
+  isMakeup?: boolean;
 };
 
 type AttState = {
@@ -292,6 +295,16 @@ export default function MarkAttendanceScreen() {
       .eq("session_date", date)
       .is("cancelled_at", null);
 
+    // And children booked for a MAKE-UP: enrolled elsewhere, guesting into
+    // this one lesson. Same mechanism, same stakes — an unmarked make-up
+    // holds the billing month open.
+    const { data: makeupBooked } = await supabase
+      .from("makeup_bookings")
+      .select("student_id, students(id, full_name)")
+      .eq("class_id", id)
+      .eq("session_date", date)
+      .is("cancelled_at", null);
+
     if (token !== loadToken.current) return;
 
     const roster = mergeRoster(
@@ -301,6 +314,10 @@ export default function MarkAttendanceScreen() {
         .filter(Boolean)
         .map((s: any) => ({ id: s.id, full_name: s.full_name })),
       (booked ?? [])
+        .map((b: any) => b.students)
+        .filter(Boolean)
+        .map((s: any) => ({ id: s.id, full_name: s.full_name })),
+      (makeupBooked ?? [])
         .map((b: any) => b.students)
         .filter(Boolean)
         .map((s: any) => ({ id: s.id, full_name: s.full_name }))
@@ -610,20 +627,34 @@ export default function MarkAttendanceScreen() {
                     {student.full_name}
                   </Text>
                   {student.attendedOnly && (
-                    // Not a weekly regular — say which kind, because a TRIAL is
+                    // Not a weekly regular — say which kind. A TRIAL is
                     // someone the coach is meeting for the first time and the
-                    // status they pick decides what the family is charged.
+                    // status they pick decides what the family is charged; a
+                    // MAKE-UP is an enrolled child guesting from another class
+                    // for this one lesson.
                     <View
                       className={`px-2 py-0.5 rounded-full ${
-                        student.isTrial ? "bg-sky-100" : "bg-amber-100"
+                        student.isTrial
+                          ? "bg-sky-100"
+                          : student.isMakeup
+                            ? "bg-emerald-100"
+                            : "bg-amber-100"
                       }`}
                     >
                       <Text
                         className={`text-[10px] font-semibold ${
-                          student.isTrial ? "text-sky-700" : "text-amber-700"
+                          student.isTrial
+                            ? "text-sky-700"
+                            : student.isMakeup
+                              ? "text-emerald-700"
+                              : "text-amber-700"
                         }`}
                       >
-                        {student.isTrial ? "Trial" : "Not enrolled"}
+                        {student.isTrial
+                          ? "Trial"
+                          : student.isMakeup
+                            ? "Make-up"
+                            : "Not enrolled"}
                       </Text>
                     </View>
                   )}
@@ -639,9 +670,14 @@ export default function MarkAttendanceScreen() {
                   </View>
                 )}
 
-                {/* Top-level status buttons */}
+                {/* Top-level status buttons. A make-up guest gets the ordinary
+                    statuses only: the trial statuses price by the trial rate,
+                    and a make-up is not a trial. Affordance, not the guard —
+                    the engine prices a mismark at the class rate. */}
                 <View className="flex-row gap-2">
-                  {TOP_STATUSES.map(({ key, label, ring, bg }) => {
+                  {TOP_STATUSES.filter(
+                    ({ key }) => !(student.isMakeup && key === "trial")
+                  ).map(({ key, label, ring, bg }) => {
                     const isSelected = state.top === key;
                     return (
                       <TouchableOpacity

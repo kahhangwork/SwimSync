@@ -184,6 +184,16 @@ export type Scenario = {
     date: string,
     opts?: { classId?: string; categoryId?: string }
   ) => Promise<string>;
+  /** Book an ENROLLED child into one lesson of another class as a make-up.
+   *  Written directly (like bookTrial) — the RPC's refusals are pinned in
+   *  pgTAP; the engine reads the row shape, which is what these tests cover.
+   *  `homeClassId` is the snapshot the ad-hoc rate resolves from;
+   *  `categoryId` the snapshot packages match against. */
+  bookMakeup: (
+    studentId: string,
+    date: string,
+    opts: { homeClassId: string; classId?: string; categoryId?: string }
+  ) => Promise<string>;
   /** Set a trial price for a category, effective from a date. Insert-only. */
   setTrialRate: (
     categoryId: string,
@@ -628,10 +638,12 @@ export async function newScenario(
    * another scenario's parent inside this tenant.
    */
   async function teardown(): Promise<void> {
-    // Trials first. trial_bookings.class_id and trial_rates.category_id are
-    // both ON DELETE RESTRICT — deliberately, so a class or category cannot be
-    // deleted out from under bookings that price past lessons — which means
-    // they must go before the classes and categories they point at.
+    // Bookings first. trial_bookings.class_id, trial_rates.category_id and
+    // makeup_bookings' class/home-class/category columns are all ON DELETE
+    // RESTRICT — deliberately, so a class or category cannot be deleted out
+    // from under bookings that price past lessons — which means they must go
+    // before the classes and categories they point at.
+    await db.from("makeup_bookings").delete().eq("tenant_id", tenantId);
     await db.from("trial_bookings").delete().eq("tenant_id", tenantId);
     await db.from("trial_rates").delete().eq("tenant_id", tenantId);
 
@@ -825,6 +837,31 @@ export async function newScenario(
     return data.id as string;
   }
 
+  async function bookMakeup(
+    studentId: string,
+    date: string,
+    opts: { homeClassId: string; classId?: string; categoryId?: string }
+  ): Promise<string> {
+    // Direct insert, like bookTrial: the RPC gates on auth.uid() and these
+    // tests run as service_role. The snapshots are the caller's to state —
+    // that is the point of snapshots.
+    const { data, error } = await db
+      .from("makeup_bookings")
+      .insert({
+        tenant_id: tenantId,
+        student_id: studentId,
+        class_id: opts.classId ?? classId,
+        session_date: date,
+        category_id: opts.categoryId ?? categoryId,
+        home_class_id: opts.homeClassId,
+        booked_by: coachProfileId,
+      })
+      .select("id")
+      .single();
+    if (error || !data) throw new Error(`bookMakeup failed: ${error?.message}`);
+    return data.id as string;
+  }
+
   async function setTrialRate(
     catId: string,
     rate: number,
@@ -861,6 +898,7 @@ export async function newScenario(
     addUnclaimedStudent,
     settle,
     bookTrial,
+    bookMakeup,
     setTrialRate,
     setRate,
     creditBalance,

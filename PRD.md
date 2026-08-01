@@ -1680,6 +1680,59 @@ the number looks wrong, not to withhold the record.
 
 ---
 
+### 7.20 Make-up Classes *(implemented 2026-08-02)*
+
+A missed lesson (rain, coach cancellation, a parent cancelling — all marked with a
+non-billable status) bills nothing and is otherwise simply gone. For an ad-hoc family
+that is the whole answer: pay only for lessons taken. For a **package** family it is
+not — the package count sits unspent while the expiry date approaches. A make-up is the
+recourse: the **business's admin** books an enrolled child into **one lesson of another
+class in the same category**, same coach or a different one.
+
+**The model is a guest pass, deliberately.** A make-up booking is not tied to a specific
+missed lesson and there is no miss-redemption ledger — the admin decides who deserves
+one. It is a **booking, never an enrolment** (`makeup_bookings`, the `trial_bookings`
+shape): the child is expected at that ONE lesson, appears on the host coach's roster and
+marking screen for that date with a *Make-up* chip, and an **unmarked make-up holds the
+billing month open** exactly as a trial does. The trial refusals invert: a trial child
+must not be enrolled; a make-up child must be (active, actively enrolled).
+
+**Booked by the admin, from the Make-ups page** (the Trials mirror, including its
+"Past — needs marking" list). The form is child-first — the child's own class decides
+the category, and the class list offers same-category classes *minus their own*. The
+date list is the host's real lesson days plus any admin-scheduled off-schedule session
+(`book_makeup()` accepts those — an existing session proves the lesson is real). Every
+refusal lives in the RPC, not the screen: unenrolled or inactive child, inactive host
+class, cross-category, the child's own class ("use Extra lesson instead" — which is how
+a **private-category** make-up is done, since there is no other private class to guest
+into), a date the class doesn't meet, a date inside an already-billed month, a duplicate
+live slot. Cancelling is soft, and a cancelled slot can be re-booked.
+
+**What it costs follows who the family is, with two snapshots on the booking (§7.45):**
+
+- A **package** family's attended make-up **draws from the package** at its locked rate —
+  the engine matches the booking's snapshotted *category*, so re-tagging the host class
+  later cannot detach the draw. This is the whole point: the count clears before expiry.
+- An **ad-hoc** family pays the child's **own (home) class rate**, effective-dated on the
+  make-up's own date — the make-up replaces their missed lesson, so their usual price
+  applies, not the host's. The booking snapshots the *home class id* (not the rate
+  number), so a later rate correction still flows through and a deactivated home class
+  still prices.
+- The invoice line carries the host class title suffixed **"(make-up)"**, so a
+  host-class line at a home-class price explains itself.
+- A guest marked absent (or rained off) bills nothing, as ever. A child enrolled in the
+  host class on that date prices as a member — enrolment wins over a stray booking.
+
+**Who sees it:** the parent's home card announces *"Make-up lesson booked — class ·
+date"* **in addition to** the weekly class block; the host coach's roster shows a
+*"Make-ups coming up"* panel and their class counts never treat the guest as a member;
+the admin's invoice pre-flight counts the booking exactly as the engine's gate does.
+Booking-level visibility follows the trials rule (the business, the host class's coach,
+the child's own parent) — and `coach_serves_student()` was widened so a host coach can
+read a guest's *name* (which also closed the same latent gap for trial guests).
+
+---
+
 ## 8. Non-Functional Requirements
 
 ### 8.1 Platform
