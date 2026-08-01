@@ -1,13 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-02 — **the parent's invoice detail now marks each package-funded
-line** ("Paid by package · *name*", from the `package_applications` ledger — §8.24), closing
-the one surface 2026-08-01's payment-method-chip work deliberately skipped. The chip work
-itself (§8.23): a per-child "Package · N left" / "Ad-hoc" chip on ten admin surfaces + the
-parent app, backed by `student_package_coverage()`, fixing the Students-page chip that
-summed by parent while ignoring category and expiry. All deployed; grant-dump gate clean.
-The standing headline is unchanged: **real attendance exists on production**, and **July has
-still not been billed** — §9, and the marking window closes at the end of August._
+_Last updated: 2026-08-02 — **make-up classes shipped (guest-pass model, PRD §7.20,
+§8.25)**: the admin books an enrolled child into one lesson of another same-category
+class; a package family's attended make-up draws the package (the expiring-package
+recourse), an ad-hoc guest pays their own class's rate. Five migrations + engine v17 +
+all three UIs, **verified local only — NOT yet deployed** (migrations, the function and
+the apps are all pending; §7.60 ordering applies). Same day, earlier: the parent invoice
+detail marks package-funded lines (§8.24). The standing headline is unchanged: **real
+attendance exists on production**, and **July has still not been billed** — §9, and the
+marking window closes at the end of August._
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
 
@@ -175,6 +176,16 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   (Parents, Claims) label the family instead. Coaches deliberately see nothing.
   The parent's **invoice detail marks each package-funded line** by the package's name
   (reversed draws read ad hoc — §8.24). PRD §7.16, §8.23.
+- **Make-up classes (verified local: pgTAP + Deno ×2 + vitest + jest + a 14-check UI
+  driver — NOT YET DEPLOYED)** — the guest-pass model (PRD §7.20): the business's admin
+  books an **enrolled** child into one lesson of **another same-category class** from the
+  new admin Make-ups page; the booking (never an enrolment) makes the child expected at
+  that one lesson, an unmarked one blocks the month like a trial, a package family's
+  attended make-up **draws from the package** via the booking's snapshotted category, an
+  ad-hoc guest pays their **home class's** effective-dated rate (snapshotted class id),
+  and the invoice line reads "(make-up)". Private-category make-ups route to the existing
+  Extra-lesson mechanism. The visibility widening also closed the latent trial-guest gap
+  (host coach couldn't read a guest's name). §8.25.
 - **Creating a business (verified UI + backend, live 2026-07-21)** — the platform admin
   provisions a tenant and invites its first admin from `/platform`: `provision_tenant()` is
   the **only** INSERT path into `tenants`, the invite link is minted with
@@ -378,6 +389,43 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.25 (2026-08-02) — A MISSED LESSON CAN BE MADE UP IN ANOTHER CLASS
+
+**The feature** (PRD §7.20 — the durable home): the guest-pass model, settled with the
+user against three alternatives — freeform admin discretion (no per-miss ledger), any
+enrolled child (not package-only), private-category make-ups reuse `schedule_extra_lesson()`
+(different-coach private make-ups → BACKLOG), ad-hoc guests at the **home** class rate.
+Five migrations (`20260802000100–500`), engine → **v17**, all three UIs. **NOT yet
+deployed** — §7.60 ordering: `db push` → grant dump (§7.39) → `functions deploy` → push
+`main` last.
+
+**What made it cheap:** `trial_bookings` was the template, and the miss already billed $0
+(`BILLABLE = {present, trial_paid}`), so one attended make-up = one draw / one charge —
+no double relief, no "makeup credit" ledger. The predicted invariant breaks never
+happened: a booking is not an enrolment, and billing still follows attendance rows.
+
+**The two snapshots are the design** (§7.45): `category_id` (package matching survives a
+host re-tag — pinned by the Deno snapshot test AND the `package_live_balances()` COALESCE,
+whose absence would have broken the engine↔SQL pin on re-tag) and `home_class_id` (the
+class id, not the rate number — corrections still flow; the engine's class-rates fetch
+widens to cover it or a deactivated home class would kill the whole run in `rateOn`).
+
+**Found while building:** `merge_students`' unknown-cascade tripwire REFUSED the suite the
+moment `makeup_bookings` landed — exactly its designed behaviour; migration 5 teaches it
+the fifth cascading table. And the coach-visibility gap was latent **for trials too**
+(masked because the live coach is the admin) — `coach_serves_student()` now grants a read
+via either booking table, proven needed by Phase-0 probes counting 0 as the real roles.
+
+**Verified:** pgTAP 445 (26 new, incl. negative RLS probes and a table-did-not-grow
+mutation check); Deno 123 **run twice** (12 make-up tests, 8 proven RED on v16; tripwire
+recorded green on v16 first); vitest 222; jest 192; `verify-makeups.mjs` 14/14 (fixture
+in round-trip CI, 14 fixtures clean; coach screens by fixed-id deep link, §7.58; the
+fixture's off-schedule session on *today* makes the marking checks day-independent).
+Durable homes: PRD §7.20 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §10 · BACKLOG
+(three follow-ups + the shipped item retired) · `supabase/rollback/20260802_…_DOWN.sql`.
+
+---
+
 ## 8.24 (2026-08-02) — AN INVOICE NOW SAYS WHICH LINES THE PACKAGE PAID FOR
 
 One commit, app-only — **no migration**: parents could already read their own
@@ -402,51 +450,11 @@ a permanent version needs a fixture invoice, which would entangle
 
 ---
 
-## 8.23 (2026-08-01) — EVERY CHILD'S NAME NOW SAYS HOW THEY ARE PAID, AND THE ONE CHIP THAT ALREADY EXISTED WAS WRONG TWO WAYS
-
-Three commits, all deployed (two migrations pushed, grant-dump gate clean, both apps live —
-the app bundle greps for the new copy; the admin's authed chunks can't be fetched logged-out,
-so eyeball `/students` once). The durable material: **PRD §7.16** (the behaviour),
-`docs/TESTING.md` §5 (the suites and the driver), `docs/ARCHITECTURE.md` §10 (the new
-files), `BACKLOG.md` (the one surface deliberately skipped).
-
-**The feature:** a payment-method chip — **"Package · N left" / "Ad-hoc", explicit both
-ways** — beside every child's name: ten admin surfaces, the parent home cards, and the child
-profile's Balances card. One new SQL verdict, `student_package_coverage()` (SECURITY INVOKER;
-category matching over `package_live_balances()`, never a second balance derivation), so both
-apps ship only null-tolerant row-shapers and RLS does the scoping — a coach calling it gets
-nothing, which is the standing "coaches don't handle family money" decision, now pgTAP-pinned.
-
-**The bug it fixed:** the Students-page chip summed `live_lessons_remaining` **by parent**,
-so a family holding only a Private-scoped package read "N left" beside their child in a
-Group class — and date-expired `status='active'` packages inflated the count. The verdict is
-per child and category-aware; the "running low" filter follows it (an ad-hoc child is never
-"low"; an **exhausted** package is "Package · 0 left", never "Ad-hoc" — the engine's
-affordability rule is pinned OUT of the display predicate by a pg_proc-source assertion).
-The driver asserts the discriminating siblings **by name** in both UIs (16 → 21 checks).
-
-**Found while building:** `one_active_enrolment_per_student` means a child has at most one
-active class, so the `'mixed'` verdict (some classes covered, some not) is **structurally
-unreachable today** — the SQL arm and UI branches exist and are unit-tested, and a pgTAP pin
-on the index makes the day the constraint lifts loud instead of silently mislabelling.
-
-### Not done (deliberate)
-
-- **Invoice surfaces show no chip** (admin Invoices, dashboard outstanding mini-table,
-  parent invoice detail): an invoice is a *historic document* — `package_applied` records
-  how it **was** funded; a current-status chip beside it invites misreading. Per-line
-  marking via `package_applications` was filed in `BACKLOG.md` with that reasoning —
-  **and shipped the next day as §8.24** (the historic grain, not a current-status chip).
-- **No coach surfaces**, reaffirming the design decision rather than revisiting it.
-- **No new gotcha filed** — nothing cost real time; the two rules worth keeping (the label
-  rule, the 'mixed' unreachability) live in the migration header, the pgTAP pins and PRD §7.16.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.23** | 2026-08-01 | The per-child, category-aware payment-method chip ("Package · N left" / "Ad-hoc") on ten admin surfaces + the parent app via `student_package_coverage()`, fixing the Students-page chip that summed by parent and counted date-expired packages; 'mixed' proven structurally unreachable and pgTAP-pinned; coaches deliberately see nothing | PRD §7.16 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §10 |
 | **8.22** | 2026-08-01 | A latent unordered `LIMIT 1` in `fixtures-trial-onboarding.sql` broke CI (§7.73 biting its author — fixture now owns its class, no `roundtrip-exempt` left); `verify-trial-onboarding.mjs` had aborted on check 1 since two hours after it was written (0 → 10 checks); and a user's coach-rate question found the platform "unpaid" badge had **never rendered** (`as`-cast field mismatch) plus the private-vs-school dropdown answering an unanswerable question — replaced with staff-without-rate. **`tenants.kind` still exists, nothing reads it, do not start**; the RPC-narrowing migration queues behind the two hygiene migrations (§7.55) | **§7.73, §7.76** · `docs/TESTING.md` §5 · PRD §4.4 |
 | **8.21** | 2026-08-01 | The "possibly real product bugs" in `verify-attendance-window.mjs` were **clock rot, product correct in all three cases** — its three unique behaviours folded into `verify-attendance-guard.mjs` (20/20), driver + fixture deleted; found the guard driver's own unnamed-entity bug on the way | **§7.74, §7.75** · `docs/TESTING.md` §5 · `docs/plans/ATTENDANCE_WINDOW_DRIVER_FOLD_PLAN.md` |
 | **8.20** | 2026-08-01 | **CI loads every UI fixture now** (`check-fixture-roundtrip.sh`, two passes: isolated round-trip, then stacked footprint comparison) — and it found three broken fixtures the first time it ran | `docs/TESTING.md` §5 · **§7.73** |
