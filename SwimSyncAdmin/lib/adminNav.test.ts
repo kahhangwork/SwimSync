@@ -22,13 +22,14 @@ describe("hasTenant", () => {
 });
 
 describe("navFor", () => {
-  it("gives a business admin the fourteen business pages and NOT Platform", () => {
+  it("gives a business admin the fifteen business pages and NOT Platform", () => {
     const hrefs = navFor(A_TENANT).map((n) => n.href);
     // 11 + Packages (2026-07-20) + Trials (2026-07-25) + Parent Requests
-    // (2026-07-26). The count is asserted deliberately: NAV also drives
-    // RequiresTenant's route gate, so a page added here without being thought
-    // about is a page gated by accident rather than on purpose.
-    expect(hrefs).toHaveLength(14);
+    // (2026-07-26) + Make-ups (2026-08-02). The count is asserted
+    // deliberately: NAV also drives RequiresTenant's route gate, so a page
+    // added here without being thought about is a page gated by accident
+    // rather than on purpose.
+    expect(hrefs).toHaveLength(15);
     expect(hrefs).toContain("/dashboard");
     expect(hrefs).toContain("/wages");
     expect(hrefs).toContain("/packages");
@@ -116,5 +117,16 @@ describe("Trials", () => {
 
   it("is NOT offered to the platform admin", () => {
     expect(navFor(null).map((i) => i.href)).not.toContain("/trials");
+  });
+});
+
+describe("Make-ups", () => {
+  // Same reasoning as Trials: booking a make-up is a one-business action.
+  it("is offered to a business admin", () => {
+    expect(navFor(A_TENANT).map((i) => i.href)).toContain("/makeups");
+  });
+
+  it("is NOT offered to the platform admin", () => {
+    expect(navFor(null).map((i) => i.href)).not.toContain("/makeups");
   });
 });

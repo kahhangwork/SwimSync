@@ -92,6 +92,51 @@ describe("mergeRoster — trial bookings", () => {
   });
 });
 
+describe("mergeRoster — make-up bookings", () => {
+  // Same stakes as a trial: without this the guest never appears, is never
+  // marked, and the billing month can never close.
+  it("includes a child booked for a make-up on this date, flagged as one", () => {
+    const out = mergeRoster(enrolled, [], [], [{ id: "m", full_name: "Mia Makeup" }]);
+    expect(out.map((s) => s.id)).toEqual(["a", "b", "m"]);
+    const mia = out.find((s) => s.id === "m");
+    expect(mia?.isMakeup).toBe(true);
+    expect(mia?.isTrial).toBe(false);
+    expect(mia?.attendedOnly).toBe(true);
+  });
+
+  it("does not label an enrolled student as a make-up", () => {
+    const out = mergeRoster(enrolled, [], [], []);
+    expect(out.every((s) => s.isMakeup === false)).toBe(true);
+  });
+
+  // A guest the coach has already marked appears in both sources.
+  it("shows a booked-and-marked guest once, still flagged as a make-up", () => {
+    const out = mergeRoster(
+      enrolled,
+      [{ id: "m", full_name: "Mia Makeup" }],
+      [],
+      [{ id: "m", full_name: "Mia Makeup" }]
+    );
+    expect(out.filter((s) => s.id === "m")).toHaveLength(1);
+    expect(out.find((s) => s.id === "m")?.isMakeup).toBe(true);
+  });
+
+  // A trial child cannot be enrolled, so trial + make-up on one child is a
+  // data error — the safer label for the coach is "Trial", exactly once.
+  it("lets a trial booking win the label if both somehow exist", () => {
+    const out = mergeRoster(
+      enrolled,
+      [],
+      [{ id: "w", full_name: "Weird Both" }],
+      [{ id: "w", full_name: "Weird Both" }]
+    );
+    expect(out.filter((s) => s.id === "w")).toHaveLength(1);
+    const w = out.find((s) => s.id === "w");
+    expect(w?.isTrial).toBe(true);
+    expect(w?.isMakeup).toBe(false);
+  });
+});
+
 // ── A CHILD WITH TWO ENROLMENT ROWS IN ONE CLASS ────────────────────────────
 // The caller builds `activeStudents` from enrolment ROWS, and unenrol/re-enrol
 // keeps history (PRD §11.5), so two spans can both cover one date. A duplicate

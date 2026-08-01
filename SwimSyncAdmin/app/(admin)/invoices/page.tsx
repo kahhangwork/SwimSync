@@ -216,35 +216,46 @@ export default function InvoicesPage() {
         return;
       }
 
-      const [enrolmentsRes, sessionsRes, bookingsRes] = await Promise.all([
-        supabase
-          .from("student_class_enrolments")
-          // unenrolled_at is needed as well as enrolled_at: who must be marked
-          // is a question about the LESSON'S date, so an enrolment is a span,
-          // not a flag. See EnrolmentSpan in lib/attendanceCompleteness.ts.
-          .select("class_id, student_id, is_active, enrolled_at, unenrolled_at")
-          .in("class_id", classIds),
-        supabase
-          .from("lesson_sessions")
-          .select("id, class_id, session_date")
-          .in("class_id", classIds)
-          .gte("session_date", bounds.start)
-          .lte("session_date", bounds.end),
-        // Trial bookings. Without these this check and the ENGINE disagree:
-        // the engine expects a booked child on their lesson and refuses to
-        // seal, while this dialog would report the month all clear. §7.18 is
-        // exactly that divergence, and it cost a live underbill.
-        supabase
-          .from("trial_bookings")
-          .select("class_id, student_id, session_date")
-          .in("class_id", classIds)
-          .is("cancelled_at", null)
-          .gte("session_date", bounds.start)
-          .lte("session_date", bounds.end),
-      ]);
+      const [enrolmentsRes, sessionsRes, bookingsRes, makeupsRes] =
+        await Promise.all([
+          supabase
+            .from("student_class_enrolments")
+            // unenrolled_at is needed as well as enrolled_at: who must be marked
+            // is a question about the LESSON'S date, so an enrolment is a span,
+            // not a flag. See EnrolmentSpan in lib/attendanceCompleteness.ts.
+            .select("class_id, student_id, is_active, enrolled_at, unenrolled_at")
+            .in("class_id", classIds),
+          supabase
+            .from("lesson_sessions")
+            .select("id, class_id, session_date")
+            .in("class_id", classIds)
+            .gte("session_date", bounds.start)
+            .lte("session_date", bounds.end),
+          // Trial AND make-up bookings. Without these this check and the
+          // ENGINE disagree: the engine expects a booked child on their lesson
+          // and refuses to seal, while this dialog would report the month all
+          // clear. §7.18 is exactly that divergence, and it cost a live
+          // underbill. Both kinds satisfy the same "expected at one lesson"
+          // contract, so they merge into one bookings list.
+          supabase
+            .from("trial_bookings")
+            .select("class_id, student_id, session_date")
+            .in("class_id", classIds)
+            .is("cancelled_at", null)
+            .gte("session_date", bounds.start)
+            .lte("session_date", bounds.end),
+          supabase
+            .from("makeup_bookings")
+            .select("class_id, student_id, session_date")
+            .in("class_id", classIds)
+            .is("cancelled_at", null)
+            .gte("session_date", bounds.start)
+            .lte("session_date", bounds.end),
+        ]);
       if (enrolmentsRes.error) throw enrolmentsRes.error;
       if (sessionsRes.error) throw sessionsRes.error;
       if (bookingsRes.error) throw bookingsRes.error;
+      if (makeupsRes.error) throw makeupsRes.error;
 
       const sessionIds = (sessionsRes.data ?? []).map((s) => s.id);
       // NB the attendance select below is by SESSION, not by student, so a
@@ -266,7 +277,7 @@ export default function InvoicesPage() {
           attendanceRes.data ?? [],
           billingMonth,
           todayInSg(),
-          bookingsRes.data ?? []
+          [...(bookingsRes.data ?? []), ...(makeupsRes.data ?? [])]
         )
       );
     } catch (e) {

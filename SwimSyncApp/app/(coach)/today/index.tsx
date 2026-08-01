@@ -217,17 +217,25 @@ export default function TodayScreen() {
     // Lessons that should have happened but aren't fully marked. A lesson is
     // only "marked" once every active student has an attendance row — the same
     // rule the invoice engine's completeness gate uses.
-    // Trial bookings across this coach's classes. A booked child is expected at
-    // ONE lesson and is not enrolled, so without these an unmarked trial never
-    // reaches the coach's backlog — while the invoice engine refuses to close
-    // the month over it. The two must agree (§7.18).
-    const { data: bookingRows } = await supabase
-      .from("trial_bookings")
-      .select("class_id, student_id, session_date")
-      .is("cancelled_at", null);
+    // Trial AND make-up bookings across this coach's classes. A booked child
+    // is expected at ONE lesson and is not enrolled here, so without these an
+    // unmarked booking never reaches the coach's backlog — while the invoice
+    // engine refuses to close the month over it. The two must agree (§7.18).
+    // Both kinds satisfy the same "expected at one lesson" contract, so they
+    // merge into one map — exactly as the engine merges them (core.ts).
+    const [{ data: bookingRows }, { data: makeupRows }] = await Promise.all([
+      supabase
+        .from("trial_bookings")
+        .select("class_id, student_id, session_date")
+        .is("cancelled_at", null),
+      supabase
+        .from("makeup_bookings")
+        .select("class_id, student_id, session_date")
+        .is("cancelled_at", null),
+    ]);
 
     const bookedByClassDate = new Map<string, Map<string, string[]>>();
-    for (const b of bookingRows ?? []) {
+    for (const b of [...(bookingRows ?? []), ...(makeupRows ?? [])]) {
       const perClass =
         bookedByClassDate.get(b.class_id as string) ?? new Map<string, string[]>();
       const list = perClass.get(b.session_date as string) ?? [];

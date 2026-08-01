@@ -301,4 +301,33 @@ describe("trial bookings", () => {
     );
     expect(out[0].missingDates).not.toContain("2026-08-01");
   });
+
+  // MAKE-UP bookings ride the same parameter — the invoices page concatenates
+  // trial and make-up rows into one list. This pins that a booked-but-unmarked
+  // make-up guest names the same missing lesson the engine's blocking list
+  // does (§7.18: the pre-flight and the gate must tell one story).
+  it("reports a booked-but-unmarked MAKE-UP guest as a missing lesson", () => {
+    const makeup = [
+      { class_id: "c1", student_id: "guest1", session_date: "2026-08-01" },
+    ];
+    const out = computeClassCoverage(
+      cls, enrolled, [sess1],
+      [{ lesson_session_id: "sess1", student_id: "s1" }],
+      "2026-08", "2026-08-31",
+      [...booking, ...makeup]
+    );
+    expect(out[0].missingDates).toContain("2026-08-01");
+
+    const marked = computeClassCoverage(
+      cls, enrolled, [sess1],
+      [
+        { lesson_session_id: "sess1", student_id: "s1" },
+        { lesson_session_id: "sess1", student_id: "trial1" },
+        { lesson_session_id: "sess1", student_id: "guest1" },
+      ],
+      "2026-08", "2026-08-31",
+      [...booking, ...makeup]
+    );
+    expect(marked[0].missingDates).not.toContain("2026-08-01");
+  });
 });
