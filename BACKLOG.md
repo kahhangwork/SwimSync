@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-01 (two shipped and removed — *Run the fixtures in CI* and *`verify-attendance-window.mjs` guards half of what it claims*, the latter's failures turning out to be **clock rot with the product correct in every case**. One successor added: ***Run the UI drivers in CI*** (**M**, now the highest-value engineering item — CI loads every fixture but executes no driver). *Give `fixtures-trial-onboarding.sql` its own class* was filed and then **shipped the same day**, when its unordered `LIMIT 1` broke CI (§7.73)_
+_Last updated: 2026-08-01 (two shipped and removed — *Run the fixtures in CI* and *`verify-attendance-window.mjs` guards half of what it claims*, the latter's failures turning out to be **clock rot with the product correct in every case**. Two added: *`verify-trial-onboarding.mjs` asserts a control that was deleted* (**S**, found aborting on check 1 — broken since 2026-07-25) and ***Run the UI drivers in CI*** (**M**, now the highest-value engineering item — CI loads every fixture but executes no driver). *Give `fixtures-trial-onboarding.sql` its own class* was filed and then **shipped the same day**, when its unordered `LIMIT 1` broke CI (§7.73)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -951,6 +951,28 @@ it failed, looked like a regression in the change under test, and needed a run a
 admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
 and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
 
+### `verify-trial-onboarding.mjs` asserts a control that was deleted — **S**
+It fails on its first check — *"the Add a walk-in control is offered on the attendance
+screen"* — then **crashes**, because the next line taps that control and the locator times
+out. It does not score; it aborts.
+
+**Why:** the control is gone by design. `912bd11` (2026-07-25 22:59) removed walk-in
+creation from the coach app when a trial became a booking the **admin** arranges ahead of
+time (PRD §7.17, HANDOVER §3 spells this out). The driver was written at **20:49 the same
+day**, two hours before the feature it tests was deleted, and has been broken ever since —
+discovered 2026-08-01 only because an unrelated fixture change prompted a hand-run. A driver
+that aborts on check 1 guards nothing at all, which is worse than the 2/5 that got
+`verify-attendance-window.mjs` retired.
+
+**Notes:** decide what it should test now, rather than repairing it in place — the coach's
+only write path is marking attendance, so the "coach adds a walk-in" half has no product
+behind it. The fixture is fine and was improved on 2026-08-01 (it owns its class); the
+billing half of the scenario — an unclaimed billable lesson **holds the month open** instead
+of being sealed over — is still real, still valuable, and is the part worth keeping. The
+admin-side creation paths are covered by `verify-trial-visibility.mjs`. This is the third
+driver in one week found rotting undetected (§7.62, §8.21, this) — see *Run the UI drivers
+in CI*, which is the systemic fix.
+
 ### Run the UI drivers in CI, not just their fixtures — **M**
 CI now loads every `fixtures-*.sql` and asserts it round-trips
 (`check-fixture-roundtrip.sh`, 2026-08-01), but no `verify-*.mjs` is ever executed. The
@@ -958,10 +980,12 @@ drivers need a browser and both dev servers, so this is a bigger job than the fi
 was.
 
 **Why:** the fixture check closes the *loading* half of the gap and leaves the *asserting*
-half open. `verify-attendance-window.mjs` proved the cost: its fixture loaded perfectly
-while the driver sat at 2/5 for over a month, and nobody knew, because the only way to find
-out was for a human to run it by hand. Every driver is one calendar change away from the
-same rot — the assertions are the part that goes stale, and nothing watches them.
+half open. **Three drivers were found rotting in one week, all by accident, none by a test.**
+`verify-attendance-window.mjs` sat at 2/5 for over a month (a stale calendar);
+`verify-trial-onboarding.mjs` has **aborted on its first check since 2026-07-25**, two hours
+after it was written, because the control it taps was deleted the same evening; and §7.62's
+pair could not load at all. A driver is one calendar change or one deleted button away from
+guarding nothing, and nothing watches them.
 
 **Notes:** ~19 drivers, most needing Expo web on :8081 and several also Next on :3000, plus
 Playwright against installed Chrome (`channel: "chrome"` — the runner would need a browser
