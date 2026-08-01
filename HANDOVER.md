@@ -1,12 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-01 (third session that day) — **every child's name now says how they
-are paid.** A per-child **payment-method chip** ("Package · N left" / "Ad-hoc", explicit both
-ways) shipped across ten admin surfaces and the parent app, backed by a new SQL verdict
-`student_package_coverage()` — and it **fixed the Students-page chip, which summed the
-family's lessons by parent while ignoring both category scope and expiry** (§8.23). Two
-migrations pushed to production, grant-dump gate clean, both apps deployed. Earlier that day:
-CI fixture loading + two driver repairs (§8.21 ledger, §8.22).
+_Last updated: 2026-08-02 — **the parent's invoice detail now marks each package-funded
+line** ("Paid by package · *name*", from the `package_applications` ledger — §8.24), closing
+the one surface 2026-08-01's payment-method-chip work deliberately skipped. The chip work
+itself (§8.23): a per-child "Package · N left" / "Ad-hoc" chip on ten admin surfaces + the
+parent app, backed by `student_package_coverage()`, fixing the Students-page chip that
+summed by parent while ignoring category and expiry. All deployed; grant-dump gate clean.
 The standing headline is unchanged: **real attendance exists on production**, and **July has
 still not been billed** — §9, and the marking window closes at the end of August._
 
@@ -174,7 +173,8 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   The old Students-page chip — summed by parent, category- and expiry-blind — is gone,
   and the "running low" filter follows the per-child rule. Family-grain surfaces
   (Parents, Claims) label the family instead. Coaches deliberately see nothing.
-  PRD §7.16, §8.23.
+  The parent's **invoice detail marks each package-funded line** by the package's name
+  (reversed draws read ad hoc — §8.24). PRD §7.16, §8.23.
 - **Creating a business (verified UI + backend, live 2026-07-21)** — the platform admin
   provisions a tenant and invites its first admin from `/platform`: `provision_tenant()` is
   the **only** INSERT path into `tenants`, the invite link is minted with
@@ -378,6 +378,30 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.24 (2026-08-02) — AN INVOICE NOW SAYS WHICH LINES THE PACKAGE PAID FOR
+
+One commit, app-only — **no migration**: parents could already read their own
+`package_applications` (`parent_id = current_parent_id()` was in the 2026-07-20 policy).
+The parent invoice detail joins that ledger to its line items: a funded line reads
+**"Paid by package · *name*"** in emerald; a **reversed** draw deliberately reads ad hoc,
+because the correction path put that money back on the package. Durable material:
+**PRD §7.16** (the behaviour + the historic-vs-current rule), `docs/TESTING.md` §5
+(`invoiceFunding` suite). The BACKLOG item — filed the previous day as deliberately
+skipped — shipped and was removed.
+
+**Scope fact:** the admin Invoices page renders **no line items at all** (its
+`invoice_items` join only feeds the student-names column), so the parent detail is the
+only surface where "which lines" can render. An admin invoice-detail view would be a new
+feature, not part of this.
+
+**Verified**: jest 188 (+5, incl. reversed-draw-is-not-funding and the null-input
+fail-safe); a throwaway two-line invoice (one funded + ledger row, one ad hoc) driven in
+the real UI — exactly one line tagged, by name — then torn down. Not a committed driver:
+a permanent version needs a fixture invoice, which would entangle
+`fixtures-packages.sql`'s carefully un-invoiced live-balance scenario.
+
+---
+
 ## 8.23 (2026-08-01) — EVERY CHILD'S NAME NOW SAYS HOW THEY ARE PAID, AND THE ONE CHIP THAT ALREADY EXISTED WAS WRONG TWO WAYS
 
 Three commits, all deployed (two migrations pushed, grant-dump gate clean, both apps live —
@@ -411,62 +435,11 @@ on the index makes the day the constraint lifts loud instead of silently mislabe
 - **Invoice surfaces show no chip** (admin Invoices, dashboard outstanding mini-table,
   parent invoice detail): an invoice is a *historic document* — `package_applied` records
   how it **was** funded; a current-status chip beside it invites misreading. Per-line
-  marking via `package_applications` is filed in `BACKLOG.md` with that reasoning.
+  marking via `package_applications` was filed in `BACKLOG.md` with that reasoning —
+  **and shipped the next day as §8.24** (the historic grain, not a current-status chip).
 - **No coach surfaces**, reaffirming the design decision rather than revisiting it.
 - **No new gotcha filed** — nothing cost real time; the two rules worth keeping (the label
   rule, the 'mixed' unreachability) live in the migration header, the pgTAP pins and PRD §7.16.
-
----
-
-## 8.22 (2026-08-01) — A LATENT `LIMIT 1` BROKE CI, AND A USER'S QUESTION FOUND A WARNING THAT HAD NEVER RENDERED
-
-Four commits, two threads. **No product behaviour was removed that anyone was using**, and
-the durable material is in **§7.73** and **§7.76**, `docs/TESTING.md` §5 and PRD §4.4.
-
-**Thread 1 — CI went red on a docs-only commit, which is the tell.**
-`fixtures-trial-onboarding.sql` picked its class with an unordered `LIMIT 1`; §8.21 added two
-classes to the seed tenant, the pick moved to `Saturday Beginners`, and it collided with
-another fixture's session. **Locally the identical code picked a different class and passed.**
-That is §7.73 — written three commits earlier — biting its own author. Fixed by having the
-fixture own its class (`8a5ba3a`), which also retired the suite's only `roundtrip-exempt`:
-no fixture is exempt from the footprint check now.
-
-Verifying that fix by hand found **`verify-trial-onboarding.mjs` had aborted on check 1 since
-2026-07-25** — it tapped a control deleted **two hours after the driver was written**. Its six
-billing checks were unreachable behind the crash but had **not** rotted (measured 6/6 before
-any change). Re-pointed at the fixture's own child rather than rebuilding a deleted flow:
-**0 → 10 checks** (`403292a`). That is **three drivers found rotting in one week, all by
-accident**, which is now the evidence under *Run the UI drivers in CI*.
-
-**Thread 2 — the user asked why SwimSync keeps telling a private coach to set a rate.**
-It doesn't. PRD §7.13, the wages page and the coach app all state and implement the rule
-correctly: *a coach is on payroll when they have a rate, and a private coach has none because
-their income is their parents' invoices*. **`HANDOVER.md` §9 was the thing asking**, and it
-had been wrong for weeks — the file every session reads first, so the error was repeated at
-every handover. Corrected in §3 and §9.
-
-Looking, though, found two real defects (`6993d6e`):
-- **The "unpaid" badge had never rendered.** The RPC returns `kind` / `coaches_without_rate`;
-  the page declared `shape` / `staff_without_rate` behind a bare `as` cast, so both were
-  `undefined`, the Shape column was blank and `undefined > 0` was always false. **§7.76.**
-- **Private-vs-school cannot be derived.** PRD §4.4 claimed it was; that was never built and
-  could not work — *a one-coach school that pays its owner and a private coach who takes none
-  are identical in the data*. The dropdown that asked and discarded the answer is gone.
-
-The replacement asks the question that **can** be answered: an owner without a rate is a
-choice, a **staff** coach without one is the mistake. Proven in the real UI both ways — owner
-only → no badge; add a staff coach → `1 unpaid`.
-
-### Not done (deliberate)
-
-- **The migration half.** Narrowing `coaches_without_rate` needs a changed `RETURNS TABLE`
-  (DROP/CREATE), so the staff count is computed **in the browser** for now, behind a visible
-  tripwire that says so if it truncates or errors. Filed with the `tenants.kind` drop, which
-  is now dead data. Both queue behind the two hygiene migrations (§7.55).
-- **`tenants.kind` still exists** and every new tenant still gets `'private'` by default.
-  Nothing reads it. Do not start.
-- **Two of my own claims were wrong and are corrected in place**: that the platform page
-  derived shape from data (it never did), and that narrowing the RPC was non-migration work.
 
 ---
 
@@ -474,6 +447,7 @@ only → no badge; add a staff coach → `1 unpaid`.
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.22** | 2026-08-01 | A latent unordered `LIMIT 1` in `fixtures-trial-onboarding.sql` broke CI (§7.73 biting its author — fixture now owns its class, no `roundtrip-exempt` left); `verify-trial-onboarding.mjs` had aborted on check 1 since two hours after it was written (0 → 10 checks); and a user's coach-rate question found the platform "unpaid" badge had **never rendered** (`as`-cast field mismatch) plus the private-vs-school dropdown answering an unanswerable question — replaced with staff-without-rate. **`tenants.kind` still exists, nothing reads it, do not start**; the RPC-narrowing migration queues behind the two hygiene migrations (§7.55) | **§7.73, §7.76** · `docs/TESTING.md` §5 · PRD §4.4 |
 | **8.21** | 2026-08-01 | The "possibly real product bugs" in `verify-attendance-window.mjs` were **clock rot, product correct in all three cases** — its three unique behaviours folded into `verify-attendance-guard.mjs` (20/20), driver + fixture deleted; found the guard driver's own unnamed-entity bug on the way | **§7.74, §7.75** · `docs/TESTING.md` §5 · `docs/plans/ATTENDANCE_WINDOW_DRIVER_FOLD_PLAN.md` |
 | **8.20** | 2026-08-01 | **CI loads every UI fixture now** (`check-fixture-roundtrip.sh`, two passes: isolated round-trip, then stacked footprint comparison) — and it found three broken fixtures the first time it ran | `docs/TESTING.md` §5 · **§7.73** |
 | **8.19** | 2026-07-26 | **A coach marked a real lesson on production for the first time** — four bugs on the marking path to get there. Every lesson list gained a marking status; the admin's tables became sortable and its student counts mean *active* | **§7.64–§7.68** · `docs/plans/COACH_ATTENDANCE_STATUS_PLAN.md` · PRD §7.6, §14.3/§14.4 |

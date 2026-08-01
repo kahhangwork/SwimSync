@@ -10,6 +10,7 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import { fundingByItem } from "@/lib/invoiceFunding";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
@@ -21,6 +22,10 @@ type InvoiceItem = {
   session_date: string;
   attendance_status: string;
   amount: number;
+  /** The package that funded this line (its snapshotted name), or null for an
+   *  ad-hoc line. From the package_applications ledger — a reversed draw
+   *  reads as ad hoc, because that money went back to the package. */
+  funded_by: string | null;
 };
 
 type CreditNoteApplied = {
@@ -113,6 +118,18 @@ export default function InvoiceDetailScreen() {
         .select("id, reference_number, amount, reason")
         .eq("applied_to_invoice_id", id);
 
+      // Which lines the package funded — the "Package Applied" total,
+      // itemised. RLS scopes the ledger to the parent's own packages; a
+      // failed read just means no tags (fundingByItem is null-tolerant).
+      const itemIds = (inv.invoice_items ?? []).map((it: any) => it.id);
+      const { data: apps } = itemIds.length
+        ? await supabase
+            .from("package_applications")
+            .select("invoice_item_id, reversed_at, parent_packages(name)")
+            .in("invoice_item_id", itemIds)
+        : { data: [] };
+      const funded = fundingByItem(apps ?? []);
+
       // Get coach id via first invoice item's lesson session.
       // NB: look up by lesson_session_id (not the invoice_item id).
       let coachId: string | null = null;
@@ -151,6 +168,7 @@ export default function InvoiceDetailScreen() {
             session_date: item.session_date,
             attendance_status: item.attendance_status,
             amount: Number(item.amount),
+            funded_by: funded.get(item.id) ?? null,
           }))
           .sort((a: InvoiceItem, b: InvoiceItem) =>
             a.session_date.localeCompare(b.session_date)
@@ -281,8 +299,17 @@ export default function InvoiceDetailScreen() {
                   <Text className="text-xs text-gray-400">
                     {capitalize(item.attendance_status)}
                   </Text>
+                  {item.funded_by && (
+                    <Text className="text-xs font-semibold text-emerald-600">
+                      Paid by package · {item.funded_by}
+                    </Text>
+                  )}
                 </View>
-                <Text className="text-sm font-medium text-gray-800">
+                <Text
+                  className={`text-sm font-medium ${
+                    item.funded_by ? "text-emerald-600" : "text-gray-800"
+                  }`}
+                >
                   S${item.amount.toFixed(2)}
                 </Text>
               </View>

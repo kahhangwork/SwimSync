@@ -134,10 +134,12 @@ the bug it prevents — *"NEVER says nobody when only inactive children hold the
 (§7.69). `Table.test.tsx` gained sortable-header render tests (click, reverse, `firstDir`,
 `aria-sort`, non-sortable columns) plus width assertions, and keeps its `<Thead>`-owns-its-
 `<tr>` call-site scan.
-`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **13 files, 183 tests**, scoped to
+`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **14 files, 188 tests**, scoped to
 `lib/**` unit tests: `attendanceBulk`, `attendanceCompleteness`, `attendancePayload`,
 `attendanceRoster`, `attendanceSession`, `attendanceSummary`, `attendanceWindow`,
-`authErrors`, `claimCandidates`, `landing`, `lessonDates`, `packageCoverage` (the
+`authErrors`, `claimCandidates`, `invoiceFunding` (which invoice lines a package funded —
+a **reversed** draw is not funding, and garbage input yields no tags, never a crash),
+`landing`, `lessonDates`, `packageCoverage` (the
 mapper's fail-safe and `describeCoverage`'s exact Balances-line copy), `timeOfDay`. Deeper
 component-render tests (RN screens with mocked Supabase, admin tables) are the natural next
 additions.

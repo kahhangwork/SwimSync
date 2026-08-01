@@ -1318,7 +1318,10 @@ cash paid always equals value granted — nothing to reconcile.
   terms are immutable in the database — retire and recreate, never edit.
 - **Money moves at invoice time only.** Attendance still drives everything: the same
   engine, gates, sealing and month rules apply; covered lines are priced at the package
-  rate and the invoice records `package applied` beside credit. When a package runs out
+  rate and the invoice records `package applied` beside credit — and the parent's
+  invoice detail marks **each funded line** ("Paid by package · *name*", from the
+  `package_applications` ledger; a **reversed** draw reads ad hoc, because that money
+  went back to the package) *(implemented 2026-08-02)*. When a package runs out
   mid-month the remaining lessons bill **ad hoc at the class's own effective-dated
   rate**, on the same invoice — nobody is blocked at poolside and nothing is lost. A
   family with no package takes exactly the pre-package path.

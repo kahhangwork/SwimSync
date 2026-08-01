@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-01, second pass (*Mark package-funded lines on the invoice detail* added (**S**) — the one surface deliberately left out of the payment-method-chip work, with the historic-vs-current reasoning in its Notes). Earlier same day: *Retire `tenants.kind`, and narrow `coaches_without_rate`* added (**S**, migration — the half of the platform fix that could not ship without one). Two shipped and removed — *Run the fixtures in CI* and *`verify-attendance-window.mjs` guards half of what it claims*, the latter's failures turning out to be **clock rot with the product correct in every case**. ***Run the UI drivers in CI*** added (**M**, now the highest-value engineering item — CI loads every fixture but executes no driver). *`verify-trial-onboarding.mjs` asserts a control that was deleted* was filed and **shipped the same day**: re-pointed at the fixture's child, 10/10. *Give `fixtures-trial-onboarding.sql` its own class* likewise filed and shipped, when its unordered `LIMIT 1` broke CI (§7.73)_
+_Last updated: 2026-08-02 (*Mark package-funded lines on the invoice detail* — filed 2026-08-01 as the one surface deliberately left out of the payment-method-chip work — **shipped the next day and removed**; the historic-vs-current rule it recorded now lives in PRD §7.16 and HANDOVER §8.23's "Not done". Earlier, 2026-08-01: *Retire `tenants.kind`, and narrow `coaches_without_rate`* added (**S**, migration — the half of the platform fix that could not ship without one). Two shipped and removed — *Run the fixtures in CI* and *`verify-attendance-window.mjs` guards half of what it claims*, the latter's failures turning out to be **clock rot with the product correct in every case**. ***Run the UI drivers in CI*** added (**M**, now the highest-value engineering item — CI loads every fixture but executes no driver). *`verify-trial-onboarding.mjs` asserts a control that was deleted* was filed and **shipped the same day**: re-pointed at the fixture's child, 10/10. *Give `fixtures-trial-onboarding.sql` its own class* likewise filed and shipped, when its unordered `LIMIT 1` broke CI (§7.73)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -306,20 +306,6 @@ filter (per-tenant threshold) but the nudge still travels by hand. The building 
 exist: `package_live_balances()` is the number, and the `package-emails` function is
 the delivery path — this is a scheduled check away (needs cron, like the reminder
 chain).
-
-### Mark package-funded lines on the invoice detail — **S**
-The parent's invoice detail shows a `Package Applied` total, but not **which lines** the
-package funded — `package_applications` records exactly that per `invoice_item_id` and
-nothing reads it.
-
-**Why:** a parent holding a category-scoped package sees a mixed invoice (covered lines
-at the locked rate, uncovered at the class rate) with only a lump-sum deduction to
-explain it; per-line marking is the difference between "this is right" and a WhatsApp
-question. **Notes:** deliberately skipped from the 2026-08-01 payment-method-chip work —
-invoice lists/details are *historic documents*, so they show how the invoice **was**
-funded (`package_applied`, `package_applications`), never the family's *current* method;
-a "current status" chip on an invoice invites misreading. Same reasoning kept the chip
-off the admin Invoices table and the dashboard's outstanding-invoices mini-table.
 
 ### In-app package refunds — **S**
 Record a refund against a cancelled package instead of settling fully offline.
