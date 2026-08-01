@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-01 (two shipped and removed: *Run the fixtures in CI* — replaced by its successor *Give `fixtures-trial-onboarding.sql` its own class* (**S**) — and *`verify-attendance-window.mjs` guards half of what it claims*, whose failures turned out to be **clock rot with the product correct in every case**; it was folded into `verify-attendance-guard.mjs` and deleted)_
+_Last updated: 2026-08-01 (two shipped and removed — *Run the fixtures in CI* and *`verify-attendance-window.mjs` guards half of what it claims*, the latter's failures turning out to be **clock rot with the product correct in every case**. Two successors added: ***Run the UI drivers in CI*** (**M**, now the highest-value engineering item — CI loads every fixture but executes no driver) and *Give `fixtures-trial-onboarding.sql` its own class* (**S**))_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -950,6 +950,28 @@ it failed, looked like a regression in the change under test, and needed a run a
 **Notes:** it also drives Expo, so a fix should keep the admin half runnable alone — an
 admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
 and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
+
+### Run the UI drivers in CI, not just their fixtures — **M**
+CI now loads every `fixtures-*.sql` and asserts it round-trips
+(`check-fixture-roundtrip.sh`, 2026-08-01), but no `verify-*.mjs` is ever executed. The
+drivers need a browser and both dev servers, so this is a bigger job than the fixture check
+was.
+
+**Why:** the fixture check closes the *loading* half of the gap and leaves the *asserting*
+half open. `verify-attendance-window.mjs` proved the cost: its fixture loaded perfectly
+while the driver sat at 2/5 for over a month, and nobody knew, because the only way to find
+out was for a human to run it by hand. Every driver is one calendar change away from the
+same rot — the assertions are the part that goes stale, and nothing watches them.
+
+**Notes:** ~19 drivers, most needing Expo web on :8081 and several also Next on :3000, plus
+Playwright against installed Chrome (`channel: "chrome"` — the runner would need a browser
+image). Wall-clock is the real constraint: the guard driver alone takes minutes. Options
+worth weighing rather than assuming: a **nightly** job instead of per-push; a **subset** of
+the highest-value drivers; or asserting only the DB-visible half of each scenario without a
+browser. Fixtures must be torn down between drivers — they share one database
+(§7.55) — which the round-trip harness already knows how to do. Note that a driver can rot
+in two directions: the product changes (a real regression) or the calendar moves (§7.73's
+family), and only the first should page anyone.
 
 ### Give `fixtures-trial-onboarding.sql` its own class — **S**
 The fixture borrows the seed business's class (`SELECT id FROM classes WHERE tenant_id = …

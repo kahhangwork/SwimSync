@@ -1,12 +1,13 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-01 — **CI now loads every UI fixture, and it found three broken ones
-the first time it ran.** No product code changed. `check-fixture-roundtrip.sh` closes the
-gap §7.62 and §7.63 both shipped through; the bugs it caught are one fixture that could not
-load without a browser, one unordered `LIMIT 1` that picked the wrong tenant (**§7.73**),
-and one declared cross-fixture write. See §8.20. The previous session's headline still
-stands: **real attendance exists on production** (§8.19), and **July has still not been
-billed** — §9._
+_Last updated: 2026-08-01 — **two engineering sessions, no product code.** CI now loads every
+UI fixture and found three broken ones (§8.20), and the long-standing
+`verify-attendance-window.mjs` failure turned out to be **a stale calendar, not a product
+bug** — it was folded into `verify-attendance-guard.mjs` and deleted (§8.21). Five gotchas
+graduated: **§7.73–§7.75** are all one idea in three layers — *never depend on a list, a row
+or a date you do not control*. **There is no known undiagnosed test failure left.**
+The standing headline is unchanged: **real attendance exists on production**, and **July has
+still not been billed** — §9, and the marking window closes at the end of August._
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
 
@@ -247,9 +248,10 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   "Total Students" became **Active Students**. PRD §14.3/§14.4.
 - **Automated tests** — backend **397 pgTAP + 111 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest 162, `SwimSyncApp` jest-expo 109); all run in CI on push to `main`. See §5.
-  Since 2026-08-01 CI also **loads all 14 UI fixtures** and asserts each one round-trips and
-  writes only its own rows (`check-fixture-roundtrip.sh`) — the drivers themselves still run
-  by hand. It found three broken fixtures on its first run (§8.20).
+  Since 2026-08-01 CI also **loads every UI fixture** and asserts each one round-trips and
+  writes only its own rows (`check-fixture-roundtrip.sh`); it found three broken fixtures on
+  its first run (§8.20). **The drivers themselves still run by hand** — that is the half of
+  the gap still open (`BACKLOG.md` → *Run the UI drivers in CI*), and §8.21 is what it costs.
 
 > **"CLEAN SLATE" IS A BANNED PHRASE FOR THIS DATABASE — it has now been wrong twice.**
 > The first time (corrected 2026-07-25) it claimed production held "only the superadmin +
@@ -359,6 +361,55 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.21 (2026-08-01) — THE DRIVER THAT LOOKED LIKE A PRODUCT BUG WAS A STALE CALENDAR
+
+**§9 had flagged `verify-attendance-window.mjs`'s failures as possibly real product bugs
+that "matter more than the driver does". They were not.** Every failure was clock rot and
+the product rendered the correct state in all three cases. One commit, `057b8c5`. The
+durable material is in **§7.74**, **§7.75** and **`docs/TESTING.md` §5**; the plan and its
+walked gate are in **`docs/plans/ATTENDANCE_WINDOW_DRIVER_FOLD_PLAN.md`**.
+
+**It had rotted further than recorded — 2/5, not the 3/5 in the docs.** Its fixture pinned a
+child's enrolment to `2026-07-16` and needed *"no Sunday to have fallen due since"*, true for
+three days in July 2026. Proved by changing exactly one thing — that date to `now()` — which
+flipped both checks to PASS. The third failure was the same shape from the other side: the
+run happened to be on a Saturday, so the roster correctly read `Mark Attendance — Sat, 1 Aug
+2026 (Today)` while the driver hard-coded `Jul 2026` and forbade `(Today)`.
+
+Its three unique behaviours were folded into `verify-attendance-guard.mjs` (**14/14 →
+20/20**) and the driver, fixture and teardown deleted. The rebuild is anchored, not pinned:
+one class whose weekday is **tomorrow's** so its first lesson is always ahead, another whose
+weekday is **yesterday's** so a lesson is always overdue.
+
+**The finding worth carrying is the second bug, which was in the driver being folded INTO.**
+`verify-attendance-guard.mjs` opened the extra-lesson dialog with
+`getByText("Extra lesson").first()`. A second class in the fixture made it schedule against
+the wrong one — 14/14 → 10/14 — while the *"admin can schedule"* check kept **passing**,
+because it only asserted that *a* confirmation appeared. **A UI assertion that does not name
+the entity it acted on cannot tell "it worked" from "it worked on something else"** (§7.75).
+
+**Two process points, both cheap and both load-bearing:**
+- It was found at all because the fixture was changed **first** and the **unchanged** driver
+  re-run before any driver edit — leaving exactly one suspect. That split came from
+  `/plan-review` and cost one extra run.
+- The diagnosis started from **rendered output**, not from the driver's regexes. Dumping what
+  the two screens actually said is what turned "possibly a product bug" into "the calendar
+  moved" in one pass, against a backlog entry that was itself a corrected wrong diagnosis.
+
+### Not done (deliberate)
+
+- **Drivers still do not run in CI**, only their fixtures. Filed as **M** with the wall-clock
+  problem and three narrower options named, because this session is the evidence for it: a
+  driver sat at 2/5 for over a month and only a human running it by hand could tell.
+- **`fixtures-attendance-guard.sql` uses `SELECT INTO` on a class title with no `ORDER BY`.**
+  Unchanged in kind from the code it replaced and the seed title is unique; the bug that
+  mattered — picking an arbitrary *tenant* — is now structurally impossible (§7.73).
+- **The old driver's checks 1 and 2 were not carried over** (button targets the most recent
+  expected lesson; the "how far back" note). Both are already covered by the guard driver's
+  window assertions — the fold preserved what was unique, not what was duplicated.
+
+---
+
 ## 8.20 (2026-08-01) — CI LOADS THE FIXTURES NOW, AND THREE OF THEM WERE BROKEN
 
 **No product code changed.** One commit, `c781dc0`. The highest-value engineering item in
@@ -411,92 +462,11 @@ applied.
 
 ---
 
-## 8.19 (2026-07-26) — A COACH MARKED A REAL LESSON, AND IT TOOK FOUR BUGS TO GET THERE
-
-**The headline is §3's, not this section's: production has real attendance rows for the
-first time.** The user drove it from the live app and hit a wall on each attempt; each wall
-was a different defect on the same screen. All four are fixed, deployed and verified in the
-served bundle. The durable lessons are in **§7.64–§7.68** — read those, not this.
-
-**What the four were, and why they were mistaken for one:**
-
-| | Symptom the user saw | Actually |
-|---|---|---|
-| **§7.64** | marked 19 Jul, "Attendance saved.", still unmarked | rows landed on the **26 Jul** session — Expo Router reuses the screen when only `?date=` changes, and the load effect had `[]` deps |
-| **§7.65** | saving the 9:30 class returned them to the 8:45 one | the screen lives in the Classes tab's stack but is pushed from Today; switching tabs doesn't unwind it, so `router.back()` popped into the previous **lesson** |
-| **§7.67** | "Failed to save attendance", only on 19 Jul | a **partially** marked lesson: `id` on some rows only made supabase-js put it in `columns=`, and PostgREST sends NULL for a key a row omits |
-| **§7.66** | — | a latent duplicate-roster hazard found while chasing §7.67. **Not the cause**; the check returned zero rows |
-
-**Two things about the process are worth more than the fixes.**
-
-*I diagnosed §7.67 wrong twice before getting it right,* and both times the shape of the
-symptom was the answer. "Only 19 July fails" reads as something about the date; it meant
-"only the dates that already have rows fail", and 19 Jul was where §7.64 had left partial
-attendance. **When one date fails and its neighbours don't, compare what already EXISTS on
-those dates, not what is different about the date.** The first wrong diagnosis was also
-written into §7.66 as fact and had to be corrected in place.
-
-*A driver that navigates by URL cannot catch a router bug.* `verify-attendance-guard.mjs`
-scored **14/14 against the broken build**, because a deep link mounts a fresh screen. The
-new `verify-stale-screen.mjs` clicks through instead — 4/8 → 18/18 across the three fixes.
-`docs/TESTING.md` §5 has what it pins.
-
-**Then the feature the user asked for:** every lesson list now states which of five states
-it is in (**Upcoming / Not marked / N of M marked / Marked / No students**) with a breakdown
-of what was recorded. Planned with `/plan-with-confidence` and `/plan-review`; the plan and
-its seven inlined risk mitigations are in **`docs/plans/COACH_ATTENDANCE_STATUS_PLAN.md`**,
-and the two that outlive it graduated to **§7.7** (a `getHours()` beside `todayInSg()` — a
-live second instance of the SGT bug, fixed first as its own commit) and **§7.68** (the
-display layer must not "fix" the billing gate's vacuous-true, and the button's asymmetry).
-
-**In parallel, in the same repo, the user shipped two admin changes** — sortable columns and
-content-sized widths on all 22 tables plus Attendance class/date filters (`lib/tableSort.ts`;
-it also fixed a latent `.order("id").limit(500)` that took an arbitrary 500 rows and
-presented them as the most recent), and student counts that mean **active** students
-(`lib/studentCounts.ts`). Both are in PRD §14.3/§14.4 and the §10 file map. Their commits
-carry the reasoning: `737b446`, `38b4092`.
-
-**The `admin-ui` worktree's graduate list was nearly lost, and that is the process finding
-of this session.** `/worktree-close` never ran, so `WORKTREE.md` — which is **gitignored** —
-still held four ungraduated gotchas when `/update-docs` had already finished. They are now
-**§7.69–§7.72**: a display filter reused as a destructive-action guard, a client-side
-`.length` silently capped at `max_rows`, `w-full` on a table cell crushing the very column it
-grows, and a refinement to §7.31 (Next.js code-splits per route, so grepping the wrong page's
-chunks reports "not deployed" for a live build — eight wrong conclusions in a row). Caught
-only because `/session-close` step 5 lists the worktrees. **The ordering in
-`docs/WORKTREES.md` is load-bearing for a reason; it was skipped and it nearly cost four
-findings.**
-
-**And I broke the reset rule.** `supabase db reset` ran twice from the root checkout while
-that worktree was driving the UI — it caught `public` with 0 tables mid-flight. Harmless that
-time, and the durable half is now in `docs/WORKTREES.md` Phase 4: the root checkout is the
-one participant with **no brief**, so `git worktree list` belongs immediately before every
-reset rather than once at session start. Checking early and not again is exactly what
-happened.
-
-### Not done (deliberate)
-
-- **The July billing run.** Attendance exists now but has not been checked class-by-class,
-  and nothing has been invoiced. That is §9's first item.
-- **`verify-attendance-window.mjs` was re-measured at 3/5, not diagnosed.** Its own backlog
-  entry asked for the re-measure; the two remaining failures (a coach roster placeholder, a
-  parent empty-state) are named there and **may be real product bugs**. Nobody has looked.
-  > **Answered 2026-08-01: they were not product bugs.** Every failure was clock rot — the
-  > fixture pinned an enrolment to `2026-07-16` — and by then the driver had rotted further,
-  > to 2/5. The product rendered the correct state in every case. Its three unique checks
-  > were folded into `verify-attendance-guard.mjs` and the driver deleted.
-- **No "In progress" state** on a class card while its lesson runs — offered and declined;
-  reasoning in `BACKLOG.md` → *Deliberately not doing*.
-- **The enrolment backdate was a data fix, not a feature.** All active enrolments were moved
-  to 2026-07-08 so July's lessons were markable. It is not repeatable from the UI and there
-  is deliberately no button for it.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.19** | 2026-07-26 | **A coach marked a real lesson on production for the first time** — four bugs on the marking path to get there. Every lesson list gained a marking status; the admin's tables became sortable and its student counts mean *active* | **§7.64–§7.68** · `docs/plans/COACH_ATTENDANCE_STATUS_PLAN.md` · PRD §7.6, §14.3/§14.4 |
 | **8.18** | 2026-07-26 | Parallel work got a protocol (`docs/WORKTREES.md`), nine missing fixture teardowns written + a CI guard, and two skills (`/worktree-start`, `/worktree-close`). The round-trip harness it invented found §7.62 and §7.63; **§8.20 automated it** | `docs/WORKTREES.md` · `docs/TESTING.md` §5 · **§7.62, §7.63** |
 | **8.17** | 2026-07-26 | The documents became an index: `HANDOVER.md` 3,972 lines → ~460, and the four `/session-start` documents ~131k → ~12k tokens. Four orphaned facts promoted first, and FIFO capping of the ledger was rejected — entries are cited from applied migrations | `docs/GOTCHAS.md` **§7.56, §7.61** · `docs/DEPLOYMENT.md` **§11.5, §11.6** |
 | **8.16** | 2026-07-26 | Repo root 22 markdown files → 8 (`docs/design`, `docs/plans`, `docs/database`); the auth redirect allow-list found **broken in production** — admin password reset had been landing on the wrong page | `README.md` → *Where everything lives* · **§7.41** |
@@ -539,8 +509,10 @@ happened.
 
 ### FIRST — finish July's attendance, then bill it
 
-**The long block is broken: real attendance exists (§3, §8.19).** What is left is the other
-half — nothing has been invoiced, and nobody has checked that July is *complete*.
+**The long block is broken: real attendance exists (§3, ledger §8.19).** What is left is the
+other half — nothing has been invoiced, and nobody has checked that July is *complete*.
+**As of 2026-08-01 July has ended, so it can be billed now** — and the marking window that
+makes it possible closes at the end of August.
 
 1. **Audit July class by class.** The gate blocks generation outright with **no override**, so
    find the gaps before running it, not from an error message:
@@ -579,11 +551,11 @@ themed sections below it. Nearest candidates with no dependencies: **credit-note
 (the other half of the notification work), an **upcoming-lessons view for parents** (small,
 and the building block already exists), or **convert a trial into an enrolled student**.
 
-*(Two engineering items shipped 2026-08-01. **Run the fixtures in CI** is
-live, and **`verify-attendance-window.mjs`** is diagnosed and gone: every one of its failures
-was clock rot with the product correct, so its three unique checks were folded into
-`verify-attendance-guard.mjs`, which now runs **19**. There is no known undiagnosed driver
-failure left.)*
+**The highest-value engineering item is now *Run the UI drivers in CI* (M).** CI loads every
+fixture as of 2026-08-01 but executes no driver, and §8.21 is the evidence for why that
+matters: a driver sat at 2/5 for over a month and only a human running it by hand could tell.
+It needs a browser and both dev servers, so weigh the narrower options in its `BACKLOG.md`
+entry — nightly rather than per-push, a subset, or the DB-visible half without a browser.
 
 **Two hygiene migrations, neither urgent:** *revoke `anon` EXECUTE from the remaining SECURITY
 DEFINER functions* (§7.39's missing second layer), and *a business cannot read its own audit
