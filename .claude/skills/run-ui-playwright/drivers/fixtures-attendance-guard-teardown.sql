@@ -30,16 +30,43 @@ DELETE FROM attendance a
 DELETE FROM lesson_sessions
  WHERE class_id = (SELECT id FROM classes WHERE title = 'Saturday Beginners');
 
+-- 2b. The same, for the "nothing has fallen due yet" class. It should have NO
+--     sessions — that absence IS the scenario — but a driver run that marked it
+--     by mistake must not survive into the next run, so delete by class id
+--     rather than assuming emptiness.
+DELETE FROM attendance a
+ USING lesson_sessions ls
+ WHERE a.lesson_session_id = ls.id
+   AND ls.class_id IN ('d0000000-0000-0000-0000-0000000000e1',
+                       'd0000000-0000-0000-0000-0000000000e2');
+DELETE FROM lesson_sessions
+ WHERE class_id IN ('d0000000-0000-0000-0000-0000000000e1',
+                    'd0000000-0000-0000-0000-0000000000e2');
+
 -- 3. Enrolments, then the family links, then the children.
 DELETE FROM student_class_enrolments
  WHERE student_id IN ('d0000000-0000-0000-0000-0000000000b1',
-                      'd0000000-0000-0000-0000-0000000000b2');
+                      'd0000000-0000-0000-0000-0000000000b2',
+                      'd0000000-0000-0000-0000-0000000000b3',
+                      'd0000000-0000-0000-0000-0000000000b4');
 DELETE FROM parent_students
  WHERE student_id IN ('d0000000-0000-0000-0000-0000000000b1',
-                      'd0000000-0000-0000-0000-0000000000b2');
+                      'd0000000-0000-0000-0000-0000000000b2',
+                      'd0000000-0000-0000-0000-0000000000b3',
+                      'd0000000-0000-0000-0000-0000000000b4');
 DELETE FROM students
  WHERE id IN ('d0000000-0000-0000-0000-0000000000b1',
-              'd0000000-0000-0000-0000-0000000000b2');
+              'd0000000-0000-0000-0000-0000000000b2',
+              'd0000000-0000-0000-0000-0000000000b3',
+              'd0000000-0000-0000-0000-0000000000b4');
+
+-- 3b. The class itself, and the effective-dated rate a trigger created with it.
+--     By exact id: 'Guard Newbies' is this fixture's own class, but a title
+--     match would take a real one someone names the same (§8.12).
+DELETE FROM class_rates WHERE class_id IN ('d0000000-0000-0000-0000-0000000000e1',
+                                           'd0000000-0000-0000-0000-0000000000e2');
+DELETE FROM classes     WHERE id       IN ('d0000000-0000-0000-0000-0000000000e1',
+                                           'd0000000-0000-0000-0000-0000000000e2');
 
 -- 4. Audit rows AUTHORED BY the fixture parent must go before the profile does:
 --    audit_log.actor_id is NOT NULL and NO ACTION, so it can be neither
@@ -58,8 +85,12 @@ COMMIT;
 -- not that the check is wrong.
 SELECT
   (SELECT count(*) FROM students
-    WHERE full_name IN ('Ana Guard', 'Late Joiner'))              AS guard_students,
+    WHERE full_name IN ('Ana Guard', 'Late Joiner',
+                        'Newjoiner Guard', 'Waiting Guard'))          AS guard_students,
   (SELECT count(*) FROM auth.users
     WHERE email = 'parent-guard@swimsync.test')                   AS guard_parent,
   (SELECT count(*) FROM lesson_sessions
-    WHERE off_schedule_reason IS NOT NULL)                        AS extra_lessons;
+    WHERE off_schedule_reason IS NOT NULL)                        AS extra_lessons,
+  (SELECT count(*) FROM classes
+    WHERE id IN ('d0000000-0000-0000-0000-0000000000e1',
+                 'd0000000-0000-0000-0000-0000000000e2'))             AS guard_classes;

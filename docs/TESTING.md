@@ -234,11 +234,7 @@ the delivery outcome stated explicitly, `invited` -> accept -> **the new admin s
 `verify-invoice-controls.mjs` drives the admin invoice controls — it MEASURES the toggle's
 track and knob rects from the DOM (§7.34) in both states and asserts the knob stays inside the
 track, that a click round-trips through the DB, and that the billing month defaults to and is
-capped at the last completed month; `verify-attendance-window.mjs` (+ `fixtures-attendance-window.sql`) drives the attendance
-window (§8b) across coach + parent — the roster button targets the most recent expected
-lesson (not raw "today"), the "no lessons to mark yet" placeholder shows for a class with
-nothing due, and the parent screen distinguishes "no lessons have taken place yet" from
-"no lessons marked yet";
+capped at the last completed month;
 `verify-trial-visibility.mjs` (+ `fixtures-trial-visibility.sql`) drives a booked trial from
 all three sides — the parent is told WHEN, the coach's roster lists trials coming up, and
 Unassigned Children **excludes** an upcoming trial while **keeping** a past one; its last
@@ -285,11 +281,31 @@ identical press leaves exactly ONE session, §7.7), the coach is told it is comi
 mark it before the day, a past in-window lesson opens with **only the children enrolled on
 that date** (the late joiner is absent — the whole point), an out-of-window date and a
 non-lesson day are each refused **in English with no markable roster**, and a save followed
-by a correction round-trips through the real upsert path that §7.57 governs (14 checks).
+by a correction round-trips through the real upsert path that §7.57 governs.
 **Scores 6/12 on the pre-fix screen**, which is what makes it worth having. Its fixture
 derives every date from ONE clock anchor rather than hardcoding — deliberately the opposite
 of §7.33's rule for unit suites, because the behaviour under test IS relative to now(). It
 carries `pressByText()` for §7.58; needs both servers.
+
+> **It absorbed `verify-attendance-window.mjs` on 2026-08-01 and now runs 19 checks.** That
+> driver had rotted to **2/5** with the product correct in every case: its fixture pinned a
+> child's enrolment to `2026-07-16` and needed "no Sunday since", true for three days in
+> July 2026. Two drivers over one rule is why nobody noticed. The three behaviours nothing
+> else guarded were rebuilt on this fixture's anchor:
+> - the coach roster's **"No lessons to mark yet"** placeholder, on a class whose weekday is
+>   *tomorrow's* so its first lesson is always still ahead;
+> - the parent's **"No lessons marked yet"** (a lesson happened, the coach is behind), on a
+>   second class whose weekday is *yesterday's* so a lesson is always overdue;
+> - the parent's **"No lessons have taken place yet"** (nothing happened, nobody is behind).
+>
+> **Each parent check asserts its sibling sentence is ABSENT, not merely that its own is
+> present.** A previous screen stays mounted under the current one (§7.10, §7.58), so a
+> present-only assertion can pass on the *other* child's panel — and these two sentences are
+> the entire behaviour: saying the first when the second is true accuses a coach of being
+> late when they are not (PRD §5.1). Both weekdays are derived away from Saturday, and the
+> driver **asserts the new class's `day_of_week` is not `saturday`** — a collision would make
+> the "nothing has happened yet" premise false silently, and only on Fridays.
+> All three were observed RED (by flipping the enrolment dates) before being accepted (§7.25).
 
 `verify-stale-screen.mjs` (+ `fixtures-stale-screen.sql`) is the only driver that can reach
 the three 2026-07-26 attendance bugs, **because all three live in the router or the wire

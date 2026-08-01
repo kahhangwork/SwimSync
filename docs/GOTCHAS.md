@@ -1002,3 +1002,45 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     Caught by the pass-2 stacked check the first time it ran, not by any driver.
     (Fixed 2026-08-01.)
 ---
+
+74. **AN "EMPTY STATE" ASSERTION MUST CLAIM THE SIBLING STATE IS *ABSENT*, NOT ONLY THAT ITS
+    OWN STRING IS PRESENT — THE PREVIOUS SCREEN IS STILL MOUNTED UNDERNEATH.**
+    The parent Attendance screen has two empty states that mean opposite things:
+    *"No lessons marked yet"* (a lesson happened, the coach is behind) and *"No lessons have
+    taken place yet"* (nothing has happened, nobody is behind). Telling a family the first
+    when the second is true accuses their coach of being late (PRD §5.1) — the distinction
+    IS the feature.
+    A check written as `/No lessons marked yet/.test(text)` can pass on **the other child's
+    panel**: §7.10/§7.58 mean the screen you navigated away from stays mounted and its text
+    is still in `document.body.innerText`, so a mis-tapped chip proves nothing and reads
+    green. That is the §8.19 "assertion passes vacuously" shape, at the assertion layer
+    rather than the fixture layer.
+    - **Assert presence AND sibling-absence**, always, for any pair of states that are
+      mutually exclusive by design. `expected present && sibling absent` cannot be satisfied
+      by a stale overlay showing the other one.
+    - Assert the **selected entity's name** is on screen first, so a mis-tap fails loudly
+      instead of silently reading the wrong panel.
+    - The failure detail should distinguish "expected sentence absent" from "BOTH sentences
+      on screen" — the second names the mis-tap directly.
+    Applied in `verify-attendance-guard.mjs` when it absorbed `verify-attendance-window.mjs`.
+    (2026-08-01.)
+
+75. **A DRIVER THAT DOES `.first()` ON A LIST IT DOES NOT CONTROL SCHEDULES AGAINST THE WRONG
+    ROW — AND THE CHECK NEXT TO IT KEEPS PASSING WHILE THREE OTHERS GO RED.**
+    `verify-attendance-guard.mjs` opened the extra-lesson dialog with
+    `getByText("Extra lesson").first()`. Correct while its fixture had exactly one class;
+    the moment a second was added the admin table listed it first and every extra lesson was
+    scheduled **against the wrong class**. Measured: 14/14 → 10/14.
+    **The diagnostic trap is which check survived.** *"admin can schedule an extra lesson"*
+    still **PASSED**, because it only asserted that a confirmation containing `Scheduled for`
+    appeared — and one did, for the other class. The three that failed were the ones that
+    queried the DATABASE by `class_id`. A UI assertion that does not name the entity it acted
+    on cannot tell "it worked" from "it worked on something else".
+    - **Scope to the row**: `locator("tr", { hasText: <title> }).getByText("Extra lesson")`.
+    - **Assert the dialog names the entity** — the modal titles itself
+      `Extra lesson — <class>`, so one regex converts a vacuous pass into a real one.
+    - This is §7.73 in the UI layer: never index into a list whose length you do not control.
+      Same audit question — *"is there more than one row this could match, ever?"*
+    Found because the fixture change was made FIRST and the **unchanged** driver re-run
+    before any driver edit, which left exactly one suspect. Do that split; it is cheap.
+    (2026-08-01.)

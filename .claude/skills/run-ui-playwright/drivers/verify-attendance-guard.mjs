@@ -89,6 +89,12 @@ function sql(q) {
 }
 
 const CLASS_ID = sql("SELECT id FROM classes WHERE title='Saturday Beginners'");
+// The two classes folded in from the retired verify-attendance-window.mjs
+// (2026-08-01). NEW_CLASS's first lesson is still ahead; its sibling
+// 'Guard Waiting' has already had one and was never marked. The id is literal
+// because the fixture creates it literally — no lookup a second class confuses.
+const NEW_CLASS_ID = "d0000000-0000-0000-0000-0000000000e1";
+const NEW_CLASS_DOW = sql(`SELECT day_of_week::text FROM classes WHERE id='${NEW_CLASS_ID}'`);
 const TODAY = sql("SELECT (now() AT TIME ZONE 'Asia/Singapore')::date");
 const LAST_SAT = sql(
   "SELECT ((now() AT TIME ZONE 'Asia/Singapore')::date - ((EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 1) % 7))"
@@ -124,8 +130,25 @@ try {
   await apage.goto(`${ADMIN}/classes`, { waitUntil: "networkidle" });
   await apage.waitForTimeout(1500);
 
-  await tap(apage.getByText("Extra lesson").first(), "Extra lesson button");
+  // SCOPED TO THE CLASS'S OWN ROW. This was `getByText("Extra lesson").first()`,
+  // which schedules against whichever class the table happens to list first —
+  // correct only while the fixture had exactly one class. Adding 'Guard Newbies'
+  // (2026-08-01) made it target the wrong class, and three checks below went red
+  // while the "admin can schedule" check kept PASSING, because it only asserted
+  // that *a* confirmation appeared. Same family as §7.73: never index into a
+  // list whose length you do not control.
+  const extraRow = apage.locator("tr", { hasText: "Saturday Beginners" });
+  await tap(extraRow.getByText("Extra lesson"), "Extra lesson button (Saturday Beginners row)");
   await apage.waitForTimeout(800);
+
+  // The modal titles itself `Extra lesson — <class>`, so this is the cheap
+  // structural proof that the row scoping worked. Without it the checks below
+  // can only say "something was scheduled", not "the right class was".
+  const modalTitle = await dumpText(apage, 200);
+  check("the extra-lesson dialog is for the class under test, not another one",
+    /Extra lesson — Saturday Beginners/.test(modalTitle),
+    modalTitle.match(/Extra lesson[^\n]*/)?.[0] ?? "(no title)");
+
   await apage.locator('input[type="date"]').fill(D_EXTRA);
   await apage
     .locator('input[placeholder*="Makeup"]')
@@ -146,6 +169,11 @@ try {
 
   // A second identical press must not create a second row: a duplicate
   // (class, date) double-bills the whole class (§7.7).
+  // Re-open from the same scoped row — the modal closes on success.
+  if (!(await apage.locator('input[type="date"]').count())) {
+    await tap(extraRow.getByText("Extra lesson"), "Extra lesson button (re-open)");
+    await apage.waitForTimeout(800);
+  }
   await apage.locator('input[type="date"]').fill(D_EXTRA);
   await apage
     .locator('input[placeholder*="Makeup"]')
@@ -252,6 +280,71 @@ try {
   check("a future extra lesson cannot be marked ahead of time",
     /hasn't happened yet/.test(t) || /hasn’t happened yet/.test(t),
     t.match(/That lesson.{0,25}/)?.[0] ?? "(no message)");
+
+  // ══════════ 6. THE EMPTY STATES, folded in from verify-attendance-window.mjs
+  // That driver was deleted 2026-08-01: its fixture hard-coded 2026-07-16 and
+  // needed "no Sunday since", true for three days in July 2026, so it rotted to
+  // 2/5 with the PRODUCT correct in every case. The three checks below are the
+  // half of it nothing else guarded, rebuilt on this fixture's anchor.
+
+  // Risk-3 assertion: 'Guard Newbies' must not share a weekday with
+  // 'Saturday Beginners'. If it did, a Saturday could already have fallen due
+  // and "nothing has happened yet" would be false — silently, and only on
+  // Fridays. Fail loudly instead.
+  // The emptiness test is deliberate: an unloaded fixture makes sql() return "",
+  // and `"" !== "saturday"` would pass this check while proving nothing.
+  check("the not-yet-started class does not collide with the Saturday class",
+    NEW_CLASS_DOW.length > 0 && NEW_CLASS_DOW !== "saturday",
+    `day_of_week=${NEW_CLASS_DOW || "(class not found — is the fixture loaded?)"}`);
+
+  await gotoAuthed(page, `${EXPO}/(coach)/classes/${NEW_CLASS_ID}/roster`);
+  await page.waitForTimeout(3500);
+  t = await dumpText(page);
+  await page.screenshot({ path: `${SHOT}/ag-coach-notyet.png`, fullPage: true });
+  check("coach roster offers a placeholder, not a button, before the first lesson",
+    /No lessons to mark yet/.test(t) && /first lesson hasn't taken place yet/.test(t),
+    t.match(/No lessons to mark yet/)?.[0] ?? "(no placeholder)");
+
+  // ── The parent's two empty states, which are DIFFERENT SENTENCES ─────────
+  // "No lessons marked yet"          → a lesson happened, the coach is behind
+  // "No lessons have taken place yet" → nothing has happened; nobody is behind
+  // Telling a family the second thing in the first words accuses their coach of
+  // being late when they are not (PRD §5.1). Each check therefore asserts the
+  // expected sentence is present AND THE SIBLING IS ABSENT: a prior screen stays
+  // mounted under the current one (§7.10, §7.58), so a present-only assertion
+  // can pass on the other child's panel and prove nothing.
+  const pctx = await browser.newContext(mobile);
+  const ppage = await pctx.newPage();
+  ppage.on("dialog", (d) => d.accept().catch(() => {}));
+  await loginExpo(ppage, "parent-guard@swimsync.test", "password123");
+  await tap(ppage.locator('a[href="/attendance"]').first(), "Attendance tab");
+  await ppage.waitForTimeout(3500);
+
+  // Neither empty state names the child (the copy is just the sentence plus
+  // "Lessons appear here once the coach marks attendance"), so there is no name
+  // to assert on. The available proof that the tap actually MOVED the selection
+  // is that the two panels differ: 'Late Joiner' is also unmarked with lessons
+  // due, so a chip tap that silently did nothing could otherwise satisfy the
+  // first check on the wrong child's panel.
+  const panels = [];
+  for (const [chip, expected, sibling] of [
+    ["Waiting",   "No lessons marked yet",           "No lessons have taken place yet"],
+    ["Newjoiner", "No lessons have taken place yet", "No lessons marked yet"],
+  ]) {
+    await tap(ppage.getByText(chip, { exact: true }).last(), `${chip} chip`);
+    await ppage.waitForTimeout(3000);
+    const pt = await dumpText(ppage);
+    panels.push(pt);
+    await ppage.screenshot({ path: `${SHOT}/ag-parent-${chip.toLowerCase()}.png`, fullPage: true });
+    check(`parent: ${chip} reads "${expected}" and NOT its sibling state`,
+      pt.includes(expected) && !pt.includes(sibling),
+      pt.includes(expected)
+        ? (pt.includes(sibling) ? "BOTH sentences on screen — wrong child selected?" : "ok")
+        : "expected sentence absent");
+  }
+  check("selecting the second child actually changed the panel",
+    panels.length === 2 && panels[0] !== panels[1],
+    panels[0] === panels[1] ? "identical panels — the chip tap did nothing" : "ok");
 } catch (err) {
   // Without this the process.exit() below swallows the stack trace, and a run
   // that died half way through prints a tidy "9/9 passed" — which reads as a

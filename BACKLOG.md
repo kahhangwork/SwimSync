@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-01 (*Run the fixtures in CI* **shipped** — removed, and replaced by its successor *Give `fixtures-trial-onboarding.sql` its own class* (**S**), the last declared `roundtrip-exempt`. `verify-attendance-window.mjs` remains at **3/5**, and §7.62 is now ruled out as the cause — the two failures are named but still undiagnosed)_
+_Last updated: 2026-08-01 (two shipped and removed: *Run the fixtures in CI* — replaced by its successor *Give `fixtures-trial-onboarding.sql` its own class* (**S**) — and *`verify-attendance-window.mjs` guards half of what it claims*, whose failures turned out to be **clock rot with the product correct in every case**; it was folded into `verify-attendance-guard.mjs` and deleted)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -950,54 +950,6 @@ it failed, looked like a regression in the change under test, and needed a run a
 **Notes:** it also drives Expo, so a fix should keep the admin half runnable alone — an
 admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
 and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
-
-### `verify-attendance-window.mjs` guards half of what it claims — **S**
-It scores **3/5** (re-measured 2026-07-26).
-
-> **The diagnosis below was WRONG, and the correction is the useful part.** This entry
-> blamed the fixture's hard-coded clock. The actual cause, found 2026-07-26 by round-tripping
-> every fixture: **`fixtures-attendance-window.sql` could not load at all.**
-> `20260719000600_students_tenant_not_null.sql` made `students.tenant_id` NOT NULL and the
-> fixture inserted students without it, so both children failed to insert while the rest of
-> the script carried on — a driver with no students to assert on scores 0/4 no matter what
-> the clock says. **Fixed 2026-07-26** (the fixture now passes `tenant_id`); see
-> **§7.62** for the durable lesson, which is that no fixture runs in CI.
->
-> The clock problem below is **real and still outstanding** — it was simply not what was
-> producing the 0/4. Re-measure before assuming the score is now what this entry predicts.
->
-> **Re-measured 2026-07-26, as this entry asked: it now scores 3/5.** With the fixture
-> loading, three checks pass. The two that fail are a **coach roster placeholder** ("when
-> nothing has fallen due") and a **parent empty-state** ("a just-joined child reads *No
-> lessons have taken place yet*"). Measured identically on both sides of the
-> attendance-status work by stashing the two screens, so neither is a regression.
-> **What is NOT yet known is whether those two are clock-dependent or genuine product
-> bugs** — this was a measurement, not a diagnosis. Do that first: if they are product
-> bugs, they matter more than the driver does.
-
-Its fixture header states the assumption outright — *"Assumes the machine
-clock is Thu 16 – Fri 17 Jul 2026"* (`fixtures-attendance-window.sql:3`) — and hard-codes a
-week of dates around it. Off that week, every check misses.
-
-**Why:** it is the **older of the two drivers covering the attendance window**, so the
-directory listing implies that area is covered twice when it is covered once. A partially
-failing driver is the worst kind: a reader counts it as coverage, and a permanently red
-check trains everyone to ignore its output — which is how a real failure hides among the
-expected ones. **Verified pre-existing, not a regression** — the same 3/5, with the same
-two failures, on both sides of the 2026-07-26 attendance-status work.
-
-**Notes:** the fix is to derive its dates from **one clock anchor**, the way
-`fixtures-attendance-guard.sql` now does. That is **deliberately the opposite of §7.33's
-rule for unit suites** — there, a suite that reads the real clock is the bug, because the
-behaviour under test is timeless. Here the behaviour under test *is relative to `now()`*:
-the marking window is "the class's own weekday between the 1st of last month and today", so
-a fixture pinned to fixed calendar dates is the thing that goes stale. Anchor once, derive
-every date from it, and let the anchor move. See HANDOVER **§8.15** for the rule this driver
-should be exercising, and `verify-attendance-guard.mjs` for the shape that works.
-
-Decide while fixing whether the older driver still earns its place at all, or whether its
-unique cases should be folded into `verify-attendance-guard.mjs` and the file deleted —
-two drivers over one rule is the reason this went unnoticed.
 
 ### Give `fixtures-trial-onboarding.sql` its own class — **S**
 The fixture borrows the seed business's class (`SELECT id FROM classes WHERE tenant_id = …

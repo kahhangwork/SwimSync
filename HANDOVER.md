@@ -23,7 +23,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.73** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.75** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -481,6 +481,10 @@ happened.
 - **`verify-attendance-window.mjs` was re-measured at 3/5, not diagnosed.** Its own backlog
   entry asked for the re-measure; the two remaining failures (a coach roster placeholder, a
   parent empty-state) are named there and **may be real product bugs**. Nobody has looked.
+  > **Answered 2026-08-01: they were not product bugs.** Every failure was clock rot — the
+  > fixture pinned an enrolment to `2026-07-16` — and by then the driver had rotted further,
+  > to 2/5. The product rendered the correct state in every case. Its three unique checks
+  > were folded into `verify-attendance-guard.mjs` and the driver deleted.
 - **No "In progress" state** on a class card while its lesson runs — offered and declined;
   reasoning in `BACKLOG.md` → *Deliberately not doing*.
 - **The enrolment backdate was a data fix, not a feature.** All active enrolments were moved
@@ -575,14 +579,11 @@ themed sections below it. Nearest candidates with no dependencies: **credit-note
 (the other half of the notification work), an **upcoming-lessons view for parents** (small,
 and the building block already exists), or **convert a trial into an enrolled student**.
 
-**The loose end most likely to be a real product bug:** `verify-attendance-window.mjs` scores
-**3/5**. The two failures — a coach roster placeholder, and a parent *"No lessons have taken
-place yet"* — were measured on 2026-07-26, **not diagnosed**, and §7.62 is now ruled out as
-the cause (fixtures load in CI, and this one passes). If they are genuine product bugs they
-matter more than the driver does; that is an hour's work to find out.
-
-*(Run the fixtures in CI shipped 2026-08-01 — §8.20. It is no longer the top engineering
-item, and the three bugs it found are fixed.)*
+*(Two engineering items shipped 2026-08-01. **Run the fixtures in CI** is
+live, and **`verify-attendance-window.mjs`** is diagnosed and gone: every one of its failures
+was clock rot with the product correct, so its three unique checks were folded into
+`verify-attendance-guard.mjs`, which now runs **19**. There is no known undiagnosed driver
+failure left.)*
 
 **Two hygiene migrations, neither urgent:** *revoke `anon` EXECUTE from the remaining SECURITY
 DEFINER functions* (§7.39's missing second layer), and *a business cannot read its own audit
