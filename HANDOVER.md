@@ -138,7 +138,11 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   been exercised on real data.
 - **Coach wages (verified UI + backend, live)** — effective-dated rates, the pay-decision
   table, draft→frozen payouts with next-period adjustments. A coach sees their own pay;
-  rates are admin-only.
+  rates are admin-only. **Payroll is correctly EMPTY for production**, which is a private
+  coach: a coach is on payroll when they have a rate, and a private coach has none because
+  their income is their parents' invoices (PRD §7.13). There is no private-vs-school branch
+  in the code — *the distinction is data, not a rule* — so "no rate" is the finished state,
+  not a missing setup step. Don't file it as one.
 - **Active/inactive families and children (verified UI + backend, live)** — per business,
   with the date they left. Deactivating a child offers to take the siblings and states the
   family consequence; a departed family returns by re-entering the join code. New admin
@@ -534,7 +538,18 @@ makes it possible closes at the end of August.
 2. **Then bill July, in August**, following `INVOICE_RUNBOOK.md`. This will be the **first
    invoice this product has ever generated**, so expect to read the runbook rather than skim
    it. `auto_invoice_enabled` is **false**, so it is the admin button.
-3. **Before payroll means anything, set a coach rate** — still none, so wages compute nothing.
+> **There is no third item, and "set a coach rate" is NOT one.** This list carried
+> *"before payroll means anything, set a coach rate — still none, so wages compute
+> nothing"* until 2026-08-01, and it was **wrong**. Production is a **private coach** — one
+> coach, who is also the business's admin — and PRD §7.13 is explicit: *"a private coach
+> simply has no rate, because their income IS their parents' invoices and there is nobody
+> upstream to pay them."* **No rate is the correct, finished state here**, not a gap.
+> The product already knows this everywhere it matters — the admin wages page says it in
+> the UI, the coach app deliberately hides the "Your pay" card when there are no payouts,
+> and the platform overview excludes owners from `staff_without_rate`. Only this file was
+> wrong, and it is the file every session reads first, so the error was repeated at every
+> handover. **A rate becomes a real to-do the day this business hires a second coach —
+> not before.**
 
 **The deadline, now enforced by the database:** the coach can only mark back to **the 1st of
 last month** (§8.15). Bill July in August and every lesson is markable; leave it to September

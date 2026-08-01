@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-01 (two shipped and removed — *Run the fixtures in CI* and *`verify-attendance-window.mjs` guards half of what it claims*, the latter's failures turning out to be **clock rot with the product correct in every case**. ***Run the UI drivers in CI*** added (**M**, now the highest-value engineering item — CI loads every fixture but executes no driver). *`verify-trial-onboarding.mjs` asserts a control that was deleted* was filed and **shipped the same day**: re-pointed at the fixture's child, 10/10. *Give `fixtures-trial-onboarding.sql` its own class* likewise filed and shipped, when its unordered `LIMIT 1` broke CI (§7.73)_
+_Last updated: 2026-08-01 (*Retire `tenants.kind`, and narrow `coaches_without_rate`* added (**S**, migration — the half of the platform fix that could not ship without one). Two shipped and removed — *Run the fixtures in CI* and *`verify-attendance-window.mjs` guards half of what it claims*, the latter's failures turning out to be **clock rot with the product correct in every case**. ***Run the UI drivers in CI*** added (**M**, now the highest-value engineering item — CI loads every fixture but executes no driver). *`verify-trial-onboarding.mjs` asserts a control that was deleted* was filed and **shipped the same day**: re-pointed at the fixture's child, 10/10. *Give `fixtures-trial-onboarding.sql` its own class* likewise filed and shipped, when its unordered `LIMIT 1` broke CI (§7.73)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -950,6 +950,33 @@ it failed, looked like a regression in the change under test, and needed a run a
 **Notes:** it also drives Expo, so a fix should keep the admin half runnable alone — an
 admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
 and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
+
+### Retire `tenants.kind`, and narrow `coaches_without_rate` — **S** `[migration]`
+Two changes to one RPC and one column, both deferred out of the 2026-08-01 platform fix
+because they need a migration and migrations land alone (§7.55).
+
+1. `platform_tenant_overview()` returns `coaches_without_rate`, which counts the business's
+   OWNER as well as its staff. An owner without a rate is correct (PRD §7.13), so the figure
+   is unusable as-is — the page now computes the staff-only count **in the browser** instead.
+   Narrow the column in SQL (exclude coaches whose profile role is `tenant_admin`), rename it
+   `staff_without_rate`, and delete the client-side scan and its `STAFF_SCAN_LIMIT` tripwire.
+2. `tenants.kind` (`'private' | 'school'`, NOT NULL, default `'private'`) is dead. Nothing
+   reads it, the UI that set it was removed 2026-08-01, and PRD §4.4 now states outright that
+   SwimSync does not classify businesses this way. Drop it.
+
+**Why:** the browser-side count is bounded by `max_rows` and re-introduces exactly the
+aggregation the RPC was written to replace — it is guarded by a visible tripwire, not by
+being correct at scale. And a NOT NULL column that every new tenant gets, that no code reads
+and no UI sets, is a trap: the next person to find it will reasonably assume it means
+something. It already misled a session into asserting the platform page derived a business's
+shape from it, which it never did.
+
+**Notes:** one migration, expand/contract — the RPC is `CREATE OR REPLACE` with a changed
+`RETURNS TABLE`, so it needs `DROP FUNCTION` first. Order matters: **ship the RPC change and
+the page change together**, because the page reads the new column name the moment it exists.
+Dropping `kind` is independent and can ride along or follow. `provision_tenant()` takes a
+`p_kind` argument that would go with it. Queue behind the two hygiene migrations already
+waiting; only one schema change in flight at a time.
 
 ### Run the UI drivers in CI, not just their fixtures — **M**
 CI now loads every `fixtures-*.sql` and asserts it round-trips

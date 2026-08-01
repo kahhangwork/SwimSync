@@ -262,9 +262,15 @@ support rather than daily operation.
   whether any **member of staff** has no pay rate (which is why payroll would silently pay
   them nothing). A coach who *owns* the business is deliberately not counted there: their
   income is their own parents' invoices and a rate would be meaningless, per §7.13.
-  Whether a business is a private coach or a school is **derived** from whether its only
-  coach is also its admin — not stored, so it stays true when a coach hires their first
-  colleague
+  **SwimSync does not classify a business as a private coach or a school at all**
+  *(corrected 2026-08-01)*. This once said the shape was "derived from whether its only
+  coach is also its admin"; that derivation was specified but never built, and it could not
+  have worked — a one-coach school that pays its owner a wage and a private coach who takes
+  none are **identical in the data**, and the difference is intent, which no query can see.
+  Nothing in the product branches on it. The question a platform admin actually has is
+  *"will anyone here be paid nothing by mistake?"*, which needs no classification: an owner
+  without a rate is a **choice**, a non-owner coach without one is the **mistake**, and only
+  the second is flagged
 - **Create a business, and invite its first admin** *(implemented 2026-07-21)* — see below
 - **Parents who registered but never entered a join code** — they belong to no business, so
   nobody else can see them
@@ -291,8 +297,11 @@ the Supabase dashboard — and there was no way to create a **tenant admin** at 
 admin panel had a login page and no signup, which was correct but left onboarding with no
 route that wasn't a database console.
 
-The platform admin now creates a business from their own panel: its **name**, whether it
-is a private coach or a school, and the name and email of the person who will run it. The
+The platform admin now creates a business from their own panel: its **name**, and the name
+and email of the person who will run it — plus one real question, *does this person coach
+too?*, which decides whether they get a coach record. A **"Private coach / Swim school"
+dropdown was removed 2026-08-01**: it stored an answer nothing ever read, and asked the
+platform admin to declare something unknowable at creation time. The
 business exists immediately, with its **join code**, and that person is emailed a one-time
 link to choose a password.
 
