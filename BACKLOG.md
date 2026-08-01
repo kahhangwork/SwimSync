@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-07-26 (`verify-attendance-window.mjs` **re-measured at 3/5**, as its own entry asked — the two remaining failures are named but not yet diagnosed; *Better filtering and search* is **partly shipped** (sorting everywhere, Attendance filters); one rejected option added to *Deliberately not doing*)_
+_Last updated: 2026-08-01 (*Run the fixtures in CI* **shipped** — removed, and replaced by its successor *Give `fixtures-trial-onboarding.sql` its own class* (**S**), the last declared `roundtrip-exempt`. `verify-attendance-window.mjs` remains at **3/5**, and §7.62 is now ruled out as the cause — the two failures are named but still undiagnosed)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the

@@ -1,11 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-07-26 — **the coach recorded real attendance on production for the
-first time**, which took four bugs on the marking path to reach: §7.64 (rows landed on the
-wrong lesson), §7.65 (saving returned to a different lesson), §7.67 (a partially-marked
-lesson could never be saved) and §7.66 (a latent duplicate-roster hazard). All fixed and
-live. Every lesson list now states its marking status; the admin's tables became sortable
-and its student counts mean *active*. See §8.19._
+_Last updated: 2026-08-01 — **CI now loads every UI fixture, and it found three broken ones
+the first time it ran.** No product code changed. `check-fixture-roundtrip.sh` closes the
+gap §7.62 and §7.63 both shipped through; the bugs it caught are one fixture that could not
+load without a browser, one unordered `LIMIT 1` that picked the wrong tenant (**§7.73**),
+and one declared cross-fixture write. See §8.20. The previous session's headline still
+stands: **real attendance exists on production** (§8.19), and **July has still not been
+billed** — §9._
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
 
@@ -22,7 +23,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.72** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.73** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -246,6 +247,9 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   "Total Students" became **Active Students**. PRD §14.3/§14.4.
 - **Automated tests** — backend **397 pgTAP + 111 Deno**, plus frontend suites
   (`SwimSyncAdmin` vitest 162, `SwimSyncApp` jest-expo 109); all run in CI on push to `main`. See §5.
+  Since 2026-08-01 CI also **loads all 14 UI fixtures** and asserts each one round-trips and
+  writes only its own rows (`check-fixture-roundtrip.sh`) — the drivers themselves still run
+  by hand. It found three broken fixtures on its first run (§8.20).
 
 > **"CLEAN SLATE" IS A BANNED PHRASE FOR THIS DATABASE — it has now been wrong twice.**
 > The first time (corrected 2026-07-25) it claimed production held "only the superadmin +
@@ -355,6 +359,58 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.20 (2026-08-01) — CI LOADS THE FIXTURES NOW, AND THREE OF THEM WERE BROKEN
+
+**No product code changed.** One commit, `c781dc0`. The highest-value engineering item in
+§9 since 2026-07-26 — *Run the fixtures in CI* — is done, and the durable material is in
+**`docs/TESTING.md` §5** (what it runs, how to write a fixture that passes) and **§7.73**
+(the bug it found). Read those, not this.
+
+**`check-fixture-roundtrip.sh` runs two passes** in the existing `backend-tests` job:
+isolated (load with `ON_ERROR_STOP=1`, tear down, assert every row count returned) and
+stacked (all 14 loaded on top of each other, each fixture's footprint compared against its
+isolated one — divergence is §7.63's signature). It restores what it found, so it is safe
+beside a sibling worktree.
+
+**Three pre-existing bugs, caught on the first run:**
+
+| Fixture | What was wrong |
+|---|---|
+| `phase4-billing` | `RAISE`d unless a human had registered its parent in a browser — the one fixture nothing automated could check. Now self-seeds; teardown removes them by email, which also makes the driver re-runnable |
+| `student-identity` | `SELECT id FROM tenants LIMIT 1`, unordered — **§7.73**. Once a second business existed it put children in one tenant and enrolled them in another's class |
+| `trial-onboarding` | Marks siblings' children present (+1 alone, +5 stacked). Deliberate and teardown-compensated → now a **declared** `roundtrip-exempt`, echoed every run |
+
+**The finding worth carrying: the bug appeared in a file nobody had touched.**
+`student-identity` had been correct for months and broke the instant a *different* fixture
+started working, because fixing `phase4-billing` created the second tenant its unordered
+`LIMIT 1` could then pick. Neither file's diff would have shown it. That is the whole
+argument for the stacked pass — no per-fixture check, however careful, can find a bug that
+only exists in the combination.
+
+**Both detectors were proven to fail without the fix** (§7.25) rather than assumed: removing
+`tenant_id` from a fixture's insert showed plain `psql` **exiting 0** with the error buried
+and 1 of 3 rows created; restoring the unscoped `CROSS JOIN` reproduced §7.63's documented
+second-order failure. The measurements are in `docs/TESTING.md` §5.
+
+That exercise also caught a bug in the harness itself — a fixture that half-loaded during
+the stacked pass was never torn down, so the script left the shared database dirty, the
+exact sin it exists to catch. Fixtures are now queued for unwinding *before* they are
+applied.
+
+### Not done (deliberate)
+
+- **`fixtures-trial-onboarding.sql` still borrows the seed class.** Its exemption is honest
+  but it is a compensated hazard, not a safe pattern. Filed in `BACKLOG.md` as an **S** with
+  the fix shape; when it lands, deleting the `-- roundtrip-exempt:` line is enough to start
+  enforcing it — no harness change.
+- **`fixtures-student-identity.sql` still uses `SELECT INTO` with no `ORDER BY`** for the
+  class. Unchanged in kind from the line it replaced, and the seed title is unique; the
+  actual bug — picking an arbitrary *tenant* — is now structurally impossible.
+- **The drivers themselves still do not run in CI**, only their fixtures. That needs a
+  browser and two dev servers; nobody has costed it.
+
+---
+
 ## 8.19 (2026-07-26) — A COACH MARKED A REAL LESSON, AND IT TOOK FOUR BUGS TO GET THERE
 
 **The headline is §3's, not this section's: production has real attendance rows for the
@@ -433,83 +489,11 @@ happened.
 
 ---
 
-## 8.18 (2026-07-26) — PARALLEL WORK GETS A PROTOCOL, AND THE FIXTURES GET THEIR CLEANUP
-
-Same conversation as §8.17, continued. **No product code changed.** Five commits: `5a04a50`
-(worktree guide), `6bbcffe` (nine teardowns + a CI guard), `229b984` (fixture scoping),
-`68dd3fe` (worked examples), `ce92661` (two skills).
-
-**`docs/WORKTREES.md` — the protocol that was scattered across five files.** The material
-existed — §7.55, §7.56, `/session-close` §5, `/commit-review`'s branch-to-branch push — but
-only as *gotchas*, with no entry point: `grep "git worktree"` across every markdown file
-returned **zero hits**. The guide states the model those notes never did — **one writer per
-shared resource** — and walks six phases plus two worked examples, one with a migration and
-one without.
-
-**The rule the examples forced into the open: a worktree NEVER authors a migration.** The
-model table had said "one worktree owns `supabase/`" while the same row said "never carry a
-migration on a feature branch" — both cannot be true. §7.55 is the correct one: write it in
-the **root checkout** on a `db/…` branch, land it on `main`, *then* create the worktree, which
-branches from `origin/main` and already has the schema. Corrected in five places.
-
-**Nine of thirteen UI fixtures had no teardown**, so for those a session had to choose between
-leaving rows in the shared database and running the `db reset` that `/session-close` forbids.
-All nine written; `check-teardowns.sh` + a `repo-invariants` CI job now fail the build if a
-fixture arrives without one — proven to fail by removing one (§7.25).
-
-**Verified by round-trip, not by reading.** Snapshot every table, apply fixture, apply
-teardown, assert counts identical: **9/9 clean**. That harness caught two defects that looked
-correct on the page (a stray `parent_tenants` row; a teardown that could not reach the session
-its fixture deliberately leaves unmarked) **and two pre-existing bugs**:
-
-- **§7.62 — two fixtures had been unloadable since 2026-07-19.** `20260719000600` made
-  `students.tenant_id` NOT NULL; they insert students without it. Nothing reported it because
-  **no fixture runs in CI**, and psql aborts the failing statement and carries on — so the
-  fixture half-loads and the driver's low score reads as a product regression. **This, not the
-  stale clock, is why `verify-attendance-window.mjs` scored 0/4.** That backlog entry's
-  diagnosis is corrected *in place*, because a wrong diagnosis sends the next person to fix
-  the wrong thing.
-  > **Since that fix it scores 3/5** (measured 2026-07-26 on both sides of the
-  > attendance-status work). The two remaining failures — a coach roster placeholder and a
-  > parent empty-state — are genuine and still unfixed. So the driver guards *something*
-  > again; don't read "0/4" as its current state.
-- **§7.63 — `fixtures-unmarked-lessons.sql` enrolled and marked present every student in the
-  database** (two unscoped `CROSS JOIN`s). Measured: 6 children instead of 2. The second-order
-  failure is worse — the duplicate enrolment violates `one_active_enrolment_per_student`,
-  aborting the statement, so with any sibling fixture loaded the fixture's **own** children
-  were never enrolled at all.
-
-**Two skills: `/worktree-start` and `/worktree-close`.** Start runs Phases 0–3 and goes
-**after** planning — the plan is what answers its migration question (§8.15 is the cautionary
-case: an **S** with no schema implied turned out to need two DB triggers). Close runs Phase 6
-and goes **before** `/update-docs`, which fixes a real ordering bug: `/session-close` §5
-settled the worktree *after* the documentation pass, but `WORKTREE.md` is gitignored and
-carries the **graduate list**, so the findings were already gone by the time the docs were
-written.
-
-### Not done (deliberate)
-
-- **No `/worktree-commit`.** `/commit-review` already ships correctly from a worktree
-  (`<branch>:main`, fast-forward only, then fast-forward the root). A second commit skill
-  would duplicate and drift from it; it got a pointer instead.
-- **No split into `/start-worktree-migration` and `-no-migration`** (the first sketch).
-  "Does this need a migration?" is the question the skill *answers*, not a prerequisite for
-  choosing it — and the migration path does not begin by making a worktree at all.
-- **Fixtures still do not run in CI.** The gap both §7.62 and §7.63 came through. Filed as
-  **M** with the proven harness as its shape, and the note that it must **stack** fixtures
-  rather than test each on a clean database — testing in isolation would have missed §7.63,
-  as the first pass here did.
-- **`fixtures-attendance-window.sql` still scopes by `full_name`**, not by an owned id.
-  Weaker than the house rule but functional and not broken; left rather than churned.
-- **The dates in §8.15/§8.16 read 2026-07-27; their commits are 2026-07-26.** The ledger rows
-  below use the git-true date.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.18** | 2026-07-26 | Parallel work got a protocol (`docs/WORKTREES.md`), nine missing fixture teardowns written + a CI guard, and two skills (`/worktree-start`, `/worktree-close`). The round-trip harness it invented found §7.62 and §7.63; **§8.20 automated it** | `docs/WORKTREES.md` · `docs/TESTING.md` §5 · **§7.62, §7.63** |
 | **8.17** | 2026-07-26 | The documents became an index: `HANDOVER.md` 3,972 lines → ~460, and the four `/session-start` documents ~131k → ~12k tokens. Four orphaned facts promoted first, and FIFO capping of the ledger was rejected — entries are cited from applied migrations | `docs/GOTCHAS.md` **§7.56, §7.61** · `docs/DEPLOYMENT.md` **§11.5, §11.6** |
 | **8.16** | 2026-07-26 | Repo root 22 markdown files → 8 (`docs/design`, `docs/plans`, `docs/database`); the auth redirect allow-list found **broken in production** — admin password reset had been landing on the wrong page | `README.md` → *Where everything lives* · **§7.41** |
 | **8.15** | 2026-07-26 | The attendance marking window became a **database rule**; a child who joins mid-month no longer blocks that month from billing. Engine **v16 → v17** | `docs/plans/ATTENDANCE_WINDOW_PLAN.md` · PRD §7.5, §7.6 · §7.57–§7.60 |
@@ -591,18 +575,14 @@ themed sections below it. Nearest candidates with no dependencies: **credit-note
 (the other half of the notification work), an **upcoming-lessons view for parents** (small,
 and the building block already exists), or **convert a trial into an enrolled student**.
 
-**One loose end from this session, and it may not be a test problem at all:**
-`verify-attendance-window.mjs` was re-measured at **3/5** (its backlog entry asked for that).
-The two failures — a coach roster placeholder, and a parent *"No lessons have taken place
-yet"* — were measured, **not diagnosed**. If they are genuine product bugs they matter more
-than the driver does; that is an hour's work to find out.
+**The loose end most likely to be a real product bug:** `verify-attendance-window.mjs` scores
+**3/5**. The two failures — a coach roster placeholder, and a parent *"No lessons have taken
+place yet"* — were measured on 2026-07-26, **not diagnosed**, and §7.62 is now ruled out as
+the cause (fixtures load in CI, and this one passes). If they are genuine product bugs they
+matter more than the driver does; that is an hour's work to find out.
 
-**The highest-value engineering item is now *Run the fixtures in CI* (M).** Two classes of
-breakage shipped undetected because CI never applies a fixture — §7.62 (a NOT NULL migration
-made two fixtures unloadable for a week) and §7.63 (an unscoped write enrolled every child in
-the database). Both were found by accident. The harness is written and proven; it needs
-wiring into the existing `backend-tests` job, and it must **stack** fixtures rather than test
-each on a clean database.
+*(Run the fixtures in CI shipped 2026-08-01 — §8.20. It is no longer the top engineering
+item, and the three bugs it found are fixed.)*
 
 **Two hygiene migrations, neither urgent:** *revoke `anon` EXECUTE from the remaining SECURITY
 DEFINER functions* (§7.39's missing second layer), and *a business cannot read its own audit

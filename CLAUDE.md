@@ -32,6 +32,7 @@ supabase/functions/generate-invoices/test.sh        # Deno — RUN IT TWICE (see
 cd SwimSyncAdmin && npm test                        # vitest
 cd SwimSyncApp   && npm test                        # jest-expo
 cd <app> && npm run typecheck                       # tsc --noEmit, enforced in CI
+.claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh  # UI fixtures, in CI
 ```
 
 Full setup, seed logins and test flows: **`LOCAL_DEV_GUIDE.md`**.

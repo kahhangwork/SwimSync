@@ -170,13 +170,43 @@ still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 > without one; run it locally any time. Each teardown ends with a SELECT printing **0** for
 > what it removed and **1** for each seed identity that had to survive — read that output.
 >
-> **Writing a new fixture?** Prove the teardown round-trips instead of eyeballing it:
-> snapshot every table's row count, apply the fixture, apply the teardown, assert the counts
-> are identical — and do it **on top of another fixture**, not on a clean database. That
-> ordering is what surfaced §7.63. See `docs/WORKTREES.md` Phase 4.
+> **Every fixture is now LOADED by CI too** (2026-08-01), by
+> `drivers/check-fixture-roundtrip.sh` — a step in `backend-tests`, which already boots a
+> Supabase stack. It runs **two passes**:
 >
-> **No fixture is applied by CI at all** — that gap is filed (`BACKLOG.md` → *Run the
-> fixtures in CI*) and it is how §7.62 and §7.63 both shipped undetected.
+> - **Pass 1, isolated** — snapshot every base-table row count in `public`/`auth`/`storage`,
+>   apply the fixture with **`ON_ERROR_STOP=1`**, apply its teardown, assert the counts came
+>   back identical. This is the round-trip from `docs/WORKTREES.md` Phase 4, automated.
+> - **Pass 2, stacked** — apply all 14 in sequence *without* tearing down between them, then
+>   unwind in reverse. Each fixture's per-table footprint is compared against its isolated
+>   one: a fixture that touches only its own rows behaves identically on top of thirteen
+>   siblings, so **a divergence is §7.63's signature** and fails the build.
+>
+> **`ON_ERROR_STOP=1` is the load-bearing part.** Measured 2026-08-01 by re-introducing
+> §7.62 (dropping `tenant_id` from a fixture's insert): plain `psql` **exits 0**, buries one
+> `ERROR` line in its output, and creates **1 of 3** students. The fixture half-loads, the
+> driver then scores low, and the low score reads as a *product* regression. With
+> `ON_ERROR_STOP=1` it exits 1 and names the constraint. Re-introducing §7.63's unscoped
+> `CROSS JOIN` reproduced its documented second-order failure — the
+> `one_active_enrolment_per_student` violation that means the fixture's **own** children
+> never enrol. Both detectors were proven to fail without the fix (§7.25) before shipping.
+>
+> Run it locally any time (the stack must be up); it restores what it found, so it is safe
+> beside a sibling worktree. `--only <name>` checks one fixture, `--isolated-only` skips
+> pass 2.
+>
+> **Two rules for writing a new fixture, both learned by this check refusing to run:**
+> 1. **It must load against a bare seeded database.** `fixtures-phase4-billing.sql` used to
+>    `RAISE` unless a human had registered its parent through a browser first, which made it
+>    the one fixture nothing automated could ever check. A fixture that needs an account
+>    seeds it itself (insert `auth.users`; `handle_new_user` fans out to profiles/parents),
+>    guarded by an existence test **on the email**, since a UI registration mints a random id.
+> 2. **Scope every write to rows you own** (§7.63), and never reach for an unordered
+>    `LIMIT 1` (§7.73). If a fixture genuinely must write beyond its own rows — the way
+>    `fixtures-trial-onboarding.sql` must mark the whole roster to build a *complete* month —
+>    declare it in the fixture with `-- roundtrip-exempt: cross-fixture-writes — <why>` and
+>    make the teardown compensate. The declaration is echoed on every run; it exempts pass 2
+>    only, never pass 1.
 
 _UI drivers (`.claude/skills/run-ui-playwright/drivers/`, run by hand, not CI):_
 `verify-unmarked-lessons.mjs` + `fixtures-unmarked-lessons.sql` drive the whole

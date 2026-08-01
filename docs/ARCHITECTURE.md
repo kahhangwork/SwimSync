@@ -359,6 +359,7 @@ the shape of the system changes:_
 | `docs/WORKTREES.md` | **How to run two sessions in parallel without clashing** — one writer per shared resource, six phases, two worked examples (with and without a migration) |
 | `.claude/skills/worktree-start/` · `worktree-close/` | The skills that run that protocol. Start goes **after** planning; close goes **before** `/update-docs` |
 | `.claude/skills/run-ui-playwright/drivers/check-teardowns.sh` | CI guard: every `fixtures-*.sql` must have a `-teardown.sql`. Run it locally too |
+| `.claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh` | CI guard: every fixture LOADS (`ON_ERROR_STOP=1`), owns only its own rows, and its teardown restores every row count. Two passes — isolated, then stacked. Found three broken fixtures the first time it ran |
 | `docs/design/TENANCY_DESIGN.md` | **The multi-tenancy design of record.** 10 settled decisions (§10). Read before changing anything tenant-shaped |
 | `docs/plans/TENANCY_PLAN.md` | The 6-phase build, its risks, and the definition of done |
 | `supabase/migrations/20260718000400…20260719000600` | The tenancy migrations: roles, tenants, backfill, RLS rewrite, billing constraints, join codes, wages, contract |

@@ -976,4 +976,29 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       source shipped, not that the rule applies.
     The Expo app does not have this problem — it serves one `entry-*.js` bundle, which is why
     §7.31's original recipe kept working there. (2026-07-26.)
+
+73. **AN UNORDERED `LIMIT 1` OVER A SHARED TABLE IS A BUG THAT CANNOT FIRE UNTIL A SECOND ROW
+    EXISTS — AND THEN IT PICKS THE WRONG TENANT.**
+    `fixtures-student-identity.sql` opened with `SELECT id INTO v_tenant FROM tenants LIMIT 1`
+    and took the class on the next line by title, from the seed business. With one tenant in
+    the database the two always agreed, so it was correct for months. The moment
+    `fixtures-phase4-billing.sql` created a second business ('Harbour Swim Club'), the
+    unordered scan could return **that** one: the children were written into one tenant and
+    enrolled into another's class, and `enforce_enrolment_tenant()` refused with
+    `cross-tenant enrolment refused`.
+    **The tell is that nothing changed in the failing file.** The bug was introduced by a
+    *different* fixture starting to work — which is why it appeared the same day
+    `check-fixture-roundtrip.sh` fixed phase4-billing, and why it had never been seen before.
+    - **`LIMIT 1` with no `ORDER BY` has no defined row.** Postgres may return a different one
+      after a vacuum, an index change, or a plan change, with no schema change at all.
+    - **Derive, don't re-look-up.** The fix was `SELECT id, tenant_id INTO v_class, v_tenant
+      FROM classes WHERE title = …` — one query, so the two values cannot disagree by
+      construction. That is strictly better than adding `ORDER BY` to the original, which
+      would only have made the wrong answer *stable*.
+    - Same shape as the `.order("id").limit(500)` in §8.19's table work, which took an
+      arbitrary 500 rows and presented them as the most recent. Audit with
+      `grep -rn "LIMIT 1" .claude/skills/run-ui-playwright/drivers/fixtures-*.sql` and ask of
+      each: "is there more than one row this could match, ever?"
+    Caught by the pass-2 stacked check the first time it ran, not by any driver.
+    (Fixed 2026-08-01.)
 ---
