@@ -27,11 +27,10 @@ DO $$
 DECLARE
   v_tenant UUID := '70000000-0000-0000-0000-000000000001';
   v_month  DATE;
-  v_class  UUID;
+  v_class  UUID := 'fb000000-0000-0000-0000-000000000001';
 BEGIN
   v_month := date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date)
              - INTERVAL '1 month';
-  SELECT id INTO v_class FROM classes WHERE tenant_id = v_tenant LIMIT 1;
 
   -- The walk-in and everything hanging off it.
   DELETE FROM attendance a USING students s
@@ -69,6 +68,13 @@ BEGIN
   DELETE FROM billing_periods
     WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
 
+  -- The class this fixture owns, and the effective-dated rate its trigger made.
+  -- It used to BORROW the seed class, which is what broke CI on 2026-08-01; now
+  -- that it creates one, the teardown has to remove it or the round-trip check
+  -- reports a class left behind.
+  DELETE FROM class_rates WHERE class_id = v_class;
+  DELETE FROM classes     WHERE id       = v_class;
+
   RAISE NOTICE 'torn down trial-onboarding for billing month %',
     to_char(v_month, 'YYYY-MM');
 END $$;
@@ -89,4 +95,6 @@ SELECT
             date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date)
             - INTERVAL '1 month', 'YYYY-MM'))                            AS invoices,
   (SELECT count(*) FROM classes
-    WHERE tenant_id = '70000000-0000-0000-0000-000000000001')            AS seed_class_intact;
+    WHERE tenant_id = '70000000-0000-0000-0000-000000000001')            AS seed_class_intact,
+  (SELECT count(*) FROM classes
+    WHERE id = 'fb000000-0000-0000-0000-000000000001')                   AS own_class;

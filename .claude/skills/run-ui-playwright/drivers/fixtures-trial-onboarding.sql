@@ -12,35 +12,53 @@
 --
 -- Idempotent — safe to re-run between driver runs.
 --
--- roundtrip-exempt: cross-fixture-writes — a COMPLETE month is the scenario, so it must mark every child enrolled in the class, siblings' included.
+-- IT OWNS ITS CLASS, AND THAT IS LOAD-BEARING (2026-08-01). This used to do
+-- `SELECT id INTO v_class FROM classes WHERE tenant_id = ... LIMIT 1` — unordered,
+-- so *which* class it borrowed depended on how many others existed and on physical
+-- row order. It broke CI the day two classes were added to the seed tenant: the
+-- pick moved to 'Saturday Beginners', where it created a session on every Saturday
+-- of the previous month, and `fixtures-unmarked-lessons.sql` then hit
+-- `lesson_sessions_class_id_session_date_key` inserting its own 2026-07-04 row.
+-- Locally the same code picked a different class and passed — the worst kind of
+-- difference (§7.73).
 --
--- Completeness is measured across the whole roster, so scoping this to its own
--- walk-in would make the run refuse for the wrong reason and the assertion pass
--- vacuously. The teardown compensates — it deletes every attendance row in that
--- month on that class, for ANY student, not just its own.
---
--- This is a compensated hazard, not a safe pattern. The durable fix is for the
--- fixture to own its own class instead of borrowing the seed one
--- (`classes WHERE tenant_id = ... LIMIT 1` is also unordered, so which class it
--- borrows is not even stable). Filed in BACKLOG.md.
+-- Owning the class also retired this fixture's `roundtrip-exempt` declaration. It
+-- marks "every actively enrolled student in the class" to build a COMPLETE month;
+-- on a borrowed class that meant siblings' children, so its footprint changed when
+-- other fixtures were loaded. On its own class the same statement touches only its
+-- own walk-in, so the scenario is unchanged and the write is now self-scoped.
 
 BEGIN;
 
--- The seed tenant and its one class.
+-- The seed tenant, and this fixture's own class within it.
 \set tenant '70000000-0000-0000-0000-000000000001'
 
 DO $$
 DECLARE
   v_tenant   UUID := '70000000-0000-0000-0000-000000000001';
-  v_class    UUID;
+  v_class    UUID := 'fb000000-0000-0000-0000-000000000001';
+  v_coach    UUID;
   v_coach_pf UUID;
   v_month    DATE;
   v_sat      DATE;
   v_session  UUID;
   v_walkin   UUID;
 BEGIN
-  SELECT id INTO v_class FROM classes WHERE tenant_id = v_tenant LIMIT 1;
-  SELECT profile_id INTO v_coach_pf FROM coaches WHERE tenant_id = v_tenant LIMIT 1;
+  -- By email, not LIMIT 1: the seed coach is a known identity, and an unordered
+  -- pick is what this fixture was just fixed for.
+  SELECT co.id, co.profile_id INTO v_coach, v_coach_pf
+    FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
+   WHERE pr.email = 'coach@swimsync.test';
+
+  -- Saturday, because the loop below walks the previous month's Saturdays.
+  INSERT INTO classes (id, coach_id, tenant_id, title, day_of_week,
+                       start_time, end_time, location_name, price_per_lesson, category_id)
+  VALUES (v_class, v_coach, v_tenant, 'Trial Onboarding Class', 'saturday',
+          '14:00', '15:00', 'Test Pool', 40,
+          (SELECT cc.id FROM class_categories cc
+            WHERE cc.tenant_id = v_tenant
+              AND lower(trim(cc.name)) = 'default group'))
+  ON CONFLICT (id) DO NOTHING;
 
   -- First day of the PREVIOUS month, in SGT. Derived from the DB clock only
   -- because a fixture is allowed to; the PRODUCT never does this (§7.7).

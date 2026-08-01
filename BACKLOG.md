@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-01 (two shipped and removed — *Run the fixtures in CI* and *`verify-attendance-window.mjs` guards half of what it claims*, the latter's failures turning out to be **clock rot with the product correct in every case**. Two successors added: ***Run the UI drivers in CI*** (**M**, now the highest-value engineering item — CI loads every fixture but executes no driver) and *Give `fixtures-trial-onboarding.sql` its own class* (**S**))_
+_Last updated: 2026-08-01 (two shipped and removed — *Run the fixtures in CI* and *`verify-attendance-window.mjs` guards half of what it claims*, the latter's failures turning out to be **clock rot with the product correct in every case**. One successor added: ***Run the UI drivers in CI*** (**M**, now the highest-value engineering item — CI loads every fixture but executes no driver). *Give `fixtures-trial-onboarding.sql` its own class* was filed and then **shipped the same day**, when its unordered `LIMIT 1` broke CI (§7.73)_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -972,27 +972,6 @@ browser. Fixtures must be torn down between drivers — they share one database
 (§7.55) — which the round-trip harness already knows how to do. Note that a driver can rot
 in two directions: the product changes (a real regression) or the calendar moves (§7.73's
 family), and only the first should page anyone.
-
-### Give `fixtures-trial-onboarding.sql` its own class — **S**
-The fixture borrows the seed business's class (`SELECT id FROM classes WHERE tenant_id = …
-LIMIT 1`) and then marks **every actively-enrolled child in it** present on every Saturday of
-the previous month — siblings' children included. Give it a class of its own and the write
-becomes self-scoped.
-
-**Why:** it is the last declared `roundtrip-exempt` in the suite. The exemption is honest —
-a *complete* billing month is the scenario, and completeness is measured across the whole
-roster, so scoping to its own walk-in would make the run refuse for the wrong reason and the
-assertion pass vacuously — but it is a compensated hazard, not a safe pattern. Measured
-2026-08-01: **+1 attendance row alone, +5 stacked**. The compensation is a teardown that
-deletes every attendance row in that month on that class *for any student*, which is
-correct and also means the fixture can delete a sibling's marks. Separately, that `LIMIT 1`
-has no `ORDER BY`, so **which** class it borrows is not stable.
-
-**Notes:** the fixture needs a class plus its `class_rates` row and a category, in the seed
-tenant, prefixed like everything else it owns. `verify-trial-onboarding.mjs` may navigate by
-class name — check before renaming anything. When it lands, delete the
-`-- roundtrip-exempt:` line from the fixture and `check-fixture-roundtrip.sh` starts
-enforcing the footprint comparison on it automatically; no change to the harness.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`

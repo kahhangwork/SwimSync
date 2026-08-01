@@ -202,11 +202,13 @@ still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 >    seeds it itself (insert `auth.users`; `handle_new_user` fans out to profiles/parents),
 >    guarded by an existence test **on the email**, since a UI registration mints a random id.
 > 2. **Scope every write to rows you own** (§7.63), and never reach for an unordered
->    `LIMIT 1` (§7.73). If a fixture genuinely must write beyond its own rows — the way
->    `fixtures-trial-onboarding.sql` must mark the whole roster to build a *complete* month —
->    declare it in the fixture with `-- roundtrip-exempt: cross-fixture-writes — <why>` and
->    make the teardown compensate. The declaration is echoed on every run; it exempts pass 2
->    only, never pass 1.
+>    `LIMIT 1` (§7.73). If a fixture genuinely must write beyond its own rows, declare it with
+>    `-- roundtrip-exempt: cross-fixture-writes — <why>` and make the teardown compensate; the
+>    declaration is echoed on every run and exempts pass 2 only, never pass 1. **Nothing
+>    declares it today.** The one fixture that did — `fixtures-trial-onboarding.sql`, which
+>    marks every child enrolled in its class to build a *complete* month — stopped needing it
+>    on 2026-08-01 by owning its class instead of borrowing one. Prefer that fix: an exemption
+>    is a compensated hazard, and this one broke CI before it was removed (§7.73).
 
 _UI drivers (`.claude/skills/run-ui-playwright/drivers/`, run by hand, not CI):_
 `verify-unmarked-lessons.mjs` + `fixtures-unmarked-lessons.sql` drive the whole
