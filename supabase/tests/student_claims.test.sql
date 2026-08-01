@@ -32,7 +32,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(47);
+SELECT plan(49);
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
@@ -445,6 +445,27 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"c1000000-0000-0000-0000-0000000000a2"
 SELECT is(
   (SELECT count(*)::INT FROM list_student_claims()),
   0, 'another business''s admin gets no rows from the queue reader');
+
+-- The queue reader also names the parent BY ID — the payment-method chip joins
+-- package_live_balances() on it, and name/email cannot key that join.
+SET LOCAL "request.jwt.claims" TO '{"sub":"c1000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
+SELECT is(
+  (SELECT lsc.parent_id FROM list_student_claims() lsc
+    WHERE lsc.student_id = 'c1a99999-0000-0000-0000-000000000002'),
+  (SELECT sc.parent_id FROM student_claims sc
+    WHERE sc.student_id = 'c1a99999-0000-0000-0000-000000000002'),
+  'the queue reader returns the claimant''s parent_id, matching the claim row');
+
+-- §7.39 — the DROP/CREATE that added parent_id minted a NEW pg_proc row, and
+-- cloud default-grants anon EXECUTE on creation. This pins the local revoke;
+-- the remote grant dump at deploy time is the other, load-bearing half.
+RESET ROLE;
+SET LOCAL ROLE anon;
+SELECT throws_ok(
+  $$ SELECT * FROM list_student_claims() $$,
+  '42501', NULL, 'anon has no EXECUTE on the re-created list_student_claims');
+RESET ROLE;
+SET LOCAL ROLE authenticated;
 
 -- ══ The contract: a parent has no direct INSERT any more ══════════════════
 -- ⚠ THIS IS WHAT MAKES THE WHOLE SLICE REAL. add_child_or_claim() checks for
