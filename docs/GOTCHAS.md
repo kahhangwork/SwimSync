@@ -1044,3 +1044,29 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     Found because the fixture change was made FIRST and the **unchanged** driver re-run
     before any driver edit, which left exactly one suspect. Do that split; it is cheap.
     (2026-08-01.)
+
+76. **A BARE `as SomeType[]` ON AN RPC RESULT DOES NOT CHECK ANYTHING — RENAME A COLUMN AND
+    THE UI RENDERS NOTHING, FOREVER, WITH NO ERROR.**
+    `platform_tenant_overview()` returns `kind` and `coaches_without_rate`. The page declared
+    `shape` and `staff_without_rate` and bridged the two with
+    `setTenants((data ?? []) as TenantRow[])`. A `as` cast is an *assertion*, not a
+    conversion: TypeScript believed it, so both fields were `undefined` at runtime. Result —
+    the "Shape" column rendered **blank** on every row, and the amber
+    `{t.staff_without_rate > 0 && …}` badge was `undefined > 0`, which is **false**, so the
+    warning that exists to catch *a staff coach being paid nothing by payroll* had
+    **never rendered once** since it was written (found 2026-08-01).
+    **Both failures look like "there is nothing to report", which is the answer the reader
+    wants** — an empty column reads as no data, a missing badge reads as no problem. Nothing
+    logs, nothing throws, and the page that exists to surface trouble reports calm.
+    - **Never `as` an RPC result.** Read the migration's `RETURNS TABLE` and match the names,
+      or map field-by-field so a rename is a compile error.
+    - The durable fix is generated types (`BACKLOG.md` → *Generate real Supabase `Database`
+      types*). This is the concrete cost of not having them; it is not hypothetical.
+    - **Audit:** `grep -n "as [A-Z][A-Za-z]*\[\]" **/*.tsx` and check every hit against the
+      RPC that feeds it.
+    - Its sibling: **supabase-js infers a to-one embed as an ARRAY while PostgREST returns an
+      OBJECT.** Verified against the running API — `profiles!inner(role)` yields
+      `"profiles": {"role": "tenant_admin"}`, not `[{…}]`. `tsc` will reject the honest cast
+      here, and the temptation is `as unknown as T`, which silences the compiler and leaves
+      the field undefined if the shape ever moves. Accept both shapes and normalise.
+    (2026-08-01.)
