@@ -7,16 +7,53 @@
 // be unbillable forever the moment the parent finally registered — the same
 // permanent-underbill shape as §7.8, §7.13 and §7.32.
 //
-// It also pins the roster-union regression (RISK 6): a trial walk-in's
-// enrolment is CLOSED on its own date, so before the union fix they vanished
-// from the very screen that had just marked them.
+// ─────────────────────────────────────────────────────────────────────────────
+// REWRITTEN 2026-08-01, AND THE REASON IS WORTH KNOWING.
+//
+// This driver used to open by adding a walk-in through the COACH's attendance
+// screen. `912bd11` (2026-07-25 22:59) deleted that control when a trial became
+// a booking the ADMIN arranges ahead of time (PRD §7.17) — two hours after this
+// driver was written at 20:49 the same day. From then it FAILED its first check
+// and then CRASHED on the tap, so it scored nothing and guarded nothing, and the
+// six billing checks below — the ones that matter — were unreachable behind the
+// crash. Nobody noticed for a week, because no driver runs in CI
+// (`BACKLOG.md` → *Run the UI drivers in CI*).
+//
+// The fix was not to rebuild the deleted flow but to change the SUBJECT: every
+// surviving assertion now points at `Fixture Walkin`, which
+// fixtures-trial-onboarding.sql creates with the identical shape (a trial
+// enrolment opened and closed on its own date, no parent link). The screens are
+// reached by URL instead of by clicking through a creation form that no longer
+// exists.
+//
+// Two checks were dropped rather than re-pointed, both deliberately:
+//   • "the Add a walk-in control is offered" — the control is gone by design.
+//   • "labelled so they don't read as a weekly regular" — MEASURED 2026-08-01:
+//     the badge renders only when `attendedOnly` is true (lib/attendanceRoster.ts),
+//     and the fixture's walk-in IS enrolled on its own date because the enrolment
+//     span is both-ends-inclusive. So no badge renders for it and the assertion
+//     has no subject here. Re-pointing it would mean giving the fixture a child
+//     with attendance but no enrolment span — a different scenario, and not one
+//     this driver is about.
+//
+// A NOTE ON WHAT THE ROSTER CHECK IS WORTH. "the trial walk-in is on the roster
+// of the lesson that marked them" is defended in depth: they arrive either
+// through the both-ends-inclusive enrolment span OR through the attendance
+// union, so ONE of those regressing will not turn it red. It pins the
+// user-visible guarantee — they never vanish from the screen that just marked
+// them — rather than either mechanism, which is the right thing to assert but a
+// weaker test than its history suggests. `lib/attendanceRoster.test.ts` pins the
+// two mechanisms separately, and that is where a unit-level regression shows up.
 //
 // Setup: supabase running + seed; cd SwimSyncAdmin && npm run dev;
 //        cd SwimSyncApp && npx expo start --web
 //        supabase functions serve generate-invoices --env-file supabase/functions/.env --no-verify-jwt
+//        docker exec -i supabase_db_SwimSync psql -U postgres -d postgres \
+//          < .claude/skills/run-ui-playwright/drivers/fixtures-trial-onboarding.sql
 import os from "node:os";
 import path from "node:path";
-import { launch, loginExpo, loginAdmin, tap, ADMIN, EXPO } from "./lib.mjs";
+import { execSync } from "node:child_process";
+import { launch, loginExpo, loginAdmin, tap, gotoAuthed, ADMIN, EXPO } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (name) => path.join(SHOT, name);
@@ -26,63 +63,56 @@ const check = (label, pass, detail = "") => {
   console.log(`${pass ? "PASS" : "FAIL"}  ${label}${detail ? ` — ${detail}` : ""}`);
 };
 
-const STAMP = Date.now();
-const WALK_IN = `Walkin ${STAMP}`;
-// Placed by fixtures-trial-onboarding.sql in the PREVIOUS (billable) month.
-// The UI-added walk-in above lands on TODAY, which generation correctly refuses
-// to bill — a month must have ENDED (PRD §5.5) — so the billing assertions need
-// a lesson that is actually in scope.
-const FIXTURE_WALK_IN = "Fixture Walkin";
+/** Ask the database where the fixture put things. One source of truth. */
+function sql(q) {
+  return execSync(
+    `docker exec -i supabase_db_SwimSync psql -U postgres -d postgres -tAc ${JSON.stringify(q)}`,
+    { encoding: "utf8" }
+  ).trim();
+}
+
+// The unclaimed child, and the lesson they were marked at. Both come from the
+// fixture, which derives them from the clock — the billable month must have
+// ENDED (PRD §5.5), so a hardcoded date would stop meaning anything next month.
+const WALK_IN = "Fixture Walkin";
+// ONE LINE EACH, deliberately: the query goes through `docker exec ... -c`, and
+// an embedded newline arrives as a literal \n rather than whitespace, which
+// Postgres rejects with `syntax error at or near "\"`. Same trap as
+// verify-attendance-guard.mjs.
+const FROM_WALKIN_LESSON = `FROM lesson_sessions ls JOIN attendance a ON a.lesson_session_id = ls.id JOIN students s ON s.id = a.student_id WHERE s.full_name = '${WALK_IN}'`;
+const CLASS_ID = sql(`SELECT ls.class_id ${FROM_WALKIN_LESSON}`);
+const LESSON_DATE = sql(`SELECT ls.session_date ${FROM_WALKIN_LESSON}`);
+
+if (!CLASS_ID || !LESSON_DATE) {
+  console.error(
+    `\nDRIVER ABORTED: no lesson found for "${WALK_IN}".` +
+      `\nLoad fixtures-trial-onboarding.sql first — without it every check below` +
+      `\nwould pass or fail for reasons that have nothing to do with the product.`
+  );
+  process.exit(1);
+}
+console.log({ WALK_IN, CLASS_ID, LESSON_DATE });
 
 const { browser, page } = await launch();
 
-// ── COACH: add a walk-in mid-lesson ──────────────────────────────────────────
+// ── COACH: the trial walk-in has not vanished from the lesson that marked them ─
+// Their enrolment was opened AND closed on this date, so a roster built from
+// is_active enrolments alone would lose them here — which is precisely what
+// happened before the roster fix.
 await loginExpo(page, "coach@swimsync.test");
 await page.waitForTimeout(1500);
+await gotoAuthed(page, `${EXPO}/(coach)/classes/${CLASS_ID}/attendance?date=${LESSON_DATE}`);
+await page.waitForTimeout(3500);
 
-// Reach a class roster, then the mark-attendance screen.
-await tap(page.getByText(/Classes/i).first(), "Classes tab");
-await page.waitForTimeout(1200);
-await tap(page.getByText(/Saturday Beginners/i).first(), "the seed class");
-await page.waitForTimeout(1200);
-await tap(page.getByText(/Mark Attendance|Take Attendance/i).first(), "mark attendance");
-await page.waitForTimeout(1500);
-
-const beforeText = await page.evaluate(() => document.body.innerText);
-check(
-  "the Add a walk-in control is offered on the attendance screen",
-  /Add a walk-in/i.test(beforeText)
-);
-
-await tap(page.getByText(/Add a walk-in/i).first(), "open the walk-in form");
-await page.waitForTimeout(600);
-
-await page.getByPlaceholder("Child's name").fill(WALK_IN);
-await page.getByPlaceholder("Parent's phone (optional)").fill("+65 9123 4567");
-await tap(page.getByText(/^Paid trial$/i).first(), "paid trial");
-await page.waitForTimeout(300);
-await tap(page.getByText(/Add & mark/i).first(), "submit the walk-in");
-await page.waitForTimeout(2500);
-
-const afterAdd = await page.evaluate(() => document.body.innerText);
-check("the walk-in appears on the roster after being added", afterAdd.includes(WALK_IN));
-
-// ⚠ RISK 6. Their enrolment was closed on this date, so a roster built from
-// is_active enrolments alone would have lost them here. Reload — do not trust
-// the in-memory state that added them.
-await page.reload();
-await page.waitForTimeout(2500);
-const afterReload = await page.evaluate(() => document.body.innerText);
-check(
-  "RISK 6: the walk-in SURVIVES a reload of the attendance screen",
-  afterReload.includes(WALK_IN),
-  "closed trial enrolment must not hide them from the screen that marked them"
-);
-check(
-  "and they are labelled so they don't read as a weekly regular",
-  /Not enrolled/i.test(afterReload)
-);
+const rosterText = await page.evaluate(() => document.body.innerText);
 await page.screenshot({ path: shot("trial-01-coach-roster.png"), fullPage: true });
+check(
+  "the trial walk-in is on the roster of the lesson that marked them",
+  rosterText.includes(WALK_IN),
+  rosterText.includes(WALK_IN)
+    ? ""
+    : "a closed trial enrolment must not hide them from the screen that marked them"
+);
 
 // ── ADMIN: the child shows as having no parent account ───────────────────────
 // The TENANT admin, not superadmin@. The seed's platform admin belongs to no
@@ -111,8 +141,8 @@ await page.goto(`${ADMIN}/invoices`);
 await page.waitForTimeout(2000);
 
 // The month picker defaults to the last COMPLETED month (§7.32), which is the
-// month we want: the walk-in was marked today, so use whatever the engine will
-// accept and assert on the reported shape rather than a hardcoded month.
+// month we want: the fixture's lesson is in it. Assert on the reported shape
+// rather than a hardcoded month.
 await tap(page.getByRole("button", { name: /Generate Invoices/i }).first(), "generate");
 await page.waitForTimeout(1500);
 
@@ -127,7 +157,7 @@ const genText = await page.evaluate(() => document.body.innerText);
 await page.screenshot({ path: shot("trial-03-admin-generate.png"), fullPage: true });
 
 // The whole point. Either the modal named them, or the result line did.
-const named = genText.includes(FIXTURE_WALK_IN);
+const named = genText.includes(WALK_IN);
 const explained = /no parent account to bill|have no parent account/i.test(genText);
 check(
   "RISK 5: generation reports the unclaimed child BY NAME",

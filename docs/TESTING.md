@@ -237,6 +237,25 @@ the delivery outcome stated explicitly, `invited` -> accept -> **the new admin s
 track and knob rects from the DOM (§7.34) in both states and asserts the knob stays inside the
 track, that a click round-trips through the DB, and that the billing month defaults to and is
 capped at the last completed month;
+`verify-trial-onboarding.mjs` (+ `fixtures-trial-onboarding.sql`) drives the case of a
+**billable lesson with nobody to bill** (10 checks): generation names the unclaimed child,
+explains it as a *missing parent account* rather than unmarked attendance, offers the settle
+actions inline, and **does not seal the month** — sealing would strand those lessons the
+moment the parent finally registered, the permanent-underbill shape of §7.8/§7.13/§7.32.
+It refuses to run at all (**exit 1**) when its fixture is absent, rather than scoring on an
+empty database — §7.62's lesson applied at the driver.
+> **Rewritten 2026-08-01 after a week broken, and how it broke is the lesson.** It used to
+> open by adding a walk-in through the coach's attendance screen; `912bd11` deleted that
+> control **two hours after the driver was written**, when a trial became a booking the admin
+> arranges ahead of time. From then it failed check 1 and then *crashed* on the tap, so the
+> six billing checks behind it were unreachable and it guarded nothing. The repair was to
+> change the **subject** — every surviving assertion now points at the fixture's
+> `Fixture Walkin` and reaches the screens by URL — not to rebuild a deleted flow. Two checks
+> were dropped deliberately, and the reasoning is in the driver's own header.
+> Its roster check is **defence in depth** (the walk-in arrives via either the
+> both-ends-inclusive enrolment span or the attendance union), so one regression will not turn
+> it red; `lib/attendanceRoster.test.ts` pins the two mechanisms separately;
+
 `verify-trial-visibility.mjs` (+ `fixtures-trial-visibility.sql`) drives a booked trial from
 all three sides — the parent is told WHEN, the coach's roster lists trials coming up, and
 Unassigned Children **excludes** an upcoming trial while **keeping** a past one; its last
