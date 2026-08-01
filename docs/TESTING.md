@@ -269,6 +269,20 @@ empty database — §7.62's lesson applied at the driver.
 > both-ends-inclusive enrolment span or the attendance union), so one regression will not turn
 > it red; `lib/attendanceRoster.test.ts` pins the two mechanisms separately;
 
+`verify-makeups.mjs` (+ `fixtures-makeups.sql` and its `-teardown.sql`) drives a make-up —
+an enrolled child guesting one lesson of another same-category class — end to end through
+both real UIs (14 checks): the admin's booking form is child-first (the class list is the
+same category **minus the child's own class**), the date list is the host's real lesson
+days **plus the fixture's off-schedule extra session on today's date** (which is what lets
+the coach marking-screen checks run whatever weekday it is), the duplicate-slot refusal
+surfaces the RPC's own sentence (§7.32), the host coach's roster shows a "Make-ups coming
+up" panel **naming the guest** (the widened `coach_serves_student()` at work — an RLS gap
+here silently `.filter(Boolean)`s the child away rather than erroring), the guest is NOT
+counted a member (`Students (0)`), the marking screen lists them with a "Make-up" chip,
+and the parent's home card announces the make-up **in addition to** the weekly class
+block. Coach screens are reached by fixed-id deep links (§7.58 — tab taps force-click the
+overlaying screen). **Re-load the fixture between runs** — the driver books through the
+real UI, so a second run against the same state trips its own duplicate refusal;
 `verify-trial-visibility.mjs` (+ `fixtures-trial-visibility.sql`) drives a booked trial from
 all three sides — the parent is told WHEN, the coach's roster lists trials coming up, and
 Unassigned Children **excludes** an upcoming trial while **keeping** a past one; its last
