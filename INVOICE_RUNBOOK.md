@@ -207,5 +207,15 @@ Billing is based on **actual attendance**, so make sure last month is complete:
 
 ---
 
+**After generating (since 2026-08-02, PRD §7.21):** every invoice carries an
+`INV-YYYY-NNNN` reference and a public payment link automatically. To chase payment,
+use the **WhatsApp** button on each outstanding row (opens a pre-filled chat — you
+still press Send) or the **WhatsApp reminders** queue to work down all of them. When a
+parent taps *"I've paid"*, the row shows *"parent says paid"* and the **Claimed**
+filter collects those rows — check your bank (the reference identifies the transfer),
+then **Mark Paid**. First time only: enter your PayNow mobile/UEN on the Invoices page
+and pass the bank-app scan gate (HANDOVER §9) before pointing parents at the QR.
+
 _Related: PRD §5.5–5.6 (billing & credit rules), §7.7 (invoice generation),
-§10 (calculation logic); `docs/DEPLOYMENT.md` §11 (cloud setup)._
+§10 (calculation logic); §7.21 (payment collection); `docs/DEPLOYMENT.md` §11 (cloud
+setup)._

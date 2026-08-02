@@ -96,6 +96,16 @@ the shape of the system changes:_
   - **`package-emails`** is a separate Edge Function (verify_jwt ON, caller re-checked
     in-body), sharing the project-wide `RESEND_API_KEY`. Deployed separately, like
     everything under `supabase/functions/`.
+- **ANYTHING PUBLIC (SESSIONLESS) IS SERVED BY AN EDGE FUNCTION, NEVER AN ANON RPC**
+  (2026-08-02, `public-invoice`). The tempting alternative — `GRANT USAGE ON SCHEMA
+  public TO anon` + one RPC — is a standing foot-gun: Supabase cloud's project-level
+  default privileges grant EXECUTE on **every new public function** to `anon` (§7.39),
+  so opening schema USAGE arms every function whose revoke is ever forgotten,
+  forever. The house posture is *"anon gets nothing"* (20260309000800), and it held:
+  an edge function with `verify_jwt = false` needs zero schema grants, rate-limits
+  in-function, and its service-role reads go through an explicit serializer
+  allowlist. Do not add the anon USAGE grant for a future public feature — add an
+  edge function.
 - **A BUSINESS IS CREATED BY ONE RPC, AND ONLY THE PLATFORM ADMIN MAY CALL IT**
   (2026-07-21, PRD §4.4, `TENANT_PROVISIONING_PLAN.md`). The rules that must not be
   re-derived wrongly:
@@ -414,6 +424,11 @@ the shape of the system changes:_
 | `SwimSyncAdmin/components/PackageChip.tsx` · `SwimSyncApp/components/PackageBadge.tsx` | "Package · N left" / "Ad-hoc" — explicit both ways; renders nothing only with no coverage row (unclaimed child / failed RPC) |
 | `supabase/migrations/20260802000100..500_*.sql` | Make-ups (PRD §7.20): `makeup_bookings` (trial_bookings' shape + TWO snapshots — home category for package matching, home class id for the ad-hoc rate, §7.45), `book_makeup()`/`cancel_makeup_booking()`, the coach/parent visibility widening (also closed the latent trial-guest gap), `package_live_balances()` reading the snapshot, and `merge_students` taught the fifth cascading table — its unknown-cascade tripwire caught it on the suite's first run |
 | `SwimSyncAdmin/app/(admin)/makeups/page.tsx` · `lib/makeupSearch.ts` | Admin: book/cancel make-ups — child found via ONE search box matching name OR class title (pure filter in the lib, unit-tested), past-and-unmarked list, package-expiry advisory |
+| `supabase/migrations/20260802000600_payment_collection_schema.sql` · `…000700_invoice_paid_rpcs.sql` | Payment collection (PRD §7.21): per-tenant `INV-YYYY-NNNN` references (year from the invoice's OWN `billing_month`, §7.7) + 128-bit `public_token`, assigned by a BEFORE INSERT trigger so the engine is untouched (§7.78 — the DEFINER hop is load-bearing); the pin trigger; `claim_invoice_paid()` / `confirm_invoice_paid()` (gate = the `invoices_update` policy, verbatim) |
+| `SwimSyncApp/lib/paynow.ts` | EMVCo PayNow payload builder (TLV + CRC-16/CCITT-FALSE) — pure, **throws on dubious input** (a wrong-but-valid QR pays the wrong amount silently), test-pinned to an INDEPENDENT generator's vector |
+| `supabase/functions/public-invoice/` | The tokenized invoice page's data source — deliberately an edge function, NOT an anon RPC (see §6); serializer allowlist, uniform 404, in-memory rate limit; also the sessionless "I've paid" claim |
+| `SwimSyncApp/app/invoice/[token].tsx` | The public invoice page (chrome-less, in `PUBLIC_PATHS`): computed QR, Save-QR-image + scan-from-gallery instruction, claim button |
+| `SwimSyncAdmin/lib/waMessage.ts` · `app/(admin)/invoices/ReminderQueue.tsx` | The wa.me reminder message/link builders (on `normalizeSgPhone`; unusable number → null → visible "no number") and the click-through queue ("chat opened" wording is a rule, not copy taste) |
 | `supabase/functions/generate-invoices/makeups.test.ts` | Engine: the zero-bookings TRIPWIRE, gate both directions, home-rate + snapshot pins, the live-balances re-tag pin |
 | `supabase/functions/generate-invoices/rates.ts` | `rateOn()` — the terms in force on a lesson's date. Pure + unit-tested, like `dates.ts`. Dates compared as **YYYY-MM-DD strings**, never parsed to `Date` (keeps the timezone traps of §7.7/§7.12 out). A missing rate **throws** (§6) |
 | `supabase/migrations/20260719000700_class_rates.sql` | Effective-dated price + paid coach, `class_rate_on()`, floor-dated backfill + seed trigger, display sync, RLS |

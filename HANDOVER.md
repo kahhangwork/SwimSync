@@ -1,15 +1,19 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-02 — **make-up classes shipped AND DEPLOYED (guest-pass model,
-PRD §7.20, §8.25)**: the admin books an enrolled child into one lesson of another
-same-category class; a package family's attended make-up draws the package (the
-expiring-package recourse), an ad-hoc guest pays their own class's rate. Five
-migrations + the engine + all three UIs, deployed in the §7.60 order and verified
-(grant dump clean, bundle grep positive), then the child picker became **one search box
-matching child OR class name** after the user drove the live page and found the dropdown
-unusable at scale — **dormant on production until the first make-up is booked**. Same day, earlier: the parent invoice detail marks package-funded
-lines (§8.24). The standing headline is unchanged: **real attendance exists on
-production**, and **July has still not been billed** — §9, and the marking window
+_Last updated: 2026-08-02 (third session that day) — **fee-free payment collection
+shipped AND DEPLOYED, Phases 0–3 (PRD §7.21, §8.26)**: every invoice now carries a
+per-tenant `INV-YYYY-NNNN` reference and a 128-bit public token (BEFORE INSERT
+trigger — the engine is untouched); a **dynamic PayNow QR** with amount + reference
+locked is computed client-side from new tenant UEN/mobile settings; a **tokenized
+public invoice page** (`swimsync.sg/invoice/<token>`, no login, served by the new
+`public-invoice` edge function) is where the **WhatsApp reminder button + click-through
+queue** on the admin Invoices page send parents; the parent's **"I've paid" claim** and
+ONE converged `confirm_invoice_paid()` path close the loop. Two migrations, a third
+edge function, all three UIs, a 19-check driver — deployed in the §7.60 order and
+verified (grant dumps clean, both bundles grep-positive). **Dormant until July is
+billed**, and **the bank-app scan gate is still open** (§9 — production's PayNow proxy
+fields stay NULL until a real scan passes). Earlier that day: make-up classes (§8.25).
+The standing headline: **July has still not been billed** — §9, and the marking window
 closes at the end of August._
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
@@ -178,6 +182,23 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   (Parents, Claims) label the family instead. Coaches deliberately see nothing.
   The parent's **invoice detail marks each package-funded line** by the package's name
   (reversed draws read ad hoc — §8.24). PRD §7.16, §8.23.
+- **Fee-free payment collection (verified local: pgTAP + Deno ×2 + vitest + jest + a
+  19-check UI driver — LIVE 2026-08-02, dormant until July is billed)** — PRD §7.21,
+  `docs/design/PAYMENT_COLLECTION_DESIGN.md`: SwimSync stays out of the money path
+  (no gateway, no percentage). Every invoice gets `INV-YYYY-NNNN` (per-tenant counter,
+  year from its own billing month) + a 128-bit public token via a BEFORE INSERT
+  trigger (§7.78 — the engine is untouched); the admin enters a PayNow **UEN or
+  mobile** once (Invoices page) and every outstanding invoice renders a locked-amount
+  **dynamic QR** (`lib/paynow.ts`, pinned to an independent vector, throws on dubious
+  input); the **tokenized public page** (`/invoice/<token>`, sessionless, edge
+  function `public-invoice` — deliberately not an anon RPC) carries the QR +
+  Save-QR-image; the admin's **WhatsApp button + click-through queue** opens
+  pre-filled wa.me chats (the admin presses Send — stamps read **"chat opened"**,
+  never "reminded"); the parent's **"I've paid"** claim (public page or in-app RPC)
+  surfaces as a badge + **Claimed** filter; and **every** mark-paid goes through
+  `confirm_invoice_paid()` (audit row included — the admin panel used to skip it).
+  **STILL GATED: a real bank-app scan.** Production's `paynow_uen`/`paynow_mobile`
+  are NULL, so the feature is dormant by construction until the scan gate passes (§9).
 - **Make-up classes (verified local: pgTAP + Deno ×2 + vitest + jest + a 14-check UI
   driver — LIVE 2026-08-02, dormant until the first make-up is booked)** — the
   guest-pass model (PRD §7.20): the business's admin
@@ -327,21 +348,21 @@ See §11.
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **As of 2026-08-02 production is fully caught up**: every migration through
-> `20260802000500` is applied (`supabase migration list --linked` shows nothing pending),
-> `generate-invoices` is at **version 18** on the platform's counter (make-up bookings,
-> on top of trial bookings + category trial pricing, the unclaimed-attendance seal
-> condition, package drawdown, the completed-month guard and effective-dated pricing),
-> and a SECOND function exists: **`package-emails` v1** (verify_jwt ON — deployed
-> separately, and a deploy of generate-invoices does NOT touch it). *(The previous
-> version of this line went stale for two sessions — `supabase functions list` and
-> `supabase migration list` are the honest answers; treat this sentence as a hint, not
-> a fact.)*
+> **As of 2026-08-02 (evening) production is fully caught up**: every migration through
+> `20260802000700` is applied (`supabase migration list --linked` shows nothing pending),
+> `generate-invoices` is at **version 18** on the platform's counter, and THREE functions
+> exist: `generate-invoices` v18, **`package-emails` v1** (verify_jwt ON), and
+> **`public-invoice` v1** (verify_jwt **false**, deliberately — the invoice token is the
+> access control; deployed 2026-08-02, each deployed separately). *(This line has gone
+> stale before — `supabase functions list` and `supabase migration list` are the honest
+> answers; treat this sentence as a hint, not a fact.)*
 > Backups were taken before each production migration through 2026-08-01 (scratchpad,
 > not committed). **The 2026-08-02 make-ups batch went out WITHOUT a fresh backup** —
 > additive-only plus three CREATE OR REPLACEs whose pre-change bodies are captured in
 > `supabase/rollback/20260802_makeup_bookings_DOWN.sql`; noted here so the omission is
-> a fact, not a discovery.
+> a fact, not a discovery. The payment-collection batch (000600/000700) DID take
+> schema + data dumps first (scratchpad, not committed); both migrations are additive
+> and production's `invoices` table was empty when they landed.
 >
 > The **tenancy** deploys (§8.1) had **opposite orderings** and both were deliberate — phase 4
 > *dropped* columns so the app deployed first; phase 5 only *added*, so migrations went
@@ -397,6 +418,42 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.26 (2026-08-02, third session) — PAYMENT COLLECTION WITHOUT A PAYMENT PROVIDER
+
+**The feature** (PRD §7.21 — the durable home; design record
+`docs/design/PAYMENT_COLLECTION_DESIGN.md`, decisions locked with the user after a
+two-agent research pass): the user wanted WhatsApp payment nudges and payment
+*validation* with **no percentage fees**. Research corrected two assumptions — PayNow
+gateways charge 0.65–1.3% (not the feared 2%), and, decisively, **the PayNow QR format
+is open** (EMVCo), so a per-invoice QR with amount + reference locked needs no bank or
+gateway at all. Four phases shipped and deployed same-day in the §7.60 order (each
+increment: migration → verify → functions deploy → grant dump → merge main LAST):
+references + tokens by trigger (engine untouched — §7.78), the EMVCo lib pinned to an
+**independent generator's vector**, the `public-invoice` edge function (the planned
+anon RPC was replaced at plan time — `anon` has no schema USAGE and opening it arms
+§7.39 platform-wide; recorded in `docs/ARCHITECTURE.md` §6), the tokenized public
+page, the wa.me click-through queue ("chat opened" wording is a rule — RISK 7), the
+"I've paid" claim, and mark-paid converged on `confirm_invoice_paid()` (the admin
+panel's old direct update wrote **no audit fields**; both direct writers deleted).
+
+**What the driver caught** (19 checks, `verify-payment-collection.mjs`): the admin
+fetch was missing the `paid_claimed_at` column (mapped but never selected — badge and
+Claimed filter silently dead); `getByRole`'s substring name-matching clicking the
+wrong WhatsApp button (run-ui-playwright skill §4.7 updated); and the fixture parent
+being invisible to the admin because **`tenant_serves_parent()` requires a child, not
+just membership** (§7.77). One-click bulk sends (Meta Cloud API, ≈S$0.02/msg) went to
+BACKLOG by user decision; unofficial WhatsApp automation is permanently ruled out
+(bans the coach's own number).
+
+**Verified:** pgTAP 468 (23 in the suite; the RISK 5 role matrix both sides); Deno 130
+**run twice** ×3 sessions of runs (7 new incl. the serializer's exact-key-set pin);
+vitest 237; jest 207; driver 19/19; fixtures 15/15 round-trip; grant dumps clean
+(both RPCs authenticated-only, `next_invoice_ref` granted to **nobody**); both
+production bundles grep-positive. **Open release gate:** a real SG bank-app scan —
+production's PayNow proxy stays NULL until it passes (§9).
+
+---
+
 ## 8.25 (2026-08-02) — A MISSED LESSON CAN BE MADE UP IN ANOTHER CLASS
 
 **The feature** (PRD §7.20 — the durable home): the guest-pass model, settled with the
@@ -444,34 +501,11 @@ Durable homes: PRD §7.20 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §1
 
 ---
 
-## 8.24 (2026-08-02) — AN INVOICE NOW SAYS WHICH LINES THE PACKAGE PAID FOR
-
-One commit, app-only — **no migration**: parents could already read their own
-`package_applications` (`parent_id = current_parent_id()` was in the 2026-07-20 policy).
-The parent invoice detail joins that ledger to its line items: a funded line reads
-**"Paid by package · *name*"** in emerald; a **reversed** draw deliberately reads ad hoc,
-because the correction path put that money back on the package. Durable material:
-**PRD §7.16** (the behaviour + the historic-vs-current rule), `docs/TESTING.md` §5
-(`invoiceFunding` suite). The BACKLOG item — filed the previous day as deliberately
-skipped — shipped and was removed.
-
-**Scope fact:** the admin Invoices page renders **no line items at all** (its
-`invoice_items` join only feeds the student-names column), so the parent detail is the
-only surface where "which lines" can render. An admin invoice-detail view would be a new
-feature, not part of this.
-
-**Verified**: jest 188 (+5, incl. reversed-draw-is-not-funding and the null-input
-fail-safe); a throwaway two-line invoice (one funded + ledger row, one ad hoc) driven in
-the real UI — exactly one line tagged, by name — then torn down. Not a committed driver:
-a permanent version needs a fixture invoice, which would entangle
-`fixtures-packages.sql`'s carefully un-invoiced live-balance scenario.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.24** | 2026-08-02 | The parent invoice detail marks package-funded lines ("Paid by package · *name*"; a reversed draw reads ad hoc). App-only, no migration. The admin Invoices page renders no line items, so the parent detail is the only "which lines" surface — an admin invoice detail would be a new feature | PRD §7.16 · `docs/TESTING.md` §5 (`invoiceFunding`) |
 | **8.23** | 2026-08-01 | The per-child, category-aware payment-method chip ("Package · N left" / "Ad-hoc") on ten admin surfaces + the parent app via `student_package_coverage()`, fixing the Students-page chip that summed by parent and counted date-expired packages; 'mixed' proven structurally unreachable and pgTAP-pinned; coaches deliberately see nothing | PRD §7.16 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §10 |
 | **8.22** | 2026-08-01 | A latent unordered `LIMIT 1` in `fixtures-trial-onboarding.sql` broke CI (§7.73 biting its author — fixture now owns its class, no `roundtrip-exempt` left); `verify-trial-onboarding.mjs` had aborted on check 1 since two hours after it was written (0 → 10 checks); and a user's coach-rate question found the platform "unpaid" badge had **never rendered** (`as`-cast field mismatch) plus the private-vs-school dropdown answering an unanswerable question — replaced with staff-without-rate. **`tenants.kind` still exists, nothing reads it, do not start**; the RPC-narrowing migration queues behind the two hygiene migrations (§7.55) | **§7.73, §7.76** · `docs/TESTING.md` §5 · PRD §4.4 |
 | **8.21** | 2026-08-01 | The "possibly real product bugs" in `verify-attendance-window.mjs` were **clock rot, product correct in all three cases** — its three unique behaviours folded into `verify-attendance-guard.mjs` (20/20), driver + fixture deleted; found the guard driver's own unnamed-entity bug on the way | **§7.74, §7.75** · `docs/TESTING.md` §5 · `docs/plans/ATTENDANCE_WINDOW_DRIVER_FOLD_PLAN.md` |
@@ -543,8 +577,18 @@ makes it possible closes at the end of August.
    overridden.
 2. **Then bill July, in August**, following `INVOICE_RUNBOOK.md`. This will be the **first
    invoice this product has ever generated**, so expect to read the runbook rather than skim
-   it. `auto_invoice_enabled` is **false**, so it is the admin button.
-> **There is no third item, and "set a coach rate" is NOT one.** This list carried
+   it. `auto_invoice_enabled` is **false**, so it is the admin button. *(New since
+   2026-08-02: every generated invoice automatically gets its `INV-YYYY-NNNN` reference and
+   public token — nothing extra to do — and once invoices exist, the Invoices page's
+   WhatsApp buttons and reminder queue go live by themselves. PRD §7.21.)*
+3. **Before telling parents to scan: pass the bank-app scan gate.** Production's
+   `paynow_uen`/`paynow_mobile` are deliberately NULL, which keeps the QR dormant. Enter
+   the coach's PayNow mobile number on the Invoices page, open one invoice's public link,
+   and scan the QR with a real SG bank app — checking recipient name, amount **locked**,
+   and whether the reference shows. Wrong anything → clear the field and report; right →
+   the whole flow is live. Two minutes, cannot be automated, must not be skipped
+   (`PAYMENT_COLLECTION_DESIGN.md` RISK 2).
+> **There is no fourth item, and "set a coach rate" is NOT one.** This list carried
 > *"before payroll means anything, set a coach rate — still none, so wages compute
 > nothing"* until 2026-08-01, and it was **wrong**. Production is a **private coach** — one
 > coach, who is also the business's admin — and PRD §7.13 is explicit: *"a private coach

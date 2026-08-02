@@ -1070,3 +1070,27 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       here, and the temptation is `as unknown as T`, which silences the compiler and leaves
       the field undefined if the shape ever moves. Accept both shapes and normalise.
     (2026-08-01.)
+
+77. **A TENANT ADMIN READS A PARENT'S PROFILE (NAME, PHONE) ONLY IF THAT PARENT HAS A CHILD
+    IN THE TENANT — `parent_tenants` MEMBERSHIP ALONE IS NOT ENOUGH.** `profiles_select`'s
+    admin arm goes through `tenant_serves_parent()`, which requires a `parent_students` →
+    `students` chain into the caller's tenant. A fixture (or a real family) with a
+    membership row but no child renders as "—" with no phone on every admin surface — the
+    WhatsApp reminder button showed "no number" for a parent whose phone was right there
+    in `profiles`. Nothing errors; the join silently returns null (found 2026-08-02 by
+    `verify-payment-collection.mjs`, cost ~20 minutes of RLS spelunking).
+    - When an admin page shows "—" for a parent who definitely exists, check the CHILD
+      link before suspecting the fetch.
+    (2026-08-02.)
+
+78. **A FUNCTION CALLED ONLY BY A `SECURITY DEFINER` TRIGGER SHOULD BE REVOKED FROM
+    *EVERYONE* — INCLUDING `service_role` — AND THE TRIGGER FUNCTION ITSELF MUST STAY
+    DEFINER, OR PRODUCTION BILLING DIES AT FIRST INSERT.** `next_invoice_ref()` is
+    executable by nobody; the engine (as `service_role`) reaches it only because
+    `assign_invoice_public_fields()` is SECURITY DEFINER and Postgres does not check
+    EXECUTE privilege when *firing* a trigger. Two standing prohibitions
+    (20260802000600): do NOT "clean up" the DEFINER on the trigger function, and do NOT
+    "fix" a future permission error on `next_invoice_ref` by granting — a permission
+    error THERE means the DEFINER hop was flattened, which is the actual bug. The pgTAP
+    suite's service_role-shaped INSERT is the tripwire that goes red first.
+    (2026-08-02.)

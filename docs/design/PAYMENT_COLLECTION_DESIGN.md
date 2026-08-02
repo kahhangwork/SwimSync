@@ -1,7 +1,16 @@
 # SwimSync — Fee-Free Payment Collection: Dynamic PayNow QR, WhatsApp Reminders, Reconciliation
 
-_Drafted 2026-08-02. Status: **DESIGN — decisions locked with the user 2026-08-02**;
-nothing built yet. The economic constraint is the design: swim-coaching margins cannot
+_Drafted 2026-08-02. Status: **BUILT — Phases 0–3, 2026-08-02, deployed and
+production-verified** (migrations `20260802000600`/`000700`, edge function
+`public-invoice` v1, both app bundles grep-verified; 19-check driver green). Shipped
+behaviour lives in **PRD §7.21**; this document remains the design record. **One
+deviation from the table below, ratified at plan approval:** the public data path is
+the `public-invoice` EDGE FUNCTION, not an anon-callable RPC — `anon` has no USAGE on
+schema `public`, and opening it would arm §7.39's cloud default-EXECUTE grants
+platform-wide (decision recorded in `docs/ARCHITECTURE.md` §6). Phase 4 (CSV
+reconciliation) remains unbuilt — BACKLOG. **The bank-app scan release gate is still
+open**: the production tenant's PayNow proxy fields stay NULL until a real scan test
+passes (HANDOVER §9)._ The economic constraint is the design: swim-coaching margins cannot
 absorb a percentage fee, so **no payment party ever sits between parent and coach** —
 SwimSync relays payment information and never touches funds (which also keeps it outside
 Payment Services Act licensing; the First Schedule excludes pure technical relays)._

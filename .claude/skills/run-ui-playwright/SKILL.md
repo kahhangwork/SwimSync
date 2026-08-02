@@ -85,7 +85,9 @@ These cost time to rediscover:
 6. **Both stacked screens are in the DOM.** Native-stack keeps the previous
    screen mounted under the current one, so `document.body.innerText` shows
    both. Assert on text unique to the target screen.
-7. **`getByText` matches SUBSTRINGS, so short button labels collide.**
+7. **`getByText` AND `getByRole`'s `name` both match SUBSTRINGS, so short button labels
+   collide.** `getByRole("button", { name: "WhatsApp" })` clicked the "WhatsApp
+   *reminders*" queue button above the table (2026-08-02) — pass `exact: true` there too.
    `getByText("Edit")` also matches **"Credit Balance"** — "Cr-*edit*-". Pairing
    that with `.last()` clicked the balance label instead of the button, and the
    driver reported "the form did not open", which sent me hunting a routing bug
