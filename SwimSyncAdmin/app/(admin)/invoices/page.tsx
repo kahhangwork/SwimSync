@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
+import { blankToNull, checkSgPhone, normalizeSgPhone } from "@/lib/sgPhone";
 
 type InvoiceRow = {
   id: string;
@@ -76,6 +77,11 @@ export default function InvoicesPage() {
   const [togglingAuto, setTogglingAuto] = useState(false);
   const [runDay, setRunDay] = useState<number | null>(null);
   const [savingRunDay, setSavingRunDay] = useState(false);
+  // PayNow proxy — where invoice QRs point the money. null = not loaded yet
+  // (platform admin has no tenant); "" = loaded and unset.
+  const [paynowUen, setPaynowUen] = useState<string | null>(null);
+  const [paynowMobile, setPaynowMobile] = useState<string | null>(null);
+  const [paynowSaved, setPaynowSaved] = useState<string | null>(null);
   // Students with billable attendance and no parent account to bill. They hold
   // the month OPEN (the engine's fifth seal condition), so the remedy has to be
   // reachable from right here — an admin sent to another page to find them is
@@ -135,13 +141,31 @@ export default function InvoicesPage() {
 
     const { data: tenant } = await supabase
       .from("tenants")
-      .select("auto_invoice_enabled, invoice_run_day")
+      .select("auto_invoice_enabled, invoice_run_day, paynow_uen, paynow_mobile")
       .eq("id", tid)
       .maybeSingle();
 
     setAutoEnabled(tenant?.auto_invoice_enabled ?? true);
     const n = Number(tenant?.invoice_run_day);
     setRunDay(Number.isFinite(n) && n >= 1 ? Math.min(28, n) : 7);
+    setPaynowUen((tenant?.paynow_uen as string | null) ?? "");
+    setPaynowMobile((tenant?.paynow_mobile as string | null) ?? "");
+  }
+
+  // Saves on blur, like the run day. Validation is ADVISORY only (the
+  // sgPhone doctrine — a blocked save helps nobody); normalizeSgPhone strips
+  // +65 so the stored form is the bare 8 digits the QR payload needs.
+  async function handleSavePaynow(field: "paynow_uen" | "paynow_mobile", raw: string) {
+    if (!tenantId) return;
+    const value =
+      field === "paynow_mobile" ? blankToNull(normalizeSgPhone(raw)) : blankToNull(raw);
+    const { error } = await supabase
+      .from("tenants")
+      .update({ [field]: value, updated_at: new Date().toISOString() })
+      .eq("id", tenantId);
+    setPaynowSaved(error ? `Error: ${error.message}` : "PayNow details saved.");
+    if (!error && field === "paynow_mobile") setPaynowMobile(value ?? "");
+    if (!error && field === "paynow_uen") setPaynowUen(value ?? "");
   }
 
   // Capped at 28 to match the engine: 29-31 would never fire in February.
@@ -667,6 +691,66 @@ export default function InvoicesPage() {
             of the following month
             {!autoEnabled && " — no effect while automatic generation is off"}
           </span>
+        </div>
+
+        {/* PayNow proxy. The invoice QR is computed from these — no QR image
+            is uploaded anywhere. UEN wins when both are set (a corporate
+            account is guaranteed to get the reference on its statement; a
+            personal mobile proxy is best-effort, and mobile-only is a fully
+            supported setup — production's private coach runs on one). */}
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <div className="text-xs font-semibold text-gray-700 mb-1">
+            PayNow details for invoice QR codes
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="paynow-uen" className="text-xs text-gray-500">
+              UEN
+            </label>
+            <input
+              id="paynow-uen"
+              type="text"
+              value={paynowUen ?? ""}
+              placeholder="e.g. 201403121W"
+              disabled={paynowUen === null}
+              onChange={(e) => setPaynowUen(e.target.value)}
+              onBlur={(e) => handleSavePaynow("paynow_uen", e.target.value)}
+              className="w-36 rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-50"
+            />
+            <label htmlFor="paynow-mobile" className="text-xs text-gray-500 ml-2">
+              or mobile
+            </label>
+            <input
+              id="paynow-mobile"
+              type="text"
+              value={paynowMobile ?? ""}
+              placeholder="e.g. 91234567"
+              disabled={paynowMobile === null}
+              onChange={(e) => setPaynowMobile(e.target.value)}
+              onBlur={(e) => handleSavePaynow("paynow_mobile", e.target.value)}
+              className="w-32 rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-50"
+            />
+            {(() => {
+              const check = checkSgPhone(paynowMobile ?? "");
+              return check.message ? (
+                <span className="text-[11px] text-amber-600">{check.message}</span>
+              ) : null;
+            })()}
+          </div>
+          <p className="mt-1 text-[11px] text-gray-400">
+            Invoices show a PayNow QR with the amount and reference locked in.
+            A UEN (business account) is preferred when you have one — the
+            reference then always reaches your bank statement. A personal
+            mobile number works too; reference visibility depends on the bank.
+          </p>
+          {paynowSaved && (
+            <p
+              className={`mt-1 text-xs font-medium ${
+                paynowSaved.startsWith("Error") ? "text-red-600" : "text-green-600"
+              }`}
+            >
+              {paynowSaved}
+            </p>
+          )}
         </div>
 
         <p className="mt-3 text-xs text-gray-500">

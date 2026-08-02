@@ -439,6 +439,13 @@ deno_version = 2
 [functions.generate-invoices]
 verify_jwt = false
 
+# public-invoice: the tokenized invoice page's data source. No JWT on
+# purpose — the 128-bit invoice token is the access control, and the caller
+# is a sessionless parent who clicked a WhatsApp link. See the function's
+# core.ts header for why this exists instead of an anon RPC (§7.39).
+[functions.public-invoice]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

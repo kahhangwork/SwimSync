@@ -48,7 +48,11 @@ function parseAuthTokens(
 // Public routes that must render without a session. The session-restore below
 // otherwise bounces every session-less load to /login, which would hide the
 // parent-facing /welcome onboarding page.
-const PUBLIC_PATHS = ["/welcome"];
+// ⚠ Widening this list widens the auth gate — no other path joins it as part
+// of payment collection. /invoice is the tokenized public invoice page; the
+// AUTHED invoice screen lives at /billing/invoice/…, which startsWith does
+// not match.
+const PUBLIC_PATHS = ["/welcome", "/invoice"];
 function onPublicRoute(): boolean {
   if (Platform.OS === "web" && typeof window !== "undefined") {
     return PUBLIC_PATHS.some((p) => window.location.pathname.startsWith(p));
@@ -129,6 +133,11 @@ export default function RootLayout() {
         .eq("profile_id", session.user.id)
         .maybeSingle();
 
+      // A signed-in user opening a public page (e.g. their own invoice link
+      // from WhatsApp) stays on it — the session is restored above, but the
+      // redirect-to-home must not steal the page they asked for.
+      if (onPublicRoute()) return;
+
       const landing = landingFor(profile.role, !!coachRow);
       if (landing.route) router.replace(landing.route);
     }
@@ -193,6 +202,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="welcome" />
+        <Stack.Screen name="invoice/[token]" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(parent)" />
         <Stack.Screen name="(coach)" />

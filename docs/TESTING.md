@@ -82,7 +82,10 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
-_Deno tests — `core.test.ts` + `email.test.ts` + `dates.test.ts` (run by `test.sh`):_
+_Deno tests (run by `generate-invoices/test.sh`, which also carries
+`../package-emails/email.test.ts` and `../public-invoice/core.test.ts` — the latter
+pins the public serializer's EXACT key set, first-names-only students, uniform
+null-for-every-failure, and claim idempotency against the local stack):_
 **The clock is part of every fixture** — `monthEnded()` in `test-helpers.ts` supplies the
 billing month, an instant at which it is billable, and an early-enough enrolment as ONE fact,
 and `newScenario()` **throws** on a scenario expecting zero lessons (§7.33). The

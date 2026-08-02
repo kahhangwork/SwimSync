@@ -1734,6 +1734,38 @@ Booking-level visibility follows the trials rule (the business, the host class's
 the child's own parent) — and `coach_serves_student()` was widened so a host coach can
 read a guest's *name* (which also closed the same latent gap for trial guests).
 
+### 7.21 Fee-Free Payment Collection *(Phase 1 implemented 2026-08-02)*
+
+SwimSync never sits in the money path: a parent pays the business's own PayNow account
+directly, and no gateway takes a percentage. What the product supplies is
+**identification** — knowing who paid for what — built from three pieces
+(design record: `docs/design/PAYMENT_COLLECTION_DESIGN.md`):
+
+- **Every invoice carries a reference number** — `INV-YYYY-NNNN`, numbered within the
+  business (same per-tenant scheme and volume-leak rationale as credit notes, §9.17),
+  the year taken from the invoice's **own billing month**, never the clock. Assigned by
+  a database trigger on insert; the billing engine is untouched. References and tokens
+  are pinned — not client-writable.
+- **A dynamic PayNow QR per invoice.** The business's admin enters a **UEN or mobile
+  number** once (Invoices page → *PayNow details*; UEN preferred when both — a
+  corporate account is guaranteed to receive the reference on its statement, a personal
+  mobile proxy is best-effort and the copy never promises it). Every outstanding
+  invoice then renders an EMVCo QR with the **amount and reference locked in**,
+  computed client-side (`SwimSyncApp/lib/paynow.ts`, pinned to an independent
+  generator's test vector). The generator **throws on dubious input** rather than
+  encode a wrong-but-scannable QR. The uploaded static QR image remains as the
+  fallback for package requests and unconfigured tenants.
+- **A tokenized public invoice page** — `swimsync.sg/invoice/<128-bit token>`, no
+  login, served by the `public-invoice` Edge Function (deliberately not an anon RPC —
+  §7.39). Shows business name, month, child **first names only**, amount, reference
+  and the QR; a **Save QR image** button with a scan-from-gallery instruction covers
+  the you-can't-scan-your-own-screen case; amount and reference are selectable text.
+  Every failure mode returns one identical not-found response. The page is where the
+  WhatsApp reminder link (§7.21 Phase 2, unbuilt) will land.
+
+Parents with accounts see the same dynamic QR on the in-app PayNow screen (web;
+native keeps the static image).
+
 ---
 
 ## 8. Non-Functional Requirements
