@@ -560,17 +560,35 @@ silent drops a real cost.
 misses without re-emailing successes. Deliberately deferred from the first cut to keep it an
 'S'. Pairs with watching Resend delivery in the dashboard.
 
-### WhatsApp payment reminders — **M** `[Phase 2]`
+### WhatsApp payment reminders — **M** `[Phase 2]` `[DESIGNED 2026-08-02]`
 Nudge parents about outstanding invoices over WhatsApp.
 
 **Why:** in Singapore, WhatsApp is where this conversation actually happens — the coach
 is already sending these messages by hand. Email is politer; WhatsApp gets read.
 
-**Notes:** a named secondary goal since the original PRD (§2.2). Needs the WhatsApp
-Business API (approval + per-message cost) or an unofficial bridge, which is
-against-terms and fragile. **Sequence this after email**, which is free and already
-wired. Consider a middle option first: a "copy reminder message" button the coach pastes
-into WhatsApp — no API, most of the value.
+**Notes:** a named secondary goal since the original PRD (§2.2). **Designed 2026-08-02
+as part of `docs/design/PAYMENT_COLLECTION_DESIGN.md`** — the chosen mechanism is
+wa.me click-to-chat links (free, ToS-clean, admin presses Send) with a click-through
+queue over unpaid invoices, NOT the Business API and NOT an unofficial bridge (real,
+enforced ban risk against the coach's own number — permanently ruled out). Remove this
+entry when the queue ships.
+
+### One-click bulk WhatsApp sends (Cloud API) — **M** `[Phase 3]`
+Send the payment reminder to every unpaid parent with ONE click, server-side, instead
+of one Send per chat via the wa.me click-through queue.
+
+**Why:** the queue costs the admin one press of Send per parent (deliberate — that press
+is WhatsApp's anti-spam boundary and the wa.me path cannot legitimately remove it). At
+some roster size, or for tenants who want unattended sends, that stops being acceptable.
+
+**Notes:** decided with the user 2026-08-02 (`docs/design/PAYMENT_COLLECTION_DESIGN.md`):
+the only legitimate path is Meta's WhatsApp Business Platform (Cloud API) — utility
+template messages to SG numbers at ≈S$0.02 each (≈S$1–5/month at 50–200 msgs), which the
+user judged plausibly acceptable. The cost is friction, not money: a dedicated phone
+number NOT registered on the consumer/Business app, Meta business setup, pre-approved
+message template, and unverified accounts cap at 250 business-initiated conversations
+per 24h (sufficient here; full verification lifts it). Sequence strictly after the
+wa.me queue ships and only if a real tenant asks.
 
 ### Push notifications — **M** `[MVP-excluded]`
 Native push to parents and coaches.
