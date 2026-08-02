@@ -517,7 +517,12 @@ async function generateForTenant(
       string,
       { homeClassId: string; categoryId: string }
     >();
-    const bookingsByDate = new Map<string, string[]>(bookedByDate);
+    // Lists COPIED, not aliased: new Map(bookedByDate) shares the arrays, and
+    // pushing a make-up guest into a date that already holds a trial would
+    // silently mutate bookedByDate too.
+    const bookingsByDate = new Map<string, string[]>(
+      [...bookedByDate].map(([d, list]) => [d, [...list]])
+    );
     for (const m of makeupRows ?? []) {
       if (m.class_id !== cls.id) continue;
       const d = m.session_date as string;
@@ -785,6 +790,13 @@ async function generateForTenant(
           // host class is re-tagged afterwards — §7.45), and a title marker so
           // the parent's invoice explains a host-class line at a home-class
           // price. Enrolment wins, as in priceFor: a member is not a guest.
+          //
+          // Known, accepted edge: package_live_balances() COALESCEs to the
+          // snapshot whenever a live booking exists — it has no enrolment-wins
+          // arm — so a MEMBER with a stray booking diverges from the engine's
+          // category if the host is also re-tagged. Reaching that state means
+          // transferring a child INTO their own host class after booking; the
+          // chip discrepancy is transient and settles at invoicing.
           const mk = makeupInfo.get(`${ps.student_id}:${sessionDate}`);
           const isGuest =
             !!mk &&
