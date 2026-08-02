@@ -23,7 +23,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(23);
+SELECT plan(24);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -136,6 +136,26 @@ SELECT is(
   (SELECT reference_number FROM invoices WHERE id='f5000000-0000-0000-0000-0000000000a2'),
   'INV-2025-0002',
   'year comes from the invoice''s own billing_month, never the clock (§7.7); counter continues within the tenant');
+
+-- ── Past 9999 the reference GROWS — LPAD must never truncate ────────────────
+-- lpad('10000',4,'0') = '1000' in Postgres: without the GREATEST() guard the
+-- 10,000th invoice reuses reference 1000 (a big tenant reaches that in ~13
+-- months) and the billing run dies on the unique constraint.
+
+UPDATE tenants SET invoice_counter = 9999
+ WHERE id = 'fa000000-0000-0000-0000-00000000000b';
+
+SET LOCAL ROLE service_role;
+INSERT INTO invoices (id, parent_id, tenant_id, billing_month, gross_amount, net_amount)
+SELECT 'f5000000-0000-0000-0000-0000000000b2', p.id,
+       'fa000000-0000-0000-0000-00000000000b','2026-07', 40, 40
+  FROM parents p WHERE p.profile_id='fd000000-0000-0000-0000-000000000003';
+RESET ROLE;
+
+SELECT is(
+  (SELECT reference_number FROM invoices WHERE id='f5000000-0000-0000-0000-0000000000b2'),
+  'INV-2026-10000',
+  'the 10,000th invoice reads 10000, not a truncated 1000');
 
 -- ── The pin: not client-writable, even for the tenant admin ─────────────────
 
