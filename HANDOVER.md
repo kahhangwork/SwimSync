@@ -445,7 +445,14 @@ just membership** (§7.77). One-click bulk sends (Meta Cloud API, ≈S$0.02/msg)
 BACKLOG by user decision; unofficial WhatsApp automation is permanently ruled out
 (bans the coach's own number).
 
-**Verified:** pgTAP 468 (23 in the suite; the RISK 5 role matrix both sides); Deno 130
+**Post-ship, same day:** the user asked what `NNNN` caps at — which exposed that
+Postgres **LPAD truncates** past the pad width, so a tenant's 10,000th invoice would
+have silently reused reference 1000 (unique-violation billing failure within ~13
+months for an 800-family tenant), and `next_credit_note_ref` had carried the identical
+latent bug since 2026-07-18. Both fixed by `20260802000800` (pad grows past 9999),
+proven RED first, deployed.
+
+**Verified:** pgTAP 469 (24 in the suite; the RISK 5 role matrix both sides); Deno 130
 **run twice** ×3 sessions of runs (7 new incl. the serializer's exact-key-set pin);
 vitest 237; jest 207; driver 19/19; fixtures 15/15 round-trip; grant dumps clean
 (both RPCs authenticated-only, `next_invoice_ref` granted to **nobody**); both
