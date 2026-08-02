@@ -114,34 +114,26 @@ export default function CoachBillingScreen() {
   async function markPaid(invoiceId: string) {
     if (!session) return;
     setMarkingPaid(invoiceId);
-    const now = new Date().toISOString();
 
-    const { error: invErr } = await supabase
-      .from("invoices")
-      .update({ status: "paid", paid_at: now, paid_marked_by: session.id })
-      .eq("id", invoiceId);
+    // ONE mark-paid path for every client: status + paid_at + paid_marked_by
+    // + the payment_records audit row, atomically (PRD §9.13, §7.21). This
+    // replaced a two-statement version whose audit insert was non-fatal — and
+    // whose admin-panel sibling wrote no audit row at all.
+    const { error } = await supabase.rpc("confirm_invoice_paid", {
+      p_invoice_id: invoiceId,
+    });
 
-    if (invErr) {
-      setMarkingPaid(null);
+    setMarkingPaid(null);
+    if (error) {
       showToast("Could not mark as paid", "error");
       return;
     }
-
-    // Record the manual payment confirmation (PRD §9.13). Non-fatal if it fails.
-    const { error: payErr } = await supabase
-      .from("payment_records")
-      .insert({ invoice_id: invoiceId, marked_by: session.id, paid_at: now });
-
-    setMarkingPaid(null);
     setInvoices((prev) =>
       prev.map((inv) =>
         inv.id === invoiceId ? { ...inv, status: "paid" } : inv
       )
     );
-    showToast(
-      payErr ? "Marked paid (record not logged)" : "Invoice marked as paid",
-      payErr ? "info" : "success"
-    );
+    showToast("Invoice marked as paid", "success");
   }
 
   function confirmMarkPaid(inv: Invoice) {

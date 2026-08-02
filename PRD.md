@@ -1776,6 +1776,18 @@ directly, and no gateway takes a percentage. What the product supplies is
   advisory from `lib/sgPhone.ts`), never a broken link. A **Link** button copies the
   invoice's public URL for any other channel.
 
+- **"I've paid" → confirm** *(Phase 3, implemented 2026-08-02)*. The parent taps
+  **I've paid** — on the tokenized page (sessionless, via the edge function) or on the
+  in-app invoice detail (`claim_invoice_paid()` RPC) — which records a **timestamped
+  claim, never a status change**; claiming twice keeps the first timestamp. The admin
+  sees a *"parent says paid"* badge and a **Claimed** filter (outstanding + claimed —
+  the rows to check against the bank first). Confirmation goes through **one RPC for
+  every client**, `confirm_invoice_paid()` — gate identical to the `invoices_update`
+  policy — which writes `status`/`paid_at`/`paid_marked_by` **and** the
+  `payment_records` audit row atomically. (Before this, the admin panel's mark-paid
+  wrote no audit fields at all and the coach app wrote them non-atomically; the direct
+  update paths are deleted.)
+
 Parents with accounts see the same dynamic QR on the in-app PayNow screen (web;
 native keeps the static image).
 

@@ -16,6 +16,7 @@ import { useLocalSearchParams } from "expo-router";
 import QRCode from "qrcode";
 import Logo from "@/components/Logo";
 import PrimaryButton from "@/components/PrimaryButton";
+import { confirmAction } from "@/lib/confirm";
 import { buildPayNowPayload, selectPayNowProxy } from "@/lib/paynow";
 
 const FUNCTIONS_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/public-invoice`;
@@ -109,6 +110,37 @@ export default function PublicInvoicePage() {
     a.click();
   }
 
+  const [claiming, setClaiming] = useState(false);
+
+  // The sessionless "I've paid" — a timestamped CLAIM the coach confirms
+  // against their bank, never a status change. Web-safe confirm (§7.10).
+  function claimPaid() {
+    if (!invoice || claiming) return;
+    confirmAction(
+      "Mark as paid?",
+      "This tells your coach you've made the PayNow transfer. They'll confirm it against their bank account.",
+      async () => {
+        setClaiming(true);
+        try {
+          const res = await fetch(FUNCTIONS_URL, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ token, action: "claim" }),
+          });
+          if (res.ok) {
+            const { paid_claimed_at } = await res.json();
+            setInvoice((prev) =>
+              prev ? { ...prev, paid_claimed_at } : prev,
+            );
+          }
+        } finally {
+          setClaiming(false);
+        }
+      },
+      "I've paid",
+    );
+  }
+
   if (state === "loading") {
     return (
       <View className="flex-1 bg-sky-50 items-center justify-center">
@@ -194,11 +226,20 @@ export default function PublicInvoicePage() {
           </View>
         )}
 
-        {claimed && (
-          <Text className="text-sm text-sky-700 mt-4">
-            You've told us this is paid — your coach will confirm it.
-          </Text>
-        )}
+        {!paid &&
+          (claimed ? (
+            <Text className="text-sm text-sky-700 mt-4">
+              You've told us this is paid — your coach will confirm it.
+            </Text>
+          ) : (
+            <View className="mt-4 w-full">
+              <PrimaryButton
+                label={claiming ? "Saving…" : "I've paid"}
+                variant="outline"
+                onPress={claimPaid}
+              />
+            </View>
+          ))}
       </View>
 
       <Text className="text-center text-xs text-gray-400">

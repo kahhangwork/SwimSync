@@ -10,7 +10,9 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import { confirmAction } from "@/lib/confirm";
 import { fundingByItem } from "@/lib/invoiceFunding";
+import { useAppStore } from "@/store/useAppStore";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
@@ -45,6 +47,7 @@ type InvoiceDetail = {
   status: "outstanding" | "paid";
   generated_at: string;
   paid_at: string | null;
+  paid_claimed_at: string | null;
   items: InvoiceItem[];
   credit_notes: CreditNoteApplied[];
   coach_id: string | null;
@@ -75,6 +78,32 @@ export default function InvoiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [claiming, setClaiming] = useState(false);
+  const showToast = useAppStore((s) => s.showToast);
+
+  function claimPaid() {
+    if (!invoice || claiming) return;
+    confirmAction(
+      "Mark as paid?",
+      "This tells your coach you've made the PayNow transfer. They'll confirm it against their bank account.",
+      async () => {
+        setClaiming(true);
+        const { data, error } = await supabase.rpc("claim_invoice_paid", {
+          p_invoice_id: invoice.id,
+        });
+        setClaiming(false);
+        if (error) {
+          showToast("Couldn't record that — please try again.", "error");
+          return;
+        }
+        setInvoice((prev) =>
+          prev ? { ...prev, paid_claimed_at: data as string } : prev
+        );
+        showToast("Noted — your coach will confirm the payment.", "success");
+      },
+      "I've paid"
+    );
+  }
 
   useEffect(() => {
     async function load() {
@@ -92,6 +121,7 @@ export default function InvoiceDetailScreen() {
           status,
           generated_at,
           paid_at,
+          paid_claimed_at,
           tenants(display_name),
           invoice_items(
             id,
@@ -157,6 +187,7 @@ export default function InvoiceDetailScreen() {
         status: inv.status,
         generated_at: inv.generated_at,
         paid_at: inv.paid_at,
+        paid_claimed_at: (inv as any).paid_claimed_at ?? null,
         items: (inv.invoice_items ?? [])
           .map((item: any) => ({
             id: item.id,
@@ -344,14 +375,29 @@ export default function InvoiceDetailScreen() {
 
         {/* PayNow CTA */}
         {invoice.status === "outstanding" && (
-          <PrimaryButton
-            label="Pay via PayNow QR"
-            onPress={() =>
-              router.push(
-                `/(parent)/billing/paynow?invoiceId=${invoice.id}&coachId=${invoice.coach_id ?? ""}`
-              )
-            }
-          />
+          <View className="gap-3">
+            <PrimaryButton
+              label="Pay via PayNow QR"
+              onPress={() =>
+                router.push(
+                  `/(parent)/billing/paynow?invoiceId=${invoice.id}&coachId=${invoice.coach_id ?? ""}`
+                )
+              }
+            />
+            {/* A CLAIM, not a status change — the coach confirms against
+                their bank. Idempotent server-side; first timestamp wins. */}
+            {invoice.paid_claimed_at ? (
+              <Text className="text-sm text-sky-700 text-center">
+                You've told your coach this is paid — they'll confirm it.
+              </Text>
+            ) : (
+              <PrimaryButton
+                label={claiming ? "Saving…" : "I've paid"}
+                variant="outline"
+                onPress={claimPaid}
+              />
+            )}
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>

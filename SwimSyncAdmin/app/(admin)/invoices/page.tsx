@@ -34,6 +34,8 @@ type InvoiceRow = {
   /** When the admin last OPENED a WhatsApp chat for this invoice. It does
    *  not prove a message was sent — copy must read "chat opened". */
   reminded_at: string | null;
+  /** The parent's "I've paid" claim — check the bank, then confirm. */
+  paid_claimed_at: string | null;
   /** wa.me-ready "65XXXXXXXX", or null → the button reads "no number". */
   wa_number: string | null;
   /** What the parent actually typed — the queue's advisory when unusable. */
@@ -50,7 +52,9 @@ type UnclaimedStudent = {
   latest_session_date: string;
 };
 
-const STATUS_FILTERS = ["All", "Outstanding", "Paid"];
+// "Claimed" = outstanding AND the parent has said "I've paid" — the rows an
+// admin should check against the bank first.
+const STATUS_FILTERS = ["All", "Outstanding", "Claimed", "Paid"];
 
 function formatBillingMonth(ym: string): string {
   const [year, month] = ym.split("-");
@@ -508,7 +512,7 @@ export default function InvoicesPage() {
     const { data } = await supabase
       .from("invoices")
       .select(
-        "id, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, reference_number, public_token, reminded_at, parents(profiles(full_name, phone)), invoice_items(student_name, students(full_name))"
+        "id, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, parents(profiles(full_name, phone)), invoice_items(student_name, students(full_name))"
       )
       .order("generated_at", { ascending: false });
 
@@ -534,6 +538,7 @@ export default function InvoicesPage() {
           reference_number: inv.reference_number ?? "—",
           public_token: inv.public_token ?? "",
           reminded_at: inv.reminded_at ?? null,
+          paid_claimed_at: inv.paid_claimed_at ?? null,
           wa_number: toWaNumber(inv.parents?.profiles?.phone ?? null),
           raw_phone: inv.parents?.profiles?.phone ?? null,
           student_name_list: nameList,
@@ -578,12 +583,14 @@ export default function InvoicesPage() {
 
   async function handleMarkPaid(invoiceId: string) {
     setMarkingPaid(invoiceId);
-    await supabase
-      .from("invoices")
-      .update({ status: "paid", paid_at: new Date().toISOString() })
-      .eq("id", invoiceId);
+    // ONE mark-paid path for every client (PRD §7.21): the RPC writes
+    // status + paid_at + paid_marked_by + the payment_records audit row
+    // atomically. This page's old direct UPDATE wrote neither audit field.
+    const { error } = await supabase.rpc("confirm_invoice_paid", {
+      p_invoice_id: invoiceId,
+    });
     setMarkingPaid(null);
-    // Update state locally for instant feedback
+    if (error) return;
     setInvoices((prev) =>
       prev.map((inv) =>
         inv.id === invoiceId ? { ...inv, status: "paid" } : inv
@@ -597,7 +604,9 @@ export default function InvoicesPage() {
       inv.student_names.toLowerCase().includes(search.toLowerCase());
     const matchStatus =
       statusFilter === "All" ||
-      inv.status.toLowerCase() === statusFilter.toLowerCase();
+      (statusFilter === "Claimed"
+        ? inv.status === "outstanding" && inv.paid_claimed_at !== null
+        : inv.status.toLowerCase() === statusFilter.toLowerCase());
     return matchSearch && matchStatus;
   });
 
@@ -1181,6 +1190,15 @@ export default function InvoicesPage() {
                       inv.status === "outstanding" ? "Outstanding" : "Paid"
                     }
                   />
+                  {inv.status === "outstanding" && inv.paid_claimed_at && (
+                    <div
+                      className="text-[10px] text-sky-700 mt-0.5"
+                      title="The parent tapped 'I've paid' — check your bank, then Mark Paid"
+                    >
+                      parent says paid{" "}
+                      {new Date(inv.paid_claimed_at).toLocaleDateString("en-SG")}
+                    </div>
+                  )}
                 </Td>
                 <Td>
                   {inv.status === "outstanding" && (

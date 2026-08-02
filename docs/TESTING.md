@@ -273,6 +273,20 @@ empty database — §7.62's lesson applied at the driver.
 > both-ends-inclusive enrolment span or the attendance union), so one regression will not turn
 > it red; `lib/attendanceRoster.test.ts` pins the two mechanisms separately;
 
+`verify-payment-collection.mjs` (+ `fixtures-payment-collection.sql` and its
+`-teardown.sql`) drives fee-free payment collection (PRD §7.21) end to end (19 checks):
+the admin's PayNow settings round-trip incl. `+65` normalization, the WhatsApp button's
+**popup is caught, never Sent** — asserting the right number and that the message
+carries the tokenized link and reference (wa.me 302s to `api.whatsapp.com/send`, so the
+number, not the host, is the assertion), the "chat opened" stamp wording (never
+"reminded" — RISK 7), the tokenized page rendering **sessionless** (amount, reference,
+computed QR, Save-QR), the RISK 4 auth-gate pair (sessionless `/billing` still bounces
+to login; a SIGNED-IN parent opening the public link is not stolen from it), the
+sessionless "I've paid" claim, the admin's "parent says paid" badge + Claimed filter,
+the converged RPC Mark Paid, and the public page's paid state. **The fixture resets its
+invoice on every load** — re-load before each run. Requires `supabase functions serve
+public-invoice` alongside both dev servers. What it deliberately does NOT prove: a real
+bank app accepting the QR (that is the manual release gate);
 `verify-makeups.mjs` (+ `fixtures-makeups.sql` and its `-teardown.sql`) drives a make-up —
 an enrolled child guesting one lesson of another same-category class — end to end through
 both real UIs (15 checks): the admin's booking form is child-first via **one search box
