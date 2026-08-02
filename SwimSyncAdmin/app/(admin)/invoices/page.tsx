@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle, RefreshCw } from "lucide-react";
+import { CheckCircle, Link as LinkIcon, MessageCircle, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
   todayInSg,
@@ -16,6 +16,8 @@ import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Tabl
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { blankToNull, checkSgPhone, normalizeSgPhone } from "@/lib/sgPhone";
+import { buildReminderMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
+import { ReminderQueue } from "./ReminderQueue";
 
 type InvoiceRow = {
   id: string;
@@ -27,6 +29,16 @@ type InvoiceRow = {
   status: string;
   parent_name: string;
   student_names: string; // first invoice item's student name(s)
+  reference_number: string;
+  public_token: string;
+  /** When the admin last OPENED a WhatsApp chat for this invoice. It does
+   *  not prove a message was sent — copy must read "chat opened". */
+  reminded_at: string | null;
+  /** wa.me-ready "65XXXXXXXX", or null → the button reads "no number". */
+  wa_number: string | null;
+  /** What the parent actually typed — the queue's advisory when unusable. */
+  raw_phone: string | null;
+  student_name_list: string[];
 };
 
 /** Mirrors GenerateResult.unclaimed_students in the billing engine. */
@@ -82,6 +94,9 @@ export default function InvoicesPage() {
   const [paynowUen, setPaynowUen] = useState<string | null>(null);
   const [paynowMobile, setPaynowMobile] = useState<string | null>(null);
   const [paynowSaved, setPaynowSaved] = useState<string | null>(null);
+  const [businessName, setBusinessName] = useState("your swim school");
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
   // Students with billable attendance and no parent account to bill. They hold
   // the month OPEN (the engine's fifth seal condition), so the remedy has to be
   // reachable from right here — an admin sent to another page to find them is
@@ -141,10 +156,13 @@ export default function InvoicesPage() {
 
     const { data: tenant } = await supabase
       .from("tenants")
-      .select("auto_invoice_enabled, invoice_run_day, paynow_uen, paynow_mobile")
+      .select(
+        "display_name, auto_invoice_enabled, invoice_run_day, paynow_uen, paynow_mobile"
+      )
       .eq("id", tid)
       .maybeSingle();
 
+    setBusinessName((tenant?.display_name as string | null) ?? "your swim school");
     setAutoEnabled(tenant?.auto_invoice_enabled ?? true);
     const n = Number(tenant?.invoice_run_day);
     setRunDay(Number.isFinite(n) && n >= 1 ? Math.min(28, n) : 7);
@@ -490,19 +508,19 @@ export default function InvoicesPage() {
     const { data } = await supabase
       .from("invoices")
       .select(
-        "id, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, parents(profiles(full_name)), invoice_items(student_name, students(full_name))"
+        "id, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, reference_number, public_token, reminded_at, parents(profiles(full_name, phone)), invoice_items(student_name, students(full_name))"
       )
       .order("generated_at", { ascending: false });
 
     setInvoices(
       (data ?? []).map((inv: any) => {
-        const studentNames = [
+        const nameList: string[] = [
           ...new Set(
             (inv.invoice_items ?? [])
               .map((item: any) => item.student_name ?? item.students?.full_name)
               .filter(Boolean)
           ),
-        ].join(", ");
+        ] as string[];
         return {
           id: inv.id,
           billing_month: inv.billing_month,
@@ -512,11 +530,50 @@ export default function InvoicesPage() {
           net_amount: Number(inv.net_amount),
           status: inv.status,
           parent_name: inv.parents?.profiles?.full_name ?? "—",
-          student_names: studentNames || "—",
+          student_names: nameList.join(", ") || "—",
+          reference_number: inv.reference_number ?? "—",
+          public_token: inv.public_token ?? "",
+          reminded_at: inv.reminded_at ?? null,
+          wa_number: toWaNumber(inv.parents?.profiles?.phone ?? null),
+          raw_phone: inv.parents?.profiles?.phone ?? null,
+          student_name_list: nameList,
         };
       })
     );
     setLoading(false);
+  }
+
+  /** The tokenized public page for an invoice — what the WhatsApp message
+   *  links to (the QR rides on the page; wa.me links cannot carry images). */
+  function invoiceLink(inv: InvoiceRow): string {
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://swimsync.sg";
+    return `${base}/invoice/${inv.public_token}`;
+  }
+
+  /** Opens the pre-filled chat, then stamps reminded_at. The stamp means
+   *  "chat opened", NOT "message sent" — the admin still presses Send, and
+   *  the button stays enabled so re-opening is always possible. */
+  async function handleWhatsApp(inv: InvoiceRow, businessName: string) {
+    if (!inv.wa_number) return;
+    const message = buildReminderMessage({
+      businessName,
+      studentNames: inv.student_name_list,
+      billingMonth: inv.billing_month,
+      amount: inv.net_amount,
+      link: invoiceLink(inv),
+      reference: inv.reference_number,
+    });
+    window.open(buildWaLink(inv.wa_number, message), "_blank", "noopener");
+    const stamp = new Date().toISOString();
+    const { error } = await supabase
+      .from("invoices")
+      .update({ reminded_at: stamp })
+      .eq("id", inv.id);
+    if (!error) {
+      setInvoices((prev) =>
+        prev.map((row) => (row.id === inv.id ? { ...row, reminded_at: stamp } : row))
+      );
+    }
   }
 
   async function handleMarkPaid(invoiceId: string) {
@@ -1034,7 +1091,38 @@ export default function InvoicesPage() {
             </button>
           ))}
         </div>
+        <div className="ml-auto">
+          <Button
+            variant="outline"
+            disabled={invoices.every((i) => i.status !== "outstanding")}
+            onClick={() => setQueueOpen(true)}
+          >
+            <MessageCircle className="h-4 w-4" />
+            WhatsApp reminders
+          </Button>
+        </div>
       </div>
+
+      <ReminderQueue
+        open={queueOpen}
+        onClose={() => setQueueOpen(false)}
+        rows={invoices
+          .filter((i) => i.status === "outstanding")
+          .map((i) => ({
+            id: i.id,
+            parent_name: i.parent_name,
+            student_names: i.student_names,
+            net_amount: i.net_amount,
+            reference_number: i.reference_number,
+            reminded_at: i.reminded_at,
+            wa_number: i.wa_number,
+            raw_phone: i.raw_phone,
+          }))}
+        onOpenChat={(id) => {
+          const inv = invoices.find((i) => i.id === id);
+          if (inv) handleWhatsApp(inv, businessName);
+        }}
+      />
 
       <Table>
         <Thead>
@@ -1096,15 +1184,62 @@ export default function InvoicesPage() {
                 </Td>
                 <Td>
                   {inv.status === "outstanding" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={markingPaid === inv.id}
-                      onClick={() => handleMarkPaid(inv.id)}
-                    >
-                      <CheckCircle className="h-3.5 w-3.5" />
-                      {markingPaid === inv.id ? "Saving…" : "Mark Paid"}
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={markingPaid === inv.id}
+                        onClick={() => handleMarkPaid(inv.id)}
+                      >
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        {markingPaid === inv.id ? "Saving…" : "Mark Paid"}
+                      </Button>
+                      {/* Stays enabled after the stamp — opening a chat is
+                          not sending a message, so re-opening must always be
+                          possible. "No number" is a visible state, never a
+                          broken link. */}
+                      {inv.wa_number ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleWhatsApp(inv, businessName)}
+                          title={
+                            inv.reminded_at
+                              ? `Chat opened ${new Date(inv.reminded_at).toLocaleDateString("en-SG")}`
+                              : "Open a pre-filled WhatsApp chat"
+                          }
+                        >
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          WhatsApp
+                        </Button>
+                      ) : (
+                        <span
+                          className="text-[11px] text-gray-400"
+                          title="This parent has no usable phone number"
+                        >
+                          no number
+                        </span>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Copy the invoice's payment link"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(invoiceLink(inv));
+                          setCopiedLink(inv.id);
+                          setTimeout(() => setCopiedLink(null), 1500);
+                        }}
+                      >
+                        <LinkIcon className="h-3.5 w-3.5" />
+                        {copiedLink === inv.id ? "Copied" : "Link"}
+                      </Button>
+                    </div>
+                  )}
+                  {inv.status === "outstanding" && inv.reminded_at && (
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      chat opened{" "}
+                      {new Date(inv.reminded_at).toLocaleDateString("en-SG")}
+                    </div>
                   )}
                 </Td>
               </Tr>

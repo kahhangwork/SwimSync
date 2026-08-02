@@ -560,19 +560,6 @@ silent drops a real cost.
 misses without re-emailing successes. Deliberately deferred from the first cut to keep it an
 'S'. Pairs with watching Resend delivery in the dashboard.
 
-### WhatsApp payment reminders — **M** `[Phase 2]` `[DESIGNED 2026-08-02]`
-Nudge parents about outstanding invoices over WhatsApp.
-
-**Why:** in Singapore, WhatsApp is where this conversation actually happens — the coach
-is already sending these messages by hand. Email is politer; WhatsApp gets read.
-
-**Notes:** a named secondary goal since the original PRD (§2.2). **Designed 2026-08-02
-as part of `docs/design/PAYMENT_COLLECTION_DESIGN.md`** — the chosen mechanism is
-wa.me click-to-chat links (free, ToS-clean, admin presses Send) with a click-through
-queue over unpaid invoices, NOT the Business API and NOT an unofficial bridge (real,
-enforced ban risk against the coach's own number — permanently ruled out). Remove this
-entry when the queue ships.
-
 ### One-click bulk WhatsApp sends (Cloud API) — **M** `[Phase 3]`
 Send the payment reminder to every unpaid parent with ONE click, server-side, instead
 of one Send per chat via the wa.me click-through queue.

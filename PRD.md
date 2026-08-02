@@ -1761,7 +1761,20 @@ directly, and no gateway takes a percentage. What the product supplies is
   and the QR; a **Save QR image** button with a scan-from-gallery instruction covers
   the you-can't-scan-your-own-screen case; amount and reference are selectable text.
   Every failure mode returns one identical not-found response. The page is where the
-  WhatsApp reminder link (§7.21 Phase 2, unbuilt) will land.
+  WhatsApp reminder link lands.
+- **WhatsApp reminders, by click-to-chat** *(Phase 2, implemented 2026-08-02)*. Every
+  outstanding invoice row has a **WhatsApp** button: it opens a pre-filled chat
+  (wa.me — free, ToS-compliant; the fixed message carries business name, children,
+  month, amount, reference and the tokenized link) and **the admin presses Send** —
+  that press is WhatsApp's anti-spam boundary, and the product never automates past it
+  (unofficial bridges risk banning the coach's own number; one-click bulk is the
+  Cloud API backlog item). A **WhatsApp reminders** queue works down every unpaid
+  invoice: never-contacted parents first, then oldest stamp; each click opens the next
+  chat. The stamp deliberately reads **"chat opened"**, never "reminded" — opening a
+  chat is not proof a message was sent, so rows never leave the queue until paid. A
+  parent with no usable phone number is a **visible "no number" state** (with the
+  advisory from `lib/sgPhone.ts`), never a broken link. A **Link** button copies the
+  invoice's public URL for any other channel.
 
 Parents with accounts see the same dynamic QR on the in-app PayNow screen (web;
 native keeps the static image).
