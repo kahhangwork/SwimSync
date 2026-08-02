@@ -1,14 +1,15 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-02 — **make-up classes shipped (guest-pass model, PRD §7.20,
-§8.25)**: the admin books an enrolled child into one lesson of another same-category
-class; a package family's attended make-up draws the package (the expiring-package
-recourse), an ad-hoc guest pays their own class's rate. Five migrations + engine v17 +
-all three UIs, **verified local only — NOT yet deployed** (migrations, the function and
-the apps are all pending; §7.60 ordering applies). Same day, earlier: the parent invoice
-detail marks package-funded lines (§8.24). The standing headline is unchanged: **real
-attendance exists on production**, and **July has still not been billed** — §9, and the
-marking window closes at the end of August._
+_Last updated: 2026-08-02 — **make-up classes shipped AND DEPLOYED (guest-pass model,
+PRD §7.20, §8.25)**: the admin books an enrolled child into one lesson of another
+same-category class; a package family's attended make-up draws the package (the
+expiring-package recourse), an ad-hoc guest pays their own class's rate. Five
+migrations + the engine + all three UIs, deployed in the §7.60 order and verified
+(grant dump clean, bundle grep positive) — **dormant on production until the first
+make-up is booked**. Same day, earlier: the parent invoice detail marks package-funded
+lines (§8.24). The standing headline is unchanged: **real attendance exists on
+production**, and **July has still not been billed** — §9, and the marking window
+closes at the end of August._
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
 
@@ -177,7 +178,8 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   The parent's **invoice detail marks each package-funded line** by the package's name
   (reversed draws read ad hoc — §8.24). PRD §7.16, §8.23.
 - **Make-up classes (verified local: pgTAP + Deno ×2 + vitest + jest + a 14-check UI
-  driver — NOT YET DEPLOYED)** — the guest-pass model (PRD §7.20): the business's admin
+  driver — LIVE 2026-08-02, dormant until the first make-up is booked)** — the
+  guest-pass model (PRD §7.20): the business's admin
   books an **enrolled** child into one lesson of **another same-category class** from the
   new admin Make-ups page; the booking (never an enrolment) makes the child expected at
   that one lesson, an unmarked one blocks the month like a trial, a package family's
@@ -324,16 +326,21 @@ See §11.
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **As of 2026-08-01 production is fully caught up**: every migration through
-> `20260801000200` is applied (`supabase migration list --linked` shows nothing pending),
-> `generate-invoices` is at **v16** (trial bookings + category trial pricing, on top of
-> the unclaimed-attendance seal condition,
-> package drawdown, the completed-month guard and effective-dated pricing), and a SECOND
-> function exists: **`package-emails` v1** (verify_jwt ON — deployed separately, and a
-> deploy of generate-invoices does NOT touch it). *(The previous version of this line went stale for two sessions —
-> `supabase functions list` and `supabase migration list` are the honest answers; treat
-> this sentence as a hint, not a fact.)*
-> Backups were taken before each production migration (scratchpad, not committed).
+> **As of 2026-08-02 production is fully caught up**: every migration through
+> `20260802000500` is applied (`supabase migration list --linked` shows nothing pending),
+> `generate-invoices` is at **version 18** on the platform's counter (make-up bookings,
+> on top of trial bookings + category trial pricing, the unclaimed-attendance seal
+> condition, package drawdown, the completed-month guard and effective-dated pricing),
+> and a SECOND function exists: **`package-emails` v1** (verify_jwt ON — deployed
+> separately, and a deploy of generate-invoices does NOT touch it). *(The previous
+> version of this line went stale for two sessions — `supabase functions list` and
+> `supabase migration list` are the honest answers; treat this sentence as a hint, not
+> a fact.)*
+> Backups were taken before each production migration through 2026-08-01 (scratchpad,
+> not committed). **The 2026-08-02 make-ups batch went out WITHOUT a fresh backup** —
+> additive-only plus three CREATE OR REPLACEs whose pre-change bodies are captured in
+> `supabase/rollback/20260802_makeup_bookings_DOWN.sql`; noted here so the omission is
+> a fact, not a discovery.
 >
 > The **tenancy** deploys (§8.1) had **opposite orderings** and both were deliberate — phase 4
 > *dropped* columns so the app deployed first; phase 5 only *added*, so migrations went
@@ -395,9 +402,16 @@ table to `docs/SESSIONS.md` and point at it from here — still one hop.
 user against three alternatives — freeform admin discretion (no per-miss ledger), any
 enrolled child (not package-only), private-category make-ups reuse `schedule_extra_lesson()`
 (different-coach private make-ups → BACKLOG), ad-hoc guests at the **home** class rate.
-Five migrations (`20260802000100–500`), engine → **v17**, all three UIs. **NOT yet
-deployed** — §7.60 ordering: `db push` → grant dump (§7.39) → `functions deploy` → push
-`main` last.
+Five migrations (`20260802000100–500`), the engine, all three UIs. **Deployed 2026-08-02
+in the §7.60 order and verified at each step**: `migration list --linked` clean; the
+remote grant dump shows only `authenticated` may execute the two RPCs (the table's
+`anon` grant is the platform-wide default posture — RLS with `TO authenticated`
+policies is the boundary, same as every sibling table); `generate-invoices` ACTIVE at
+platform version 18; CI green; the served swimsync.sg bundle carries `makeup_bookings`
+×4 and the new copy. The admin's authed chunks can't be fetched logged-out — **eyeball
+`/makeups` once when next signed in** (the §8.23 convention). Dormant until the first
+booking. `db push` printed a noisy pgdelta certificate error and still succeeded —
+`migration list --linked` was the honest answer (§7.31's shape).
 
 **What made it cheap:** `trial_bookings` was the template, and the miss already billed $0
 (`BILLABLE = {present, trial_paid}`), so one attended make-up = one draw / one charge —
