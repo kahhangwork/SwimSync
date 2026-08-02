@@ -13,6 +13,7 @@ import {
   expectedLessonDates,
   type DayOfWeek,
 } from "@/lib/lessonDates";
+import { filterEligibleKids } from "@/lib/makeupSearch";
 
 /**
  * Make-ups — an ENROLLED child guesting into one lesson of ANOTHER class in
@@ -71,6 +72,9 @@ export default function MakeupsPage() {
   // and the category decides which classes can host them.
   const [bookOpen, setBookOpen] = useState(false);
   const [bookKid, setBookKid] = useState("");
+  // One search box, matching the child's name OR their class's title — a
+  // dropdown stops working at a few dozen children (lib/makeupSearch.ts).
+  const [kidQuery, setKidQuery] = useState("");
   const [bookClass, setBookClass] = useState("");
   const [bookDate, setBookDate] = useState("");
   const [bookBusy, setBookBusy] = useState(false);
@@ -260,6 +264,15 @@ export default function MakeupsPage() {
     return `The family's package expires ${formatSgDate(latest)} — this lesson is after that, so it will bill at the class rate instead.`;
   }, [kid, bookDate, parentsOf, livePackages]);
 
+  // The search results, capped so a two-letter query over hundreds of
+  // children doesn't render a wall. The cap is display-only — narrowing the
+  // query is the intended way to find someone, and the cut is announced.
+  const kidMatches = useMemo(
+    () => filterEligibleKids(eligible, kidQuery),
+    [eligible, kidQuery]
+  );
+  const KID_RESULTS_CAP = 8;
+
   async function handleBook() {
     setBookError(null);
     if (!bookKid || !bookClass || !bookDate) return;
@@ -279,6 +292,7 @@ export default function MakeupsPage() {
     }
     setBookOpen(false);
     setBookKid("");
+    setKidQuery("");
     setBookClass("");
     setBookDate("");
     await loadAll();
@@ -395,28 +409,76 @@ export default function MakeupsPage() {
       {/* ── Book ───────────────────────────────────────────────────────────── */}
       <Modal title="Book a make-up" open={bookOpen} onClose={() => setBookOpen(false)}>
         <div className="space-y-4">
-          <label className="block">
+          <div>
             <span className="text-xs font-semibold text-gray-600">Child</span>
-            <select
-              value={bookKid}
-              onChange={(e) => {
-                setBookKid(e.target.value);
-                setBookClass("");
-                setBookDate("");
-              }}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">Choose a child…</option>
-              {eligible.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.full_name} — {k.home_class_title}
-                </option>
-              ))}
-            </select>
-            <span className="mt-1 block text-[11px] text-gray-400">
-              Only children currently enrolled in a class.
-            </span>
-          </label>
+            {kid ? (
+              // Chosen. One line naming child + class, and a Change control —
+              // re-opening the search is how you un-pick.
+              <div className="mt-1 flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
+                <span className="text-sm text-sky-900">
+                  <span className="font-semibold">{kid.full_name}</span>
+                  <span className="text-sky-700"> — {kid.home_class_title}</span>
+                </span>
+                <button
+                  onClick={() => {
+                    setBookKid("");
+                    setBookClass("");
+                    setBookDate("");
+                  }}
+                  className="rounded-lg border border-sky-300 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-white"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  placeholder="Search by child or class…"
+                  value={kidQuery}
+                  onChange={(e) => setKidQuery(e.target.value)}
+                  autoFocus
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                />
+                <div className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+                  {kidMatches.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-gray-400">
+                      No enrolled child matches “{kidQuery}”.
+                    </p>
+                  ) : (
+                    kidMatches.slice(0, KID_RESULTS_CAP).map((k) => (
+                      <button
+                        key={k.id}
+                        onClick={() => {
+                          setBookKid(k.id);
+                          setBookClass("");
+                          setBookDate("");
+                        }}
+                        className="flex w-full items-baseline justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-sky-50"
+                      >
+                        <span className="font-medium text-gray-800">
+                          {k.full_name}
+                        </span>
+                        <span className="shrink-0 text-xs text-gray-500">
+                          {k.home_class_title}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                  {kidMatches.length > KID_RESULTS_CAP && (
+                    <p className="px-3 py-1.5 text-[11px] text-gray-400">
+                      {kidMatches.length - KID_RESULTS_CAP} more — keep typing to
+                      narrow it down.
+                    </p>
+                  )}
+                </div>
+                <span className="mt-1 block text-[11px] text-gray-400">
+                  Only children currently enrolled in a class. The search matches
+                  the child&apos;s name or their class&apos;s name.
+                </span>
+              </>
+            )}
+          </div>
 
           {kid && hostChoices.length === 0 ? (
             // The private-coach shape: no other class in this category. The

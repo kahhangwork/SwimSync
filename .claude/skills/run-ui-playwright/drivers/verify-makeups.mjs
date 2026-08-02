@@ -62,18 +62,26 @@ await page.screenshot({ path: shot("makeups-01-page.png"), fullPage: true });
 await tap(page.getByRole("button", { name: /Book a make-up/i }).first(), "open the form");
 await page.waitForTimeout(600);
 
-const selects = page.locator("select");
-const kidOptions = await selects.nth(0).locator("option").allTextContents();
-check(
-  "the child list names the home class beside the child",
-  kidOptions.some((o) => o.includes(KID) && o.includes(HOME_TITLE)),
-  kidOptions.filter((o) => o.includes(KID)).join(" | ")
-);
-const kidIdx = kidOptions.findIndex((o) => o.includes(KID));
-await selects.nth(0).selectOption({ index: kidIdx });
+// The child picker is a SEARCH, not a dropdown — and the distinctive claim is
+// that it matches the CLASS name too, so search by the home class's title.
+const kidSearch = page.getByPlaceholder("Search by child or class…");
+await kidSearch.fill("makeup home");
 await page.waitForTimeout(400);
+const resultRow = page.getByRole("button", { name: new RegExp(KID) }).first();
+check(
+  "searching by the CLASS name finds the child, class shown beside the name",
+  await resultRow.isVisible().catch(() => false)
+);
+await tap(resultRow, "pick the child from the results");
+await page.waitForTimeout(400);
+let formText = await page.evaluate(() => document.body.innerText);
+check(
+  "the chosen child is shown with their home class and a Change control",
+  formText.includes(KID) && formText.includes(HOME_TITLE) && /Change/.test(formText)
+);
 
-const classOptions = await selects.nth(1).locator("option").allTextContents();
+const selects = page.locator("select");
+const classOptions = await selects.nth(0).locator("option").allTextContents();
 check(
   "the class list offers the same-category hosts and EXCLUDES the child's own class",
   classOptions.some((o) => o.includes(HOST_TITLE)) &&
@@ -81,11 +89,11 @@ check(
   classOptions.slice(1).join(" | ")
 );
 const hostIdx = classOptions.findIndex((o) => o.includes(HOST_TITLE));
-await selects.nth(1).selectOption({ index: hostIdx });
+await selects.nth(0).selectOption({ index: hostIdx });
 await page.waitForTimeout(400);
 
 const norm = (s) => s.replace(/\s+/g, " ").trim();
-const dateOptions = await selects.nth(2).locator("option").allTextContents();
+const dateOptions = await selects.nth(1).locator("option").allTextContents();
 check(
   "the lesson picker offers the host's days PLUS today's off-schedule extra",
   dateOptions
@@ -99,7 +107,7 @@ check(
   pickIdx >= 1,
   `looked for "${BOOK_LABEL}" in: ${dateOptions.slice(1, 5).join(" | ")}`
 );
-await selects.nth(2).selectOption({ index: pickIdx });
+await selects.nth(1).selectOption({ index: pickIdx });
 await tap(page.getByRole("button", { name: /Book the make-up/i }).first(), "book");
 await page.waitForTimeout(3000);
 
@@ -108,14 +116,17 @@ check("the booking appears under Upcoming", text.includes(KID));
 check("and reads Awaiting the lesson", /Awaiting the lesson/.test(text));
 await page.screenshot({ path: shot("makeups-02-booked.png"), fullPage: true });
 
-// The duplicate refusal, verbatim from the RPC (§7.32).
+// The duplicate refusal, verbatim from the RPC (§7.32). This second pass
+// searches by the child's NAME — the other half of the one-box contract.
 await tap(page.getByRole("button", { name: /Book a make-up/i }).first(), "reopen the form");
 await page.waitForTimeout(600);
-await selects.nth(0).selectOption({ index: kidIdx });
+await page.getByPlaceholder("Search by child or class…").fill("makeupvis");
 await page.waitForTimeout(400);
-await selects.nth(1).selectOption({ index: hostIdx });
+await tap(page.getByRole("button", { name: new RegExp(KID) }).first(), "pick by name");
 await page.waitForTimeout(400);
-await selects.nth(2).selectOption({ index: pickIdx });
+await selects.nth(0).selectOption({ index: hostIdx });
+await page.waitForTimeout(400);
+await selects.nth(1).selectOption({ index: pickIdx });
 await tap(page.getByRole("button", { name: /Book the make-up/i }).first(), "book the same slot again");
 await page.waitForTimeout(2500);
 text = await page.evaluate(() => document.body.innerText);

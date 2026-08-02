@@ -271,8 +271,10 @@ empty database — §7.62's lesson applied at the driver.
 
 `verify-makeups.mjs` (+ `fixtures-makeups.sql` and its `-teardown.sql`) drives a make-up —
 an enrolled child guesting one lesson of another same-category class — end to end through
-both real UIs (14 checks): the admin's booking form is child-first (the class list is the
-same category **minus the child's own class**), the date list is the host's real lesson
+both real UIs (15 checks): the admin's booking form is child-first via **one search box
+matched against the child's name OR their class's title** (`lib/makeupSearch.ts`; the
+driver exercises both paths — found by class name first, by child name on the second
+pass), the class list is the same category **minus the child's own class**, the date list is the host's real lesson
 days **plus the fixture's off-schedule extra session on today's date** (which is what lets
 the coach marking-screen checks run whatever weekday it is), the duplicate-slot refusal
 surfaces the RPC's own sentence (§7.32), the host coach's roster shows a "Make-ups coming

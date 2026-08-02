@@ -1698,8 +1698,11 @@ billing month open** exactly as a trial does. The trial refusals invert: a trial
 must not be enrolled; a make-up child must be (active, actively enrolled).
 
 **Booked by the admin, from the Make-ups page** (the Trials mirror, including its
-"Past — needs marking" list). The form is child-first — the child's own class decides
-the category, and the class list offers same-category classes *minus their own*. The
+"Past — needs marking" list). The form is child-first — one search box finds the child
+by **their name or their class's name** (a dropdown stops working at a few dozen
+children; the admin often knows the class, not the spelling), then the child's own
+class decides the category, and the class list offers same-category classes *minus
+their own*. The
 date list is the host's real lesson days plus any admin-scheduled off-schedule session
 (`book_makeup()` accepts those — an existing session proves the lesson is real). Every
 refusal lives in the RPC, not the screen: unenrolled or inactive child, inactive host
