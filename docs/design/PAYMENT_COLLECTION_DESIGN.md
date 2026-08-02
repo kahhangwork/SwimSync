@@ -8,9 +8,10 @@ deviation from the table below, ratified at plan approval:** the public data pat
 the `public-invoice` EDGE FUNCTION, not an anon-callable RPC — `anon` has no USAGE on
 schema `public`, and opening it would arm §7.39's cloud default-EXECUTE grants
 platform-wide (decision recorded in `docs/ARCHITECTURE.md` §6). Phase 4 (CSV
-reconciliation) remains unbuilt — BACKLOG. **The bank-app scan release gate is still
-open**: the production tenant's PayNow proxy fields stay NULL until a real scan test
-passes (HANDOVER §9)._ The economic constraint is the design: swim-coaching margins cannot
+reconciliation) remains unbuilt — BACKLOG. **The bank-app scan release gate PASSED
+2026-08-02** — the user configured the production proxy, scanned a real invoice QR
+with a real bank app, billed July, and collected real payments. The feature is in
+real use._ The economic constraint is the design: swim-coaching margins cannot
 absorb a percentage fee, so **no payment party ever sits between parent and coach** —
 SwimSync relays payment information and never touches funds (which also keeps it outside
 Payment Services Act licensing; the First Schedule excludes pure technical relays)._
