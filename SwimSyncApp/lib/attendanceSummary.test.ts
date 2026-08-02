@@ -4,6 +4,8 @@ import {
   summariseStatuses,
   formatSummary,
   progressLabel,
+  splitExpected,
+  formatAttendees,
   type DbStatus,
   type LessonProgress,
 } from "./attendanceSummary";
@@ -219,5 +221,99 @@ describe("progressLabel", () => {
       "3 of 5 marked"
     );
     expect(progressLabel({ kind: "complete", total: 2 })).toBe("Marked");
+  });
+});
+
+describe("splitExpected", () => {
+  // ⚠ THE HIGHEST-VALUE TEST IN THIS BLOCK, and the reason splitExpected is a
+  // function rather than two subtractions on a screen. The card's head-count
+  // and the chip's denominator MUST describe the same set of people. When they
+  // disagreed, a card read "4 students" beside "3 of 5 marked" — and a coach
+  // who trusts the head-count leaves a lesson unmarked, which blocks the whole
+  // billing month with no override (§8a).
+  it("students + guests always equals the chip's denominator", () => {
+    const cases: { expected: string[]; booked: string[] }[] = [
+      { expected: ["a", "b", "c"], booked: [] },
+      { expected: ["a", "b", "c", "g1"], booked: ["g1"] },
+      { expected: ["a", "g1", "g2"], booked: ["g1", "g2"] },
+      { expected: ["g1"], booked: ["g1"] },
+      { expected: [], booked: [] },
+      // A booking for someone who is not expected today must not be counted.
+      { expected: ["a", "b"], booked: ["someone-else"] },
+    ];
+
+    for (const { expected, booked } of cases) {
+      const { students, guests } = splitExpected(expected, booked);
+      expect(students + guests).toBe(expected.length);
+
+      // And the same number the chip would print.
+      const progress = lessonProgress(expected, new Set<string>(), ENDED);
+      const denominator =
+        progress.kind === "partial" || progress.kind === "complete"
+          ? progress.total
+          : expected.length;
+      expect(students + guests).toBe(denominator);
+    }
+  });
+
+  it("counts a booked child as a guest, not a student", () => {
+    expect(splitExpected(["a", "b", "c", "g1"], ["g1"])).toEqual({
+      students: 3,
+      guests: 1,
+    });
+  });
+
+  it("is all students when nobody is booked", () => {
+    expect(splitExpected(["a", "b"], [])).toEqual({ students: 2, guests: 0 });
+  });
+
+  it("is all guests when only guests are expected (a trial-only lesson)", () => {
+    expect(splitExpected(["g1", "g2"], ["g1", "g2"])).toEqual({
+      students: 0,
+      guests: 2,
+    });
+  });
+
+  it("ignores bookings for other dates or other classes", () => {
+    expect(splitExpected(["a", "b"], ["not-expected-here"])).toEqual({
+      students: 2,
+      guests: 0,
+    });
+  });
+
+  // A make-up guest is enrolled in ANOTHER class, so this should be
+  // unreachable — but if it ever happens, counting them twice would make the
+  // card disagree with the chip, which is the whole failure being prevented.
+  it("counts a child who is both booked and expected exactly once", () => {
+    const { students, guests } = splitExpected(["a", "g1"], ["g1", "g1"]);
+    expect(students + guests).toBe(2);
+    expect(guests).toBe(1);
+  });
+
+  it("never returns a negative student count", () => {
+    const { students } = splitExpected(["g1"], ["g1", "g2", "g3"]);
+    expect(students).toBe(0);
+  });
+});
+
+describe("formatAttendees", () => {
+  it("omits guests entirely when there are none", () => {
+    expect(formatAttendees(4, 0)).toBe("4 students");
+    expect(formatAttendees(1, 0)).toBe("1 student");
+  });
+
+  // Separate, never merged — a guest at one lesson is not a weekly student
+  // (PRD §7.3, §7.17: a class reads `2+1`, never `3`).
+  it("names guests separately from students", () => {
+    expect(formatAttendees(4, 1)).toBe("4 students + 1 guest");
+    expect(formatAttendees(2, 3)).toBe("2 students + 3 guests");
+  });
+
+  it("handles a lesson whose only attendees are guests", () => {
+    expect(formatAttendees(0, 1)).toBe("0 students + 1 guest");
+  });
+
+  it("never renders a negative guest count", () => {
+    expect(formatAttendees(3, -1)).toBe("3 students");
   });
 });

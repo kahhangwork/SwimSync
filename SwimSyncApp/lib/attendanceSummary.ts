@@ -150,6 +150,50 @@ export function formatSummary(
     .join(" · ");
 }
 
+/**
+ * Split the expected head-count into weekly students and one-lesson guests.
+ *
+ * ⚠ WHY THIS EXISTS. Today's class card used to print the class's ACTIVE
+ * ENROLMENT count while the chip beside it counted the EXPECTED set — which
+ * also contains trial and make-up guests. So a card could read "4 students"
+ * next to "3 of 5 marked", and a coach who trusts the head-count walks away
+ * from a lesson still owing a mark. An unmarked lesson blocks the whole
+ * billing month, with no override (§8a).
+ *
+ * ⚠ THE SUM IS TRUE BY CONSTRUCTION, and that is the point of the function.
+ * `students` is derived by SUBTRACTING guests from the expected set rather than
+ * counted independently, so `students + guests === expected.length` cannot
+ * drift — there is no second derivation to disagree with the first (§7.18).
+ * Pass the SAME `expected` array that produced the chip.
+ *
+ * A booked child who is somehow also enrolled here counts once, as a guest —
+ * the intersection is taken against `expected`, never added to it.
+ */
+export function splitExpected(
+  expected: readonly string[],
+  bookedOnDate: readonly string[]
+): { students: number; guests: number } {
+  const booked = new Set(bookedOnDate);
+  let guests = 0;
+  for (const id of expected) if (booked.has(id)) guests++;
+  return { students: expected.length - guests, guests };
+}
+
+/**
+ * "4 students", or "4 students + 1 guest" when someone is guesting.
+ *
+ * Guests are named SEPARATELY, never folded into the student count — the same
+ * rule the roster screen and the admin Classes page follow, where a class reads
+ * `2+1` and never `3` (PRD §7.3, §7.17). A guest at one lesson is not a weekly
+ * student, and an admin acting on that confusion is what blocks a billing
+ * month.
+ */
+export function formatAttendees(students: number, guests: number): string {
+  const s = `${students} student${students === 1 ? "" : "s"}`;
+  if (guests <= 0) return s;
+  return `${s} + ${guests} guest${guests === 1 ? "" : "s"}`;
+}
+
 /** The chip's words for each state. `total` is the expected head-count. */
 export function progressLabel(progress: LessonProgress): string {
   switch (progress.kind) {

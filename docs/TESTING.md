@@ -380,12 +380,20 @@ the three 2026-07-26 attendance bugs, **because all three live in the router or 
 format rather than in any function**. It navigates **in-app** — Today's card, then the
 backlog row — which is the whole reason it exists: a deep link mounts a fresh screen and
 passes cleanly, which is exactly how `verify-attendance-guard.mjs` scored 14/14 against a
-build that was silently writing attendance to the wrong day. **18 checks**: rows land on
+build that was silently writing attendance to the wrong day. **22 checks**: rows land on
 the lesson the coach is looking at (§7.64), saving leaves the attendance screen instead of
 popping into a different lesson (§7.65), a *partially* marked lesson can be completed at all
 (§7.67 — a fully marked or fully unmarked one cannot reproduce it), and the status chips read
 correctly with no empty roster ever labelled *Marked* (§7.68). Scores **4/8 → 18/18** across
-the three fixes; the two-class fixture is required because one class cannot express "marked
+the three fixes;
+> **+4 checks on 2026-08-02 for §7.80**, the other half of §7.65: pressing the **Classes**
+> tab must land on the class list rather than the leftover attendance screen the Today tab
+> pushed into that stack, today's classes must be grouped under a *Today* heading, and —
+> the regression the fix could itself cause — Today's *Mark Attendance* must still push
+> through. Scored **18/22 → 22/22**. The same change made the driver **record a crash as a
+> failed check**: four checks appended below the last `check()` threw on their first line
+> and the run still printed *18/18 passed* and exited 0, because `finally` reached
+> `process.exit` first (§7.79). the two-class fixture is required because one class cannot express "marked
 two lessons in one sitting". Its fixture derives dates from one clock anchor, like the guard
 driver's. **It selects buttons by the card for a named class, never by page index** — an
 index broke the moment a finished class started saying *Edit attendance* — and its

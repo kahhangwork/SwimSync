@@ -124,7 +124,13 @@ check(
     await page.getByText("Sign In").last().click({ force: true });
     await page.waitForTimeout(8000);
 
-    await tap(page.getByText("Billing").last(), "billing tab");
+    // The coach's Billing tab became "My Pay" on 2026-08-02 — the invoice list
+    // and Mark Paid moved out of the coach app entirely (payment collection
+    // lives on the admin panel, PRD §7.21) and what is left is payouts. The
+    // tab is also HIDDEN when a coach has no payouts, which is why this driver
+    // freezes a paid payout above before coming here: without one there would
+    // be no tab to tap.
+    await tap(page.getByText("My Pay").last(), "my pay tab");
     await page.waitForTimeout(6000);
     const body = await page.evaluate(() => document.body.innerText);
     check("coach sees a 'Your pay' section", body.includes("Your pay"), "");

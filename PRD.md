@@ -194,9 +194,10 @@ A coach uses SwimSync to manage attendance and payment tracking for students ass
 
 - View own classes and assigned students
 - Mark and edit attendance (edit triggers credit note if invoice exists)
-- View invoices and credit notes related to own students/classes
-- Mark invoices as paid
-- Upload own PayNow QR
+- *(implemented — changed 2026-08-02)* View **their own pay** (`coach_payouts`), and
+  nothing else about money. The coach app shows **no invoices, no credit notes and no
+  mark-as-paid**; see §7.9
+- Upload own PayNow QR *(only if they are also the business's admin — see below)*
 
 #### Coach Restrictions
 
@@ -1045,9 +1046,23 @@ SwimSync shall support credit notes for post-invoice attendance corrections.
 SwimSync shall support manual payment verification.
 
 - Parent sees invoice status and outstanding amount (net of any credits applied)
-- Coach manually marks invoice as paid
 - Paid timestamp should be stored
 - No auto-payment detection required for MVP
+
+*(implemented — changed 2026-08-02)* **Marking an invoice paid is a TENANT ADMIN action,
+not a coach one.** The original line said "coach manually marks invoice as paid", and the
+coach app carried an invoice list with a Mark Paid button. Fee-free payment collection
+(§7.21) put everything that makes an invoice actionable on the admin panel — the
+`INV-YYYY-NNNN` reference, the dynamic PayNow QR, the WhatsApp reminder queue, the "parent
+says paid" badge and the **Claimed** filter — so the coach's copy was a place to make a
+money decision with strictly less information. It was removed, along with the
+"Outstanding" tile on the coach's Today screen, which counted unpaid invoices with no date
+bound while sitting between two today-scoped numbers.
+
+Every mark-paid still runs through the one converged `confirm_invoice_paid()` path (§9.13),
+now reached only from the **admin panel** and the **public invoice page**. A private coach
+holds the tenant-admin role anyway, so nothing they could do before is lost — it moved to
+`admin.swimsync.sg`.
 
 ### 7.10 PayNow QR
 
@@ -1746,6 +1761,13 @@ directly, and no gateway takes a percentage. What the product supplies is
   the year taken from the invoice's **own billing month**, never the clock. Assigned by
   a database trigger on insert; the billing engine is untouched. References and tokens
   are pinned — not client-writable.
+  *(implemented 2026-08-02)* **The reference is what the parent app shows too**, on both
+  the invoice list and the invoice detail. Those two screens printed a fragment of the
+  row's UUID (`Invoice #3F2B8C1A`) while the QR, the WhatsApp reminder, the public page
+  and the parent's own bank statement all carried `INV-2026-0001` — so a parent comparing
+  the app against their payment saw two different numbers for one invoice. One shared
+  helper renders it, falling back to the old fragment only for rows that predate the
+  trigger.
 - **A dynamic PayNow QR per invoice.** The business's admin enters a **UEN or mobile
   number** once (Invoices page → *PayNow details*; UEN preferred when both — a
   corporate account is guaranteed to receive the reference on its statement, a personal
@@ -2348,8 +2370,8 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | **Add / Edit Child** | Name, DOB, gender, notes fields | Form with save/cancel; validation on required fields (no swimming-ability field — see §5.1) |
 | **Child Profile** | Child details card; assignment status; class info if assigned | Show coach name, class day/time/location when assigned |
 | **Attendance History** | Chronological list of lessons with status badges | Color-coded: green = present, grey = absent, blue = trial |
-| **Invoices** | Monthly invoice list with status; tap for detail | Show gross, credit applied, net amount; red = outstanding |
-| **Invoice Detail** | Line items per lesson; credit notes applied; total | PayNow QR button to open payment view |
+| **Invoices** | Monthly invoice list with status; tap for detail | Show gross, credit applied, net amount; red = outstanding. *(implemented — each card names the invoice by its **`INV-YYYY-NNNN` reference**, the same string as the QR and the bank statement, §7.21)* |
+| **Invoice Detail** | Line items per lesson; credit notes applied; total | PayNow QR button to open payment view. *(implemented — carries the **reference**, selectable so it can be copied into a transfer made outside the QR, §7.21)* |
 | **Credit Notes** | List of credit notes with reference number and amount | Linked to original invoice; show applied/pending status |
 | **PayNow QR** | The QR of the business that issued the invoice; invoice amount display | Correct QR per **business** *(implemented — changed from per-coach, §7.10)*; amount shown for reference |
 
@@ -2360,13 +2382,14 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | Screen | Key Elements | Notes |
 |--------|-------------|-------|
 | **Login** | Email/password | Coach accounts created by superadmin |
-| **Today's Classes** | List of today's classes with student count; quick-action buttons | Default landing screen; highlight current/next class. *(implemented — each card also carries its **attendance state** and a breakdown of what was recorded, §7.6)* |
+| **Today's Classes** | List of today's classes with student count; quick-action buttons | Default landing screen; highlight current/next class. *(implemented — each card also carries its **attendance state** and a breakdown of what was recorded, §7.6, and names **guests separately** from students: "4 students + 1 guest", §7.20)* |
+| **My Classes** | Every class the coach teaches, **grouped by weekday with today first** | *(implemented 2026-08-02)* The tab's landing screen. It always opens here: the attendance screen lives in this tab's stack but is pushed from Today, and a leftover one used to be what the coach saw instead (§7.80) |
 | **Class Roster** | Student list for selected class; attendance status per student | Tap student row to mark/edit attendance |
 | **Mark Attendance** | Status picker per student: Present, Absent, Cancelled, Trial | Minimal taps; if Trial, sub-prompt for Paid/Free; **"Set all ▾"** header shortcut to set every student at once (§7.6); batch save |
 | **Edit Past Attendance** | Calendar/date picker; select lesson; edit status | Warning shown if lesson already invoiced; confirm triggers credit note |
-| **Invoices** | Monthly invoice list for coach's students; filter by status | Mark as Paid button; show outstanding vs paid counts |
-| **Credit Notes** | List of credit notes related to coach's students | Read-only view; linked to original invoices |
-| **PayNow QR Mgmt** | Current QR image; upload/replace button | Image picker; preview before save |
+| **My Pay** | The coach's own `coach_payouts` — period, amount, draft vs paid | *(implemented 2026-08-02 — replaced the Invoices/Credit Notes screens, §7.9)* **Hidden entirely when the coach has no payouts**, which is the finished state for a private coach (§7.13), not missing setup. Only ever their own; a colleague's pay is not inferable |
+| ~~Invoices~~ / ~~Credit Notes~~ | — | **Removed from the coach app 2026-08-02.** Both live on the admin panel, which is the only surface with the reference, the QR and the reminder queue (§7.9, §7.21) |
+| **PayNow QR Mgmt** | Current QR image; upload/replace button | Image picker; preview before save. Only for a coach who is also the business's admin (§7.10) |
 
 ### 14.3 Superadmin Web Panel — Screen Flow
 
@@ -2395,10 +2418,14 @@ The following section provides a screen-by-screen reference for each SwimSync us
 
 #### Coach App (Mobile)
 
-- Bottom tab navigation: Today, Classes, Billing, Settings
+- *(implemented — changed 2026-08-02)* Bottom tab navigation: **Today, Classes, My Pay,
+  Settings** — and **My Pay is absent** unless the coach has a payout, so a private coach
+  sees **three** tabs. It was *Today, Classes, Billing, Settings*; the Billing tab held an
+  invoice list and a Mark Paid button, both now admin-only (§7.9)
 - Today tab is the default with immediate access to attendance marking
-- Classes tab shows all assigned classes for date-based lookups
-- Billing tab shows invoices for the coach's students with quick mark-as-paid
+- Classes tab shows all assigned classes, **grouped by weekday with today's first**, and
+  **always opens on that list** — pressing the tab unwinds anything the Today tab pushed
+  into its stack (§7.80)
 - Settings tab for PayNow QR upload and account management
 
 #### Superadmin Panel (Web)

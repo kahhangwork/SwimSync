@@ -385,10 +385,10 @@ See §11.
 > fixtures** — none of it has been driven against the real production DB. No schema or
 > migration is involved, so failure looks wrong rather than destroying data.
 
-**Not done yet** (see §9): real **parent onboarding** — parents self-register + add
-their kids via **`swimsync.sg/welcome`**, then the superadmin assigns each to a class;
-this is the last gate before real billing. Native App Store / Play Store builds remain
-deferred (web app on iPhone for now).
+**Not done yet** (see §9): native **App Store / Play Store** builds remain deferred (web
+app on iPhone for now). *Parent onboarding is no longer a gate — it happened, and July
+was billed on the back of it. Onboarding a new family is now routine: they enter the join
+code at `swimsync.sg/welcome`, and the admin assigns each child to a class.*
 
 ---
 
@@ -582,10 +582,9 @@ Everything below is the monthly loop from here on:
    tracker), then **bill August in early September** — same runbook, now routine. The
    marking window still floors at the 1st of last month (§8.15): August's lessons are
    markable through September, and no later.
-3. **Worth deciding now that the loop is proven: enable cron?** (`auto_invoice_enabled`
-   — currently false.) Both original blockers are long gone. The trade recorded in §9's
-   earlier iterations stands: a blocked month becomes a *silent stall* rather than a
-   button that refuses, and the block-notification email has never fired in production.
+
+*(Whether to enable cron is a decision, not part of the loop — it lives under
+**Worth deciding, not urgent** below, once only.)*
 
 > **"Set a coach rate" is still NOT a to-do.** Production is a private coach; no rate is
 > the finished state (PRD §7.13). It becomes real the day this business hires a second

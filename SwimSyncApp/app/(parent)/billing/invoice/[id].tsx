@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { confirmAction } from "@/lib/confirm";
 import { fundingByItem } from "@/lib/invoiceFunding";
+import { invoiceLabel } from "@/lib/invoiceLabel";
 import { useAppStore } from "@/store/useAppStore";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
@@ -39,6 +40,9 @@ type CreditNoteApplied = {
 
 type InvoiceDetail = {
   id: string;
+  /** `INV-YYYY-NNNN` — what the QR, the reminder and the bank statement say.
+   *  Null only for rows written before the reference trigger existed. */
+  reference_number: string | null;
   billing_month: string;
   gross_amount: number;
   package_applied: number;
@@ -113,6 +117,7 @@ export default function InvoiceDetailScreen() {
         .from("invoices")
         .select(`
           id,
+          reference_number,
           billing_month,
           gross_amount,
           package_applied,
@@ -175,6 +180,7 @@ export default function InvoiceDetailScreen() {
 
       setInvoice({
         id: inv.id,
+        reference_number: (inv as any).reference_number ?? null,
         billing_month: inv.billing_month,
         business_name:
           (Array.isArray((inv as any).tenants)
@@ -263,6 +269,13 @@ export default function InvoiceDetailScreen() {
           </Text>
           <Text className="text-xs font-medium text-sky-600 mb-1">
             From {invoice.business_name}
+          </Text>
+          {/* The reference the parent will actually quote — it is what the QR
+              locks in, what the WhatsApp reminder says, and what lands on their
+              bank statement. Selectable so it can be copied into a transfer
+              made outside the QR. */}
+          <Text selectable className="text-xs font-semibold text-gray-700 mb-1">
+            {invoiceLabel(invoice)}
           </Text>
           <Text className="text-xs text-gray-500 mb-1">
             Generated {formatDate(invoice.generated_at)}

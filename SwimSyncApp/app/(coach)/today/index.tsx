@@ -35,6 +35,8 @@ import {
   summariseStatuses,
   formatSummary,
   progressLabel,
+  splitExpected,
+  formatAttendees,
   isFinished,
   type LessonProgress,
   type DbStatus,
@@ -48,7 +50,12 @@ type TodayClass = {
   start_time: string;
   end_time: string;
   location_name: string;
+  /** Weekly, enrolled children expected at TODAY's lesson. */
   student_count: number;
+  /** Trial or make-up children guesting at this ONE lesson. Counted apart from
+   *  students, never folded in — the `2+1`-not-`3` rule (PRD §7.3, §7.17).
+   *  `student_count + guest_count` is exactly the chip's denominator. */
+  guest_count: number;
   session_id: string | null; // null if no lesson session generated for today yet
   /** Marked / partial / upcoming / not-marked / no-students. */
   progress: LessonProgress;
@@ -109,7 +116,6 @@ export default function TodayScreen() {
   const session = useAppStore((s) => s.session);
   const [classes, setClasses] = useState<TodayClass[]>([]);
   const [backlog, setBacklog] = useState<BacklogItem[]>([]);
-  const [outstandingCount, setOutstandingCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Everything below derives from this one date string, so the weekday we query
@@ -251,7 +257,14 @@ export default function TodayScreen() {
     // so there is exactly one `expectedStudentsOn` per (class, date) in this file.
     const todayByClass = new Map<
       string,
-      { progress: LessonProgress; summary: string }
+      {
+        progress: LessonProgress;
+        summary: string;
+        /** Derived from the SAME expected set as `progress`, by subtraction —
+         *  see splitExpected. Never a second head-count. */
+        students: number;
+        guests: number;
+      }
     >();
 
     for (const cls of coachClasses as any[]) {
@@ -280,6 +293,15 @@ export default function TodayScreen() {
           enrolmentSpans,
           bookedHere
         );
+        // Students vs guests, split out of the SAME `expectedToday` array that
+        // feeds the chip below — by subtraction, so the card's head-count and
+        // the chip's denominator cannot disagree (§7.18, and see splitExpected).
+        // The card used to print the class's ACTIVE ENROLMENT count instead,
+        // which excluded guests: "4 students" beside "3 of 5 marked".
+        const split = splitExpected(
+          expectedToday,
+          bookedHere.get(todayDate) ?? []
+        );
         todayByClass.set(cls.id, {
           // Keyed to the class's END time: a coach marks at the end of a lesson,
           // so one still running is "Upcoming", not overdue.
@@ -292,6 +314,8 @@ export default function TodayScreen() {
               sessToday?.statusByStudent ?? new Map()
             )
           ),
+          students: split.students,
+          guests: split.guests,
         });
       }
 
@@ -361,9 +385,12 @@ export default function TodayScreen() {
           start_time: cls.start_time,
           end_time: cls.end_time,
           location_name: cls.location_name,
-          student_count: (cls.student_class_enrolments ?? []).filter(
-            (e: any) => e.is_active
-          ).length,
+          // From the expected set, NOT from `student_class_enrolments`. The
+          // enrolment count is a different question ("who is in this class")
+          // to the one the card asks ("who is at today's lesson"), and the two
+          // differ by exactly the guests.
+          student_count: today?.students ?? 0,
+          guest_count: today?.guests ?? 0,
           session_id:
             sessionByClassDate.get(`${cls.id}:${todayDate}`)?.id ?? null,
           // The loop above sets this for every class running today. The fallback
@@ -376,27 +403,14 @@ export default function TodayScreen() {
 
     setClasses(mapped);
 
-    // Count outstanding invoices for students in this coach's classes
-    const { count } = await supabase
-      .from("invoices")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "outstanding")
-      .in(
-        "parent_id",
-        // Subquery: get all parent_ids for students enrolled in this coach's classes
-        (
-          await supabase
-            .from("student_class_enrolments")
-            .select("students(parent_students(parent_id))")
-            .in("class_id", classIds)
-            .eq("is_active", true)
-        ).data
-          ?.flatMap((e: any) =>
-            e.students?.parent_students?.map((ps: any) => ps.parent_id) ?? []
-          ) ?? []
-      );
-
-    setOutstandingCount(count ?? 0);
+    // ⚠ NO INVOICE COUNT HERE, DELIBERATELY. This screen used to show an
+    // "Outstanding" tile counting unpaid invoices across every parent the coach
+    // serves — a number with no date bound, sitting between "Classes Today" and
+    // "Students Today" where it read as a fact about today's lessons. It is
+    // neither today-scoped nor lesson-shaped, and since payment collection
+    // shipped (PRD §7.21) chasing an invoice is an admin-panel job with the
+    // reference, the QR and the WhatsApp queue behind it. Removed 2026-08-02
+    // along with the coach's invoice list; do not re-add a count here.
     setLoading(false);
   }, [session, todayDayOfWeek, todayDate]);
 
@@ -407,6 +421,7 @@ export default function TodayScreen() {
   );
 
   const totalStudents = classes.reduce((s, c) => s + c.student_count, 0);
+  const totalGuests = classes.reduce((s, c) => s + c.guest_count, 0);
 
   return (
     <SafeAreaView className="flex-1 bg-sky-50">
@@ -441,14 +456,20 @@ export default function TodayScreen() {
               Students Today
             </Text>
           </View>
-          <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 items-center">
-            <Text className="text-2xl font-bold text-red-500">
-              {loading ? "—" : outstandingCount}
-            </Text>
-            <Text className="text-xs text-gray-500 mt-0.5 text-center">
-              Outstanding
-            </Text>
-          </View>
+          {/* Guests get their own tile rather than inflating the student count,
+              for the same reason the cards keep them apart — a guest at one
+              lesson is not a weekly student. Rendered only when there are any,
+              so an ordinary day still reads as two clean numbers. */}
+          {!loading && totalGuests > 0 && (
+            <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 items-center">
+              <Text className="text-2xl font-bold text-emerald-600">
+                {totalGuests}
+              </Text>
+              <Text className="text-xs text-gray-500 mt-0.5 text-center">
+                {totalGuests === 1 ? "Guest Today" : "Guests Today"}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Unmarked past lessons — only rendered when there are any, so a coach
@@ -565,7 +586,7 @@ export default function TodayScreen() {
                       up to. The breakdown itself is omitted entirely when
                       nothing is recorded — never a dangling separator. */}
                   <Text className="text-xs text-gray-500 mb-3 -mt-1">
-                    {cls.student_count} students
+                    {formatAttendees(cls.student_count, cls.guest_count)}
                     {cls.summary ? ` \u00b7 ${cls.summary}` : ""}
                   </Text>
 

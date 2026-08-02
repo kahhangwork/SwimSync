@@ -13,11 +13,15 @@ import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
+import { invoiceLabel } from "@/lib/invoiceLabel";
 
 type Tab = "Invoices" | "Packages" | "Credit Notes";
 
 type Invoice = {
   id: string;
+  /** `INV-YYYY-NNNN` — what the QR, the reminder and the bank statement say.
+   *  Null only for rows written before the reference trigger existed. */
+  reference_number: string | null;
   billing_month: string;
   gross_amount: number;
   package_applied: number;
@@ -118,7 +122,7 @@ export default function BillingScreen() {
       await Promise.all([
         supabase
           .from("invoices")
-          .select("id, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, tenant_id, tenants(display_name)")
+          .select("id, reference_number, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, tenant_id, tenants(display_name)")
           .eq("parent_id", parent.id)
           .order("billing_month", { ascending: false }),
 
@@ -326,8 +330,12 @@ export default function BillingScreen() {
                         <Text className="text-xs font-medium text-sky-600 mt-0.5">
                           {inv.business_name}
                         </Text>
-                        <Text className="text-xs text-gray-500 mt-0.5">
-                          Invoice #{inv.id.slice(0, 8).toUpperCase()}
+                        {/* The reference the QR, the WhatsApp reminder and the
+                            bank statement all carry — not a UUID fragment, which
+                            gave the parent a different number to the one on their
+                            own payment. */}
+                        <Text selectable className="text-xs text-gray-500 mt-0.5">
+                          {invoiceLabel(inv)}
                         </Text>
                       </View>
                       <StatusBadge

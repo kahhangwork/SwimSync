@@ -1094,3 +1094,64 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     error THERE means the DEFINER hop was flattened, which is the actual bug. The pgTAP
     suite's service_role-shaped INSERT is the tripwire that goes red first.
     (2026-08-02.)
+
+79. **A DRIVER WITH NO `check()` CALLS AND A SWALLOWING `catch` IS A SCREENSHOT SCRIPT,
+    NOT A TEST — IT REPORTS GREEN FOREVER.** `verify-coach-billing.mjs` had **zero
+    assertions**: it computed booleans, printed them with `console.log`, wrapped
+    everything in `catch (e) { console.error }`, and set no exit code. Nothing it could
+    observe was capable of failing the run. It was deleted on 2026-08-02 with the coach's
+    invoice list; `verify-tz-saturday.mjs` is the surviving instance and is in
+    `BACKLOG.md`. **The detector is one line** — run it whenever a driver is added:
+    ```bash
+    cd .claude/skills/run-ui-playwright/drivers
+    for f in verify-*.mjs; do [ $(grep -c "check(" "$f") -eq 0 ] && echo "NO ASSERTIONS: $f"; done
+    ```
+    **The subtler half, and the one that bit during the same session:** a driver that DOES
+    assert can still hide a crash, because `finally { … process.exit(passed === results.length) }`
+    runs *before* an exception can surface. Four checks appended to the end of
+    `verify-stale-screen.mjs` threw on their first line; the run printed **"18/18 checks
+    passed" and exited 0**, because the checks never entered `results` and a counter cannot
+    report an assertion that was never made. **The fix is structural: `catch` the exception
+    and record it AS A FAILED CHECK**, so the crash has to travel through the same counter
+    as everything else. That pattern is now in `verify-stale-screen.mjs`; copy it into any
+    driver you extend. This is the fourth driver-rot finding in a fortnight (§8.20–§8.22)
+    and the first that is mechanically detectable. (2026-08-02.)
+
+80. **SWITCHING TABS DOES NOT UNWIND A TAB'S STACK, AND THREE OF THE FOUR OBVIOUS WAYS TO
+    UNWIND IT YOURSELF SILENTLY DO NOTHING.** §7.65 established that the attendance screen
+    lives in the **Classes** tab's `Stack` while being pushed from the **Today** tab, and
+    fixed the within-stack half (attendance exits via `router.replace`). The other half
+    stayed broken for weeks and was reported by the user: because `replace` to a *different
+    tab* resolves to a tab jump, the Classes stack keeps its attendance screen, so pressing
+    **Classes** lands the coach on the last lesson they marked instead of their class list.
+    Fixed in `(coach)/_layout.tsx` with a `tabPress` listener. **What matters is what did
+    NOT work, because each looked correct and changed no behaviour at all:**
+    - `navigation.navigate("classes", { screen: "index" })` — no-op.
+    - `StackActions.popToTop()` targeted at the child stack — **never fires, because
+      expo-router does not populate nested navigator state**: every route in
+      `navigation.getState().routes` has `state: undefined`, so there is no child key to aim
+      at. (Verified by probe, expo-router 4 / RN 0.76.)
+    - `router.dismissAll()` — `router.canDismiss()` is **`false`** for a tab's nested stack.
+    - ✅ `router.replace("/(coach)/classes")`, **deferred by a macrotask** — when `tabPress`
+      fires you are still on the *outgoing* tab, so acting synchronously targets the stack
+      you are leaving.
+    **Two standing prohibitions.** Do NOT move this to `useFocusEffect` or `unmountOnBlur`:
+    both fire on *programmatic* entry, so they would intercept Today's "Mark Attendance"
+    push and turn the most frequent action in the product into a dead tap. And do NOT verify
+    this by unit test or deep link — it is router state, so only in-app navigation reaches
+    it (§7.65's lesson, again). `verify-stale-screen.mjs` now covers both directions: the
+    tab lands on the list, *and* the push still works. (2026-08-02.)
+
+81. **EXPO'S DEV SERVER CACHES THE ROUTE MANIFEST, SO A RENAMED ROUTE FOLDER LEAVES A GHOST
+    TAB AND EVERY DRIVER AGAINST IT IS MEASURING THE OLD APP.** After
+    `git mv app/(coach)/billing app/(coach)/pay`, a probe of the live tab bar returned
+    `["/today","/classes","/settings","/billing","/pay"]` — **both** the new route and the
+    deleted one, with the ghost still routable. `verify-coach-wages.mjs` failed against it
+    for a reason that had nothing to do with the code under test. `npx expo start --clear`
+    (a full restart, not a refresh) returned the honest
+    `["/today","/classes","/pay","/settings"]`. **Whenever you add, delete or rename a file
+    under `app/`, restart Metro with `--clear` before trusting any driver run**, and if a
+    tab or route behaves as though your change never landed, check the manifest before
+    debugging the change. Cheap probe:
+    `page.evaluate(() => [...document.querySelectorAll("a")].map(a => a.getAttribute("href")))`.
+    (2026-08-02.)

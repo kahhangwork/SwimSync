@@ -31,7 +31,7 @@
 // The admin panel is NOT needed — this is entirely a coach-app flow.
 import os from "node:os";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, dumpText, EXPO } from "./lib.mjs";
+import { launch, loginExpo, dumpText, tap, EXPO } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const results = [];
@@ -387,6 +387,89 @@ try {
     "class A's lesson is untouched by class B's save",
     marksOn(TODAY) === "Stale One=present, Stale Two=present",
     `${TODAY} class A: ${marksOn(TODAY)}`
+  );
+
+  // ── THE CLASSES TAB MUST LAND ON THE CLASS LIST ───────────────────────────
+  //
+  // §7.65's other half. The attendance screen lives in the CLASSES tab's Stack
+  // but is pushed from the TODAY tab, and switching tabs only hides a stack —
+  // it never unwinds one. §7.65 fixed the within-stack pop; it did not empty
+  // the Classes stack when the exit target is a different tab, so the stack
+  // still holds one attendance screen per lesson visited and pressing Classes
+  // lands the coach on the last lesson they marked instead of their class list.
+  //
+  // By this point in the driver we have pushed attendance for TWO different
+  // classes from Today and left via the save each time — which is exactly the
+  // accumulation §7.65 describes. So this is the real state, not a synthesised
+  // one.
+  //
+  // Asserted on the URL, deliberately. The screen navigated away from stays
+  // MOUNTED underneath (§7.10), so body text contains both screens and a
+  // text-based negative ("Save Attendance is absent") would false-pass.
+  // ⚠ pressByText, NOT `tap(page.locator('a[href="/classes"]'))`. Every mounted
+  // screen carries its own tab bar, so the DOM holds several `a[href="/classes"]`
+  // and React Navigation marks the inactive ones `aria-hidden="true"` — hidden,
+  // but still matched. `tap()` applies `.first()` (lib.mjs) and `.first()` is a
+  // hidden one, so it waits 12s for an element that will never be visible.
+  // pressByText is the helper written for exactly this seam. Both hedges were
+  // tried first; leaving the note so the next person skips the round trip.
+  await pressByText(page, "Classes");
+  await page.waitForTimeout(2500);
+  const classesUrl = page.url().replace(EXPO, "");
+  check(
+    "pressing Classes lands on the class LIST, not a leftover attendance screen",
+    classesUrl === "/classes" || classesUrl === "/classes/",
+    classesUrl
+  );
+
+  const classesBody = await dumpText(page);
+  check(
+    "the class list actually rendered",
+    classesBody.includes("My Classes"),
+    classesUrl
+  );
+  // The weekday grouping: today's group is labelled and leads the list.
+  // Case-INSENSITIVE: the section header carries Tailwind's `uppercase`, and
+  // Chrome's innerText reflects text-transform, so this reads "TODAY · SUNDAY"
+  // rather than "Today · Sunday". Matching the literal casing false-failed.
+  check(
+    "today's classes are grouped under a Today heading",
+    /today\s*·/i.test(classesBody),
+    classesBody.replace(/\s+/g, " ").slice(0, 160)
+  );
+
+  // ⚠ THE REGRESSION THIS FIX COULD CAUSE, AND THE REASON IT IS CHECKED HERE.
+  // The reset is a `tabPress` listener. If it ever fires on PROGRAMMATIC
+  // navigation instead — which is what useFocusEffect or unmountOnBlur would
+  // do — it swallows Today's push into the Classes stack, and "Mark
+  // Attendance" becomes a dead tap that dumps the coach on the class list.
+  // That is the single most frequent action in the product.
+  await pressByText(page, "Today");
+  await page.waitForTimeout(2500);
+  // pressClassButton, not pressByText("Mark Attendance") — by this point both
+  // lessons are marked, so the button reads "Edit attendance" and a literal
+  // match finds nothing. This helper accepts either label.
+  await pressClassButton(page, "Stale Screen Club");
+  await page.waitForTimeout(3000);
+  const pushedUrl = page.url().replace(EXPO, "");
+  check(
+    "the tab reset does NOT swallow Today's push into the attendance screen",
+    /\/classes\/[^/]+\/attendance/.test(pushedUrl),
+    pushedUrl
+  );
+} catch (e) {
+  // ⚠ §7.79 — THIS DRIVER SWALLOWED ITS OWN CRASH AND REPORTED GREEN.
+  // `finally` reached `process.exit(0)` before the exception could surface, so
+  // when four checks appended at the end of the try block threw on their first
+  // line, the run still printed "18/18 checks passed" and exited 0. The checks
+  // simply never entered `results`, and a count cannot report an assertion that
+  // was never made. Recording the crash AS A FAILED CHECK is the structural
+  // fix: the failure now has to travel through the same counter as everything
+  // else. (Found 2026-08-02 while adding the Classes-tab checks below.)
+  check(
+    `the driver ran to completion — it crashed: ${e.message}`,
+    false,
+    String(e.stack ?? e).slice(0, 400)
   );
 } finally {
   await browser.close();
