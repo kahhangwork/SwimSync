@@ -5,8 +5,9 @@ PRD §7.20, §8.25)**: the admin books an enrolled child into one lesson of anot
 same-category class; a package family's attended make-up draws the package (the
 expiring-package recourse), an ad-hoc guest pays their own class's rate. Five
 migrations + the engine + all three UIs, deployed in the §7.60 order and verified
-(grant dump clean, bundle grep positive) — **dormant on production until the first
-make-up is booked**. Same day, earlier: the parent invoice detail marks package-funded
+(grant dump clean, bundle grep positive), then the child picker became **one search box
+matching child OR class name** after the user drove the live page and found the dropdown
+unusable at scale — **dormant on production until the first make-up is booked**. Same day, earlier: the parent invoice detail marks package-funded
 lines (§8.24). The standing headline is unchanged: **real attendance exists on
 production**, and **July has still not been billed** — §9, and the marking window
 closes at the end of August._
@@ -408,10 +409,13 @@ remote grant dump shows only `authenticated` may execute the two RPCs (the table
 `anon` grant is the platform-wide default posture — RLS with `TO authenticated`
 policies is the boundary, same as every sibling table); `generate-invoices` ACTIVE at
 platform version 18; CI green; the served swimsync.sg bundle carries `makeup_bookings`
-×4 and the new copy. The admin's authed chunks can't be fetched logged-out — **eyeball
-`/makeups` once when next signed in** (the §8.23 convention). Dormant until the first
-booking. `db push` printed a noisy pgdelta certificate error and still succeeded —
-`migration list --linked` was the honest answer (§7.31's shape).
+×4 and the new copy. **The user then drove `/makeups` on production themselves** —
+which both confirmed the admin surface live (closing the eyeball-once item) and found
+the child dropdown unusable at real roster sizes, so the picker became **one search box
+matching the child's name OR their class's title** (`lib/makeupSearch.ts`, shipped +
+deployed same day, 15-check driver exercising both paths, user-confirmed working).
+Dormant until the first booking. `db push` printed a noisy pgdelta certificate error
+and still succeeded — `migration list --linked` was the honest answer (§7.31's shape).
 
 **What made it cheap:** `trial_bookings` was the template, and the miss already billed $0
 (`BILLABLE = {present, trial_paid}`), so one attended make-up = one draw / one charge —
