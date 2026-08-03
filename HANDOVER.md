@@ -11,10 +11,12 @@ admin panel now; the **parent app prints `INV-2026-0001`** on both invoice scree
 instead of a UUID fragment that matched nothing on the QR, the reminder or the bank
 statement; and Today's card counts **guests apart from students** ("4 students +
 1 guest") after it was found printing enrolments beside a chip counting the expected
-set. Deleted a driver with **zero assertions** and found the worse variant — a driver
-reporting "18/18 passed" while four checks crashed (§7.79). **The standing headline is
-unchanged: chase the outstanding invoices, keep marking August, bill it in early
-September — §9.**_
+set. On the test side: deleted a driver with **zero assertions**, found the worse variant
+— one reporting "18/18 passed" while four checks crashed — and then **found that the
+detector written for it was itself wrong**, having libelled a second driver that turned
+out to assert perfectly well (§7.79 carries the correction, which is the more useful half).
+**The standing headline is unchanged: chase the outstanding invoices, keep marking August,
+bill it in early September — §9.**_
 
 _Previously, 2026-08-02 (third session that day) — **fee-free payment collection
 shipped AND DEPLOYED, Phases 0–3 (PRD §7.21, §8.26)**: every invoice now carries a
