@@ -1,6 +1,22 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-02 (third session that day) — **fee-free payment collection
+_Last updated: 2026-08-03 — **the mobile app caught up with the billing that shipped
+without it (§8.27, LIVE)**. A day of real use produced four complaints, all correct:
+the coach's **Classes tab** now lands on the class list (grouped by weekday, today
+first) instead of a leftover attendance screen — the other half of §7.65, and §7.80
+records the **three fixes that silently did nothing**; the coach's **Billing tab became
+My Pay** (payouts only, hidden entirely when there are none, so production's private
+coach sees **three** tabs) because every actionable thing about an invoice lives on the
+admin panel now; the **parent app prints `INV-2026-0001`** on both invoice screens
+instead of a UUID fragment that matched nothing on the QR, the reminder or the bank
+statement; and Today's card counts **guests apart from students** ("4 students +
+1 guest") after it was found printing enrolments beside a chip counting the expected
+set. Deleted a driver with **zero assertions** and found the worse variant — a driver
+reporting "18/18 passed" while four checks crashed (§7.79). **The standing headline is
+unchanged: chase the outstanding invoices, keep marking August, bill it in early
+September — §9.**_
+
+_Previously, 2026-08-02 (third session that day) — **fee-free payment collection
 shipped AND DEPLOYED, Phases 0–3 (PRD §7.21, §8.26)**: every invoice now carries a
 per-tenant `INV-YYYY-NNNN` reference and a 128-bit public token (BEFORE INSERT
 trigger — the engine is untouched); a **dynamic PayNow QR** with amount + reference
@@ -34,7 +50,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.76** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.81** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -55,8 +71,9 @@ there is no second index to go through.
 Swim-coach attendance & billing app for Singapore. Three roles:
 - **Parent** — self-registers (mobile), adds children, views attendance, invoices,
   credit notes, and the coach's PayNow QR to pay.
-- **Coach** — marks/edits attendance (mobile), views their students' billing,
-  uploads their PayNow QR.
+- **Coach** — marks/edits attendance (mobile), sees **their own pay**, and uploads the
+  business's PayNow QR if they are also its admin. They see **no invoices** — that moved
+  to the admin panel with payment collection (§8.27).
 - **Superadmin** — web admin panel: assigns children to classes, manages
   classes/coaches, oversees invoices/credit notes.
 
@@ -128,9 +145,16 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   sees the QR of the business that **issued the invoice** on the PayNow screen; the admin
   Coaches page shows it. A school with three coaches has one bank account — an individual
   coach's QR would send the payment to the wrong person.
-- **Coach Billing screen (verified UI)** — queries live invoices (RLS-scoped) and marks
-  them paid (invoice update + `payment_records` insert), web-safe via Toast /
-  `confirmAction`. Needs `coach_serves_parent_profile()` to show parent names (§6).
+- **The coach app shows NO invoices, and that is deliberate (verified UI, LIVE
+  2026-08-03)** — the Billing tab became **My Pay**: the coach's own `coach_payouts` and
+  nothing else. No invoice list, no Mark Paid, no outstanding count. Everything that makes
+  an invoice actionable — reference, dynamic QR, WhatsApp queue, "parent says paid" badge,
+  **Claimed** filter — is on the admin panel (PRD §7.9, §7.21), so a second poorer copy on
+  the coach's phone could only prompt a decision they cannot act on well. **The tab is
+  hidden entirely when the coach has no payouts**, so production's private coach sees
+  **three** tabs (Today / Classes / Settings) — the finished state, not missing setup
+  (PRD §7.13). Don't re-add a count here; the rejection is recorded in `BACKLOG.md` →
+  *Deliberately not doing*. §8.27.
 - **Unmarked-lesson safety net (verified UI + backend)** — expected lesson dates are
   derived from `classes.day_of_week` at read time (there is no session generator — §6):
   the coach's Today tab lists **Unmarked Lessons** and links straight to marking a past
@@ -423,6 +447,50 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.27 (2026-08-03) — THE APP CATCHES UP WITH THE BILLING THAT SHIPPED WITHOUT IT
+
+**The trigger was the user opening their own app.** Payment collection (§8.26) shipped
+entirely on the admin panel and the public invoice page; the mobile app was never
+reconciled against it, and a day of real use surfaced it as four questions. All four were
+real, and a fifth was found while answering them. Shipped and **deployed** as one
+app-only change — no migration, no edge function, no engine change (`aa89bd3`).
+
+**What was wrong, and where its reasoning now lives:**
+1. *"What are the 4 outstanding?"* — unpaid invoices, counted with no date bound, sitting
+   between two today-scoped tiles. Removed with the whole category — `BACKLOG.md` →
+   *Deliberately not doing*, and PRD §7.9.
+2. *"Why does Classes open on a class?"* — the other half of **§7.65**, live for weeks.
+   `docs/GOTCHAS.md` **§7.80**, which is mostly a list of the **three fixes that silently
+   did nothing** (`navigate({screen})`, targeted `popToTop`, `dismissAll`) — each looked
+   right and changed no behaviour. Only the driver caught them.
+3. *"The Billing page is outdated"* — correct; PRD §7.9 and §14.2/§14.4.
+4. *"The PayNow QR should be unnecessary"* — correct **but not yet safe**: the static
+   upload still serves native builds and **package payments**, which have no reference to
+   lock into a QR. Recorded in `BACKLOG.md` as an ordered pair — references first, retire
+   the upload second. Doing it in the other order breaks paying for a package.
+5. **Found while working:** Today's card printed *active enrolments* while the chip beside
+   it counted the *expected* set, so it could read "4 students · 3 of 5 marked". A coach
+   trusting the head-count leaves a lesson unmarked, and that blocks the month with no
+   override. Now "4 students + 1 guest", split **by subtraction from the same array the
+   chip uses**, so the two cannot drift (§7.18).
+
+**The driver work is the durable half.** `verify-coach-billing.mjs` was deleted: it had
+**zero `check()` calls**, swallowed every error and set no exit code — it could never have
+failed. Hunting for siblings found the worse variant in `verify-stale-screen.mjs`, which
+printed *"18/18 passed"* and exited **0** while four newly-appended checks crashed, because
+`finally` reached `process.exit` first. Both are **§7.79**, with a one-line detector that
+found one survivor (`verify-tz-saturday.mjs`, now in `BACKLOG.md`). **§7.81** records that
+Metro caches the route manifest, so a renamed route folder leaves a **ghost tab** and every
+driver run against it measures the old app — which cost a debugging round here.
+
+**Verified:** jest **244** (was 207), vitest 237, both typechecks clean, fixtures 15/15,
+`verify-stale-screen` **22/22** (was 18/18), `verify-coach-wages` 10/10 (was 8/9),
+`verify-makeups` 15/15, `verify-payment-collection` 19/19. New tests proven RED first
+(§7.25). CI green; the served swimsync.sg bundle greps positive for all four changes and
+negative for the old strings.
+
+---
+
 ## 8.26 (2026-08-02, third session) — PAYMENT COLLECTION WITHOUT A PAYMENT PROVIDER
 
 **The feature** (PRD §7.21 — the durable home; design record
@@ -472,57 +540,11 @@ production's PayNow proxy stays NULL until it passes (§9).
 
 ---
 
-## 8.25 (2026-08-02) — A MISSED LESSON CAN BE MADE UP IN ANOTHER CLASS
-
-**The feature** (PRD §7.20 — the durable home): the guest-pass model, settled with the
-user against three alternatives — freeform admin discretion (no per-miss ledger), any
-enrolled child (not package-only), private-category make-ups reuse `schedule_extra_lesson()`
-(different-coach private make-ups → BACKLOG), ad-hoc guests at the **home** class rate.
-Five migrations (`20260802000100–500`), the engine, all three UIs. **Deployed 2026-08-02
-in the §7.60 order and verified at each step**: `migration list --linked` clean; the
-remote grant dump shows only `authenticated` may execute the two RPCs (the table's
-`anon` grant is the platform-wide default posture — RLS with `TO authenticated`
-policies is the boundary, same as every sibling table); `generate-invoices` ACTIVE at
-platform version 18; CI green; the served swimsync.sg bundle carries `makeup_bookings`
-×4 and the new copy. **The user then drove `/makeups` on production themselves** —
-which both confirmed the admin surface live (closing the eyeball-once item) and found
-the child dropdown unusable at real roster sizes, so the picker became **one search box
-matching the child's name OR their class's title** (`lib/makeupSearch.ts`, shipped +
-deployed same day, 15-check driver exercising both paths, user-confirmed working).
-Dormant until the first booking. `db push` printed a noisy pgdelta certificate error
-and still succeeded — `migration list --linked` was the honest answer (§7.31's shape).
-
-**What made it cheap:** `trial_bookings` was the template, and the miss already billed $0
-(`BILLABLE = {present, trial_paid}`), so one attended make-up = one draw / one charge —
-no double relief, no "makeup credit" ledger. The predicted invariant breaks never
-happened: a booking is not an enrolment, and billing still follows attendance rows.
-
-**The two snapshots are the design** (§7.45): `category_id` (package matching survives a
-host re-tag — pinned by the Deno snapshot test AND the `package_live_balances()` COALESCE,
-whose absence would have broken the engine↔SQL pin on re-tag) and `home_class_id` (the
-class id, not the rate number — corrections still flow; the engine's class-rates fetch
-widens to cover it or a deactivated home class would kill the whole run in `rateOn`).
-
-**Found while building:** `merge_students`' unknown-cascade tripwire REFUSED the suite the
-moment `makeup_bookings` landed — exactly its designed behaviour; migration 5 teaches it
-the fifth cascading table. And the coach-visibility gap was latent **for trials too**
-(masked because the live coach is the admin) — `coach_serves_student()` now grants a read
-via either booking table, proven needed by Phase-0 probes counting 0 as the real roles.
-
-**Verified:** pgTAP 445 (26 new, incl. negative RLS probes and a table-did-not-grow
-mutation check); Deno 123 **run twice** (12 make-up tests, 8 proven RED on v16; tripwire
-recorded green on v16 first); vitest 222; jest 192; `verify-makeups.mjs` 14/14 (fixture
-in round-trip CI, 14 fixtures clean; coach screens by fixed-id deep link, §7.58; the
-fixture's off-schedule session on *today* makes the marking checks day-independent).
-Durable homes: PRD §7.20 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §10 · BACKLOG
-(three follow-ups + the shipped item retired) · `supabase/rollback/20260802_…_DOWN.sql`.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.25** | 2026-08-02 | Make-up classes as the **guest-pass model** — an enrolled child booked into one lesson of another same-category class; a booking is never an enrolment, an unmarked make-up blocks the month like a trial, a package family's attended make-up draws from the package via the booking's snapshotted category, an ad-hoc guest pays their **home** class's effective-dated rate. Five migrations, the engine, all three UIs. Also closed the latent trial-guest visibility gap (a host coach could not read a guest's name) | PRD §7.20 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §10 · `supabase/rollback/20260802_makeup_bookings_DOWN.sql` |
 | **8.24** | 2026-08-02 | The parent invoice detail marks package-funded lines ("Paid by package · *name*"; a reversed draw reads ad hoc). App-only, no migration. The admin Invoices page renders no line items, so the parent detail is the only "which lines" surface — an admin invoice detail would be a new feature | PRD §7.16 · `docs/TESTING.md` §5 (`invoiceFunding`) |
 | **8.23** | 2026-08-01 | The per-child, category-aware payment-method chip ("Package · N left" / "Ad-hoc") on ten admin surfaces + the parent app via `student_package_coverage()`, fixing the Students-page chip that summed by parent and counted date-expired packages; 'mixed' proven structurally unreachable and pgTAP-pinned; coaches deliberately see nothing | PRD §7.16 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §10 |
 | **8.22** | 2026-08-01 | A latent unordered `LIMIT 1` in `fixtures-trial-onboarding.sql` broke CI (§7.73 biting its author — fixture now owns its class, no `roundtrip-exempt` left); `verify-trial-onboarding.mjs` had aborted on check 1 since two hours after it was written (0 → 10 checks); and a user's coach-rate question found the platform "unpaid" badge had **never rendered** (`as`-cast field mismatch) plus the private-vs-school dropdown answering an unanswerable question — replaced with staff-without-rate. **`tenants.kind` still exists, nothing reads it, do not start**; the RPC-narrowing migration queues behind the two hygiene migrations (§7.55) | **§7.73, §7.76** · `docs/TESTING.md` §5 · PRD §4.4 |
@@ -582,6 +604,10 @@ Everything below is the monthly loop from here on:
    tracker), then **bill August in early September** — same runbook, now routine. The
    marking window still floors at the 1st of last month (§8.15): August's lessons are
    markable through September, and no later.
+   > Marking got two small helps on 2026-08-03 (§8.27): today's card now names **guests
+   > apart from students**, so the head-count finally agrees with the number of marks the
+   > lesson actually needs, and the **Classes tab lands on the class list** rather than
+   > whatever lesson was last opened.
 
 *(Whether to enable cron is a decision, not part of the loop — it lives under
 **Worth deciding, not urgent** below, once only.)*
@@ -600,13 +626,22 @@ themed sections below it. Nearest candidates with no dependencies: **credit-note
 (the other half of the notification work), an **upcoming-lessons view for parents** (small,
 and the building block already exists), or **convert a trial into an enrolled student**.
 
-**The highest-value engineering item is now *Run the UI drivers in CI* (M).** CI loads every
-fixture as of 2026-08-01 but executes no driver, and **three drivers were caught rotting in
-one week, every one of them by accident** (§8.21, §8.22): one at 2/5 for a month from a stale
-calendar, one aborting on check 1 since two hours after it was written, and §7.62's pair that
-could not load at all. It needs a browser and both dev servers, so weigh the narrower options
-in its `BACKLOG.md` entry — nightly rather than per-push, a subset, or the DB-visible half
-without a browser.
+**A cheap, ordered pair added 2026-08-03** — *give package requests a reference number* (S)
+then *demote the static PayNow QR upload* (S). The user is right that the uploaded QR should
+be unnecessary now, but it still serves **package payments**, which have no reference to lock
+into a computed QR. **Do them in that order**; the reverse breaks paying for a package. The
+same session's copy fix (the PayNow screen calls the business "Coach") folds into whichever
+ships first.
+
+**The highest-value engineering item is still *Run the UI drivers in CI* (M), and 2026-08-03
+made the case stronger.** CI loads every fixture but executes no driver, and the count of
+drivers caught rotting **by accident** is now four (§8.21, §8.22, §8.27): one at 2/5 from a
+stale calendar, one aborting on check 1 since two hours after it was written, §7.62's pair
+that could not load at all, and now one with **zero assertions** that could never fail plus a
+second that printed *"18/18 passed"* while four checks crashed (§7.79). §7.79 carries a
+one-line detector for the assertion-less kind — **that half is mechanical and could be a CI
+step on its own, without a browser**, which is the cheapest slice of this item. Weigh the
+other narrower options in its `BACKLOG.md` entry.
 
 **Three migrations are queued behind each other, none urgent** — *revoke `anon` EXECUTE from
 the remaining SECURITY DEFINER functions* (§7.39's missing second layer), *a business cannot

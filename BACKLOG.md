@@ -283,22 +283,27 @@ without SQL. When a parent disputes a charge, the answer exists and is unreachab
 Admin panel first; the coach probably doesn't need it.
 
 ### A coach week view — **M**
-Turn the Classes tab into a Mon–Sun strip showing each lesson and whether it is marked,
-rather than the undated list it is today.
+Turn the Classes tab into a Mon–Sun strip showing each lesson **and whether it is
+marked**, rather than the recurring timetable it shows today.
 
-**Why:** PRD §14.2 already describes this tab as being "for date-based lookups", and it
-has never been that — it lists classes with no notion of *when*. The coach's only
-time-aware surfaces are Today (one day) and the Unmarked Lessons backlog (a nag list of
-what has already gone wrong). A week view is the first surface that lets a coach see
-what is coming and confirm they are square before the month closes, instead of finding
-out at invoice time that a lesson blocked it.
+**Why:** PRD §14.2 describes this tab as being "for date-based lookups". As of
+2026-08-03 it groups classes by weekday with today first (§8.27), which is a *timetable* —
+it answers "when do I teach?" but still not "which lessons have I actually marked?". Each
+row is a recurring class, not a dated lesson, so the coach's only surfaces tied to real
+dates remain Today (one day) and the Unmarked Lessons backlog (a nag list of what has
+already gone wrong). A week view is the first surface that lets a coach see what is
+coming and confirm they are square *before* the month closes, instead of finding out at
+invoice time that a lesson blocked it.
 
 **Notes:** every building block exists and none of them needs new schema — expected
 lesson dates come from `expectedLessonDates()` (`lib/lessonDates.ts`), the five marking
 states from `lessonProgress()` / `progressLabel()` (`lib/attendanceSummary.ts`), and the
 per-date expected roster from `expectedStudentsOn()`. **Do not pre-generate sessions to
-build this** (`docs/ARCHITECTURE.md` §6). Raised 2026-08-02 alongside the Classes-tab
-landing fix, which is the small half of the same complaint.
+build this** (`docs/ARCHITECTURE.md` §6). `lib/weekOrder.ts` already does the
+today-first weekday ordering and takes the weekday as a parameter, so reuse it rather
+than deriving one — nothing in that file may read a clock (§7.7). Raised 2026-08-02
+alongside the Classes-tab landing fix, which shipped 2026-08-03 as the small half of the
+same complaint.
 
 ### A link to the admin panel from coach Settings — **S**
 A coach who also holds `tenant_admin` gets a link to `admin.swimsync.sg` from their
@@ -1262,3 +1267,4 @@ Kept so the reasoning doesn't get re-litigated.
 | **Sending the invite through Supabase Auth's own invite email** | Considered 2026-07-21 and rejected in favour of `generateLink({type:'invite'})` + our own Resend send. Supabase's path would need a `templates/invite.html` **pasted into the production dashboard**, where nothing in the repo can see it and no test can catch it drifting from the file — and resending to an already-invited user has uncertain semantics (it may 422 rather than re-send). Our own send makes the template code-owned and unit-tested, no-ops without `RESEND_API_KEY`, and makes Resend deterministic. Note the deliberate inversion of the invoice-email rule: an invoice email is best-effort because billing must not depend on delivery, whereas **the invite IS the deliverable**, so a failed send surfaces the link for the operator instead of being swallowed. |
 | **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8a.) |
 | **Typing `<Thead>`'s children so a `<Tr>` inside it fails typecheck** | Considered 2026-07-26 while fixing the Levels table (`docs/GOTCHAS.md` §7.54) and declined by the user in favour of a call-site scan test. It would be the stronger guard in principle — the mistake becomes unrepresentable rather than merely detected — but React's `children` typing does not express "only these element types" cleanly, so it needs casts or a wrapper at call sites, and it would put a fiddly type on the component that backs **all 14 admin tables**. `components/Table.test.tsx` catches the same mistake in CI, names the file and the exact fix, and risks nothing at runtime. Note the earlier failure this replaces: the previous attempt at prevention was a **docblock asserting the broken form was "unrepresentable"**, which it was not — the lesson is that the guard must be executable, not that it must be a type. |
+| **Any invoice or payment count in the COACH app** | Settled with the user 2026-08-02 while removing the coach's Billing tab. The Today screen carried an "Outstanding" tile counting unpaid invoices across every parent the coach serves, and the obvious repair was to relabel it *Unpaid invoices* and make it tappable. The user rejected the whole category: **a coach does not need to know how many invoices are unpaid — that is an admin-app question.** Since fee-free payment collection shipped (PRD §7.21), everything that makes an invoice actionable — the `INV-YYYY-NNNN` reference, the dynamic QR, the WhatsApp queue, the "parent says paid" badge, the **Claimed** filter — lives on `admin.swimsync.sg`, so a number on the coach's phone can only ever prompt a decision the coach cannot act on well. It was also **not today-scoped and not lesson-shaped** while sitting between "Classes Today" and "Students Today", so it read as a fact about today's lessons. A private coach holds the tenant-admin role anyway and loses nothing. **Don't re-add a count, a badge or a filter here** (PRD §7.9; the prohibition is also a comment in `(coach)/today/index.tsx`). |
