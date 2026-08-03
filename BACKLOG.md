@@ -959,24 +959,6 @@ is a reasonable long-term answer for Singapore.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### `verify-tz-saturday.mjs` has no assertions, so it can never fail — **S**
-Give it real `check()` calls and a non-zero exit, or delete it.
-
-**Why:** it has **zero `check()` calls**, wraps its body in a `catch` that swallows every
-error, and sets no exit code — it prints booleans and takes screenshots. A green run
-proves nothing, and nobody reading a driver list can tell it apart from one that asserts.
-This is the same defect as `verify-coach-billing.mjs`, which was deleted on 2026-08-02
-for exactly this reason; `verify-tz-saturday.mjs` is the survivor. See **§7.79**, which
-records the class of bug and the one-line detector:
-`for f in verify-*.mjs; do [ $(grep -c "check(" $f) -eq 0 ] && echo "$f"; done`.
-
-**Notes:** the *subject* matters — it is the Saturday/timezone driver, guarding §7.7, the
-bug that shipped real double-billing. So deleting it is not obviously the right call;
-reading what it was meant to prove and converting those `console.log` booleans into
-`check()` calls probably is. Pairs with **Run the UI drivers in CI**: an assertion-less
-driver in CI is worse than no driver, because it reports green. Found 2026-08-02 while
-auditing drivers for the coach Billing removal.
-
 ### A business cannot read its own audit trail — **S**
 `audit_log.tenant_id` is nullable and **13 of the 19 writers never set it**. The read policy
 is `is_platform_admin() OR is_tenant_admin(tenant_id)`, and `is_tenant_admin()` opens with

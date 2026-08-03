@@ -479,7 +479,14 @@ app-only change — no migration, no edge function, no engine change (`aa89bd3`)
 failed. Hunting for siblings found the worse variant in `verify-stale-screen.mjs`, which
 printed *"18/18 passed"* and exited **0** while four newly-appended checks crashed, because
 `finally` reached `process.exit` first. Both are **§7.79**, with a one-line detector that
-found one survivor (`verify-tz-saturday.mjs`, now in `BACKLOG.md`). **§7.81** records that
+flagged one survivor — **wrongly**. `verify-tz-saturday.mjs` asserts through its own
+`[label, bool]` array and exits non-zero; the detector had grepped for this repo's
+`check(` helper name rather than for the *property*, and the false positive was written up
+as fact in both §7.79 and `BACKLOG.md`. **Running it showed 5/5** (2026-08-03). Both
+documents corrected, the backlog item deleted, the detector replaced with one that greps
+for a non-zero exit path — which now returns nothing, i.e. every driver can fail. The
+driver was hardened anyway (crash-as-failed-check, browser closed in `finally`, a run that
+asserts nothing exits 1; all three proven by mutation). **§7.81** records that
 Metro caches the route manifest, so a renamed route folder leaves a **ghost tab** and every
 driver run against it measures the old app — which cost a debugging round here.
 
@@ -639,9 +646,13 @@ drivers caught rotting **by accident** is now four (§8.21, §8.22, §8.27): one
 stale calendar, one aborting on check 1 since two hours after it was written, §7.62's pair
 that could not load at all, and now one with **zero assertions** that could never fail plus a
 second that printed *"18/18 passed"* while four checks crashed (§7.79). §7.79 carries a
-one-line detector for the assertion-less kind — **that half is mechanical and could be a CI
-step on its own, without a browser**, which is the cheapest slice of this item. Weigh the
-other narrower options in its `BACKLOG.md` entry.
+one-line detector — **that half is mechanical and could be a CI step on its own, without a
+browser**, which is the cheapest slice of this item. It currently returns nothing, which is
+the point of running it. **But note what §7.79 also records:** the *first* version of that
+detector grepped for a helper name and produced a false positive that was written up as
+fact in two documents. A static check tells you a driver *can* fail, never that it *does* —
+only executing it does that, which is the whole argument for this item. Weigh the narrower
+options in its `BACKLOG.md` entry.
 
 **Three migrations are queued behind each other, none urgent** — *revoke `anon` EXECUTE from
 the remaining SECURITY DEFINER functions* (§7.39's missing second layer), *a business cannot

@@ -227,8 +227,15 @@ _UI drivers (`.claude/skills/run-ui-playwright/drivers/`, run by hand, not CI):_
 unmarked-lesson loop (admin gap report → coach backlog → mark → both go green);
 `verify-parent-attendance.mjs` covers the parent Attendance screen — chip geometry read
 from the DOM, plus all three empty states (unassigned / nothing marked / filtered out);
-`verify-tz-saturday.mjs` pins the SGT-vs-UTC regression using Playwright's clock
-API — it **fails on the pre-fix code**, which is the point;
+`verify-tz-saturday.mjs` pins the SGT-vs-UTC regression (§7.7) using Playwright's clock
+API — it **fails on the pre-fix code**, which is the point. **5 checks**, needing only
+seed data and no fixture: pinned to 2026-07-18 07:30 SGT (= Friday 23:30 **UTC**), it
+asserts the header, the class list *and* the date the attendance screen actually targets,
+because the list can be right while the target is wrong — and that disagreement *is* the
+bug. Hardened 2026-08-03 after a bad heuristic wrongly filed it as assertion-less: it now
+carries `detail` on every check, records a crash as a **failed check**, closes the browser
+in `finally`, and **exits non-zero on a run that asserted nothing**. All three guards
+proven by mutation;
 `smoke-admin-screens.mjs` drives the admin attendance/students/dashboard pages at
 runtime (checks the deep joins resolve — no NaN, no empty tables);
 `verify-bulk-setall.mjs` (+ reuses `fixtures-unmarked-lessons.sql`) drives the bulk

@@ -1100,12 +1100,21 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     assertions**: it computed booleans, printed them with `console.log`, wrapped
     everything in `catch (e) { console.error }`, and set no exit code. Nothing it could
     observe was capable of failing the run. It was deleted on 2026-08-02 with the coach's
-    invoice list; `verify-tz-saturday.mjs` is the surviving instance and is in
-    `BACKLOG.md`. **The detector is one line** — run it whenever a driver is added:
+    invoice list.
+    ⚠ **THE FIRST DETECTOR WRITTEN FOR THIS WAS WRONG, AND ITS FALSE POSITIVE WAS WRITTEN
+    UP AS A SECOND INSTANCE.** It grepped for `check(` — the *helper name* this repo
+    happens to use — and flagged `verify-tz-saturday.mjs`, which asserts perfectly well
+    through a local `[label, bool]` array and `process.exit(ok ? 0 : 1)`. That driver was
+    filed in `BACKLOG.md` as "can never fail"; **running it showed 5/5 and a correct exit
+    code** (2026-08-03). Grep for the *property*, never for a naming convention:
     ```bash
     cd .claude/skills/run-ui-playwright/drivers
-    for f in verify-*.mjs; do [ $(grep -c "check(" "$f") -eq 0 ] && echo "NO ASSERTIONS: $f"; done
+    # A driver with no non-zero exit path cannot report failure, whatever it prints.
+    for f in verify-*.mjs; do grep -q "process.exit" "$f" || echo "CANNOT FAIL: $f"; done
     ```
+    As of 2026-08-03 this returns nothing — every driver can signal failure. **The lesson
+    is bigger than the detector: a heuristic about test quality must be confirmed by
+    running the test.** The first version cost a wrong gotcha and a wrong backlog item.
     **The subtler half, and the one that bit during the same session:** a driver that DOES
     assert can still hide a crash, because `finally { … process.exit(passed === results.length) }`
     runs *before* an exception can surface. Four checks appended to the end of
@@ -1113,9 +1122,14 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     passed" and exited 0**, because the checks never entered `results` and a counter cannot
     report an assertion that was never made. **The fix is structural: `catch` the exception
     and record it AS A FAILED CHECK**, so the crash has to travel through the same counter
-    as everything else. That pattern is now in `verify-stale-screen.mjs`; copy it into any
-    driver you extend. This is the fourth driver-rot finding in a fortnight (§8.20–§8.22)
-    and the first that is mechanically detectable. (2026-08-02.)
+    as everything else. That pattern is now in **`verify-stale-screen.mjs` and
+    `verify-tz-saturday.mjs`**; copy it into any driver you extend. Two further guards
+    belong with it, both proven by mutation on 2026-08-03: **close the browser in
+    `finally`** (an escaping exception otherwise leaks a Chrome process), and **treat a run
+    that asserted *nothing* as a failure** — `process.exit(results.length > 0 && passed ===
+    results.length ? 0 : 1)`, or deleting every check turns the driver green. This is the
+    fourth driver-rot finding in a fortnight (§8.20–§8.22). (2026-08-02, corrected
+    2026-08-03.)
 
 80. **SWITCHING TABS DOES NOT UNWIND A TAB'S STACK, AND THREE OF THE FOUR OBVIOUS WAYS TO
     UNWIND IT YOURSELF SILENTLY DO NOTHING.** §7.65 established that the attendance screen
