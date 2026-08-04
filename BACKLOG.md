@@ -138,8 +138,7 @@ Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-histo
 filtering/search (S), More polished
 dashboards (S), Deeper component-render tests (M), Convert a trial into an enrolled student (S),
 Editing a student's contact details (S),
-Email-confirmation copy/templates (S), `anon`'s table privileges on production (S),
-Revenue reporting (M — *decide accrual-vs-cash first*).
+Email-confirmation copy/templates (S), Revenue reporting (M — *decide accrual-vs-cash first*).
 
 ### Later — big features carrying their own dependencies
 
@@ -944,30 +943,6 @@ is a reasonable long-term answer for Singapore.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### `anon` holds REFERENCES / TRIGGER / TRUNCATE on every table in production — **S**
-Not from this repo. `20260309000800_grants.sql` grants `anon` nothing and says so in its
-header; these come from the Supabase image's own template, which hands the API roles
-`ALL` on public tables. Found 2026-08-04 while auditing function grants (§7.82): `anon`
-has these three privileges on **37 tables**, and `SELECT`/`INSERT`/`UPDATE`/`DELETE` on
-none.
-
-**Why:** `TRUNCATE` is the one that matters — **RLS does not restrict it**, so the
-privilege is not covered by any policy this repo writes. It is currently **unreachable**:
-`anon` has `rolcanlogin = false`, so the only path in is PostgREST, which has no TRUNCATE
-verb and no DDL. That makes this a latent privilege rather than an open door, which is
-why it was recorded instead of fixed in the same breath as the function grants — a
-table-grant change has a different blast radius from a function-grant change, and §7.55
-says one at a time.
-
-**Notes:** the revoke itself is three lines
-(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon`, plus the same for future tables
-via `ALTER DEFAULT PRIVILEGES`). What needs care is proving nothing depends on it first —
-in particular that no Supabase-internal machinery (PostgREST's schema introspection, the
-dashboard) relies on the template grants. **Verify against a remote dump, not locally**
-(§7.39/§7.82 — the local stack does not reproduce cloud's grant posture), and check
-whether `authenticated`'s `TRUNCATE` deserves the same treatment while you are in there:
-that role IS reachable, so it is the more interesting half.
-
 ### Direct writes to `students` are audited by nobody — **S**
 Two admin paths update `students` straight from the client and record **nothing**: the
 level picker (`setLevel()`) and, since 2026-07-26, the **parent contact details** modal
@@ -1158,7 +1133,7 @@ Kept so the reasoning doesn't get re-litigated.
 
 | Idea | Why not |
 |---|---|
-| **`ALTER DEFAULT PRIVILEGES … REVOKE EXECUTE ON FUNCTIONS FROM anon`** | The blanket fix for §7.39/§7.82. Declined **2026-07-21** during the tenant-provisioning deploy (recorded then: it changes every *future* function's ACL at once, including any that legitimately needs `anon`, and "a deploy is the wrong moment to find out which"), and declined again **2026-08-04** while revoking the remaining grants one function at a time — the second time by the same reasoning, so treat this as one argument twice applied, not two independent verdicts. **Know what declining costs, because the mitigation is partial.** `function_grants.test.sql` catches only what the LOCAL stack can see: a function with no ACL, falling back to the `PUBLIC` default — which is the case that bit us (§7.82). It CANNOT catch a function whose migration correctly does `REVOKE FROM PUBLIC; GRANT TO authenticated` and which cloud's project-level defaults then grant to `anon` anyway. Measured 2026-08-04: **31 non-trigger functions granted to `anon` on production vs 21 locally** — roughly ten grants that exist only on cloud and that no local test will ever show. So the standing cost of not taking the blanket fix is that **the remote dump in `docs/DEPLOYMENT.md` §11.7 is a manual step someone has to remember**, forever, after any migration that creates a function. If that step is ever missed twice running, revisit this row rather than re-deriving the argument. |
+| **A blanket `anon` revoke via default privileges** | **Done 2026-08-04 (`20260804000400`) — this row is kept only so the two earlier refusals are not re-litigated as though nothing changed.** Declined 2026-07-21 and again earlier on 2026-08-04, both times on the grounds that it would lock a future function that legitimately needs `anon`. That objection had already expired on 2026-08-02, when `public-invoice` established the standing rule (`docs/ARCHITECTURE.md` §6) that anything public is served by an **edge function, never an anon RPC** — so the case being protected was one the architecture forbids. Doing it also revealed that the statement everyone had in mind (`… IN SCHEMA public REVOKE … FROM PUBLIC`) **succeeds and does nothing** (§7.85), meaning both refusals were declining something that would not have worked anyway. |
 | **Making the Students page's "All" tab mean active-only** | Considered 2026-07-26 so the header count would always equal the visible rows, and declined **with the user**: it would hide departed children from the default view and change behaviour people rely on. The header therefore deliberately describes a **subset** of the rows, and the `· N inactive` suffix is what explains the gap. **Do not "fix" the mismatch** — it is the honest reading. (`lib/studentCounts.ts`.) |
 | **An "In progress" state on a class card while its lesson is running** | Offered 2026-07-26 while building the attendance-status chips and declined. A class shows **Upcoming** until its **end** time, because a coach marks at the end of a lesson — so one still running is not yet overdue and a fourth word for it buys nothing. The `Now` badge already says a class is happening. `hasEndedInSg()` is keyed to the end time deliberately; if this is revisited, that is the single place it changes. |
 | **Pre-generating lesson sessions** (a scheduled session generator) | PRD §7.5 is knowingly unimplemented and should stay that way. Sessions are created lazily by the coach's attendance save; which lessons *should* have happened is derived at read time from `classes.day_of_week`. Pre-generation adds a job, a schedule, and a pile of edge cases when classes change — for no gain the read-time derivation doesn't already deliver. **Don't "fix" this** without a reason the derivation genuinely can't serve. (`docs/ARCHITECTURE.md` §6.) |

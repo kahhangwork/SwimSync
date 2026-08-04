@@ -36,7 +36,12 @@ SELECT is(
          FROM pg_proc p
          JOIN pg_namespace n ON n.oid = p.pronamespace
         WHERE n.nspname = 'public'
-          AND pg_get_function_result(p.oid) <> 'trigger'
+          -- Neither kind of trigger function is reachable: Postgres does not
+          -- privilege-check them against the writing role and PostgREST does not
+          -- expose them. `event_trigger` is named explicitly because production
+          -- has one (`rls_auto_enable`) that the local stack does not — so
+          -- without it this assertion would pass here and fail against a dump.
+          AND pg_get_function_result(p.oid) NOT IN ('trigger', 'event_trigger')
           AND has_function_privilege('anon', p.oid, 'EXECUTE')
      ) q),
   '',

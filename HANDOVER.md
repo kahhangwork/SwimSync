@@ -64,7 +64,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.84** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.85** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -346,15 +346,19 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   user could fabricate any audit row — is now the one real client case: a coach, on a
   session they own. **Nothing in the product reads `audit_log` yet**; this exists so the
   first screen that does isn't authoritative-and-wrong. `docs/ARCHITECTURE.md` §6, §8.28.
-- **`anon` holds EXECUTE on no callable function (verified by REMOTE dump — LIVE
-  2026-08-04)** — 49 functions granted it before, 18 after, and all 18 are
-  trigger/event-trigger functions that Postgres never privilege-checks and PostgREST does
-  not expose. This closed a **live** hole: `next_credit_note_ref` sat on the bare `PUBLIC`
-  default and let an unauthenticated caller increment a business's credit-note counter
-  (§7.82). **The number climbs back on its own** — cloud grants `anon` EXECUTE on every new
-  function — so re-run the dump after any migration that creates one
-  (`docs/DEPLOYMENT.md` §11.7). A green `function_grants.test.sql` says nothing about
-  production (§7.39).
+- **`anon` holds EXECUTE on no callable function, and no longer gets one for free
+  (verified by REMOTE dump + apply-time probes — LIVE 2026-08-04)** — 49 functions granted
+  it before, 18 after, and all 18 are trigger/event-trigger functions that Postgres never
+  privilege-checks and PostgREST does not expose. This closed a **live** hole:
+  `next_credit_note_ref` sat on the bare `PUBLIC` default and let an unauthenticated caller
+  increment a business's credit-note counter (§7.82). `20260804000400` then turned off the
+  mechanism that kept regranting: default privileges no longer hand `anon` **or `PUBLIC`** a
+  new function, table or sequence, and the migration carries probes that RAISE at apply time
+  if that ever stops holding. **The statement everyone reaches for first
+  (`… IN SCHEMA public REVOKE … FROM PUBLIC`) succeeds and does nothing** — the built-in
+  PUBLIC grant is global, so the revoke must be too (§7.85). Consequence for new work: a
+  function is callable by **nobody** until its own migration grants it, which fails loudly
+  in development instead of silently in production.
 - **Automated tests** — pgTAP + Deno on the backend, vitest + jest-expo on the two apps, all
   in CI on push to `main`. **Counts are deliberately not written here**: the two frontend
   numbers that used to be (162 and 109) had drifted to 198 and 174 by 2026-08-01 while
@@ -524,6 +528,17 @@ functions that Postgres never privilege-checks and PostgREST does not expose
 (`docs/DEPLOYMENT.md` §11.7 has the re-run command — **the number climbs back on its own**
 as new functions are created). `audit_log` held 103 rows, 81 unstamped, now backfilled.
 
+**A fourth migration followed, once the question "should we ever run that line?" was
+asked properly.** `20260804000400` turns off the mechanism itself: default privileges no
+longer grant `anon` — or `PUBLIC` — a new function, table or sequence, so the 49→18 sweep
+stops being point-in-time. Two things made it safe to do what July had refused: the
+2026-08-02 edge-function rule (`docs/ARCHITECTURE.md` §6) means no future function can
+legitimately need `anon`, and **the statement both refusals had in mind would not have
+worked anyway** — `… IN SCHEMA public REVOKE … FROM PUBLIC` succeeds and changes nothing,
+because the built-in PUBLIC grant is global (**§7.85**). Found by mutation-testing the
+migration's own probes: the function probe went red for a revoke that had been *written*,
+not one deleted. All three probes then proven to fire independently.
+
 **Verified:** pgTAP **479** (27 files; 11 new assertions across two new files, all proven
 RED first — §7.25), Deno 130 **run twice** (§7.15), vitest 237, jest 244, both typechecks,
 fixtures 15/15. Six drivers, because the narrowed policy and the helper revokes are
@@ -684,14 +699,11 @@ into a computed QR. **Do them in that order**; the reverse breaks paying for a p
 same session's copy fix (the PayNow screen calls the business "Coach") folds into whichever
 ships first.
 
-**One security item was FILED, not fixed, on 2026-08-04** — `anon` holds
-`REFERENCES`/`TRIGGER`/**`TRUNCATE`** on 37 production tables, and RLS does not restrict
-TRUNCATE. It is **not from this repo** (Supabase's own image template; `20260309000800`
-grants `anon` nothing) and it is currently **unreachable** — `anon` cannot log in and
-PostgREST has no TRUNCATE verb. Left alone because a table-grant change has a different
-blast radius from the function-grant change it was found beside. `BACKLOG.md` →
-*Foundations*; the interesting half is whether `authenticated` deserves the same, since
-that role IS reachable.
+**Still open from 2026-08-04:** whether `authenticated` deserves the same treatment
+`anon` just got. That role IS reachable, and it holds `TRUNCATE` on all 37 tables — a
+privilege **RLS does not restrain**. Not filed as an item yet because it needs the same
+"prove nothing depends on it" pass that `anon`'s did, and unlike `anon` the answer is not
+obviously "nothing".
 
 **The highest-value engineering item is still *Run the UI drivers in CI* (M), and 2026-08-03
 made the case stronger.** CI loads every fixture but executes no driver, and the count of

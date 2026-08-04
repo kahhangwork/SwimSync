@@ -84,7 +84,12 @@ still point at the local stack for dev.
    ```
    `supabase/tests/function_grants.test.sql` covers the *local* half of this and passes by
    construction for the cloud half — a green run there is not evidence about production.
-   (2026-08-04.)
+   **Since `20260804000400` the automatic leak is closed**: default privileges no longer
+   hand `anon` (or `PUBLIC`) a new function, table or sequence, and that migration carries
+   its own probes which RAISE at apply time if the revoke ever stops taking. The dump above
+   is still worth running after a migration that creates a function — it catches a
+   `GRANT … TO anon` somebody wrote **on purpose**, which no default can prevent — but it is
+   no longer the only thing standing between you and a silent hole. (2026-08-04.)
 
 **Verified live** end to end via `run-ui-playwright` against the cloud URLs (all three
 roles): parent register → add child → superadmin assign → coach attendance → **manual

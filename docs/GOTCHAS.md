@@ -1235,3 +1235,37 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       --no-verify-jwt`, then re-run. 19/19.
     - The driver's own setup notes list the fixture and the two dev servers and **do not
       mention the edge function**, which is why this is here rather than there. (2026-08-04.)
+85. **`ALTER DEFAULT PRIVILEGES … IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`
+    SUCCEEDS AND DOES NOTHING.** Two different mechanisms hand a new function to `anon`,
+    and the obvious statement only removes one of them:
+    - **(a) an explicit `pg_default_acl` grant.** On cloud, `ALTER DEFAULT PRIVILEGES FOR
+      ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon` is a real row you can
+      see in a remote dump. Revoking it per-schema works.
+    - **(b) Postgres' own built-in default: a new function is `EXECUTE TO PUBLIC`**, and
+      `anon` is a member of `PUBLIC`. **This one is GLOBAL and is not stored anywhere**, so
+      there is no PUBLIC entry inside the schema-scoped row for a schema-scoped REVOKE to
+      remove. The statement reports `ALTER DEFAULT PRIVILEGES`, changes no row, and the
+      next function is still anon-executable. This is (b), not (a), that made
+      `next_credit_note_ref` reachable on the **local** stack (§7.82) — which is why "it's
+      a cloud-only problem" was wrong.
+    - **Measured, on the local stack (2026-08-04):**
+      ```
+      IN SCHEMA public REVOKE … FROM PUBLIC → default row UNCHANGED, new fn anon_can = true
+      (no IN SCHEMA)   REVOKE … FROM PUBLIC → new row (global)={postgres=X/postgres},
+                                               new fn acl={postgres=X/postgres}, anon_can = false
+      ```
+    - **So the global form is the only one that works, and it must be scoped by ROLE
+      instead:** `ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS
+      FROM PUBLIC` (`20260804000400`). `FOR ROLE postgres` reaches only what this repo's
+      migrations create; extension functions belong to `supabase_admin` in the `extensions`
+      schema and keep their own defaults.
+    - **How it was caught, and the general lesson: mutation-test a probe before believing
+      it.** The migration carries `DO` blocks that create a throwaway function/table/
+      sequence, ask whether `anon` can reach it, drop it and `RAISE` if so. Deleting each
+      revoke in turn and re-running proved all three fire. The **first** mutation run is
+      what exposed this — the function probe went red for a revoke that had been written,
+      not one that had been deleted. A self-check you have never seen fail is a decoration.
+    - **Consequence to know before writing the next migration:** a new function in `public`
+      is now callable by **nobody** until its own migration grants it. A forgotten
+      `GRANT EXECUTE … TO authenticated` is now a loud `permission denied for function` in
+      development instead of a silent hole only a remote dump would find. (2026-08-04.)
