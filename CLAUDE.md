@@ -89,9 +89,15 @@ touching an unfamiliar subsystem.
 **Database**
 - Expand/contract, **one schema change in flight at a time**. Write migrations on a short
   `db/…` branch, apply, `supabase test db`, merge before anything depends on them.
-- **New SECURITY DEFINER function?** `REVOKE ALL … FROM PUBLIC` is not enough — cloud's
-  project-level default privileges grant `anon` EXECUTE. Only a **remote grant dump**
-  catches it; local `pg_proc` passes. (§7.39)
+- **A new function or table is callable by NOBODY until its own migration grants it**, and
+  a migration that adds a **policy** must add the matching `GRANT` or the app throws
+  `permission denied` in dev. Deliberate, since 2026-08-04: `authenticated` holds a table
+  privilege only where a policy could permit it. **Never "fix" that with a blanket
+  re-grant** — `supabase/tests/table_grants.test.sql` goes red on any privilege no policy
+  permits. (§7.87)
+- **Still take a remote grant dump after touching privileges.** Local and cloud disagree by
+  construction, and three migrations in one day each closed a different cell of the
+  role × object-type grid while every probe passed. (§7.39, §7.89, `docs/DEPLOYMENT.md` §11.7)
 - A `BEFORE INSERT` trigger **also fires for rows that resolve to an UPDATE** via
   `.upsert()`. Detect the update inside the trigger. (§7.57)
 

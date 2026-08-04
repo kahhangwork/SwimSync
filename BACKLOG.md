@@ -1,6 +1,18 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-04 — **three items shipped and removed** (§8.28): *revoke `anon`
+_Last updated: 2026-08-04 (second session) — **one item filed, two corrected, none shipped
+from here.** Filed: *decide whether `service_role` deserves the whitelist treatment* — the
+role where grants genuinely are the only gate, and where the `authenticated` oracle
+deliberately does **not** transfer. *Run the UI drivers in CI* gained the evidence it was
+missing: `verify-parent-claim.mjs` was found red since **58 minutes after it was written**,
+and §7.79's static detector **cannot** catch that class — the driver can fail, does fail,
+and exits non-zero to nobody. *Direct writes to `students` are audited by nobody* had a
+stale premise corrected: browser-written audit rows were possible-but-wrong, and
+`20260804000300` made them **impossible**. Note the `anon` REFERENCES/TRIGGER/TRUNCATE
+concern named in the line below is **closed** — `20260804000400` revoked it and a remote
+dump on 2026-08-04 confirms `anon` holds nothing on any table._
+
+_Previously, 2026-08-04 — **three items shipped and removed** (§8.28): *revoke `anon`
 EXECUTE from the remaining SECURITY DEFINER functions*, *a business cannot read its own
 audit trail*, and *retire `tenants.kind` / narrow `coaches_without_rate`* — the last of
 which was **half-wrong as filed**: the SQL had been correct since 2026-07-19 and the
@@ -968,11 +980,15 @@ edit matters far less, which is why this sat unnoticed.
 - It also composes with the item above: derive `tenant_id` from the row (`students` has a
   real `tenant_id` column), so this one starts life correctly attributed rather than
   joining the 13.
-- **Do not audit from the browser.** It is *possible* — `authenticated` holds INSERT and
-  `audit_log_insert` permits `actor_id = auth.uid()` — and it is wrong twice over: it is a
-  second round trip that can be lost while the write lands, and everything except the
-  actor is self-reported. An audit trail with silent holes is worse than a known-absent
-  one, because it gets trusted.
+- **Do not audit from the browser — and as of 2026-08-04 you no longer can.** This bullet
+  used to say it was *possible but wrong*: wrong twice over, because it is a second round
+  trip that can be lost while the write lands, and because everything except the actor is
+  self-reported. That reasoning stands and is why the trigger is the right shape. What
+  changed is the premise: `20260804000300` narrowed `audit_log_insert` from
+  `actor_id = auth.uid()` — under which any signed-in user could fabricate any audit row —
+  to the single real client case, **a coach on a lesson session they own**. A browser-written
+  audit row for a `students` edit is now refused outright. An audit trail with silent holes
+  is worse than a known-absent one, because it gets trusted.
 - Record the **old and new values** (`to_jsonb(OLD)` / `to_jsonb(NEW)`), not just "edited".
   The dispute this exists for is *what the number used to be*.
 - Scope it: an `UPDATE` trigger firing on every column change includes the level picker,
@@ -996,6 +1012,35 @@ a page reported as "checked" when it had no rows is how this bug survives a seco
 `components/Table.test.tsx` already covers the *static* form of the mistake (a `<Tr>` inside
 a `<Thead>`); this covers layouts that break for other reasons.
 
+### Decide whether `service_role` deserves the whitelist treatment — **M**
+`20260804000600` made `authenticated`'s table grants a declared whitelist derived from
+`pg_policies`, and `000700` shut the last default-privilege row. `service_role` was left
+untouched, deliberately and on the record — this item is the decision, not a plan to do it.
+
+**Why:** it is the one role where **grants are the entire gate**. `rolbypassrls = true`, so
+no policy in the repo restrains it, and it holds `arwdDxtm` on all 37 tables plus EXECUTE on
+everything. The mitigation is that it is reachable only with the secret key — held by the
+edge functions and the admin panel's server routes, never shipped to a browser. So the
+exposure is "anything that can read an env var", which is a real but different threat model
+from `anon` and `authenticated`.
+
+**Notes:**
+- **The `authenticated` argument does not transfer, and that is the point.** There, the
+  oracle was "no policy could ever permit this", which made 50 of 148 grants provably dead.
+  `service_role` has no policies by design, so that oracle returns *everything* and is
+  useless. A whitelist here would have to be derived from **actual usage** — the edge
+  functions (`generate-invoices`, `package-emails`, `public-invoice`) and the admin's
+  `createAdminClient()` routes — which is a genuine audit, not a query.
+- Known writers to start from: `generate-invoices` touches most billing tables under
+  `service_role`; `SwimSyncAdmin/app/api/provision-tenant/route.ts` inserts and deletes
+  `tenants`; `invite-parent` writes profiles. Any narrowing must not break the invoice
+  engine, which is the one thing in this repo that must never fail silently.
+- **Do not extend `table_grants.test.sql` to cover it.** That file is scoped to
+  `authenticated` and `anon` on purpose (§7.87): the invariant is false for a role that
+  bypasses RLS, and a test that is red against a correct database gets disabled.
+- Prerequisite: an honest answer to "what does each service-role caller actually touch?".
+  Until that exists, this is a question, not a task.
+
 ### `verify-levels.mjs` is not hermetic — **S**
 It asserts an empty-ladder state as its first check, then creates levels and leaves them
 behind, so the second run of the day fails on the first run's data.
@@ -1016,12 +1061,25 @@ drivers need a browser and both dev servers, so this is a bigger job than the fi
 was.
 
 **Why:** the fixture check closes the *loading* half of the gap and leaves the *asserting*
-half open. **Three drivers were found rotting in one week, all by accident, none by a test.**
-`verify-attendance-window.mjs` sat at 2/5 for over a month (a stale calendar);
+half open. **Five drivers have now been found rotting, every one by accident, none by a
+test.** `verify-attendance-window.mjs` sat at 2/5 for over a month (a stale calendar);
 `verify-trial-onboarding.mjs` had **aborted on its first check since 2026-07-25**, two hours
 after it was written, because the control it taps was deleted the same evening (repaired
-2026-08-01, but only because someone hand-ran it); and §7.62's pair could not load at all. A driver is one calendar change or one deleted button away from
-guarding nothing, and nothing watches them.
+2026-08-01, but only because someone hand-ran it); §7.62's pair could not load at all;
+`verify-coach-billing.mjs` had **zero assertions** and `verify-stale-screen.mjs` printed
+"18/18 passed" while four checks crashed (§7.79); and on 2026-08-04
+**`verify-parent-claim.mjs` was found at 0/5, red since 58 MINUTES after it was written** —
+the app grew an "Is this right?" review modal (`bad1294`, 01:59) an hour after the driver
+was committed (`0cf8036`, 01:01), and the driver has waited for a popup the app would never
+show ever since. A driver is one calendar change or one new confirm step away from guarding
+nothing, and nothing watches them.
+
+**The last one is the argument this item had been missing.** §7.79's static detector — does
+this driver have a non-zero exit path? — **cannot catch it**. `verify-parent-claim.mjs`
+*can* fail and *does* fail; it exits non-zero, loudly, to nobody. Every cheap substitute for
+running the drivers is blind to the most common failure, which is simply that nobody ran
+them. That also means the cheapest slice (the detector as a CI step, suggested below) buys
+strictly less than it looks like it does.
 
 **Notes:** ~19 drivers, most needing Expo web on :8081 and several also Next on :3000, plus
 Playwright against installed Chrome (`channel: "chrome"` — the runner would need a browser

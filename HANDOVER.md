@@ -1,6 +1,22 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-04 — **the three queued migrations all shipped and DEPLOYED
+_Last updated: 2026-08-04 (second session) — **auditing whether `authenticated` deserved
+the sweep `anon` got found three LIVE forgery paths instead, all now closed and DEPLOYED
+(§8.29).** A self-registered stranger — signup is open, so that is anyone with an email
+address — could join any business **with no join code** (and then read its `join_code`,
+harvesting the credential they bypassed), attach themselves to **any child by UUID**, and
+rename or deactivate that child. Both policies checked *whose* row it was and never *what
+it pointed at*. The original question was answered too, in the negative: `authenticated`
+does **not** deserve `anon`'s sweep — parent, coach and admin are one database role, so
+only RLS has the resolution — but 50 of its 148 grants had no policy behind them, so the
+grant set became a **declared whitelist** that CI re-proves every run. Four migrations
+(`000500`–`000800`); the last two exist because production was **dumped after deploying
+rather than trusted**. Separately, `verify-parent-claim.mjs` was found red since **58
+minutes after it was written** — the product was correct throughout. **The standing
+headline is unchanged: chase the outstanding invoices, keep marking August, bill it in
+early September — §9.**_
+
+_Previously, 2026-08-04 — **the three queued migrations all shipped and DEPLOYED
 (§8.28), and the queue is now empty**. Two of the three were mis-filed, which is the
 useful part. *Revoke `anon` EXECUTE* was filed as "defence in depth, not a live hole" and
 was one: `next_credit_note_ref` had **no ACL at all**, so an unauthenticated POST could
@@ -14,40 +30,14 @@ the fabrication-friendly INSERT policy narrowed on the way past. **The standing 
 unchanged: chase the outstanding invoices, keep marking August, bill it in early
 September — §9.**_
 
-_Previously, 2026-08-03 — **the mobile app caught up with the billing that shipped
-without it (§8.27, LIVE)**. A day of real use produced four complaints, all correct:
-the coach's **Classes tab** now lands on the class list (grouped by weekday, today
-first) instead of a leftover attendance screen — the other half of §7.65, and §7.80
-records the **three fixes that silently did nothing**; the coach's **Billing tab became
-My Pay** (payouts only, hidden entirely when there are none, so production's private
-coach sees **three** tabs) because every actionable thing about an invoice lives on the
-admin panel now; the **parent app prints `INV-2026-0001`** on both invoice screens
-instead of a UUID fragment that matched nothing on the QR, the reminder or the bank
-statement; and Today's card counts **guests apart from students** ("4 students +
-1 guest") after it was found printing enrolments beside a chip counting the expected
-set. On the test side: deleted a driver with **zero assertions**, found the worse variant
-— one reporting "18/18 passed" while four checks crashed — and then **found that the
-detector written for it was itself wrong**, having libelled a second driver that turned
-out to assert perfectly well (§7.79 carries the correction, which is the more useful half)._
+_Previously, 2026-08-03 — **the mobile app caught up with the billing that shipped without
+it (LIVE)**: four complaints from a day of real use, all correct, plus a driver with zero
+assertions deleted and a detector that turned out to be wrong about a second one. Full
+account and pointers: the **§8.27** ledger row._
 
-_Previously, 2026-08-02 (third session that day) — **fee-free payment collection
-shipped AND DEPLOYED, Phases 0–3 (PRD §7.21, §8.26)**: every invoice now carries a
-per-tenant `INV-YYYY-NNNN` reference and a 128-bit public token (BEFORE INSERT
-trigger — the engine is untouched); a **dynamic PayNow QR** with amount + reference
-locked is computed client-side from new tenant UEN/mobile settings; a **tokenized
-public invoice page** (`swimsync.sg/invoice/<token>`, no login, served by the new
-`public-invoice` edge function) is where the **WhatsApp reminder button + click-through
-queue** on the admin Invoices page send parents; the parent's **"I've paid" claim** and
-ONE converged `confirm_invoice_paid()` path close the loop. Two migrations, a third
-edge function, all three UIs, a 19-check driver — deployed in the §7.60 order and
-verified (grant dumps clean, both bundles grep-positive). **Then, same day, the
-standing mission of this file COMPLETED: the user passed the bank-app scan gate,
-BILLED JULY FOR REAL, and COLLECTED THE FIRST REAL MONEY** — real invoices with
-references, real PayNow payments against the dynamic QR, July sealed, audit rows
-written by the converged confirm path. The product's whole loop has now run on real
-data end to end. Earlier that day: make-up classes (§8.25). New standing headline:
-**chase the remaining outstanding invoices (the WhatsApp queue exists for exactly
-this), keep marking August, and bill it in early September** — §9._
+_Earlier, 2026-08-02 — fee-free payment collection shipped and deployed, and **the standing
+mission of this file COMPLETED: July was billed for real and the first real money
+collected**. Full account and pointers: the **§8.26** ledger row._
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
 
@@ -64,7 +54,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.85** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.89** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -359,6 +349,27 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   PUBLIC grant is global, so the revoke must be too (§7.85). Consequence for new work: a
   function is callable by **nobody** until its own migration grants it, which fails loudly
   in development instead of silently in production.
+- **A signed-in stranger can no longer forge their way into a business or onto a child
+  (verified local: pgTAP ×3 files + a real anon-key session, REMOTE dump — LIVE
+  2026-08-04)** — signup is open, so `authenticated` means anyone with an email address.
+  Until this shipped they could **join any business with no join code** (then read its
+  `join_code`, plus `paynow_uen`/`mobile` and the coach's contact details), **attach
+  themselves to any child by UUID**, and rename or deactivate that child — bypassing the
+  admin-approval claim flow entirely. Both policies checked *whose* row it was and never
+  *what it pointed at*; both are dropped, and joining or adding a child now goes only
+  through the SECURITY DEFINER RPCs that always did the real work (§7.86). Student UUIDs
+  are **not enumerable**, so the second needed a UUID from outside — verified, not assumed.
+- **`authenticated`'s table grants are a DECLARED WHITELIST, re-proven by CI every run
+  (LIVE 2026-08-04)** — it holds a privilege **only** where a policy could permit it. It did
+  **not** get `anon`'s sweep and should not: parent, coach and admin are one database role,
+  so only RLS can separate them. But 50 of 148 grants had no policy behind them, and
+  TRUNCATE/REFERENCES/TRIGGER on all 37 tables were surplus **RLS cannot see**. Production
+  went from `GRANT ALL` on every table to the exact whitelist. **Consequence for new work,
+  and it is the point:** a new table is reachable by nobody until granted, a migration that
+  adds a policy must add the matching `GRANT`, and a blanket re-grant turns
+  `table_grants.test.sql` red rather than quietly restoring the old state (§7.87, §7.88).
+  `service_role` is deliberately untouched — grants really are its only gate, but the
+  oracle used here does not transfer to a role that bypasses RLS (`BACKLOG.md`).
 - **Automated tests** — pgTAP + Deno on the backend, vitest + jest-expo on the two apps, all
   in CI on push to `main`. **Counts are deliberately not written here**: the two frontend
   numbers that used to be (162 and 109) had drifted to 198 and 174 by 2026-08-01 while
@@ -413,21 +424,19 @@ See §11.
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **As of 2026-08-02 (evening) production is fully caught up**: every migration through
-> `20260802000700` is applied (`supabase migration list --linked` shows nothing pending),
-> `generate-invoices` is at **version 18** on the platform's counter, and THREE functions
-> exist: `generate-invoices` v18, **`package-emails` v1** (verify_jwt ON), and
-> **`public-invoice` v1** (verify_jwt **false**, deliberately — the invoice token is the
-> access control; deployed 2026-08-02, each deployed separately). *(This line has gone
-> stale before — `supabase functions list` and `supabase migration list` are the honest
-> answers; treat this sentence as a hint, not a fact.)*
-> Backups were taken before each production migration through 2026-08-01 (scratchpad,
-> not committed). **The 2026-08-02 make-ups batch went out WITHOUT a fresh backup** —
-> additive-only plus three CREATE OR REPLACEs whose pre-change bodies are captured in
-> `supabase/rollback/20260802_makeup_bookings_DOWN.sql`; noted here so the omission is
-> a fact, not a discovery. The payment-collection batch (000600/000700) DID take
-> schema + data dumps first (scratchpad, not committed); both migrations are additive
-> and production's `invoices` table was empty when they landed.
+> **Production was fully caught up as of 2026-08-04** — every migration through
+> `20260804000800` applied. THREE edge functions exist: `generate-invoices`,
+> `package-emails` (verify_jwt ON) and **`public-invoice` (verify_jwt false, deliberately —
+> the invoice token is the access control)**. *(Version numbers used to be written here and
+> went stale twice. `supabase functions list` and `supabase migration list --linked` are the
+> honest answers; this sentence is a hint.)*
+> **Rollback cover is uneven, so know which kind you are shipping.** Backups were taken
+> before each production migration through 2026-08-01 (scratchpad, uncommitted — so not
+> findable later); the 2026-08-02 make-ups batch went out with **no fresh backup**, covered
+> only by `supabase/rollback/20260802_makeup_bookings_DOWN.sql`; the 2026-08-04 grant work
+> is covered by a **committed** rollback file
+> (`supabase/rollback/20260804_authenticated_grants_DOWN.sql`), which is the pattern to
+> copy — a scratchpad backup nobody can find is not a rollback plan.
 >
 > The **tenancy** deploys (§8.1) had **opposite orderings** and both were deliberate — phase 4
 > *dropped* columns so the app deployed first; phase 5 only *added*, so migrations went
@@ -435,16 +444,6 @@ See §11.
 > `supabase db push`, so Vercel shipped an admin calling an RPC that did not exist yet.
 > The rule governs the **push**, not just the migration command — see §7.27.
 >
-> As of 2026-07-18 that also includes the whole §8a underbilling cluster (multi-class invoices, the
-> configurable run day, month sealing, and the hard attendance block) **and the same-day
-> empty-month seal fix (§8a.1) — `supabase functions list` shows `generate-invoices` at
-> version 7, deployed 2026-07-18 19:45 SGT, ~1 min after commit `0363757`**, plus the earlier bulk
-> attendance **"Set all"** control, **admin class
-> editing + a required day-of-week** (§8e), the unmarked-lesson safety net, and the parent
-> Attendance fixes (§8g). **Caveat worth keeping:** every check on that work ran against **local
-> fixtures** — none of it has been driven against the real production DB. No schema or
-> migration is involved, so failure looks wrong rather than destroying data.
-
 **Not done yet** (see §9): native **App Store / Play Store** builds remain deferred (web
 app on iPhone for now). *Parent onboarding is no longer a gate — it happened, and July
 was billed on the back of it. Onboarding a new family is now routine: they enter the join
@@ -482,6 +481,69 @@ ledger line plus its pointers is the whole of what is left. `/update-docs` enfor
 migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing line is a
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
+
+## 8.29 (2026-08-04, second session) — THE AUDIT FOUND THREE LIVE HOLES, NOT THE ONE IT WENT LOOKING FOR
+
+**The question was §9's leftover: does `authenticated` deserve the sweep `anon` got?**
+The answer is **no** — and asking it properly is what found the holes.
+
+**Why not, structurally:** parent, coach and tenant admin are all the same database role.
+Grants are per-table-per-command and cannot tell them apart, so no grant can stop a parent
+reading another family's invoice — `invoices` must be SELECT-able by `authenticated` for the
+product to work. **Only RLS has that resolution.** What *was* free: 50 of 148
+(table × command) grants had no policy that could ever permit them, and TRUNCATE /
+REFERENCES / TRIGGER on all 37 tables were surplus **RLS cannot even see** — no policy in
+this repo restrains a TRUNCATE.
+
+**The three holes, reproduced with a real anon-key session before anything was written**
+(`000500`). Signup is open, so the attacker is anyone with an email address:
+
+```
+POST /rest/v1/parent_tenants  {parent_id: own, tenant_id: any}  -> 201
+POST /rest/v1/parent_students {parent_id: own, student_id: any} -> 201
+PATCH /rest/v1/students?id=eq.<uuid>                            -> 200
+```
+
+Reasoning: **§7.86**, including the original comment that preserves the error
+(*"the app resolves the code to a tenant id first"* — RLS never sees your UI) and the
+mitigating fact that student UUIDs are **not enumerable**, verified against a second real
+family so the check was not vacuous.
+
+**The ordering constraint is the transferable lesson.** The whitelist is derived *from* the
+policy set. Run before `000500`, it would have granted both forgery paths into a *reviewed,
+declared* whitelist and the holes would have stopped looking like holes. **A whitelist
+inherits the judgement of whatever it is derived from.**
+
+**Two of the four migrations exist only because production was dumped after deploying.**
+`000700` closed `GRANT ALL ON FUNCTIONS TO authenticated`, which survived three migrations
+because each probe tested only what its own migration changed (**§7.89** — the grid).
+`000800` retired `parent_students_delete` after the user asked whether an unused policy
+could just go: it could, and the reason was better than "unused" — the database and
+`BACKLOG.md` disagreed about whether an approved claim could be reversed outside its own
+undo flow (**§7.47**, updated in place).
+
+**What was deliberately NOT done:** `service_role` is untouched — grants genuinely are its
+only gate, but the `authenticated` oracle does not transfer to a role that bypasses RLS, so
+it needs a usage audit rather than a query (`BACKLOG.md`). Existing function grants were not
+swept; only the tap was closed.
+
+**Verified:** pgTAP **498** in 30 files (was 479/27; 18 new assertions in 3 files, all
+proven RED first), Deno 130 **twice** (§7.15), vitest 237, jest 244, both typechecks,
+fixtures 15/15, six drivers at **19/10/6/15/20/15**. All migration probes mutation-tested —
+**two of my own errors were caught that way**: the relkind guard fired on pgTAP's own views
+(red against a correct database, which is how a test gets disabled), and the first whitelist
+missed column-level ACLs, invisible to `has_table_privilege`. Production verified by remote
+dump: zero blanket table grants, zero default-privilege rows naming either client role.
+
+**Separately — `verify-parent-claim.mjs` was red from 58 minutes after it was written.**
+`handleSave()` gained an *"Is this right?"* review modal an hour after the driver was
+committed, so it waited for a popup the app would never show. **The product was correct the
+whole time**; confirmed by removing all four migrations and reproducing the failure, and by
+calling the RPC directly. 0/5 → 21/21. Fifth driver caught rotting by accident, and the one
+§7.79's detector **cannot** catch — it can fail, does fail, and exits non-zero to nobody.
+That evidence is now in `BACKLOG.md` under *Run the UI drivers in CI*.
+
+---
 
 ## 8.28 (2026-08-04) — THE THREE QUEUED MIGRATIONS, AND THE ONE LIVE HOLE THEY FOUND
 
@@ -553,62 +615,11 @@ which cost a debugging round when four driver checks failed looking like product
 
 ---
 
-## 8.27 (2026-08-03) — THE APP CATCHES UP WITH THE BILLING THAT SHIPPED WITHOUT IT
-
-**The trigger was the user opening their own app.** Payment collection (§8.26) shipped
-entirely on the admin panel and the public invoice page; the mobile app was never
-reconciled against it, and a day of real use surfaced it as four questions. All four were
-real, and a fifth was found while answering them. Shipped and **deployed** as one
-app-only change — no migration, no edge function, no engine change (`aa89bd3`).
-
-**What was wrong, and where its reasoning now lives:**
-1. *"What are the 4 outstanding?"* — unpaid invoices, counted with no date bound, sitting
-   between two today-scoped tiles. Removed with the whole category — `BACKLOG.md` →
-   *Deliberately not doing*, and PRD §7.9.
-2. *"Why does Classes open on a class?"* — the other half of **§7.65**, live for weeks.
-   `docs/GOTCHAS.md` **§7.80**, which is mostly a list of the **three fixes that silently
-   did nothing** (`navigate({screen})`, targeted `popToTop`, `dismissAll`) — each looked
-   right and changed no behaviour. Only the driver caught them.
-3. *"The Billing page is outdated"* — correct; PRD §7.9 and §14.2/§14.4.
-4. *"The PayNow QR should be unnecessary"* — correct **but not yet safe**: the static
-   upload still serves native builds and **package payments**, which have no reference to
-   lock into a QR. Recorded in `BACKLOG.md` as an ordered pair — references first, retire
-   the upload second. Doing it in the other order breaks paying for a package.
-5. **Found while working:** Today's card printed *active enrolments* while the chip beside
-   it counted the *expected* set, so it could read "4 students · 3 of 5 marked". A coach
-   trusting the head-count leaves a lesson unmarked, and that blocks the month with no
-   override. Now "4 students + 1 guest", split **by subtraction from the same array the
-   chip uses**, so the two cannot drift (§7.18).
-
-**The driver work is the durable half.** `verify-coach-billing.mjs` was deleted: it had
-**zero `check()` calls**, swallowed every error and set no exit code — it could never have
-failed. Hunting for siblings found the worse variant in `verify-stale-screen.mjs`, which
-printed *"18/18 passed"* and exited **0** while four newly-appended checks crashed, because
-`finally` reached `process.exit` first. Both are **§7.79**, with a one-line detector that
-flagged one survivor — **wrongly**. `verify-tz-saturday.mjs` asserts through its own
-`[label, bool]` array and exits non-zero; the detector had grepped for this repo's
-`check(` helper name rather than for the *property*, and the false positive was written up
-as fact in both §7.79 and `BACKLOG.md`. **Running it showed 5/5** (2026-08-03). Both
-documents corrected, the backlog item deleted, the detector replaced with one that greps
-for a non-zero exit path — which now returns nothing, i.e. every driver can fail. The
-driver was hardened anyway (crash-as-failed-check, browser closed in `finally`, a run that
-asserts nothing exits 1; all three proven by mutation). **§7.81** records that
-Metro caches the route manifest, so a renamed route folder leaves a **ghost tab** and every
-driver run against it measures the old app — which cost a debugging round here.
-
-**Verified:** jest **244** (was 207), vitest 237, both typechecks clean, fixtures 15/15,
-`verify-stale-screen` **22/22** (was 18/18), `verify-coach-wages` 10/10 (was 8/9),
-`verify-makeups` 15/15, `verify-payment-collection` 19/19. New tests proven RED first
-(§7.25). CI green; the served swimsync.sg bundle greps positive for all four changes and
-negative for the old strings.
-
----
-
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.27** | 2026-08-03 | **The mobile app caught up with the billing that shipped without it** — four complaints from a day of real use, all correct: the coach's Classes tab lands on the class list (the other half of §7.65), the Billing tab became **My Pay** and hides entirely when there are no payouts, the parent app prints `INV-2026-0001` instead of a UUID fragment, and Today's card counts **guests apart from students**. On the test side, a driver with **zero assertions** deleted, a worse variant found printing "18/18 passed" while four checks crashed — and then the detector written to find them was itself **wrong**, having libelled a driver that asserts perfectly well | PRD §7.9, §14.2/§14.4 · **§7.79, §7.80, §7.81** · `BACKLOG.md` *(Deliberately not doing: any invoice count in the coach app)* |
 | **8.26** | 2026-08-02 | **Fee-free payment collection, Phases 0–3** — `INV-YYYY-NNNN` + a 128-bit public token by BEFORE INSERT trigger (the engine untouched), a client-computed **dynamic PayNow QR** with amount and reference locked, the **tokenized sessionless invoice page** served by the `public-invoice` edge function (deliberately not an anon RPC), the admin's **WhatsApp click-through queue** ("chat opened", never "reminded"), the parent's "I've paid" claim, and every mark-paid converged on `confirm_invoice_paid()`. Post-ship the same day, a question about the reference format exposed that **Postgres `LPAD` truncates** past the pad width — a silent reference collision within ~13 months for a large tenant, latent in `next_credit_note_ref` since July; both fixed. **Then the standing mission of this file completed: July billed for real and the first real money collected** | PRD §7.21 · `docs/design/PAYMENT_COLLECTION_DESIGN.md` · `docs/ARCHITECTURE.md` §6 *(anon-RPC refusal)* · **§7.77, §7.78** · `INVOICE_RUNBOOK.md` |
 | **8.25** | 2026-08-02 | Make-up classes as the **guest-pass model** — an enrolled child booked into one lesson of another same-category class; a booking is never an enrolment, an unmarked make-up blocks the month like a trial, a package family's attended make-up draws from the package via the booking's snapshotted category, an ad-hoc guest pays their **home** class's effective-dated rate. Five migrations, the engine, all three UIs. Also closed the latent trial-guest visibility gap (a host coach could not read a guest's name) | PRD §7.20 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §10 · `supabase/rollback/20260802_makeup_bookings_DOWN.sql` |
 | **8.24** | 2026-08-02 | The parent invoice detail marks package-funded lines ("Paid by package · *name*"; a reversed draw reads ad hoc). App-only, no migration. The admin Invoices page renders no line items, so the parent detail is the only "which lines" surface — an admin invoice detail would be a new feature | PRD §7.16 · `docs/TESTING.md` §5 (`invoiceFunding`) |
@@ -699,29 +710,30 @@ into a computed QR. **Do them in that order**; the reverse breaks paying for a p
 same session's copy fix (the PayNow screen calls the business "Coach") folds into whichever
 ships first.
 
-**Still open from 2026-08-04:** whether `authenticated` deserves the same treatment
-`anon` just got. That role IS reachable, and it holds `TRUNCATE` on all 37 tables — a
-privilege **RLS does not restrain**. Not filed as an item yet because it needs the same
-"prove nothing depends on it" pass that `anon`'s did, and unlike `anon` the answer is not
-obviously "nothing".
+**The `authenticated` question from 2026-08-04 is ANSWERED — don't re-open it.** No, it does
+not deserve `anon`'s sweep (§8.29, §3): one database role carries parent, coach and admin, so
+only RLS can separate them. The part that *was* free is done — the grants are a declared
+whitelist and CI re-proves it. **What replaced it as an open question is `service_role`**,
+now a `BACKLOG.md` item: grants genuinely are its only gate, but the oracle used for
+`authenticated` ("no policy could permit this") is useless for a role that bypasses RLS, so
+it needs a usage audit of the edge functions and the admin's server routes. Don't start it
+without that.
 
-**The highest-value engineering item is still *Run the UI drivers in CI* (M), and 2026-08-03
-made the case stronger.** CI loads every fixture but executes no driver, and the count of
-drivers caught rotting **by accident** is now four (§8.21, §8.22, §8.27): one at 2/5 from a
-stale calendar, one aborting on check 1 since two hours after it was written, §7.62's pair
-that could not load at all, and now one with **zero assertions** that could never fail plus a
-second that printed *"18/18 passed"* while four checks crashed (§7.79). §7.79 carries a
-one-line detector — **that half is mechanical and could be a CI step on its own, without a
-browser**, which is the cheapest slice of this item. It currently returns nothing, which is
-the point of running it. **But note what §7.79 also records:** the *first* version of that
-detector grepped for a helper name and produced a false positive that was written up as
-fact in two documents. A static check tells you a driver *can* fail, never that it *does* —
-only executing it does that, which is the whole argument for this item. Weigh the narrower
-options in its `BACKLOG.md` entry.
+**The highest-value engineering item is still *Run the UI drivers in CI* (M), and
+2026-08-04 made the case decisive.** Five drivers have now been caught rotting, every one by
+accident. The newest is the one that matters: `verify-parent-claim.mjs` was red from **58
+minutes after it was written** — the app grew a confirm step an hour after the driver was
+committed — and it sat at 0/5 for months while the product was perfectly correct. **§7.79's
+static detector cannot catch that class at all:** that driver *can* fail and *does* fail; it
+exits non-zero, loudly, to nobody. So the cheap slice (the detector as its own CI step) buys
+strictly less than it appears to. Weigh the narrower options in its `BACKLOG.md` entry.
 
-**The migration queue is EMPTY.** All three shipped and deployed on 2026-08-04 (§8.28).
-Nothing is in flight, so the next schema change can start immediately — still one at a time
-(§7.55), and a worktree never authors one (`docs/WORKTREES.md`).
+**The migration queue is EMPTY.** Four shipped and deployed on 2026-08-04 (§8.29:
+`000500`–`000800`). Nothing is in flight, so the next schema change can start immediately —
+still one at a time (§7.55), and a worktree never authors one (`docs/WORKTREES.md`).
+**Note what the last two of those four cost:** both existed only because production was
+**dumped after deploying** rather than trusted. Budget for that dump; it is the only honest
+check (§7.39, §7.89, `docs/DEPLOYMENT.md` §11.7).
 
 ### Worth deciding, not urgent
 

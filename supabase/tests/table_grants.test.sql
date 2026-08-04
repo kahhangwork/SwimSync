@@ -30,7 +30,7 @@
 -- `GRANT ALL ON ALL TABLES … TO authenticated` — which would restore exactly
 -- the state that migration removed. Assertion 2 is what turns that shortcut
 -- red: a blanket grant confers privileges no policy permits. The workaround
--- fails; it is not merely discouraged. (§7.86)
+-- fails; it is not merely discouraged. (§7.87)
 --
 -- PROVEN RED. Applying `supabase/rollback/20260804_authenticated_grants_DOWN.sql`
 -- to a migrated database — i.e. restoring the exact pre-000600 state — takes

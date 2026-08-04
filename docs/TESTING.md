@@ -53,7 +53,7 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 
 | File | Covers |
 |------|--------|
-| `constraints.test.sql` (4) | one-invoice-per-parent-per-month, one active enrolment per student, positive-only credit applications, credit notes immutable to app roles |
+| `constraints.test.sql` (4) | one-invoice-per-parent-per-month, one active enrolment per student, positive-only credit applications, credit notes immutable to app roles — that last one asserts a **`42501`** now, not a silent zero-row UPDATE: since `20260804000600` the grant is gone as well as the policy, so the privilege check fails first (§7.88) |
 | `credit_note_trigger.test.sql` (11) | the `handle_attendance_update` auto credit-note trigger (billable→non-billable on an invoiced lesson); **11.6** the correction leaves the original invoice intact (not modified/deleted) and the note links back to it |
 | `rls_isolation.test.sql` (10) | RLS parent/parent isolation + superadmin sees all; **11.3** a parent sees all their children across coaches while each coach sees only students in their own classes |
 | `edge_cases.test.sql` (9) | PRD §11: **11.2** a child created before assignment defaults to unassigned with an empty (not error) class view, **11.4** no bare `trial` status, **11.5** re-enrol after unenrol keeps history, **11.8** unenrol leaves `credit_balance` untouched |
@@ -80,7 +80,10 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `payment_collection.test.sql` (10) | Phase 0 of fee-free payment collection: the **RISK 1 engine tripwire** (a service_role-shaped INSERT gets reference + token from the trigger — the assertion that goes red if the DEFINER hop is ever flattened), `INV-YYYY-NNNN` with the year from the invoice's **own billing_month** (§7.7) and per-tenant numbering (both tenants start 0001), the pin on `reference_number`/`public_token` against client writes while `reminded_at` deliberately stays admin-writable, parent RLS both sides (§7.59), and `next_invoice_ref` callable by nobody external (the anon layer is §7.39's remote dump, not asserted here) |
 | `function_grants.test.sql` (3) | **The general rule, asserted over `pg_proc` rather than over a list of names:** *no function in `public` grants EXECUTE to `anon`* — failures name the offenders. Written this way because every earlier grant assertion here pins ONE function, so none of them could fail for a function nobody thought to name, which is exactly how `next_credit_note_ref` sat on the bare `PUBLIC` default with an unauthenticated write path (§7.82). Plus both reference counters pinned callable-by-**nobody**. Catches the LOCAL half only; the cloud half is still §7.39's remote dump |
 | `audit_log_tenant.test.sql` (8) | every audit row knows its business: the stamp follows the **entity** across a tenant boundary (a `Student` row takes the student's business, not the actor's), `lesson_session` resolves through its class, a **supplied `tenant_id` is overwritten** by the derived one, an unknown `entity_type` **RAISES** rather than writing an invisible row, a writer that sets no `tenant_id` (`schedule_extra_lesson`) comes out stamped anyway, and the narrowed INSERT policy **both ways** — a coach may audit a session they own and may **not** fabricate a row about a student |
-**Total: 479 across 27 files** — verified by `supabase test db` 2026-08-04 (the previous
+| `parent_link_forgery.test.sql` (9) | the two forged links closed by `20260804000500`, reproduced as HTTP 201/201/200 before the fix: a self-registered **stranger** cannot insert their own `parent_tenants` row naming an arbitrary business (so the `join_code` stays invisible), cannot attach themselves to an arbitrary child, and therefore cannot modify that child — `students_update` is untouched and correct, it was ownership that was forgeable (§7.86). Assertion 1 is the positive control that makes a silently-superuser run visible (§7.16); 7–9 are the **green guard** that the join code and Add Child still work, because the failure this file must not hide is an onboarding outage |
+| `table_grants.test.sql` (6) | the standing invariant behind `20260804000600`, over `pg_class`/`pg_policies` so a table added next month is covered on the day it is created: `authenticated` holds a table privilege **if and only if** a policy could permit it (both directions, failures named), no TRUNCATE/REFERENCES/TRIGGER anywhere, `anon` holds nothing, no postgres-owned default privilege names either role, and nothing escapes the invariant's reach (views/partitions/foreign tables, plus **column-level** ACLs, which `has_table_privilege()` cannot see and a table-level REVOKE does not remove). **Scoped to `authenticated` + `anon` deliberately** — it is false for `service_role` (bypasses RLS) and meaningless for `postgres` (owns the tables), and a test that is red against a correct database gets disabled (§7.87). Excludes extension-owned relations, or pgTAP's own views fail it inside its own harness |
+| `stranger_isolation.test.sql` (4) | the persona no other isolation file covers — a self-registered parent belonging to **nothing**, which is what an attacker is, since signup is open. Sweeps **all 37 tables at once** and asserts they see only their own `profiles` and `parents` row; assertion 1 pins what a real member sees across 15 tables so "sees nothing" can never pass vacuously, assertion 3 proves the sweep covered every table rather than a subset, and assertion 4 proves the one profile they read is *theirs*. One forged link takes it red naming **six** tables, two of which were not on the list when it was written — which is the argument for sweeping rather than naming |
+**Total: 498 across 30 files** — verified by `supabase test db` 2026-08-04 (the previous
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
@@ -324,7 +327,16 @@ the candidate is masked, Confirm is inert until one is chosen, the parent is **b
 from re-adding, the admin queue shows who is asking, approve is a two-step confirm, undo
 is offered, and the "no, different child" branch produces a duplicate that the Students
 page flags and merges (21 checks). **It found two bugs no unit test could reach** — both
-read paths rather than RPCs (§7.48, and duplicate detection hiding same-parent pairs);
+read paths rather than RPCs (§7.48, and duplicate detection hiding same-parent pairs).
+**It was itself red from 58 minutes after it was written until 2026-08-04**: `handleSave()`
+gained an *"Is this right?"* review modal (`bad1294`, 01:59) an hour after the driver was
+committed (`0cf8036`, 01:01), so it waited for a candidates popup the app would never show
+and aborted at check 1 — 0/5 for months, while the product was correct the whole time.
+Repaired by tapping the modal after each of the three saves. **Two things to know before
+running it:** it needs a full `supabase db reset` **and** `docker restart
+supabase_kong_SwimSync` first, and a second run without one fails at check 1 *identically*
+to the staleness bug above — the run files a claim, approves it and merges a duplicate, and
+re-loading the fixture does not undo those rows;
 `verify-class-students.mjs` (+ `fixtures-class-students.sql` and its
 `-teardown.sql`) drives the admin Classes page's **"See students" drawer** — the badge
 reads `2+1` (and is asserted *not* to read 3 / 2+2 / 2+3 / 3+1, each a specific way the

@@ -91,6 +91,43 @@ still point at the local stack for dev.
    `GRANT … TO anon` somebody wrote **on purpose**, which no default can prevent — but it is
    no longer the only thing standing between you and a silent hole. (2026-08-04.)
 
+   **Extended the same day, because `anon` was only one cell of the grid.** Default
+   privileges are **role × object type**, and three migrations each closed a different
+   corner while all their probes passed: `000400` did functions for `anon` and `PUBLIC`,
+   `000600` did tables and sequences for `authenticated`, and only a dump taken *after*
+   `000600` landed revealed `GRANT ALL ON FUNCTIONS TO "authenticated"` still standing —
+   closed by `000700` (§7.89). **Run this after ANY migration that touches privileges**;
+   it checks the whole grid at once and must return **zero rows**:
+   ```sql
+   SELECT pg_get_userbyid(defaclrole), defaclnamespace::regnamespace, defaclobjtype, defaclacl
+     FROM pg_default_acl
+    WHERE pg_get_userbyid(defaclrole) = 'postgres'
+      AND (defaclacl::text LIKE '%anon=%' OR defaclacl::text LIKE '%authenticated=%');
+   ```
+   The `supabase_admin`-owned rows still name both roles and are **deliberately left
+   alone** — nothing in this repo creates objects as `supabase_admin`, and on cloud
+   `postgres` may not hold the membership to change them. Don't "fix" them.
+
+8. **Production's client-role grants are a DECLARED SET now, and the dump is how you check
+   it.** Since `20260804000600` `authenticated` holds a table privilege only where a policy
+   could permit it. Verified on production 2026-08-04: **zero** `GRANT ALL ON TABLE … TO
+   "authenticated"` (it was 37, i.e. every table), and the 37 tables now carry exactly
+   13 × `SELECT,INSERT,UPDATE,DELETE`, 9 × `SELECT`, 6 × `SELECT,UPDATE`,
+   5 × `SELECT,INSERT,UPDATE`, 3 × `SELECT,INSERT`, 1 × `SELECT,DELETE` — matching local
+   shape for shape. `anon` holds nothing on any table.
+   ```bash
+   grep -cE '^GRANT ALL ON TABLE .* TO "authenticated"' /tmp/prod.sql   # expect 0
+   grep -E  '^GRANT .* ON TABLE .* TO "authenticated"' /tmp/prod.sql | sed -E 's/ ON TABLE.*//' | sort | uniq -c
+   ```
+   **What this costs on every future migration, and it is deliberate:** a new table or
+   function is reachable by **nobody** until its own migration grants it, and a migration
+   that adds a policy must add the matching `GRANT`. Both fail loudly in development
+   instead of silently in production, and `supabase/tests/table_grants.test.sql` re-proves
+   the whole invariant on every CI run — including against a blanket re-grant, which is the
+   shortcut this creates the temptation for (§7.87). Rollback, if a whitelist ever turns
+   out to be wrong in a way the migration's own probes did not catch:
+   `supabase/rollback/20260804_authenticated_grants_DOWN.sql`. (2026-08-04.)
+
 **Verified live** end to end via `run-ui-playwright` against the cloud URLs (all three
 roles): parent register → add child → superadmin assign → coach attendance → **manual
 invoice via the Edge Function** ($25) → parent sees invoice → **coach PayNow QR upload
