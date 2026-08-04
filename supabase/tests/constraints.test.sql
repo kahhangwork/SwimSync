@@ -89,17 +89,31 @@ SELECT throws_ok($$
   VALUES ('0c000000-0000-0000-0000-000000000001','e0000000-0000-0000-0000-000000000002', 0)
 $$, '23514', NULL, 'credit_applications.amount must be > 0');
 
--- ── 4. Credit notes are immutable to app roles (no UPDATE policy) ────────────
--- Under RLS with no UPDATE policy the statement silently affects 0 rows, so the
--- note's reason stays NULL. (The parent can still SELECT their own note.)
+-- ── 4. Credit notes are immutable to app roles ───────────────────────────────
+-- The guarantee is unchanged; what enforces it got stronger, and the OBSERVABLE
+-- BEHAVIOUR changed with it, which is why this assertion was rewritten on
+-- 2026-08-04 rather than left alone.
+--
+--   BEFORE 20260804000600: `authenticated` held the blanket `GRANT ALL`, so the
+--   privilege check passed and RLS did the work. With no UPDATE policy on
+--   credit_notes, RLS makes the statement match zero rows — SILENTLY. The old
+--   assertion read the reason back and checked it was still NULL.
+--
+--   AFTER: the grant is gone too (no UPDATE policy ⇒ no UPDATE grant), so the
+--   privilege check fails first and the statement RAISES 42501.
+--
+-- Loud beats silent: a zero-row UPDATE looks identical to a successful one from
+-- the client, which is how a "why didn't my edit save?" bug hides for months.
+-- Note this is also why the rewrite is necessary rather than cosmetic — an
+-- error aborts the transaction, so the old read-it-back form cannot run at all.
+-- (The parent can still SELECT their own note; only the write is refused.)
 SET LOCAL role authenticated;
 SELECT set_config('request.jwt.claims',
   '{"sub":"a0000000-0000-0000-0000-0000000000d2","role":"authenticated"}', true);
-UPDATE credit_notes SET reason='tampered'
-  WHERE id='0c000000-0000-0000-0000-000000000001';
-SELECT is(
-  (SELECT reason FROM credit_notes WHERE id='0c000000-0000-0000-0000-000000000001'),
-  NULL, 'an authenticated user cannot modify a credit note (reason unchanged)');
+SELECT throws_ok($$
+  UPDATE credit_notes SET reason='tampered'
+    WHERE id='0c000000-0000-0000-0000-000000000001'
+$$, '42501', NULL, 'an authenticated user cannot modify a credit note');
 
 SELECT * FROM finish();
 ROLLBACK;

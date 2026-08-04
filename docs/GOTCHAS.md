@@ -1269,3 +1269,94 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       is now callable by **nobody** until its own migration grants it. A forgotten
       `GRANT EXECUTE … TO authenticated` is now a loud `permission denied for function` in
       development instead of a silent hole only a remote dump would find. (2026-08-04.)
+
+86. **A `WITH CHECK` THAT ONLY ASKS "IS THIS ROW MINE?" IS NOT AN AUTHORISATION CHECK — IT
+    MUST ALSO ASK "AM I ENTITLED TO THE THING IT POINTS AT?"** Both halves of a join table
+    are a claim. Checking the half that names you and trusting the client for the other is
+    the whole bug, and it shipped twice in the same migration (`20260718000900`).
+    - **Reproduced 2026-08-04 with a real anon-key session**, closed by `20260804000500`:
+      ```
+      POST /rest/v1/parent_tenants  {parent_id: <own>, tenant_id: <any>}  → 201
+      POST /rest/v1/parent_students {parent_id: <own>, student_id: <any>} → 201
+      PATCH /rest/v1/students?id=eq.<uuid> {full_name, is_active}         → 200
+      ```
+      Signup is open, so the attacker is anyone with an email address — not a customer.
+      The first joined a business **with no join code**; the second attached the attacker
+      to someone else's child, bypassing the entire admin-approval claim flow (§8.12); the
+      third then renamed and deactivated that child, because `students_update` legitimately
+      trusts `parent_owns_student()` and ownership had just been forged.
+    - **The reasoning error is preserved in the original comment**, and it is worth reading
+      because it sounds correct: *"The app resolves the code to a tenant id first; this
+      only allows a parent to link THEMSELVES."* The policy enforced the half the sentence
+      names and left the half it assumes to the client. **RLS never sees your UI.**
+    - **What the forged membership bought:** `tenants`, `coaches`, `profiles`,
+      `class_categories` and `tenant_levels` are gated on `parent_in_tenant(tenant_id)`, so
+      it read the business row — **including its `join_code`**, i.e. the attack harvests the
+      credential it bypassed — plus `paynow_uen`/`paynow_mobile` and the coach's contact
+      details. One forged `parent_students` row exposed **six** further tables
+      (`stranger_isolation.test.sql` names them); two were not on the list when the fix was
+      drafted, which is why that file sweeps the catalogue instead of naming tables.
+    - **Mitigating fact, verified non-vacuously** (a second real family was added first,
+      because an empty table proves nothing): student UUIDs are **not enumerable** — the
+      forged member still saw only their own rows. The attack needs a UUID from outside.
+    - **`parent_packages_insert` is the same pattern written correctly** — copy it:
+      `can_admin_tenant(tenant_id) OR (parent_id = current_parent_id() AND
+      parent_in_tenant(tenant_id))`. Both halves.
+    - **The fix was to DELETE the policies, not narrow them.** Every client call site of
+      both tables is a SELECT; the writers are SECURITY DEFINER functions owned by
+      `postgres` (`join_tenant_by_code`, `add_child_or_claim`, `link_invited_parent`,
+      `merge_students`, `undo_student_claim`), which own the tables, bypass RLS and never
+      consult `authenticated`'s grants. **Check for a definer RPC before narrowing a policy
+      — the client may not need the write path at all.** (2026-08-04.)
+
+87. **`authenticated` NOW HOLDS A TABLE PRIVILEGE ONLY WHERE A POLICY COULD PERMIT IT, AND
+    THE SHORTCUT ROUND THAT RULE IS THE ONE THING CI IS WATCHING FOR.** `20260804000600`
+    revoked everything and granted back a whitelist derived from `pg_policies`; 50 of the
+    148 (table × command) pairs had no policy behind them at all.
+    - **Consequence for every future migration**, and it is deliberate: a new table is
+      reachable by **nobody** until its migration grants it, and **a migration that adds a
+      policy must add the matching `GRANT`** or the app throws `permission denied` in
+      development. Under deadline the tempting fix is `GRANT ALL ON ALL TABLES … TO
+      authenticated`. **That is the failure mode this was built to catch:**
+      `table_grants.test.sql` assertion 2 fails on any privilege no policy permits, so the
+      workaround goes red in CI rather than quietly restoring the old state.
+    - **Scope the invariant to `authenticated` and `anon` ONLY.** It is false for
+      `service_role` (`rolbypassrls = true` — grants are its entire gate, by design) and
+      meaningless for `postgres` (it owns the tables). Written over all roles the test is
+      red against a correct database, and a test that is red when correct gets disabled.
+    - **The §7.85 trap does NOT apply to tables, and the asymmetry is easy to get backwards.
+      Do not add `… REVOKE … FROM PUBLIC` here.** A new *function* carries a built-in
+      `EXECUTE TO PUBLIC` that only a global revoke removes; a new *table* carries **no**
+      PUBLIC grant at all, so the `FROM authenticated` form is both sufficient and
+      effective. Same statement shape, opposite conclusion, one migration apart.
+    - **`REVOKE ALL ON ALL TABLES` also hits views and matviews, but a policy-derived
+      whitelist cannot see them** — a view has no policies, so it would be stripped of every
+      grant and never granted back. `public` holds none today; the migration `RAISE`s if one
+      ever appears, which is the day the derivation must be extended.
+    - **The migration proves its own whitelist in both directions before committing** —
+      nothing missing, nothing extra — so a typo'd `GRANT` aborts `db push` against
+      **production**, not just CI. All four probes were mutation-tested (delete a GRANT,
+      add a surplus privilege, create a view, restore the default ACL); each fired and
+      named the offending object. (2026-08-04.)
+
+88. **A WRITE THAT RLS USED TO DENY *SILENTLY* NOW RAISES `42501`, AND THAT CHANGES
+    OBSERVABLE BEHAVIOUR — INCLUDING IN TESTS THAT WERE ASSERTING THE SILENCE.** Under RLS
+    with no matching policy, an `UPDATE` matches zero rows and returns success. Once the
+    *grant* is gone too (`20260804000600`), the privilege check fails first and the
+    statement throws.
+    - Caught by `constraints.test.sql`, whose credit-note immutability assertion did
+      `UPDATE credit_notes …` and then read the value back to prove it was unchanged. The
+      rewrite was **not cosmetic**: an error aborts the transaction, so the read-it-back
+      form cannot run at all.
+    - **The guarantee did not change; the enforcement did, and got louder.** Prefer the
+      loud version — a zero-row `UPDATE` is indistinguishable from a successful one at the
+      client, which is how "why didn't my edit save?" hides for months.
+    - **Before shipping a grant narrowing, cross-check every client write verb against the
+      whitelist**, because unit tests run as `postgres` and cannot see this:
+      ```bash
+      grep -rn 'from("<table>")' -A 4 --include="*.ts" --include="*.tsx" SwimSyncApp SwimSyncAdmin
+      ```
+      The one hit that looked like a break — `.delete()` on `tenants` — turned out to be
+      `createAdminClient()`, i.e. `service_role`, which is untouched. **The six UI drivers
+      are the real proof here**; they run as real signed-in users through PostgREST, which
+      is the only path that exercises a grant. (2026-08-04.)
