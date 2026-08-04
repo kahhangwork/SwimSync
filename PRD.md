@@ -263,15 +263,22 @@ support rather than daily operation.
   whether any **member of staff** has no pay rate (which is why payroll would silently pay
   them nothing). A coach who *owns* the business is deliberately not counted there: their
   income is their own parents' invoices and a rate would be meaningless, per §7.13.
-  **SwimSync does not classify a business as a private coach or a school at all**
-  *(corrected 2026-08-01)*. This once said the shape was "derived from whether its only
-  coach is also its admin"; that derivation was specified but never built, and it could not
-  have worked — a one-coach school that pays its owner a wage and a private coach who takes
-  none are **identical in the data**, and the difference is intent, which no query can see.
-  Nothing in the product branches on it. The question a platform admin actually has is
+  **SwimSync does not classify a business as a private coach or a school** *(2026-08-01;
+  the reasoning below corrected 2026-08-04)*. Nothing in the product branches on the
+  distinction, and no screen shows it. The question a platform admin actually has is
   *"will anyone here be paid nothing by mistake?"*, which needs no classification: an owner
   without a rate is a **choice**, a non-owner coach without one is the **mistake**, and only
-  the second is flagged
+  the second is flagged.
+  > **Correct the record on *why*.** This paragraph said until 2026-08-04 that the
+  > derivation "was specified but never built". It **was** built — `20260719002400` derives
+  > `shape` from whether the only coach is also the admin, `platform_tenant_overview()`
+  > still returns it, and `platform_overview.test.sql` has pinned both cases since the day
+  > it shipped. What is true is that **displaying it was the mistake**: a one-coach school
+  > that pays its owner a wage and a private coach who takes none are identical in the
+  > data, so the column answered a question the data cannot answer. The *column* was
+  > removed from the page; the derivation stays, unread, because it is derived and so
+  > cannot go stale. The stored `tenants.kind` — which nothing ever read — was dropped on
+  > 2026-08-04 (§8.28)
 - **Create a business, and invite its first admin** *(implemented 2026-07-21)* — see below
 - **Parents who registered but never entered a join code** — they belong to no business, so
   nobody else can see them

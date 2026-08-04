@@ -106,6 +106,42 @@ the shape of the system changes:_
   in-function, and its service-role reads go through an explicit serializer
   allowlist. Do not add the anon USAGE grant for a future public feature — add an
   edge function.
+- **AN AUDIT ROW'S BUSINESS IS DERIVED FROM ITS ENTITY, BY A TRIGGER, AND THE CLIENT
+  HAS NO SAY** (2026-08-04, `20260804000300`). `audit_log.tenant_id` is stamped
+  `BEFORE INSERT` by `set_audit_log_tenant()` → `audit_log_tenant_of(entity_type,
+  entity_id)`. Four things here are decisions, not implementation details:
+  - **From the ENTITY, not the actor.** `current_tenant_id()` is right for a coach
+    saving attendance and **wrong** for `join_tenant_by_code()` and
+    `reassign_student_tenant()`, where the actor is a *parent with no tenant at all* and
+    the row is about the tenancy being joined. Don't "simplify" this to the actor.
+  - **An unknown `entity_type` RAISES.** A `CASE` falling through to NULL is the §7.37
+    disease: the next entity type would write rows invisible to the business they
+    describe and nothing would say so. If you add one, add its lookup — the error tells
+    you where.
+  - **A derivable value OVERWRITES what was supplied.** The INSERT policy only ever
+    constrained `actor_id`, so a supplied `tenant_id` was always the client's word for
+    it.
+  - **A trigger, NOT 13 edited call sites.** Redefining `book_trial` or
+    `add_unclaimed_student` purely to add a column is the §7.40 hazard. The trigger is
+    atomic with the insert, covers the client writer, and is inherited by whatever
+    writes next.
+  Related: the INSERT policy was widened-by-default (`actor_id = auth.uid()` and nothing
+  else) and is now the single real client case — a coach, on a session they own. Every
+  other writer is `SECURITY DEFINER` and runs as the table owner, which policies do not
+  reach (`audit_log` is owned by `postgres`, no FORCE ROW LEVEL SECURITY). **Nothing in
+  the product reads `audit_log` yet** — this exists so that the first thing which does
+  is not authoritative-and-wrong.
+  - **The old rows WERE backfilled, against the backlog's own advice, and here is the
+    check that made it safe.** The filed item said *"probably don't backfill — deriving
+    from today's data invents history"*, citing the `invoice_items.student_name` refusal.
+    The concrete way it could be wrong is narrow and nameable: a child who **changed
+    businesses** since the event, whose old rows would then be attributed to the business
+    they moved *to* — a small cross-tenant disclosure. Checked against the production
+    dump before deploying: **zero `student_tenant_reassigned` rows, and one tenant**, so
+    the failure could not have occurred, while leaving 81 of 103 rows permanently
+    invisible had a certain cost. **If a second tenant ever exists and a child is moved,
+    do not repeat this reasoning for a fresh backfill** — the trigger already stamps
+    everything new, so there will never be a reason to.
 - **A BUSINESS IS CREATED BY ONE RPC, AND ONLY THE PLATFORM ADMIN MAY CALL IT**
   (2026-07-21, PRD §4.4, `TENANT_PROVISIONING_PLAN.md`). The rules that must not be
   re-derived wrongly:

@@ -69,6 +69,23 @@ still point at the local stack for dev.
    is precisely the path with **no migration record and no CI** — write down what you ran.
    (Promoted from §8k, 2026-07-14.)
 
+7. **`anon`'s EXECUTE grants on production are a REAL number, and it was 49.** A remote
+   grant dump on 2026-08-04 — the check §7.39 says is the only honest one — found
+   **49 functions** in `public` granting EXECUTE to `anon`, almost all of them from
+   cloud's project-level default privileges rather than from any migration in this repo.
+   `20260804000200` took it to **18**, and all 18 are trigger / event-trigger functions,
+   which Postgres never privilege-checks against the writing role and PostgREST does not
+   expose. **The number goes back up on its own**: every new function created on cloud
+   gets the default grant, so a migration that adds one and forgets the revoke restores
+   the problem silently. Re-run after any migration that creates a function:
+   ```bash
+   supabase db dump --linked -f /tmp/prod.sql
+   grep -E '^GRANT (ALL|EXECUTE) ON FUNCTION' /tmp/prod.sql | grep '"anon"'
+   ```
+   `supabase/tests/function_grants.test.sql` covers the *local* half of this and passes by
+   construction for the cloud half — a green run there is not evidence about production.
+   (2026-08-04.)
+
 **Verified live** end to end via `run-ui-playwright` against the cloud URLs (all three
 roles): parent register → add child → superadmin assign → coach attendance → **manual
 invoice via the Edge Function** ($25) → parent sees invoice → **coach PayNow QR upload

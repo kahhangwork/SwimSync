@@ -1,6 +1,20 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-03 — **the mobile app caught up with the billing that shipped
+_Last updated: 2026-08-04 — **the three queued migrations all shipped and DEPLOYED
+(§8.28), and the queue is now empty**. Two of the three were mis-filed, which is the
+useful part. *Revoke `anon` EXECUTE* was filed as "defence in depth, not a live hole" and
+was one: `next_credit_note_ref` had **no ACL at all**, so an unauthenticated POST could
+increment a business's credit-note counter (§7.82) — production went from **49 functions
+granted to `anon` to 18**, all of them trigger functions. *Narrow `coaches_without_rate`*
+had already been done in SQL since 2026-07-19; the 2026-08-01 session read the field
+mapping **backwards** and replaced a working column with a 2000-row browser scan, writing
+the false claim into four places (§7.83 — three oracles that settle it in seconds). The
+third, `audit_log.tenant_id`, is now stamped from each row's **entity** by a trigger, with
+the fabrication-friendly INSERT policy narrowed on the way past. **The standing headline is
+unchanged: chase the outstanding invoices, keep marking August, bill it in early
+September — §9.**_
+
+_Previously, 2026-08-03 — **the mobile app caught up with the billing that shipped
 without it (§8.27, LIVE)**. A day of real use produced four complaints, all correct:
 the coach's **Classes tab** now lands on the class list (grouped by weekday, today
 first) instead of a leftover attendance screen — the other half of §7.65, and §7.80
@@ -14,9 +28,7 @@ statement; and Today's card counts **guests apart from students** ("4 students +
 set. On the test side: deleted a driver with **zero assertions**, found the worse variant
 — one reporting "18/18 passed" while four checks crashed — and then **found that the
 detector written for it was itself wrong**, having libelled a second driver that turned
-out to assert perfectly well (§7.79 carries the correction, which is the more useful half).
-**The standing headline is unchanged: chase the outstanding invoices, keep marking August,
-bill it in early September — §9.**_
+out to assert perfectly well (§7.79 carries the correction, which is the more useful half)._
 
 _Previously, 2026-08-02 (third session that day) — **fee-free payment collection
 shipped AND DEPLOYED, Phases 0–3 (PRD §7.21, §8.26)**: every invoice now carries a
@@ -52,7 +64,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.81** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.84** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -325,6 +337,24 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   comparison rule across all 22 tables (blanks last in both directions, numeric-aware,
   weekdays in week order, stable), Attendance gained class and date-range filters, and
   "Total Students" became **Active Students**. PRD §14.3/§14.4.
+- **Every audit row knows which business it is about (verified local: pgTAP — LIVE
+  2026-08-04)** — `audit_log.tenant_id` is stamped from the row's **entity** by a BEFORE
+  INSERT trigger, so the seven writers that never set it are covered without being edited,
+  and an unknown `entity_type` **raises** rather than writing a row invisible to everyone
+  but the platform admin. Production's 81 unstamped rows (of 103) were backfilled. The
+  INSERT policy, which had been `actor_id = auth.uid()` and nothing else — any signed-in
+  user could fabricate any audit row — is now the one real client case: a coach, on a
+  session they own. **Nothing in the product reads `audit_log` yet**; this exists so the
+  first screen that does isn't authoritative-and-wrong. `docs/ARCHITECTURE.md` §6, §8.28.
+- **`anon` holds EXECUTE on no callable function (verified by REMOTE dump — LIVE
+  2026-08-04)** — 49 functions granted it before, 18 after, and all 18 are
+  trigger/event-trigger functions that Postgres never privilege-checks and PostgREST does
+  not expose. This closed a **live** hole: `next_credit_note_ref` sat on the bare `PUBLIC`
+  default and let an unauthenticated caller increment a business's credit-note counter
+  (§7.82). **The number climbs back on its own** — cloud grants `anon` EXECUTE on every new
+  function — so re-run the dump after any migration that creates one
+  (`docs/DEPLOYMENT.md` §11.7). A green `function_grants.test.sql` says nothing about
+  production (§7.39).
 - **Automated tests** — pgTAP + Deno on the backend, vitest + jest-expo on the two apps, all
   in CI on push to `main`. **Counts are deliberately not written here**: the two frontend
   numbers that used to be (162 and 109) had drifted to 198 and 174 by 2026-08-01 while
@@ -449,6 +479,65 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.28 (2026-08-04) — THE THREE QUEUED MIGRATIONS, AND THE ONE LIVE HOLE THEY FOUND
+
+**All three shipped, deployed and verified on production the same day** (`e03cba6`,
+`2a5fa0b`, `4981fd2` — migrations `20260804000100/200/300`). They were queued behind each
+other by §7.55, not by importance; the reason to take them in one session was that each
+was small and none blocked anything.
+
+**The headline is the one nobody filed.** BACKLOG called the `anon` EXECUTE item *"defence
+in depth, not a live hole"*. Auditing it found `next_credit_note_ref(uuid)` with **no ACL
+at all**, so it sat on the Postgres default of `EXECUTE TO PUBLIC` — locally as well as on
+cloud. It is `SECURITY DEFINER` and it **writes**. An unauthenticated POST carrying only
+the anon key returned `CN-2026-0001` and left `tenants.credit_note_counter` incremented.
+Anyone with a tenant's UUID could burn that business's credit-note numbers indefinitely.
+Granted to **nobody** now — its callers are all inside other definer functions.
+Reasoning: **§7.82**.
+
+**And one that had been filed backwards.** *Narrow `coaches_without_rate`* was already
+done in SQL — since 2026-07-19. The 2026-08-01 session read the field mapping in reverse,
+concluded the page was reading a column "the RPC has never returned", and replaced a
+correct SQL column with a 2000-row browser scan, a tripwire and a warning banner, writing
+the false claim into a code comment, `BACKLOG.md`, `PRD.md` §4.4 and an immutable commit
+message. All removed; **§7.83** carries the three oracles that settle this kind of
+question in seconds. The *decision* from that session — don't show a business's "shape" —
+was sound and stands; only the stated reason was wrong.
+
+**What actually needed a migration**, then: dropping `tenants.kind` (never read by
+anything) and with it `provision_tenant`'s `p_kind` parameter; the grant sweep; and
+`audit_log.tenant_id`, stamped from its **entity** by a `BEFORE INSERT` trigger with a
+`RAISE` on an unknown `entity_type` (`docs/ARCHITECTURE.md` §6 — the four parts of that
+are decisions, not implementation). The audit work also **narrowed an INSERT policy** that
+had been `actor_id = auth.uid()` and nothing else, i.e. any signed-in user could fabricate
+any audit row; it is now the single real client case, a coach on a session they own.
+
+**Departed from BACKLOG's advice once, deliberately:** it said *probably don't backfill*.
+The concrete failure — a child who changed businesses being attributed to the wrong one —
+was checked against the production dump first: **zero reassignments, one tenant**, against
+81 of 103 rows being permanently invisible. Recorded in `docs/ARCHITECTURE.md` §6 with the
+condition under which it must not be repeated.
+
+**Production numbers worth keeping** (from remote dumps, not from prose): functions
+granting EXECUTE to `anon` went **49 → 18**, and all 18 are trigger/event-trigger
+functions that Postgres never privilege-checks and PostgREST does not expose
+(`docs/DEPLOYMENT.md` §11.7 has the re-run command — **the number climbs back on its own**
+as new functions are created). `audit_log` held 103 rows, 81 unstamped, now backfilled.
+
+**Verified:** pgTAP **479** (27 files; 11 new assertions across two new files, all proven
+RED first — §7.25), Deno 130 **run twice** (§7.15), vitest 237, jest 244, both typechecks,
+fixtures 15/15. Six drivers, because the narrowed policy and the helper revokes are
+exactly what unit tests cannot see: payment-collection 19/19, coach-wages 10/10,
+platform-admin 6/6, tenant-provisioning 15/15 (a whole business provisioned through the
+real UI on the new one-argument RPC), attendance-guard 20/20, makeups 15/15. After the
+attendance run the database showed the coach's own client-side `attendance_saved` rows
+written **through** the new policy and stamped. The anon exploit re-run after the fix
+returns `42501` and leaves the counter at 0. CI green; both Vercel production deployments
+are on `4981fd2`. **§7.84** records that `supabase start` leaves the edge runtime stopped,
+which cost a debugging round when four driver checks failed looking like product bugs.
+
+---
+
 ## 8.27 (2026-08-03) — THE APP CATCHES UP WITH THE BILLING THAT SHIPPED WITHOUT IT
 
 **The trigger was the user opening their own app.** Payment collection (§8.26) shipped
@@ -500,59 +589,12 @@ negative for the old strings.
 
 ---
 
-## 8.26 (2026-08-02, third session) — PAYMENT COLLECTION WITHOUT A PAYMENT PROVIDER
-
-**The feature** (PRD §7.21 — the durable home; design record
-`docs/design/PAYMENT_COLLECTION_DESIGN.md`, decisions locked with the user after a
-two-agent research pass): the user wanted WhatsApp payment nudges and payment
-*validation* with **no percentage fees**. Research corrected two assumptions — PayNow
-gateways charge 0.65–1.3% (not the feared 2%), and, decisively, **the PayNow QR format
-is open** (EMVCo), so a per-invoice QR with amount + reference locked needs no bank or
-gateway at all. Four phases shipped and deployed same-day in the §7.60 order (each
-increment: migration → verify → functions deploy → grant dump → merge main LAST):
-references + tokens by trigger (engine untouched — §7.78), the EMVCo lib pinned to an
-**independent generator's vector**, the `public-invoice` edge function (the planned
-anon RPC was replaced at plan time — `anon` has no schema USAGE and opening it arms
-§7.39 platform-wide; recorded in `docs/ARCHITECTURE.md` §6), the tokenized public
-page, the wa.me click-through queue ("chat opened" wording is a rule — RISK 7), the
-"I've paid" claim, and mark-paid converged on `confirm_invoice_paid()` (the admin
-panel's old direct update wrote **no audit fields**; both direct writers deleted).
-
-**What the driver caught** (19 checks, `verify-payment-collection.mjs`): the admin
-fetch was missing the `paid_claimed_at` column (mapped but never selected — badge and
-Claimed filter silently dead); `getByRole`'s substring name-matching clicking the
-wrong WhatsApp button (run-ui-playwright skill §4.7 updated); and the fixture parent
-being invisible to the admin because **`tenant_serves_parent()` requires a child, not
-just membership** (§7.77). One-click bulk sends (Meta Cloud API, ≈S$0.02/msg) went to
-BACKLOG by user decision; unofficial WhatsApp automation is permanently ruled out
-(bans the coach's own number).
-
-**Post-ship, same day:** the user asked what `NNNN` caps at — which exposed that
-Postgres **LPAD truncates** past the pad width, so a tenant's 10,000th invoice would
-have silently reused reference 1000 (unique-violation billing failure within ~13
-months for an 800-family tenant), and `next_credit_note_ref` had carried the identical
-latent bug since 2026-07-18. Both fixed by `20260802000800` (pad grows past 9999),
-proven RED first, deployed.
-
-**And then the mission completed:** the user passed the bank-app scan gate on the real
-production proxy, **billed July for real, and collected the first real payments** —
-references generated by the trigger in the wild, the month sealed, confirmations
-through `confirm_invoice_paid()` with audit rows. Verified from a production data dump
-the same day; the counts live in the database, not here.
-
-**Verified:** pgTAP 469 (24 in the suite; the RISK 5 role matrix both sides); Deno 130
-**run twice** ×3 sessions of runs (7 new incl. the serializer's exact-key-set pin);
-vitest 237; jest 207; driver 19/19; fixtures 15/15 round-trip; grant dumps clean
-(both RPCs authenticated-only, `next_invoice_ref` granted to **nobody**); both
-production bundles grep-positive. **Open release gate:** a real SG bank-app scan —
-production's PayNow proxy stays NULL until it passes (§9).
-
----
 
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.26** | 2026-08-02 | **Fee-free payment collection, Phases 0–3** — `INV-YYYY-NNNN` + a 128-bit public token by BEFORE INSERT trigger (the engine untouched), a client-computed **dynamic PayNow QR** with amount and reference locked, the **tokenized sessionless invoice page** served by the `public-invoice` edge function (deliberately not an anon RPC), the admin's **WhatsApp click-through queue** ("chat opened", never "reminded"), the parent's "I've paid" claim, and every mark-paid converged on `confirm_invoice_paid()`. Post-ship the same day, a question about the reference format exposed that **Postgres `LPAD` truncates** past the pad width — a silent reference collision within ~13 months for a large tenant, latent in `next_credit_note_ref` since July; both fixed. **Then the standing mission of this file completed: July billed for real and the first real money collected** | PRD §7.21 · `docs/design/PAYMENT_COLLECTION_DESIGN.md` · `docs/ARCHITECTURE.md` §6 *(anon-RPC refusal)* · **§7.77, §7.78** · `INVOICE_RUNBOOK.md` |
 | **8.25** | 2026-08-02 | Make-up classes as the **guest-pass model** — an enrolled child booked into one lesson of another same-category class; a booking is never an enrolment, an unmarked make-up blocks the month like a trial, a package family's attended make-up draws from the package via the booking's snapshotted category, an ad-hoc guest pays their **home** class's effective-dated rate. Five migrations, the engine, all three UIs. Also closed the latent trial-guest visibility gap (a host coach could not read a guest's name) | PRD §7.20 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §10 · `supabase/rollback/20260802_makeup_bookings_DOWN.sql` |
 | **8.24** | 2026-08-02 | The parent invoice detail marks package-funded lines ("Paid by package · *name*"; a reversed draw reads ad hoc). App-only, no migration. The admin Invoices page renders no line items, so the parent detail is the only "which lines" surface — an admin invoice detail would be a new feature | PRD §7.16 · `docs/TESTING.md` §5 (`invoiceFunding`) |
 | **8.23** | 2026-08-01 | The per-child, category-aware payment-method chip ("Package · N left" / "Ad-hoc") on ten admin surfaces + the parent app via `student_package_coverage()`, fixing the Students-page chip that summed by parent and counted date-expired packages; 'mixed' proven structurally unreachable and pgTAP-pinned; coaches deliberately see nothing | PRD §7.16 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §10 |
@@ -642,6 +684,15 @@ into a computed QR. **Do them in that order**; the reverse breaks paying for a p
 same session's copy fix (the PayNow screen calls the business "Coach") folds into whichever
 ships first.
 
+**One security item was FILED, not fixed, on 2026-08-04** — `anon` holds
+`REFERENCES`/`TRIGGER`/**`TRUNCATE`** on 37 production tables, and RLS does not restrict
+TRUNCATE. It is **not from this repo** (Supabase's own image template; `20260309000800`
+grants `anon` nothing) and it is currently **unreachable** — `anon` cannot log in and
+PostgREST has no TRUNCATE verb. Left alone because a table-grant change has a different
+blast radius from the function-grant change it was found beside. `BACKLOG.md` →
+*Foundations*; the interesting half is whether `authenticated` deserves the same, since
+that role IS reachable.
+
 **The highest-value engineering item is still *Run the UI drivers in CI* (M), and 2026-08-03
 made the case stronger.** CI loads every fixture but executes no driver, and the count of
 drivers caught rotting **by accident** is now four (§8.21, §8.22, §8.27): one at 2/5 from a
@@ -656,13 +707,9 @@ fact in two documents. A static check tells you a driver *can* fail, never that 
 only executing it does that, which is the whole argument for this item. Weigh the narrower
 options in its `BACKLOG.md` entry.
 
-**Three migrations are queued behind each other, none urgent** — *revoke `anon` EXECUTE from
-the remaining SECURITY DEFINER functions* (§7.39's missing second layer), *a business cannot
-read its own audit trail* (13 of 19 writers never set `audit_log.tenant_id`, and the
-parent-claim work made it **half**-populated, which fails more quietly than empty did), and
-*retire `tenants.kind` / narrow `coaches_without_rate`* (§8.22 shipped the page half; the SQL
-half needs a changed `RETURNS TABLE`). **One schema change in flight at a time** (§7.55), and
-a worktree never authors one (`docs/WORKTREES.md`).
+**The migration queue is EMPTY.** All three shipped and deployed on 2026-08-04 (§8.28).
+Nothing is in flight, so the next schema change can start immediately — still one at a time
+(§7.55), and a worktree never authors one (`docs/WORKTREES.md`).
 
 ### Worth deciding, not urgent
 

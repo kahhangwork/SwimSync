@@ -1169,3 +1169,69 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     debugging the change. Cheap probe:
     `page.evaluate(() => [...document.querySelectorAll("a")].map(a => a.getAttribute("href")))`.
     (2026-08-02.)
+82. **`GRANT … TO authenticated` WITHOUT `REVOKE … FROM PUBLIC` LEAVES `PUBLIC` UNDERNEATH,
+    AND THE MIGRATION READS AS THOUGH IT DIDN'T.** `CREATE FUNCTION` grants `EXECUTE` to
+    `PUBLIC` by default. A migration that then adds an explicit grant looks like it has
+    declared the whole ACL — it has only added a row beside the default. This is §7.39's
+    sibling and it is **worse**, because §7.39 is a cloud-only artefact you cannot see
+    locally, while this one is visible in `pg_proc` the whole time and nobody looks.
+    - **It was live.** `next_credit_note_ref(uuid)` had **no ACL at all** — not even the
+      explicit grant — so it sat on the bare `PUBLIC` default. It is `SECURITY DEFINER`
+      and it WRITES (`UPDATE tenants SET credit_note_counter = credit_note_counter + 1`).
+      An unauthenticated `POST /rest/v1/rpc/next_credit_note_ref` carrying only the anon
+      key returned `CN-2026-0001` and left the counter incremented. Anyone holding a
+      tenant's UUID could burn that business's credit-note numbers indefinitely.
+      Fixed 2026-08-04 (`20260804000200`): granted to **nobody**, since its only callers
+      are inside other definer functions, which run as the owner.
+    - **The clone got it right and the original never did.** `next_invoice_ref` was written
+      in 20260802000600 as a copy of this function *with* correct grants. Copying a
+      function does not copy its ACL — there is nothing to copy from.
+    - **`GRANT`/`REVOKE` on a function is not covered by any test you are likely to have.**
+      Every grant assertion in this repo before 2026-08-04 named ONE function, so none of
+      them could fail for a function nobody thought to name. The replacement asserts over
+      `pg_proc` — *"no function in `public` grants EXECUTE to anon"* —
+      `supabase/tests/function_grants.test.sql`. Written that way it immediately caught a
+      second one (`package_live_balances`) that a named audit had walked past.
+    - **Production numbers, from a remote dump on 2026-08-04:** 49 functions granted
+      `EXECUTE` to `anon` before, **18 after** — and all 18 are trigger / event-trigger
+      functions, which Postgres never privilege-checks against the writing role and
+      PostgREST does not expose. (2026-08-04.)
+83. **WHAT AN RPC RETURNS IS A QUESTION FOR `pg_get_functiondef()`, NOT FOR A MIGRATION
+    FILE, A COMMIT MESSAGE, OR `BACKLOG.md` — AND GETTING IT BACKWARDS COSTS REAL CODE.**
+    On 2026-08-01 a session concluded that `platform_tenant_overview()` returned `kind` and
+    `coaches_without_rate` while the page declared `shape` and `staff_without_rate`, so the
+    page "was reading fields the RPC has never returned". **It was the exact reverse.** The
+    RPC had returned `shape` and an owner-excluded `staff_without_rate` since
+    `20260719002400`; the page was right. Acting on the reversed reading replaced a correct
+    SQL column with a **2000-row browser scan**, a `STAFF_SCAN_LIMIT` tripwire and a warning
+    banner — ~90 lines working around a column that already worked — and wrote the false
+    claim into a code comment, `BACKLOG.md`, `PRD.md` §4.4 and an immutable commit message.
+    All of it removed 2026-08-04 (`e03cba6`).
+    - **Three cheap oracles, any one of which settles it in seconds:**
+      `pg_get_functiondef('public.fn()'::regprocedure)` · the pgTAP file, which had been
+      asserting the real column names and passing the whole time · calling the RPC over
+      PostgREST and reading the JSON keys.
+    - **This function carries a header warning that says exactly this** (20260721000200:
+      *"get its CURRENT definition from the DATABASE"*), written after the same mistake was
+      caught mid-flight in July. The warning was there; the session did not read it. **A
+      redefined function is where a stale memory is most expensive** — this one has been
+      redefined three times.
+    - The *decision* that came out of that session (don't show a business's "shape" — a
+      one-coach school and a private coach are identical in the data) was sound and
+      stands. A right conclusion reached through a wrong fact still leaves the wrong fact
+      in four documents. (2026-08-04.)
+84. **`supabase start` DOES NOT START THE EDGE RUNTIME HERE, SO ANY DRIVER TOUCHING THE
+    PUBLIC INVOICE PAGE FAILS LOOKING EXACTLY LIKE A PRODUCT BUG.** `supabase status`
+    listed `supabase_edge_runtime_SwimSync` under **Stopped services** on a perfectly
+    healthy stack. `verify-payment-collection.mjs` then failed four checks — *"public page:
+    renders the amount with no session"*, the reference, the QR, Save-QR — because
+    `/functions/v1/public-invoice` was returning **503**, not because anything in the app
+    or the database was wrong. The same shape as §7.56: the failure names the feature under
+    test, so it reads as a regression in the change you just made.
+    - Confirm before diagnosing:
+      `curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:54321/functions/v1/public-invoice?token=<any>"`
+      — a **503** means nothing is served, and no amount of app debugging will move it.
+    - Fix: `supabase functions serve public-invoice --env-file supabase/functions/.env
+      --no-verify-jwt`, then re-run. 19/19.
+    - The driver's own setup notes list the fixture and the two dev servers and **do not
+      mention the edge function**, which is why this is here rather than there. (2026-08-04.)

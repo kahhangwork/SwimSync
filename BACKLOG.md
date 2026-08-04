@@ -1,6 +1,15 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-03 — six items filed from a day of real app use: the ordered pair *give package requests a reference number* → *demote the static PayNow QR upload* (**do them in that order**; the reverse breaks paying for a package), the PayNow screen's "Coach" copy, *pay and claim from the parent's invoice list*, *a coach week view*, and *a link to the admin panel from coach Settings*. One **Deliberately not doing** row: **any invoice or payment count in the coach app** — the user's decision, and the kind that gets re-litigated. One item filed and then **deleted the same day because its premise was false**: `verify-tz-saturday.mjs` was recorded as assertion-less on the strength of a bad grep, and running it showed 5/5 (§7.79). The *coach week view* entry was corrected too — the Classes tab gained weekday grouping on 2026-08-03, so the item is now about DATED lessons, not the timetable that shipped. Earlier, 2026-08-02: *Mark package-funded lines on the invoice detail* shipped and was removed_
+_Last updated: 2026-08-04 — **three items shipped and removed** (§8.28): *revoke `anon`
+EXECUTE from the remaining SECURITY DEFINER functions*, *a business cannot read its own
+audit trail*, and *retire `tenants.kind` / narrow `coaches_without_rate`* — the last of
+which was **half-wrong as filed**: the SQL had been correct since 2026-07-19 and the
+"fix" of 2026-08-01 had replaced a working column with a browser scan (§7.83). One item
+filed: **`anon`'s REFERENCES/TRIGGER/TRUNCATE on 37 production tables** — real, from
+Supabase's own template rather than this repo, and currently unreachable. One
+**Deliberately not doing** row: the blanket `ALTER DEFAULT PRIVILEGES` revoke, refused
+twice. *Attendance edit history view* had its premise corrected — it is now actually true.
+Previously, 2026-08-03 — six items filed from a day of real app use: the ordered pair *give package requests a reference number* → *demote the static PayNow QR upload* (**do them in that order**; the reverse breaks paying for a package), the PayNow screen's "Coach" copy, *pay and claim from the parent's invoice list*, *a coach week view*, and *a link to the admin panel from coach Settings*. One **Deliberately not doing** row: **any invoice or payment count in the coach app** — the user's decision, and the kind that gets re-litigated. One item filed and then **deleted the same day because its premise was false**: `verify-tz-saturday.mjs` was recorded as assertion-less on the strength of a bad grep, and running it showed 5/5 (§7.79). The *coach week view* entry was corrected too — the Classes tab gained weekday grouping on 2026-08-03, so the item is now about DATED lessons, not the timetable that shipped. Earlier, 2026-08-02: *Mark package-funded lines on the invoice detail* shipped and was removed_
 
 Things SwimSync **could** become. Nothing here is built or committed to — if it were
 built, it would be in [PRD.md](PRD.md) instead. See [README.md](README.md) for why the
@@ -129,8 +138,8 @@ Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-histo
 filtering/search (S), More polished
 dashboards (S), Deeper component-render tests (M), Convert a trial into an enrolled student (S),
 Editing a student's contact details (S),
-Email-confirmation copy/templates (S), Audit trail invisible to its own business (S), Revoke `anon` EXECUTE from the remaining
-SECURITY DEFINER functions (S), Revenue reporting (M — *decide accrual-vs-cash first*).
+Email-confirmation copy/templates (S), `anon`'s table privileges on production (S),
+Revenue reporting (M — *decide accrual-vs-cash first*).
 
 ### Later — big features carrying their own dependencies
 
@@ -281,6 +290,17 @@ without SQL. When a parent disputes a charge, the answer exists and is unreachab
 
 **Notes:** the data is already there — this is a read-only view, not a new capability.
 Admin panel first; the coach probably doesn't need it.
+
+**The premise is now actually true (2026-08-04).** This item used to carry a warning that
+"the data is already there" was only *half* true: `audit_log.tenant_id` was unset by most
+writers, and `is_tenant_admin(NULL)` returns FALSE, so a business could read almost none
+of its own trail — a history screen would have shown claims and merges and silently
+omitted every attendance save. `20260804000300` stamps every row from its entity by
+trigger and backfilled the 81 unstamped rows production held. **Two things to still get
+right when building this:** the rows are visible to the *tenant admin*, not to the coach
+whose edit they record; and `old_value`/`new_value` are full `to_jsonb(OLD/NEW)` snapshots,
+so the screen must diff them rather than print them — the dispute this exists for is
+*what the number used to be*.
 
 ### A coach week view — **M**
 Turn the Classes tab into a Mon–Sun strip showing each lesson **and whether it is
@@ -732,41 +752,6 @@ business onboarding, and it is felt on day one rather than eventually. The provi
 route and `/accept-invite` both assume one admin per tenant and will need revisiting with
 the join table. See `TENANT_PROVISIONING_PLAN.md`.
 
-### Revoke `anon` EXECUTE from the remaining SECURITY DEFINER functions — **S**
-`regenerate_join_code()`, `close_student_enrolment()` and the other `SECURITY DEFINER`
-RPCs hold `EXECUTE` for **`anon`** and `service_role` in production. Add explicit
-`REVOKE ... FROM anon, service_role` for each, the way `platform_tenant_overview()` and
-`provision_tenant()` already do.
-
-**Why:** these functions bypass RLS, so their in-body gate is their entire boundary.
-Today every gate holds — `auth.uid()` is NULL for both roles, so `is_platform_admin()` /
-`can_admin_tenant()` / `current_coach_id()` all evaluate false and the functions refuse —
-which is why this is **defence in depth, not a live hole**. But it means a single missing
-or mis-written gate in a future function is the only thing between anonymous callers and
-an RLS-bypassing routine, with no second layer behind it.
-
-**Notes:** found 2026-07-21 while deploying tenant provisioning, by dumping the **remote**
-schema after `db push` (`docs/GOTCHAS.md` §7.39). Two things conspire, and both will bite the next
-RPC too:
-- **`REVOKE ... FROM PUBLIC` does not remove role-specific grants.** `PUBLIC` is its own
-  grantee, not an umbrella over `anon`/`authenticated`/`service_role`. A migration ending
-  in `REVOKE FROM PUBLIC; GRANT TO authenticated;` reads as airtight and is not.
-- **Supabase *cloud* carries project-level default privileges** granting `EXECUTE` on new
-  `public` functions to all three roles. This repo's `20260309000800_grants.sql` sets
-  default privileges for TABLES and SEQUENCES only, so the function grants are the
-  platform's — and **the local stack does not reproduce them**, so `pg_proc` locally says
-  `{postgres, authenticated}` while production says otherwise.
-
-A pgTAP assertion is near-vacuous here for that reason (it passes locally by
-construction). The honest check is `supabase db dump` against the remote. Audit:
-`grep -E '(GRANT|REVOKE).*ON FUNCTION' <dump> | grep '"anon"'`.
-
-The tempting fix — a blanket
-`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon` — was
-**not** taken during the deploy: it changes the grant for every future function at once,
-including PostgREST-facing ones that may legitimately need `anon`, and a deploy is the
-wrong moment to find out which. Decide that deliberately, not as a side effect.
-
 ### The family-status search scans every membership client-side — **S**
 `handleFamilySearch` on the Platform page fetches **all** `parent_tenants` rows and filters
 in the browser.
@@ -959,61 +944,36 @@ is a reasonable long-term answer for Singapore.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### A business cannot read its own audit trail — **S**
-`audit_log.tenant_id` is nullable and **13 of the 19 writers never set it**. The read policy
-is `is_platform_admin() OR is_tenant_admin(tenant_id)`, and `is_tenant_admin()` opens with
-`p_tenant_id IS NOT NULL AND …` — so it returns **`false`**, not NULL, for a null tenant.
-A row with no tenant is readable by the platform admin and **nobody else**.
+### `anon` holds REFERENCES / TRIGGER / TRUNCATE on every table in production — **S**
+Not from this repo. `20260309000800_grants.sql` grants `anon` nothing and says so in its
+header; these come from the Supabase image's own template, which hands the API roles
+`ALL` on public tables. Found 2026-08-04 while auditing function grants (§7.82): `anon`
+has these three privileges on **37 tables**, and `SELECT`/`INSERT`/`UPDATE`/`DELETE` on
+none.
 
-**Why:** costless today — *nothing in the product reads `audit_log`* (verified 2026-07-26:
-the only references in either app are one insert and a test helper). It becomes a real
-problem the moment the **Attendance edit history view** item above is built, because that
-item's premise — *"the data is already there"* — is now **half true**:
+**Why:** `TRUNCATE` is the one that matters — **RLS does not restrict it**, so the
+privilege is not covered by any policy this repo writes. It is currently **unreachable**:
+`anon` has `rolcanlogin = false`, so the only path in is PostgREST, which has no TRUNCATE
+verb and no DDL. That makes this a latent privilege rather than an open door, which is
+why it was recorded instead of fixed in the same breath as the function grants — a
+table-grant change has a different blast radius from a function-grant change, and §7.55
+says one at a time.
 
-- **6 writers set it** — everything added by the parent-claim work (2026-07-26).
-- **13 do not** — `close_student_enrolment`, `join_tenant_by_code`, `set_class_terms`,
-  `add_unclaimed_student`, `link_invited_parent`, `book_trial` ×3, the active/inactive
-  RPCs ×3, one in `tenant_rls`, **and the coach's attendance screen**
-  (`SwimSyncApp/app/(coach)/classes/[id]/attendance.tsx` writes `attendance_saved`
-  directly from the client).
-
-So a history screen written the obvious way would show every claim, approval and merge —
-and **none** of the attendance saves, enrolment closures or trial bookings. A history that
-silently omits most of the history reads as authoritative and is wrong; the same failure
-this document already warns about for *Revenue reporting*. Before 2026-07-26 the column
-was uniformly empty, which fails obviously. It is now partly populated, which fails
-quietly — arguably a worse state, and one this project created.
-
-**Notes — decide the derivation FIRST, it is the whole design:**
-
-- **From the actor** (`current_tenant_id()`): right for a coach saving attendance and an
-  admin approving a claim. **Wrong for `join_tenant_by_code`**, where the actor is a
-  *parent* with no `tenant_id` at all and the row is about the tenant being joined.
-- **From the entity** (`entity_type` + `entity_id`): correct in every case, but needs a
-  `CASE` with a lookup per type — and a new entity type added later silently falls through
-  to NULL, which is the §7.37 disease again. **Preferred anyway, with a `RAISE` on an
-  unknown type** so the next one fails loudly instead of writing another invisible row.
-- **Do NOT just pass `tenant_id` from the client.** `audit_log_insert`'s `WITH CHECK` is
-  only `(actor_id = auth.uid())` — it does not constrain `tenant_id`, so a client could
-  attribute an audit row to any business. Derive it server-side, in a trigger.
-- **A trigger, not 13 edited call sites.** Editing them means redefining large functions
-  (`book_trial`, `add_unclaimed_student`) purely to add a column — exactly the §7.40 hazard
-  that has already fired twice here.
-- **Probably don't backfill.** Old rows *could* be attributed via `entity_id`, but that is
-  inventing history from today's data — the objection that made the
-  `invoice_items.student_name` backfill a deliberate no (`docs/ARCHITECTURE.md` §6). Fix forward.
-- Second-order: the Deno helper cleans up with `delete().eq("tenant_id", tenantId)`, which
-  matches nothing for null-tenant rows, so **every test run leaks audit rows**. Same shape
-  as the orphan tenants in §7.44.
-
-Settle the scale first: `SELECT tenant_id IS NULL AS invisible, count(*) FROM audit_log GROUP BY 1;`
+**Notes:** the revoke itself is three lines
+(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon`, plus the same for future tables
+via `ALTER DEFAULT PRIVILEGES`). What needs care is proving nothing depends on it first —
+in particular that no Supabase-internal machinery (PostgREST's schema introspection, the
+dashboard) relies on the template grants. **Verify against a remote dump, not locally**
+(§7.39/§7.82 — the local stack does not reproduce cloud's grant posture), and check
+whether `authenticated`'s `TRUNCATE` deserves the same treatment while you are in there:
+that role IS reachable, so it is the more interesting half.
 
 ### Direct writes to `students` are audited by nobody — **S**
 Two admin paths update `students` straight from the client and record **nothing**: the
 level picker (`setLevel()`) and, since 2026-07-26, the **parent contact details** modal
-(`CONTACT_DETAILS_PLAN.md`). They are not among the 19 writers counted in the item above —
-that item is about writers whose audit row lacks a `tenant_id`. **These write no row at
-all.**
+(`CONTACT_DETAILS_PLAN.md`). They wrote no audit row before 2026-08-04 and still write
+none — `20260804000300` stamps rows that *are* written, and cannot conjure one that
+isn't. **This is now the whole of the audit gap.**
 
 **Why:** contact details are not cosmetic. `provisional_contact_phone` and `_email` are
 the top two ranked signals in `find_student_candidates()` — they decide **which parent is
@@ -1073,33 +1033,6 @@ it failed, looked like a regression in the change under test, and needed a run a
 **Notes:** it also drives Expo, so a fix should keep the admin half runnable alone — an
 admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
 and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
-
-### Retire `tenants.kind`, and narrow `coaches_without_rate` — **S** `[migration]`
-Two changes to one RPC and one column, both deferred out of the 2026-08-01 platform fix
-because they need a migration and migrations land alone (§7.55).
-
-1. `platform_tenant_overview()` returns `coaches_without_rate`, which counts the business's
-   OWNER as well as its staff. An owner without a rate is correct (PRD §7.13), so the figure
-   is unusable as-is — the page now computes the staff-only count **in the browser** instead.
-   Narrow the column in SQL (exclude coaches whose profile role is `tenant_admin`), rename it
-   `staff_without_rate`, and delete the client-side scan and its `STAFF_SCAN_LIMIT` tripwire.
-2. `tenants.kind` (`'private' | 'school'`, NOT NULL, default `'private'`) is dead. Nothing
-   reads it, the UI that set it was removed 2026-08-01, and PRD §4.4 now states outright that
-   SwimSync does not classify businesses this way. Drop it.
-
-**Why:** the browser-side count is bounded by `max_rows` and re-introduces exactly the
-aggregation the RPC was written to replace — it is guarded by a visible tripwire, not by
-being correct at scale. And a NOT NULL column that every new tenant gets, that no code reads
-and no UI sets, is a trap: the next person to find it will reasonably assume it means
-something. It already misled a session into asserting the platform page derived a business's
-shape from it, which it never did.
-
-**Notes:** one migration, expand/contract — the RPC is `CREATE OR REPLACE` with a changed
-`RETURNS TABLE`, so it needs `DROP FUNCTION` first. Order matters: **ship the RPC change and
-the page change together**, because the page reads the new column name the moment it exists.
-Dropping `kind` is independent and can ride along or follow. `provision_tenant()` takes a
-`p_kind` argument that would go with it. Queue behind the two hygiene migrations already
-waiting; only one schema change in flight at a time.
 
 ### Run the UI drivers in CI, not just their fixtures — **M**
 CI now loads every `fixtures-*.sql` and asserts it round-trips
@@ -1225,6 +1158,7 @@ Kept so the reasoning doesn't get re-litigated.
 
 | Idea | Why not |
 |---|---|
+| **`ALTER DEFAULT PRIVILEGES … REVOKE EXECUTE ON FUNCTIONS FROM anon`** | The blanket fix for §7.39/§7.82, refused twice — 2026-07-21 during the tenant-provisioning deploy, and again 2026-08-04 when the remaining grants were revoked one function at a time. It changes the ACL of every **future** function at once, including any that legitimately needs `anon`, and the resulting failure appears far from the migration that caused it — a new RPC that simply doesn't work, with nothing pointing here. The replacement is a test, not a default: `function_grants.test.sql` asserts over `pg_proc` that no function grants EXECUTE to `anon`, so a new one fails the build **and** the author decides its ACL deliberately. If this is ever revisited, note it also cannot be verified locally (§7.39). |
 | **Making the Students page's "All" tab mean active-only** | Considered 2026-07-26 so the header count would always equal the visible rows, and declined **with the user**: it would hide departed children from the default view and change behaviour people rely on. The header therefore deliberately describes a **subset** of the rows, and the `· N inactive` suffix is what explains the gap. **Do not "fix" the mismatch** — it is the honest reading. (`lib/studentCounts.ts`.) |
 | **An "In progress" state on a class card while its lesson is running** | Offered 2026-07-26 while building the attendance-status chips and declined. A class shows **Upcoming** until its **end** time, because a coach marks at the end of a lesson — so one still running is not yet overdue and a fourth word for it buys nothing. The `Now` badge already says a class is happening. `hasEndedInSg()` is keyed to the end time deliberately; if this is revisited, that is the single place it changes. |
 | **Pre-generating lesson sessions** (a scheduled session generator) | PRD §7.5 is knowingly unimplemented and should stay that way. Sessions are created lazily by the coach's attendance save; which lessons *should* have happened is derived at read time from `classes.day_of_week`. Pre-generation adds a job, a schedule, and a pile of edge cases when classes change — for no gain the read-time derivation doesn't already deliver. **Don't "fix" this** without a reason the derivation genuinely can't serve. (`docs/ARCHITECTURE.md` §6.) |
