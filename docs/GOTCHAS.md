@@ -479,6 +479,23 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     **Do NOT "fix" this by widening `parent_students_delete` to tenant admins** — that
     grants a blanket delete over every family link in the business to close a one-row
     problem, and RLS is row-level, so there is no way to say "only the link you just made".
+    - **UPDATE 2026-08-04 — the policy is GONE (`20260804000800`), and the warning above
+      is why it went rather than being widened.** The first sentence of this entry described
+      what the POLICY permitted; `BACKLOG.md` described what the PRODUCT offered — *"once a
+      claim is approved nothing in the product can unlink them except that flow's own
+      undo"* — and the two disagreed. No UI ever called it (21 references to
+      `parent_students` across both apps, not one write verb), so a parent could
+      nonetheless unlink themselves with a single `DELETE`, reversing an approved claim
+      outside the flow built to reverse it. `undo_student_claim()` is now the **only**
+      unlink path, which is what this entry always said it should be.
+    - **`parent_students` is SELECT-only for clients now.** The deleters
+      (`undo_student_claim`, `merge_students`) are SECURITY DEFINER owned by `postgres`,
+      so they bypass RLS and were never affected; the two SECURITY INVOKER readers
+      (`package_live_balances`, `student_package_coverage`) keep the SELECT grant they need.
+    - **The grant had to go with the policy, and nobody had to remember that** —
+      `table_grants.test.sql` assertion 2 (§7.87) fails on a privilege no policy permits,
+      so dropping the policy alone goes red naming `parent_students:DELETE`. That was the
+      invariant's first real catch, on the first change made after it landed.
 
 48. **A PARENT WHO HAS JOINED BY CODE BUT HAS NO CHILD YET IS INVISIBLE TO THE BUSINESS'S
     ADMIN.** `profiles_select` reaches a parent through
