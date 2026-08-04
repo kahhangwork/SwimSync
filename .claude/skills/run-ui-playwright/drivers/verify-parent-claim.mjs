@@ -23,6 +23,15 @@
 //   supabase db reset && docker restart supabase_kong_SwimSync
 //   psql -f drivers/fixtures-parent-claim.sql
 //   SwimSyncAdmin npm run dev; SwimSyncApp npx expo start --web
+//
+// ⚠ THE `db reset` IS NOT OPTIONAL, AND SKIPPING IT LOOKS EXACTLY LIKE A BROKEN
+//   DRIVER. This run files a claim, approves it and merges a duplicate; those
+//   rows are not undone by re-loading the fixture, so a second run without a
+//   reset fails at check 1 with the popup never opening — character for
+//   character the same output as a genuinely stale driver. Cost a diagnostic
+//   round on 2026-08-04, immediately after fixing a real staleness bug in this
+//   same file, which is the worst possible moment to be handed a false positive.
+//   If you see 0/5 here, reset FIRST and re-run before believing anything.
 import os from "node:os";
 import path from "node:path";
 import { launch, loginAdmin, loginExpo, tap, ADMIN, EXPO } from "./lib.mjs";
@@ -50,6 +59,13 @@ await page.waitForTimeout(4000);
 await page.getByPlaceholder("Emma Tan").fill("Ethan");
 await page.getByPlaceholder("YYYY-MM-DD").fill("2019-01-01");
 await tap(page.getByText("Save Child Profile").last(), "save (first attempt)");
+
+// "Save Child Profile" no longer reaches the server. `handleSave()` opens an
+// "Is this right?" review modal first — added 2026-07-26 01:59, FIFTY-EIGHT
+// MINUTES after this driver was written (0cf8036 01:01, bad1294 01:59), which
+// is how it came to fail its very first check for months without anyone
+// noticing. Confirming here is what actually calls add_child_or_claim('check').
+await tap(page.getByText(/Yes, add this child/i).last(), "confirm the details (first attempt)");
 await page.waitForTimeout(3500);
 
 let text = await page.evaluate(() => document.body.innerText);
@@ -118,6 +134,7 @@ await page.waitForTimeout(4000);
 await page.getByPlaceholder("Emma Tan").fill("Ethan");
 await page.getByPlaceholder("YYYY-MM-DD").fill("2019-01-01");
 await tap(page.getByText("Save Child Profile").last(), "save (second attempt)");
+await tap(page.getByText(/Yes, add this child/i).last(), "confirm the details (second attempt)");
 await page.waitForTimeout(3500);
 text = await page.evaluate(() => document.body.innerText);
 // Asserted on STATE, not on the toast: the toast fades, and a driver that
@@ -203,6 +220,7 @@ await page.getByPlaceholder("Emma Tan").fill("Ethan Tan");
 // deliberately making it un-flaggable.
 await page.getByPlaceholder("YYYY-MM-DD").fill("2019-01-01");
 await tap(page.getByText("Save Child Profile").last(), "save (a genuinely different child)");
+await tap(page.getByText(/Yes, add this child/i).last(), "confirm the details (different child)");
 await page.waitForTimeout(3500);
 text = await page.evaluate(() => document.body.innerText);
 
