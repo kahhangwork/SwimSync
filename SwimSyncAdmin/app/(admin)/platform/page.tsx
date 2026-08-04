@@ -36,11 +36,17 @@ type TenantRow = {
   active_students: number;
   active_classes: number;
   coaches: number;
-  /** EVERY coach with no rate, the business's owner included — that is what the
-   *  RPC actually counts. Do not render this directly: an owner without a rate
-   *  is CORRECT (PRD §7.13), so this number warns about private coaches forever.
-   *  `unpaidStaff` below is the figure worth showing. */
-  coaches_without_rate: number;
+  /** Coaches who do NOT own the business and have no rate — the ones payroll
+   *  will pay nothing. The owner is excluded IN SQL (their profile role is
+   *  tenant_admin), because an owner without a rate is the correct finished
+   *  state for a private coach (PRD §7.13), not a warning.
+   *
+   *  This column has existed and been correct since 20260719002400. A browser
+   *  scan that recomputed it lived here 2026-08-01 → 2026-08-04 on the belief
+   *  that "the RPC has never returned this field"; the belief was backwards —
+   *  `pg_get_functiondef` and platform_overview.test.sql §"SHAPE IS DERIVED"
+   *  both say otherwise. Read the column. */
+  staff_without_rate: number;
   /** NULL = nothing has EVER been marked. Renders as "never", never as a date. */
   last_attendance_date: string | null;
   sessions_this_month: number;
@@ -54,36 +60,6 @@ type TenantRow = {
    *  nobody able to operate it, which is a fault, not a blank. */
   admin_status: "none" | "invited" | "active";
 };
-
-/** One coach, with just enough to answer "is this an unpaid STAFF coach?" —
- *  their profile's role (the owner is the tenant admin) and whether any rate
- *  exists at all. The rate's VALUE is deliberately not selected: this asks
- *  whether they are on payroll, not what they earn, and a platform admin has no
- *  business reading another company's pay. */
-type StaffRateRow = {
-  id: string;
-  tenant_id: string;
-  /** OBJECT OR ARRAY, and the union is not laziness. PostgREST returns a to-one
-   *  embed as an object — verified against the running API 2026-08-01:
-   *  `"profiles": {"role": "tenant_admin"}` — but supabase-js infers to-one
-   *  embeds as ARRAYS without an explicit hint, and `tsc` rejects the cast that
-   *  pretends otherwise. Accepting both and normalising is honest about the
-   *  disagreement; casting through `unknown` would just silence the compiler and
-   *  leave `roleOf` returning undefined if the shape ever moved. */
-  profiles: { role: string } | { role: string }[] | null;
-  coach_rates: { id: string }[] | null;
-};
-
-/** The coach's profile role, whichever shape the embed arrived in. */
-function roleOf(c: StaffRateRow): string | null {
-  const p = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
-  return p?.role ?? null;
-}
-
-/** Bound on the coach scan above. Not a page size — a tripwire: if a real
- *  deployment ever returns this many coaches, the count silently stops being
- *  right and `staffCountWarning` says so on screen. */
-const STAFF_SCAN_LIMIT = 2000;
 
 type StrandedParent = {
   parent_id: string;
@@ -111,13 +87,6 @@ type FamilyStatusRow = {
 export default function PlatformPage() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [tenants, setTenants] = useState<TenantRow[]>([]);
-  /** tenant_id → number of NON-OWNER coaches with no rate. See loadTenants(). */
-  const [unpaidStaff, setUnpaidStaff] = useState<Map<string, number>>(new Map());
-  /** Why the counts above cannot be trusted, or null when they can. An absent
-   *  badge and a badge that FAILED TO LOAD look identical on screen, and this
-   *  page exists to surface trouble — so the difference has to be said out
-   *  loud rather than inferred from a missing amber pill. */
-  const [staffCountWarning, setStaffCountWarning] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
@@ -185,25 +154,9 @@ export default function PlatformPage() {
    * — false reassurance on the one page that exists to show trouble.
    */
   async function loadTenants() {
-    const [overview, strandedRes, staffRes] = await Promise.all([
+    const [overview, strandedRes] = await Promise.all([
       supabase.rpc("platform_tenant_overview"),
       supabase.rpc("platform_stranded_parents"),
-      // WHY THIS IS NOT IN THE RPC. `coaches_without_rate` counts every coach
-      // with no rate, the OWNER included — and an owner without a rate is the
-      // correct, finished state for a private coach (PRD §7.13), so rendering it
-      // would put an amber "unpaid" warning on every private coach's row
-      // forever. The figure worth showing is STAFF without a rate: someone who
-      // does not own the business and will be paid nothing by payroll.
-      //
-      // Narrowing it properly means changing the RPC's RETURNS TABLE, which is a
-      // DROP/CREATE — a migration, and migrations land alone, one at a time
-      // (§7.55). This computes the same answer from three tables the platform
-      // admin can already read, so the fix ships without one. When that
-      // migration happens, delete this and read the narrowed column.
-      supabase
-        .from("coaches")
-        .select("id, tenant_id, profiles!inner(role), coach_rates(id)")
-        .limit(STAFF_SCAN_LIMIT),
     ]);
     if (overview.error) {
       setLoadError(overview.error.message);
@@ -212,35 +165,6 @@ export default function PlatformPage() {
     setLoadError(null);
     setTenants((overview.data ?? []) as TenantRow[]);
     setStranded((strandedRes.data ?? []) as StrandedParent[]);
-
-    // §7.70: a client-side length is silently capped at max_rows, and a capped
-    // scan under-counts, which here means a staff coach going unpaid and NOTHING
-    // saying so. Coaches are staff, not students, so the cap is far away — but
-    // "far away" is exactly what §7.70's 1000-row cap was before it wasn't. Say
-    // so out loud rather than quietly returning a wrong number.
-    // Checked, not assumed. Left unchecked, a failed scan yields zero counts,
-    // every row loses its badge, and the page reads as "nobody is unpaid" —
-    // the same false reassurance the overview error above is guarded against.
-    const rows = (staffRes.data ?? []) as StaffRateRow[];
-    setStaffCountWarning(
-      staffRes.error
-        ? `could not be checked: ${staffRes.error.message}`
-        : rows.length >= STAFF_SCAN_LIMIT
-          ? `hit the ${STAFF_SCAN_LIMIT}-coach scan limit, so they may be too low`
-          : null
-    );
-
-    const counts = new Map<string, number>();
-    for (const c of rows) {
-      // The owner is a coach whose PROFILE is the tenant admin — that is the
-      // whole of the private-coach shape, and it is why no private-vs-school
-      // flag is needed (PRD §7.13).
-      const isOwner = roleOf(c) === "tenant_admin";
-      const hasRate = (c.coach_rates ?? []).length > 0;
-      if (isOwner || hasRate) continue;
-      counts.set(c.tenant_id, (counts.get(c.tenant_id) ?? 0) + 1);
-    }
-    setUnpaidStaff(counts);
   }
 
   /** POST helper that carries the caller's token — the API routes verify it,
@@ -284,8 +208,8 @@ export default function PlatformPage() {
     setCreating(true);
     const { res, json } = await postAs("/api/provision-tenant", {
       businessName: newBiz.businessName.trim(),
-      // `kind` is deliberately not sent. provision_tenant() still defaults the
-      // column to 'private'; it is dead data pending a contract migration.
+      // No `kind`: the column is gone (20260804000100). A business's shape is
+      // derived from its data, never declared (PRD §4.4).
       adminName: newBiz.adminName.trim(),
       adminEmail: newBiz.adminEmail.trim(),
       isCoach: newBiz.isCoach,
@@ -491,15 +415,6 @@ export default function PlatformPage() {
         </div>
       )}
 
-      {/* §7.70: an under-counted scan means a staff coach is going unpaid and
-          nothing says so. Silence would be the bug; this is the tripwire. */}
-      {staffCountWarning && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          The “unpaid” counts below {staffCountWarning}. They are computed in the
-          browser; move them into <code>platform_tenant_overview()</code> before
-          relying on them.
-        </div>
-      )}
 
       {/* A tenant admin asks "how is MY business doing?"; a platform admin asks
           "WHICH business needs me?" — so this is one row per business with the
@@ -770,13 +685,12 @@ export default function PlatformPage() {
                       on every private coach's row forever. A coach who does NOT
                       own it and has no rate will be paid nothing by payroll,
                       which is the case worth catching before month end.
-                      This read `t.staff_without_rate` until 2026-08-01, a field
-                      the RPC has never returned, so the badge was `undefined > 0`
-                      and NEVER RENDERED. It now reads the count computed in
-                      loadTenants(). */}
-                  {(unpaidStaff.get(t.tenant_id) ?? 0) > 0 && (
+                      The owner is excluded IN SQL — see the type above for why
+                      the browser scan that briefly replaced this column was
+                      based on a backwards reading of the RPC. */}
+                  {t.staff_without_rate > 0 && (
                     <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
-                      {unpaidStaff.get(t.tenant_id)} unpaid
+                      {t.staff_without_rate} unpaid
                     </span>
                   )}
                 </Td>

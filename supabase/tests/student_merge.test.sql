@@ -26,9 +26,9 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT plan(20);
 
-INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
-  ('4e211111-0000-0000-0000-000000000001','merge-a','MERGE Business A','school','SWIM-MRGA'),
-  ('4e211111-0000-0000-0000-000000000002','merge-b','MERGE Business B','school','SWIM-MRGB');
+INSERT INTO tenants (id, slug, display_name, join_code) VALUES
+  ('4e211111-0000-0000-0000-000000000001','merge-a','MERGE Business A','SWIM-MRGA'),
+  ('4e211111-0000-0000-0000-000000000002','merge-b','MERGE Business B','SWIM-MRGB');
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,

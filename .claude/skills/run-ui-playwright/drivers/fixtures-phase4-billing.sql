@@ -20,8 +20,8 @@ BEGIN
 
   -- Second business, with its own PayNow QR so the parent can be shown the
   -- WRONG payee if the resolution is broken.
-  INSERT INTO tenants (slug, display_name, kind, join_code, paynow_qr_url)
-  VALUES ('harbour-swim', 'Harbour Swim Club', 'school', 'SWIM-HARB',
+  INSERT INTO tenants (slug, display_name, join_code, paynow_qr_url)
+  VALUES ('harbour-swim', 'Harbour Swim Club', 'SWIM-HARB',
           'https://example.test/harbour-qr.png')
   ON CONFLICT (slug) DO UPDATE SET display_name = EXCLUDED.display_name
   RETURNING id INTO v_t2;

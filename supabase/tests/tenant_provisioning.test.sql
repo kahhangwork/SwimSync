@@ -20,11 +20,12 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(21);
+-- 20 not 21: 'kind is stored as passed' went with the column (20260804000100).
+SELECT plan(20);
 
 -- ── Callers: one of each shape that can reach an RPC ────────────────────────
-INSERT INTO tenants (id, slug, display_name, kind, join_code)
-VALUES ('55555555-0000-0000-0000-000000000001','prov-a','PROV Existing','school','SWIM-PRVA');
+INSERT INTO tenants (id, slug, display_name, join_code)
+VALUES ('55555555-0000-0000-0000-000000000001','prov-a','PROV Existing','SWIM-PRVA');
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
@@ -52,14 +53,14 @@ SET LOCAL ROLE authenticated;
 -- 1. A PARENT cannot create a business.
 SET LOCAL "request.jwt.claims" TO '{"sub":"55000000-0000-0000-0000-0000000000a3","role":"authenticated"}';
 SELECT throws_ok(
-  $$ SELECT * FROM provision_tenant('Parent Made This', 'school') $$,
+  $$ SELECT * FROM provision_tenant('Parent Made This') $$,
   'only the platform admin may create a business',
   'a PARENT cannot provision a tenant');
 
 -- 2. A COACH cannot.
 SET LOCAL "request.jwt.claims" TO '{"sub":"55000000-0000-0000-0000-0000000000a2","role":"authenticated"}';
 SELECT throws_ok(
-  $$ SELECT * FROM provision_tenant('Coach Made This', 'private') $$,
+  $$ SELECT * FROM provision_tenant('Coach Made This') $$,
   'only the platform admin may create a business',
   'a COACH cannot provision a tenant');
 
@@ -68,7 +69,7 @@ SELECT throws_ok(
 --    not exist yet, so there is nothing to scope such a permission to.
 SET LOCAL "request.jwt.claims" TO '{"sub":"55000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
 SELECT throws_ok(
-  $$ SELECT * FROM provision_tenant('Admin Made This', 'school') $$,
+  $$ SELECT * FROM provision_tenant('Admin Made This') $$,
   'only the platform admin may create a business',
   'a TENANT ADMIN cannot provision a tenant — not even a second one of their own');
 
@@ -79,7 +80,7 @@ SELECT throws_ok(
 RESET ROLE;
 SET LOCAL ROLE anon;
 SELECT throws_ok(
-  $$ SELECT * FROM provision_tenant('Anon Made This', 'private') $$,
+  $$ SELECT * FROM provision_tenant('Anon Made This') $$,
   NULL,
   'ANON cannot provision a tenant');
 RESET ROLE;
@@ -95,7 +96,7 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"55000000-0000-0000-0000-0000000000f1","role":"authenticated"}';
 
 CREATE TEMP TABLE prov_result AS
-  SELECT * FROM provision_tenant('Dolphin Swim Academy', 'school');
+  SELECT * FROM provision_tenant('Dolphin Swim Academy');
 
 SELECT is((SELECT COUNT(*)::INT FROM prov_result), 1,
   'the platform admin gets exactly one row back');
@@ -114,11 +115,6 @@ SELECT is(
   'Dolphin Swim Academy',
   'the tenant row exists with the given name');
 
-SELECT is(
-  (SELECT kind::TEXT FROM tenants WHERE id = (SELECT tenant_id FROM prov_result)),
-  'school',
-  'kind is stored as passed');
-
 -- A brand-new business has NO admin yet — the auth user is created separately,
 -- afterwards, by the API route. This is the intermediate state the route must
 -- compensate for, and the state the overview flags.
@@ -132,7 +128,7 @@ SELECT is(
 
 -- Two businesses may legitimately share a name.
 CREATE TEMP TABLE prov_dupe AS
-  SELECT * FROM provision_tenant('Dolphin Swim Academy', 'school');
+  SELECT * FROM provision_tenant('Dolphin Swim Academy');
 SELECT is((SELECT slug FROM prov_dupe), 'dolphin-swim-academy-2',
   'a duplicate name gets a suffixed slug rather than failing on UNIQUE');
 
@@ -140,7 +136,7 @@ SELECT is((SELECT slug FROM prov_dupe), 'dolphin-swim-academy-2',
 -- named in non-Latin script reduces to the empty string, which is NOT NULL.
 -- Wholly plausible in Singapore.
 CREATE TEMP TABLE prov_cjk AS
-  SELECT * FROM provision_tenant('游泳學校', 'school');
+  SELECT * FROM provision_tenant('游泳學校');
 SELECT ok((SELECT slug FROM prov_cjk) <> '',
   'a non-ASCII business name still yields a non-empty slug');
 SELECT ok((SELECT slug FROM prov_cjk) LIKE 'tenant-%',
@@ -152,13 +148,13 @@ SELECT is(
 
 -- Punctuation and spacing collapse rather than producing a run of hyphens.
 SELECT is(
-  (SELECT slug FROM provision_tenant('  Marcus''s  Swim & Splash!!  ', 'private')),
+  (SELECT slug FROM provision_tenant('  Marcus''s  Swim & Splash!!  ')),
   'marcus-s-swim-splash',
   'punctuation and repeated spaces collapse to single hyphens, trimmed at both ends');
 
 -- An unnamed business is refused rather than silently slugged.
 SELECT throws_ok(
-  $$ SELECT * FROM provision_tenant('   ', 'private') $$,
+  $$ SELECT * FROM provision_tenant('   ') $$,
   'a business needs a name',
   'a blank name is refused');
 
@@ -178,10 +174,10 @@ SELECT is(
 -- them (fixed in 20260721000300). So these assert the intended ACL rather than
 -- prove it, and the real check is a dump of the REMOTE after pushing.
 SELECT ok(
-  NOT has_function_privilege('anon', 'public.provision_tenant(text,tenant_kind)', 'EXECUTE'),
+  NOT has_function_privilege('anon', 'public.provision_tenant(text)', 'EXECUTE'),
   'anon holds no EXECUTE on provision_tenant');
 SELECT ok(
-  NOT has_function_privilege('service_role', 'public.provision_tenant(text,tenant_kind)', 'EXECUTE'),
+  NOT has_function_privilege('service_role', 'public.provision_tenant(text)', 'EXECUTE'),
   'service_role holds no EXECUTE — the route must call it as the signed-in user');
 
 SELECT * FROM finish();

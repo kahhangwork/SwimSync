@@ -53,9 +53,9 @@ SELECT
 GRANT SELECT ON w TO PUBLIC;
 
 -- ── Two businesses, so the tenant boundary can be probed ────────────────────
-INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
-  ('77777777-0000-0000-0000-000000000001','win-a','WINDOW Business A','school','SWIM-WINA'),
-  ('77777777-0000-0000-0000-000000000002','win-b','WINDOW Business B','school','SWIM-WINB');
+INSERT INTO tenants (id, slug, display_name, join_code) VALUES
+  ('77777777-0000-0000-0000-000000000001','win-a','WINDOW Business A','SWIM-WINA'),
+  ('77777777-0000-0000-0000-000000000002','win-b','WINDOW Business B','SWIM-WINB');
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,

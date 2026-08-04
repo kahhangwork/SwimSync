@@ -51,17 +51,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { businessName, kind, adminName, adminEmail, isCoach } =
-    await req.json();
+  // `kind` is deliberately absent. A caller may still SEND it — an old client,
+  // a curl from a runbook — and it is ignored rather than rejected: the column
+  // it used to feed was never read by anything and was dropped on 2026-08-04
+  // (20260804000100). A 400 here would break a caller over a value that changed
+  // nothing even when it was stored.
+  const { businessName, adminName, adminEmail, isCoach } = await req.json();
 
   if (!businessName?.trim() || !adminName?.trim() || !adminEmail?.trim()) {
     return NextResponse.json(
       { error: "businessName, adminName and adminEmail are required" },
       { status: 400 }
     );
-  }
-  if (kind && kind !== "private" && kind !== "school") {
-    return NextResponse.json({ error: "kind must be private or school" }, { status: 400 });
   }
 
   const email = String(adminEmail).trim().toLowerCase();
@@ -98,7 +99,6 @@ export async function POST(req: NextRequest) {
   const { data: provRaw, error: provErr } = await callerClient
     .rpc("provision_tenant", {
       p_display_name: businessName.trim(),
-      p_kind: kind ?? "private",
     })
     .select()
     .single();

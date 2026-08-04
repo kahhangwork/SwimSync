@@ -22,9 +22,9 @@ CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT plan(24);
 
 -- ── Two tenants ─────────────────────────────────────────────────────────────
-INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
-  ('11111111-0000-0000-0000-000000000001','tenant-a','Tenant A School','school','SWIM-AAAA'),
-  ('11111111-0000-0000-0000-000000000002','tenant-b','Tenant B Private','private','SWIM-BBBB');
+INSERT INTO tenants (id, slug, display_name, join_code) VALUES
+  ('11111111-0000-0000-0000-000000000001','tenant-a','Tenant A School','SWIM-AAAA'),
+  ('11111111-0000-0000-0000-000000000002','tenant-b','Tenant B Private','SWIM-BBBB');
 
 -- ── Users: one admin + one coach per tenant, one parent per tenant, and the
 --    platform admin. Roles/tenant travel in user_metadata; the auth trigger

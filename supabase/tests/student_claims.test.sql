@@ -35,9 +35,9 @@ CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT plan(49);
 
 -- ── Two businesses ─────────────────────────────────────────────────────────
-INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
-  ('c1a11111-0000-0000-0000-000000000001','claim-a','CLAIM Business A','school','SWIM-CLMA'),
-  ('c1a11111-0000-0000-0000-000000000002','claim-b','CLAIM Business B','school','SWIM-CLMB');
+INSERT INTO tenants (id, slug, display_name, join_code) VALUES
+  ('c1a11111-0000-0000-0000-000000000001','claim-a','CLAIM Business A','SWIM-CLMA'),
+  ('c1a11111-0000-0000-0000-000000000002','claim-b','CLAIM Business B','SWIM-CLMB');
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,

@@ -21,9 +21,9 @@ CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT plan(24);
 
 -- ── Two tenants, so a count that leaked across the boundary is visible ──────
-INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
-  ('44444444-0000-0000-0000-000000000001','pov-a','POV A School','school','SWIM-POVA'),
-  ('44444444-0000-0000-0000-000000000002','pov-b','POV B Private','private','SWIM-POVB');
+INSERT INTO tenants (id, slug, display_name, join_code) VALUES
+  ('44444444-0000-0000-0000-000000000001','pov-a','POV A School','SWIM-POVA'),
+  ('44444444-0000-0000-0000-000000000002','pov-b','POV B Private','SWIM-POVB');
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
@@ -106,8 +106,8 @@ WHERE c.profile_id = '44000000-0000-0000-0000-0000000000a2';
 -- The case that made this wrong in the first place. Tenant C is a private coach
 -- exactly as production is: one coach, who is also the business's admin, with
 -- no rate. That is CORRECT and must produce no flag at all.
-INSERT INTO tenants (id, slug, display_name, kind, join_code)
-VALUES ('44444444-0000-0000-0000-000000000003','pov-c','POV C Solo','private','SWIM-POVC');
+INSERT INTO tenants (id, slug, display_name, join_code)
+VALUES ('44444444-0000-0000-0000-000000000003','pov-c','POV C Solo','SWIM-POVC');
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
   updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
@@ -217,10 +217,11 @@ SELECT is(
      WHERE tenant_id = '44444444-0000-0000-0000-000000000003'), 1,
   'they are still counted as a coach — only the RATE warning is suppressed');
 
--- ══ SHAPE IS DERIVED, NOT READ FROM tenants.kind ═══════════════════════════
--- Every seeded tenant here has kind='private' or 'school' set arbitrarily; the
--- reported shape must follow the DATA instead. Tenant B is stored 'private' but
--- its coach is not its admin, so it is a school.
+-- ══ SHAPE IS DERIVED FROM THE DATA ═════════════════════════════════════════
+-- There is nowhere to declare a business's shape and never was one that
+-- worked: `tenants.kind` was dropped on 2026-08-04 (20260804000100) having
+-- never been read. These assertions are what replaced it — the shape follows
+-- who the coaches are. Tenant B's coach is not its admin, so it is a school.
 SELECT is(
   (SELECT shape FROM platform_tenant_overview()
      WHERE tenant_id = '44444444-0000-0000-0000-000000000003'), 'private coach',

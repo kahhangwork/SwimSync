@@ -24,9 +24,9 @@ CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT plan(34);
 
 -- ── Two businesses, so the tenant boundary can be probed ───────────────────
-INSERT INTO tenants (id, slug, display_name, kind, join_code) VALUES
-  ('66666666-0000-0000-0000-000000000001','trial-a','TRIAL Business A','school','SWIM-TRLA'),
-  ('66666666-0000-0000-0000-000000000002','trial-b','TRIAL Business B','school','SWIM-TRLB');
+INSERT INTO tenants (id, slug, display_name, join_code) VALUES
+  ('66666666-0000-0000-0000-000000000001','trial-a','TRIAL Business A','SWIM-TRLA'),
+  ('66666666-0000-0000-0000-000000000002','trial-b','TRIAL Business B','SWIM-TRLB');
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
