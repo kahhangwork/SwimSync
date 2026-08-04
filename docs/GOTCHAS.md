@@ -1360,3 +1360,49 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       `createAdminClient()`, i.e. `service_role`, which is untouched. **The six UI drivers
       are the real proof here**; they run as real signed-in users through PostgREST, which
       is the only path that exercises a grant. (2026-08-04.)
+
+89. **DEFAULT PRIVILEGES ARE A GRID — ROLE × OBJECT TYPE — AND CLOSING IT IN PIECES LEAVES
+    A CELL OPEN THAT NO PROBE IS LOOKING AT.** It took four migrations in one day, and the
+    last one existed only because production was dumped *after* the deploy rather than
+    trusted:
+
+    | migration | closed | left open |
+    |---|---|---|
+    | `20260804000400` | functions ← `anon`, and `PUBLIC` globally | **functions ← `authenticated`** |
+    | `20260804000600` | tables, sequences ← `authenticated` | **functions ← `authenticated`** |
+    | `20260804000700` | functions ← `authenticated` | — |
+
+    - **Each migration's probe tested only what that migration changed**, so all three
+      passed while the row
+      `ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON
+      FUNCTIONS TO "authenticated"` sat untouched on cloud the whole time. A probe scoped
+      to your own diff cannot see the cell you did not think about.
+    - **It was the dangerous direction of the §7.39 split**, which is why it is worth its
+      own number. LOCAL had no such row, so a new function would have been callable by
+      nobody in development — failing loudly, exactly as promised — while being silently
+      EXECUTE-able by every signed-in user on production. The loud half gets "fixed" by
+      adding the grant you meant; the silent half keeps whatever else the function exposed.
+      §7.82 with `authenticated` in place of `anon` — and since **signup is open**, that is
+      a much smaller reduction in blast radius than it sounds.
+    - **Nothing was actually over-granted**, and the way that was established is the
+      reusable part: diff the remote's authenticated-executable function set against
+      local's. 79 vs 78, and the single difference was `rls_auto_enable`, production's
+      event-trigger function — the known local/cloud exception. So the 78 real ones came
+      from explicit migration grants, and this was the tap rather than a spill.
+      ```bash
+      supabase db dump --linked -f /tmp/prod.sql
+      grep -E '^GRANT ALL ON FUNCTION "public"' /tmp/prod.sql | grep '"authenticated"'
+      ```
+    - **The check that closes the whole grid**, and the one to run after any migration that
+      touches privileges — expect **zero rows**:
+      ```sql
+      SELECT pg_get_userbyid(defaclrole), defaclnamespace::regnamespace, defaclobjtype, defaclacl
+        FROM pg_default_acl
+       WHERE pg_get_userbyid(defaclrole) = 'postgres'
+         AND (defaclacl::text LIKE '%anon=%' OR defaclacl::text LIKE '%authenticated=%');
+      ```
+      `table_grants.test.sql` assertion 5 asserts exactly this — but **it runs against
+      local, where the row never existed**, so it passes by construction for the cloud case.
+      Same limitation as `function_grants.test.sql` (§7.39): the remote dump is the honest
+      check, and an apply-time probe in the migration is the only one that executes against
+      production. (2026-08-04.)
