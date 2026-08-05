@@ -74,12 +74,19 @@ jobs:
           EOF
           echo "CRON_SECRET=ci-only-secret" > supabase/functions/.env
 
+      # Bare `wait` returns 0 whatever the children did — the first cloud run
+      # shipped that mistake: the drivers' npm ci failed (no lockfile committed,
+      # at the time), the step stayed green, and all 32 drivers crashed on a
+      # missing playwright-core. Wait each PID and fail the step.
       - name: Install app + driver deps
         run: |
-          (cd SwimSyncAdmin && npm ci) &
-          (cd SwimSyncApp && npm ci) &
-          (cd .claude/skills/run-ui-playwright/drivers && npm ci) &
-          wait
+          pids=()
+          (cd SwimSyncAdmin && npm ci) & pids+=($!)
+          (cd SwimSyncApp && npm ci) & pids+=($!)
+          (cd .claude/skills/run-ui-playwright/drivers && npm ci) & pids+=($!)
+          rc=0
+          for p in "${pids[@]}"; do wait "$p" || rc=1; done
+          exit $rc
 
       - name: Start dev servers + edge functions (background)
         run: |

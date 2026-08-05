@@ -129,6 +129,10 @@ wait_for_auth() {
 # Every check here names its fix, so a red preflight is a one-line repair.
 preflight() {
   local ok=0 code
+  # One clear line beats 32 identical crashes — the first cloud run failed every
+  # driver on a missing playwright-core because nothing checked it up front.
+  node -e "import('playwright-core').then(()=>process.exit(0),()=>process.exit(1))" 2>/dev/null || \
+    { echo "✗ playwright-core not installed — run: npm ci  (in drivers/)" >&2; ok=1; }
   code="$(http_code "$ADMIN_URL")"
   [[ "$code" == "000" ]] && { echo "✗ admin not answering at $ADMIN_URL — cd SwimSyncAdmin && npm run dev" >&2; ok=1; }
   code="$(http_code "$EXPO_URL")"
