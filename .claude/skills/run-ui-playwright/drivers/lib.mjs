@@ -29,16 +29,30 @@ export async function tap(locator, label = "") {
   if (label) console.log("tapped:", label);
 }
 
-/** Log into the Expo app. Handles the Sign-In heading/button text collision. */
+/** Log into the Expo app. Handles the Sign-In heading/button text collision.
+ *
+ * RETRIES, because one shot is a flake under load: on the CI runner a single
+ * driver (verify-stale-screen, run 31011697069) lost the 15s race once, stayed
+ * on /login silently, and all 16 downstream checks cascaded red while the same
+ * login worked in 20 sibling drivers. Three attempts, and a loud throw rather
+ * than a silent continue — a driver cannot do anything useful unauthenticated,
+ * so failing here with the real reason beats 16 misleading FAILs. */
 export async function loginExpo(page, email, password = "password123") {
-  await page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(7000); // Metro hydrate
-  await page.getByPlaceholder("you@email.com").fill(email);
-  await page.locator('input[type="password"]').fill(password);
-  await page.getByText("Sign In").last().click();
-  await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 15000 }).catch(() => {});
-  await page.waitForTimeout(2500);
-  console.log("loginExpo ->", page.url());
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(7000); // Metro hydrate
+    await page.getByPlaceholder("you@email.com").fill(email);
+    await page.locator('input[type="password"]').fill(password);
+    await page.getByText("Sign In").last().click();
+    await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2500);
+    if (!new URL(page.url()).pathname.endsWith("/login")) {
+      console.log("loginExpo ->", page.url());
+      return;
+    }
+    console.log(`loginExpo: still on /login after attempt ${attempt}`);
+  }
+  throw new Error(`loginExpo: ${email} could not log in after 3 attempts`);
 }
 
 /** Log into the Next.js admin panel. */
