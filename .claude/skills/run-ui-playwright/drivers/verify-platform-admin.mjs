@@ -17,8 +17,13 @@ const check = (name, ok, detail = "") => {
 
 // A second tenant + a student to move, seeded through the service role so the
 // UI has something cross-tenant to act on.
+// Resolved relative to this file, not an absolute path — the checkout lives
+// somewhere else on the CI runner.
 const { createClient } = await import(
-  "/Users/kahhang/Documents/Code/SwimSync/SwimSyncAdmin/node_modules/@supabase/supabase-js/dist/index.mjs"
+  new URL(
+    "../../../../SwimSyncAdmin/node_modules/@supabase/supabase-js/dist/index.mjs",
+    import.meta.url
+  ).href
 );
 const svc = createClient(
   "http://127.0.0.1:54321",

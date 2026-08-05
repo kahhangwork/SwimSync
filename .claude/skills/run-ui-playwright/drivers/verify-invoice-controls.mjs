@@ -121,26 +121,26 @@ try {
 
   await page.screenshot({ path: `${SHOT}/invoice-controls-tenant.png`, fullPage: true });
 
-  // ── 2. PLATFORM ADMIN — the unknown case ────────────────────────────────
+  // ── 2. PLATFORM ADMIN — refused, not disabled ───────────────────────────
+  // This section used to assert a disabled toggle + "No business selected".
+  // RequiresTenant (components/RequiresTenant.tsx) superseded that: tenant
+  // pages now UNMOUNT for a platform admin, because a mounted page still
+  // queries and paints cross-tenant rows underneath any notice. So the
+  // assertion is the refusal screen and the ABSENCE of the page — a rendered
+  // toggle here would mean the gate has regressed.
   await page.goto(`${ADMIN}/login`, { waitUntil: "networkidle" });
   await page.evaluate(() => window.localStorage.clear());
   await loginAdmin(page, "superadmin@swimsync.test", "password123");
   await page.goto(`${ADMIN}/invoices`, { waitUntil: "networkidle" });
   await page.waitForTimeout(2500);
 
-  const pa = await toggleBox(page);
-  console.log("platform-admin toggle:", JSON.stringify(pa));
-  assertToggleGeometry("platform admin", pa);
-  check("toggle is DISABLED for a platform admin (no business)", pa.disabled === true);
-
   const text = await page.evaluate(() => document.body.innerText);
-  check("says no business is selected, rather than inventing 'day 7'",
-    /No business selected/.test(text));
-  check("does NOT present a fabricated run day",
-    !/Runs from day \d+ for the previous month/.test(text));
-
-  const runDay = await page.locator("#run-day").inputValue();
-  check("run-day field is blank, not a made-up 7", runDay === "", `value="${runDay}"`);
+  check("platform admin is REFUSED the tenant invoices page",
+    /This page shows a single business/.test(text));
+  check("the refusal points at the Platform panel", /Platform/.test(text));
+  check("the invoices page did NOT mount (no toggle in the DOM)",
+    (await page.locator("button[aria-pressed]").count()) === 0);
+  check("no fabricated run day anywhere", !/Runs from day \d+/.test(text));
 
   await page.screenshot({ path: `${SHOT}/invoice-controls-platform.png`, fullPage: true });
   console.log(`\nscreenshots in ${SHOT}`);

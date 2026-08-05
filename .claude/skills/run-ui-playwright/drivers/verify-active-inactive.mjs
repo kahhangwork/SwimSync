@@ -35,7 +35,9 @@ execSync(
 );
 
 const { browser, page } = await launch();
-await loginAdmin(page, "superadmin@swimsync.test", "password123");
+// coach@swimsync.test is the TENANT admin (superadmin@ became the cross-tenant
+// platform admin on 2026-07-19 and has no tenant pages — §8.7).
+await loginAdmin(page, "coach@swimsync.test", "password123");
 
 // ── 1. The Parents page exists and lists the family ─────────────────────────
 await page.goto("http://localhost:3000/parents");

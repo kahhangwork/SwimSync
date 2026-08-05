@@ -103,14 +103,18 @@ try {
   check("tenant admin LANDS on /dashboard", page.url().includes("/dashboard"), page.url());
 
   const tnav = await go(page, "/dashboard");
-  check("sidebar shows the 11 business pages", tnav.navLinks.length === 11,
+  // Pins the sidebar INVENTORY — a dropped entry is the regression this
+  // catches, so an exact count is deliberate. It also reddens when a page is
+  // legitimately added; the fix then is bumping this number (11 → 15 on
+  // 2026-08-05, after claims/parents/trials/makeups/packages landed).
+  check("sidebar shows the 15 business pages", tnav.navLinks.length === 15,
     `${tnav.navLinks.length}: ${JSON.stringify(tnav.navLinks)}`);
   check("sidebar does NOT show Platform", !tnav.navLinks.includes("/platform"));
 
   // The regression that matters most: every page must still WORK for them.
   // Asserting "no refusal" is not enough — a blank page would pass that.
   const CONTENT = {
-    "/dashboard":    /Total Students/,
+    "/dashboard":    /Active Students/, // renamed from "Total Students" 2026-07-26 (§8.19)
     "/unassigned":   /Unassigned/,
     "/classes":      /Classes/,
     "/students":     /Students/,

@@ -104,9 +104,14 @@ try {
   await page.goto(`${ADMIN}/invoices`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
   const platformBody = await page.evaluate(() => document.body.innerText);
+  // The in-page notice ("Invoice generation runs for one business at a time")
+  // was superseded by RequiresTenant, which UNMOUNTS tenant pages for a
+  // platform admin and shows the refusal screen instead (see
+  // components/RequiresTenant.tsx — a mounted page still queries and paints
+  // cross-tenant rows).
   check(
-    "platform_admin sees the 'no business attached' notice",
-    platformBody.includes("Invoice generation runs for one business at a time")
+    "platform_admin is refused the tenant invoices page",
+    platformBody.includes("This page shows a single business")
   );
 } catch (e) {
   check("driver completed without throwing", false, String(e));

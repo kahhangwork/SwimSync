@@ -227,7 +227,19 @@ still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 >    on 2026-08-01 by owning its class instead of borrowing one. Prefer that fix: an exemption
 >    is a compensated hazard, and this one broke CI before it was removed (§7.73).
 
-_UI drivers (`.claude/skills/run-ui-playwright/drivers/`, run by hand, not CI):_
+> **Every driver runs NIGHTLY in CI as of 2026-08-05** (`.github/workflows/ui-drivers.yml`,
+> 04:00 SGT daily + a manual Run-workflow button), via
+> `drivers/run-all-drivers.sh` — which is also the way to run the whole set locally.
+> The protocol per driver is uniform, deliberately: `supabase db reset` → kong restart
+> (§7.44) → load its fixture → run it under a hard timeout. The next reset is the cleanup,
+> so teardowns are not run — which is why this must NEVER run beside a sibling worktree
+> (§7.55). Exceptions and the fixture map live in the script header. On failure the
+> workflow updates ONE rolling `ui-driver-rot` issue (green closes it); triage rule:
+> product changed → real regression; driver/calendar assumption moved (§7.73) → fix the
+> driver. Its first full sweep found and repaired SEVEN rotted drivers and one flake —
+> none of them a product bug.
+
+_UI drivers (`.claude/skills/run-ui-playwright/drivers/`, each also runnable by hand):_
 `verify-unmarked-lessons.mjs` + `fixtures-unmarked-lessons.sql` drive the whole
 unmarked-lesson loop (admin gap report → coach backlog → mark → both go green);
 `verify-parent-attendance.mjs` covers the parent Attendance screen — chip geometry read

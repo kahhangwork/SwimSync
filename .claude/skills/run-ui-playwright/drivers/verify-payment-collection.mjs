@@ -66,6 +66,11 @@ try {
     context.waitForEvent("page"),
     page.getByRole("button", { name: "WhatsApp", exact: true }).first().click(),
   ]);
+  // The page EVENT fires before the popup has navigated anywhere — reading
+  // url() immediately returns "" on a loaded machine and the number/link/ref
+  // checks all fail with no detail. Wait for the wa.me/whatsapp URL first
+  // (found by the first CI sweep, 2026-08-05; it had passed by luck until then).
+  await popup.waitForURL(/wa\.me|whatsapp/, { timeout: 15000 }).catch(() => {});
   const waUrl = popup.url();
   await popup.close();
   // wa.me 302s to api.whatsapp.com/send/?phone=... — by the time the popup

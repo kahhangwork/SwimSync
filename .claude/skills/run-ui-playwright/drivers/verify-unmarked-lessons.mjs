@@ -42,7 +42,9 @@ const adminCtx = await browser.newContext({
 });
 await adminCtx.clock.install({ time: TODAY_SGT });
 const admin = await adminCtx.newPage();
-await loginAdmin(admin, "superadmin@swimsync.test", "password123");
+// coach@swimsync.test is the TENANT admin (superadmin@ became the cross-tenant
+// platform admin on 2026-07-19 and is refused the tenant pages — §8.7).
+await loginAdmin(admin, "coach@swimsync.test", "password123");
 
 async function openCoverageModal() {
   await admin.goto("http://localhost:3000/invoices");
@@ -60,7 +62,12 @@ await admin.screenshot({ path: shot("admin-modal-gap.png"), fullPage: true });
 check("Admin modal warns lessons are unmarked", /no attendance marked/i.test(adminText));
 check("Admin modal reports 1 of 2 lessons marked", /1 of 2 lessons marked/.test(adminText));
 check("Admin modal names the missing date", /Missing:.*11 Jul/.test(adminText));
-check("Confirm button reworded to 'Generate anyway'", /Generate anyway/.test(adminText));
+// "Generate anyway" existed briefly before §8a made unmarked attendance a HARD
+// block with no override (an override can only produce a permanent underbill).
+// Its ABSENCE is now the product rule this modal must obey — asserting its
+// presence was rot from the pre-hard-block era (repaired 2026-08-05).
+check("No 'Generate anyway' override exists — the block is hard (§8a)",
+  !/Generate anyway/i.test(adminText));
 // Today is 15 Jul: the 18th and 25th are future and must not be called missing.
 check("Future Saturdays are not reported as gaps", !/18 Jul|25 Jul/.test(adminText));
 

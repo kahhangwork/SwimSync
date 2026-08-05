@@ -1,0 +1,164 @@
+name: UI drivers (nightly)
+
+# Runs every verify-*.mjs Playwright driver against the real apps — Expo web +
+# the admin panel + a full local Supabase stack — on GitHub's runners.
+#
+# WHY: five drivers rotted silently while "run by hand" was the policy, every
+# one found by accident (BACKLOG → Run the UI drivers in CI). The decisive case:
+# verify-parent-claim.mjs was red from 58 minutes after it was written until
+# 2026-08-04, while the product was correct the whole time. Nothing but actually
+# running the drivers can catch "nobody ran it".
+#
+# NIGHTLY + MANUAL, deliberately not per-push: the sweep resets the database
+# between drivers and takes real wall clock, and a flaky driver must never block
+# a deploy (a push to main IS the app deploy — §7.60). Rot detection within a
+# day is the goal; the run is free on a public repo.
+#
+# ON FAILURE it updates ONE rolling issue (label: ui-driver-rot) rather than
+# opening a new issue per night — a driver red for four days is one issue with
+# four entries. Triage rule from BACKLOG: a driver can rot in two directions —
+# the product changed (a real regression: fix the product) or the driver/its
+# calendar assumptions moved (§7.73's family: fix the driver). Only the first
+# is an app bug.
+
+on:
+  schedule:
+    - cron: "0 20 * * *" # 20:00 UTC = 04:00 SGT daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ui-drivers
+  cancel-in-progress: false
+
+jobs:
+  drivers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: latest
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      - name: Start Supabase stack
+        run: supabase start
+
+      # The three env files are gitignored (real values locally); in CI they are
+      # synthesized from the stack's own keys. CRON_SECRET is arbitrary — it
+      # only has to match between the admin app and the functions env.
+      - name: Write env files from supabase status
+        run: |
+          eval "$(supabase status -o env | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+          cat > SwimSyncAdmin/.env.local <<EOF
+          NEXT_PUBLIC_SUPABASE_URL=$API_URL
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
+          SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY
+          CRON_SECRET=ci-only-secret
+          NEXT_PUBLIC_APP_URL=http://localhost:8081
+          EOF
+          cat > SwimSyncApp/.env <<EOF
+          EXPO_PUBLIC_SUPABASE_URL=$API_URL
+          EXPO_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
+          EOF
+          echo "CRON_SECRET=ci-only-secret" > supabase/functions/.env
+
+      - name: Install app + driver deps
+        run: |
+          (cd SwimSyncAdmin && npm ci) &
+          (cd SwimSyncApp && npm ci) &
+          (cd .claude/skills/run-ui-playwright/drivers && npm ci) &
+          wait
+
+      - name: Start dev servers + edge functions (background)
+        run: |
+          (cd SwimSyncAdmin && nohup npm run dev > "$RUNNER_TEMP/admin.log" 2>&1 &)
+          (cd SwimSyncApp && nohup npx expo start --web > "$RUNNER_TEMP/expo.log" 2>&1 &)
+          nohup supabase functions serve --env-file supabase/functions/.env --no-verify-jwt > "$RUNNER_TEMP/functions.log" 2>&1 &
+
+      # Metro compiles the bundle on first request, which takes minutes on a CI
+      # runner — prime it here so the first driver's login isn't the thing that
+      # pays for compilation and times out looking like a product bug.
+      - name: Wait for servers, prime the Metro bundle
+        run: |
+          wait_200() {
+            for i in $(seq 1 120); do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$1" || true)"
+              case "$code" in 2*|3*) return 0 ;; esac
+              sleep 5
+            done
+            echo "::error::$1 never came up (last: $code)"; tail -50 "$2"; return 1
+          }
+          wait_200 http://localhost:3000 "$RUNNER_TEMP/admin.log"
+          wait_200 http://localhost:8081 "$RUNNER_TEMP/expo.log"
+          # The bundle URL carries transform params that must match what the app
+          # will request — read it out of the served HTML rather than guessing.
+          BUNDLE="$(curl -s http://localhost:8081 | grep -o 'src="[^"]*bundle[^"]*"' | head -1 | sed 's/^src="//;s/"$//')"
+          [ -n "$BUNDLE" ] && curl -s -o /dev/null --max-time 600 "http://localhost:8081$BUNDLE" || true
+
+      - name: Run every UI driver
+        id: sweep
+        run: |
+          export RUN_DIR="$RUNNER_TEMP/ui-drivers"
+          echo "run_dir=$RUN_DIR" >> "$GITHUB_OUTPUT"
+          .claude/skills/run-ui-playwright/drivers/run-all-drivers.sh
+
+      - name: Upload logs + screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-driver-run
+          path: ${{ runner.temp }}/ui-drivers
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # One ROLLING issue, not one per night. Green runs post nothing and close
+      # the issue if it exists — so an open ui-driver-rot issue always means
+      # "red right now", never "red once, long fixed".
+      - name: Update the rolling rot issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ steps.sweep.outcome }}
+        run: |
+          TITLE="Nightly UI drivers are red"
+          NUM="$(gh issue list --state open --label ui-driver-rot --json number -q '.[0].number' || true)"
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -n "$NUM" ]; then
+              gh issue close "$NUM" --comment "Green again: $RUN_URL"
+            fi
+            exit 0
+          fi
+          BODY="$RUNNER_TEMP/issue-body.md"
+          {
+            echo "### Run $(date -u '+%Y-%m-%d %H:%M UTC') — [logs & screenshots]($RUN_URL)"
+            echo
+            if [ -f "$RUNNER_TEMP/ui-drivers/summary.md" ]; then
+              cat "$RUNNER_TEMP/ui-drivers/summary.md"
+            else
+              echo "The sweep did not produce a summary — the environment itself failed. Read the run logs."
+            fi
+            echo
+            echo "_Triage: product changed → real regression, fix the product. Driver/calendar assumption moved (§7.73) → fix the driver. Only the first is an app bug._"
+          } > "$BODY"
+          if [ -n "$NUM" ]; then
+            gh issue comment "$NUM" --body-file "$BODY"
+          else
+            gh issue create --title "$TITLE" --label ui-driver-rot --body-file "$BODY"
+          fi
+
+      - name: Stop Supabase stack
+        if: always()
+        run: supabase stop

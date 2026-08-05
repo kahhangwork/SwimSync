@@ -119,6 +119,11 @@ try {
   await page.getByPlaceholder("Emma Tan").fill("Maya Tan");
   await page.getByPlaceholder("YYYY-MM-DD").fill("2020-07-19");
   await tap(page.getByText("Save Child Profile"), "Save");
+  // handleSave() shows an "Is this right?" review modal before anything fires
+  // (added 2026-07-26 — the same change that silently killed verify-parent-
+  // claim for months, §8.29). Confirm it or the save never happens.
+  await page.waitForTimeout(1500);
+  await tap(page.getByText(/Yes, add this child/i).last(), "confirm the details");
   await page.waitForTimeout(3000);
 
   const afterSave = await page.evaluate(() => document.body.innerText);
@@ -135,6 +140,8 @@ try {
   await page.getByPlaceholder("Emma Tan").fill("Maya Tan");
   await page.getByPlaceholder("YYYY-MM-DD").fill("2022-01-05");
   await tap(page.getByText("Save Child Profile"), "Save (different DOB)");
+  await page.waitForTimeout(1500);
+  await tap(page.getByText(/Yes, add this child/i).last(), "confirm the details (different DOB)");
   await page.waitForTimeout(3000);
 
   // Assert on NAVIGATION, not the toast: the success path router.back()s and

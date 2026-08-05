@@ -1054,43 +1054,6 @@ it failed, looked like a regression in the change under test, and needed a run a
 admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
 and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
 
-### Run the UI drivers in CI, not just their fixtures — **M**
-CI now loads every `fixtures-*.sql` and asserts it round-trips
-(`check-fixture-roundtrip.sh`, 2026-08-01), but no `verify-*.mjs` is ever executed. The
-drivers need a browser and both dev servers, so this is a bigger job than the fixture check
-was.
-
-**Why:** the fixture check closes the *loading* half of the gap and leaves the *asserting*
-half open. **Five drivers have now been found rotting, every one by accident, none by a
-test.** `verify-attendance-window.mjs` sat at 2/5 for over a month (a stale calendar);
-`verify-trial-onboarding.mjs` had **aborted on its first check since 2026-07-25**, two hours
-after it was written, because the control it taps was deleted the same evening (repaired
-2026-08-01, but only because someone hand-ran it); §7.62's pair could not load at all;
-`verify-coach-billing.mjs` had **zero assertions** and `verify-stale-screen.mjs` printed
-"18/18 passed" while four checks crashed (§7.79); and on 2026-08-04
-**`verify-parent-claim.mjs` was found at 0/5, red since 58 MINUTES after it was written** —
-the app grew an "Is this right?" review modal (`bad1294`, 01:59) an hour after the driver
-was committed (`0cf8036`, 01:01), and the driver has waited for a popup the app would never
-show ever since. A driver is one calendar change or one new confirm step away from guarding
-nothing, and nothing watches them.
-
-**The last one is the argument this item had been missing.** §7.79's static detector — does
-this driver have a non-zero exit path? — **cannot catch it**. `verify-parent-claim.mjs`
-*can* fail and *does* fail; it exits non-zero, loudly, to nobody. Every cheap substitute for
-running the drivers is blind to the most common failure, which is simply that nobody ran
-them. That also means the cheapest slice (the detector as a CI step, suggested below) buys
-strictly less than it looks like it does.
-
-**Notes:** ~19 drivers, most needing Expo web on :8081 and several also Next on :3000, plus
-Playwright against installed Chrome (`channel: "chrome"` — the runner would need a browser
-image). Wall-clock is the real constraint: the guard driver alone takes minutes. Options
-worth weighing rather than assuming: a **nightly** job instead of per-push; a **subset** of
-the highest-value drivers; or asserting only the DB-visible half of each scenario without a
-browser. Fixtures must be torn down between drivers — they share one database
-(§7.55) — which the round-trip harness already knows how to do. Note that a driver can rot
-in two directions: the product changes (a real regression) or the calendar moves (§7.73's
-family), and only the first should page anyone.
-
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`
 → `createClient<Database>(...)`) so query results are typed from the real schema instead
