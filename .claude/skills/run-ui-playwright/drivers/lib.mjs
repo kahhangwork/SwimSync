@@ -38,21 +38,38 @@ export async function tap(locator, label = "") {
  * than a silent continue — a driver cannot do anything useful unauthenticated,
  * so failing here with the real reason beats 16 misleading FAILs. */
 export async function loginExpo(page, email, password = "password123") {
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  // "Authed" = on the APP, off /login. The origin check is load-bearing: a
+  // fresh page is about:blank, whose pathname also doesn't end in /login — a
+  // path-only check declared victory before ever navigating and skipped the
+  // whole login ("loginExpo -> about:blank", two drivers red, 2026-08-05).
+  const authed = () => {
+    const u = new URL(page.url());
+    return u.origin === new URL(EXPO).origin && !u.pathname.endsWith("/login");
+  };
+  for (let attempt = 1; attempt <= 3 && !authed(); attempt++) {
     await page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(7000); // Metro hydrate
-    await page.getByPlaceholder("you@email.com").fill(email);
-    await page.locator('input[type="password"]').fill(password);
-    await page.getByText("Sign In").last().click();
-    await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2500);
-    if (!new URL(page.url()).pathname.endsWith("/login")) {
-      console.log("loginExpo ->", page.url());
-      return;
+    // A slow PREVIOUS attempt can complete after its window closed: the
+    // session then exists and this goto bounces straight off /login — that is
+    // a success, and filling a form that is no longer there was run
+    // 31016327691's crash (two drivers, "waiting for you@email.com").
+    if (authed()) break;
+    try {
+      await page.getByPlaceholder("you@email.com").fill(email, { timeout: 10000 });
+      await page.locator('input[type="password"]').fill(password, { timeout: 5000 });
+    } catch {
+      await page.waitForTimeout(3000);
+      if (authed()) break; // redirect landed mid-fill — logged in after all
+      console.log(`loginExpo: form not ready on attempt ${attempt}`);
+      continue; // not hydrated yet — next attempt reloads
     }
-    console.log(`loginExpo: still on /login after attempt ${attempt}`);
+    await page.getByText("Sign In").last().click();
+    await page.waitForURL((u) => !u.pathname.endsWith("/login"), { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(2500);
+    if (!authed()) console.log(`loginExpo: still on /login after attempt ${attempt}`);
   }
-  throw new Error(`loginExpo: ${email} could not log in after 3 attempts`);
+  if (!authed()) throw new Error(`loginExpo: ${email} could not log in after 3 attempts`);
+  console.log("loginExpo ->", page.url());
 }
 
 /** Log into the Next.js admin panel. */
