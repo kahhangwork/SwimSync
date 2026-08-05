@@ -1,6 +1,22 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-04 (second session) — **auditing whether `authenticated` deserved
+_Last updated: 2026-08-05 — **every UI driver now runs NIGHTLY in CI (§8.30):**
+`run-all-drivers.sh` sweeps all 32 `verify-*.mjs` under `ui-drivers.yml` (04:00 SGT daily
++ a manual button), maintaining one rolling `ui-driver-rot` issue — failures append, a
+green run closes it. The first full sweep was the argument made flesh: **8 of 32 red,
+none a product bug** — eight rotted drivers (four still logged in as `superadmin@` for
+tenant pages, dead since the roles split on 2026-07-19; two asserted the
+pre-`RequiresTenant` platform-admin UX; one pinned a renamed stat and an outgrown
+sidebar; one never confirmed the review modal that killed parent-claim in §8.29; one
+waited for the "Generate anyway" override §8a deliberately removed — its absence is now
+the assertion), one flake (popup URL read before navigation), one runner bug
+(pre-loading tenant-branding's self-managed fixture). All repaired, all 32 re-verified
+green locally; the first cloud run was in flight when this was written — **the Actions
+tab and the rolling issue are the fact, not this sentence**. **The standing headline is
+unchanged: chase the outstanding invoices, keep marking August, bill it in early
+September — §9.**_
+
+_Previously, 2026-08-04 (second session) — **auditing whether `authenticated` deserved
 the sweep `anon` got found three LIVE forgery paths instead, all now closed and DEPLOYED
 (§8.29).** A self-registered stranger — signup is open, so that is anyone with an email
 address — could join any business **with no join code** (and then read its `join_code`,
@@ -35,9 +51,6 @@ it (LIVE)**: four complaints from a day of real use, all correct, plus a driver 
 assertions deleted and a detector that turned out to be wrong about a second one. Full
 account and pointers: the **§8.27** ledger row._
 
-_Earlier, 2026-08-02 — fee-free payment collection shipped and deployed, and **the standing
-mission of this file COMPLETED: July was billed for real and the first real money
-collected**. Full account and pointers: the **§8.26** ledger row._
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
 
@@ -377,8 +390,10 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   fact**.
   Since 2026-08-01 CI also **loads every UI fixture** and asserts each one round-trips and
   writes only its own rows (`check-fixture-roundtrip.sh`); it found three broken fixtures on
-  its first run (§8.20). **The drivers themselves still run by hand** — that is the half of
-  the gap still open (`BACKLOG.md` → *Run the UI drivers in CI*), and §8.21 is what it costs.
+  its first run (§8.20). **And since 2026-08-05 every driver RUNS nightly in CI** (§8.30):
+  `run-all-drivers.sh` under `ui-drivers.yml`, failures collected in one rolling
+  `ui-driver-rot` issue that a green run closes. Protocol and triage rule:
+  `docs/TESTING.md` §5.
 
 > **"CLEAN SLATE" IS A BANNED PHRASE FOR THIS DATABASE — it has now been wrong twice.**
 > The first time (corrected 2026-07-25) it claimed production held "only the superadmin +
@@ -482,6 +497,50 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.30 (2026-08-05) — EVERY UI DRIVER RUNS NIGHTLY IN CI, AND THE FIRST SWEEP FOUND EIGHT ROTTED-OR-BROKEN DRIVERS — NONE A PRODUCT BUG
+
+**The asserting half of the driver-rot gap is closed** (`d98a873`; the loading half was
+§8.20). `run-all-drivers.sh` executes all 32 `verify-*.mjs` with a **uniform per-driver
+protocol**: `supabase db reset` → kong restart (§7.44) → load its fixture → run under a
+hard timeout. The next reset is the cleanup, so teardowns are deliberately not run — and
+the script must therefore **never run beside a sibling worktree** (§7.55).
+`ui-drivers.yml` runs it on GitHub's runners nightly at 04:00 SGT plus a manual button,
+uploads logs/screenshots as artifacts, and maintains **one rolling `ui-driver-rot`
+issue** — failures append a summary table, a green run closes it, so an open issue always
+means "red right now". Uniformity is the point: no per-driver reset judgment to rot. The
+price is wall clock, which a nightly job has to spend.
+
+**The first full sweep scored 24/32, and every red was the tests' fault or the
+harness's:** four drivers still logged in as `superadmin@swimsync.test` for tenant pages —
+dead since the platform/tenant role split (2026-07-19); two asserted the
+pre-`RequiresTenant` platform-admin UX (a disabled toggle / an in-page notice) that
+unmounting superseded; `platform-admin-scope` pinned an 11-page sidebar (now 15) and
+"Total Students" (renamed *Active* 2026-07-26); `student-identity` never confirmed the
+"Is this right?" review modal — **the same 2026-07-26 change that killed parent-claim for
+months (§8.29)**; `unmarked-lessons` asserted a "Generate anyway" override §8a
+deliberately removed — the check is now **inverted**, since the absence is the rule;
+`payment-collection` read the popup URL before navigation began (flake — passed by luck
+until a loaded machine); and the runner itself pre-loaded `tenant-branding`'s fixture,
+colliding with the UI registration that driver performs (it self-manages — the exception
+is documented in the script's fixture map). `verify-platform-admin` also lost its
+hardcoded `/Users/kahhang/...` import and hand-exported key — the runner now exports the
+stack's own keys. **All 32 re-verified green through the runner.**
+
+**Deliberately not done:** per-push (a flaky driver must never block a deploy — §7.60);
+weekly cadence (red must map to yesterday's commits, not a week's); running
+`smoke-admin-screens.mjs` in CI (no assertions, no exit code — a §7.79 screenshot
+script, correctly excluded).
+
+**Where the durable parts live:** protocol + triage rule (product changed → regression;
+calendar/driver assumption moved → fix the driver, §7.73) in `docs/TESTING.md` §5; the
+seed-login trap (`superadmin@` is the PLATFORM admin — tenant pages need
+`coach@swimsync.test`) in the run-ui-playwright `SKILL.md`; the fixture-map exception in
+the script header. Verified: full local sweep + 8 individual re-runs, all green; the
+first cloud run was in flight at write time — `gh run list --workflow=ui-drivers.yml`
+is the fact.
+
+---
+
 ## 8.29 (2026-08-04, second session) — THE AUDIT FOUND THREE LIVE HOLES, NOT THE ONE IT WENT LOOKING FOR
 
 **The question was §9's leftover: does `authenticated` deserve the sweep `anon` got?**
@@ -541,77 +600,8 @@ committed, so it waited for a popup the app would never show. **The product was 
 whole time**; confirmed by removing all four migrations and reproducing the failure, and by
 calling the RPC directly. 0/5 → 21/21. Fifth driver caught rotting by accident, and the one
 §7.79's detector **cannot** catch — it can fail, does fail, and exits non-zero to nobody.
-That evidence is now in `BACKLOG.md` under *Run the UI drivers in CI*.
-
----
-
-## 8.28 (2026-08-04) — THE THREE QUEUED MIGRATIONS, AND THE ONE LIVE HOLE THEY FOUND
-
-**All three shipped, deployed and verified on production the same day** (`e03cba6`,
-`2a5fa0b`, `4981fd2` — migrations `20260804000100/200/300`). They were queued behind each
-other by §7.55, not by importance; the reason to take them in one session was that each
-was small and none blocked anything.
-
-**The headline is the one nobody filed.** BACKLOG called the `anon` EXECUTE item *"defence
-in depth, not a live hole"*. Auditing it found `next_credit_note_ref(uuid)` with **no ACL
-at all**, so it sat on the Postgres default of `EXECUTE TO PUBLIC` — locally as well as on
-cloud. It is `SECURITY DEFINER` and it **writes**. An unauthenticated POST carrying only
-the anon key returned `CN-2026-0001` and left `tenants.credit_note_counter` incremented.
-Anyone with a tenant's UUID could burn that business's credit-note numbers indefinitely.
-Granted to **nobody** now — its callers are all inside other definer functions.
-Reasoning: **§7.82**.
-
-**And one that had been filed backwards.** *Narrow `coaches_without_rate`* was already
-done in SQL — since 2026-07-19. The 2026-08-01 session read the field mapping in reverse,
-concluded the page was reading a column "the RPC has never returned", and replaced a
-correct SQL column with a 2000-row browser scan, a tripwire and a warning banner, writing
-the false claim into a code comment, `BACKLOG.md`, `PRD.md` §4.4 and an immutable commit
-message. All removed; **§7.83** carries the three oracles that settle this kind of
-question in seconds. The *decision* from that session — don't show a business's "shape" —
-was sound and stands; only the stated reason was wrong.
-
-**What actually needed a migration**, then: dropping `tenants.kind` (never read by
-anything) and with it `provision_tenant`'s `p_kind` parameter; the grant sweep; and
-`audit_log.tenant_id`, stamped from its **entity** by a `BEFORE INSERT` trigger with a
-`RAISE` on an unknown `entity_type` (`docs/ARCHITECTURE.md` §6 — the four parts of that
-are decisions, not implementation). The audit work also **narrowed an INSERT policy** that
-had been `actor_id = auth.uid()` and nothing else, i.e. any signed-in user could fabricate
-any audit row; it is now the single real client case, a coach on a session they own.
-
-**Departed from BACKLOG's advice once, deliberately:** it said *probably don't backfill*.
-The concrete failure — a child who changed businesses being attributed to the wrong one —
-was checked against the production dump first: **zero reassignments, one tenant**, against
-81 of 103 rows being permanently invisible. Recorded in `docs/ARCHITECTURE.md` §6 with the
-condition under which it must not be repeated.
-
-**Production numbers worth keeping** (from remote dumps, not from prose): functions
-granting EXECUTE to `anon` went **49 → 18**, and all 18 are trigger/event-trigger
-functions that Postgres never privilege-checks and PostgREST does not expose
-(`docs/DEPLOYMENT.md` §11.7 has the re-run command — **the number climbs back on its own**
-as new functions are created). `audit_log` held 103 rows, 81 unstamped, now backfilled.
-
-**A fourth migration followed, once the question "should we ever run that line?" was
-asked properly.** `20260804000400` turns off the mechanism itself: default privileges no
-longer grant `anon` — or `PUBLIC` — a new function, table or sequence, so the 49→18 sweep
-stops being point-in-time. Two things made it safe to do what July had refused: the
-2026-08-02 edge-function rule (`docs/ARCHITECTURE.md` §6) means no future function can
-legitimately need `anon`, and **the statement both refusals had in mind would not have
-worked anyway** — `… IN SCHEMA public REVOKE … FROM PUBLIC` succeeds and changes nothing,
-because the built-in PUBLIC grant is global (**§7.85**). Found by mutation-testing the
-migration's own probes: the function probe went red for a revoke that had been *written*,
-not one deleted. All three probes then proven to fire independently.
-
-**Verified:** pgTAP **479** (27 files; 11 new assertions across two new files, all proven
-RED first — §7.25), Deno 130 **run twice** (§7.15), vitest 237, jest 244, both typechecks,
-fixtures 15/15. Six drivers, because the narrowed policy and the helper revokes are
-exactly what unit tests cannot see: payment-collection 19/19, coach-wages 10/10,
-platform-admin 6/6, tenant-provisioning 15/15 (a whole business provisioned through the
-real UI on the new one-argument RPC), attendance-guard 20/20, makeups 15/15. After the
-attendance run the database showed the coach's own client-side `attendance_saved` rows
-written **through** the new policy and stamped. The anon exploit re-run after the fix
-returns `42501` and leaves the counter at 0. CI green; both Vercel production deployments
-are on `4981fd2`. **§7.84** records that `supabase start` leaves the edge runtime stopped,
-which cost a debugging round when four driver checks failed looking like product bugs.
+That evidence became the case for the nightly driver sweep, which shipped the next
+day (§8.30) and deleted the `BACKLOG.md` entry it had lived in.
 
 ---
 
@@ -619,6 +609,7 @@ which cost a debugging round when four driver checks failed looking like product
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.28** | 2026-08-04 | The three queued migrations shipped and DEPLOYED the same day (`20260804000100/200/300` + follow-up `000400`), and the headline was the one nobody filed: `next_credit_note_ref` had **no ACL at all** — an unauthenticated POST incremented a business's credit-note counter (§7.82); production went 49 → 18 functions granting `anon` EXECUTE, then `000400` turned off default-privilege grants to `anon`/`PUBLIC` entirely (the obvious per-schema revoke does nothing — §7.85). *Narrow `coaches_without_rate`* turned out filed **backwards** (§7.83 — the three oracles); `audit_log.tenant_id` stamped from its entity by trigger, fabrication-friendly INSERT policy narrowed, 81 rows backfilled after checking the dump. §7.84 (edge runtime stopped after `supabase start`) cost a diagnostic round | **§7.82–§7.85** · `docs/ARCHITECTURE.md` §6 · `docs/DEPLOYMENT.md` §11.7 · BACKLOG *(service_role audit)* |
 | **8.27** | 2026-08-03 | **The mobile app caught up with the billing that shipped without it** — four complaints from a day of real use, all correct: the coach's Classes tab lands on the class list (the other half of §7.65), the Billing tab became **My Pay** and hides entirely when there are no payouts, the parent app prints `INV-2026-0001` instead of a UUID fragment, and Today's card counts **guests apart from students**. On the test side, a driver with **zero assertions** deleted, a worse variant found printing "18/18 passed" while four checks crashed — and then the detector written to find them was itself **wrong**, having libelled a driver that asserts perfectly well | PRD §7.9, §14.2/§14.4 · **§7.79, §7.80, §7.81** · `BACKLOG.md` *(Deliberately not doing: any invoice count in the coach app)* |
 | **8.26** | 2026-08-02 | **Fee-free payment collection, Phases 0–3** — `INV-YYYY-NNNN` + a 128-bit public token by BEFORE INSERT trigger (the engine untouched), a client-computed **dynamic PayNow QR** with amount and reference locked, the **tokenized sessionless invoice page** served by the `public-invoice` edge function (deliberately not an anon RPC), the admin's **WhatsApp click-through queue** ("chat opened", never "reminded"), the parent's "I've paid" claim, and every mark-paid converged on `confirm_invoice_paid()`. Post-ship the same day, a question about the reference format exposed that **Postgres `LPAD` truncates** past the pad width — a silent reference collision within ~13 months for a large tenant, latent in `next_credit_note_ref` since July; both fixed. **Then the standing mission of this file completed: July billed for real and the first real money collected** | PRD §7.21 · `docs/design/PAYMENT_COLLECTION_DESIGN.md` · `docs/ARCHITECTURE.md` §6 *(anon-RPC refusal)* · **§7.77, §7.78** · `INVOICE_RUNBOOK.md` |
 | **8.25** | 2026-08-02 | Make-up classes as the **guest-pass model** — an enrolled child booked into one lesson of another same-category class; a booking is never an enrolment, an unmarked make-up blocks the month like a trial, a package family's attended make-up draws from the package via the booking's snapshotted category, an ad-hoc guest pays their **home** class's effective-dated rate. Five migrations, the engine, all three UIs. Also closed the latent trial-guest visibility gap (a host coach could not read a guest's name) | PRD §7.20 · `docs/TESTING.md` §5 · `docs/ARCHITECTURE.md` §10 · `supabase/rollback/20260802_makeup_bookings_DOWN.sql` |
@@ -719,14 +710,14 @@ now a `BACKLOG.md` item: grants genuinely are its only gate, but the oracle used
 it needs a usage audit of the edge functions and the admin's server routes. Don't start it
 without that.
 
-**The highest-value engineering item is still *Run the UI drivers in CI* (M), and
-2026-08-04 made the case decisive.** Five drivers have now been caught rotting, every one by
-accident. The newest is the one that matters: `verify-parent-claim.mjs` was red from **58
-minutes after it was written** — the app grew a confirm step an hour after the driver was
-committed — and it sat at 0/5 for months while the product was perfectly correct. **§7.79's
-static detector cannot catch that class at all:** that driver *can* fail and *does* fail; it
-exits non-zero, loudly, to nobody. So the cheap slice (the detector as its own CI step) buys
-strictly less than it appears to. Weigh the narrower options in its `BACKLOG.md` entry.
+***Run the UI drivers in CI* SHIPPED 2026-08-05 (§8.30) — it is now an operating rhythm,
+not a to-do.** The nightly sweep (04:00 SGT, `ui-drivers.yml`) maintains one rolling
+`ui-driver-rot` issue: an open issue means red *right now*; green closes it. Triage rule
+when it reddens: the product changed → a real regression, fix the product; the
+driver's/calendar's assumption moved (§7.73) → fix the driver. **A UI redesign is
+planned** — expect regular reds through it, and treat "its drivers are green again" as
+part of each redesigned screen being done. At write time the first cloud run was still in
+flight; `gh run list --workflow=ui-drivers.yml` and the rolling issue are the fact.
 
 **The migration queue is EMPTY.** Four shipped and deployed on 2026-08-04 (§8.29:
 `000500`–`000800`). Nothing is in flight, so the next schema change can start immediately —

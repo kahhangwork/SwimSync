@@ -33,6 +33,7 @@ cd SwimSyncAdmin && npm test                        # vitest
 cd SwimSyncApp   && npm test                        # jest-expo
 cd <app> && npm run typecheck                       # tsc --noEmit, enforced in CI
 .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh  # UI fixtures, in CI
+.claude/skills/run-ui-playwright/drivers/run-all-drivers.sh  # ALL UI drivers (nightly CI) — resets the DB per driver; never beside a worktree
 ```
 
 Full setup, seed logins and test flows: **`LOCAL_DEV_GUIDE.md`**.

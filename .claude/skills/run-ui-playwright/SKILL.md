@@ -46,13 +46,22 @@ cd .claude/skills/run-ui-playwright/drivers && npm install   # installs playwrig
 `drivers/lib.mjs` holds the reusable helpers; import it from a small script per
 flow. `channel: "chrome"` uses the installed Chrome — no `playwright install`.
 
+To run **every** driver the way nightly CI does (reset → kong restart → fixture →
+driver, per driver): `drivers/run-all-drivers.sh` — but **never beside a sibling
+worktree**; it resets the shared database repeatedly. `--only <name>` runs one.
+
 ## 3. Seed logins (from supabase/seed.sql)
 
 | Role | Email | Password | Lands on |
 |------|-------|----------|----------|
-| Superadmin | `superadmin@swimsync.test` | `password123` | admin `/dashboard` (web-only; mobile shows "unrecognised role") |
-| Coach | `coach@swimsync.test` | `password123` | app `/today` |
+| Platform admin | `superadmin@swimsync.test` | `password123` | admin `/platform` — and is **REFUSED every tenant page** (RequiresTenant unmounts them) |
+| Tenant admin + coach | `coach@swimsync.test` | `password123` | admin `/dashboard` (tenant pages) or app `/today` |
 | Parent | self-register in app, or seed an `auth.users` row with `raw_user_meta_data.role='parent'` (`password123`) | | app `/home` |
+
+> **A driver for a tenant admin page logs in as `coach@swimsync.test`, never
+> `superadmin@`.** superadmin@ became the cross-tenant platform admin when the roles
+> split (2026-07-19); six drivers kept using it for tenant pages and every one was
+> silently dead until the first CI sweep (2026-08-05) caught them.
 
 ## 4. Drive it — Expo-web gotchas (READ THIS)
 

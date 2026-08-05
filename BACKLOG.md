@@ -1,6 +1,12 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-04 (second session) — **one item filed, two corrected, none shipped
+_Last updated: 2026-08-05 — **one item SHIPPED and removed:** *Run the UI drivers in CI*
+(HANDOVER §8.30) — all 32 drivers now run nightly under `.github/workflows/ui-drivers.yml`
+via `run-all-drivers.sh`, failures collected in one rolling `ui-driver-rot` issue. The
+first sweep found eight broken drivers, none a product bug, which was the item's whole
+thesis._
+
+_Previously, 2026-08-04 (second session) — **one item filed, two corrected, none shipped
 from here.** Filed: *decide whether `service_role` deserves the whitelist treatment* — the
 role where grants genuinely are the only gate, and where the `authenticated` oracle
 deliberately does **not** transfer. *Run the UI drivers in CI* gained the evidence it was
