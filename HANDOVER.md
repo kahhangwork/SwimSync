@@ -10,11 +10,13 @@ pre-`RequiresTenant` platform-admin UX; one pinned a renamed stat and an outgrow
 sidebar; one never confirmed the review modal that killed parent-claim in §8.29; one
 waited for the "Generate anyway" override §8a deliberately removed — its absence is now
 the assertion), one flake (popup URL read before navigation), one runner bug
-(pre-loading tenant-branding's self-managed fixture). All repaired, all 32 re-verified
-green locally; the first cloud run was in flight when this was written — **the Actions
-tab and the rolling issue are the fact, not this sentence**. **The standing headline is
-unchanged: chase the outstanding invoices, keep marking August, bill it in early
-September — §9.**_
+(pre-loading tenant-branding's self-managed fixture). All repaired, and **the cloud runs
+went green on attempt 4** — the first three each exposed one environment bug (an ignored
+lockfile behind a `wait` that hid its failure; a single-shot Expo login losing its race
+under runner load; the retry's own `about:blank` bug) — after which the rolling issue
+**closed itself with "Green again"**, exercising every path of the loop. **The standing
+headline is unchanged: chase the outstanding invoices, keep marking August, bill it in
+early September — §9.**_
 
 _Previously, 2026-08-04 (second session) — **auditing whether `authenticated` deserved
 the sweep `anon` got found three LIVE forgery paths instead, all now closed and DEPLOYED
@@ -535,9 +537,14 @@ script, correctly excluded).
 calendar/driver assumption moved → fix the driver, §7.73) in `docs/TESTING.md` §5; the
 seed-login trap (`superadmin@` is the PLATFORM admin — tenant pages need
 `coach@swimsync.test`) in the run-ui-playwright `SKILL.md`; the fixture-map exception in
-the script header. Verified: full local sweep + 8 individual re-runs, all green; the
-first cloud run was in flight at write time — `gh run list --workflow=ui-drivers.yml`
-is the fact.
+the script header. Verified: full local sweep + 8 individual re-runs, then **four cloud
+runs to green** — run 1 failed all 32 on the drivers' gitignored lockfile *behind a
+`wait` that reported success* (both fixed, plus a preflight playwright-core check); run 2
+scored 31/32, one lost Expo login race (loginExpo now retries ×3 and THROWS rather than
+continuing unauthenticated); run 3 scored 30/32 on the retry's own bug (`about:blank`
+passes a path-only "not /login" check — authed now requires the app's origin); run 4
+**green, and the rolling issue closed itself**. `gh run list --workflow=ui-drivers.yml`
+is always the current fact.
 
 ---
 
@@ -716,8 +723,9 @@ not a to-do.** The nightly sweep (04:00 SGT, `ui-drivers.yml`) maintains one rol
 when it reddens: the product changed → a real regression, fix the product; the
 driver's/calendar's assumption moved (§7.73) → fix the driver. **A UI redesign is
 planned** — expect regular reds through it, and treat "its drivers are green again" as
-part of each redesigned screen being done. At write time the first cloud run was still in
-flight; `gh run list --workflow=ui-drivers.yml` and the rolling issue are the fact.
+part of each redesigned screen being done. The pipeline is proven end to end: run 4 went
+green and closed the rolling issue itself; `gh run list --workflow=ui-drivers.yml` and
+the rolling issue are always the current fact.
 
 **The migration queue is EMPTY.** Four shipped and deployed on 2026-08-04 (§8.29:
 `000500`–`000800`). Nothing is in flight, so the next schema change can start immediately —
