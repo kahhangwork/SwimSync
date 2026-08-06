@@ -48,7 +48,10 @@ export default function AcceptInvitePage() {
     const loadBusiness = async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("tenants(display_name)")
+        // The !tenant_id hint is load-bearing: tenants also points back at
+        // profiles via owner_profile_id (20260806000100), so a bare
+        // tenants(...) embed is ambiguous and PostgREST refuses it.
+        .select("tenants!tenant_id(display_name)")
         .maybeSingle();
       const t = Array.isArray(data?.tenants) ? data?.tenants[0] : data?.tenants;
       if (t?.display_name) setBusiness(t.display_name);

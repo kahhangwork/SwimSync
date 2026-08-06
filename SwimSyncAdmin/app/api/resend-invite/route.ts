@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   const { data: tenant } = await adminClient
     .from("tenants")
-    .select("id, display_name, join_code")
+    .select("id, display_name, join_code, owner_profile_id")
     .eq("id", tenantId)
     .maybeSingle();
 
@@ -58,14 +58,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No such business" }, { status: 404 });
   }
 
-  const { data: admin } = await adminClient
-    .from("profiles")
-    .select("id, email, full_name")
-    .eq("tenant_id", tenantId)
-    .eq("role", "tenant_admin")
-    .order("created_at")
-    .limit(1)
-    .maybeSingle();
+  // The OWNER, by column — not "earliest created" (which is who the column was
+  // backfilled from, but co-admins exist now and this route must never mail
+  // one of them the owner's onboarding invite). 20260806000100.
+  const { data: admin } = tenant.owner_profile_id
+    ? await adminClient
+        .from("profiles")
+        .select("id, email, full_name")
+        .eq("id", tenant.owner_profile_id)
+        .maybeSingle()
+    : { data: null };
 
   if (!admin) {
     return NextResponse.json(

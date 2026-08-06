@@ -38,10 +38,18 @@ export default function LoginPage() {
       .single();
 
     // `superadmin` split into tenant_admin (one business) and platform_admin
-    // (SwimSync itself, cross-tenant support). Both belong in this panel.
+    // (SwimSync itself, cross-tenant support). Both belong in this panel. A
+    // coach or parent is told where they DO belong — "access denied" to
+    // someone holding a perfectly good account is a support ticket, not a
+    // boundary. (RequiresTenant repeats this refusal for any session that
+    // arrives without passing through here.)
     if (profile?.role !== "tenant_admin" && profile?.role !== "platform_admin") {
       await supabase.auth.signOut();
-      setError("Access denied. Superadmin accounts only.");
+      setError(
+        profile?.role === "coach" || profile?.role === "parent"
+          ? "This is the admin panel — please use the SwimSync app instead."
+          : "Access denied. Admin accounts only."
+      );
       setLoading(false);
       return;
     }

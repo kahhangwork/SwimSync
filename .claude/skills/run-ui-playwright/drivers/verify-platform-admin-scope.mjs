@@ -34,7 +34,8 @@ const check = (label, pass, detail = "") => {
 
 const TENANT_PAGES = [
   "/dashboard", "/unassigned", "/classes", "/students", "/levels",
-  "/parents", "/attendance", "/invoices", "/credit-notes", "/coaches", "/wages",
+  "/parents", "/attendance", "/invoices", "/credit-notes", "/coaches",
+  "/admins", "/wages",
 ];
 
 const REFUSAL = /This page shows a single business/;
@@ -106,8 +107,9 @@ try {
   // Pins the sidebar INVENTORY — a dropped entry is the regression this
   // catches, so an exact count is deliberate. It also reddens when a page is
   // legitimately added; the fix then is bumping this number (11 → 15 on
-  // 2026-08-05, after claims/parents/trials/makeups/packages landed).
-  check("sidebar shows the 15 business pages", tnav.navLinks.length === 15,
+  // 2026-08-05, after claims/parents/trials/makeups/packages landed; 15 → 16
+  // on 2026-08-06 for Admins).
+  check("sidebar shows the 16 business pages", tnav.navLinks.length === 16,
     `${tnav.navLinks.length}: ${JSON.stringify(tnav.navLinks)}`);
   check("sidebar does NOT show Platform", !tnav.navLinks.includes("/platform"));
 
@@ -124,6 +126,7 @@ try {
     "/invoices":     /Billing month/,
     "/credit-notes": /Credit Note/,
     "/coaches":      /Coach/,
+    "/admins":       /admin account|Invite admin|Admins/,
     "/wages":        /Wage|Payout|Pay/,
   };
   for (const path of TENANT_PAGES) {

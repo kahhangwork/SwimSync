@@ -1,22 +1,22 @@
 // Which admin pages an account can use, and what the sidebar shows it.
 //
-// THE RULE: ask "does this account have a BUSINESS?", never "what is its role?".
+// TWO QUESTIONS, TWO ANSWERS — and they are deliberately different:
 //
-// Almost every page in this panel shows one business — its students, its
-// classes, its invoices. A PLATFORM ADMIN belongs to no business, and their RLS
-// reach is every row of every table across every tenant, so those pages do not
-// error for them: they render several businesses' data as though it were one.
-// That is worse than an error. An error teaches you the page is not for you; a
-// page that quietly sums two schools together looks authoritative and is wrong.
+// 1. "WHICH pages does this admin see?" — ask "does this account have a
+//    BUSINESS?" (tenant_id), never the role. A platform admin belongs to no
+//    business, and their RLS reach is every row across every tenant, so the
+//    business pages don't error for them — they render several businesses'
+//    data as though it were one, which is worse than an error. A private coach
+//    holds `tenant_admin` *and* a `coaches` row (a tenant of one); gating THIS
+//    question on a role comparison is what shipped "Unrecognised role" to the
+//    only real coach in production (`docs/GOTCHAS.md` §7.19). tenant_id
+//    answers it directly, mirroring `current_tenant_id()` server-side.
 //
-// WHY tenant_id AND NOT role. A private coach holds `tenant_admin` *and* a
-// `coaches` row — they are a tenant of one. Gating on a role comparison is
-// exactly what shipped "Unrecognised role. Please contact support." to the only
-// real coach in production during the tenancy backfill (`docs/GOTCHAS.md` §7.19). The
-// question these pages actually ask is "do you have a business?", and
-// `profiles.tenant_id` answers it directly — so a renamed role, a new role, or
-// a second admin role all keep working, with no enum to fall out of sync with.
-// This mirrors `current_tenant_id()` server-side, which encodes the same fact.
+// 2. "May this account enter the panel AT ALL?" — that one IS role, and lives
+//    in components/RequiresTenant.tsx (since 20260806000100): a created coach
+//    also has a tenant_id, so tenant_id cannot distinguish an admin from the
+//    coach they hired. The §7.19 lesson survives in the check's SHAPE — refuse
+//    only a RESOLVED, affirmatively non-admin role, never "not yet known".
 //
 // Pure so it can be unit-tested; callers do the lookup and pass the answer in.
 // The mobile app's twin of this idea is SwimSyncApp/lib/landing.ts.
@@ -39,6 +39,7 @@ import {
   Package,
   UserCheck,
   RefreshCcw,
+  ShieldCheck,
 } from "lucide-react";
 
 /** A page's audience. `tenant` = shows ONE business. `platform` = cross-tenant. */
@@ -69,6 +70,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/packages",     label: "Packages",             icon: Package,         scope: "tenant"   },
   { href: "/credit-notes", label: "Credit Notes",         icon: FileText,        scope: "tenant"   },
   { href: "/coaches",      label: "Coaches",              icon: UserCog,         scope: "tenant"   },
+  { href: "/admins",       label: "Admins",               icon: ShieldCheck,     scope: "tenant"   },
   { href: "/wages",        label: "Coach Wages",          icon: Wallet,          scope: "tenant"   },
   { href: "/platform",     label: "Platform",             icon: Globe,           scope: "platform" },
 ];

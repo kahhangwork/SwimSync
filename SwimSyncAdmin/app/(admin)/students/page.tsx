@@ -181,7 +181,9 @@ export default function StudentsPage() {
     const { data: userRes } = await supabase.auth.getUser();
     const { data: prof } = await supabase
       .from("profiles")
-      .select("tenant_id, tenants(low_package_lessons)")
+      // !tenant_id disambiguates: tenants also references profiles via
+      // owner_profile_id (20260806000100), so a bare embed is refused.
+      .select("tenant_id, tenants!tenant_id(low_package_lessons)")
       .eq("id", userRes.user?.id)
       .single();
     setTenantId((prof as any)?.tenant_id ?? null);
