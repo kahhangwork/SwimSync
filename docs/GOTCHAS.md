@@ -1504,3 +1504,34 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       wholesale, the rollback genuinely restored the old world rather than a lookalike.
     - Budget for it: the round trip is three `supabase db reset` cycles, about ten
       minutes. (2026-08-07.)
+
+94. **`CURRENT_DATE` IN A FUNCTION IS THE *SESSION'S* TIME ZONE — UTC ON THIS SERVER — SO IT
+    IS §7.7 WITH THE DATABASE HOLDING THE WRONG CLOCK. USE `today_sg()`.** §7.7 taught
+    everyone to distrust dates derived on the CLIENT, and every client here is already
+    correct (`todayInSg()`). Nobody looked at the other end of the wire.
+    - **It was live for three weeks and cost eight hours a day.**
+      `set_class_terms()` refused terms dated in the future via `v_from > CURRENT_DATE`
+      while the admin panel sent `todayInSg()`. Between 00:00 and 08:00 SGT those differ by
+      a day, so **every class edit failed** with `P0001: terms cannot start in the future`.
+      `sync_class_display_price()` had the same clock: a rate effective today did not
+      display until 08:00. Both fixed in `20260807000100`.
+    - **THE REASON A 14-TEST FILE COVERING THAT EXACT FUNCTION MISSED IT — this is the
+      transferable part.** Three independent places had made the same UTC assumption, so
+      they **agreed with each other**: the RPC, `class_terms.test.sql`, and
+      `verify-class-terms.mjs` all said `CURRENT_DATE`. A test that derives its expectation
+      the same wrong way as the code under test will pass. Fixing only the code turned five
+      pgTAP assertions and two driver checks red — they had been green *by agreement with
+      the bug*. When a date is involved, ask whether the test computes it INDEPENDENTLY.
+    - **And the existing guard test could not have caught it anyway:** it dated terms
+      `CURRENT_DATE + 30`, which is future under any clock. The whole bug lives in the
+      one-day gap between two notions of "today". **Test date guards AT the boundary
+      (`today_sg()`, `today_sg() + 1`), never at a comfortable distance from it.**
+    - `class_terms.test.sql` now asserts over `pg_proc` that **no** function in `public`
+      matches `CURRENT_DATE` or `now()::date`, so the next one fails in CI rather than in an
+      8-hour window weeks later. That assertion is the only deterministic one of the three —
+      the behavioural pair passes all day outside the window.
+    - **A green suite proves the code worked AT THE TIME IT RAN.** The nightly sweep found
+      this because it fires at 04:00 SGT; four manual runs the same week went green because
+      they were run in the evening, and §8.30 recorded the pipeline as healthy on that
+      basis. For anything date-derived, *when* a suite runs is part of what it proves.
+      (2026-08-07.)

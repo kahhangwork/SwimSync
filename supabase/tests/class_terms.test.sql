@@ -10,7 +10,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(14);
+SELECT plan(17);
 
 INSERT INTO tenants (id, slug, display_name, join_code)
 VALUES ('88888888-0000-0000-0000-000000000002','terms','Terms Swim','SWIM-TERM');
@@ -102,7 +102,7 @@ SELECT lives_ok(
   $$ SELECT set_class_terms('67000000-0000-0000-0000-000000000001','Renamed','monday',
        '10:00','11:00','Pool', 60,
        (SELECT id FROM coaches WHERE profile_id='79000000-0000-0000-0000-000000000002'),
-       CURRENT_DATE, FALSE) $$,
+       today_sg(), FALSE) $$,
   'a genuine price rise can be dated from today'
 );
 SELECT is(
@@ -116,7 +116,7 @@ SELECT is(
   'CHANGE leaves earlier lessons on the OLD price — the whole point'
 );
 SELECT is(
-  (SELECT price_per_lesson FROM class_rate_on('67000000-0000-0000-0000-000000000001', CURRENT_DATE)),
+  (SELECT price_per_lesson FROM class_rate_on('67000000-0000-0000-0000-000000000001', today_sg())),
   60.00,
   'and today onward is on the new one'
 );
@@ -126,7 +126,7 @@ SELECT throws_ok(
   $$ SELECT set_class_terms('67000000-0000-0000-0000-000000000001','Renamed','monday',
        '10:00','11:00','Pool', 99,
        (SELECT id FROM coaches WHERE profile_id='79000000-0000-0000-0000-000000000002'),
-       CURRENT_DATE + 30, FALSE) $$,
+       today_sg() + 30, FALSE) $$,
   NULL, NULL,
   'terms cannot be dated into the future (the display sync only tracks today)'
 );
@@ -149,10 +149,64 @@ SELECT throws_ok(
   'a coach from ANOTHER business cannot be assigned the class'
 );
 
+-- ══ 14-16. THE CLOCK. `CURRENT_DATE` IS THE SESSION'S TIME ZONE, NOT SGT ════
+-- Live bug, 20260719000700 → 20260807000100: the guard below compared against
+-- CURRENT_DATE while the admin panel sends todayInSg(), so between 00:00 and
+-- 08:00 SGT every class edit was refused with "terms cannot start in the
+-- future". Eight hours out of every twenty-four, for three weeks.
+--
+-- ⚠ WHY THE EXISTING GUARD TEST ABOVE COULD NOT CATCH IT: it dates terms a
+-- MONTH out, which is refused under either clock. The whole bug lives in the
+-- ONE-DAY gap between two notions of "today", so only a boundary case reaches
+-- it. Test a date guard AT its boundary, never at a comfortable distance.
+
+-- 14. The actual admin action: terms effective TODAY, Singapore. Must always
+--     be accepted. Before the fix this passed for sixteen hours a day and
+--     failed for eight, which is the shape that makes a suite look healthy.
+SELECT lives_ok(
+  $$ SELECT set_class_terms('67000000-0000-0000-0000-000000000001','Renamed','monday',
+       '10:00','11:00','Pool', 30,
+       (SELECT id FROM coaches WHERE profile_id='79000000-0000-0000-0000-000000000002'),
+       today_sg(), FALSE) $$,
+  'terms may start TODAY in Singapore — the guard must not read a UTC date'
+);
+
+-- 15. …and the guard is still a guard, tested one day out rather than thirty.
+SELECT throws_ok(
+  $$ SELECT set_class_terms('67000000-0000-0000-0000-000000000001','Renamed','monday',
+       '10:00','11:00','Pool', 30,
+       (SELECT id FROM coaches WHERE profile_id='79000000-0000-0000-0000-000000000002'),
+       today_sg() + 1, FALSE) $$,
+  NULL, NULL,
+  'tomorrow is still refused — the fix moves the boundary, it does not remove it'
+);
+
+-- 16. ⚠ THE CLASS OF BUG, NOT THE TWO INSTANCES — and the only one of these
+--     three that is deterministic. Tests 14 and 15 are honest but pass all day
+--     outside the window; this one fails at 3pm too. Same shape as
+--     function_grants.test.sql: assert over pg_proc so it catches the function
+--     nobody thought to name. Dates in this product are Singapore-local
+--     (§7.7) — today_sg() is the only correct source inside the database.
+SELECT is(
+  (SELECT string_agg(p.proname, ', ' ORDER BY p.proname)
+     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND (p.prosrc ~ 'CURRENT_DATE' OR p.prosrc ~ 'now\(\)::date')
+      -- Extension-owned functions are not ours to fix: pgTAP ships `_def_is`,
+      -- which matches. Without this the assertion passes or fails depending on
+      -- whether pgTAP happens to be installed — a test that is red against a
+      -- correct database is a test that gets disabled (§7.87).
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d
+                       WHERE d.objid = p.oid AND d.deptype = 'e')),
+  NULL,
+  'NO function in public derives a date from the session time zone — use today_sg()'
+);
+
+
 -- Settled money must not move: seal the month, then try to reprice into it.
 RESET ROLE;
 INSERT INTO billing_periods (tenant_id, billing_month, invoices_issued)
-VALUES ('88888888-0000-0000-0000-000000000002', to_char(CURRENT_DATE,'YYYY-MM'), 1);
+VALUES ('88888888-0000-0000-0000-000000000002', to_char(today_sg(),'YYYY-MM'), 1);
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"79000000-0000-0000-0000-000000000001","role":"authenticated"}';
 
@@ -160,10 +214,11 @@ SELECT throws_ok(
   $$ SELECT set_class_terms('67000000-0000-0000-0000-000000000001','Renamed','monday',
        '10:00','11:00','Pool', 75,
        (SELECT id FROM coaches WHERE profile_id='79000000-0000-0000-0000-000000000002'),
-       CURRENT_DATE, FALSE) $$,
+       today_sg(), FALSE) $$,
   NULL, NULL,
   'terms cannot be repriced into a month that has already been invoiced and sealed'
 );
+
 
 SELECT * FROM finish();
 ROLLBACK;

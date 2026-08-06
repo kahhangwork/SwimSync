@@ -76,6 +76,13 @@ check(
 await page.screenshot({ path: shot("class-terms-prompt.png"), fullPage: true });
 
 // "A change from today" is preselected — the option that cannot rewrite history.
+//
+// ⚠ ASK IN SINGAPORE TIME, NOT CURRENT_DATE. set_class_terms() dates new terms
+// from today_sg(); CURRENT_DATE is the SESSION time zone (UTC on this server),
+// so between 00:00 and 08:00 SGT it names YESTERDAY and every "what does it cost
+// today" query below returns the OLD rate. This driver used to carry the same
+// UTC assumption as the RPC, which is exactly why the two agreed and neither
+// caught the live bug fixed in 20260807000100.
 const changeRadio = page.locator('input[type="radio"]').first();
 check("the non-destructive option is preselected", await changeRadio.isChecked());
 
@@ -87,7 +94,7 @@ const priceThen = sql(
   "SELECT price_per_lesson FROM class_rate_on((SELECT id FROM classes WHERE title LIKE 'Saturday Beginners%'), DATE '2020-01-01')"
 );
 const priceNow = sql(
-  "SELECT price_per_lesson FROM class_rate_on((SELECT id FROM classes WHERE title LIKE 'Saturday Beginners%'), CURRENT_DATE)"
+  "SELECT price_per_lesson FROM class_rate_on((SELECT id FROM classes WHERE title LIKE 'Saturday Beginners%'), today_sg())"
 );
 check("a lesson from 2020 still prices at the ORIGINAL rate", priceThen === "25.00", `got ${priceThen}`);
 check("a lesson today prices at the NEW rate", priceNow === "55.00", `got ${priceNow}`);
@@ -105,7 +112,7 @@ await page.getByRole("button", { name: /Save Changes/i }).click();
 await page.waitForTimeout(1500);
 
 const afterFix = sql(
-  "SELECT price_per_lesson FROM class_rate_on((SELECT id FROM classes WHERE title LIKE 'Saturday Beginners%'), CURRENT_DATE)"
+  "SELECT price_per_lesson FROM class_rate_on((SELECT id FROM classes WHERE title LIKE 'Saturday Beginners%'), today_sg())"
 );
 const stillOld = sql(
   "SELECT price_per_lesson FROM class_rate_on((SELECT id FROM classes WHERE title LIKE 'Saturday Beginners%'), DATE '2020-01-01')"
