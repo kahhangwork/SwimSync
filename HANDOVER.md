@@ -11,10 +11,16 @@ tenants read `2026-07-01` unchanged on deploy day. `book_trial()` gained a floor
 had. Two gotchas graduated from the ROLLBACK file, which was executed rather than merely
 written: **§7.92** (Postgres takes regex greediness from the FIRST quantifier — a `.*?`
 after a greedy `\s*` deleted three of `book_trial`'s four guards) and **§7.93** (execute
-every rollback and diff `pg_get_functiondef()`). **Two things this session did not cause,
-both in §9: the nightly UI drivers are RED (issue #2 OPEN — `class-edit` 4/5 and
-`class-terms` crashed, since the 2026-08-06 sweep), and CI on `b5da2c5` is red purely
-because GitHub Actions was in a MAJOR OUTAGE — re-run it, do not debug it.**_
+every rollback and diff `pg_get_functiondef()`).
+
+**Then triaging the red nightly drivers found a SECOND live bug and fixed it (§8.33):**
+`CURRENT_DATE` is the session's time zone — UTC here — so `set_class_terms()` **refused
+every class edit between 00:00 and 08:00 SGT**, three weeks live, while the admin panel
+sent the correct Singapore date. Both red drivers were that one bug, not driver rot. The
+lesson is **§7.94**: the RPC, its pgTAP file and its driver had all made the same UTC
+assumption and therefore agreed, so a 14-test file on that exact function stayed green.
+**CI is red purely because GitHub Actions was in a MAJOR OUTAGE — re-run it, don't debug
+it (§9).**_
 
 _Previously, 2026-08-06 — **a business can have CO-ADMINS, and the owner manages them —
 LIVE and verified on production (§8.31).** `tenants.owner_profile_id` marks the "main"
@@ -53,7 +59,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.93** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.94** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -406,8 +412,10 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   its first run (§8.20). **And since 2026-08-05 every driver RUNS nightly in CI** (§8.30):
   `run-all-drivers.sh` under `ui-drivers.yml`, failures collected in one rolling
   `ui-driver-rot` issue that a green run closes. Protocol and triage rule:
-  `docs/TESTING.md` §5. **⚠ That issue is OPEN as of 2026-08-07 — the sweep is RED, two
-  drivers, neither related to the most recent work. §9 has the triage.**
+  `docs/TESTING.md` §5. **Its first scheduled sweep found a LIVE product bug that had been
+  invisible to four green manual runs — see §8.33 and §7.94. That is the whole argument for
+  the nightly, made on its first outing. Issue #2 was open on 2026-08-07; the cause is
+  fixed and a green sweep should close it.**
 
 > **"CLEAN SLATE" IS A BANNED PHRASE FOR THIS DATABASE — it has now been wrong twice.**
 > The first time (corrected 2026-07-25) it claimed production held "only the superadmin +
@@ -513,6 +521,42 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.33 (2026-08-07) — TRIAGING TWO RED DRIVERS FOUND A LIVE BUG THAT REFUSED EVERY CLASS EDIT FOR EIGHT HOURS A DAY
+
+**`CURRENT_DATE` is the SESSION's time zone — UTC here — and nobody had looked at that end
+of the wire.** §7.7 taught this repo to distrust dates derived on the *client*, and every
+client is correct (`todayInSg()`). `set_class_terms()` refused terms dated in the future
+via `v_from > CURRENT_DATE`, so between 00:00 and 08:00 SGT the admin's own SGT date read
+as tomorrow and **every class edit failed** with `P0001: terms cannot start in the future`.
+Live since 20260719001000. `sync_class_display_price()` had the same clock (a rate
+effective today didn't display until 08:00). Both now use `today_sg()`; a `pg_proc` scan
+found exactly those two, and `class_terms.test.sql` now asserts that scan returns nothing.
+
+**Why a 14-test file on that exact function missed it — §7.94, and the part worth
+carrying.** Three places had independently made the same UTC assumption and therefore
+**agreed**: the RPC, the pgTAP file, and `verify-class-terms.mjs` all said `CURRENT_DATE`.
+Fixing only the RPC turned **five** pgTAP assertions and two driver checks red — they had
+been green *by agreement with the bug*. The existing guard test also dated terms a month
+out, while the whole bug lives in a one-day gap: **test a date guard AT its boundary.**
+
+**Why it hid for three weeks, and the vindication of §8.30.** The nightly sweep fires at
+04:00 SGT — inside the window — and went red the first time it ran on schedule. Four manual
+runs that week went green because they ran in the evening, and §8.30 recorded the pipeline
+as healthy on that basis. **A green run proves the code worked at the time it ran.**
+
+**Caught in review before it could bite:** the migration's `pg_proc` probe matched pgTAP's
+own `_def_is`, which would have **aborted `supabase db push`** on any database with pgTAP
+installed. Probe and test now exclude extension-owned functions; verified by applying the
+migration to a pgTAP-installed database.
+
+**Verified:** pgTAP **557** in 32 files (`class_terms` 14 → 17, the new three proven red
+against the unfixed DB), Deno 130 ×2, fixture round-trip 16/16, `verify-class-edit` 5/5
+(was 4/5), `verify-class-terms` 10/10 (was a crash). Rollback **executed** per §7.93 — both
+functions restore byte-identically. Production confirmed *inside* the broken window:
+`CURRENT_DATE` 2026-08-06 vs `today_sg()` 2026-08-07, and 0 functions left on a UTC date.
+
+---
+
 ## 8.32 (2026-08-07) — THE MARKING FLOOR FOLLOWS `billing_periods`, NOT THE CALENDAR — LIVE, AND A NO-OP ON PRODUCTION THE DAY IT SHIPPED
 
 **Built as insurance, ahead of its own stated trigger.** The backlog item said "revisit the
@@ -561,51 +605,10 @@ matching local, and the live `swimsync.sg` bundle greps for `markable_window_sta
 
 ---
 
-## 8.31 (2026-08-06) — CO-ADMINS: THE OWNER MANAGES A BUSINESS'S ADMIN ACCOUNTS, LIVE AND VERIFIED ON PRODUCTION
-
-**A business is no longer one login.** The user's ask: the main tenant admin creates and
-manages additional admin accounts with identical authority (feature-splitting later), on
-the hierarchy platform admin → tenant superadmin → tenant admin → coaches/parents.
-Shipped as `20260806000100` + the Admins page, both deployed the same day, the migration
-verified against production data (all three tenants' `owner_profile_id` correct) before
-the apps went out — the §7.60 order, done right.
-
-**The design calls that will matter later** (full reasoning `docs/ARCHITECTURE.md` §6):
-ownership is a **column**, not a role — `tenant_superadmin` as an enum value was
-considered and rejected (permanent, string-audited in ~25 files, can't enforce
-one-owner-per-tenant), as was the BACKLOG `tenant_members` join table (buys nothing while
-all admins are equal; still available additively). Deactivation is one clause in
-`is_tenant_admin()`; coach access survives because it rides the `coaches` row. Guard
-triggers (invoker, NOT definer — §7.38) closed a hole that predates the feature:
-`profiles_update` let ANY tenant admin rewrite any tenant profile's **role**, harmless
-with one admin and an escalation path with two — the pgTAP mutation run proved it, the
-self-promotion landing and corrupting 13 downstream assertions.
-
-**Found and fixed on the way:** §7.90 — the new FK made every bare `profiles`↔`tenants`
-PostgREST embed ambiguous; `verify-tenant-provisioning` went red within the hour
-(accept-invite lost the business name) and both affected embeds now carry `!tenant_id`
-hints. The admin login page already refused non-admin roles, so the user-requested coach
-gate became better copy ("use the SwimSync app") plus a defense-in-depth screen in
-`RequiresTenant` — the one deliberate exception to "never gate on role" (§7.91).
-
-**Deliberately not done:** owner transfer (guard-refused; BACKLOG), per-admin permission
-splits (BACKLOG, with the seam named), widening deactivation to cut
-`current_tenant_id()`-keyed membership reads (the coach app needs them; the auth ban
-bounds the residue at one token lifetime — pinned as chosen in pgTAP).
-
-**Verified:** pgTAP **536** in 31 files (was 498/30; the new 38 proven red three ways),
-vitest 250 (was 237), typecheck clean, drivers `verify-admins` 21/21 (new — bans are
-auth-layer, only a driver can see them), scope 32/32 (sidebar pinned at 16),
-tenant-admin 10/10, platform-admin 6/6, tenant-provisioning 15/15, fixture round-trip
-16/16. Production: remote dump post-deploy — RPCs grant only `authenticated`, anon still
-exactly its 18 trigger functions, zero blanket grants; committed rollback file. The
-deploy was confirmed by the user driving the live Admins page, not by a 200 (§7.31).
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.31** | 2026-08-06 | **Co-admins:** the first admin of a tenant is its **owner** (`tenants.owner_profile_id` — ownership is a COLUMN, not a role); only the owner invites, deactivates and deletes co-admins, who otherwise hold identical authority. Deactivation is one clause in `is_tenant_admin()` plus an auth-layer ban for pure admins; a coach-admin keeps coaching. Guard triggers closed a pre-existing hole — `profiles_update` let ANY tenant admin rewrite any profile's **role**, harmless with one admin and an escalation path with two. Coach/parent logins refused at the panel door | PRD §4.3 · `docs/ARCHITECTURE.md` §6 *(why not an enum role, why not `tenant_members`)* · **§7.90, §7.91** · `supabase/rollback/20260806_co_admins_DOWN.sql` |
 |---|---|---|---|
 | **8.30** | 2026-08-05 | All 32 UI drivers run **nightly** (`ui-drivers.yml` → `run-all-drivers.sh`, one rolling `ui-driver-rot` issue: open = red right now). The first sweep scored 24/32 and **every red was the tests' or the harness's fault, none a product bug** — the item's whole thesis. Four cloud runs to green, each failing differently | `docs/TESTING.md` §5 *(protocol + §7.73 triage)* · run-ui-playwright `SKILL.md` *(the `superadmin@` seed-login trap)* · `run-all-drivers.sh` header *(fixture-map exception)* |
 | **8.29** | 2026-08-04 (2nd) | The `authenticated` audit found **three LIVE forgery paths** instead of the one it went looking for — a self-registered stranger could join any business with no join code (then read it), attach to any child by UUID, and rename/deactivate that child; both policies checked *whose* row, never *what it pointed at*. All closed (`000500`–`000800`), the grant set became a **declared whitelist CI re-proves**, and the answer to the original question was NO — one database role carries parent/coach/admin, only RLS has the resolution. Two migrations exist only because production was **dumped after deploying** (§7.89). Separately `verify-parent-claim.mjs` had been red since 58 minutes after it was written, product correct throughout — the evidence that became §8.30's nightly sweep | **§7.86–§7.89** · §7.47 · `docs/TESTING.md` §5 · `docs/DEPLOYMENT.md` §11.7–11.8 · BACKLOG *(service_role audit)* |
@@ -710,19 +713,17 @@ now a `BACKLOG.md` item: grants genuinely are its only gate, but the oracle used
 it needs a usage audit of the edge functions and the admin's server routes. Don't start it
 without that.
 
-### ⚠ TWO RED SIGNALS TO CLEAR FIRST — neither caused by §8.32, both cheap to triage
+### ⚠ ONE RED SIGNAL LEFT, and it is infrastructure
 
-**1. The nightly UI drivers are RED and issue #2 is OPEN.** An open `ui-driver-rot` issue
-means red *right now* — that is the protocol, and §3 said the pipeline was green because
-it was written the day the first sweep went green and never revisited. The 2026-08-06 sweep
-scored **30/32**: `class-edit` **4/5** and `class-terms` **crashed outright (no score)**.
-Everything else passed, including `attendance-guard` at 20/20 — so this predates §8.32 and
-is untouched by it. Apply the §7.73 triage rule: product changed → real regression, fix the
-product; the driver's or calendar's assumption moved → fix the driver. Both are class-editing
-drivers, and class **terms** are effective-dated (§8.3), which makes a calendar assumption
-the first thing to check. `gh issue view 2` has the full table and a logs link.
+**The nightly UI drivers were RED, were triaged, and the cause is FIXED (§8.33).** Both
+reds were one live product bug, not driver rot: `set_class_terms()` compared against
+`CURRENT_DATE` (UTC) while the admin sent `todayInSg()`, so **every class edit was refused
+between 00:00 and 08:00 SGT** — three weeks, live. `class-edit` is 5/5 and `class-terms`
+10/10 again. **Issue #2 should close itself on the next green sweep (04:00 SGT); if it does
+not, that is a new failure, not this one.** `gh run list --workflow=ui-drivers.yml` is the
+current fact.
 
-**2. CI on `b5da2c5` is red, and it is NOT the code — do not debug it.** GitHub Actions
+**CI on `b5da2c5`/`13c845b` is red, and it is NOT the code — do not debug it.** GitHub Actions
 was in a **major outage** (incident opened 2026-08-06T15:22Z, `Actions -> major_outage`),
 and all three attempts died in *"Set up job"* at `Getting action download info` with
 `Service Unavailable`, before checkout. `backend-tests` **passed**; the other two jobs were
