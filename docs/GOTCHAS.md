@@ -1460,3 +1460,47 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     - The head comments in `lib/adminNav.ts` and `components/RequiresTenant.tsx` were
       rewritten to carry the two-question split; if either ever again says "never role",
       someone has reverted the gate. `verify-admins.mjs` pins the refusal; `verify-tenant-admin.mjs` pins that the production admin shape still enters. (2026-08-06.)
+
+92. **POSTGRES DECIDES REGEX GREEDINESS FOR THE *WHOLE* EXPRESSION FROM ITS **FIRST**
+    QUANTIFIER — SO A `.*?` AFTER A GREEDY `\s*` IS GREEDY, AND IT WILL EAT YOUR WHOLE
+    FUNCTION BODY.** This is not how PCRE, JS, Python or Perl behave, where greediness is
+    per-quantifier, so the mistake survives review by everyone who has used any of them.
+    - Found writing `20260806_markable_floor_DOWN.sql`, which stripped one `IF` block
+      from `book_trial()` with
+      `regexp_replace(def, '\s*IF p_session_date < markable_floor\(v_tenant\) THEN.*?END IF;', '', 'ns')`.
+      The leading `\s*` is greedy, so the `.*?` ran to the **LAST** `END IF;` in the
+      function and **deleted all three of book_trial's other refusals**. The rolled-back
+      function would have accepted a trial on a non-lesson day, for an already-enrolled
+      child, and for a family holding a prepaid package — three guards gone, silently,
+      in the file whose whole job is to restore a known-good state.
+    - The ARE docs say this ("the quantifier that determines greediness is the first one
+      in the RE"), and it is easy to read past because it describes an ordering property,
+      not an obvious hazard.
+    - **Do not fix it by making the first quantifier lazy** (`\s*?`). That works, and it
+      is a one-character difference between correct and catastrophic sitting in a file
+      nobody runs. Prefer a form whose correctness is visible: an exact literal
+      `replace()`, or line-wise removal anchored on a marker. Both are used in that
+      rollback file.
+    - Beware the second-order trap that followed: the literal-`replace()` version *also*
+      failed, because the block's comment rule is drawn with box characters (`──`) that
+      do not survive being retyped. It failed **loudly** — the guard raised and the whole
+      transaction rolled back — which is the only reason it was not shipped. (2026-08-07.)
+
+93. **A ROLLBACK FILE THAT HAS NEVER BEEN EXECUTED IS NOT A ROLLBACK PLAN. RUN IT, AGAINST
+    A REAL APPLY, BEFORE YOU SHIP THE THING IT ROLLS BACK.** §7.92 and its sequel were
+    both found this way and neither was findable by reading — the first produced valid SQL
+    that created a valid function with three guards missing.
+    - The committed-rollback pattern started 2026-08-04 (`20260804_authenticated_grants_DOWN.sql`)
+      and is the right one; this is the missing half. **Committed ≠ verified.**
+    - The check that catches everything: after `supabase db reset` (migration applied),
+      run the DOWN file, then diff `pg_get_functiondef()` for every function it touches
+      against the pre-migration definitions. `20260806_markable_floor_DOWN.sql` restores
+      all five **byte-identically**, which is a stronger claim than "it ran without error"
+      — and it is what surfaced that three restated functions had silently lost their
+      comments, including the §7.38 seam note and §7.57's upsert-fires-BEFORE-INSERT
+      warning. `pg_get_functiondef()` is the only record of those once a rollback runs.
+    - Then re-run the **pre-migration** test file under the rolled-back schema. If
+      `attendance_window.test.sql` still scores 31 and the new feature's file fails
+      wholesale, the rollback genuinely restored the old world rather than a lookalike.
+    - Budget for it: the round trip is three `supabase db reset` cycles, about ten
+      minutes. (2026-08-07.)

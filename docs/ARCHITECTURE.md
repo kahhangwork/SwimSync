@@ -199,6 +199,38 @@ the shape of the system changes:_
   - A class that legitimately didn't run needs **no new concept**: the coach marks
     everyone `cancelled_rain`/`cancelled_coach` (non-billable), which creates the
     session and drops the date out of the backlog permanently.
+- **The marking floor follows `billing_periods`, not the calendar, and it is PER TENANT**
+  (`markable_floor(tenant)`, `20260806000200`). It is `LEAST(1st of last month, the month
+  after that business's latest sealed billing month, else its `created_at`)`. That
+  function is **the single definition**; `session_window_start()` survives only as its
+  calendar term. Anything that hardcodes "the 1st of last month" as the floor is wrong.
+  - **Why it moved off the calendar.** The engine bills **any** completed month while the
+    calendar floor reached back one, so billing August on 5 October with a single unmarked
+    lesson made the gate name a lesson **nobody could record any more** — not the coach,
+    not the admin — with no override by design (PRD §7.7). The month could then never be
+    billed. While the window was a UI convention this was recoverable; `20260727000100`
+    made it a database rule and removed the escape. Full history: that plan's §10.1.
+  - **⚠ `LEAST` is the entire safety argument and must stay outermost.** It guarantees the
+    floor can only move EARLIER than the old calendar rule, never later — so the change
+    could not make any date unmarkable that was markable before it. `markable_floor.test.sql`
+    asserts that as a **property over a matrix of tenant states**, not case by case,
+    precisely so a `GREATEST` typo fails even when every named example still passes.
+  - **Do NOT "simplify" it to "the earliest unsealed month",** which is what the backlog
+    item specified and what anyone re-deriving this will reach for first. A month with
+    nothing recorded is **never sealed** (§8a.1 — `core.ts` requires `classesComplete > 0`),
+    so gaps in `billing_periods` are ordinary, and "earliest unsealed" reaches back past
+    the business's first day and leaves no floor at all. Anchor on the **latest** seal.
+  - **The client applies it as a MINIMUM, never directly** —
+    `min(calendar, server ?? calendar)` in `backlogWindowStart()`. That makes an absent,
+    null, unresolved or nonsense floor *mathematically incapable* of tightening the
+    window, so screens do not have to sequence their loads correctly to stay safe and
+    neither does any future caller. Don't replace it with the server value: refusing
+    something the database would accept is a bug invented by the client, and this shape is
+    what makes the failure impossible rather than merely unlikely.
+  - Coaches cannot read `billing_periods` (its policy is platform- or tenant-admin only,
+    and the coach app deliberately carries no invoice figures), so the client gets the
+    floor from `markable_window_start()` — a no-arg SECURITY DEFINER RPC returning one
+    DATE for the caller's own business. It must keep returning **only a date**.
   - **Completeness rule — now ONE definition** (`lib/attendanceCompleteness.ts`, extracted
     2026-07-18). A lesson counts as marked only when its session exists **and every
     actively-enrolled student has an attendance row on it**, and **a lesson with no session

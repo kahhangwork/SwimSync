@@ -137,6 +137,17 @@ still point at the local stack for dev.
    out to be wrong in a way the migration's own probes did not catch:
    `supabase/rollback/20260804_authenticated_grants_DOWN.sql`. (2026-08-04.)
 
+**A committed rollback file is not a verified one — EXECUTE it before shipping the
+migration it undoes** (§7.93, added 2026-08-07). The pattern the row above established is
+right and should continue; what it was missing is the run. Doing it for
+`20260806_markable_floor_DOWN.sql` found **two** bugs in that file, one of which produced
+perfectly valid SQL that restored `book_trial()` with three of its four safety refusals
+silently deleted (§7.92). Neither was findable by reading. The check that catches
+everything is a `pg_get_functiondef()` diff of every touched function against its
+pre-migration definition — **byte-identical**, not merely "ran without error" — plus a
+re-run of the pre-migration test file under the rolled-back schema. Budget ~10 minutes and
+three `supabase db reset` cycles.
+
 **Verified live** end to end via `run-ui-playwright` against the cloud URLs (all three
 roles): parent register → add child → superadmin assign → coach attendance → **manual
 invoice via the Edge Function** ($25) → parent sees invoice → **coach PayNow QR upload
