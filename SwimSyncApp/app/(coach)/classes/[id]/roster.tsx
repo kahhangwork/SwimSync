@@ -20,6 +20,7 @@ import {
   ageFromDob,
   type DayOfWeek,
 } from "@/lib/lessonDates";
+import { fetchMarkableFloor } from "@/lib/markableFloor";
 import {
   type EnrolmentSpan,
   expectedStudentsOn,
@@ -197,6 +198,13 @@ export default function ClassRosterScreen() {
 
     setStudents(activeStudents);
 
+    // The business's marking floor. STARTED here and awaited far below, so the
+    // round trip overlaps the two session queries instead of being appended to
+    // them. Safe to leave in flight: fetchMarkableFloor resolves on every path
+    // and never rejects, which is what stops a deferred await becoming an
+    // unhandled rejection.
+    const markableFloorPromise = fetchMarkableFloor();
+
     // Load all past sessions for this class (up to today)
     const { data: sessionData } = await supabase
       .from("lesson_sessions")
@@ -350,17 +358,24 @@ export default function ClassRosterScreen() {
     // have no session row, so querying lesson_sessions alone renders nothing and
     // the screen would imply the class is fully up to date.
     //
-    // The window floor is max(start of last month, earliest enrolment): the coach
-    // can mark back to there but no further — older lessons sit behind a generated
-    // invoice and need a credit note, not a late mark. The same window bounds the
-    // "Mark Attendance" target below.
+    // The window floor is max(the BUSINESS'S marking floor, earliest enrolment):
+    // the coach can mark back to there but no further — older lessons sit behind
+    // a generated invoice and need a credit note, not a late mark. The same
+    // window bounds the "Mark Attendance" target below.
+    //
+    // That floor is NOT "the start of last month" any more. Since 20260806000200
+    // it follows billing_periods per business, so a month that was never sealed
+    // stays markable after the calendar has rolled past it — which is what stops
+    // a late-billed month from stranding a lesson nobody may record. A failed
+    // fetch returns null and falls back to the old calendar rule.
+    const markableFloor = await markableFloorPromise;
     const enrolments = (cls.student_class_enrolments ?? []) as any[];
     let winStart: string | null = null;
     let target: { date: string; sessionId: string | null } | null = null;
 
     if (activeStudentIds.length > 0) {
       const earliest = enrolments.map((e) => toSgDate(e.enrolled_at)).sort()[0];
-      winStart = backlogWindowStart(todayDate, earliest ?? null);
+      winStart = backlogWindowStart(todayDate, earliest ?? null, markableFloor);
 
       const expected = expectedLessonDates(
         cls.day_of_week as DayOfWeek,

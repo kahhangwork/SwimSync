@@ -6,6 +6,13 @@
 // WHOSE class a coach may write, never WHICH date, so without that migration
 // the window was a UI convention rather than a rule.
 //
+// THE FLOOR IS PER BUSINESS, AND IT IS NOT THE CALENDAR. Since 20260806000200
+// it is `markable_floor(tenant)` — the 1st of last month, or EARLIER if the
+// business has months that were never sealed, so that billing a month late
+// cannot strand a lesson nobody may record any more. Screens read it from
+// `markable_window_start()` and hand it in as `windowFloor`. Anything that
+// hardcodes "the 1st of last month" as the floor is now wrong.
+//
 // THIS FILE IS THE AFFORDANCE, NOT THE GUARD. Its whole job is to fail early
 // and in English, so a coach who reaches a bad date sees "that lesson is
 // closed" instead of a roster that refuses to save with a Postgres error. If
@@ -24,18 +31,27 @@ export type MarkableCheck =
   | { ok: false; title: string; detail: string };
 
 /**
- * The floor of the markable window, as the DATABASE computes it: the 1st of
- * last month.
+ * The floor of the markable window, as the DATABASE computes it.
+ *
+ * Since 20260806000200 that is PER BUSINESS and follows `billing_periods`, not
+ * the calendar: `markable_floor(tenant)` is the 1st of last month OR earlier,
+ * reaching back to the month after the business's latest sealed one. Pass what
+ * `markable_window_start()` returned as `serverFloor`; omit it and this falls
+ * back to the calendar rule, which is what the database enforced before that
+ * migration and therefore always a safe answer.
  *
  * NOTE this is deliberately looser than the coach roster's floor, which is
- * `max(1st of last month, earliest enrolment)`. The roster is choosing what to
+ * `max(that floor, earliest enrolment)`. The roster is choosing what to
  * OFFER and may be as tight as it likes; this is checking what will be
  * REFUSED, and refusing something the database would accept would be a bug
- * invented by the client. Passing `null` here is what drops the
+ * invented by the client. Passing `null` for the enrolment is what drops the
  * enrolment-aware half of backlogWindowStart().
  */
-export function markableWindowStart(today: string): string {
-  return backlogWindowStart(today, null);
+export function markableWindowStart(
+  today: string,
+  serverFloor?: string | null
+): string {
+  return backlogWindowStart(today, null, serverFloor);
 }
 
 /**
@@ -54,8 +70,16 @@ export function checkMarkableDate(opts: {
   classDayOfWeek: DayOfWeek;
   classTitle: string;
   sessionExists: boolean;
+  /**
+   * The business's own floor from markable_window_start(). Optional on purpose:
+   * a screen that has not fetched it yet, or whose fetch failed, gets the
+   * calendar rule and refuses only what the database refused before
+   * 20260806000200. It can never make this check STRICTER than the database.
+   */
+  windowFloor?: string | null;
 }): MarkableCheck {
-  const { date, today, classDayOfWeek, classTitle, sessionExists } = opts;
+  const { date, today, classDayOfWeek, classTitle, sessionExists, windowFloor } =
+    opts;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return {
@@ -74,7 +98,7 @@ export function checkMarkableDate(opts: {
     };
   }
 
-  const floor = markableWindowStart(today);
+  const floor = markableWindowStart(today, windowFloor);
   if (date < floor) {
     return {
       ok: false,

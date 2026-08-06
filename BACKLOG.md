@@ -1,6 +1,16 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-06 — **one item SHIPPED and removed:** *Multiple admin accounts per
+_Last updated: 2026-08-06 (second session) — **two items SHIPPED and removed:** *Tie the
+attendance-marking window to un-invoiced months* and *`book_trial` has no date floor*, both
+closed by `20260806000200` (PRD §7.6). The first shipped **before its own stated trigger** —
+it said "revisit the first time a month is billed late", and the user chose to build it as
+insurance instead, one month into a live monthly billing rhythm. Its filed fix was also
+**wrong in one detail**: "the earliest UNSEALED billing month" leaves no floor at all,
+because a month with nothing recorded is never sealed (§8a.1), so gaps reach back forever.
+The shipped rule anchors on the **latest** seal instead, with the business's `created_at` as
+the fallback when nothing has ever been billed._
+
+_Previously, 2026-08-06 — **one item SHIPPED and removed:** *Multiple admin accounts per
 tenant* (PRD §4.3, §8.31 — the join-table sketch it carried was superseded by
 `tenants.owner_profile_id`, reasoning in `docs/ARCHITECTURE.md` §6); *Disable a staff
 account* narrowed to its remaining COACH half; two new items: *Split co-admin permissions*
@@ -195,13 +205,6 @@ coach by construction. A school whose private coach is away wants the make-up ta
 *different* coach, which means a temporary one-off class (its own coach, rate, wage row,
 and cleanup) or a per-lesson coach override. Deliberately deferred from the guest-pass
 work: real complexity, no requester yet.
-
-### `book_trial` has no date floor; `book_makeup` does — **S**
-`book_makeup()` refuses a date before `session_window_start()` (a booking in a billed
-month can neither be marked nor bill — silently lost). `book_trial()` predates the floor
-and will happily book into an already-billed month, with the same silent-loss shape.
-Give it the same guard; one sentence of SQL. Recorded rather than fixed in the make-up
-work to keep that batch single-purpose.
 
 ### Tick off swimming skills per child — **M**
 Mark which of a level's skills a child has passed, so a coach can see "Ethan has 4 of 6
@@ -492,35 +495,6 @@ already holds live bookings. The future deactivation path must count BOTH tables
 Probably: bill from
 classes that had sessions in the month regardless of `is_active`, and keep `is_active` for
 *scheduling* only.
-
-### Tie the attendance-marking window to un-invoiced months — **M** — _upgraded 2026-07-27_
-The marking window floor is a **calendar proxy** — the 1st of last month — rather than "the
-earliest month not yet invoiced". Since 2026-07-27 that proxy is **enforced by the database**
-(`assert_markable_date`, `20260727000100`), not merely offered by the UI, which turns a small
-seam into a hard one.
-
-**Why — and this is much sharper than when it was first filed.** Two gaps, in opposite
-directions:
-
-- **Markable yet unbillable** (the original). The moment a month is invoiced (July, on 1 Aug)
-  its lessons stay *in-window* until the calendar rolls over, but a record added there is
-  **not** added to the existing invoice. Small and silent.
-- **⚠ Billable yet unmarkable** (new, and why this is now **M**). The engine permits billing
-  **any** completed month, but the floor only reaches back to the 1st of last month. Bill
-  **July on 5 September** with one lesson unmarked and the gate names a lesson **nobody can
-  record any more** — not the coach, not the admin — so the month cannot be billed at all,
-  and there is no override by design (PRD §7.7). Before the database enforced the window this
-  was recoverable, because the window was a UI convention and the coach could still reach the
-  date.
-
-**Notes:** the fix is to floor at `min(1st of last month, first day of the earliest UNSEALED
-billing month)` — let the window follow `billing_periods` rather than the calendar — in
-`assert_markable_date()` **and** `backlogWindowStart` (`lib/lessonDates.ts`, **both apps**).
-The calendar rule was chosen deliberately over this on 2026-07-27: predictable, no cross-table
-lookup, never falsely refuses, and a fine default for the monthly cadence. **Revisit the first
-time a month is billed late** — that is the trigger, not a hypothetical. Full reasoning in
-`ATTENDANCE_WINDOW_PLAN.md` §10.1. Related to the credit-note flow, which is the *correct*
-tool for changing an already-invoiced lesson.
 
 ### The attendance screen trusts a `sessionId` handed to it in the URL — **S**
 `(coach)/classes/[id]/attendance.tsx` takes `sessionId` from the query string and never checks

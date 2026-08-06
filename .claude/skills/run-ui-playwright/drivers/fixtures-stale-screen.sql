@@ -21,10 +21,16 @@
 -- the reused screen writes last week's marks onto today's session.
 --
 -- The enrolment is 8 DAYS OLD, not 60. The coach's backlog floor is
--- max(1st of last month, earliest enrolment), so an old enrolment would put
--- every same-weekday date since the 1st of last month in the backlog and the
+-- max(the business's marking floor, earliest enrolment), so an old enrolment
+-- would put every same-weekday date since that floor in the backlog and the
 -- driver would have to pick one out of eight. Eight days back yields exactly
 -- one past lesson, which is also what production had.
+--
+-- The floor is the 1st of last month FOR THIS FIXTURE because the seed tenant
+-- has no sealed billing months. Since 20260806000200 it can reach further back
+-- when a business has unsealed months (markable_floor), so if this fixture ever
+-- gains a billing_periods row, re-check the "exactly one past lesson" premise —
+-- it is what makes the driver's row unambiguous.
 
 \set ON_ERROR_STOP on
 

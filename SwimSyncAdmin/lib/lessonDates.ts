@@ -192,16 +192,33 @@ export function ageFromDob(
 
 /**
  * Lower bound for the coach's unmarked-lesson backlog:
- * max(first day of the previous month, earliest enrolment).
+ * max(the business's marking floor, earliest enrolment).
  *
- * The previous-month floor is the window the coach can still act on — once a
- * month is invoiced, a late-marked lesson is not added to the existing invoice
- * and needs a credit note instead, so surfacing older gaps would only train the
- * coach to ignore the list.
+ * The floor is the window the coach can still act on — once a month is
+ * invoiced, a late-marked lesson is not added to the existing invoice and needs
+ * a credit note instead, so surfacing older gaps would only train the coach to
+ * ignore the list.
+ *
+ * `serverFloor` IS THE BUSINESS'S OWN FLOOR, from markable_window_start()
+ * (20260806000200). Since that migration the floor follows `billing_periods`
+ * rather than the calendar: a month that has not been sealed can still be
+ * marked even once the calendar has rolled past it, which is what stops a
+ * late-billed month from becoming permanently unbillable.
+ *
+ * ⚠ IT IS APPLIED AS A MINIMUM, NEVER USED DIRECTLY, AND THAT IS DELIBERATE.
+ * Absent, null, or somehow later than the calendar rule, the answer is exactly
+ * what this function returned before the server floor existed. So a fetch that
+ * failed, has not resolved yet, or returned nonsense CANNOT tighten the window
+ * — the worst case is today's behaviour. Screens therefore do not have to
+ * sequence their loads correctly to stay safe, and neither does any future
+ * caller. The database is the guard (assert_markable_date in two triggers);
+ * this is the affordance, and an affordance that refuses something the database
+ * would accept is a bug invented by the client.
  */
 export function backlogWindowStart(
   today: string,
-  earliestEnrolmentDate: string | null
+  earliestEnrolmentDate: string | null,
+  serverFloor?: string | null
 ): string {
   const t = parseDate(today);
   if (Number.isNaN(t)) return earliestEnrolmentDate ?? "";
@@ -211,11 +228,12 @@ export function backlogWindowStart(
     Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)
   );
 
-  if (!earliestEnrolmentDate) return prevMonthStart;
-  // Both are "YYYY-MM-DD", so lexical comparison is chronological.
-  return earliestEnrolmentDate > prevMonthStart
-    ? earliestEnrolmentDate
-    : prevMonthStart;
+  // Both are "YYYY-MM-DD", so lexical comparison is chronological throughout.
+  const floor =
+    serverFloor && serverFloor < prevMonthStart ? serverFloor : prevMonthStart;
+
+  if (!earliestEnrolmentDate) return floor;
+  return earliestEnrolmentDate > floor ? earliestEnrolmentDate : floor;
 }
 
 /**

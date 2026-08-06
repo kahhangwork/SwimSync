@@ -233,6 +233,39 @@ describe("backlogWindowStart", () => {
   it("uses the month floor when the enrolment is older", () => {
     expect(backlogWindowStart("2026-08-01", "2026-03-02")).toBe("2026-07-01");
   });
+
+  // ── The server floor (markable_window_start, 20260806000200) ──────────────
+  // It is applied as a MINIMUM against the calendar rule, never used directly.
+  // These four cases are the whole safety argument for the client half: no
+  // input to this parameter can make the window narrower than it was before
+  // the parameter existed, so a fetch that failed, has not resolved yet, or
+  // returned nonsense degrades to the old behaviour instead of telling a coach
+  // a perfectly valid lesson is closed.
+
+  it("opens the window earlier when the business's floor reaches further back", () => {
+    // The case the whole change exists for: billing August in October.
+    expect(backlogWindowStart("2026-10-05", null, "2026-08-01")).toBe("2026-08-01");
+  });
+
+  it("IGNORES a server floor later than the calendar rule — it can only widen", () => {
+    expect(backlogWindowStart("2026-08-01", null, "2026-09-01")).toBe("2026-07-01");
+  });
+
+  it("falls back to the calendar rule when the floor is null (fetch failed)", () => {
+    expect(backlogWindowStart("2026-08-01", null, null)).toBe("2026-07-01");
+  });
+
+  it("falls back to the calendar rule when the floor is absent (not yet loaded)", () => {
+    expect(backlogWindowStart("2026-08-01", null, undefined)).toBe("2026-07-01");
+  });
+
+  it("still respects a later enrolment date over a reopened floor", () => {
+    // The enrolment bound is about what to OFFER and stays the tighter of the
+    // two: never ask a coach about lessons from before the child joined.
+    expect(backlogWindowStart("2026-10-05", "2026-09-10", "2026-08-01")).toBe(
+      "2026-09-10"
+    );
+  });
 });
 
 describe("previousBillingMonth", () => {

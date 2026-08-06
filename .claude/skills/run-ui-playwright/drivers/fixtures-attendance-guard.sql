@@ -2,7 +2,8 @@
 --
 -- DATES ARE COMPUTED FROM THE CLOCK, not hardcoded — deliberately the opposite
 -- of §7.33's rule for the *unit* suites. The behaviour under test IS relative to
--- now() (the window floor is "the 1st of last month"), and this driver is run by
+-- now() (the window floor is the 1st of last month OR EARLIER — see the sealed
+-- month below), and this driver is run by
 -- hand against a live stack, so a fixed date would simply stop meaning anything
 -- next month. Everything derives from ONE anchor so the relationships hold
 -- whatever day it runs.
@@ -32,9 +33,25 @@
 --
 -- and the dates the driver navigates to by URL:
 --   d_past      three Saturdays back, IN window  → roster must omit Late Joiner
+--   d_reopen    ten Saturdays back                → BELOW the calendar rule and
+--                                                   ABOVE this business's floor,
+--                                                   so it must OPEN for marking
 --   d_closed    20 Saturdays back, OUT of window → "That lesson is closed"
 --   d_wrongday  two days ago, not a Saturday     → "That isn't a lesson day"
 --   d_extra     three days ahead, not a Saturday → the admin's extra lesson
+--
+-- ── THE SEALED MONTH IS PART OF THE FIXTURE, NOT SCENERY ───────────────────
+-- Since 20260806000200 the floor is markable_floor(tenant): the 1st of last
+-- month, OR the month after the business's latest SEALED billing month if that
+-- is earlier. This fixture seals a month four back, which puts the floor three
+-- months back — so d_reopen (about ten weeks back) sits in the gap that only
+-- exists because of that migration.
+--
+-- That gap is the whole point of the feature. Without it, billing a month LATE
+-- names an unmarked lesson nobody may record any more — no coach, no admin, no
+-- override by design — and the month can never bill (ATTENDANCE_WINDOW_PLAN
+-- §10.1). Only a driver can prove the fix works end to end, because the failure
+-- was never in the database: it was the coach's screen never OFFERING the date.
 
 \set ON_ERROR_STOP on
 
@@ -51,7 +68,13 @@ CREATE TEMP TABLE d AS
 SELECT
   today,
   (last_sat - 21)  AS d_past,      -- in window, before Late Joiner enrolled
-  (last_sat - 140) AS d_closed,    -- far below the window floor
+  -- 70 days is a whole number of weeks, so this stays a Saturday — otherwise
+  -- the WEEKDAY rule would refuse it and this fixture would prove nothing about
+  -- the floor. It lands 70–76 days back, while the calendar rule floors at
+  -- 30–61 days back and the sealed-month floor at 89–123: comfortably between
+  -- the two on every day of the year, which is what makes it a stable probe.
+  (last_sat - 70)  AS d_reopen,
+  (last_sat - 140) AS d_closed,    -- below BOTH floors, on every run
   -- Two days back, nudged off Saturday so it is unambiguously a non-lesson day.
   CASE WHEN EXTRACT(DOW FROM today - 2) = 6 THEN today - 3 ELSE today - 2 END
     AS d_wrongday,
@@ -169,8 +192,14 @@ ON CONFLICT DO NOTHING;
 
 -- Ana has been here for months; Late Joiner arrived three days ago. That gap is
 -- the whole fixture: d_past falls between the two.
+--
+-- Ana is dated from d_reopen, not d_past, so she is already enrolled on the
+-- reopened lesson too. The roster answers "who was expected here" from enrolment
+-- SPANS (20260727000100), so an enrolment starting after d_reopen would leave
+-- that lesson with an empty roster and the reopened-window check would pass
+-- vacuously — green for the wrong reason.
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
-SELECT 'd0000000-0000-0000-0000-0000000000b1', c.id, (d.d_past - 30)::timestamptz, TRUE
+SELECT 'd0000000-0000-0000-0000-0000000000b1', c.id, (d.d_reopen - 30)::timestamptz, TRUE
   FROM classes c, d WHERE c.title = 'Saturday Beginners';
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
 SELECT 'd0000000-0000-0000-0000-0000000000b2', c.id, (d.today - 3)::timestamptz, TRUE
@@ -190,6 +219,21 @@ INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_acti
 SELECT 'd0000000-0000-0000-0000-0000000000b4',
        'd0000000-0000-0000-0000-0000000000e2', (d.today - 30)::timestamptz, TRUE
   FROM d;
+
+-- ── A SEALED billing month, which is what moves this business's floor ──────
+-- Four months back, so markable_floor() lands on the 1st of three months back
+-- and d_reopen falls in the reopened gap. Without this row the floor is the
+-- plain calendar rule and d_reopen would be refused — which is exactly what a
+-- run against the pre-20260806000200 database does, and how the new checks
+-- below were proven red.
+INSERT INTO billing_periods (tenant_id, billing_month, invoices_issued, notes)
+SELECT c.tenant_id,
+       to_char(d.today - INTERVAL '4 months', 'YYYY-MM'),
+       0,
+       'fixtures-attendance-guard: seals a month so the floor reaches back'
+  FROM classes c, d
+ WHERE c.title = 'Saturday Beginners'
+ON CONFLICT DO NOTHING;
 
 -- ── A real, already-billed lesson far outside the window ───────────────────
 -- Written as postgres, which the guard exempts by design: a fixture builds the
@@ -212,7 +256,14 @@ VALUES ('d0000000-0000-0000-0000-0000000000c1',
 -- makes it fail loudly instead.
 SELECT
   (SELECT id FROM classes WHERE title = 'Saturday Beginners') AS class_id,
-  today, d_past, d_closed, d_wrongday, d_extra,
+  today, d_past, d_reopen, d_closed, d_wrongday, d_extra,
+  -- Printed so the driver can assert the premise rather than assume it:
+  -- d_reopen must be BELOW the calendar rule (or it proves nothing) and the
+  -- floor must be BELOW d_reopen (or the check would fail for the right answer
+  -- and the wrong reason).
+  session_window_start()                                      AS calendar_floor,
+  markable_floor((SELECT tenant_id FROM classes
+                   WHERE title = 'Saturday Beginners'))       AS business_floor,
   'd0000000-0000-0000-0000-0000000000e1'                      AS new_class_id,
   d_firstlesson,
   lower(to_char(d_firstlesson, 'FMDay'))                      AS new_class_dow,

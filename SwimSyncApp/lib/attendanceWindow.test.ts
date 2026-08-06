@@ -12,12 +12,33 @@ const base = {
 };
 
 describe("markableWindowStart", () => {
-  it("is the 1st of last month", () => {
+  it("is the 1st of last month with no server floor", () => {
     expect(markableWindowStart("2026-07-25")).toBe("2026-06-01");
   });
 
   it("rolls back across a year boundary", () => {
     expect(markableWindowStart("2026-01-10")).toBe("2025-12-01");
+  });
+
+  // The business's own floor (markable_window_start, 20260806000200). Applied
+  // as a minimum, so it can only ever OPEN dates — never close one the calendar
+  // rule allowed. A client stricter than the database is a bug the client
+  // invented; these four cases are what stop that shape existing.
+
+  it("takes the business's floor when it reaches further back", () => {
+    expect(markableWindowStart("2026-10-05", "2026-08-01")).toBe("2026-08-01");
+  });
+
+  it("IGNORES a server floor later than the calendar rule", () => {
+    expect(markableWindowStart("2026-07-25", "2026-07-01")).toBe("2026-06-01");
+  });
+
+  it("falls back to the calendar rule on null (the fetch failed)", () => {
+    expect(markableWindowStart("2026-07-25", null)).toBe("2026-06-01");
+  });
+
+  it("falls back to the calendar rule on undefined (not yet loaded)", () => {
+    expect(markableWindowStart("2026-07-25", undefined)).toBe("2026-06-01");
   });
 });
 
@@ -86,5 +107,41 @@ describe("checkMarkableDate", () => {
   it("refuses a malformed date rather than passing it to the database", () => {
     const out = checkMarkableDate({ ...base, date: "not-a-date" });
     expect(out.ok).toBe(false);
+  });
+
+  // ── windowFloor: the business's own floor reaches the screen ──────────────
+
+  it("allows a lesson the CALENDAR rule would close, when the business's floor is lower", () => {
+    // 5 Oct 2026, marking a Saturday in August — the deadlock case. Refused
+    // before 20260806000200; allowed now because August was never sealed.
+    const out = checkMarkableDate({
+      ...base,
+      today: "2026-10-05",
+      date: "2026-08-15",
+      windowFloor: "2026-08-01",
+    });
+    expect(out.ok).toBe(true);
+  });
+
+  it("still refuses below the business's own floor, naming it", () => {
+    const out = checkMarkableDate({
+      ...base,
+      today: "2026-10-05",
+      date: "2026-07-18",
+      windowFloor: "2026-08-01",
+    });
+    expect(out.ok).toBe(false);
+    expect(out.ok === false && out.detail).toContain("2026-08-01");
+  });
+
+  it("is never STRICTER than the calendar rule, whatever windowFloor says", () => {
+    // A floor later than the calendar rule must not close a date that a client
+    // without the parameter would have allowed.
+    const out = checkMarkableDate({
+      ...base,
+      date: "2026-06-06",
+      windowFloor: "2026-07-01",
+    });
+    expect(out.ok).toBe(true);
   });
 });

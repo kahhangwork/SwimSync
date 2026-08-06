@@ -79,10 +79,19 @@ DELETE FROM audit_log WHERE actor_id = 'd0000000-0000-0000-0000-0000000000aa';
 --    parent_tenants.
 DELETE FROM auth.users WHERE id = 'd0000000-0000-0000-0000-0000000000aa';
 
+-- 6. The sealed billing month the fixture wrote to move markable_floor().
+--    Identified by its own notes string rather than by month: the month is
+--    derived from the clock, so a teardown run on a later day would compute a
+--    different one and silently leave the row behind — and a stray seal is the
+--    worst kind of leftover here, because it moves the marking floor for EVERY
+--    later driver in the tenant without failing anything visibly.
+DELETE FROM billing_periods
+ WHERE notes = 'fixtures-attendance-guard: seals a month so the floor reaches back';
+
 COMMIT;
 
--- Verify — expect 0, 0, 0. A non-zero here means the teardown is incomplete,
--- not that the check is wrong.
+-- Verify — expect 0 across the board. A non-zero here means the teardown is
+-- incomplete, not that the check is wrong.
 SELECT
   (SELECT count(*) FROM students
     WHERE full_name IN ('Ana Guard', 'Late Joiner',
@@ -93,4 +102,7 @@ SELECT
     WHERE off_schedule_reason IS NOT NULL)                        AS extra_lessons,
   (SELECT count(*) FROM classes
     WHERE id IN ('d0000000-0000-0000-0000-0000000000e1',
-                 'd0000000-0000-0000-0000-0000000000e2'))             AS guard_classes;
+                 'd0000000-0000-0000-0000-0000000000e2'))             AS guard_classes,
+  (SELECT count(*) FROM billing_periods
+    WHERE notes = 'fixtures-attendance-guard: seals a month so the floor reaches back')
+                                                                  AS guard_seals;

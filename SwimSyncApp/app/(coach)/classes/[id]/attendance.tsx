@@ -17,6 +17,7 @@ import { applyBulkStatus, SET_ALL_OPTIONS, BulkOption } from "@/lib/attendanceBu
 import { mergeRoster } from "@/lib/attendanceRoster";
 import { buildAttendanceRows } from "@/lib/attendancePayload";
 import { checkMarkableDate, type MarkableCheck } from "@/lib/attendanceWindow";
+import { fetchMarkableFloor } from "@/lib/markableFloor";
 import {
   resolveSessionForDate,
   isShowingDate,
@@ -238,6 +239,12 @@ export default function MarkAttendanceScreen() {
         full_name: e.students.full_name,
       }));
 
+    // The business's marking floor, STARTED here so it overlaps the session
+    // lookup below rather than delaying the screen by a round trip. Awaited at
+    // the check. fetchMarkableFloor resolves on every path and never rejects,
+    // so leaving it in flight cannot become an unhandled rejection.
+    const markableFloorPromise = fetchMarkableFloor();
+
     // Resolve session id — use param, or look up existing, or leave null (create on save)
     let sid = sessionIdParam ?? null;
     if (!sid) {
@@ -260,12 +267,17 @@ export default function MarkAttendanceScreen() {
     // Checked AFTER the session lookup, because an existing session is itself
     // the authorisation: an off-schedule lesson the admin scheduled is not on
     // the class's weekday and must still be markable.
+    //
+    // windowFloor is awaited rather than passed as a promise so the check never
+    // runs against a floor that has not resolved. A null answer is the calendar
+    // rule, which the database enforced before 20260806000200 and still accepts.
     const check = checkMarkableDate({
       date,
       today: todayInSg(),
       classDayOfWeek: cls.day_of_week as DayOfWeek,
       classTitle: cls.title,
       sessionExists: sid !== null,
+      windowFloor: await markableFloorPromise,
     });
     if (!check.ok) {
       setBlocked(check);

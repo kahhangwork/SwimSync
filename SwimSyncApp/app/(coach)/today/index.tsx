@@ -20,6 +20,7 @@ import {
   formatSgDate,
   type DayOfWeek,
 } from "@/lib/lessonDates";
+import { fetchMarkableFloor } from "@/lib/markableFloor";
 import {
   type EnrolmentSpan,
   isLessonFullyMarked,
@@ -137,12 +138,14 @@ export default function TodayScreen() {
     if (!session) return;
     setLoading(true);
 
-    // Get coach record
-    const { data: coach } = await supabase
-      .from("coaches")
-      .select("id")
-      .eq("profile_id", session.id)
-      .single();
+    // Get coach record — and the business's marking floor alongside it. The
+    // floor depends on nothing here, and this screen is the coach's landing tab
+    // and refetches on every focus, so it rides with a query already in flight
+    // rather than adding a round trip in front of everything else.
+    const [{ data: coach }, markableFloor] = await Promise.all([
+      supabase.from("coaches").select("id").eq("profile_id", session.id).single(),
+      fetchMarkableFloor(),
+    ]);
 
     if (!coach) {
       setLoading(false);
@@ -178,7 +181,7 @@ export default function TodayScreen() {
     // grows with classes × students, and PostgREST's `max_rows = 1000`
     // (supabase/config.toml) is a silent ceiling: past it the backlog would
     // under-report rather than error. Paginate or move server-side before then.
-    const windowStart = backlogWindowStart(todayDate, null);
+    const windowStart = backlogWindowStart(todayDate, null, markableFloor);
     const { data: windowSessions } = classIds.length > 0
       ? await supabase
           .from("lesson_sessions")
@@ -328,7 +331,7 @@ export default function TodayScreen() {
       const earliest = enrolments
         .map((e: any) => toSgDate(e.enrolled_at))
         .sort()[0];
-      const from = backlogWindowStart(todayDate, earliest ?? null);
+      const from = backlogWindowStart(todayDate, earliest ?? null, markableFloor);
 
       // Booking dates join the expected list: a trial on a date with no session
       // would otherwise never appear here.

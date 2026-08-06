@@ -100,7 +100,15 @@ const LAST_SAT = sql(
   "SELECT ((now() AT TIME ZONE 'Asia/Singapore')::date - ((EXTRACT(DOW FROM (now() AT TIME ZONE 'Asia/Singapore')::date)::int + 1) % 7))"
 );
 const D_PAST = sql(`SELECT '${LAST_SAT}'::date - 21`);
+// Below the CALENDAR rule but above this business's own floor, because the
+// fixture sealed a billing month four back (20260806000200). Ten whole weeks,
+// so it is still a Saturday and only the floor can decide it.
+const D_REOPEN = sql(`SELECT '${LAST_SAT}'::date - 70`);
 const D_CLOSED = sql(`SELECT '${LAST_SAT}'::date - 140`);
+const CALENDAR_FLOOR = sql("SELECT session_window_start()");
+const BUSINESS_FLOOR = sql(
+  `SELECT markable_floor((SELECT tenant_id FROM classes WHERE id='${CLASS_ID}'))`
+);
 const D_WRONGDAY = sql(
   `SELECT CASE WHEN EXTRACT(DOW FROM '${TODAY}'::date - 2) = 6 THEN '${TODAY}'::date - 3 ELSE '${TODAY}'::date - 2 END`
 );
@@ -108,7 +116,31 @@ const D_EXTRA = sql(
   `SELECT CASE WHEN EXTRACT(DOW FROM '${TODAY}'::date + 3) = 6 THEN '${TODAY}'::date + 4 ELSE '${TODAY}'::date + 3 END`
 );
 
-console.log({ CLASS_ID, TODAY, LAST_SAT, D_PAST, D_CLOSED, D_WRONGDAY, D_EXTRA });
+console.log({ CLASS_ID, TODAY, LAST_SAT, D_PAST, D_REOPEN, D_CLOSED, D_WRONGDAY,
+              D_EXTRA, CALENDAR_FLOOR, BUSINESS_FLOOR });
+
+// ⚠ THE PREMISE, ASSERTED RATHER THAN ASSUMED. D_REOPEN only tests anything if
+// it sits in the gap between the two floors. If the fixture's seal did not
+// load, both floors are equal, D_REOPEN is simply out of window, and the check
+// below would fail while looking like a product regression. Fail here instead,
+// naming the actual cause.
+if (!(BUSINESS_FLOOR < CALENDAR_FLOOR)) {
+  console.error(
+    `FIXTURE NOT LOADED: business floor ${BUSINESS_FLOOR} is not earlier than the ` +
+    `calendar floor ${CALENDAR_FLOOR}. fixtures-attendance-guard.sql seals a billing ` +
+    `month to create that gap — load it before running this driver.`
+  );
+  process.exit(1);
+}
+if (!(D_REOPEN >= BUSINESS_FLOOR && D_REOPEN < CALENDAR_FLOOR)) {
+  console.error(
+    `DATE ROT: D_REOPEN ${D_REOPEN} is not between the business floor ` +
+    `${BUSINESS_FLOOR} and the calendar floor ${CALENDAR_FLOOR}. The 70-day offset ` +
+    `was chosen to hold on every day of the year; if this fires, re-derive it ` +
+    `rather than nudging the constant (§7.73).`
+  );
+  process.exit(1);
+}
 
 const mobile = {
   viewport: { width: 420, height: 900 },
@@ -203,7 +235,28 @@ try {
     !/Late Joiner/.test(t),
     /Late Joiner/.test(t) ? "Late Joiner wrongly shown" : "correctly absent");
 
+  // ── 1b. A month the CALENDAR rule would have closed, but this business has
+  //        never sealed ──────────────────────────────────────────────────────
+  // THE CASE THE WHOLE CHANGE EXISTS FOR (20260806000200). Before it, the floor
+  // was the 1st of last month full stop, so billing a month LATE named an
+  // unmarked lesson nobody could ever record and the month could never bill
+  // (ATTENDANCE_WINDOW_PLAN §10.1). The database half was never the hard part —
+  // the coach's screen simply never OFFERED the date, which is why this lives in
+  // a driver and not only in pgTAP.
+  await gotoAuthed(page, `${EXPO}/(coach)/classes/${CLASS_ID}/attendance?date=${D_REOPEN}`);
+  await page.waitForTimeout(3000);
+  t = await dumpText(page);
+  await page.screenshot({ path: `${SHOT}/ag-coach-reopened.png`, fullPage: true });
+  check("a lesson below the CALENDAR floor opens when its month was never sealed",
+    !/That lesson is closed/.test(t),
+    /That lesson is closed/.test(t) ? "wrongly closed" : "open");
+  check("…and it offers a real, markable roster rather than an empty screen",
+    /Ana Guard/.test(t) && /Save Attendance/.test(t),
+    `roster=${/Ana Guard/.test(t)} save=${/Save Attendance/.test(t)}`);
+
   // ── 2. Out of window ─────────────────────────────────────────────────────
+  // Below BOTH floors, so the window still exists — a floor that opened
+  // everything would pass 1b and fail here.
   await gotoAuthed(page, `${EXPO}/(coach)/classes/${CLASS_ID}/attendance?date=${D_CLOSED}`);
   await page.waitForTimeout(3000);
   t = await dumpText(page);
