@@ -29,7 +29,8 @@ type AdminRow = {
   phone: string | null;
   isOwner: boolean;
   isCoach: boolean;
-  status: "active" | "invited" | "deactivated";
+  /** null = invited-vs-active not known yet (the one auth-layer fact). */
+  status: "active" | "invited" | "deactivated" | null;
 };
 
 function Field({
@@ -61,7 +62,7 @@ function Field({
   );
 }
 
-const STATUS_PILL: Record<AdminRow["status"], string> = {
+const STATUS_PILL: Record<NonNullable<AdminRow["status"]>, string> = {
   active: "bg-green-100 text-green-700",
   invited: "bg-amber-100 text-amber-700",
   deactivated: "bg-gray-200 text-gray-600",
@@ -107,24 +108,64 @@ export default function AdminsPage() {
     return { ok: res.ok, json };
   }
 
+  // Two-phase load, deliberately. Everything except invited-vs-active is
+  // client-readable under RLS (profiles, coaches, the owner column), so the
+  // table paints in one direct round-trip like every other page. The ONE fact
+  // the browser cannot read — auth.users.last_sign_in_at — comes from the
+  // server route, which sits behind a serverless cold start; its pills fill
+  // in when it arrives rather than holding the whole page hostage.
   const loadAdmins = useCallback(async () => {
-    setLoading(true);
     setPageError(null);
+    const { data: auth } = await supabase.auth.getUser();
+    const myId = auth.user?.id;
+
+    const [{ data: profiles }, { data: tenants }, { data: coachRows }] =
+      await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, full_name, email, phone, admin_disabled_at")
+          .eq("role", "tenant_admin")
+          .order("created_at"),
+        supabase.from("tenants").select("id, owner_profile_id"),
+        supabase.from("coaches").select("profile_id"),
+      ]);
+
+    const ownerId = (tenants ?? [])[0]?.owner_profile_id ?? null;
+    const coachIds = new Set((coachRows ?? []).map((c) => c.profile_id));
+
+    setAdmins(
+      (profiles ?? []).map((p) => ({
+        id: p.id,
+        fullName: p.full_name,
+        email: p.email,
+        phone: p.phone,
+        isOwner: p.id === ownerId,
+        isCoach: coachIds.has(p.id),
+        // Deactivation is client-readable; invited-vs-active is not (yet null).
+        status: p.admin_disabled_at ? ("deactivated" as const) : null,
+      }))
+    );
+    setIsOwner(!!myId && myId === ownerId);
+    setLoading(false);
+
+    // Phase 2: the auth-layer half. On failure the pills quietly stay "—";
+    // the roster above is already correct and the actions carry their own
+    // errors, so a red banner here would outshout a cosmetic gap.
     const { data: session } = await supabase.auth.getSession();
     const res = await fetch("/api/list-admins", {
       headers: {
         Authorization: `Bearer ${session.session?.access_token ?? ""}`,
       },
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setPageError(json.error ?? "Could not load the admin list.");
-      setAdmins([]);
-    } else {
-      setAdmins(json.admins ?? []);
-      setIsOwner(Boolean(json.callerIsOwner));
-    }
-    setLoading(false);
+    }).catch(() => null);
+    if (!res?.ok) return;
+    const json = await res.json().catch(() => null);
+    if (!json?.admins) return;
+    const statusById = new Map<string, AdminRow["status"]>(
+      json.admins.map((a: AdminRow) => [a.id, a.status])
+    );
+    setAdmins((rows) =>
+      rows.map((r) => ({ ...r, status: statusById.get(r.id) ?? r.status }))
+    );
   }, []);
 
   useEffect(() => {
@@ -310,12 +351,14 @@ export default function AdminsPage() {
                     <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
                       <ShieldCheck className="h-3 w-3" /> Owner
                     </span>
-                  ) : (
+                  ) : admin.status ? (
                     <span
                       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_PILL[admin.status]}`}
                     >
                       {admin.status}
                     </span>
+                  ) : (
+                    <span className="text-xs text-gray-300">—</span>
                   )}
                 </Td>
                 <Td>
