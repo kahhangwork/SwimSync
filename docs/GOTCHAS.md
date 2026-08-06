@@ -1423,3 +1423,40 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       Same limitation as `function_grants.test.sql` (§7.39): the remote dump is the honest
       check, and an apply-time probe in the migration is the only one that executes against
       production. (2026-08-04.)
+
+90. **A SECOND FOREIGN KEY BETWEEN TWO TABLES BREAKS EVERY *BARE* POSTGREST EMBED BETWEEN
+    THEM — IN BOTH DIRECTIONS, EVERYWHERE, THE MOMENT THE MIGRATION APPLIES.**
+    `tenants.owner_profile_id → profiles` (`20260806000100`) was the second relationship
+    between `profiles` and `tenants` (the first: `profiles.tenant_id`). From then on
+    `.from("profiles").select("tenants(display_name)")` is **ambiguous** and PostgREST
+    refuses it with "more than one relationship" — the query that had worked for weeks
+    returns an error, and the UI built on `maybeSingle()` reads that as *no row* and
+    renders its empty state. That is how `/accept-invite` silently lost the business name
+    and the Students page would have lost its low-package threshold.
+    - **The failure is at a distance**: the migration is correct, the query is unchanged,
+      and nothing fails at apply time — only the *read* breaks, only through PostgREST
+      (raw SQL is fine), and only for embeds between that table pair.
+    - **The fix is a hint**: `tenants!tenant_id(display_name)` — hint by **column**, which
+      survives constraint renames, rather than by constraint name.
+    - **The sweep that finds every victim**: grep both apps for embeds of either table
+      name and keep only those whose `.from(...)` is the other table of the pair. Only
+      `profiles`-sourced embeds were ambiguous here; the eight `tenants(...)` embeds from
+      single-FK tables (invoices, parent_tenants, coaches…) were untouched.
+    - Found by `verify-tenant-provisioning.mjs` within the hour, which is the argument for
+      running drivers before deploying a migration that adds an FK. (2026-08-06.)
+
+91. **"NEVER GATE ON ROLE" (§7.19) NOW HAS EXACTLY ONE DELIBERATE EXCEPTION — ADMIN-PANEL
+    *ENTRY* — AND ITS SHAPE IS WHAT KEEPS IT FROM RECREATING §7.19. DO NOT "FIX" IT BACK.**
+    Since co-admins (`20260806000100`), the login page and `RequiresTenant` refuse
+    `coach`/`parent` accounts with "please use the SwimSync app". The old rule ("ask *does
+    this account have a business*, never the role") still governs **which pages** an admin
+    sees — but it cannot answer **may you enter at all**, because a created coach also has
+    a `tenant_id`; before this gate they got a half-working, read-only panel.
+    - **The §7.19 lesson survives as the check's shape**: refuse ONLY a **resolved**
+      profile whose role is affirmatively `coach` or `parent`. Loading, fetch errors and
+      unknown role values must never refuse — refusing on "not yet known" is exactly how
+      the real coach got locked out of production once.
+    - The private coach passes both gates: their role IS `tenant_admin`.
+    - The head comments in `lib/adminNav.ts` and `components/RequiresTenant.tsx` were
+      rewritten to carry the two-question split; if either ever again says "never role",
+      someone has reverted the gate. `verify-admins.mjs` pins the refusal; `verify-tenant-admin.mjs` pins that the production admin shape still enters. (2026-08-06.)

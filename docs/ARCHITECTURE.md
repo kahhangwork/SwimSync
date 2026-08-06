@@ -384,6 +384,33 @@ the shape of the system changes:_
     `SECURITY DEFINER` owned by `postgres`, so client DML is distinguishable by the role
     it arrives as. Any new SECURITY DEFINER writer inherits the exemption automatically.
 
+- **Business OWNERSHIP is data, not a role — `tenants.owner_profile_id` — and the choice
+  was deliberate (2026-08-06, §8.31).** Owner and co-admins share the one `tenant_admin`
+  role; the hierarchy platform admin → owner → co-admin → coach/parent is carried by that
+  column, not by the enum. Considered and rejected: a `tenant_superadmin` enum value —
+  permanent once added (enum values are retired by data, never DDL), hardcoded-string
+  audits across ~25 files, and structurally unable to enforce one-owner-per-tenant; and
+  the `tenant_members` join table once sketched in `BACKLOG.md` — buys nothing while all
+  admins hold identical authorization, and stays available additively if permissions ever
+  split. Consequences a future session must not undo:
+  - **The first `tenant_admin` of a tenant claims ownership inside `handle_new_user`**
+    (guarded `owner_profile_id IS NULL`), which is why provisioning needed no change.
+    `handle_new_user` must STAY `SECURITY DEFINER` — that is the only reason its claim
+    UPDATE passes the `tenants` guard trigger.
+  - **Deactivation is one clause in one function**: `admin_disabled_at IS NULL` inside
+    `is_tenant_admin()`, so every admin policy inherits it. Coach access survives because
+    it derives from the `coaches` row (`current_coach_id()`), not the role — the same
+    fact that makes the private coach work. Membership reads keyed on
+    `current_tenant_id()` are deliberately NOT cut (the coach app needs them); the auth
+    ban on pure admins is what ends those, within one token lifetime.
+  - **The guard triggers on `profiles` (role/tenant_id/admin_disabled_at) and `tenants`
+    (owner_profile_id) are INVOKER functions on purpose** — a SECURITY DEFINER guard
+    checks `postgres`, not the caller (§7.38) — and they exist because `profiles_update`
+    lets any tenant admin update any tenant profile, which with two admins is an
+    escalation path.
+  - **There is no owner-transfer path** — refused at the trigger. Adding one is a
+    `BACKLOG.md` item, not a quick UPDATE.
+
 - **The mark renders two different ways on purpose, and is absent from the invoice email
   on purpose.** `SwimSyncAdmin/components/Logo.tsx` inlines the SVG paths (recolourable via
   `currentColor`, no request); `SwimSyncApp/components/Logo.tsx` uses a white-knockout
@@ -509,10 +536,13 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `supabase/tests/student_identity · student_tenant_pin · document_name_snapshot · tenant_levels · level_skills · parent_address` | This session's pgTAP (+50). Each was confirmed to FAIL without its fix |
 | `.claude/skills/run-ui-playwright/drivers/verify-{student-identity,edit-child,levels,level-skills,parent-address}.mjs` | Fifth session's UI drivers (49 checks). They caught three defects that typechecked clean and passed pgTAP |
 | `.claude/skills/run-ui-playwright/drivers/verify-invoice-controls.mjs` | Sixth session (21 checks): MEASURES the toggle's track/knob rects from the DOM and asserts the billing-month default + cap. Its **14/21 baseline on unfixed code** is what located the knob bug (§7.34) |
-| `SwimSyncAdmin/lib/adminNav.ts` (+ test) | Which pages an account can use, keyed on **`tenant_id`, never `role`** (§7.19). Sidebar, the layout gate and the post-login landing all derive from it, so they cannot disagree. Unknown routes fail closed |
-| `SwimSyncAdmin/components/RequiresTenant.tsx` | The audience gate, applied once in the `(admin)` layout. **Early-returns** so a refused page's children never mount — an overlay would leave the queries running (§7.10) |
+| `SwimSyncAdmin/lib/adminNav.ts` (+ test) | **Which pages** an admin sees, keyed on `tenant_id` (§7.19). Panel **entry** is a separate, role-based question since co-admins — the two-question split is §7.91 and the file's own header. Sidebar, the layout gate and the post-login landing all derive from it, so they cannot disagree. Unknown routes fail closed |
+| `SwimSyncAdmin/components/RequiresTenant.tsx` | The audience gate, applied once in the `(admin)` layout: role gate (coach/parent → "use the SwimSync app", **only on a resolved profile** — §7.91), suspension screen for deactivated admins, then tenant-vs-platform scope. **Early-returns** so a refused page's children never mount — an overlay would leave the queries running (§7.10) |
+| `SwimSyncAdmin/app/(admin)/admins/page.tsx` + `app/api/{invite,resend-admin-invite,deactivate,reactivate,delete,list}-admin*` | Co-admin management (§8.31): roster visible to every admin, levers owner-only. Routes call the RPCs **as the caller** (service-role would blow past `is_tenant_owner()`); delete order is ban → RPC → deleteUser |
+| `SwimSyncAdmin/lib/adminManagementGate.ts` | The shared route gate (caller's tenant from their OWN profile, owner check against `tenants.owner_profile_id`) — five routes, one boundary |
+| `SwimSyncAdmin/lib/coAdminInviteEmail.ts` (+ test) | Co-admin invite copy: "help manage", **no join-code custody paragraph** — that language belongs to the owner invite (`inviteEmail.ts`) |
 | `supabase/migrations/2026071900{2300,2400}` | `platform_tenant_overview()` + `platform_stranded_parents()`, then the derived-shape correction. SECURITY DEFINER, gated internally, REVOKEd from PUBLIC (§7.35) |
-| `.claude/skills/run-ui-playwright/drivers/verify-platform-admin-scope.mjs` | 30 checks: every refusal asserts the **absence of rows**, and the tenant-admin half asserts all eleven pages render their **content** — "no refusal" would also pass on a blank page |
+| `.claude/skills/run-ui-playwright/drivers/verify-platform-admin-scope.mjs` | 32 checks: every refusal asserts the **absence of rows**, the tenant-admin half asserts each listed page renders its **content** — "no refusal" would also pass on a blank page — and the sidebar count is pinned (16 since Admins, 2026-08-06) |
 | `supabase/functions/generate-invoices/test-helpers.ts` → `monthEnded()` | The suite's clock seam. Supplies billing month + a clock at which it is billable + an early-enough enrolment as ONE fact, and **throws on a scenario expecting zero lessons** (§7.33) |
 
 gotchas: `swimsync-project`, `swimsync-backend-gotchas`.

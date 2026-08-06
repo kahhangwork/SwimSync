@@ -108,6 +108,15 @@ still point at the local stack for dev.
    alone** — nothing in this repo creates objects as `supabase_admin`, and on cloud
    `postgres` may not hold the membership to change them. Don't "fix" them.
 
+   **`service_role` still gets a default EXECUTE on every new function, and that is the
+   untouched-by-design cell** (§8.29 scoped the sweep to the client roles). Observed
+   2026-08-06: `is_tenant_owner()` and `profile_reference_columns()` came out of
+   `20260806000100` with a cloud-side `GRANT … TO service_role` neither migration wrote,
+   while the four co-admin RPCs don't — they carry an explicit
+   `REVOKE … FROM service_role`. Harmless for these (both are `auth.uid()`-keyed or
+   catalog reads), but it is a standing local/cloud drift: don't read a service_role grant
+   in a remote dump as evidence someone granted it.
+
 8. **Production's client-role grants are a DECLARED SET now, and the dump is how you check
    it.** Since `20260804000600` `authenticated` holds a table privilege only where a policy
    could permit it. Verified on production 2026-08-04: **zero** `GRANT ALL ON TABLE … TO

@@ -1,6 +1,10 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-05 — **one item SHIPPED and removed:** *Run the UI drivers in CI*
+_Last updated: 2026-08-06 — **one item SHIPPED and removed:** *Multiple admin accounts per
+tenant* (PRD §4.3, §8.31 — the join-table sketch it carried was superseded by
+`tenants.owner_profile_id`, reasoning in `docs/ARCHITECTURE.md` §6); *Disable a staff
+account* narrowed to its remaining COACH half; two new items: *Split co-admin permissions*
+and *Owner transfer*. Previously 2026-08-05: *Run the UI drivers in CI*
 (HANDOVER §8.30) — all 32 drivers now run nightly under `.github/workflows/ui-drivers.yml`
 via `run-all-drivers.sh`, failures collected in one rolling `ui-driver-rot` issue. The
 first sweep found eight broken drivers, none a product bug, which was the item's whole
@@ -152,7 +156,7 @@ package notifications, in-app refunds.
 ### Unordered — no dependencies, pick by value
 
 Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-history view
-(S), Export to CSV (S), Disable a staff account (M), Student-move loose ends (S), Better
+(S), Export to CSV (S), Disable a coach account (M), Student-move loose ends (S), Better
 filtering/search (S), More polished
 dashboards (S), Deeper component-render tests (M), Convert a trial into an enrolled student (S),
 Editing a student's contact details (S),
@@ -740,34 +744,39 @@ constraint is the real gate here, not the feature.
 
 ## Admin and operations
 
-### Multiple admin accounts per tenant — **M**
-More than one person can administer the same business — e.g. a school owner plus an
-operations manager, both seeing that school's coaches, classes, students and billing, and
-neither seeing any other tenant.
+### Split co-admin permissions — **M**
+Restrict what individual co-admins can do — e.g. an assistant who can mark attendance and
+chase payments but cannot change class pricing or issue credit notes.
 
-**Why:** a school is not one person. The owner who signs up is rarely the person doing
-daily attendance chasing and invoice runs, and today the only way to share that work is to
-share one login — which destroys the audit trail (`audit_log.actor_id` becomes
-meaningless) and means offboarding a staff member requires a password change for everyone.
-Not needed for the August pilot, where a single school admin is sufficient.
+**Why:** the user has said feature-splitting is coming ("I will only be splitting features
+in the future"). Today every co-admin has the owner's full authority except admin
+management, which is the right first cut but means an assistant hired to chase invoices
+can also reprice every class.
 
-**Notes:** deliberately excluded from `TENANCY_DESIGN.md` §8 so the first cut stays small,
-but the design leaves room for it and names the exact seam. That design puts the role on
-`profiles` (one `tenant_admin` per tenant); **this item is the point at which that shortcut
-is replaced by a `tenant_members (tenant_id, profile_id, role)` join table**. Doing it that
-way round is cheap — the join table is additive and the role-on-profile check becomes a
-lookup — whereas building the join table up front would add a table and a migration for a
-capability nobody has asked for yet. Worth settling at the same time: whether a second admin
-is a *full* admin or a restricted one (e.g. can mark attendance and chase payment but cannot
-change class pricing), since that decides whether `role` on the join table is a real enum or
-a placeholder.
+**Notes:** parent/coach/admin are ONE database role, so grants can't do this — only RLS
+resolution or per-capability checks can (§8.29's structural finding). The seam is
+`is_tenant_admin()`/`is_tenant_owner()` in `20260806000100`: a permissions model slots in
+as either more owner-style columns (cheap, coarse) or a `tenant_members`-style capability
+table (the additive path the shipped design deliberately left open —
+`docs/ARCHITECTURE.md` §6). Don't add enum roles for this (same reasoning as the owner
+column: permanent, string-audited everywhere, can't express one-owner-per-tenant).
 
-**Sharper since 2026-07-21:** provisioning a business (PRD §4.4) now mints **exactly one**
-admin and there is no way to add a second afterwards — not even by hand, short of SQL. So
-this is no longer only "sharing work is awkward"; it is the single remaining gap in
-business onboarding, and it is felt on day one rather than eventually. The provisioning
-route and `/accept-invite` both assume one admin per tenant and will need revisiting with
-the join table. See `TENANT_PROVISIONING_PLAN.md`.
+### Owner transfer — **S/M**
+Hand a business's ownership to another of its admins (owner retires, business is sold,
+the founding admin leaves).
+
+**Why:** `tenants.owner_profile_id` has no transfer path — it is pinned against ALL
+client writes by a guard trigger (20260806000100), deliberately, because with co-admins
+any writable path is a takeover path. If an owner is lost today (account deleted at the
+auth layer, owner dies/leaves), their business's admin management is frozen until the
+platform admin intervenes in SQL.
+
+**Notes:** the mechanism wants to be a SECURITY DEFINER RPC gated on the CURRENT owner
+(self-service handover) plus a platform-admin recovery path for the lost-owner case. The
+guard trigger passes definer functions automatically (`current_user = 'postgres'` —
+§7.38's mechanism, documented in the migration). Remember `platform_tenant_overview()`
+and `resend-invite` both key on the owner column now — a transfer moves who the platform
+panel shows and who gets the onboarding resend, which is correct but worth asserting.
 
 ### The family-status search scans every membership client-side — **S**
 `handleFamilySearch` on the Platform page fetches **all** `parent_tenants` rows and filters
@@ -810,39 +819,42 @@ gives them its join code, and the child is added there as a new record. History 
 the business that taught it, which is the isolation working correctly. Don't conflate the
 two by making the rescue tool "move everything".
 
-### Disable a staff account (coach / tenant admin) — **M** `[handover]`
-Revoke a coach's or a tenant admin's access without deleting them. Absorbs the older
-"delete-coach action" item, whose own note already concluded **deactivate is the right
-verb** — real deletion destroys billing history.
+### Disable a COACH account — **M** `[handover]`
+Revoke a coach's access without deleting them. **The ADMIN half of this item shipped
+2026-08-06** (PRD §4.3: the owner deactivates/deletes co-admins, with the auth-layer ban
+for pure admins) — what remains is the coach half, plus platform-level tenant suspension.
+Absorbs the older "delete-coach action" item, whose own note already concluded
+**deactivate is the right verb** — real deletion destroys billing history.
 
-**Why:** there is no way to switch off a staff account today. When a school's coach
-leaves, or SwimSync parts ways with a school, someone with access to that business's
-students, attendance and billing keeps it indefinitely. The only remedy is SQL in the
-Supabase dashboard — fine for the owner, impossible for anyone else, and dashboard SQL
-against production is exactly where a bad afternoon comes from.
+**Why:** when a school's coach leaves, someone with access to that business's students
+and attendance keeps it indefinitely. The only remedy is SQL in the Supabase dashboard —
+fine for the owner, impossible for anyone else, and dashboard SQL against production is
+exactly where a bad afternoon comes from.
 
-**Notes — the control sits at two different levels, and that's the main decision:**
+**Notes — the control levels that remain:**
 
 | Disabling… | Who does it | Why there |
 |---|---|---|
 | A **school's coach** | That business's **tenant admin** | Their own staffing. The platform has no business being in the loop |
-| A **tenant admin** | **Platform admin** | There is only one admin per business today, so nobody inside it can |
 | A whole **tenant** | **Platform admin** | Suspending a business; cascades to its accounts |
 
-**`profiles.is_active` is the right home** — it already exists, is global, covers every
-role, and is currently **enforced nowhere**, so it has no behaviour to break. Enforcement
-needs two layers: RLS teeth (`current_coach_id()` returning NULL for a disabled account,
-so a disabled session sees nothing whatever the client does) and a friendly sign-out
-message. ⚠️ **That helper feeds all 37 policies** — it is the highest-blast-radius edit
-available in this codebase, and wants its own pgTAP coverage before any UI exists.
+The shipped admin half established the working pattern to reuse: authority cut by one
+clause in the identity helper (`admin_disabled_at IS NULL` inside `is_tenant_admin()` —
+the coach twin is `current_coach_id()` returning NULL for a disabled coach), an
+auth-layer ban for accounts with no other role, idempotent owner-gated RPCs, and the
+guard trigger pinning the column against client writes (20260806000100). ⚠️
+`current_coach_id()` feeds the coach half of the policy set — same blast-radius warning
+as ever: pgTAP before any UI. `profiles.is_active` still exists and is still enforced
+nowhere; the shipped work deliberately did NOT use it (it is whole-account, and an
+admin-who-coaches must keep coaching when their admin half is suspended — the coach
+version has the mirror-image concern).
 
 **Two traps, both already paid for elsewhere:**
 
 - **A private coach holds `tenant_admin` *and* a `coaches` row** (`docs/ARCHITECTURE.md` §6). "Disable
   the coach" for them means locking the business owner out of their own business. Guard
-  it as *"cannot disable the sole tenant admin of a tenant"* — and check **which extension
-  rows exist**, never `role`. Branching on the role enum is exactly what locked the real
-  coach out of production (§7.19).
+  it as *"cannot disable the sole coach who is also the owner"* — and check **which
+  extension rows exist**, never `role` (§7.19, and now §7.91's scoped exception).
 - **`classes.coach_id` is RESTRICT with no cascade.** A disabled coach's classes still
   exist and still need attendance marked — and unmarked attendance **blocks invoice
   generation outright, with no override** (PRD §7.7). So disabling a coach without

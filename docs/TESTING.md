@@ -387,7 +387,20 @@ by a correction round-trips through the real upsert path that §7.57 governs.
 **Scores 6/12 on the pre-fix screen**, which is what makes it worth having. Its fixture
 derives every date from ONE clock anchor rather than hardcoding — deliberately the opposite
 of §7.33's rule for unit suites, because the behaviour under test IS relative to now(). It
-carries `pressByText()` for §7.58; needs both servers.
+carries `pressByText()` for §7.58; needs both servers;
+`verify-admins.mjs` (+ `fixtures-admins.sql` and its `-teardown.sql`) drives co-admin
+management (§8.31) across five personas — what only a driver can prove, since bans live in
+auth, not the database: the owner's roster with Owner badge and levers; the invite path
+**asserting the hand-over-link warning, not a fake success** (no RESEND key locally);
+deactivating a PURE admin flips the pill AND **kills their login** (the ban half),
+reactivate restores both; a deactivated COACH-admin still logs in (never banned — coaching
+survives) and lands on the suspension screen; a co-admin sees the same roster with **no
+buttons**; the typed-DELETE modal's button is dead until the word is typed, warns about the
+audit purge, removes the row and the login; and a plain coach is refused at the login door
+with "use the SwimSync app", not "access denied" (21 checks; admin-only). **The driver
+consumes state** (deletes one fixture admin, invites another) — teardown or reset between
+runs. The same session's driver pass is what caught §7.90: `verify-tenant-provisioning`'s
+accept-invite check went red within the hour of the migration applying;
 
 > **It absorbed `verify-attendance-window.mjs` on 2026-08-01 and now runs 19 checks.** That
 > driver had rotted to **2/5** with the product correct in every case: its fixture pinned a

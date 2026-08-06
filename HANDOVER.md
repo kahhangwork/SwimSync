@@ -1,57 +1,32 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-05 — **every UI driver now runs NIGHTLY in CI (§8.30):**
-`run-all-drivers.sh` sweeps all 32 `verify-*.mjs` under `ui-drivers.yml` (04:00 SGT daily
-+ a manual button), maintaining one rolling `ui-driver-rot` issue — failures append, a
-green run closes it. The first full sweep was the argument made flesh: **8 of 32 red,
-none a product bug** — eight rotted drivers (four still logged in as `superadmin@` for
-tenant pages, dead since the roles split on 2026-07-19; two asserted the
-pre-`RequiresTenant` platform-admin UX; one pinned a renamed stat and an outgrown
-sidebar; one never confirmed the review modal that killed parent-claim in §8.29; one
-waited for the "Generate anyway" override §8a deliberately removed — its absence is now
-the assertion), one flake (popup URL read before navigation), one runner bug
-(pre-loading tenant-branding's self-managed fixture). All repaired, and **the cloud runs
-went green on attempt 4** — the first three each exposed one environment bug (an ignored
-lockfile behind a `wait` that hid its failure; a single-shot Expo login losing its race
-under runner load; the retry's own `about:blank` bug) — after which the rolling issue
-**closed itself with "Green again"**, exercising every path of the loop. **The standing
-headline is unchanged: chase the outstanding invoices, keep marking August, bill it in
-early September — §9.**_
-
-_Previously, 2026-08-04 (second session) — **auditing whether `authenticated` deserved
-the sweep `anon` got found three LIVE forgery paths instead, all now closed and DEPLOYED
-(§8.29).** A self-registered stranger — signup is open, so that is anyone with an email
-address — could join any business **with no join code** (and then read its `join_code`,
-harvesting the credential they bypassed), attach themselves to **any child by UUID**, and
-rename or deactivate that child. Both policies checked *whose* row it was and never *what
-it pointed at*. The original question was answered too, in the negative: `authenticated`
-does **not** deserve `anon`'s sweep — parent, coach and admin are one database role, so
-only RLS has the resolution — but 50 of its 148 grants had no policy behind them, so the
-grant set became a **declared whitelist** that CI re-proves every run. Four migrations
-(`000500`–`000800`); the last two exist because production was **dumped after deploying
-rather than trusted**. Separately, `verify-parent-claim.mjs` was found red since **58
-minutes after it was written** — the product was correct throughout. **The standing
-headline is unchanged: chase the outstanding invoices, keep marking August, bill it in
-early September — §9.**_
-
-_Previously, 2026-08-04 — **the three queued migrations all shipped and DEPLOYED
-(§8.28), and the queue is now empty**. Two of the three were mis-filed, which is the
-useful part. *Revoke `anon` EXECUTE* was filed as "defence in depth, not a live hole" and
-was one: `next_credit_note_ref` had **no ACL at all**, so an unauthenticated POST could
-increment a business's credit-note counter (§7.82) — production went from **49 functions
-granted to `anon` to 18**, all of them trigger functions. *Narrow `coaches_without_rate`*
-had already been done in SQL since 2026-07-19; the 2026-08-01 session read the field
-mapping **backwards** and replaced a working column with a 2000-row browser scan, writing
-the false claim into four places (§7.83 — three oracles that settle it in seconds). The
-third, `audit_log.tenant_id`, is now stamped from each row's **entity** by a trigger, with
-the fabrication-friendly INSERT policy narrowed on the way past. **The standing headline is
+_Last updated: 2026-08-06 — **a business can have CO-ADMINS, and the owner manages them —
+LIVE and verified on production (§8.31).** `tenants.owner_profile_id` marks the "main"
+admin (ownership is data, not a new role — `docs/ARCHITECTURE.md` §6); the owner invites
+co-admins (optionally also coaches) from a new **Admins** page, deactivates/reactivates
+them (pure admins are also banned at the auth layer; a coach-admin keeps coaching), and
+deletes — demotion for coach-admins, typed-DELETE hard delete for pure ones. Escalation
+guards now pin `profiles.role`/`admin_disabled_at`/`tenants.owner_profile_id` against
+client writes (`profiles_update` would otherwise have let any co-admin promote
+themselves). Coach/parent accounts are refused at the admin panel's door — the one
+deliberate exception to "never gate on role" (§7.91). The deploy surfaced §7.90: a second
+FK between two tables breaks every bare PostgREST embed between them — caught by the
+provisioning driver within the hour, both embeds hinted. **The standing headline is
 unchanged: chase the outstanding invoices, keep marking August, bill it in early
 September — §9.**_
 
-_Previously, 2026-08-03 — **the mobile app caught up with the billing that shipped without
-it (LIVE)**: four complaints from a day of real use, all correct, plus a driver with zero
-assertions deleted and a detector that turned out to be wrong about a second one. Full
-account and pointers: the **§8.27** ledger row._
+_Previously, 2026-08-05 — **every UI driver now runs NIGHTLY in CI (§8.30):**
+`run-all-drivers.sh` sweeps all 32 `verify-*.mjs` under `ui-drivers.yml` (04:00 SGT daily
++ a manual button), one rolling `ui-driver-rot` issue — failures append, a green run
+closes it. The first full sweep scored **8 of 32 red, none a product bug** (rotted
+drivers, one flake, one runner bug — all repaired), and the cloud runs went green on
+attempt 4, the rolling issue closing itself._
+
+_Previously, 2026-08-04 (second session) — **auditing whether `authenticated` deserved
+the sweep `anon` got found three LIVE forgery paths instead, all closed and DEPLOYED
+(§8.29)**: a self-registered stranger could join any business with no join code, attach
+themselves to any child by UUID, and rename that child. The grant set became a declared
+whitelist CI re-proves. Full account and pointers: the **§8.29** ledger row._
 
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
@@ -385,6 +360,19 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   `table_grants.test.sql` red rather than quietly restoring the old state (§7.87, §7.88).
   `service_role` is deliberately untouched — grants really are its only gate, but the
   oracle used here does not transfer to a role that bypasses RLS (`BACKLOG.md`).
+- **Co-admins, managed by the business's OWNER (verified local: pgTAP 38 + vitest + a
+  21-check UI driver, and on production data — LIVE 2026-08-06)** — the first admin of a
+  tenant is its **owner** (`tenants.owner_profile_id`, backfilled; all three production
+  tenants verified), and only the owner manages admin accounts from the new **Admins**
+  page: invite (optionally *also a coach*), resend, deactivate/reactivate, delete.
+  Co-admins hold identical authority otherwise; the owner can never be a target.
+  Deactivation suspends admin authority through one clause in `is_tenant_admin()` and
+  additionally **bans** a pure admin's login; a coach-admin is never banned — coaching
+  survives, and their "delete" is demotion to coach. A pure admin's hard delete purges
+  their audit rows (typed-DELETE confirm says so) and is refused if they have recorded
+  work. Coach/parent logins are refused at the panel door with "use the SwimSync app"
+  (§7.91). Escalation guards pin the privilege columns client-side writes used to reach
+  (PRD §4.3, `docs/ARCHITECTURE.md` §6, §8.31).
 - **Automated tests** — pgTAP + Deno on the backend, vitest + jest-expo on the two apps, all
   in CI on push to `main`. **Counts are deliberately not written here**: the two frontend
   numbers that used to be (162 and 109) had drifted to 198 and 174 by 2026-08-01 while
@@ -441,8 +429,8 @@ See §11.
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **Production was fully caught up as of 2026-08-04** — every migration through
-> `20260804000800` applied. THREE edge functions exist: `generate-invoices`,
+> **Production was fully caught up as of 2026-08-06** — every migration through
+> `20260806000100` applied. THREE edge functions exist: `generate-invoices`,
 > `package-emails` (verify_jwt ON) and **`public-invoice` (verify_jwt false, deliberately —
 > the invoice token is the access control)**. *(Version numbers used to be written here and
 > went stale twice. `supabase functions list` and `supabase migration list --linked` are the
@@ -453,7 +441,9 @@ See §11.
 > only by `supabase/rollback/20260802_makeup_bookings_DOWN.sql`; the 2026-08-04 grant work
 > is covered by a **committed** rollback file
 > (`supabase/rollback/20260804_authenticated_grants_DOWN.sql`), which is the pattern to
-> copy — a scratchpad backup nobody can find is not a rollback plan.
+> copy — a scratchpad backup nobody can find is not a rollback plan. The 2026-08-06
+> co-admins migration followed it: `supabase/rollback/20260806_co_admins_DOWN.sql`,
+> committed **before** the deploy.
 >
 > The **tenancy** deploys (§8.1) had **opposite orderings** and both were deliberate — phase 4
 > *dropped* columns so the app deployed first; phase 5 only *added*, so migrations went
@@ -498,6 +488,48 @@ ledger line plus its pointers is the whole of what is left. `/update-docs` enfor
 migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing line is a
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
+
+## 8.31 (2026-08-06) — CO-ADMINS: THE OWNER MANAGES A BUSINESS'S ADMIN ACCOUNTS, LIVE AND VERIFIED ON PRODUCTION
+
+**A business is no longer one login.** The user's ask: the main tenant admin creates and
+manages additional admin accounts with identical authority (feature-splitting later), on
+the hierarchy platform admin → tenant superadmin → tenant admin → coaches/parents.
+Shipped as `20260806000100` + the Admins page, both deployed the same day, the migration
+verified against production data (all three tenants' `owner_profile_id` correct) before
+the apps went out — the §7.60 order, done right.
+
+**The design calls that will matter later** (full reasoning `docs/ARCHITECTURE.md` §6):
+ownership is a **column**, not a role — `tenant_superadmin` as an enum value was
+considered and rejected (permanent, string-audited in ~25 files, can't enforce
+one-owner-per-tenant), as was the BACKLOG `tenant_members` join table (buys nothing while
+all admins are equal; still available additively). Deactivation is one clause in
+`is_tenant_admin()`; coach access survives because it rides the `coaches` row. Guard
+triggers (invoker, NOT definer — §7.38) closed a hole that predates the feature:
+`profiles_update` let ANY tenant admin rewrite any tenant profile's **role**, harmless
+with one admin and an escalation path with two — the pgTAP mutation run proved it, the
+self-promotion landing and corrupting 13 downstream assertions.
+
+**Found and fixed on the way:** §7.90 — the new FK made every bare `profiles`↔`tenants`
+PostgREST embed ambiguous; `verify-tenant-provisioning` went red within the hour
+(accept-invite lost the business name) and both affected embeds now carry `!tenant_id`
+hints. The admin login page already refused non-admin roles, so the user-requested coach
+gate became better copy ("use the SwimSync app") plus a defense-in-depth screen in
+`RequiresTenant` — the one deliberate exception to "never gate on role" (§7.91).
+
+**Deliberately not done:** owner transfer (guard-refused; BACKLOG), per-admin permission
+splits (BACKLOG, with the seam named), widening deactivation to cut
+`current_tenant_id()`-keyed membership reads (the coach app needs them; the auth ban
+bounds the residue at one token lifetime — pinned as chosen in pgTAP).
+
+**Verified:** pgTAP **536** in 31 files (was 498/30; the new 38 proven red three ways),
+vitest 250 (was 237), typecheck clean, drivers `verify-admins` 21/21 (new — bans are
+auth-layer, only a driver can see them), scope 32/32 (sidebar pinned at 16),
+tenant-admin 10/10, platform-admin 6/6, tenant-provisioning 15/15, fixture round-trip
+16/16. Production: remote dump post-deploy — RPCs grant only `authenticated`, anon still
+exactly its 18 trigger functions, zero blanket grants; committed rollback file. The
+deploy was confirmed by the user driving the live Admins page, not by a 200 (§7.31).
+
+---
 
 ## 8.30 (2026-08-05) — EVERY UI DRIVER RUNS NIGHTLY IN CI, AND THE FIRST SWEEP FOUND EIGHT ROTTED-OR-BROKEN DRIVERS — NONE A PRODUCT BUG
 
@@ -548,74 +580,11 @@ is always the current fact.
 
 ---
 
-## 8.29 (2026-08-04, second session) — THE AUDIT FOUND THREE LIVE HOLES, NOT THE ONE IT WENT LOOKING FOR
-
-**The question was §9's leftover: does `authenticated` deserve the sweep `anon` got?**
-The answer is **no** — and asking it properly is what found the holes.
-
-**Why not, structurally:** parent, coach and tenant admin are all the same database role.
-Grants are per-table-per-command and cannot tell them apart, so no grant can stop a parent
-reading another family's invoice — `invoices` must be SELECT-able by `authenticated` for the
-product to work. **Only RLS has that resolution.** What *was* free: 50 of 148
-(table × command) grants had no policy that could ever permit them, and TRUNCATE /
-REFERENCES / TRIGGER on all 37 tables were surplus **RLS cannot even see** — no policy in
-this repo restrains a TRUNCATE.
-
-**The three holes, reproduced with a real anon-key session before anything was written**
-(`000500`). Signup is open, so the attacker is anyone with an email address:
-
-```
-POST /rest/v1/parent_tenants  {parent_id: own, tenant_id: any}  -> 201
-POST /rest/v1/parent_students {parent_id: own, student_id: any} -> 201
-PATCH /rest/v1/students?id=eq.<uuid>                            -> 200
-```
-
-Reasoning: **§7.86**, including the original comment that preserves the error
-(*"the app resolves the code to a tenant id first"* — RLS never sees your UI) and the
-mitigating fact that student UUIDs are **not enumerable**, verified against a second real
-family so the check was not vacuous.
-
-**The ordering constraint is the transferable lesson.** The whitelist is derived *from* the
-policy set. Run before `000500`, it would have granted both forgery paths into a *reviewed,
-declared* whitelist and the holes would have stopped looking like holes. **A whitelist
-inherits the judgement of whatever it is derived from.**
-
-**Two of the four migrations exist only because production was dumped after deploying.**
-`000700` closed `GRANT ALL ON FUNCTIONS TO authenticated`, which survived three migrations
-because each probe tested only what its own migration changed (**§7.89** — the grid).
-`000800` retired `parent_students_delete` after the user asked whether an unused policy
-could just go: it could, and the reason was better than "unused" — the database and
-`BACKLOG.md` disagreed about whether an approved claim could be reversed outside its own
-undo flow (**§7.47**, updated in place).
-
-**What was deliberately NOT done:** `service_role` is untouched — grants genuinely are its
-only gate, but the `authenticated` oracle does not transfer to a role that bypasses RLS, so
-it needs a usage audit rather than a query (`BACKLOG.md`). Existing function grants were not
-swept; only the tap was closed.
-
-**Verified:** pgTAP **498** in 30 files (was 479/27; 18 new assertions in 3 files, all
-proven RED first), Deno 130 **twice** (§7.15), vitest 237, jest 244, both typechecks,
-fixtures 15/15, six drivers at **19/10/6/15/20/15**. All migration probes mutation-tested —
-**two of my own errors were caught that way**: the relkind guard fired on pgTAP's own views
-(red against a correct database, which is how a test gets disabled), and the first whitelist
-missed column-level ACLs, invisible to `has_table_privilege`. Production verified by remote
-dump: zero blanket table grants, zero default-privilege rows naming either client role.
-
-**Separately — `verify-parent-claim.mjs` was red from 58 minutes after it was written.**
-`handleSave()` gained an *"Is this right?"* review modal an hour after the driver was
-committed, so it waited for a popup the app would never show. **The product was correct the
-whole time**; confirmed by removing all four migrations and reproducing the failure, and by
-calling the RPC directly. 0/5 → 21/21. Fifth driver caught rotting by accident, and the one
-§7.79's detector **cannot** catch — it can fail, does fail, and exits non-zero to nobody.
-That evidence became the case for the nightly driver sweep, which shipped the next
-day (§8.30) and deleted the `BACKLOG.md` entry it had lived in.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.29** | 2026-08-04 (2nd) | The `authenticated` audit found **three LIVE forgery paths** instead of the one it went looking for — a self-registered stranger could join any business with no join code (then read it), attach to any child by UUID, and rename/deactivate that child; both policies checked *whose* row, never *what it pointed at*. All closed (`000500`–`000800`), the grant set became a **declared whitelist CI re-proves**, and the answer to the original question was NO — one database role carries parent/coach/admin, only RLS has the resolution. Two migrations exist only because production was **dumped after deploying** (§7.89). Separately `verify-parent-claim.mjs` had been red since 58 minutes after it was written, product correct throughout — the evidence that became §8.30's nightly sweep | **§7.86–§7.89** · §7.47 · `docs/TESTING.md` §5 · `docs/DEPLOYMENT.md` §11.7–11.8 · BACKLOG *(service_role audit)* |
 | **8.28** | 2026-08-04 | The three queued migrations shipped and DEPLOYED the same day (`20260804000100/200/300` + follow-up `000400`), and the headline was the one nobody filed: `next_credit_note_ref` had **no ACL at all** — an unauthenticated POST incremented a business's credit-note counter (§7.82); production went 49 → 18 functions granting `anon` EXECUTE, then `000400` turned off default-privilege grants to `anon`/`PUBLIC` entirely (the obvious per-schema revoke does nothing — §7.85). *Narrow `coaches_without_rate`* turned out filed **backwards** (§7.83 — the three oracles); `audit_log.tenant_id` stamped from its entity by trigger, fabrication-friendly INSERT policy narrowed, 81 rows backfilled after checking the dump. §7.84 (edge runtime stopped after `supabase start`) cost a diagnostic round | **§7.82–§7.85** · `docs/ARCHITECTURE.md` §6 · `docs/DEPLOYMENT.md` §11.7 · BACKLOG *(service_role audit)* |
 | **8.27** | 2026-08-03 | **The mobile app caught up with the billing that shipped without it** — four complaints from a day of real use, all correct: the coach's Classes tab lands on the class list (the other half of §7.65), the Billing tab became **My Pay** and hides entirely when there are no payouts, the parent app prints `INV-2026-0001` instead of a UUID fragment, and Today's card counts **guests apart from students**. On the test side, a driver with **zero assertions** deleted, a worse variant found printing "18/18 passed" while four checks crashed — and then the detector written to find them was itself **wrong**, having libelled a driver that asserts perfectly well | PRD §7.9, §14.2/§14.4 · **§7.79, §7.80, §7.81** · `BACKLOG.md` *(Deliberately not doing: any invoice count in the coach app)* |
 | **8.26** | 2026-08-02 | **Fee-free payment collection, Phases 0–3** — `INV-YYYY-NNNN` + a 128-bit public token by BEFORE INSERT trigger (the engine untouched), a client-computed **dynamic PayNow QR** with amount and reference locked, the **tokenized sessionless invoice page** served by the `public-invoice` edge function (deliberately not an anon RPC), the admin's **WhatsApp click-through queue** ("chat opened", never "reminded"), the parent's "I've paid" claim, and every mark-paid converged on `confirm_invoice_paid()`. Post-ship the same day, a question about the reference format exposed that **Postgres `LPAD` truncates** past the pad width — a silent reference collision within ~13 months for a large tenant, latent in `next_credit_note_ref` since July; both fixed. **Then the standing mission of this file completed: July billed for real and the first real money collected** | PRD §7.21 · `docs/design/PAYMENT_COLLECTION_DESIGN.md` · `docs/ARCHITECTURE.md` §6 *(anon-RPC refusal)* · **§7.77, §7.78** · `INVOICE_RUNBOOK.md` |
@@ -727,12 +696,11 @@ part of each redesigned screen being done. The pipeline is proven end to end: ru
 green and closed the rolling issue itself; `gh run list --workflow=ui-drivers.yml` and
 the rolling issue are always the current fact.
 
-**The migration queue is EMPTY.** Four shipped and deployed on 2026-08-04 (§8.29:
-`000500`–`000800`). Nothing is in flight, so the next schema change can start immediately —
-still one at a time (§7.55), and a worktree never authors one (`docs/WORKTREES.md`).
-**Note what the last two of those four cost:** both existed only because production was
-**dumped after deploying** rather than trusted. Budget for that dump; it is the only honest
-check (§7.39, §7.89, `docs/DEPLOYMENT.md` §11.7).
+**The migration queue is EMPTY.** The latest, `20260806000100` (co-admins, §8.31), shipped
+and deployed 2026-08-06 with its post-deploy dump taken the same hour. Nothing is in
+flight, so the next schema change can start immediately — still one at a time (§7.55), and
+a worktree never authors one (`docs/WORKTREES.md`). Keep budgeting the post-deploy dump;
+it is the only honest check (§7.39, §7.89, `docs/DEPLOYMENT.md` §11.7).
 
 ### Worth deciding, not urgent
 
