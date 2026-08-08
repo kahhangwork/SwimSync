@@ -1,6 +1,27 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-08 — **two items SHIPPED (struck through in place, not deleted),
+_Last updated: 2026-08-08 (second pass) — **`## Build order` is no longer empty.** It had
+been since 2026-07-19. The queue is now ranked by **rework cost** rather than value or size
+— each item placed so finishing it never sends you back into something already built
+(method: `.claude/skills/backlog-prioritisation/SKILL.md`). Five waves, plus an unordered
+pool and a strictly-ordered email/scheduler chain. **Six decisions settled with the user
+are recorded in a table at the top of the ranking**, because an unrecorded decision is
+re-litigated: co-admin permission splitting (yes, not now), coach-per-lesson rather than
+per-class, trainee pay (own rate), substitute pay (whoever taught), multiple classes per
+child (yes, soon), and native builds (not yet).
+
+**Four new items, one rewrite, one reversal.** New: *A lesson can have a substitute coach,
+temporarily* and *Trainee coaches shadow the main coach on a lesson* (Coach workflow), *A
+lesson recorded into an already-BILLED month is reported, and settled* (replacing "A
+session added AFTER a month is invoiced is never billed"), and *An owner-only accounting
+page* (Admin and operations). Superseded: *Multiple coaches per class* — both real needs
+turned out to be session-level, so a class-level join table would have been rebuilt.
+**Reversed: the *Deliberately not doing* row on substitute coaches** — it claimed
+`session_pay_overrides` already supported it, which is false (that table can suppress a
+lesson's pay and cannot name another coach). *Revenue reporting* is **absorbed** into the
+accounting page, which adds the question it never asked: who is allowed to see it.
+
+_Previously, 2026-08-08 — **two items SHIPPED (struck through in place, not deleted),
 one DEPRIORITISED, and one idea refused.** Shipped: *A coach week view*, which went
 further than it asked — the week view **replaced the Today tab outright** rather than
 reshaping the Classes tab, so the coach's tabs are now Schedule / Classes / My Pay /
@@ -95,124 +116,167 @@ stays reachable:
 
 ## Build order
 
-The ranking for the "billing is untested, so build other things" stretch (set 2026-07-16,
-while parents onboard and before the first real invoice run on 1 Aug). **Ordered to
-prevent re-work:** each item is placed so that finishing it never forces you back into an
-earlier one — if building A then B then C would send you back to rethink A while doing C,
-C is moved ahead of A. Sizes as above (**S**/**M**/**L**).
+**Ordered to prevent RE-WORK, not by value or by size:** each item is placed so that
+finishing it never sends you back into something already built. Where two items have no
+edge between them they share a wave and are picked by value. Method:
+`.claude/skills/backlog-prioritisation/SKILL.md`. Sizes as above (**S**/**M**/**L**).
 
 This ranking lives **only here** (one source of truth — deliberately not duplicated as a
 number on every heading, which would just drift). The item bodies below stay grouped by
 theme.
 
+> ⚠ **A SHIP HAS TO BE MARKED IN TWO PLACES, AND THE RANKED LIST IS THE ONE THAT GETS
+> FORGOTTEN.** Three items were found listed here as unbuilt while their own sections read
+> SHIPPED — *Makeup lessons* (6 days), *Editing a student's contact details* (6 weeks), and
+> *Pay and claim from the parent's invoice list* (caught during the session that shipped
+> it). The item bodies were correct every time; these lists were not, and a list is what
+> someone picking work actually reads. **When you strike an item through, grep this
+> document for its name before you close the file.**
+
 ### The near-term plan — build roughly in this order
 
-_(Shipped and removed from this list: bulk "set all" on the attendance screen
-(**2026-07-16** — PRD §7.6); the `tsc`-baseline + CI-typecheck item (**2026-07-16** —
-HANDOVER §8d); the **invoice half of email notifications** (**2026-07-16** — PRD §7.7;
-credit-note emails remain, now in _Notifications_); and the **UTC-derived default billing
-month fix** (**2026-07-17** — PRD §7.7, HANDOVER §8a). The list below is renumbered from what
-remains.)_
+_(Re-ranked **2026-08-08** by rework cost. The previous ranking had been empty since
+2026-07-19. Five shaping decisions were settled with the user the same day and are recorded
+below, because an unrecorded decision is re-litigated.)_
 
-**This list is empty.** All three near-term items shipped on 2026-07-19, and the two
-platform-admin items raised the same day shipped too — the panel is now scoped by audience
-and the Platform page is a per-tenant operations view (PRD §4.4, HANDOVER §8.7).
+#### The six decisions this ranking rests on (settled 2026-08-08)
 
-Pick from the sections beneath, or from `HANDOVER.md` §9 — which argues the real
-priority is not a build item at all, but getting real attendance marked in production.
+| Decision | Answer | Consequence for the order |
+|---|---|---|
+| Split co-admin permissions? | **Yes eventually, not now** | *Split co-admin permissions* moves to Later. The first real need — an **owner-only accounting page** — needs no capability model, because `is_tenant_owner()` already exists |
+| Coach per class or per lesson? | **Per lesson, on top of class assignment** | A permanent handover already works. A **temporary substitute** and **trainee/shadow coaches** are new lesson-level items; *Multiple coaches per class* is superseded |
+| Trainee coach pay? | **Paid at their own rate** | A shadowed lesson produces two payout rows — the payroll half of the accounting page must come after it |
+| Substitute pay? | **Whoever actually taught it** | The session override moves money, so it is a wages change, not just a roster label |
+| Multiple classes per child? | **Yes, and soon** | Promoted to Wave 2. It drops `one_active_enrolment_per_student`, so every enrolment-shaped surface built after it inherits the new model — and everything built before it gets reworked |
+| Native store builds ($99/yr)? | **Not yet — stay web-only** | *Push notifications* stays blocked. *Demote the static PayNow QR upload* must **hide** the upload, never delete it — the native fallback path stays alive |
 
-_Shipped 2026-07-18 and removed from this list:_ the **multi-class-parent under-billing
-bug**, plus the configurable **invoice run day**, **month sealing**, and the **hard
-attendance block** — see PRD §7.7 and HANDOVER §8.
+#### Wave 1 — cheap, independent, and inherited by everything after (8 × **S**, ~2 weeks)
 
-_Shipped 2026-07-19 and removed:_ **extract the completeness-rule shared helper** (it was
-#1; done as tenanting phase 0, and it immediately exposed a live underbill — `docs/GOTCHAS.md`
-§7.18), and the whole **tenant/coach money cluster** including **coach wages**.
+Nothing here is blocked by anything, and each one is paid for again by every screen shipped
+before it lands. Two chains, run in either order.
 
-_Shipped 2026-07-19 and removed:_ **address + postal code at parent signup** — optional at
-registration, editable afterwards at Profile → Contact Details (without which the field
-would only ever hold data for families who joined after it shipped). `postal_code` is TEXT.
-See PRD §5.1.
+**The PayNow / package chain — strict internal order, one screen:**
 
-_Shipped 2026-07-19 and removed:_ **coach-defined swimming levels** — per-business
-`tenant_levels` with an explicit order, set by the business's admin, read-only to coach and
-parent. The old fixed enum is dropped. See PRD §7.15.
+1. **Give package requests a reference number** — the stated blocker for #2.
+2. **Demote the static PayNow QR upload** — needs #1. **Hide, do not delete**: the native
+   fallback stays, per the decision above.
+3. **The PayNow screen calls the business "Coach"** — copy-only, folds into #1 or #2.
+4. **A link to the admin panel from coach Settings** — same `(coach)/settings` screen as
+   #2; batch it.
 
-_Shipped 2026-07-19 and removed:_ **child identification + derived age** — shipped as
-**name + date of birth**, not NRIC. The NRIC half was dropped deliberately: partial NRIC
-is still personal data under PDPC guidance, and DOB was already collected, so the same
-question is answered with no new regulated data. See PRD §5.1. It also grew an
-**edit-child screen**, because the roster problem is about children who already exist and
-nothing in the app could edit one — which in turn surfaced two latent bugs (HANDOVER §8).
+**The foundations:**
 
-_Shipped 2026-07-19 and removed:_ **active/inactive status for parents and children** —
-all six phases, live. It was the oldest outstanding item in this document. See PRD §7.14
-for what it does and HANDOVER §8 for how it went.
+5. **Direct writes to `students` are audited by nobody** — an `AFTER UPDATE` trigger is
+   inherited free by every future writer. Every screen shipped first writes unaudited.
+6. **An inactive CLASS is invisible to billing and to the block** — must precede any
+   class-deactivation path, and *Disable a coach* forces class reassignment.
+7. **Check column geometry on every admin table** — a UI redesign is planned; worth
+   ~14 tables of protection during it and near zero after.
+8. **`verify-levels.mjs` is not hermetic** — the nightly sweep is now the primary signal
+   (§8.30, §8.33); one non-hermetic driver makes it lie.
 
-_Shipped 2026-07-20 and removed:_ **package / subscription pricing** — as prepaid
-lesson packages, live same day (PRD §7.16, `PACKAGES_DESIGN.md`, HANDOVER §8.8). Worth
-keeping: the old entry's two warnings were **wrong** in instructive ways — it predicted
-a "second billing model inverting billing-derives-from-attendance" (the build refused
-that shape: same engine, money moves at invoice time, ad-hoc path byte-identical) and
-client-side concurrent drawdown (drawdown lives in the single-threaded engine; live
-displays are a read-only RPC). Its follow-ups are queued as items: parent-facing
-package notifications, in-app refunds.
+_(**Pay and claim from the parent's invoice LIST** headed this wave and **SHIPPED
+2026-08-08** alongside the Schedule tab, covered by `verify-parent-pay-claim.mjs`.)_
 
-### Later — clusters with a fixed internal order
+#### Wave 2 — **Multiple classes per child** (M)
 
-- ~~**The tenant/coach money cluster.**~~ **SHIPPED 2026-07-19** — multi-tenancy,
-  the role split, and coach wages are all built and live. See `PRD.md` §4.3/§7.13 and
-  `TENANCY_DESIGN.md`. It turned out **smaller than this entry feared**, and the reason
-  is worth keeping: treating a **private coach as a tenant of one** meant coach *type*
-  never became an authorization concept, so no rule branches on it and wages needed no
-  private-vs-school check at all. The "built twice" risk this entry warned about was
-  real, and was avoided by reframing rather than by building carefully.
-  **Coach-created student profiles** sat behind this and **shipped 2026-07-25** as part
-  of trial onboarding (PRD §7.17) — though the *coach-side* half of it was removed one
-  session later: trials are **arranged ahead of time by the business's admin**, and the
-  coach app has no write path but marking attendance (PRD §7.17). **What remained — *Parents claiming their own child* — SHIPPED
-  2026-07-26** (PRD §7.18, `PARENT_CLAIM_PLAN.md`). This cluster is now complete, and its
-  item is removed from this document rather than left marked done — the reasoning lives in
-  the plan and the PRD.
-- **The platform chain.** Native store builds (M) → Push notifications (M) — push can't
-  work on the current static web app, so it can't precede native builds.
-- **The reminder chain.** Invoice emails **shipped** (HANDOVER §8c); the rest sequences after
-  them: credit-note emails (M) → WhatsApp reminders (M) → Automated reminder workflows
-  (M — needs a scheduler, i.e. cron; the UTC-billing-month fix that had to precede enabling
-  cron is now **shipped**, so that prerequisite is cleared).
+The single largest retrofit tax in the backlog, and the user's answer is *build it soon*.
+It drops the `one_active_enrolment_per_student` constraint and reworks the enrolment UI,
+`expectedStudentsOn()` and the attendance rosters. Billing needs less than expected —
+the engine already sums per attendance record.
+
+**It goes before Waves 3–5 because every one of them touches enrolment or the roster.**
+*Convert a trial into an enrolled student* and *Book a make-up from the Attendance page*
+both sit on this ground and are deliberately held until after it. Trials and make-ups
+themselves are unaffected — a booking was never an enrolment.
+
+#### Wave 3 — **The lesson-level coach roster** (M/L)
+
+One schema change (`CLAUDE.md`: one in flight at a time), built once with a main/shadow
+distinction rather than a substitute column later widened:
+
+9. **A lesson can have a substitute coach, temporarily** — a per-session
+   `taught_by_coach_id`; pay follows it. `session_pay_overrides` **cannot** express this.
+10. **Trainee coaches shadow the main coach** — one main coach plus N trainees, each paid
+    at their own rate, so a lesson produces more than one payout row.
+11. Fold in **the attendance screen trusts a `sessionId` in the URL** (S) — same file, and
+    its own note says "do it the next time that screen is opened".
+
+⚠ **The blast radius is coach RLS, not the roster.** A coach reaches a class today via
+`classes.coach_id`; a substitute or trainee must open a lesson of a class they do not own.
+`current_coach_id()` feeds that policy set — pgTAP before any UI.
+
+> **The Schedule tab's exposure here is already measured, so do not re-derive it.** It
+> resolves "my lessons" from `classes.coach_id` and will show the wrong week for a
+> substitute — but the entire coupling is **two lines of one query** in
+> `schedule/index.tsx`'s `loadData` (the `coaches` lookup, then `.eq("coach_id", coach.id)`
+> on `classes`). **`lib/scheduleWeek.*` and `lib/scheduleBuckets.*` need NO change at all** —
+> they are pure date and bucket maths with zero code references to a coach. Wave 3 changes
+> only *which class ids the query selects*; the sections, week arithmetic and marking-state
+> logic are inherited unchanged. (Checked 2026-08-08.)
+
+#### Wave 4 — **A lesson recorded into an already-BILLED month is reported, and settled** (S/M)
+
+Placed after Wave 2 because a **backdated enrolment** is its main trigger, and Wave 2
+rewrites enrolment. Reuses the `unclaimed_billable` reporting shape and
+`student_settlements`; adds no invoice concept and no override. Correct
+`schedule_extra_lesson()`'s comment in the same pass — it claims the floor blocks this and
+it does not.
+
+#### Wave 5 — admin authority
+
+12. **Owner transfer** (S/M) — a live gap: a lost owner freezes a business today and SQL is
+    the only remedy.
+13. **Disable a COACH account** (M) — needs Wave 1 #6 and the coach RLS model settled in
+    Wave 3.
 
 ### Unordered — no dependencies, pick by value
 
-Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-history view
-(S), Export to CSV (S), Disable a coach account (M), Student-move loose ends (S), Better
-filtering/search (S), More polished
-dashboards (S), Deeper component-render tests (M), Convert a trial into an enrolled student (S),
-Email-confirmation copy/templates (S).
+Upcoming-lessons view for parents (S), Maps deep link (S), Moving a student between
+businesses (S), The family-status search client-side scan (S), Better filtering/search (S),
+Export to CSV (S), Tick off swimming skills per child (M), Email-confirmation
+copy/templates (S).
 
-_Removed 2026-08-08: **Editing a student's contact details** — shipped 2026-07-26 and
-struck through in its own section since then, but left standing here for six weeks. See
-the note under_ Later _below: this list and the item bodies are two places to mark a ship,
-and only one of them is ever remembered._
+**Three sit here but carry one edge each:**
+
+- **Attendance edit history view** (S) — after Wave 1 #5. Build the audit *writers* before
+  the audit *reader*.
+- **Convert a trial into an enrolled student** (S) and **Book a make-up from the
+  Attendance page** (S) — after Wave 2, which changes what an enrolment is.
+
+### The email / scheduler chain — strict internal order, start any time
+
+**Track invoice-email delivery + retry** (S) establishes the `sent_at` + `IS NULL`
+idempotency pattern in `email.ts` → **Credit-note email notifications** (M) inherits it
+rather than inventing a second one → *then* the cron decision (HANDOVER §9) gates
+**Parent-facing package notifications** (S) and **Automated reminder workflows** (M).
 
 ### Later — big features carrying their own dependencies
 
-Multiple classes per child (M), Parent
-self-enrolment (M), Coach-assisted assignment (M), Household split billing (M), Auto PayNow
-detection (L), In-app payment gateway (L), **Revenue reporting (M — *decide accrual-vs-cash
-first*; moved here 2026-08-08, see the item)**, Multiple coaches per class (S), Multi-language
-(M), Shared `lessonDates` package (M — *not recommended*, see the item), Generate real
-Supabase `Database` types (M — *do last*, needs a frozen schema; see the item).
+**An owner-only accounting page (M — *absorbs Revenue reporting*; decide accrual-vs-cash
+first; not a priority per the user 2026-08-08)** — build after the trainee-coach item, or
+its payroll half is written twice. Needs no capability model.
+**Split co-admin permissions (M)** — *yes eventually*; the accounting page does not wait
+on it. Parent self-enrolment (M — *needs class capacity, which does not exist*),
+Coach-assisted assignment (M), Household split billing (M — *needs a credit-splitting
+rule*), Auto PayNow detection (L — *the CSV-import M is the 10% worth doing first*),
+In-app payment gateway (L), Native store builds (M — *deferred; not spending the $99 yet*)
+→ Push notifications (M — *blocked by it*), Check the logo for brand collisions (S —
+*before native builds, whenever those happen*), Bulk WhatsApp Cloud API (M — *only on a
+real tenant's request*), Multi-language (M — **decide or refuse it; it is accruing
+retrofit tax unranked**), Decide whether `service_role` deserves the whitelist treatment
+(M — *a question until the usage audit exists*), More polished dashboards (S — *delete
+unless a real question replaces it*).
 
-_Removed 2026-08-08: **Makeup lessons** — shipped 2026-08-02 as the guest-pass model and
-struck through in its own section on the day, but left standing here._
+**Two items are deliberately LAST, and get cheaper by waiting:**
 
-> ⚠ **A SHIP HAS TO BE MARKED IN TWO PLACES, AND THE RANKED LIST IS THE ONE THAT GETS
-> FORGOTTEN.** Three items were found still listed here as unbuilt while their own
-> sections read SHIPPED — *Makeup lessons* (6 days), *Editing a student's contact details*
-> (6 weeks), and *Pay and claim from the parent's invoice list* (caught during the same
-> session that shipped it). The item bodies were correct every time; these lists were not,
-> and a list is what someone picking work actually reads. **When you strike an item
-> through, grep this document for its name before you close the file.**
+- **Generate real Supabase `Database` types** (M) — a schema snapshot. Waves 2 and 3 are
+  both migrations; every one landed first invalidates it.
+- **Deeper component-render tests** (M) — they pin screens the planned redesign will
+  rewrite.
+
+**Shared `lessonDates.ts` package (M)** stays not-recommended and unranked — free only if
+workspaces arrive for another reason.
 
 ---
 
@@ -384,6 +448,62 @@ Deliberately NOT built: a configurable first-day-of-week. `weekOrder.ts` is Mond
 rendering already overrides most of what the setting would buy. Considered and dropped
 with the user 2026-08-08; do not file it as an oversight.
 
+### A lesson can have a substitute coach, temporarily — **M**
+Record that Coach B taught one lesson of Coach A's class, without changing who the class
+belongs to. Pay follows **whoever actually taught it**.
+
+**Why:** a permanent handover already works — `set_class_terms()` takes a coach, updates
+`classes.coach_id` and writes a `class_rates` row with `paid_coach_id` + `effective_from`,
+so the outgoing coach keeps their pay for lessons before the change date. What has no
+representation at all is a **one-off cover**: Coach A cannot make Wednesday, Coach B
+teaches it, and the class assignment must not move. Today Coach A is paid and Coach B has
+no record of having worked.
+
+**Notes — the previously filed answer was wrong, and this is why:**
+
+- **`session_pay_overrides` cannot express this.** It is
+  `(lesson_session_id PK, pays_coach BOOLEAN, set_by, set_at)` — it can say a lesson *does
+  not* pay its coach, and cannot say *who else* it pays. The *Deliberately not doing* row
+  on substitute coaches asserted "the schema already supports it"; that row is now a
+  pointer here.
+- **This changes coach RLS, which is the blast radius.** A coach reaches a class today via
+  `classes.coach_id`. A substitute must be able to open and mark a lesson of a class they
+  do not own — so the coach's read/write path becomes "assigned to the class **or** named
+  on this session". `current_coach_id()` feeds that policy set; ⚠ same blast-radius rule as
+  ever — pgTAP before any UI.
+- **Pay attribution:** `class_rates.paid_coach_id` is `NOT NULL` and resolves per date, so
+  the payout path currently asks the class, not the session. A session-level override must
+  take precedence over `class_rate_on()` for that one lesson, and must be visible in the
+  pay-decision table rather than silently altering a total.
+- Decide whether a cover can span a **date range** (Coach A is away for three weeks) or
+  only one lesson at a time. A range is the same record repeated; the reason to decide up
+  front is the UI, not the schema.
+
+### Trainee coaches shadow the main coach on a lesson — **M**
+A lesson has exactly **one main coach** plus any number of trainee/shadow coaches.
+Trainees are **paid at their own rate**.
+
+**Why:** shadowing is how a school brings a coach on, and today SwimSync cannot represent
+it — a trainee is either the class's coach or invisible. The main coach must stay
+unambiguous, because pay attribution, RLS and the roster all resolve to one person.
+
+**Notes:**
+
+- **Sequence this AFTER the substitute item above** — both add "who taught this lesson" to
+  `lesson_sessions`, and they are one schema change, not two (`CLAUDE.md`: one schema
+  change in flight at a time). Build the session coach roster once, with a main/shadow
+  distinction, rather than adding a substitute column and then widening it.
+- **Paid at their own rate is the decision (2026-08-08), and it is the expensive half.**
+  A shadowed lesson produces **two** `coach_payouts` rows, which breaks the current
+  assumption that a lesson pays one coach via `class_rates.paid_coach_id`. The trainee's
+  rate comes from the existing effective-dated `coach_rates`, so no new rate concept — but
+  the payout builder, the pay-decision table and the coach's My Pay screen all now sum a
+  set rather than a single row.
+- A trainee must be able to **see** the lesson without being able to change the class —
+  same RLS widening as the substitute item, which is the other reason to build them
+  together.
+- **This supersedes _Multiple coaches per class_**: the need is per-lesson, not per-class.
+
 ### A link to the admin panel from coach Settings — **S**
 A coach who also holds `tenant_admin` gets a link to `admin.swimsync.sg` from their
 Settings screen.
@@ -458,8 +578,15 @@ rule and a decision about which parent's credit balance a correction lands in. C
 pooled **per parent** (`docs/ARCHITECTURE.md` §6), so splitting invoices without splitting credit
 would produce a ledger nobody can explain.
 
-### Revenue reporting — **M** — _deprioritised 2026-08-08_
+### ~~Revenue reporting~~ — **ABSORBED 2026-08-08** into *An owner-only accounting page*
 Tell a business what it actually earned in a month.
+
+**Absorbed, not dropped.** The content is now the main half of *An owner-only accounting
+page* (**Admin and operations**), which adds the one thing this item never said: **who is
+allowed to see it**. That turned out to be the deciding question — it is the first concrete
+thing a co-admin should not see, and it needs no capability model because
+`is_tenant_owner()` already exists. Everything below still applies and is the reason the
+accounting page carries a decide-first question.
 
 **Deprioritised 2026-08-08**, and moved from *Unordered — no dependencies* to *Later*.
 Raised as a build candidate one month into the live billing rhythm and declined by the
@@ -494,20 +621,43 @@ That is precisely the mistake PRD §4.4 records about the platform pages, which 
 several businesses' figures added together and labelled as one; the fix there was to show
 nothing rather than something wrong.
 
-### A session added AFTER a month is invoiced is never billed — **S**
-The hard block (HANDOVER §8) guarantees every lesson is marked *at generation time*. It does
-not cover a `lesson_sessions` row created **afterwards** for an already-invoiced month.
+### A lesson recorded into an already-BILLED month is reported, and settled — **S/M**
+_(Replaces "A session added AFTER a month is invoiced is never billed". Decided
+2026-08-08 — walked through with the user.)_
 
-**Why:** the parent has an invoice, so the `already_exists` guard skips them on any re-run,
-and the new lesson is silently unbillable — the same permanent-underbill shape the block was
-built to prevent, through the one door it doesn't watch. Much rarer now (it needs a
-back-dated mark into a closed month), but the failure is still invisible.
+The lesson still records. An admin-visible report lists lessons sitting inside a sealed
+billing month with nobody billed for them, and a **settlement** clears the line.
 
-**Notes:** the sealed month (`billing_periods`) makes this *mostly* unreachable — a sealed
-month is skipped entirely, and reopening it is a deliberate act. The honest fix is a
-"top-up" concept, or accepting that the correction tool is a credit note in the other
-direction. **Decide which before building anything**; the credit-note flow may already be
-the right answer, in which case this item becomes a doc line, not code.
+**Why:** the hard block guarantees every lesson is marked *at generation time*. It cannot
+cover a lesson created afterwards. The `unclaimed_billable` net already catches children
+the admin **entered** before billing — their lessons hold the month open. It cannot catch a
+child nobody entered: a family that started swimming on 16 July, registered on 12 August
+after July was billed, whose enrolment is then backdated so their real lessons can be
+recorded. Those lessons are unbillable and, today, **invisible**.
+
+**Notes:**
+
+- **Refusing was considered and rejected**: the coach would be unable to record a lesson a
+  child genuinely attended, the parent would see a gap in their child's history, and
+  §8.32 deliberately left no "reopen this month" escape hatch. A teaching record is not
+  only a billing record.
+- **Reuse the shape that already exists** — this is `unclaimed_billable` pointed at a
+  different cause: collect as a report with earliest/latest lesson dates, never touch
+  `billableStudentIds` or any invoice arithmetic, and release through
+  `student_settlements` (already effective-dated via `settled_through`, so settling once
+  cannot blanket-authorise future lessons). No new invoice concept, no override on the
+  `already_exists` guard.
+- The line must **persist until acted on**. A one-time warning was considered and rejected:
+  the entire failure mode is silence, and a message that is dismissed is gone.
+- ⚠ **`schedule_extra_lesson()`'s comment is WRONG and must be corrected in the same
+  pass.** It reads *"The FLOOR still applies — scheduling a lesson into an already-invoiced
+  month would create a lesson that can never bill."* It does not: `markable_floor()` is
+  `LEAST(1st of last month, month after the latest seal, …)` and `LEAST` takes the
+  **earlier**, so in August the floor sits at 1 July whether or not July is sealed. The
+  check tests the floor and the comment describes testing the seal. Pre-existing — not
+  introduced by §8.32. An applied migration is never edited, so the correction goes in the
+  new migration and in the function's `COMMENT`.
+- `book_makeup()` and `book_trial()` check the same floor and carry the same gap.
 
 ### An inactive CLASS is invisible to billing and to the block — **S**
 `core.ts` only scans `classes.is_active = true`.
@@ -774,6 +924,30 @@ constraint is the real gate here, not the feature.
 
 ## Admin and operations
 
+### An owner-only accounting page — **M** — _raised 2026-08-08, not a priority_
+One page showing what the business actually earned and paid out — revenue, wages paid,
+outstanding — **visible to the owner and not to co-admins**.
+
+**Why:** raised by the user while deciding whether co-admin permissions need splitting. It
+is the first concrete thing a co-admin should *not* see, and the reason the answer to
+"split co-admin permissions" is *yes eventually, not now*.
+
+**Notes:**
+
+- **This needs NO capability model.** "Owner only" is already expressible —
+  `tenants.owner_profile_id` and `is_tenant_owner()` shipped 2026-08-06. So this page can
+  be built whenever it becomes a priority, and it does **not** wait on
+  *Split co-admin permissions*. Recording that explicitly, because the two look coupled and
+  are not.
+- **This absorbs _Revenue reporting_** as its main content, and inherits that item's
+  decide-first question: **accrual (invoices issued this month) or cash (payments received
+  this month)?** Everything else follows from the answer. It also inherits *do not ship a
+  partial figure* — two sources must be summed, `invoices` **plus**
+  `student_settlements.amount` where `kind = 'paid_outside'`.
+- Wages paid out come from `coach_payouts`, which is already draft→frozen per period.
+  Note the trainee-coach item makes a lesson pay **more than one** coach — build this
+  after it, or the payroll half is written twice.
+
 ### Split co-admin permissions — **M**
 Restrict what individual co-admins can do — e.g. an assistant who can mark attendance and
 chase payments but cannot change class pricing or issue credit notes.
@@ -976,16 +1150,15 @@ wordmark in the lockup is a **placeholder system font stack**, not a chosen type
 worth settling in the same pass. Geometry and rationale are in `brand/README.md`;
 HANDOVER §8.2.
 
-### Multiple coaches per class — **S** `[MVP-excluded]`
-Allow more than one coach on a single class.
+### ~~Multiple coaches per class~~ — **SUPERSEDED 2026-08-08**
+Replaced by two lesson-level items in *Coach workflow*: *A lesson can have a substitute
+coach, temporarily* and *Trainee coaches shadow the main coach on a lesson*.
 
-**Why:** covers a co-taught lane or a substitute coach. Low urgency at one coach.
-
-**Notes:** `classes.coach_id` is a single FK — this becomes a join table. Worth checking
-against the substitute case first: if the real need is "someone else covers this week,"
-that's a *session*-level concern, not a class-level one, and the cheaper fix is
-different from what this item describes. **Confirm the need before building the join
-table.**
+The item's own note asked the right question — *"if the real need is 'someone else covers
+this week', that's a session-level concern, not a class-level one"* — and the answer, from
+the user on 2026-08-08, is that **both** real needs are session-level: a temporary
+substitute, and trainees shadowing. A class-level join table would have expressed neither
+and would have been rebuilt.
 
 ### Multi-language support — **M** `[MVP-excluded]`
 Beyond English.
@@ -1214,7 +1387,7 @@ Kept so the reasoning doesn't get re-litigated.
 | **An override / "Generate anyway" on the attendance block** | Removed deliberately 2026-07-18 (PRD §7.7). The case it appeared to serve — a class that genuinely didn't run — is already handled *inside* the completeness rule by marking everyone `cancelled_rain`/`cancelled_coach`. So the bypass wasn't covering a legitimate case; it was letting an unrecorded lesson through into a **permanent** underbill, because a lesson can never be added to an invoice that already exists (§11.6). The escape hatch for a class that can't be completed is removing the student, not overriding the check. |
 | ~~**A per-tenant invoice run day**~~ **— NOW BUILT (2026-07-19)** | Kept as a record of the reasoning, which held up. It was correctly refused while there was one business, and shipped as a per-tenant column the moment tenanting arrived, exactly as this row predicted ("trivial next to the RLS rewrite that happens anyway"). A useful example of deferring a small generalisation until the thing that needs it exists. |
 | **Modelling level families and a progression graph** (Toddler/Beginner/Intermediate tiers, "T4 → B3" rules, milestone markers) | Considered 2026-07-19 from a real swim school's level table, and rejected by the user: **different schools and coaches have different ladders, and different mappings between them.** Modelling tiers and progression edges would bake one business's structure into the schema and make every other tenant bend to it — the opposite of what a per-tenant curriculum is for. The generic primitive already covers it: a school with 16 rungs across 5 tiers simply names them that way (`Toddler 1` … `Epic 2`) and orders them, and `tenant_levels.note` carries any progression rule *in that business's own words* ("Progress to B3 upon completing T4"). Free text is the right amount of structure here — human-readable, and no schema commitment to a shape only one customer has. Revisit only if something needs to *compute* over progression (auto-advancing a child, say), which nothing does. |
-| **Modelling substitute coaches** | Surfaced 2026-07-19 while making pay attribution effective-dated. A lesson pays the coach the class was assigned to **on that date** — so if Coach B covers one week for Coach A with no class change, **A is paid**. Not modelled, deliberately: the fix for a genuine cover is a per-session pay override, which the schema already supports (`session_pay_overrides`), and inventing a "who actually turned up" concept would add a second source of truth beside the class assignment for a case that has never occurred with one real coach. Revisit when a business has enough coaches to cover for each other. |
+| ~~**Modelling substitute coaches**~~ **— REVERSED 2026-08-08, now a real item** | **Two things in the original refusal were wrong.** (1) *"The schema already supports it (`session_pay_overrides`)"* is **FALSE**: that table is `(lesson_session_id, pays_coach BOOLEAN, set_by, set_at)` — it can suppress a lesson's pay and cannot name another coach. (2) *"Revisit when a business has enough coaches to cover for each other"* — that is now; the user asked for it directly on 2026-08-08, including trainee coaches, and decided pay follows **whoever actually taught**. See *A lesson can have a substitute coach, temporarily* and *Trainee coaches shadow the main coach on a lesson* under **Coach workflow**. **The row's one durable finding survives and is why this is not a regression:** a PERMANENT handover is not this problem and already works through effective-dated class terms (`set_class_terms()` writes `class_rates.paid_coach_id` + `effective_from`). What had no representation was the one-off cover. |
 | **Wiring anything to `tenants.kind`** | The column is an enum defaulting to `'private'` that **nothing sets, changes or reads** — the tenancy backfill hardcoded it in July 2026 and no screen, RPC or admin control has touched it since. It is reserved for future *pricing*, and §6 forbids it reaching an RLS policy. It briefly appeared as a "Type" column on the Platform page and was replaced 2026-07-19 with a **derived** shape (one coach who is also the admin = a private coach), because the stored value would have read "private" for an actual swim school and nobody would have noticed. **Don't display it, and don't branch on it** — if a business's shape matters, derive it. If pricing eventually needs a stored kind, give it a writer and a UI at the same time, or it will drift again. |
 | **A browsable directory of coaches / schools for parents** | Considered as the way a parent picks their business, rejected 2026-07-19 in favour of **join codes** (PRD §5.1). A list publishes SwimSync's entire customer roster to every parent and every competing school; worse, a mis-tap puts a child on a stranger's roster where that business's admin can see and bill them, because nothing in the flow proves the family deals with them. **Possession of a code is that proof.** It also stops scaling at a few hundred tenants. If a discovery feature is ever wanted, make it search-by-exact-name so the full list is never enumerable. |
 | **A "view as tenant" impersonation mode for the platform admin** | Rejected 2026-07-19 while building the platform page. It means scoping *every* admin screen to a chosen tenant rather than the caller's own — far larger than the support need, which is answered by a cross-tenant business list plus the ability to **move a student** between businesses (PRD §4.4). Revisit only if support actually gets stuck without it. |
