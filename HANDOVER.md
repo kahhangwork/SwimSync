@@ -1,29 +1,26 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-08 — **the coach's Today tab is gone: SCHEDULE replaced it, and
-parents can now pay and claim straight from their invoice list. Both are LOCAL ONLY —
-nothing is committed or deployed yet (§9).** The Schedule tab is a Monday-start week
-selector over four sections (NEEDS MARKING / TODAY / COMING UP / DONE), and the two
-decisions worth carrying are that **NEEDS MARKING is floor-scoped and ignores the
-selector** — week-scoping it would hide a straggler nobody would go looking for, and
-unmarked attendance blocks billing with no override — and that **the week is an offset
-integer, not a stored Monday** (§7.95: an absolute date captured at mount goes stale on a
-PWA that survives a Sunday→Monday boundary, and the symptom is today's lessons simply
-absent). Four gotchas graduated: **§7.95–§7.98**, plus a new paragraph on **§7.70** —
-"the range cannot grow without bound" was false for a tenant that has never sealed a
-month, whose floor is its `created_at`.
+_Last updated: 2026-08-08 — **the coach's Today tab is gone: SCHEDULE replaced it, parents
+can pay and claim straight from their invoice list, and `BACKLOG.md`'s build order is
+ranked again for the first time since 2026-07-19. All LIVE — five commits on `main`, CI
+green (§8.34).** The Schedule tab is a Monday-start week selector over NEEDS MARKING /
+TODAY / COMING UP / DONE, and the two decisions worth carrying are that **NEEDS MARKING is
+floor-scoped and ignores the selector** — week-scoping it would hide a straggler nobody
+would go looking for, and unmarked attendance blocks billing with no override — and that
+**the week is an offset integer, not a stored Monday** (**§7.95**: an absolute date captured
+at mount goes stale on a PWA that survives a Sunday→Monday boundary, and the symptom is
+today's lessons simply absent). Five gotchas graduated: **§7.95–§7.99**, plus a new
+paragraph on **§7.70**.
 
-**Two things a plan review predicted that turned out WRONG, and the corrections matter
-more than the predictions.** (1) Nesting the parent's Pay/Claim buttons inside the card's
-touchable was supposed to double-fire; it was tested by deliberately re-nesting them and
-the driver still scored 16/16 — RN's responder system does not propagate a press to
-ancestor Touchables. The layout was kept, the false mechanism struck from both comments.
-(2) `verify-stale-screen.mjs` was going to be a permanent false pass, and that one was
-REAL: it asserted `/today\s*·/i` against the Classes tab while the Schedule screen —
-mounted underneath and rendering its own `TODAY ·` heading — could satisfy it. Fixed with
-a shared `visibleText()`. **Verified: jest 308, typecheck clean, and six coach/parent UI
-drivers green (stale-screen 22/22 against a measured 22/22 baseline, schedule-week 19/19,
-attendance-guard 22/22, tz-saturday 6/6, unmarked-lessons 12/12, bulk-setall 10/10).**_
+**Three predictions were wrong this session and the corrections are the durable part.**
+Nested Touchables do **not** double-fire on RN-web (**§7.99**, tested by re-nesting them);
+the backlog range **can** grow large, for a tenant that has never sealed a month
+(**§7.70**); and consolidating two drivers' "identical" `pressByText` copies broke one,
+because deep-link and in-app navigation need opposite answers (**§7.98**). The prediction
+that held was the expensive one: `verify-stale-screen.mjs` really was about to become a
+permanent false pass. A pre-commit review then caught a regression introduced *while
+writing* §7.97 — the extracted date-union clipped booking dates the old screen never
+clipped, dropping a trial from the coach's list while the engine still blocked the month._
 
 _Previously, 2026-08-07 — **the attendance-marking floor now follows `billing_periods`
 instead of the calendar — LIVE on production (§8.32).** `markable_floor(tenant)` is
@@ -84,7 +81,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.98** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.99** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -134,6 +131,13 @@ Swim-coach attendance & billing app for Singapore. Three roles:
 ---
 
 ## 3. Current state — what works (verified end to end, local stack)
+
+> **§3 is now ~400 lines — half this file, and the largest thing left in it.** It is the
+> next graduation candidate, the way §8 was in §8.17: most bullets describe behaviour
+> `PRD.md` already specifies in full, and what is genuinely load-bearing here is the
+> **prohibitions** ("don't re-add a count", "no rate is the finished state", "clean slate
+> is a banned phrase") and the *verified-vs-specified* distinction. When it is split, keep
+> those and point at the PRD for the rest. Prefer editing a line here to adding one.
 
 The **entire MVP core loop works and is verified across the UI + backend**:
 parent register → add child → superadmin assign → coach attendance →
@@ -359,7 +363,7 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   > the reopened window has never actually been used. That is the point — it is insurance,
   > shipped ahead of the trigger its own backlog item named.
 - **The coach's landing tab is a WEEK, not a day (verified local: jest 308 + a 19-check UI
-  driver + 5 existing coach drivers re-run — NOT yet deployed)** — the Today tab is gone;
+  driver + 5 existing coach drivers re-run — LIVE 2026-08-08)** — the Today tab is gone;
   **Schedule** replaced it, and the tabs are Schedule / Classes / My Pay / Settings (a
   private coach still sees three). A Monday-start week selector sits over four sections:
   **NEEDS MARKING**, **TODAY**, **COMING UP**, **DONE**. The Classes tab and its roster are
@@ -565,6 +569,51 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.34 (2026-08-08) — THE COACH'S TODAY TAB BECAME A WEEK, PARENTS CAN PAY FROM THE LIST, AND THE BACKLOG GOT ITS FIRST RANKING SINCE JULY
+
+**Schedule REPLACED Today rather than joining it.** The coach's only date-bound surfaces
+were one day and a nag list of what had already gone wrong; nothing showed what was
+*coming*, and unmarked attendance blocks billing outright with no override. Tabs are now
+Schedule / Classes / My Pay / Settings — a private coach still sees three. Four sections
+under a Monday-start week selector, driven by **marking state rather than the calendar**,
+because a purely calendar split collapses into one undifferentiated list on exactly the
+weeks a selector exists to reach. The Classes tab and its roster are untouched.
+
+**Two decisions carry the risk, and both are now pinned by a driver or a test.** NEEDS
+MARKING is **floor-scoped and ignores the selector**; week-scoping it would hide a
+straggler nobody would go looking for. The week is a **`weekOffset` integer, not a stored
+Monday** — §7.95, a new axis on §7.7: not a wrong clock, a *frozen* one, whose symptom is
+indistinguishable from a quiet day.
+
+**Two plan-review predictions were wrong, and the corrections outlived the predictions.**
+Nested Touchables were said to double-fire; re-nesting them deliberately still scored
+16/16, because RN's responder system stops at the innermost view (**§7.99**). And "the
+backlog range cannot grow without bound" was false for a tenant that has never sealed a
+month, whose floor is its `created_at` (**§7.70**, extended). The one prediction that held
+was the expensive one: `verify-stale-screen.mjs` really was about to become a permanent
+false pass, asserting `/today\s*·/i` against the Classes tab while the Schedule screen sat
+mounted underneath rendering its own `TODAY ·` heading (**§7.98**).
+
+**A review then caught a regression I had introduced while writing §7.97.** Extracting the
+lesson-date union into a helper applied a lower bound to *booking* dates that the old
+screen never had, dropping a trial taken before a class's first enrolment while the engine
+still blocked the month over it. Fixed to the business-wide floor — strictly better than
+the original, which also surfaced lessons below the floor that nobody can mark.
+
+**Deliberately not done:** no configurable first-day-of-week (`weekOrder.ts` is Monday-first
+*because* it mirrors the Postgres enum, and today-first already overrides most of what the
+setting would buy); no `run-all-drivers.sh` sweep locally — seven drivers were run
+individually, so the nightly is the first full-suite evidence.
+
+**Verified:** jest **308** (was 256), vitest 255, pgTAP 557, Deno 130 ×2, both typechecks,
+fixture round-trip 16/16, and eight UI drivers green — `stale-screen` 22/22 against a
+*measured* 22/22 baseline (labels diffed: two renames, nothing lost), `schedule-week`
+19/19 new, `parent-pay-claim` 17/17 new, `attendance-guard` 22/22, `tz-saturday` 6/6,
+`unmarked-lessons` 12/12, `bulk-setall` 10/10, `tenant-branding` 6/6. CI green on all
+three pushes.
+
+---
+
 ## 8.33 (2026-08-07) — TRIAGING TWO RED DRIVERS FOUND A LIVE BUG THAT REFUSED EVERY CLASS EDIT FOR EIGHT HOURS A DAY
 
 **`CURRENT_DATE` is the SESSION's time zone — UTC here — and nobody had looked at that end
@@ -601,57 +650,10 @@ functions restore byte-identically. Production confirmed *inside* the broken win
 
 ---
 
-## 8.32 (2026-08-07) — THE MARKING FLOOR FOLLOWS `billing_periods`, NOT THE CALENDAR — LIVE, AND A NO-OP ON PRODUCTION THE DAY IT SHIPPED
-
-**Built as insurance, ahead of its own stated trigger.** The backlog item said "revisit the
-first time a month is billed late"; the user chose to build it one month into a live
-monthly billing rhythm instead. What it removes has no remedy: the engine bills **any**
-completed month while the floor reached back one, so billing August on 5 October with a
-single unmarked lesson made the gate name a lesson **nobody could record any more** — not
-the coach, not the admin, no override by design — and the month could then never be billed.
-`20260727000100` had turned the window from a UI convention into a database rule, which is
-what removed the escape hatch. Its own plan §10.1 predicted this exactly.
-
-**The rule, and the one line that carries the safety argument:**
-`LEAST(1st of last month, month after the latest seal, else `created_at`)`. `LEAST` means
-the floor can only move **EARLIER**, so no date markable before the change is unmarkable
-after it — asserted as a **property over a matrix of tenant states**, not case by case, so
-a `GREATEST` typo fails even when all seven named examples pass. Deploy day bore it out:
-all three production tenants read `2026-07-01`, unchanged.
-
-**The filed fix was wrong in one detail, and the reason is worth carrying:** "the earliest
-UNSEALED billing month" leaves *no floor at all*, because a month with nothing recorded is
-never sealed (§8a.1) so gaps reach back past the business's first day. Anchored on the
-**latest** seal instead. Reasoning in `docs/ARCHITECTURE.md` §6 so it is not re-derived
-wrongly.
-
-**Found by EXECUTING the rollback file rather than writing it** — two bugs, neither
-readable: **§7.92**, a `regexp_replace` whose greediness Postgres takes from the *first*
-quantifier, which produced valid SQL restoring `book_trial()` with three of its four
-guards silently deleted; and a hand-typed Unicode literal that never matched (it failed
-loudly, which is why it did not ship). **§7.93** is the general lesson: committed ≠
-verified, and the check that catches everything is a byte-identical `pg_get_functiondef()`
-diff plus a re-run of the pre-migration test file under the rolled-back schema.
-
-**Deliberately not done:** no `force`, no admin "reopen this month" button — this widens
-what can be *recorded* and adds no bypass to the attendance block or the completed-month
-guard, both refused an override on the record. `20260727000100`'s header still describes
-the old floor: **an applied migration is never edited**, so the correction lives in the new
-migration and in the `session_window_start()` `COMMENT`, which is what a catalog dump shows.
-
-**Verified:** pgTAP **554** in 32 files (new file 18, proven red two ways — 18/18 with no
-migration, 12/18 against an inverted `GREATEST`), Deno 130 ×2, jest-expo 256, vitest 255,
-both typechecks, fixture round-trip 16/16, `verify-attendance-guard` **22/22** (was 20/20;
-both new checks proven red by stubbing the fetch to null — they fail, the other 20 pass,
-which demonstrates the degradation guarantee in the real UI). Production: migration applied,
-all three floors unchanged, 0 trial bookings below the new floor, remote grant grid 9/9
-matching local, and the live `swimsync.sg` bundle greps for `markable_window_start` (§7.31).
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.32** | 2026-08-07 | **The marking floor follows `billing_periods`, not the calendar** — `markable_floor(tenant)` = `LEAST(1st of last month, month after that business's latest seal, else `created_at`)`. Built as insurance ahead of its own stated trigger: billing a month LATE made the gate name a lesson **nobody could record any more**, with no override by design, so the month could never be billed. `LEAST` is the safety argument — the floor only ever moves EARLIER — asserted as a property over a matrix of tenant states, not case by case. All three production tenants read `2026-07-01` unchanged on deploy day. The filed fix was **wrong in one detail**: "the earliest UNSEALED month" leaves no floor at all, because a month with nothing recorded is never sealed (§8a.1). Found by EXECUTING the rollback file rather than writing it | PRD §7.6 · `docs/ARCHITECTURE.md` §6 *(why the LATEST seal, not the earliest unsealed)* · **§7.92, §7.93** · `supabase/rollback/20260806_markable_floor_DOWN.sql` |
 | **8.31** | 2026-08-06 | **Co-admins:** the first admin of a tenant is its **owner** (`tenants.owner_profile_id` — ownership is a COLUMN, not a role); only the owner invites, deactivates and deletes co-admins, who otherwise hold identical authority. Deactivation is one clause in `is_tenant_admin()` plus an auth-layer ban for pure admins; a coach-admin keeps coaching. Guard triggers closed a pre-existing hole — `profiles_update` let ANY tenant admin rewrite any profile's **role**, harmless with one admin and an escalation path with two. Coach/parent logins refused at the panel door | PRD §4.3 · `docs/ARCHITECTURE.md` §6 *(why not an enum role, why not `tenant_members`)* · **§7.90, §7.91** · `supabase/rollback/20260806_co_admins_DOWN.sql` |
 |---|---|---|---|
 | **8.30** | 2026-08-05 | All 32 UI drivers run **nightly** (`ui-drivers.yml` → `run-all-drivers.sh`, one rolling `ui-driver-rot` issue: open = red right now). The first sweep scored 24/32 and **every red was the tests' or the harness's fault, none a product bug** — the item's whole thesis. Four cloud runs to green, each failing differently | `docs/TESTING.md` §5 *(protocol + §7.73 triage)* · run-ui-playwright `SKILL.md` *(the `superadmin@` seed-login trap)* · `run-all-drivers.sh` header *(fixture-map exception)* |
@@ -734,102 +736,71 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### ⚠ UNCOMMITTED WORK IS SITTING IN THE TREE — READ THIS FIRST
+### ⚠ THE COACH'S TAB BAR CHANGED — AND IT IS ALREADY LIVE
 
-**Nothing from 2026-08-08 is committed, pushed or deployed.** Three pieces are finished
-and verified locally, on `main`, in the working tree:
+`git push … :main` **is** the web deploy, so the Schedule tab reached `swimsync.sg` the
+moment it landed. The coach opens the app to a different first screen than yesterday. It
+is app-only — no migration, no edge function, no grant change — so the §7.60 ordering trap
+did not apply, and the migration queue is still **EMPTY**.
 
-1. **Revenue reporting was deprioritised** and moved out of *Unordered — no dependencies*
-   into *Later* in `BACKLOG.md`. Its accrual-vs-cash decision genuinely is a dependency,
-   so the move is a correction as well as a demotion.
-2. **Parent pay-and-claim from the invoice list** — `(parent)/billing/index.tsx` only, no
-   migration, no RPC. New driver `verify-parent-pay-claim.mjs` (16/16).
-3. **The coach Schedule tab replaced the Today tab** — see the dateline and §3. New
-   driver `verify-schedule-week.mjs` (19/19); five existing coach drivers re-run green.
+**Two things worth doing early, neither urgent:**
 
-**What is left to do, in order:**
+1. **Grep the served bundle** for `NEEDS MARKING` (§7.31 — a 200 proves nothing). Not yet
+   done from this session.
+2. **Watch the nightly sweep.** Eight drivers changed and `run-all-drivers.sh` was **not**
+   run end to end locally — it resets the DB per driver and takes ~45 minutes — so the
+   04:00 SGT sweep is the first full-suite evidence. Two drivers are new
+   (`verify-schedule-week`, `verify-parent-pay-claim`) and both are registered in
+   `run-all-drivers.sh`'s fixture map.
 
-- **Commit it.** `/commit-review` per the convention. The Schedule tab is a big enough
-  change to deserve its own commit separate from the parent billing one.
-- **Deploy is a plain `git push … :main`** — all three are app-only. No migration, no edge
-  function, no grant change, so the §7.60 ordering trap does not apply. But the push IS
-  the deploy for both web apps, so expect the coach's tab bar to change the moment it
-  lands.
-- **Grep the served bundle afterwards** (§7.31) — a 200 proves nothing. `NEEDS MARKING` is
-  a string only the new build has.
-- **Watch the next nightly sweep.** Six drivers changed; `run-all-drivers.sh` was NOT run
-  end to end locally (it resets the DB per driver and takes ~45 min), so the nightly is
-  the first full-suite evidence.
-
-> **One deliberate deviation from the plan, recorded so it is not read as an oversight.**
-> The plan said `verify-stale-screen.mjs` should go 22 → 23 checks by absorbing a
-> floor-scope assertion. It stayed at **22**, and the new assertion went into
-> `verify-schedule-week.mjs` instead: driving the week selector inside that driver
-> destabilised seven downstream checks, because its subject is §7.64 router reuse and it
-> needs the screen left where it starts. The label diff against `main` is two renames and
-> **nothing lost** — that was checked, not assumed.
+**And the queue is ranked again.** `BACKLOG.md → ## Build order` had been empty since
+2026-07-19; it is now five waves ordered by **rework cost**, with the six decisions the
+ranking rests on recorded in a table at the top of it. **Read that table before
+re-litigating any of them** — coach-per-lesson, trainee pay, multiple classes per child,
+and native builds were all settled 2026-08-08. Wave 1 is eight **S** items, roughly two
+weeks, and nothing in it is blocked.
 
 ### If you would rather build than onboard
 
-**`BACKLOG.md` → `## Build order` is EMPTY** and has been since 2026-07-19. Pick from the
-themed sections below it. Nearest candidates with no dependencies: **credit-note emails**
-(the other half of the notification work), an **upcoming-lessons view for parents** (small,
-and the building block already exists), or **convert a trial into an enrolled student**.
+**`BACKLOG.md` → `## Build order` is the answer, and it is ranked again** (2026-08-08, by
+rework cost — five waves). Do not restate it here; that is how the two drift. Two things
+about it that are not obvious from reading the list:
 
-**A cheap, ordered pair added 2026-08-03** — *give package requests a reference number* (S)
-then *demote the static PayNow QR upload* (S). The user is right that the uploaded QR should
-be unnecessary now, but it still serves **package payments**, which have no reference to lock
-into a computed QR. **Do them in that order**; the reverse breaks paying for a package. The
-same session's copy fix (the PayNow screen calls the business "Coach") folds into whichever
-ships first.
+- **Wave 1 is eight `S` items, nothing blocked, roughly two weeks**, and every one of them
+  is paid for again by each screen shipped before it lands — the audit trigger, the
+  inactive-class hole, the geometry check, the non-hermetic driver.
+- **The six decisions the ranking rests on are in a table at the top of it.** Read them
+  before re-opening any: coach-per-lesson (not per-class), trainee pay (own rate),
+  substitute pay (whoever taught), multiple classes per child (yes, soon), co-admin
+  permission splitting (yes, not now), native builds (not yet).
 
 **The `authenticated` question from 2026-08-04 is ANSWERED — don't re-open it.** No, it does
 not deserve `anon`'s sweep (§8.29, §3): one database role carries parent, coach and admin, so
-only RLS can separate them. The part that *was* free is done — the grants are a declared
-whitelist and CI re-proves it. **What replaced it as an open question is `service_role`**,
-now a `BACKLOG.md` item: grants genuinely are its only gate, but the oracle used for
+only RLS can separate them. **What replaced it as an open question is `service_role`**, now a
+`BACKLOG.md` item — grants genuinely are its only gate, but the oracle used for
 `authenticated` ("no policy could permit this") is useless for a role that bypasses RLS, so
-it needs a usage audit of the edge functions and the admin's server routes. Don't start it
-without that.
+it needs a usage audit of the edge functions and the admin's server routes first.
 
-### ✅ NO RED SIGNALS — both are cleared, don't re-triage them
+### ✅ NO RED SIGNALS
 
-**The nightly UI drivers are GREEN and stayed green.** The two reds of 2026-08-06 were one
-live product bug, not driver rot: `set_class_terms()` compared against `CURRENT_DATE` (UTC)
-while the admin sent `todayInSg()`, so **every class edit was refused between 00:00 and
-08:00 SGT** — three weeks, live (§8.33, §7.94). Since the fix the sweep has run **green
-twice** (2026-08-07 00:53Z and 20:47Z), both firings **inside the window the bug lived in**,
-and closed the rolling `ui-driver-rot` issue itself. That is the fix verified by the same
-mechanism that caught it. **If it reddens again it is a NEW failure — triage it fresh
-(`docs/TESTING.md` §5), don't reach for this paragraph.**
+The nightly UI sweep has been green since the §8.33 `CURRENT_DATE` fix, and CI is green on
+all three of 2026-08-08's pushes. `gh run list --workflow=ui-drivers.yml` and the rolling
+`ui-driver-rot` issue are always the current fact — an open issue means red *right now*.
 
-**The red CI on `b5da2c5`/`13c845b`/`2e0feed` was the GitHub Actions outage, and it has been
-re-run (2026-08-08).** All three attempts had died in *"Set up job"* at `Getting action
-download info` with `Service Unavailable`, before checkout — `backend-tests` passed, the
-other two jobs were cancelled by fail-fast rather than failing. Everything had been verified
-locally before the push (pgTAP 557, Deno 130 ×2, jest 256, vitest 255, both typechecks,
-driver 22/22) and the migration directly against production. **The lesson worth keeping is
-the triage, not the incident: a job that dies before checkout is not your code** — check
-`githubstatus.com` before reading a diff.
+**Two triage rules worth keeping, both bought with real time:**
 
-***Run the UI drivers in CI* SHIPPED 2026-08-05 (§8.30) — it is now an operating rhythm,
-not a to-do.** The nightly sweep (04:00 SGT, `ui-drivers.yml`) maintains one rolling
-`ui-driver-rot` issue: an open issue means red *right now*; green closes it. Triage rule
-when it reddens: the product changed → a real regression, fix the product; the
-driver's/calendar's assumption moved (§7.73) → fix the driver. **A UI redesign is
-planned** — expect regular reds through it, and treat "its drivers are green again" as
-part of each redesigned screen being done. The pipeline is proven end to end: run 4 went
-green and closed the rolling issue itself; `gh run list --workflow=ui-drivers.yml` and
-the rolling issue are always the current fact.
+- **A job that dies before checkout is not your code.** Three CI runs on 2026-08-06 failed
+  in *"Set up job"* during a GitHub Actions major outage. Check `githubstatus.com` before
+  reading a diff.
+- **When the sweep reddens, ask which moved — the product or the driver's assumption.**
+  §7.73 is the calendar case; §8.33 is the product case, and it was a live bug that four
+  green *manual* runs had missed because they ran outside the broken window.
 
 **The migration queue is EMPTY.** The latest, `20260806000200` (the marking floor, §8.32),
-shipped and deployed 2026-08-07 with its grant grid checked against production the same
-hour (9/9 matching local). Nothing is in flight, so the next schema change can start
-immediately — still one at a time (§7.55), and a worktree never authors one
-(`docs/WORKTREES.md`). Keep budgeting the post-deploy grant check; it is the only honest
-one (§7.39, §7.89, `docs/DEPLOYMENT.md` §11.7). **And budget the rollback REHEARSAL too —
-§7.93, new this session: writing the DOWN file is half the job, running it is the half that
-finds the bugs.**
+deployed 2026-08-07 with its grant grid checked against production the same hour. Nothing is
+in flight, so the next schema change can start immediately — still one at a time (§7.55), a
+worktree never authors one, and budget the post-deploy grant check (§7.39, §7.89) **and** the
+rollback rehearsal (§7.93 — running the DOWN file is the half that finds the bugs).
 
 ### Worth deciding, not urgent
 

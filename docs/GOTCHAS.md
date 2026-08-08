@@ -1621,3 +1621,27 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       could have been deleted outright and that check would have stayed green forever.
       The one driver written to catch a screen overlaying another was about to be fooled
       by a screen overlaying another. (2026-08-08.)
+99. **A NESTED `TouchableOpacity` DOES NOT DOUBLE-FIRE ON RN-WEB — THE PRESS STOPS AT THE
+    INNERMOST VIEW.** Filed as a correction, because this was predicted confidently in a
+    plan review, designed around, and then found to be false. The prediction: putting
+    "Pay via PayNow" / "I've paid" buttons inside the parent invoice card's own
+    card-wide `TouchableOpacity` would let the press bubble — and since `confirmAction`
+    is a **synchronous, blocking `window.confirm`** on web (`lib/confirm.ts`), the
+    sequence would be inner `onPress` → confirm blocks → RPC runs → *then* the card's
+    `router.push` fires, landing the parent on the detail screen while the optimistic
+    patch, the success toast and the claimed line were applied to a screen they had
+    already left.
+    - **Tested rather than assumed.** The buttons were deliberately re-nested inside the
+      card's touchable and `verify-parent-pay-claim.mjs` was re-run: **still 16/16**,
+      including "the press did NOT also fire the card's navigation". React Native's
+      responder system grants the responder to the **innermost** view that wants it and
+      does not propagate to ancestor Touchables, so the second handler never runs.
+    - **The layout still puts the action row as a SIBLING of the touchable**, because it
+      reads honestly and does not depend on that behaviour surviving an RN-web upgrade —
+      but the comments no longer state the double-fire as fact, and the driver's "one
+      dialog / no navigation" checks are labelled as **outcome guards, not the nesting
+      guard**: re-nesting cannot turn them red, so per §7.25 they are not that coverage.
+    - **The general lesson is §7.83's, on a new axis:** a confidently-filed mechanism is
+      worth one cheap experiment before you design around it. The mitigation here was
+      harmless, but the *comment* asserting a bug that does not exist would have been
+      copied forward and believed. (2026-08-08.)

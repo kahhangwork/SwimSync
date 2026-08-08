@@ -104,13 +104,14 @@ Billing is based on **actual attendance**, so make sure last month is complete:
    - 🚩 **"Some lessons have no attendance marked"**, naming each class and the
      missing dates (e.g. *Saturday Beginners — 3 of 4 lessons marked · Missing:
      Sat, 18 Jul*). **Stop.** Cancel, get the coach to mark those lessons (they
-     appear under **Unmarked Lessons** on the coach's Today tab), then come back.
+     appear under **NEEDS MARKING** on the coach's Schedule tab), then come back.
      **The Generate button is disabled — there is no "generate anyway".** That is
      deliberate: a lesson marked *after* an invoice exists can never be added to it,
      so billing around a gap loses that money permanently.
      Two ways forward, both legitimate:
-     - **The lesson ran** → the coach marks it (it appears under **Unmarked Lessons**
-       on their Today tab). Come back and generate.
+     - **The lesson ran** → the coach marks it (it appears under **NEEDS MARKING**
+       on their Schedule tab — the coach's landing tab, renamed from Today on
+       2026-08-08). Come back and generate.
      - **The lesson didn't run** → the coach marks everyone **Cancelled — rain** or
        **Cancelled — coach**. Non-billable, and it clears the block.
      - **A child has stopped coming** and is holding the class open → **Remove from

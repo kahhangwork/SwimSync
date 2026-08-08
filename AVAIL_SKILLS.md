@@ -161,6 +161,25 @@ written from the **root checkout on `main`**, because no worktree edits them.
 - **Pairs with:** `/update-docs` (next), `/session-close` (last).
 - **Details:** [.claude/skills/worktree-close/SKILL.md](.claude/skills/worktree-close/SKILL.md)
 
+### `backlog-prioritisation` — order the queue to minimise REWORK
+
+Re-sequences `BACKLOG.md → ## Build order` by **blast radius** — how many other
+items a decision changes — rather than by value or size. The question it answers
+is not "what is most valuable?" but "what, if built later, forces me back into
+something already built?"
+
+- **Use when:** the queue has drifted, the build order is empty or stale, or you
+  are deciding what to build next and the order matters more than the item.
+- **Produces:** a wave-ordered ranking plus a table of the **decisions the
+  ranking rests on** — because an unrecorded decision gets re-litigated, and the
+  order stops making sense once the reasoning behind it is gone.
+- ⚠ **A worktree may not write `BACKLOG.md`** (`docs/WORKTREES.md`). Run from
+  the root checkout, or stage the output as a hand-off file under `docs/plans/`
+  and apply it from the root — then **delete the hand-off**, because the ranking
+  lives only in `## Build order` and two copies drift.
+- **Invoke:** `/backlog-prioritisation`, or ask to prioritise / re-order the backlog.
+- **Details:** [.claude/skills/backlog-prioritisation/SKILL.md](.claude/skills/backlog-prioritisation/SKILL.md)
+
 ### `update-docs` — reconcile the three living documents
 
 _Called `/session-close` before 2026-07-26._
@@ -261,6 +280,7 @@ login, decisions deliberately left open.
 /commit-review            review, commit, AND push to main                     [per change]
 /worktree-close           retire it + carry the graduate list out (BEFORE      [per worktree]
                           /update-docs)
+/backlog-prioritisation   re-rank the build order by rework cost            [when it drifts]
 /update-docs              reconcile PRD/BACKLOG/HANDOVER  (was: /session-close)     [once]
 /session-close            shut down: fixtures, ports, unpushed work, worktree      [last]
 
