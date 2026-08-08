@@ -35,14 +35,18 @@ before it lands. Two chains, run in either order.
 
 **The PayNow / package chain — strict internal order, one screen:**
 
-1. **Finish _Pay and claim from the parent's invoice LIST_** — already half-built in the
-   working tree; finishing beats abandoning the context.
-2. **Give package requests a reference number** — the stated blocker for #3.
-3. **Demote the static PayNow QR upload** — needs #2. **Hide, do not delete**: the native
+_(**Pay and claim from the parent's invoice LIST — SHIPPED 2026-08-08**, alongside the
+Schedule tab. It headed this wave as "already half-built in the working tree"; it is now
+built, with `verify-parent-pay-claim.mjs` covering it. Remove the item when applying this
+block — and note its `BACKLOG.md` entry was **not** struck through by that session's
+`/update-docs` pass, so the strike-through is part of applying this.)_
+
+1. **Give package requests a reference number** — the stated blocker for #2.
+2. **Demote the static PayNow QR upload** — needs #1. **Hide, do not delete**: the native
    fallback stays, per the decision above.
-4. **The PayNow screen calls the business "Coach"** — copy-only, folds into #2 or #3.
-5. **A link to the admin panel from coach Settings** — same `(coach)/settings` screen as
-   #3; batch it.
+3. **The PayNow screen calls the business "Coach"** — copy-only, folds into #1 or #2.
+4. **A link to the admin panel from coach Settings** — same `(coach)/settings` screen as
+   #2; batch it.
 
 **The foundations:**
 
@@ -112,7 +116,14 @@ copy/templates (S).
   the audit *reader*.
 - **Convert a trial into an enrolled student** (S) and **Book a make-up from the
   Attendance page** (S) — after Wave 2, which changes what an enrolment is.
-- **A coach week view** (M) — after Wave 3, which changes whose lessons appear in it.
+
+**_A coach week view_ SHIPPED 2026-08-08 as the Schedule tab, ahead of this ranking, which
+had placed it after Wave 3.** The reason it was placed there still applies and is now a
+carry-forward rather than a sequencing note: a substitute or trainee teaches a lesson of a
+class they do not own, so a Schedule tab that resolves "my lessons" from `classes.coach_id`
+will show the wrong week. **Wave 3 must revisit `lib/scheduleWeek.*` / `lib/scheduleBuckets.*`
+and the Schedule tab's query** — cheap if the lookup already sits behind a helper, a screen
+rewrite if it does not. Check which before starting Wave 3.
 
 ### The email / scheduler chain — strict internal order, start any time
 
