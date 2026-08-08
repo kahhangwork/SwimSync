@@ -3,6 +3,7 @@ import {
   toMinutes,
   isNowInRange,
   hasEndedInSg,
+  hasLessonEnded,
 } from "./timeOfDay";
 
 // The instant that proves the point: 23:30 UTC is 07:30 the NEXT DAY in
@@ -107,5 +108,48 @@ describe("hasEndedInSg", () => {
     // today's 06:00 class, which has ended.
     expect(hasEndedInSg("06:00", nowMinutesInSg(LATE_UTC))).toBe(true);
     expect(hasEndedInSg("09:30", nowMinutesInSg(LATE_UTC))).toBe(false);
+  });
+});
+
+describe("hasLessonEnded — the dated generalisation", () => {
+  const TODAY = "2026-08-08";
+  const MIDDAY = toMinutes("12:00");
+
+  it("a PAST lesson has always ended, whatever the clock says", () => {
+    expect(hasLessonEnded("2026-08-07", TODAY, "23:59", 0)).toBe(true);
+    expect(hasLessonEnded("2026-07-01", TODAY, "09:00", MIDDAY)).toBe(true);
+  });
+
+  it("a FUTURE lesson never has — this is what stops a week view nagging", () => {
+    // The one that matters: without it, tomorrow's 09:00 class reads
+    // "Not marked" at midday today, i.e. the screen demands attendance for a
+    // lesson that has not happened.
+    expect(hasLessonEnded("2026-08-09", TODAY, "09:00", MIDDAY)).toBe(false);
+    expect(hasLessonEnded("2026-08-09", TODAY, "00:01", MIDDAY)).toBe(false);
+  });
+
+  it("TODAY defers to the clock, exactly as hasEndedInSg does", () => {
+    expect(hasLessonEnded(TODAY, TODAY, "11:59", MIDDAY)).toBe(true);
+    expect(hasLessonEnded(TODAY, TODAY, "12:00", MIDDAY)).toBe(false);
+    expect(hasLessonEnded(TODAY, TODAY, "12:01", MIDDAY)).toBe(false);
+  });
+
+  it("agrees with hasEndedInSg for every same-day case", () => {
+    const ends = ["06:00", "09:30", "12:00", "17:15", "23:59"];
+    const nows = [0, toMinutes("09:29"), MIDDAY, toMinutes("23:58"), 1439];
+    for (const end of ends) {
+      for (const now of nows) {
+        expect(hasLessonEnded(TODAY, TODAY, end, now)).toBe(
+          hasEndedInSg(end, now)
+        );
+      }
+    }
+  });
+
+  it("reads no clock — the same inputs always give the same answer", () => {
+    const a = hasLessonEnded("2026-08-09", TODAY, "09:00", MIDDAY);
+    const b = hasLessonEnded("2026-08-09", TODAY, "09:00", MIDDAY);
+    expect(a).toBe(b);
+    expect(a).toBe(false);
   });
 });

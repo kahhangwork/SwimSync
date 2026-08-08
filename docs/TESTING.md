@@ -444,7 +444,7 @@ popping into a different lesson (§7.65), a *partially* marked lesson can be com
 correctly with no empty roster ever labelled *Marked* (§7.68). Scores **4/8 → 18/18** across
 the three fixes;
 > **+4 checks on 2026-08-02 for §7.80**, the other half of §7.65: pressing the **Classes**
-> tab must land on the class list rather than the leftover attendance screen the Today tab
+> tab must land on the class list rather than the leftover attendance screen the Schedule tab
 > pushed into that stack, today's classes must be grouped under a *Today* heading, and —
 > the regression the fix could itself cause — Today's *Mark Attendance* must still push
 > through. Scored **18/22 → 22/22**. The same change made the driver **record a crash as a
@@ -456,6 +456,41 @@ driver's. **It selects buttons by the card for a named class, never by page inde
 index broke the moment a finished class started saying *Edit attendance* — and its
 `pressByText` filters on `aria-hidden` so a press cannot land on a screen React Navigation
 has left mounted. Coach app only; no admin server needed.
+> **2026-08-08, the Today tab became the Schedule tab.** Still **22 checks** — the label
+> diff against `main` is two renames and nothing lost. Two of them were rewired: the
+> backlog heading is now `NEEDS MARKING (N)` (**keep the count in the regex** — it is the
+> only assertion that the floor-scoped set is neither larger nor smaller than it should
+> be), and the tab press is `"Schedule"`. The important change is that the
+> weekday-grouping check now reads **`visibleText()`**, not `dumpText()`: the Schedule
+> screen renders its own `TODAY · <date>` heading and stays mounted under the Classes tab,
+> so the old assertion would have matched the screen it had navigated *away from* and the
+> Classes tab's grouping could have been deleted outright while it stayed green (§7.98).
+
+`verify-schedule-week.mjs` (reuses `fixtures-stale-screen.sql`) owns the **Schedule tab's
+week selector**, split out of the driver above because driving the selector inside it
+destabilised seven downstream checks — that driver needs the screen left where it starts.
+**19 checks.** The load-bearing one is *"a straggler from ANOTHER week still appears under
+NEEDS MARKING"*: that list is **floor-scoped, not week-scoped**, so a lesson from three
+weeks back stays visible whatever the selector shows. Week-scoping it would hide a lesson
+the coach has no reason to go looking for, and unmarked attendance blocks billing with no
+override. **Proven RED** by scoping the query to the week (§7.25). Also pins: TODAY renders
+only in the current week, the *Back to this week* escape appears exactly when needed, the
+arrows stop at the marking floor and at the end of next week, and a COMING UP row never
+reaches the attendance screen (a future date is refused there, so it would be a dead tap).
+**Not** covered here: the week surviving a Sunday→Monday boundary with the app mounted —
+that is why the screen holds an offset rather than a date (§7.95), and only
+`lib/scheduleWeek.test.ts` can move the clock far enough to prove it.
+
+`verify-parent-pay-claim.mjs` (reuses `fixtures-payment-collection.sql`) covers **Pay via
+PayNow and I've paid on the parent's invoice LIST** (PRD §7.21), which no other driver
+walks. **16 checks**: both controls render on an outstanding card, Pay opens the PayNow
+screen carrying `invoiceId` without routing via the detail screen, the claim raises exactly
+one confirm dialog and does not navigate, the claimed line replaces the button in place and
+survives a reload, and the invoice stays **outstanding** — a claim is a statement, never a
+status change. ⚠ Its "one dialog / no navigation" pair are OUTCOME guards only: the nesting
+they were written to catch was tested by deliberately re-nesting the buttons and the driver
+still scored 16/16, because RN's responder system does not propagate a press to ancestor
+Touchables. Do not cite them as the nesting guard.
 
 See LOCAL_DEV_GUIDE §"Running the tests".
 

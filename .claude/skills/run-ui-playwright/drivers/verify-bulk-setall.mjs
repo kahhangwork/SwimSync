@@ -49,7 +49,7 @@ await loginExpo(coach, "coach@swimsync.test", "password123");
 await coach.waitForTimeout(3000);
 
 async function openJul11() {
-  await coach.goto("http://localhost:8081/today");
+  await coach.goto("http://localhost:8081/schedule");
   await coach.waitForTimeout(4000);
   await tap(coach.getByText("11 Jul").first(), "backlog row → 11 Jul");
   await coach.waitForTimeout(3000);
@@ -105,10 +105,10 @@ await coach.screenshot({ path: shot("setall-cancelled-rain.png"), fullPage: true
 // mark screen stays mounted under Today and pollutes body.innerText.)
 await tap(coach.getByText(/Save/).first(), "Save Attendance");
 await coach.waitForTimeout(4000);
-await coach.goto("http://localhost:8081/today");
+await coach.goto("http://localhost:8081/schedule");
 await coach.waitForTimeout(4000);
 text = await dumpText(coach);
-check("After bulk save, 11 Jul clears the unmarked backlog", !/Unmarked Lessons/.test(text));
+check("After bulk save, 11 Jul clears the unmarked backlog", !/NEEDS MARKING/i.test(text));
 
 await browser.close();
 

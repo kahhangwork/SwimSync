@@ -55,7 +55,7 @@ worktree**; it resets the shared database repeatedly. `--only <name>` runs one.
 | Role | Email | Password | Lands on |
 |------|-------|----------|----------|
 | Platform admin | `superadmin@swimsync.test` | `password123` | admin `/platform` — and is **REFUSED every tenant page** (RequiresTenant unmounts them) |
-| Tenant admin + coach | `coach@swimsync.test` | `password123` | admin `/dashboard` (tenant pages) or app `/today` |
+| Tenant admin + coach | `coach@swimsync.test` | `password123` | admin `/dashboard` (tenant pages) or app `/schedule` |
 | Parent | self-register in app, or seed an `auth.users` row with `raw_user_meta_data.role='parent'` (`password123`) | | app `/home` |
 
 > **A driver for a tenant admin page logs in as `coach@swimsync.test`, never
@@ -80,9 +80,9 @@ These cost time to rediscover:
    alive and never reloads.
 3. **Deep-linking to a nested stack screen is unreliable.** Navigating straight
    to `/classes/<id>/attendance?...` can resolve the URL back to the stack's
-   initial route (`/today`) with the target rendered off-screen. **Navigate like
+   initial route (`/schedule`) with the target rendered off-screen. **Navigate like
    a user instead:** tab bar link → card → row. Tab bar exposes real client-side
-   links: `a[href="/classes"]`, `/billing`, `/today`, `/settings`.
+   links: `a[href="/classes"]`, `/schedule`, `/pay`, `/settings`.
 4. **RN-web touchables need `click({ force: true })`.** `TouchableOpacity`
    renders with overlay siblings that intercept pointer events; a normal click
    times out ("subtree intercepts pointer events"). Force-click dispatches on

@@ -86,7 +86,7 @@ await coach.waitForTimeout(3000);
 
 let text = await dumpText(coach);
 await coach.screenshot({ path: shot("coach-today-backlog.png"), fullPage: true });
-check("Today lists one unmarked lesson", /Unmarked Lessons \(1\)/.test(text));
+check("Schedule lists one unmarked lesson", /NEEDS MARKING \(1\)/i.test(text));
 check("Backlog names the forgotten Saturday", /11 Jul/.test(text));
 check("Backlog omits the already-marked Saturday", !/Sat, 4 Jul/.test(text));
 
@@ -104,11 +104,11 @@ await tap(coach.getByText(/Save/).first(), "Save");
 await coach.waitForTimeout(4000);
 
 // ── 4. Backlog clears, admin goes green ──────────────────────────────────────
-await coach.goto("http://localhost:8081/today");
+await coach.goto("http://localhost:8081/schedule");
 await coach.waitForTimeout(4000);
 text = await dumpText(coach);
 await coach.screenshot({ path: shot("coach-today-cleared.png"), fullPage: true });
-check("Backlog clears once marked", !/Unmarked Lessons/.test(text));
+check("Backlog clears once marked", !/NEEDS MARKING/i.test(text));
 
 adminText = await openCoverageModal();
 await admin.screenshot({ path: shot("admin-modal-clear.png"), fullPage: true });

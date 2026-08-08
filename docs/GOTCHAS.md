@@ -960,6 +960,16 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     and deliberately inherits the ceiling**, because that whole page is an unpaginated
     client-side list — which is why the two surfaces are implemented differently and must not
     be "tidied" into consistency. (2026-07-26.)
+    - **Do not talk yourself out of it with a steady-state argument.** The coach Schedule
+      tab's plan claimed its backlog range "cannot grow without bound" because
+      `markable_floor` follows `billing_periods` and each billing run pushes it forward.
+      That is true only for a business that HAS billed: when nothing is sealed the floor
+      falls back to the tenant's **`created_at`** (`20260806000200`), so a school onboarded
+      eight months ago that has never billed carries eight months of lessons — and the
+      businesses least able to diagnose a short list are exactly the ones that hit it.
+      Where a head count will not do, ask for an explicit `.limit()` BELOW the cap and
+      render something loud when a result comes back at exactly that length; a silently
+      short "what still needs marking" list reads as *you are up to date*. (2026-08-08.)
 
 71. **`w-full` ON A TABLE CELL IS A *PREFERRED* WIDTH, NOT A FLOOR — SO THE COLUMN YOU GROW
     IS THE COLUMN THAT GETS CRUSHED.**
@@ -1535,3 +1545,79 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       they were run in the evening, and §8.30 recorded the pipeline as healthy on that
       basis. For anything date-derived, *when* a suite runs is part of what it proves.
       (2026-08-07.)
+95. **A SCREEN THAT STORES AN ABSOLUTE DATE IN `useState` AT MOUNT GOES STALE ON A
+    LONG-LIVED PWA — HOLD AN OFFSET FROM TODAY, NOT A DATE.** A new axis on §7.7: not a
+    wrong clock, a **frozen** one. The coach Schedule tab shows one week at a time, and
+    the obvious implementation is `useState(startOfWeek(todayInSg()))`. That evaluates
+    **once**. The coach app is a home-screen PWA that stays mounted for days, so the first
+    time it survives a Sunday→Monday boundary the stored Monday is *last* week's: the
+    TODAY section disappears, the header quietly reads "Last week", and today's lessons
+    are missing from the coach's landing tab with nothing saying why.
+    - The fix is structural, not vigilance: store `weekOffset: number` and derive
+      `addDays(startOfWeek(todayDate), weekOffset * 7)` on every render from the same
+      `todayDate` the rest of the screen uses. `weekOffset === 0` then *means* "this week"
+      however long the screen has been mounted, and crossing midnight self-corrects.
+    - **The symptom is indistinguishable from "there is nothing today"**, which is why it
+      would have survived a long time. It is also invisible to a browser driver — nothing
+      in a Playwright run crosses midnight — so the coverage is
+      `lib/scheduleWeek.test.ts`'s "offset 0 self-corrects across a Sunday->Monday
+      boundary", which can move the clock. Found in plan review, before it shipped.
+      (2026-08-08.)
+96. **DE-DUPLICATING BETWEEN TWO SECTIONS MUST HAPPEN WHERE BOTH ARE *RENDERED*, NEVER
+    WHERE ONE IS *FETCHED*.** The Schedule tab shows a floor-scoped NEEDS MARKING list and
+    a TODAY section, and today's unmarked lesson belongs in exactly one of them. Doing that
+    filtering inside the async `loadData` couples it to `showsTodaySection`, a render-time
+    fact: a week-arrow press that re-renders without refetching then yields a screen with
+    **no TODAY section and no NEEDS MARKING row for today either**, so today's lesson is
+    unmarkable from the landing tab and the month blocks at invoice time with nothing
+    explaining it.
+    - Derive both from the same render's inputs — `needsMarking.filter(i => !(showsTodaySection && i.date === todayDate))`.
+      Two values derived in one render pass cannot disagree; two derived in different
+      passes eventually always do.
+    - The same rule caught a second, visible instance the same day: an unmarked past
+      lesson rendered under **both** NEEDS MARKING and DONE, because the week buckets were
+      built without subtracting the nag list. A nag filed under a heading that means
+      *finished* is worse than either alone. (2026-08-08.)
+97. **A PERFORMANCE FIX THAT ADDS A DATE FILTER TO A QUERY FEEDING A COMPLETENESS CHECK IS
+    A BILLING CHANGE.** §7.18's sibling, arriving through a door nobody guards. The coach
+    screen's `trial_bookings`/`makeup_bookings` queries had no class filter and no date
+    filter at all, so they were the nearest thing to the silent `max_rows = 1000` ceiling
+    and obviously wanted bounding. The tempting bound is the **visible week**. It is wrong:
+    that map feeds `expectedStudentsOn()` for every date in the **floor-scoped** backlog,
+    so a lesson whose only attendee was a trial silently drops out of the coach's
+    needs-marking list while the invoice engine still refuses to close the month over it.
+    - Bound such queries to the **union** of every range they serve, and say so in a
+      comment at the query. Prove it by narrowing them on purpose and watching a
+      trial-only past lesson vanish (§7.25).
+    - `bookedHere.size` is also the guard that keeps a class with **no enrolments but a
+      booking** in the loop at all, so an over-narrow bound removes the class as well as
+      the date. (2026-08-08.)
+98. **A DRIVER HELPER THAT WALKS UP THE DOM MUST PRESS ONLY ON A *UNIQUE* MATCH, AND TWO
+    DRIVERS' COPIES OF "THE SAME" HELPER MAY NOT BE THE SAME.** Two failures, one root:
+    helpers copied between drivers drift, and consolidating them without reading both
+    breaks one.
+    - **The walk.** `pressClassButton` climbs from a class title looking for its card's
+      action button. Widen the bound and the ancestor eventually becomes the section
+      wrapper, where `find` returns the *first* button in document order — a different
+      card's — and the driver presses a stranger's button while reporting success. Collect
+      **all** matches per level and press only when there is exactly one; more than one
+      means the walk has left the card. Then the bound is just a stop condition. This also
+      exposed a real ambiguity: on the Schedule tab one class legitimately appears twice
+      (NEEDS MARKING and TODAY), so the helper must try **every** occurrence of the title,
+      not just the first.
+    - **The consolidation.** `verify-stale-screen.mjs` filtered `pressByText` to the
+      VISIBLE screen; `verify-attendance-guard.mjs` deliberately did **not**. Both are
+      right: the first navigates in-app, where a stale mounted screen steals the press;
+      the second navigates by **deep link**, where `page.goto` mounts the target and the
+      root layout's session restore then replaces the route with the landing tab — so the
+      screen under test renders fully while sitting inside an `aria-hidden` subtree, and
+      filtering it out presses nothing at all. Merging them into one visible-only helper
+      turned two attendance-guard checks red. The shared helper now takes
+      `includeHidden`, defaulting to the safe filtered behaviour.
+    - **`document.body.innerText` contains the screens you left**, so any assertion a
+      stale mount could satisfy needs `visibleText()`. `verify-stale-screen.mjs:437`
+      asserted `/today\s*·/i` against the Classes tab — and the Schedule screen renders
+      `TODAY · <date>` while mounted underneath, so the Classes tab's weekday grouping
+      could have been deleted outright and that check would have stayed green forever.
+      The one driver written to catch a screen overlaying another was about to be fooled
+      by a screen overlaying another. (2026-08-08.)

@@ -31,7 +31,9 @@
 // The admin panel is NOT needed — this is entirely a coach-app flow.
 import os from "node:os";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, dumpText, tap, EXPO } from "./lib.mjs";
+import {
+  launch, loginExpo, dumpText, visibleText, tap, pressByText, pressClassButton, EXPO,
+} from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const results = [];
@@ -51,96 +53,6 @@ function sql(q) {
   ).trim();
 }
 
-/**
- * Press an RN-web Pressable by its exact label text.
- *
- * Lifted from verify-attendance-guard.mjs — see its comment for why
- * click({force:true}) is not enough (§7.58): the screen you navigated away
- * from stays mounted and can be laid out ON TOP, so a coordinate click lands
- * on the wrong element and the run reads as "the save is broken".
- */
-async function pressByText(page, label, index = 0) {
-  const ok = await page.evaluate(
-    ({ label, index }) => {
-      // ⚠ ONLY THE VISIBLE SCREEN. React Navigation keeps the screens you left
-      // mounted, and this driver's whole subject is navigating between lessons
-      // — so a plain text search finds the PREVIOUS lesson's buttons first and
-      // presses those. It cost a false FAIL here: "Absent" landed on a stale
-      // screen, that screen's Save ran instead, and the run read as "the fix
-      // does not work" while a URL-navigated probe saved perfectly.
-      //
-      // React Navigation marks the inactive screen `aria-hidden="true"` — the
-      // same attribute Chrome warns about in the console on this app — so that
-      // is the seam, plus a non-zero box for anything display:none.
-      const visible = (e) =>
-        !e.closest('[aria-hidden="true"]') &&
-        e.getClientRects().length > 0;
-
-      const hits = [...document.querySelectorAll("*")].filter(
-        (e) =>
-          e.children.length === 0 &&
-          e.textContent.trim() === label &&
-          visible(e)
-      );
-      const el = hits[index];
-      if (!el) return false;
-      const target = el.parentElement;
-      const opts = { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, button: 0 };
-      target.dispatchEvent(new PointerEvent("pointerdown", opts));
-      target.dispatchEvent(new PointerEvent("pointerup", opts));
-      target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      return true;
-    },
-    { label, index }
-  );
-  console.log(`pressed: ${label}${ok ? "" : " (NOT FOUND)"}`);
-  return ok;
-}
-
-/**
- * Press the action button inside the card for a named class.
- *
- * Scoped to the CARD, not to an index into the whole page. An index broke the
- * moment a finished class started saying "Edit attendance" instead of "Mark
- * Attendance": class B's button moved from index 1 to index 0 and the driver
- * pressed the wrong card. Selecting by the class title is stable under label
- * changes, which is the whole point of a status feature.
- */
-async function pressClassButton(page, classTitle) {
-  const ok = await page.evaluate((classTitle) => {
-    const visible = (e) =>
-      !e.closest('[aria-hidden="true"]') && e.getClientRects().length > 0;
-    const title = [...document.querySelectorAll("*")].find(
-      (e) =>
-        e.children.length === 0 &&
-        e.textContent.trim() === classTitle &&
-        visible(e)
-    );
-    if (!title) return false;
-    // Walk up to the card, then find its button by either label.
-    let card = title;
-    for (let i = 0; i < 8 && card; i++) {
-      const btn = [...card.querySelectorAll("*")].find(
-        (e) =>
-          e.children.length === 0 &&
-          /^(Mark Attendance|Edit attendance)$/.test(e.textContent.trim()) &&
-          visible(e)
-      );
-      if (btn) {
-        const target = btn.parentElement;
-        const o = { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, button: 0 };
-        target.dispatchEvent(new PointerEvent("pointerdown", o));
-        target.dispatchEvent(new PointerEvent("pointerup", o));
-        target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-        return true;
-      }
-      card = card.parentElement;
-    }
-    return false;
-  }, classTitle);
-  console.log(`pressed card button: ${classTitle}${ok ? "" : " (NOT FOUND)"}`);
-  return ok;
-}
 
 const CLASS_ID = "e1000000-0000-0000-0000-0000000000c1";
 const CLASS_B  = "e1000000-0000-0000-0000-0000000000c2";
@@ -173,20 +85,31 @@ try {
   const page = await ctx.newPage();
   page.on("dialog", (d) => d.accept().catch(() => {}));
   await loginExpo(page, "coach@swimsync.test", "password123");
-  await page.waitForTimeout(3000);
+  // 8s, not 3s: the landing tab is now the SCHEDULE screen, which derives a
+  // whole week of lessons plus the floor-scoped backlog (two lessonDatesInRange
+  // passes and three queries) where the old Today screen derived one day. At 3s
+  // the first press landed before the cards existed and seven checks cascaded
+  // red — a race, not a regression. If this ever needs raising again, prefer
+  // waiting for the control rather than adding seconds.
+  await page.waitForTimeout(8000);
 
   let t = await dumpText(page);
   await page.screenshot({ path: `${SHOT}/ss-1-today.png`, fullPage: true });
 
   check(
     "the backlog offers last week's lesson, and only that one",
-    /Unmarked Lessons \(1\)/.test(t),
-    t.match(/Unmarked Lessons \([0-9]+\)/)?.[0] ?? "(no backlog heading)"
+    /NEEDS MARKING \(1\)/i.test(t),
+    t.match(/NEEDS MARKING \([0-9]+\)/i)?.[0] ?? "(no backlog heading)"
   );
+
+  // (The floor-scoped-not-week-scoped property of NEEDS MARKING is proven by
+  // verify-schedule-week.mjs, which owns the week selector. It was tried here
+  // first and destabilised everything downstream: this driver's subject is
+  // §7.64 router reuse, and it needs the screen left exactly where it started.)
 
   // ── 1. Mark TODAY's lesson, from Today's card ────────────────────────────
   await pressClassButton(page, "Stale Screen Club");
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(4000);
   t = await dumpText(page);
   check(
     "today's lesson opens with both children",
@@ -213,8 +136,8 @@ try {
   t = await dumpText(page);
   check(
     "after saving today, the backlog still lists last week's lesson",
-    /Unmarked Lessons/.test(t),
-    t.match(/Unmarked Lessons \([0-9]+\)/)?.[0] ?? "(backlog gone)"
+    /NEEDS MARKING/i.test(t),
+    t.match(/NEEDS MARKING \([0-9]+\)/i)?.[0] ?? "(backlog gone)"
   );
 
   await pressByText(page, "Mark");
@@ -266,11 +189,14 @@ try {
 
   // ── 4. And the backlog clears, which is what the coach came for ──────────
   await page.waitForTimeout(2000);
-  t = await dumpText(page);
+  // visibleText: this is a NEGATIVE assertion, so a stale mount still holding
+  // the old heading would make it false-FAIL, and (worse) a stale mount that
+  // had already cleared could make a real regression false-PASS.
+  t = await visibleText(page);
   check(
-    "the Unmarked Lessons banner clears once the lesson is really marked",
-    !/Unmarked Lessons/.test(t),
-    t.match(/Unmarked Lessons \([0-9]+\)/)?.[0] ?? "(cleared)"
+    "the NEEDS MARKING banner clears once the lesson is really marked",
+    !/NEEDS MARKING/i.test(t),
+    t.match(/NEEDS MARKING \([0-9]+\)/i)?.[0] ?? "(cleared)"
   );
 
   // ══════════════ THE STATUS CHIPS AND BREAKDOWN ══════════════
@@ -278,7 +204,7 @@ try {
   // B's is partially marked (one of two, from the fixture). So one Today screen
   // carries a `Marked` card, a `1 of 2 marked` card and a `Not marked` backlog
   // row, which is every state a real screen can show at once.
-  t = await dumpText(page);
+  t = await visibleText(page);
 
   check(
     "a fully marked class shows the Marked chip",
@@ -422,7 +348,15 @@ try {
     classesUrl
   );
 
-  const classesBody = await dumpText(page);
+  // ⚠ visibleText, NOT dumpText — AND THIS IS THE WHOLE POINT OF THIS DRIVER.
+  // `document.body.innerText` contains the SCHEDULE screen too: React
+  // Navigation leaves it mounted underneath (§7.10/§7.58), and since
+  // 2026-08-08 that screen renders its own "TODAY · <date>" heading. So the
+  // grouping check below would match the screen we navigated AWAY from, and the
+  // Classes tab's weekday grouping could be deleted outright while this stayed
+  // green forever. A driver that exists to catch one screen overlaying another
+  // must not itself be fooled by one screen overlaying another.
+  const classesBody = await visibleText(page);
   check(
     "the class list actually rendered",
     classesBody.includes("My Classes"),
@@ -444,8 +378,11 @@ try {
   // do — it swallows Today's push into the Classes stack, and "Mark
   // Attendance" becomes a dead tap that dumps the coach on the class list.
   // That is the single most frequent action in the product.
-  await pressByText(page, "Today");
-  await page.waitForTimeout(2500);
+  // "Schedule", not "Today" — the coach's landing tab was renamed 2026-08-08.
+  // pressByText matches leaf text EXACTLY, so the screen's own "TODAY · Sat,
+  // 8 Aug" heading cannot collide with it, and "Schedule" is unique to the tab.
+  await pressByText(page, "Schedule");
+  await page.waitForTimeout(4000);
   // pressClassButton, not pressByText("Mark Attendance") — by this point both
   // lessons are marked, so the button reads "Edit attendance" and a literal
   // match finds nothing. This helper accepts either label.
@@ -453,7 +390,7 @@ try {
   await page.waitForTimeout(3000);
   const pushedUrl = page.url().replace(EXPO, "");
   check(
-    "the tab reset does NOT swallow Today's push into the attendance screen",
+    "the tab reset does NOT swallow Schedule's push into the attendance screen",
     /\/classes\/[^/]+\/attendance/.test(pushedUrl),
     pushedUrl
   );

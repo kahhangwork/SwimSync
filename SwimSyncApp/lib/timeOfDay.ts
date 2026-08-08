@@ -77,3 +77,30 @@ export function isNowInRange(
 export function hasEndedInSg(end: string, nowMinutes: number): boolean {
   return nowMinutes > toMinutes(end);
 }
+
+/**
+ * Has the lesson ON `date` finishing at `end` already finished, given `today`?
+ *
+ * The DATED generalisation of hasEndedInSg, for any screen showing more than
+ * one day at a time. The coach Today screen only ever needed the same-day case
+ * and hardcoded `true` for its backlog; a week view needs all three, and
+ * getting the middle one wrong is what makes a future lesson render as
+ * "Not marked" — nagging a coach about a lesson that has not happened.
+ *
+ *   date <  today  ->  true   (a past lesson has always ended)
+ *   date >  today  ->  false  (a future one never has)
+ *   date == today  ->  ask the clock, via hasEndedInSg
+ *
+ * Takes `today` and `nowMinutes` as PARAMETERS and reads no clock itself —
+ * the rule this whole file exists to enforce (§7.7).
+ */
+export function hasLessonEnded(
+  date: string,
+  today: string,
+  end: string,
+  nowMinutes: number
+): boolean {
+  if (date < today) return true;
+  if (date > today) return false;
+  return hasEndedInSg(end, nowMinutes);
+}

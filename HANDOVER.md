@@ -1,6 +1,31 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-07 — **the attendance-marking floor now follows `billing_periods`
+_Last updated: 2026-08-08 — **the coach's Today tab is gone: SCHEDULE replaced it, and
+parents can now pay and claim straight from their invoice list. Both are LOCAL ONLY —
+nothing is committed or deployed yet (§9).** The Schedule tab is a Monday-start week
+selector over four sections (NEEDS MARKING / TODAY / COMING UP / DONE), and the two
+decisions worth carrying are that **NEEDS MARKING is floor-scoped and ignores the
+selector** — week-scoping it would hide a straggler nobody would go looking for, and
+unmarked attendance blocks billing with no override — and that **the week is an offset
+integer, not a stored Monday** (§7.95: an absolute date captured at mount goes stale on a
+PWA that survives a Sunday→Monday boundary, and the symptom is today's lessons simply
+absent). Four gotchas graduated: **§7.95–§7.98**, plus a new paragraph on **§7.70** —
+"the range cannot grow without bound" was false for a tenant that has never sealed a
+month, whose floor is its `created_at`.
+
+**Two things a plan review predicted that turned out WRONG, and the corrections matter
+more than the predictions.** (1) Nesting the parent's Pay/Claim buttons inside the card's
+touchable was supposed to double-fire; it was tested by deliberately re-nesting them and
+the driver still scored 16/16 — RN's responder system does not propagate a press to
+ancestor Touchables. The layout was kept, the false mechanism struck from both comments.
+(2) `verify-stale-screen.mjs` was going to be a permanent false pass, and that one was
+REAL: it asserted `/today\s*·/i` against the Classes tab while the Schedule screen —
+mounted underneath and rendering its own `TODAY ·` heading — could satisfy it. Fixed with
+a shared `visibleText()`. **Verified: jest 308, typecheck clean, and six coach/parent UI
+drivers green (stale-screen 22/22 against a measured 22/22 baseline, schedule-week 19/19,
+attendance-guard 22/22, tz-saturday 6/6, unmarked-lessons 12/12, bulk-setall 10/10).**_
+
+_Previously, 2026-08-07 — **the attendance-marking floor now follows `billing_periods`
 instead of the calendar — LIVE on production (§8.32).** `markable_floor(tenant)` is
 `LEAST(1st of last month, the month after that business's latest sealed month, else its
 `created_at`)`, replacing a calendar proxy that could make a month billed LATE
@@ -19,8 +44,8 @@ every class edit between 00:00 and 08:00 SGT**, three weeks live, while the admi
 sent the correct Singapore date. Both red drivers were that one bug, not driver rot. The
 lesson is **§7.94**: the RPC, its pgTAP file and its driver had all made the same UTC
 assumption and therefore agreed, so a 14-test file on that exact function stayed green.
-**CI is red purely because GitHub Actions was in a MAJOR OUTAGE — re-run it, don't debug
-it (§9).**_
+*(This session's CI was red purely because GitHub Actions was in a major outage — re-run
+on 2026-08-08, see the dateline above.)*_
 
 _Previously, 2026-08-06 — **a business can have CO-ADMINS, and the owner manages them —
 LIVE and verified on production (§8.31).** `tenants.owner_profile_id` marks the "main"
@@ -59,7 +84,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.94** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.98** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -166,8 +191,8 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   *Deliberately not doing*. §8.27.
 - **Unmarked-lesson safety net (verified UI + backend)** — expected lesson dates are
   derived from `classes.day_of_week` at read time (there is no session generator — §6):
-  the coach's Today tab lists **Unmarked Lessons** and links straight to marking a past
-  date, and the admin's invoice-generation dialog reports `N of M lessons marked` per
+  the coach's Schedule tab leads with **NEEDS MARKING** and links straight to marking a
+  past date, and the admin's invoice-generation dialog reports `N of M lessons marked` per
   class with the missing dates named. Closes the hole where a forgotten lesson was
   silently unbillable and invisible to everyone (§8i).
 - **Parent Attendance states (verified UI)** — an unassigned child gets the
@@ -333,8 +358,24 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   > **Dormant in the sense that matters:** no production month has been billed late yet, so
   > the reopened window has never actually been used. That is the point — it is insurance,
   > shipped ahead of the trigger its own backlog item named.
+- **The coach's landing tab is a WEEK, not a day (verified local: jest 308 + a 19-check UI
+  driver + 5 existing coach drivers re-run — NOT yet deployed)** — the Today tab is gone;
+  **Schedule** replaced it, and the tabs are Schedule / Classes / My Pay / Settings (a
+  private coach still sees three). A Monday-start week selector sits over four sections:
+  **NEEDS MARKING**, **TODAY**, **COMING UP**, **DONE**. The Classes tab and its roster are
+  untouched.
+  > **NEEDS MARKING is FLOOR-scoped and deliberately ignores the selector** — every
+  > unmarked lesson from the business's `markable_floor` to today, whatever week is shown.
+  > Week-scoping it would hide a straggler the coach has no reason to look for, and
+  > unmarked attendance blocks billing with no override (§8i). `verify-schedule-week.mjs`
+  > pins it, proven red by scoping the query to the week.
+  > **The week is an offset integer, not a stored Monday** (§7.95): an absolute Monday
+  > captured at mount goes stale on a PWA that survives a Sunday→Monday boundary, and the
+  > symptom — today's lessons simply absent — is indistinguishable from a quiet day.
+  > Sections are driven by **marking state, not the calendar**, so they still mean
+  > something on a week that is not the current one. PRD §14.2, §7.5.
 - **Every lesson list says whether it has been marked (verified UI driver — LIVE
-  2026-07-26)** — Today's class cards, the Unmarked Lessons rows and the class roster each
+  2026-07-26)** — the Schedule tab's lesson cards, the NEEDS MARKING rows and the class roster each
   carry one of five states — **Upcoming** / **Not marked** / **N of M marked** / **Marked** /
   **No students** — plus a breakdown of what was recorded (*"2 students · 3 present ·
   1 cancelled (rain)"*), keeping *rain* and *coach* apart because they bill differently. A
@@ -414,8 +455,11 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   `ui-driver-rot` issue that a green run closes. Protocol and triage rule:
   `docs/TESTING.md` §5. **Its first scheduled sweep found a LIVE product bug that had been
   invisible to four green manual runs — see §8.33 and §7.94. That is the whole argument for
-  the nightly, made on its first outing. Issue #2 was open on 2026-08-07; the cause is
-  fixed and a green sweep should close it.**
+  the nightly, made on its first outing.** The fix is confirmed by the mechanism that found
+  it: the sweep has run **green twice since** (2026-08-07 00:53Z and 20:47Z, both inside the
+  04:00 SGT window the bug lived in) and closed issue #2 itself. `gh run
+  list --workflow=ui-drivers.yml` is the current fact; an open `ui-driver-rot` issue means
+  red right now.
 
 > **"CLEAN SLATE" IS A BANNED PHRASE FOR THIS DATABASE — it has now been wrong twice.**
 > The first time (corrected 2026-07-25) it claimed production held "only the superadmin +
@@ -671,8 +715,8 @@ Everything below is the monthly loop from here on:
    built for (Invoices → *WhatsApp reminders*; one press of Send per parent; the
    **Claimed** filter collects "parent says paid" rows to check against the bank).
    `SELECT status, count(*) FROM invoices GROUP BY 1;` is the honest scoreboard.
-2. **Keep August marked as it happens** (the coach's Unmarked Lessons list is the
-   tracker), then **bill August in early September** — same runbook, now routine. The
+2. **Keep August marked as it happens** (the coach's **NEEDS MARKING** list on the
+   Schedule tab is the tracker), then **bill August in early September** — same runbook, now routine. The
    marking window still floors at the 1st of last month (§8.15): August's lessons are
    markable through September, and no later.
    > Marking got two small helps on 2026-08-03 (§8.27): today's card now names **guests
@@ -689,6 +733,41 @@ Everything below is the monthly loop from here on:
 
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
+
+### ⚠ UNCOMMITTED WORK IS SITTING IN THE TREE — READ THIS FIRST
+
+**Nothing from 2026-08-08 is committed, pushed or deployed.** Three pieces are finished
+and verified locally, on `main`, in the working tree:
+
+1. **Revenue reporting was deprioritised** and moved out of *Unordered — no dependencies*
+   into *Later* in `BACKLOG.md`. Its accrual-vs-cash decision genuinely is a dependency,
+   so the move is a correction as well as a demotion.
+2. **Parent pay-and-claim from the invoice list** — `(parent)/billing/index.tsx` only, no
+   migration, no RPC. New driver `verify-parent-pay-claim.mjs` (16/16).
+3. **The coach Schedule tab replaced the Today tab** — see the dateline and §3. New
+   driver `verify-schedule-week.mjs` (19/19); five existing coach drivers re-run green.
+
+**What is left to do, in order:**
+
+- **Commit it.** `/commit-review` per the convention. The Schedule tab is a big enough
+  change to deserve its own commit separate from the parent billing one.
+- **Deploy is a plain `git push … :main`** — all three are app-only. No migration, no edge
+  function, no grant change, so the §7.60 ordering trap does not apply. But the push IS
+  the deploy for both web apps, so expect the coach's tab bar to change the moment it
+  lands.
+- **Grep the served bundle afterwards** (§7.31) — a 200 proves nothing. `NEEDS MARKING` is
+  a string only the new build has.
+- **Watch the next nightly sweep.** Six drivers changed; `run-all-drivers.sh` was NOT run
+  end to end locally (it resets the DB per driver and takes ~45 min), so the nightly is
+  the first full-suite evidence.
+
+> **One deliberate deviation from the plan, recorded so it is not read as an oversight.**
+> The plan said `verify-stale-screen.mjs` should go 22 → 23 checks by absorbing a
+> floor-scope assertion. It stayed at **22**, and the new assertion went into
+> `verify-schedule-week.mjs` instead: driving the week selector inside that driver
+> destabilised seven downstream checks, because its subject is §7.64 router reuse and it
+> needs the screen left where it starts. The label diff against `main` is two renames and
+> **nothing lost** — that was checked, not assumed.
 
 ### If you would rather build than onboard
 
@@ -713,24 +792,25 @@ now a `BACKLOG.md` item: grants genuinely are its only gate, but the oracle used
 it needs a usage audit of the edge functions and the admin's server routes. Don't start it
 without that.
 
-### ⚠ ONE RED SIGNAL LEFT, and it is infrastructure
+### ✅ NO RED SIGNALS — both are cleared, don't re-triage them
 
-**The nightly UI drivers were RED, were triaged, and the cause is FIXED (§8.33).** Both
-reds were one live product bug, not driver rot: `set_class_terms()` compared against
-`CURRENT_DATE` (UTC) while the admin sent `todayInSg()`, so **every class edit was refused
-between 00:00 and 08:00 SGT** — three weeks, live. `class-edit` is 5/5 and `class-terms`
-10/10 again. **Issue #2 should close itself on the next green sweep (04:00 SGT); if it does
-not, that is a new failure, not this one.** `gh run list --workflow=ui-drivers.yml` is the
-current fact.
+**The nightly UI drivers are GREEN and stayed green.** The two reds of 2026-08-06 were one
+live product bug, not driver rot: `set_class_terms()` compared against `CURRENT_DATE` (UTC)
+while the admin sent `todayInSg()`, so **every class edit was refused between 00:00 and
+08:00 SGT** — three weeks, live (§8.33, §7.94). Since the fix the sweep has run **green
+twice** (2026-08-07 00:53Z and 20:47Z), both firings **inside the window the bug lived in**,
+and closed the rolling `ui-driver-rot` issue itself. That is the fix verified by the same
+mechanism that caught it. **If it reddens again it is a NEW failure — triage it fresh
+(`docs/TESTING.md` §5), don't reach for this paragraph.**
 
-**CI on `b5da2c5`/`13c845b` is red, and it is NOT the code — do not debug it.** GitHub Actions
-was in a **major outage** (incident opened 2026-08-06T15:22Z, `Actions -> major_outage`),
-and all three attempts died in *"Set up job"* at `Getting action download info` with
-`Service Unavailable`, before checkout. `backend-tests` **passed**; the other two jobs were
-cancelled by fail-fast rather than failing. Everything was verified locally before the push
-(pgTAP 554, Deno 130 ×2, jest 256, vitest 255, both typechecks, driver 22/22) and the
-migration was verified directly against production. **Just re-run it** once
-`githubstatus.com` shows Actions operational: `gh run rerun 31118381157 --failed`.
+**The red CI on `b5da2c5`/`13c845b`/`2e0feed` was the GitHub Actions outage, and it has been
+re-run (2026-08-08).** All three attempts had died in *"Set up job"* at `Getting action
+download info` with `Service Unavailable`, before checkout — `backend-tests` passed, the
+other two jobs were cancelled by fail-fast rather than failing. Everything had been verified
+locally before the push (pgTAP 557, Deno 130 ×2, jest 256, vitest 255, both typechecks,
+driver 22/22) and the migration directly against production. **The lesson worth keeping is
+the triage, not the incident: a job that dies before checkout is not your code** — check
+`githubstatus.com` before reading a diff.
 
 ***Run the UI drivers in CI* SHIPPED 2026-08-05 (§8.30) — it is now an operating rhythm,
 not a to-do.** The nightly sweep (04:00 SGT, `ui-drivers.yml`) maintains one rolling

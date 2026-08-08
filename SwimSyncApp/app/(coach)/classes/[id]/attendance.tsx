@@ -119,12 +119,12 @@ export default function MarkAttendanceScreen() {
   // what is underneath is frequently ANOTHER LESSON'S attendance screen.
   //
   // This screen lives in the CLASSES tab's Stack (classes/_layout.tsx) but is
-  // pushed from the TODAY tab as well. Switching tabs does not unwind the
+  // pushed from the SCHEDULE tab as well. Switching tabs does not unwind the
   // Classes stack, it only hides it, so the stack accumulates:
   //
-  //   Today → tap 845am card       [classes-index, att(845, 26 Jul)]
-  //   back chevron → Today         [classes-index, att(845, 26 Jul)]  ← kept
-  //   Today → tap 930am card       [classes-index, att(845,26), att(930,26)]
+  //   Schedule → tap 845am card    [classes-index, att(845, 26 Jul)]
+  //   back chevron → Schedule      [classes-index, att(845, 26 Jul)]  ← kept
+  //   Schedule → tap 930am card    [classes-index, att(845,26), att(930,26)]
   //   Save → router.back()         → lands on att(845, 26 Jul)
   //
   // Which is what the coach reported: saving the 9:30 class returned them to
@@ -133,8 +133,13 @@ export default function MarkAttendanceScreen() {
   // So the caller says where it came from and we go there EXPLICITLY, with
   // `replace` rather than `push` — that also drops this screen out of the
   // history, so nothing can pop back into a lesson the coach has finished.
+  //
+  // ⚠ THE DEFAULT ARM IS THE SAFETY NET — KEEP IT AS `from === "roster" ? … : …`
+  // rather than switching on "schedule". A stale `from=today` (a bookmark, a
+  // driver nobody updated) then still lands on a real screen instead of
+  // nowhere. Narrowing it to an exact match buys nothing and can only break.
   const exitHref =
-    from === "roster" ? `/(coach)/classes/${id}/roster` : "/(coach)/today";
+    from === "roster" ? `/(coach)/classes/${id}/roster` : "/(coach)/schedule";
 
   function leaveScreen() {
     router.replace(exitHref as any);

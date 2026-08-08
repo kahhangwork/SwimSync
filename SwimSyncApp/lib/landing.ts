@@ -25,7 +25,7 @@ export type LandingRole =
 
 export type Landing =
   | { route: "/(parent)/home" }
-  | { route: "/(coach)/today" }
+  | { route: "/(coach)/schedule" }
   /** No mobile home for this account; `reason` is shown to the user. */
   | { route: null; reason: string };
 
@@ -44,7 +44,7 @@ export function landingFor(
 
   // Anyone who actually teaches gets the coach app — `coach` and the
   // private-coach `tenant_admin` alike.
-  if (isCoach) return { route: "/(coach)/today" };
+  if (isCoach) return { route: "/(coach)/schedule" };
 
   // An admin who does not teach: real account, no mobile surface. Say that,
   // rather than "unrecognised role", which reads like their account is broken

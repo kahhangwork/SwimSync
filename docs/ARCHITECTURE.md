@@ -236,7 +236,7 @@ the shape of the system changes:_
     actively-enrolled student has an attendance row on it**, and **a lesson with no session
     row at all is UNMARKED, not absent** — sessions are created lazily, so "no row" is
     exactly what a forgotten lesson looks like. Used by
-    `SwimSyncAdmin/lib/classCoverage.ts`, `(coach)/today/index.tsx` and
+    `SwimSyncAdmin/lib/classCoverage.ts`, `(coach)/schedule/index.tsx` and
     `(coach)/classes/[id]/roster.tsx`. **Duplicated byte-identical in both apps** (same
     arrangement as `lessonDates.ts`), and the engine keeps its own Deno copy — so it is
     **three edits, not one**. Callers still own their own *window* (billing month vs coach

@@ -25,7 +25,7 @@
 // hold whether or not that class has students.
 
 import os from "node:os";
-import { launch, loginExpo, tap, dumpText } from "./lib.mjs";
+import { launch, loginExpo, tap, dumpText, pressClassButton } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 // 2026-07-18 07:30 SGT == 2026-07-17 23:30 UTC. Friday in UTC, Saturday in SG.
@@ -71,16 +71,30 @@ try {
     /Saturday Beginners/.test(text),
     /Saturday Beginners/.test(text) ? "" : "seed's Saturday class missing from Today"
   );
+  // ⚠ REPINNED 2026-08-08. This used to deny "No classes today", which was the
+  // TODAY tab's empty state. The Schedule tab renders "No lessons today." —
+  // so the old negative would have passed for the wrong reason forever: the
+  // string it denies no longer exists anywhere in the app. Deny the CURRENT
+  // string, and assert the positive counterpart so an empty TODAY section
+  // cannot satisfy this by saying nothing at all.
   check(
-    "the screen does not claim there are no classes today",
-    !/No classes today/.test(text),
-    /No classes today/.test(text) ? "screen says 'No classes today'" : ""
+    "the screen does not claim there are no lessons today",
+    !/No lessons today/.test(text),
+    /No lessons today/.test(text) ? "screen says 'No lessons today'" : ""
+  );
+  check(
+    "TODAY actually names a lesson count, so the section is populated",
+    /TODAY ·/i.test(text) && /\d+ lesson/.test(text),
+    (text.match(/TODAY ·[^\n]*/i) ?? ["(no TODAY heading)"])[0]
   );
 
   // The other half of §7.7, and the half that actually mis-billed: the DATE the
   // attendance screen targets. The list above can be right while this is wrong
   // — that disagreement IS the bug.
-  await tap(page.getByText("Mark Attendance").first(), "Mark Attendance");
+  // Not getByText("Mark Attendance").first(): the Schedule screen can render
+  // several cards at once, and the label flips to "Edit attendance" once a
+  // lesson is marked. pressClassButton is stable under both.
+  await pressClassButton(page, "Saturday Beginners");
   await page.waitForTimeout(2500);
   const url = page.url();
   await page.screenshot({ path: `${SHOT}/tz-saturday-attendance.png`, fullPage: true });

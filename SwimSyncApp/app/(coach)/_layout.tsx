@@ -6,7 +6,7 @@ export default function CoachLayout() {
   // ⚠ RENDER IS NEVER GATED ON THIS. The hook returns a plain boolean and
   // resolves every failure path to `false` (lib/useCoachHasPayouts.ts), so the
   // tab bar below renders immediately and unconditionally. A network call in
-  // the coach ROOT layout has the whole app as its blast radius — Today,
+  // the coach ROOT layout has the whole app as its blast radius — Schedule,
   // Classes and Settings included — so nothing here may await, throw, or
   // early-return on it.
   const hasPayouts = useCoachHasPayouts();
@@ -28,12 +28,18 @@ export default function CoachLayout() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
+      {/* ⚠ THIS MUST STAY THE FIRST <Tabs.Screen>. expo-router's
+          getSortedChildren puts DECLARED screens in declaration order and
+          appends undeclared ones alphabetically, and the first is the
+          navigator's initial route — so declaration order is the only thing
+          making Schedule the tab a coach lands on. Move it below `classes` and
+          the coach opens on the class list instead. */}
       <Tabs.Screen
-        name="today"
+        name="schedule"
         options={{
-          title: "Today",
+          title: "Schedule",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="today-outline" size={size} color={color} />
+            <Ionicons name="calendar-outline" size={size} color={color} />
           ),
         }}
       />
@@ -46,16 +52,21 @@ export default function CoachLayout() {
           ),
         }}
         // The attendance screen lives in THIS tab's Stack (classes/_layout.tsx)
-        // but is pushed from the TODAY tab — §7.65. Switching tabs only hides a
-        // stack, it never unwinds one, so the Classes stack accumulates an
+        // but is pushed from the SCHEDULE tab — §7.65. Switching tabs only hides
+        // a stack, it never unwinds one, so the Classes stack accumulates an
         // attendance screen per lesson visited and tapping Classes lands on the
         // last lesson marked instead of the class list. §7.65 fixed the
         // within-stack half (attendance leaves via `replace`); this is the other
         // half, where the exit target is a different tab and the stack is simply
         // left behind.
         //
+        // Renaming the pushing tab (Today -> Schedule, 2026-08-08) changed
+        // NOTHING about this: the push still lands in the Classes stack and the
+        // exit is still a tab jump, so the body below is untouched. Only the
+        // prose moved.
+        //
         // ⚠ DO NOT move this to useFocusEffect or unmountOnBlur. Both fire on
-        // PROGRAMMATIC entry, which would intercept Today's "Mark Attendance"
+        // PROGRAMMATIC entry, which would intercept Schedule's "Mark Attendance"
         // push into this stack and turn the coach's most frequent daily action
         // into a dead tap that dumps them on the class list. `tabPress` fires
         // only on a real press of the tab-bar button, which is what makes it
@@ -66,7 +77,8 @@ export default function CoachLayout() {
             // bottom-tabs behaviour already pops the stack to top when you
             // press the tab you are on, so repeating it here would be a
             // redundant navigation that remounts the list and throws away the
-            // coach's scroll position — on the tab they open most after Today.
+            // coach's scroll position — on the tab they open most after
+            // Schedule.
             // The bug this exists for is the cross-tab case, where the stack is
             // left untouched entirely.
             if (navigation.isFocused()) return;

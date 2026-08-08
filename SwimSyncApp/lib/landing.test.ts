@@ -15,7 +15,7 @@ describe("landingFor", () => {
   });
 
   it("sends a plain coach to the coach app", () => {
-    expect(landingFor("coach", true)).toEqual({ route: "/(coach)/today" });
+    expect(landingFor("coach", true)).toEqual({ route: "/(coach)/schedule" });
   });
 
   // THE PRODUCTION REGRESSION. The tenancy backfill made the only real coach a
@@ -23,7 +23,7 @@ describe("landingFor", () => {
   // enum alone locked them out with "Unrecognised role".
   it("sends a PRIVATE COACH (tenant_admin with a coaches row) to the coach app", () => {
     expect(landingFor("tenant_admin", true)).toEqual({
-      route: "/(coach)/today",
+      route: "/(coach)/schedule",
     });
   });
 

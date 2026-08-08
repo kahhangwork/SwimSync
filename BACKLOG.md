@@ -1,6 +1,24 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-06 (second session) — **two items SHIPPED and removed:** *Tie the
+_Last updated: 2026-08-08 — **two items SHIPPED (struck through in place, not deleted),
+one DEPRIORITISED, and one idea refused.** Shipped: *A coach week view*, which went
+further than it asked — the week view **replaced the Today tab outright** rather than
+reshaping the Classes tab, so the coach's tabs are now Schedule / Classes / My Pay /
+Settings — and *Pay and claim straight from the parent's invoice LIST*. Deprioritised:
+**Revenue reporting**, moved from *Unordered — no dependencies* to *Later*, which is a
+correction as much as a demotion (its accrual-vs-cash question is a dependency, so it
+never belonged under "no dependencies"). Refused: a **configurable first-day-of-week**,
+considered and dropped with the user — `weekOrder.ts` is Monday-first because it mirrors
+the Postgres enum declaration order, and today-first rendering already overrides most of
+what the setting would buy. **All of it is LOCAL ONLY at time of writing; see HANDOVER §9.**
+
+Both shipped items carry a **corrected prediction** in their entry, which is the part
+worth reading: the week view's filed shape (reshape the Classes tab) was wrong about
+where it belonged, and the parent-billing item's predicted double-fire bug **does not
+exist** — nested Touchables do not propagate a press on RN-web, tested by deliberately
+re-nesting them._
+
+_Previously, 2026-08-06 (second session) — **two items SHIPPED and removed:** *Tie the
 attendance-marking window to un-invoiced months* and *`book_trial` has no date floor*, both
 closed by `20260806000200` (PRD §7.6). The first shipped **before its own stated trigger** —
 it said "revisit the first time a month is billed late", and the user chose to build it as
@@ -169,16 +187,32 @@ Upcoming-lessons view for parents (S), Maps deep link (S), Attendance edit-histo
 (S), Export to CSV (S), Disable a coach account (M), Student-move loose ends (S), Better
 filtering/search (S), More polished
 dashboards (S), Deeper component-render tests (M), Convert a trial into an enrolled student (S),
-Editing a student's contact details (S),
-Email-confirmation copy/templates (S), Revenue reporting (M — *decide accrual-vs-cash first*).
+Email-confirmation copy/templates (S).
+
+_Removed 2026-08-08: **Editing a student's contact details** — shipped 2026-07-26 and
+struck through in its own section since then, but left standing here for six weeks. See
+the note under_ Later _below: this list and the item bodies are two places to mark a ship,
+and only one of them is ever remembered._
 
 ### Later — big features carrying their own dependencies
 
-Makeup lessons (L), Multiple classes per child (M), Parent
+Multiple classes per child (M), Parent
 self-enrolment (M), Coach-assisted assignment (M), Household split billing (M), Auto PayNow
-detection (L), In-app payment gateway (L), Multiple coaches per class (S), Multi-language
+detection (L), In-app payment gateway (L), **Revenue reporting (M — *decide accrual-vs-cash
+first*; moved here 2026-08-08, see the item)**, Multiple coaches per class (S), Multi-language
 (M), Shared `lessonDates` package (M — *not recommended*, see the item), Generate real
 Supabase `Database` types (M — *do last*, needs a frozen schema; see the item).
+
+_Removed 2026-08-08: **Makeup lessons** — shipped 2026-08-02 as the guest-pass model and
+struck through in its own section on the day, but left standing here._
+
+> ⚠ **A SHIP HAS TO BE MARKED IN TWO PLACES, AND THE RANKED LIST IS THE ONE THAT GETS
+> FORGOTTEN.** Three items were found still listed here as unbuilt while their own
+> sections read SHIPPED — *Makeup lessons* (6 days), *Editing a student's contact details*
+> (6 weeks), and *Pay and claim from the parent's invoice list* (caught during the same
+> session that shipped it). The item bodies were correct every time; these lists were not,
+> and a list is what someone picking work actually reads. **When you strike an item
+> through, grep this document for its name before you close the file.**
 
 ---
 
@@ -326,28 +360,29 @@ whose edit they record; and `old_value`/`new_value` are full `to_jsonb(OLD/NEW)`
 so the screen must diff them rather than print them — the dispute this exists for is
 *what the number used to be*.
 
-### A coach week view — **M**
-Turn the Classes tab into a Mon–Sun strip showing each lesson **and whether it is
-marked**, rather than the recurring timetable it shows today.
+### ~~A coach week view~~ — **SHIPPED 2026-08-08 as the Schedule tab** (PRD §14.2)
+It went further than this item asked. Rather than turning the *Classes* tab into a week
+strip, the week view **replaced the Today tab outright** — the user's call, on the grounds
+that two tabs both listing today's lessons with marking chips is duplication in the app's
+most prominent navigation. Tabs are now **Schedule / Classes / My Pay / Settings**, and
+the Classes tab and its roster are untouched.
 
-**Why:** PRD §14.2 describes this tab as being "for date-based lookups". As of
-2026-08-03 it groups classes by weekday with today first (§8.27), which is a *timetable* —
-it answers "when do I teach?" but still not "which lessons have I actually marked?". Each
-row is a recurring class, not a dated lesson, so the coach's only surfaces tied to real
-dates remain Today (one day) and the Unmarked Lessons backlog (a nag list of what has
-already gone wrong). A week view is the first surface that lets a coach see what is
-coming and confirm they are square *before* the month closes, instead of finding out at
-invoice time that a lesson blocked it.
+Three decisions worth keeping, because each was reached by rejecting the obvious version:
 
-**Notes:** every building block exists and none of them needs new schema — expected
-lesson dates come from `expectedLessonDates()` (`lib/lessonDates.ts`), the five marking
-states from `lessonProgress()` / `progressLabel()` (`lib/attendanceSummary.ts`), and the
-per-date expected roster from `expectedStudentsOn()`. **Do not pre-generate sessions to
-build this** (`docs/ARCHITECTURE.md` §6). `lib/weekOrder.ts` already does the
-today-first weekday ordering and takes the weekday as a parameter, so reuse it rather
-than deriving one — nothing in that file may read a clock (§7.7). Raised 2026-08-02
-alongside the Classes-tab landing fix, which shipped 2026-08-03 as the small half of the
-same complaint.
+- **Sections are driven by MARKING STATE, not the calendar** — NEEDS MARKING / TODAY /
+  COMING UP / DONE. A purely calendar split (today / upcoming / past) collapses into one
+  undifferentiated list on any week that is not the current one, which is exactly the week
+  a selector exists to reach.
+- **NEEDS MARKING is FLOOR-scoped, never week-scoped**, and it is the only section that
+  ignores the selector. Week-scoping it would hide a straggler the coach has no reason to
+  go looking for, and unmarked attendance blocks billing with no override. Note the range
+  is not unbounded: `markable_floor` already means "back to the latest unsealed month".
+- **The week is held as an OFFSET integer, not a stored Monday** (§7.95).
+
+Deliberately NOT built: a configurable first-day-of-week. `weekOrder.ts` is Monday-first
+*because* it mirrors the Postgres `day_of_week` enum declaration order, and today-first
+rendering already overrides most of what the setting would buy. Considered and dropped
+with the user 2026-08-08; do not file it as an oversight.
 
 ### A link to the admin panel from coach Settings — **S**
 A coach who also holds `tenant_admin` gets a link to `admin.swimsync.sg` from their
@@ -423,8 +458,16 @@ rule and a decision about which parent's credit balance a correction lands in. C
 pooled **per parent** (`docs/ARCHITECTURE.md` §6), so splitting invoices without splitting credit
 would produce a ledger nobody can explain.
 
-### Revenue reporting — **M**
+### Revenue reporting — **M** — _deprioritised 2026-08-08_
 Tell a business what it actually earned in a month.
+
+**Deprioritised 2026-08-08**, and moved from *Unordered — no dependencies* to *Later*.
+Raised as a build candidate one month into the live billing rhythm and declined by the
+user — the question is real but not urgent while there is one business and one operator
+who can read the invoice list directly. The move is also a correction: the item's own
+notes say the accrual-vs-cash question must be settled **before any code**, which is a
+dependency, so it never belonged under *no dependencies*. That decision is still the
+first thing to settle if this is picked up.
 
 **Why:** SwimSync has **no revenue ledger at all.** It tracks obligations (`invoices`),
 whether they were settled (`status`/`paid_at`), and outgoings (`coach_payouts`) — but
@@ -574,21 +617,34 @@ already exists — expected lesson dates are derived at read time from
 unmarked-lessons backlog uses. Point it at the future instead of the past. **This does
 not require pre-generating sessions** — resist that; see `docs/ARCHITECTURE.md` §6.
 
-### Pay and claim straight from the parent's invoice LIST — **S**
-Put "Pay via PayNow" and "I've paid" on each card in `(parent)/billing`, not only inside
-the invoice detail screen.
+### ~~Pay and claim straight from the parent's invoice LIST~~ — **SHIPPED 2026-08-08** (PRD §7.21)
+Both controls now sit on each outstanding card in `(parent)/billing`, matching the public
+tokenized page the WhatsApp reminder links to. App-only: no migration, no new RPC — the
+list select just had to start fetching `paid_claimed_at`, which only the detail screen
+had been reading. `verify-parent-pay-claim.mjs` (16 checks) is the guard.
 
-**Why:** paying is the single action the product most wants a parent to take, and it is
-currently two taps deep behind "View Details". The public tokenized page
-(`/invoice/<token>`) — which is what the WhatsApp reminder actually links to — puts both
-controls in front of the parent immediately, so the **in-app** path is the slower one.
-That inversion is backwards: the parent who bothered to open the app gets the worse
-experience.
+The claim's one-way rule held exactly as this item required: `claim_invoice_paid` writes
+`paid_claimed_at` and nothing else, so a claimed invoice stays **outstanding** until the
+coach confirms it against their bank. The driver asserts that explicitly.
 
-**Notes:** both call sites already exist and need no new backend — `claim_invoice_paid`
-is the RPC (`(parent)/billing/invoice/[id].tsx`), and the PayNow screen already takes
-`?invoiceId=`. Keep the claim's one-way rule: a claim is a timestamped *statement*, never
-a status change (PRD §7.21). Raised 2026-08-02.
+**Two findings worth keeping, because both corrected a confident prediction:**
+
+- **Nesting the buttons inside the card's touchable does NOT double-fire**, which is the
+  opposite of what the plan review expected. The concern was real in shape —
+  `confirmAction` is a blocking `window.confirm` on RN-web, so a bubbled press would run
+  the RPC and *then* navigate, stranding the toast and the claimed line on a screen the
+  parent had already left. It was tested by deliberately re-nesting them: still 16/16.
+  React Native's responder system grants the responder to the innermost view and does not
+  propagate to ancestor Touchables. The card is still laid out with the action row as a
+  **sibling** of the touchable — it reads honestly and does not depend on that behaviour
+  surviving an RN-web upgrade — but **do not repeat the double-fire claim as fact**, and
+  do not cite the driver's "one dialog / no navigation" checks as the nesting guard; they
+  cannot go red from nesting.
+- **The detail screen's label is "Pay via PayNow QR" and the list's is "Pay via PayNow".**
+  That difference is load-bearing for `verify-tenant-branding.mjs`, which used to match
+  `/PayNow/i` and resolved to the right control only because the detail screen mounted
+  later in DOM order (§7.10). It now targets the longer string, which only the detail
+  screen can contain. Keep the two labels distinct.
 
 ### Child identification: NRIC last 4 — **S** — _considered and declined 2026-07-19_
 Capture the last 4 characters of a child's NRIC as part of their identity.
@@ -1171,4 +1227,4 @@ Kept so the reasoning doesn't get re-litigated.
 | **Sending the invite through Supabase Auth's own invite email** | Considered 2026-07-21 and rejected in favour of `generateLink({type:'invite'})` + our own Resend send. Supabase's path would need a `templates/invite.html` **pasted into the production dashboard**, where nothing in the repo can see it and no test can catch it drifting from the file — and resending to an already-invited user has uncertain semantics (it may 422 rather than re-send). Our own send makes the template code-owned and unit-tested, no-ops without `RESEND_API_KEY`, and makes Resend deterministic. Note the deliberate inversion of the invoice-email rule: an invoice email is best-effort because billing must not depend on delivery, whereas **the invite IS the deliverable**, so a failed send surfaces the link for the operator instead of being swallowed. |
 | **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8a.) |
 | **Typing `<Thead>`'s children so a `<Tr>` inside it fails typecheck** | Considered 2026-07-26 while fixing the Levels table (`docs/GOTCHAS.md` §7.54) and declined by the user in favour of a call-site scan test. It would be the stronger guard in principle — the mistake becomes unrepresentable rather than merely detected — but React's `children` typing does not express "only these element types" cleanly, so it needs casts or a wrapper at call sites, and it would put a fiddly type on the component that backs **all 14 admin tables**. `components/Table.test.tsx` catches the same mistake in CI, names the file and the exact fix, and risks nothing at runtime. Note the earlier failure this replaces: the previous attempt at prevention was a **docblock asserting the broken form was "unrepresentable"**, which it was not — the lesson is that the guard must be executable, not that it must be a type. |
-| **Any invoice or payment count in the COACH app** | Settled with the user 2026-08-02 while removing the coach's Billing tab. The Today screen carried an "Outstanding" tile counting unpaid invoices across every parent the coach serves, and the obvious repair was to relabel it *Unpaid invoices* and make it tappable. The user rejected the whole category: **a coach does not need to know how many invoices are unpaid — that is an admin-app question.** Since fee-free payment collection shipped (PRD §7.21), everything that makes an invoice actionable — the `INV-YYYY-NNNN` reference, the dynamic QR, the WhatsApp queue, the "parent says paid" badge, the **Claimed** filter — lives on `admin.swimsync.sg`, so a number on the coach's phone can only ever prompt a decision the coach cannot act on well. It was also **not today-scoped and not lesson-shaped** while sitting between "Classes Today" and "Students Today", so it read as a fact about today's lessons. A private coach holds the tenant-admin role anyway and loses nothing. **Don't re-add a count, a badge or a filter here** (PRD §7.9; the prohibition is also a comment in `(coach)/today/index.tsx`). |
+| **Any invoice or payment count in the COACH app** | Settled with the user 2026-08-02 while removing the coach's Billing tab. The Today screen carried an "Outstanding" tile counting unpaid invoices across every parent the coach serves, and the obvious repair was to relabel it *Unpaid invoices* and make it tappable. The user rejected the whole category: **a coach does not need to know how many invoices are unpaid — that is an admin-app question.** Since fee-free payment collection shipped (PRD §7.21), everything that makes an invoice actionable — the `INV-YYYY-NNNN` reference, the dynamic QR, the WhatsApp queue, the "parent says paid" badge, the **Claimed** filter — lives on `admin.swimsync.sg`, so a number on the coach's phone can only ever prompt a decision the coach cannot act on well. It was also **not today-scoped and not lesson-shaped** while sitting between "Classes Today" and "Students Today", so it read as a fact about today's lessons. A private coach holds the tenant-admin role anyway and loses nothing. **Don't re-add a count, a badge or a filter here** (PRD §7.9; the prohibition is also a comment in `(coach)/schedule/index.tsx`). |

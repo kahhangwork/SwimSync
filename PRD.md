@@ -787,11 +787,17 @@ The requirement that actually mattered — knowing a lesson *should* have happen
 by **deriving expected lesson dates from the class's `day_of_week` at read time** rather
 than materialising rows ahead of time. This is what makes a forgotten lesson visible:
 
-- The **coach's Today tab** lists **Unmarked Lessons** (past lessons not fully marked)
-  and links straight to marking them; the class roster shows expected-but-missing dates
-  as a distinct *"Not marked"* state.
+- The **coach's Schedule tab** leads with **NEEDS MARKING** (past lessons not fully
+  marked) and links straight to marking them; the class roster shows expected-but-missing
+  dates as a distinct *"Not marked"* state.
+  > **That list is FLOOR-scoped, not week-scoped, and the distinction is load-bearing.**
+  > It spans the business's `markable_floor` up to today whatever week the selector
+  > shows, so a straggler three weeks back stays visible. Week-scoping it would hide a
+  > lesson the coach has no reason to go looking for, and unmarked attendance blocks
+  > invoice generation outright with no override (§7.7 of this document, HANDOVER §8i).
+  > `verify-schedule-week.mjs` is the guard.
 - **Every lesson list states which of five states it is in, and what was recorded**
-  *(implemented)* — on Today's class cards, the Unmarked Lessons rows and the class
+  *(implemented)* — on the Schedule tab's lesson cards, the NEEDS MARKING rows and the class
   roster: **Upcoming** (nothing recorded, the class has not ended), **Not marked**
   (nothing recorded, it has), **2 of 4 marked**, **Marked**, and **No students** for an
   empty roster. A breakdown names what was entered — *"2 students · 3 present ·
@@ -1868,9 +1874,10 @@ directly, and no gateway takes a percentage. What the product supplies is
   advisory from `lib/sgPhone.ts`), never a broken link. A **Link** button copies the
   invoice's public URL for any other channel.
 
-- **"I've paid" → confirm** *(Phase 3, implemented 2026-08-02)*. The parent taps
-  **I've paid** — on the tokenized page (sessionless, via the edge function) or on the
-  in-app invoice detail (`claim_invoice_paid()` RPC) — which records a **timestamped
+- **"I've paid" → confirm** *(Phase 3, implemented 2026-08-02; the in-app LIST surface
+  added 2026-08-08)*. The parent taps **I've paid** — on the tokenized page (sessionless,
+  via the edge function), or in the app on **either the invoice list or the invoice
+  detail** (`claim_invoice_paid()` RPC) — which records a **timestamped
   claim, never a status change**; claiming twice keeps the first timestamp. The admin
   sees a *"parent says paid"* badge and a **Claimed** filter (outstanding + claimed —
   the rows to check against the bank first). Confirmation goes through **one RPC for
@@ -2440,7 +2447,7 @@ The following section provides a screen-by-screen reference for each SwimSync us
 | **Add / Edit Child** | Name, DOB, gender, notes fields | Form with save/cancel; validation on required fields (no swimming-ability field — see §5.1) |
 | **Child Profile** | Child details card; assignment status; class info if assigned | Show coach name, class day/time/location when assigned |
 | **Attendance History** | Chronological list of lessons with status badges | Color-coded: green = present, grey = absent, blue = trial |
-| **Invoices** | Monthly invoice list with status; tap for detail | Show gross, credit applied, net amount; red = outstanding. *(implemented — each card names the invoice by its **`INV-YYYY-NNNN` reference**, the same string as the QR and the bank statement, §7.21)* |
+| **Invoices** | Monthly invoice list with status; **pay or claim from the card itself**; tap for detail | Show gross, credit applied, net amount; red = outstanding. *(implemented — each card names the invoice by its **`INV-YYYY-NNNN` reference**, the same string as the QR and the bank statement, §7.21)*. *(implemented 2026-08-08 — an outstanding card carries **Pay via PayNow** and **I've paid** directly, so the in-app path is no longer slower than the public tokenized page the WhatsApp reminder links to. A claimed card replaces the button with the same acknowledgement line the other two surfaces use, and stays **outstanding** — a claim is a statement, never a status change)* |
 | **Invoice Detail** | Line items per lesson; credit notes applied; total | PayNow QR button to open payment view. *(implemented — carries the **reference**, selectable so it can be copied into a transfer made outside the QR, §7.21)* |
 | **Credit Notes** | List of credit notes with reference number and amount | Linked to original invoice; show applied/pending status |
 | **PayNow QR** | The QR of the business that issued the invoice; invoice amount display | Correct QR per **business** *(implemented — changed from per-coach, §7.10)*; amount shown for reference |
@@ -2488,14 +2495,19 @@ The following section provides a screen-by-screen reference for each SwimSync us
 
 #### Coach App (Mobile)
 
-- *(implemented — changed 2026-08-02)* Bottom tab navigation: **Today, Classes, My Pay,
+- *(implemented — changed 2026-08-08)* Bottom tab navigation: **Schedule, Classes, My Pay,
   Settings** — and **My Pay is absent** unless the coach has a payout, so a private coach
   sees **three** tabs. It was *Today, Classes, Billing, Settings*; the Billing tab held an
-  invoice list and a Mark Paid button, both now admin-only (§7.9)
-- Today tab is the default with immediate access to attendance marking
+  invoice list and a Mark Paid button, both now admin-only (§7.9), and the **Today tab
+  became Schedule** (below)
+- **Schedule is the default tab**, and it is a WEEK rather than a day: a week selector
+  (Monday-start, fixed) over four sections — **NEEDS MARKING**, **TODAY**, **COMING UP**,
+  **DONE**. It replaced the Today tab outright rather than sitting beside it, because two
+  tabs both listing today's lessons with marking chips is duplication in the app's most
+  prominent navigation
 - Classes tab shows all assigned classes, **grouped by weekday with today's first**, and
-  **always opens on that list** — pressing the tab unwinds anything the Today tab pushed
-  into its stack (§7.80)
+  **always opens on that list** — pressing the tab unwinds anything the Schedule tab
+  pushed into its stack (§7.80)
 - Settings tab for PayNow QR upload and account management
 
 #### Superadmin Panel (Web)

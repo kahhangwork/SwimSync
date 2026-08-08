@@ -34,7 +34,19 @@
 // so assert on strings unique to the target screen.
 import os from "node:os";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, loginAdmin, tap, dumpText, gotoAuthed, ADMIN, EXPO } from "./lib.mjs";
+import {
+  launch, loginExpo, loginAdmin, tap, dumpText, visibleText, gotoAuthed,
+  pressByText as pressByTextShared, pressClassButton, ADMIN, EXPO,
+} from "./lib.mjs";
+
+// ⚠ THIS DRIVER REACHES EVERY SCREEN BY DEEP LINK, so the screen under test is
+// mounted INSIDE an aria-hidden subtree while the coach's landing tab is the
+// "visible" one (the root layout's session restore replaces the route after
+// page.goto). The shared pressByText filters to the visible screen by default,
+// which presses nothing here. Opt out once, at the top, rather than at each of
+// the call sites below.
+const pressByText = (page, label, index = 0) =>
+  pressByTextShared(page, label, index, { includeHidden: true });
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const results = [];
@@ -43,42 +55,6 @@ const check = (label, pass, detail = "") => {
   console.log(`${pass ? "PASS" : "FAIL"}  ${label}${detail ? ` — ${detail}` : ""}`);
 };
 
-/**
- * Press an RN-web Pressable by its label, by DISPATCHING events on the element
- * rather than clicking its coordinates.
- *
- * WHY force-click is not enough here, and this is gotcha #6 with teeth. The
- * screen you navigated away from stays mounted underneath — normally that only
- * pollutes document.body.innerText. When the target is reached by DEEP LINK the
- * stale screen is also laid out on top, so `document.elementFromPoint()` at the
- * button's own centre returns a card belonging to the OTHER screen. Playwright's
- * `click({force:true})` skips the actionability check but still clicks at those
- * coordinates, so the press silently lands on the overlay: the status never
- * changes, nothing errors, and the run reads as "the save is broken".
- *
- * Verified rather than assumed — the diagnostic printed
- * `isSelfOrChild: false` with a Today-screen card on top.
- */
-async function pressByText(page, label, index = 0) {
-  const ok = await page.evaluate(
-    ({ label, index }) => {
-      const hits = [...document.querySelectorAll("*")].filter(
-        (e) => e.children.length === 0 && e.textContent.trim() === label
-      );
-      const el = hits[index];
-      if (!el) return false;
-      const target = el.parentElement;
-      const opts = { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, button: 0 };
-      target.dispatchEvent(new PointerEvent("pointerdown", opts));
-      target.dispatchEvent(new PointerEvent("pointerup", opts));
-      target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      return true;
-    },
-    { label, index }
-  );
-  console.log(`pressed: ${label}${ok ? "" : " (NOT FOUND)"}`);
-  return ok;
-}
 
 /** Ask the database for the fixture's anchor dates. One source of truth. */
 function sql(q) {

@@ -84,6 +84,15 @@ fixture_for() {
   case "$1" in
     bulk-setall|parent-attendance) echo "fixtures-unmarked-lessons.sql" ;;
     edit-child|levels|level-skills) echo "fixtures-student-identity.sql" ;;
+    # parent-pay-claim needs an OUTSTANDING, UNCLAIMED invoice held by a parent
+    # who can log into the app — which fixtures-payment-collection.sql already
+    # builds (pay-driver-parent@swimsync.test, INV-2026-9901). A second fixture
+    # would be a second copy of the same rows to keep in step.
+    parent-pay-claim) echo "fixtures-payment-collection.sql" ;;
+    # schedule-week needs two classes running today plus ONE unmarked lesson a
+    # week back — which fixtures-stale-screen.sql already builds, and builds
+    # weekday-agnostically (it derives the class weekday from today).
+    schedule-week) echo "fixtures-stale-screen.sql" ;;
     # tenant-branding registers its parent through the REAL UI first and loads
     # fixtures-phase4-billing.sql itself afterwards. Pre-loading that fixture
     # here seeds the same email and the UI registration dies on a duplicate —
