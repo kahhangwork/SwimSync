@@ -121,9 +121,21 @@ copy/templates (S).
 had placed it after Wave 3.** The reason it was placed there still applies and is now a
 carry-forward rather than a sequencing note: a substitute or trainee teaches a lesson of a
 class they do not own, so a Schedule tab that resolves "my lessons" from `classes.coach_id`
-will show the wrong week. **Wave 3 must revisit `lib/scheduleWeek.*` / `lib/scheduleBuckets.*`
-and the Schedule tab's query** — cheap if the lookup already sits behind a helper, a screen
-rewrite if it does not. Check which before starting Wave 3.
+will show the wrong week.
+
+> **ANSWERED 2026-08-08, so Wave 3 does not have to re-derive it — and the answer is
+> narrower than this note assumed.** It is the **cheap** branch, but not because a helper
+> already exists. The coupling is **two lines of one query** in `schedule/index.tsx`'s
+> `loadData`: `from("coaches").select("id").eq("profile_id", session.id)` and then
+> `.eq("coach_id", coach.id)` on `classes`. Nothing else in the screen asks who the coach
+> is.
+>
+> **`lib/scheduleWeek.*` and `lib/scheduleBuckets.*` need NO change at all** — they are
+> pure date and bucket maths and contain zero code references to a coach (every mention in
+> both files is prose). So Wave 3 changes *which class ids the query selects*, and the
+> sections, week arithmetic and marking-state logic are all inherited unchanged. Whatever
+> replaces "classes I own" — a `class_coaches` join, a per-session override — only has to
+> produce a list of class ids.
 
 ### The email / scheduler chain — strict internal order, start any time
 
