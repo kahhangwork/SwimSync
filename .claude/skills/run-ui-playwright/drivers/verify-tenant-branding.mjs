@@ -68,9 +68,17 @@ try {
   const onInvoice = body.includes("Harbour Swim Club");
   check("invoice detail opens for the right business", onInvoice, "");
 
-  const payNow = page.getByText(/PayNow/i);
+  // ⚠ TARGET THE DETAIL SCREEN'S LABEL EXACTLY — `/PayNow/i` IS NO LONGER SAFE.
+  // Since the invoice LIST gained its own "Pay via PayNow" button, a loose
+  // match hits both screens: the list stays mounted underneath the detail
+  // (§7.10/§7.58), so `.last()` resolved to the right control only because the
+  // detail happened to mount later in DOM order. That is luck, not a selector.
+  // The detail screen's label is "Pay via PayNow QR" and the list's is
+  // "Pay via PayNow" — searching for the longer string can only match the
+  // detail, because Playwright's text match is containment.
+  const payNow = page.getByText("Pay via PayNow QR");
   if (await payNow.count()) {
-    await tap(payNow.last(), "paynow");
+    await tap(payNow.first(), "paynow");
     await page.waitForTimeout(6000);
     body = await page.evaluate(() => document.body.innerText);
     check(

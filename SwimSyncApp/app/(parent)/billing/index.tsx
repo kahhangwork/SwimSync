@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import { invoiceLabel } from "@/lib/invoiceLabel";
+import { confirmAction } from "@/lib/confirm";
 
 type Tab = "Invoices" | "Packages" | "Credit Notes";
 
@@ -28,6 +29,11 @@ type Invoice = {
   credit_applied: number;
   net_amount: number;
   status: "outstanding" | "paid";
+  /** When the parent said they had paid. A timestamped STATEMENT, never a
+   *  status change (PRD §7.21) — the coach confirms against their bank.
+   *  Fetched here, not only on the detail screen, because the list now
+   *  carries the claim control too. */
+  paid_claimed_at: string | null;
   /** Which business issued it. A parent may deal with several, and an
    *  ungrouped list gives no way to tell whose bill is whose. */
   tenant_id: string;
@@ -92,6 +98,7 @@ function capitalize(str: string): string {
 
 export default function BillingScreen() {
   const session = useAppStore((s) => s.session);
+  const showToast = useAppStore((s) => s.showToast);
   const [activeTab, setActiveTab] = useState<Tab>("Invoices");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
@@ -101,6 +108,47 @@ export default function BillingScreen() {
   const [requestingId, setRequestingId] = useState<string | null>(null);
   const [packageError, setPackageError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /** PER-INVOICE, not a single boolean like the detail screen's `claiming` —
+   *  a list can have several outstanding invoices and one in flight must not
+   *  disable the rest. The re-entrancy guard below is scoped to the SAME row
+   *  for that reason: a global `if (claimingId) return` would make a tap on a
+   *  second invoice do nothing at all — no dialog, no toast — which is
+   *  indistinguishable from a dead button. */
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+
+  /** Mirrors `claimPaid` on the invoice detail screen, verbatim copy included:
+   *  three surfaces (list, detail, the public tokenized page) must word this
+   *  identically or the parent reads three different promises. */
+  function claimPaid(inv: Invoice) {
+    if (claimingId === inv.id) return; // this row only — see the state comment
+    confirmAction(
+      "Mark as paid?",
+      "This tells your coach you've made the PayNow transfer. They'll confirm it against their bank account.",
+      async () => {
+        setClaimingId(inv.id);
+        const { data, error } = await supabase.rpc("claim_invoice_paid", {
+          p_invoice_id: inv.id,
+        });
+        setClaimingId(null);
+        if (error) {
+          showToast("Couldn't record that — please try again.", "error");
+          return;
+        }
+        // Patch only the row that was claimed. The RPC returns the stored
+        // timestamp, and it is IDEMPOTENT — a second press returns the first
+        // one unchanged rather than moving it.
+        setInvoices((prev) =>
+          prev.map((row) =>
+            row.id === inv.id
+              ? { ...row, paid_claimed_at: data as string }
+              : row
+          )
+        );
+        showToast("Noted — your coach will confirm the payment.", "success");
+      },
+      "I've paid"
+    );
+  }
 
   const loadData = useCallback(async () => {
     if (!session) return;
@@ -122,7 +170,7 @@ export default function BillingScreen() {
       await Promise.all([
         supabase
           .from("invoices")
-          .select("id, reference_number, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, tenant_id, tenants(display_name)")
+          .select("id, reference_number, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, paid_claimed_at, tenant_id, tenants(display_name)")
           .eq("parent_id", parent.id)
           .order("billing_month", { ascending: false }),
 
@@ -313,12 +361,30 @@ export default function BillingScreen() {
               </View>
             ) : (
               invoices.map((inv) => (
-                <TouchableOpacity
-                  key={inv.id}
-                  onPress={() => router.push(`/(parent)/billing/invoice/${inv.id}`)}
-                  activeOpacity={0.8}
-                >
-                  <Card>
+                /* `Card` is the OUTER element and the action row below is a
+                   SIBLING of the touchable, not nested inside it — so the
+                   buttons cannot depend on responder semantics to work.
+
+                   ⚠ AND THE FEARED BUG DOES NOT EXIST — MEASURED, 2026-08-08.
+                   This was built to prevent a double-fire: `confirmAction` is a
+                   synchronous, blocking `window.confirm` on RN-web
+                   (lib/confirm.ts), so a press that ALSO bubbled to the card
+                   would run the RPC and then navigate, landing the parent on
+                   the detail screen while the optimistic patch and success
+                   toast applied to a screen they just left. The nesting was
+                   then deliberately reintroduced and driven:
+                   verify-parent-pay-claim.mjs still scored 16/16. React
+                   Native's responder system grants the responder to the
+                   INNERMOST view and does not propagate to ancestor
+                   Touchables, so nested presses do not double-fire here.
+                   This layout is kept because it reads honestly and does not
+                   rely on that behaviour surviving an RN-web upgrade — but do
+                   not repeat the double-fire claim as fact. */
+                <Card key={inv.id}>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/(parent)/billing/invoice/${inv.id}`)}
+                    activeOpacity={0.8}
+                  >
                     <View className="flex-row items-start justify-between mb-3">
                       <View>
                         <Text className="text-base font-bold text-gray-900">
@@ -385,8 +451,53 @@ export default function BillingScreen() {
                       <Text className="text-xs text-sky-500">View Details</Text>
                       <Ionicons name="chevron-forward" size={13} color="#0ea5e9" />
                     </View>
-                  </Card>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+
+                  {/* Paying is the single action this product most wants a
+                      parent to take, and until now it was two taps deep behind
+                      "View Details" — while the public tokenized page the
+                      WhatsApp reminder links to put both controls in front of
+                      them immediately. The parent who opened the APP got the
+                      slower path; this removes that inversion. */}
+                  {inv.status === "outstanding" && (
+                    <View className="mt-3 border-t border-gray-100 pt-3 gap-2">
+                      <View className="flex-row gap-2">
+                        <TouchableOpacity
+                          onPress={() =>
+                            router.push(
+                              `/(parent)/billing/paynow?invoiceId=${inv.id}`
+                            )
+                          }
+                          className="flex-1 bg-sky-500 rounded-xl py-2.5 items-center"
+                        >
+                          <Text className="text-sm font-semibold text-white">
+                            Pay via PayNow
+                          </Text>
+                        </TouchableOpacity>
+                        {/* A claim is one-way and idempotent, so once made the
+                            button is replaced rather than disabled. Pay stays
+                            available either way — a claimed invoice is still
+                            unpaid until the coach confirms it. */}
+                        {!inv.paid_claimed_at && (
+                          <TouchableOpacity
+                            onPress={() => claimPaid(inv)}
+                            className="flex-1 border border-gray-200 rounded-xl py-2.5 items-center"
+                          >
+                            <Text className="text-sm font-semibold text-gray-500">
+                              {claimingId === inv.id ? "Saving…" : "I've paid"}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      {inv.paid_claimed_at && (
+                        <Text className="text-xs text-sky-700 text-center">
+                          You&apos;ve told your coach this is paid — they&apos;ll
+                          confirm it.
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </Card>
               ))
             )
           ) : activeTab === "Packages" ? (
