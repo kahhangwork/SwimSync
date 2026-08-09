@@ -1,12 +1,46 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-09 (3rd session) — **Wave 1 Chunk 2 is LIVE: a package purchase is
+_Last updated: 2026-08-09 (4th session) — **Wave 1 Chunk 3 is LIVE: every edit to a child's
+record is now recorded (§8.38).** An `AFTER UPDATE` trigger on `students` writes the full
+`to_jsonb(OLD)`/`to_jsonb(NEW)` to `audit_log`, so the four client paths that changed a
+child and told nobody — the admin level picker, the admin contact modal, the admin Assign
+action and the parent's own edit-child screen — now answer *"what was the phone number
+before?"*, which is the question a disputed claim raises. Migration `20260809000200`
+deployed, remote grant dump taken and diffed, CI green. **Wave 1 is down to ONE item**, and
+it is Chunk 4, the only one that touches money (§9).
+
+**The risk was never the audit row; it was the refused edit.** `audit_log_insert` permits
+`authenticated` exactly one `entity_type`, so an invoker-rights version of this trigger is
+refused with `42501` and — a raising trigger killing the statement — **stops every student
+edit in the product**. Proven by breaking the live function, not argued. So §7.104 now
+carries **both directions on the same function**: `SECURITY DEFINER` is *required* for a
+trigger that writes to an RLS-protected table, **and** it silently kills any `current_user`
+seam placed inside. Its corollary is about tests, not code — a pgTAP file that writes as
+`postgres` passes against the broken build, because the owner is exempt from the policy the
+bug trips over.
+
+**Two corrections to the plan's own RISK 2, both from asking the code.** The coach roster is
+**not** a writer (`roster.tsx:295` is a `.select(`, and the coach app writes to `students`
+nowhere at all), and the list **missed** `unassigned/page.tsx:215`. `WAVE_1_PLAN.md` is
+corrected in place with the grep that produces the list, because Chunk 4 reads the same
+file. The plan's volume premise was wrong too, in the safe direction: the engine only
+SELECTs `students`.
+
+**Filed, not fixed, and disclosed rather than silent:** `prepare_admin_delete()` purges a
+deleted admin's `audit_log` rows, so removing a departing admin destroys exactly the history
+this preserves (`BACKLOG.md`; the migration header says so). **§7.108** is new and is a
+triage rule: a driver dying on `page.goto(admin/login)` with a 30s `networkidle` timeout is
+a cold Next.js compile — neither the product nor the driver moved, which is the answer
+§7.73's question does not have._
+
+_Previously, 2026-08-09 (3rd session) — **Wave 1 Chunk 2 is LIVE: a package purchase is
 now numbered and QR-payable like an invoice (§8.37).** `parent_packages` carries
 **`PKG-YYYY-NNNN`**, the parent's PayNow screen builds the same amount-and-reference-locked
 dynamic QR an invoice has had since 2026-08-02, and the admin Packages page shows the
 reference so a bank line can be matched. Migration `20260809000100` deployed, both apps
 deployed, remote grant dump diffed, CI green. **Four backlog items closed in one commit —
-Wave 1 is down to two, each one migration** (§9).
+Wave 1 was down to two, each one migration** *(one of those two shipped the same day as
+Chunk 3; §9 has the live count)*.
 
 **Three findings outlived the code.** The plan's own RISK 6 assertion **cannot fail**:
 `'2025-12-31 23:30+08'` is 2025 in both SGT and UTC, so it passes against the bug it was
@@ -100,7 +134,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.107** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.108** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -429,6 +463,19 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   user could fabricate any audit row — is now the one real client case: a coach, on a
   session they own. **Nothing in the product reads `audit_log` yet**; this exists so the
   first screen that does isn't authoritative-and-wrong. `docs/ARCHITECTURE.md` §6, §8.28.
+  > **And since 2026-08-09 every EDIT to a child is recorded too (verified local: pgTAP 11
+  > + the four UI drivers that write to `students` — LIVE, `20260809000200`).** An
+  > `AFTER UPDATE … WHEN (OLD.* IS DISTINCT FROM NEW.*)` trigger writes the full
+  > `to_jsonb(OLD)`/`to_jsonb(NEW)` for all four client writers — the admin level picker,
+  > the admin contact modal, the admin Assign action, the parent's own edit-child screen.
+  > **It is `SECURITY DEFINER` and that is not a style choice**: invoker-rights, the
+  > `audit_log` INSERT policy refuses the row and the student UPDATE dies with it, so every
+  > student edit in the product stops working (§7.104). A write with no JWT actor —
+  > migration, `psql`, seed, edge function — records **nothing and is allowed through**, on
+  > purpose: an audit gap on a backend path is recoverable, a refused student write is not.
+  > **Two known holes, both disclosed rather than silent:** backend writes are unattributed
+  > (a reader must render "system", not blank), and `prepare_admin_delete()` purges a
+  > deleted admin's rows (`BACKLOG.md`). §8.38.
 - **`anon` holds EXECUTE on no callable function, and no longer gets one for free
   (verified by REMOTE dump + apply-time probes — LIVE 2026-08-04)** — 49 functions granted
   it before, 18 after, and all 18 are trigger/event-trigger functions that Postgres never
@@ -601,6 +648,65 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.38 (2026-08-09, 4th session) — WAVE 1 CHUNK 3 IS LIVE: EVERY EDIT TO A CHILD IS RECORDED
+
+**Four client paths changed a child's record and told nobody.** The admin level picker, the
+admin contact-details modal, the admin Assign action and the parent's own edit-child screen
+all `UPDATE students` straight from the browser. `provisional_contact_phone` and `_email`
+are the top two ranked signals in `find_student_candidates()` — they decide **which parent
+is offered which child**, and once a claim is approved nothing in the product can unlink
+them except that flow's own undo (§7.47). *"Who changed the number, and when?"* is exactly
+what a disputed claim asks, and the answer did not exist. An `AFTER UPDATE` trigger records
+`to_jsonb(OLD)`/`to_jsonb(NEW)` — never the string "edited" — and is inherited free by
+writers that do not exist yet, which is why it is a trigger and not an RPC per call site.
+Deployed in full: migration `20260809000200`, remote grant dump taken and diffed, CI green.
+**Wave 1 is down to one item** — see §9.
+
+**All three of RISK 2's abort vectors were real, and each is closed AND asserted.** The
+trigger is `SECURITY DEFINER` (or `audit_log_insert` refuses the row and the student UPDATE
+dies with it); it resolves its actor through `profiles` and returns early when there is none
+(or `actor_id`'s `NOT NULL` kills any backend write with no JWT — the next data-fix
+migration would fail `supabase db push` against production); and `entity_type` is exactly
+`'Student'` (or `audit_log_tenant_of`'s closed `CASE` raises). Proven by breaking the live
+function twice: `SECURITY INVOKER` → assertion 1 dies with `42501` and takes the whole
+transaction with it, which is the honest picture of that bug — not one broken screen, every
+student edit; guard removed → 9 and 10 die with `23502` while 1–8 stay green, which is the
+honest picture of *that* one — nothing a user does breaks, and the next migration fails
+against production instead.
+
+**What the work found that the plan did not.**
+- **The plan's call-site list was wrong in BOTH directions**, and the reusable part is the
+  correction: ask the code, never inherit a list. The coach roster is **not** a writer —
+  `roster.tsx:295` is a `.select(`, and the coach app writes to `students` nowhere at all —
+  and `unassigned/page.tsx:215` was missing. `WAVE_1_PLAN.md` RISK 2 is corrected in place,
+  with the grep, because Chunk 4 reads the same file.
+- **The plan's volume premise was wrong in the safe direction:** the invoice engine only
+  `SELECT`s `students`, so engine-driven volume here is zero and an engine run cannot be
+  aborted by this trigger.
+- **§7.108**, from a driver failure that was neither the product nor the driver: a 30s
+  `networkidle` timeout on `page.goto(admin/login)` is a cold Next.js compile. `curl` the
+  route and re-run before reaching for §7.73.
+
+**Deliberately not done.** `prepare_admin_delete()` still purges a deleted admin's
+`audit_log` rows, so hard-deleting a departing admin destroys exactly the contact history
+this preserves — **stated in the migration header and filed**, because a trail that quietly
+evaporates is worse than a known-absent one. It is a retention decision before it is a
+schema one, and `audit_log.actor_id` must **not** be made nullable to solve it (§7.50).
+`audit_student_update` was left holding cloud's default `GRANT … TO service_role`, matching
+its sibling trigger functions — the fourth data point for the standing `service_role` audit,
+which must not be closed one migration at a time (`docs/DEPLOYMENT.md` §11.7). No
+INSERT/DELETE arm: creation and merge already audit themselves from inside their own RPCs.
+
+**Verified:** pgTAP **581** (`students_audit.test.sql` 11/11, proven red **both ways**);
+Deno **130 ×2** (§7.15); vitest 255; jest 308; both typechecks clean; the four drivers that
+write to `students` through the real UI — `verify-levels` 9/9, `verify-contact-details`
+21/21, `verify-edit-child` 7/7, `verify-trial-visibility` 11/11; the rollback file
+**executed** and the migration re-applied on top of it (§7.93); CI green on `main`; and on
+production, the trigger present with its `WHEN` clause, `anon` EXECUTE still **18**, zero
+`GRANT ALL ON TABLE … TO "authenticated"`.
+
+---
+
 ## 8.37 (2026-08-09, 3rd session) — WAVE 1 CHUNK 2 IS LIVE: PACKAGES ARE PAID LIKE INVOICES
 
 **A package purchase was the one payment left in the product that nobody could attribute.**
@@ -660,66 +766,10 @@ migration re-applied on top of it (§7.93); CI green on `main`.
 
 ---
 
-## 8.36 (2026-08-09, 2nd session) — WAVE 1 GOT A PLAN, AND ITS FIRST CHUNK SHIPPED
-
-**The plan is the deliverable as much as the code.** `docs/plans/WAVE_1_PLAN.md` sequences
-Wave 1's eight items into four chunks; a `/plan-review` pass then rewrote it with **17
-mitigations inlined next to the steps they govern**, because a trailing Risks section is
-read once at planning time and never again. Seven decisions were settled and recorded so
-they are not re-litigated — the two that changed the shape of the work are that **item #6
-became engine fix PLUS a real class-deactivation feature** (so the wave carries **three**
-migrations, ~3 weeks, not the backlog's ~2) and that migrations run **strictly serially
-with no worktrees**.
-
-**Two of the review's findings would have broken chunks that have not been built yet**, and
-both are now steps in the plan rather than warnings: a plain `AFTER UPDATE` audit trigger on
-`students` would have **refused every student edit in the product** (`audit_log_insert`
-permits `authenticated` exactly one `entity_type`, so an invoker-rights trigger aborts the
-originating write — it must be `SECURITY DEFINER`), and widening the engine's class scan
-widens what **blocks** it, on a class that is invisible to all three screens that could
-clear the block.
-
-**Chunk 1 shipped — tooling only, nothing deployed.** `verify-levels.mjs` was not hermetic,
-and the real failure was worse than the backlog said: a second run in the same day reported
-**one check of nine and then died** on a 30s timeout, because the refused create left a
-modal open whose backdrop intercepted every later click. It now removes its own levels
-**through the admin UI** before check 1 and again on exit, so the empty state it asserts is
-one it created and a crashed run self-heals — chosen over a SQL teardown after discovering
-that a lone teardown file is invisible to both CI guards (**§7.102**).
-`verify-admin-table-geometry.mjs` takes the §7.54 geometry measurement from one admin table
-to **15 of 16**, and its fixture exists because the bare seed leaves **ten** of them empty —
-without it the sweep would report green while checking six pages and skipping ten.
-
-**What the work found that the plan did not predict.** A positional locator (`nth(2)`,
-commented "Maya Tan is the 3rd student alphabetically") wrote a level onto **a child the
-driver did not own**, and cleanup then blanked it via `ON DELETE SET NULL` — measured 3 → 2,
-while the driver's own checks stayed green (**§7.101**, and it applies to every driver).
-The CI round-trip then caught two bugs in the new fixture that loading it alone never
-would: a `lesson_sessions` collision with `fixtures-parent-claim.sql`, and an unordered
-`LIMIT 1` over `coaches`. It also exposed a **latent** one in a sibling —
-`fixtures-trial-onboarding-teardown.sql` deletes every invoice in the tenant for its
-billing month, rows it does not own (`BACKLOG.md`).
-
-**Deliberately not done:** the sibling teardown was **not** fixed — this fixture stands clear
-of it instead, and the real fix is filed. `/platform` is excluded from the sweep (a
-platform-admin page, a missing *role* not missing data, and `superadmin@` carries its own
-seed-login trap). Only the **first** `<table>` on a page is measured, recorded as a known
-gap rather than closed. `check(label, ok)` vs `check(ok, label)` still differs between the
-two geometry drivers; each is internally consistent and swapping either risks a silent green.
-
-**Verified:** `verify-levels` 9/9 on three consecutive runs with no reset;
-`verify-levels-table` **12/12, identical to its pre-change baseline** (it keeps its own
-inline copy of the measurement on purpose — it is the calibrated reference); the sweep 46
-passed / 0 failed, 15/15 measured, **proven load-bearing at 675px against a 2px tolerance**
-by injecting §7.54's nesting into `/parents`; all **17** fixtures load, own only their own
-rows and tear down clean; `check-teardowns` green; admin typecheck clean; CI green on
-`main`.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.36** | 2026-08-09 | **Wave 1 got a PLAN, and its first chunk shipped — tooling only, nothing deployed.** `docs/plans/WAVE_1_PLAN.md` sequences the wave into four chunks with **17 mitigations inlined next to the steps they govern**, because a trailing Risks section is read once at planning time and never again; seven decisions were settled so they are not re-litigated, two of which changed the shape of the work (item #6 became engine fix **plus** a real class-deactivation feature; migrations run **strictly serially, no worktrees**). Two review findings would have broken chunks not yet built: a plain `AFTER UPDATE` audit trigger on `students` **refuses every student edit in the product** (it must be `SECURITY DEFINER` — this landed as Chunk 3, §8.38), and widening the engine's class scan widens what **blocks** it on a class invisible to all three clearing screens. Chunk 1: `verify-levels.mjs` made hermetic (its real failure was worse than filed — a second same-day run died after one check of nine, on a modal backdrop the refused create left open) and `verify-admin-table-geometry.mjs` took the §7.54 measurement from one admin table to **15 of 16**. A positional locator wrote a level onto **a child the driver did not own** while its own checks stayed green | **§7.101, §7.102** · `docs/TESTING.md` §5 · `docs/plans/WAVE_1_PLAN.md` · `BACKLOG.md` *(the sibling teardown that deletes invoices it does not own)* |
 | **8.35** | 2026-08-09 | **The red nightly was a driver that had been reporting PASS while asserting NOTHING since 2026-07-26.** `verify-trials.mjs` never filled the phone field §8.12 had made mandatory, so `book_trial()` was never called and every later check failed for an unrelated reason. What hid it is the durable part: the driver **skipped itself unless today was the seed class's weekday**, computed from `new Date()` in the RUNNER's zone — and the nightly's `0 20 * * *` cron (04:00 SGT) means **every sweep runs on the previous UTC day**, so the skip fired every time until the first UTC-Saturday sweep. A driver that self-skips exits 0 and is counted PASS, so **a green sweep is not proof a driver ran**. A second finding fell out of the fix: the class roster gates Mark Attendance on enrolments only, so a lesson whose only attendee is a trial or make-up guest renders nothing there — real, filed, not a billing hole (the Schedule tab has no such gate). Caught in review: a reused `RegExp` would have carried `lastIndex` across elements | **§7.100** · `docs/TESTING.md` §5 · `BACKLOG.md` *(the roster gate)* |
 | **8.34** | 2026-08-08 | **The coach's Today tab became a WEEK, parents can pay from the invoice list, and the backlog got its first ranking since July.** Schedule REPLACED Today (tabs: Schedule / Classes / My Pay / Settings), four sections under a Monday-start week selector driven by **marking state, not the calendar**. Two decisions carry the risk: **NEEDS MARKING is floor-scoped and ignores the selector** (week-scoping it hides a straggler nobody would look for, and unmarked attendance blocks billing with no override), and **the week is an OFFSET INTEGER, not a stored Monday** — an absolute date captured at mount goes stale on a PWA surviving a Sunday→Monday boundary, and the symptom is indistinguishable from a quiet day. **Three plan-review predictions were WRONG and the corrections outlived them**: nested Touchables do not double-fire on RN-web, the backlog range *can* grow unbounded for a tenant that never sealed a month, and consolidating two drivers' "identical" `pressByText` copies broke one. A pre-commit review then caught a regression introduced *while writing* §7.97 | PRD §14.2, §7.5 · **§7.95–§7.99** *(and a new paragraph on §7.70)* · `docs/TESTING.md` §5 |
 | **8.33** | 2026-08-07 | **Triaging two red nightly drivers found a LIVE bug that refused every class edit for eight hours a day.** `CURRENT_DATE` in a function is the SESSION's time zone — UTC here — so between 00:00 and 08:00 SGT `set_class_terms()` read the admin's own SGT date as tomorrow and raised *terms cannot start in the future*; live since 20260719001000, with `sync_class_display_price()` on the same clock. Both moved to `today_sg()`, and `class_terms.test.sql` now asserts a `pg_proc` scan for UTC-dated functions returns nothing. **A 14-test file on that exact function stayed green because the RPC, the pgTAP file and the driver had all made the same assumption and therefore AGREED** — fixing only the RPC turned five assertions red. Both red drivers were that one bug, not driver rot. Its `pg_proc` probe also matched pgTAP's own `_def_is`, which would have aborted `supabase db push` on any pgTAP-installed database | **§7.94** *(and: test a date guard AT its boundary)* · §8.30 *(the nightly's first scheduled sweep is what found it)* · `docs/TESTING.md` §5 |
@@ -825,27 +875,37 @@ its first sweep: it **mutates the seed tenant's PayNow columns** and restores th
 `finally`, so if it ever dies hard, later drivers in that run see a business it configured.
 Its teardown re-nulls them as a second layer.)*
 
+> **Before triaging any red in that sweep, read §7.108 — it is NEW and it costs a re-run to
+> learn.** A driver that dies on `page.goto(admin/login)` with a 30s `networkidle` timeout
+> is a cold Next.js compile, not driver rot and not a product bug: §7.73's question, *which
+> moved — the product or the driver's assumption?*, has the answer **neither**.
+> `verify-trial-visibility` failed that way on 2026-08-09 after eight green checks and gave
+> **11/11** on a re-run whose only difference was one `curl` of `/login`.
+
 **One verification gap from this session, and it is the honest kind.** The admin panel's new
 **Reference** column on `/packages` was **not** confirmed by the served-bundle grep (§7.31):
 that page's chunk is behind auth and code-split, so its hashed URL is not discoverable
 unauthenticated. The mobile app bundle *was* grepped and is confirmed new. Opening
 `https://admin.swimsync.sg/packages` and looking is a two-minute close-out.
 
-### If you would rather build than onboard — WAVE 1 IS DOWN TO TWO MIGRATIONS
+### If you would rather build than onboard — WAVE 1 IS DOWN TO ONE MIGRATION
 
-**`docs/plans/WAVE_1_PLAN.md` is the answer, and Chunks 1 and 2 are done.** Do not re-plan
-it and do not restate it here; that is how the two drift. Both remaining chunks are one
-migration each, **strictly serial, no worktrees** (a worktree never authors a migration).
+**`docs/plans/WAVE_1_PLAN.md` is the answer, and Chunks 1, 2 and 3 are done.** Do not
+re-plan it and do not restate it here; that is how the two drift.
 
-1. **Chunk 3 — the `students` audit trigger.** Branch `db/students-audit` in the **root
-   checkout**. Read `⚠ RISK 2` before writing a line: the trigger **must be `SECURITY
-   DEFINER`** or it refuses every student edit in the product, and there are **two more
-   abort vectors** beside it — `audit_log.actor_id` is `NOT NULL` and `auth.uid()` is NULL
-   on every backend path, and `entity_type` is a closed set where anything but `'Student'`
-   raises. §7.104 is the same trap from this session, in the other direction: DEFINER is
-   required here *and* it silently kills any `current_user` check you put inside.
-2. **Chunk 4 — the inactive-class engine fix plus class deactivation.** The only chunk that
-   touches money: **migrations → engine → apps, `main` last** (§7.60).
+**Chunk 4 — the inactive-class engine fix plus class deactivation.** Branch
+`db/class-deactivation` in the **root checkout** (a worktree never authors a migration). It
+is the only chunk that touches money, and the only one whose deploy has an ordering rule:
+**migrations → engine → apps, `main` last** (§7.60).
+
+> **Read `⚠ RISK 1` before writing a line — it is ranked 1 overall, above everything Chunk 3
+> carried.** Widening `core.ts:352` past `is_active` also widens what enters the
+> **completeness gate**, and an inactive class with live enrolments then blocks the month
+> with **no override and no screen that can clear it** — the coach class list, the coach
+> Schedule tab and the admin Classes page all filter on `is_active`, so the class is
+> invisible to every role who could mark it. `markable_floor()` does not rescue this: that
+> is a *date* gate and the obstruction is *visibility*. **Step 1 is a production data audit
+> and a non-zero result is a blocker, not a caveat** — the query is in the plan.
 
 **`BACKLOG.md` → `## Build order` still governs everything after Wave 1.** The six decisions
 the ranking rests on are in a table at its top; read them before re-opening any. One of
@@ -855,11 +915,12 @@ conditional.
 
 **The `authenticated` question from 2026-08-04 is ANSWERED — don't re-open it.** No, it does
 not deserve `anon`'s sweep (§8.29, §3): one database role carries parent, coach and admin, so
-only RLS can separate them. **`service_role` is the one still open**, and this session added a
-third data point: whatever a migration does not explicitly revoke, cloud grants `service_role`
-by default (`docs/DEPLOYMENT.md` §11.7). It is a `BACKLOG.md` item and wants a usage audit of
-the edge functions and admin server routes **first** — do not close cells of it one migration
-at a time.
+only RLS can separate them. **`service_role` is the one still open**, and it now has a
+**fourth** data point: whatever a migration does not explicitly revoke, cloud grants
+`service_role` by default — `20260809000200` was predicted and then confirmed by the dump
+(`docs/DEPLOYMENT.md` §11.7). Predicting it is not a substitute for taking the dump. It is a
+`BACKLOG.md` item and wants a usage audit of the edge functions and admin server routes
+**first** — do not close cells of it one migration at a time.
 
 ### Triage rules, when the sweep does redden
 
@@ -876,12 +937,15 @@ at a time.
   — and was in fact a driver that had been broken for two weeks and had been skipping
   itself into a green PASS. Check when the driver last actually asserted anything.
 
-**The migration queue is EMPTY, and Wave 1 will fill it three times.** The latest applied,
-`20260806000200` (the marking floor, §8.32), deployed 2026-08-07 with its grant grid checked
-against production the same hour. Nothing is in flight, so Chunk 2's can start immediately —
-still one at a time (§7.55), a worktree never authors one, and budget the post-deploy grant
-check (§7.39, §7.89) **and** the rollback rehearsal (§7.93 — running the DOWN file is the
-half that finds the bugs). Each of Chunks 2, 3 and 4 carries exactly one.
+**The migration queue is EMPTY, and Wave 1 will fill it once more.** The latest applied is
+`20260809000200` (the students audit trigger, §8.38), deployed the same day with its grant
+dump taken and diffed within the hour. Nothing is in flight, so Chunk 4's can start
+immediately — still one at a time (§7.55), a worktree never authors one, and budget the
+post-deploy grant check (§7.39, §7.89) **and** the rollback rehearsal (§7.93 — running the
+DOWN file is the half that finds the bugs). **Don't take `supabase db push`'s own output as
+proof it applied:** on 2026-08-09 it printed a `pgdelta` certificate stack trace *and*
+`Finished supabase db push`. `supabase migration list --linked` is the fact — check the
+`remote` column is filled.
 
 ### Worth deciding, not urgent
 

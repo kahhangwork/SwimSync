@@ -1,6 +1,16 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-09 (3rd) — **the entire PayNow / package chain SHIPPED and was
+_Last updated: 2026-08-09 (4th) — **the last of the audit gap SHIPPED and was removed**
+(Wave 1 Chunk 3, `20260809000200`): *Direct writes to `students` are audited by nobody* is
+struck from the Build order **and** its own section. **Wave 1 is now ONE item** — Chunk 4,
+the inactive-class engine fix, the only one that touches money. **One item added**, and it
+is the hole the shipped work disclosed rather than closed: *Deleting an admin destroys the
+audit history* (**S**) — `prepare_admin_delete()` purges the target's `audit_log` rows,
+which is exactly the contact-detail history a disputed claim needs. It carries a named
+prohibition: do **not** make `actor_id` nullable to solve it (§7.50). *Attendance edit
+history view* had its blocker cleared — the writers now exist, so the reader is buildable._
+
+_Previously, 2026-08-09 (3rd) — **the entire PayNow / package chain SHIPPED and was
 removed** (Wave 1 Chunk 2, `docs/plans/WAVE_1_PLAN.md`): *Give package requests a
 reference number*, *Demote the static PayNow QR upload*, *The PayNow screen calls the
 business "Coach"* and *A link to the admin panel from coach Settings* — struck from the
@@ -175,21 +185,22 @@ below, because an unrecorded decision is re-litigated.)_
 | Multiple classes per child? | **Yes, and soon** | Promoted to Wave 2. It drops `one_active_enrolment_per_student`, so every enrolment-shaped surface built after it inherits the new model — and everything built before it gets reworked |
 | Native store builds ($99/yr)? | **Not yet — stay web-only** | *Push notifications* stays blocked. **Settled by what shipped 2026-08-09:** the static PayNow QR upload was neither deleted nor hidden — it is **collapsed behind a disclosure and always present**, which keeps the native fallback path alive *and* survives a stored-but-unencodable PayNow ID. Any future native decision inherits that, not a conditional |
 
-#### Wave 1 — cheap, independent, and inherited by everything after (1 × **S** + 1 **M** left)
+#### Wave 1 — cheap, independent, and inherited by everything after (**1 × M left**)
 
-**The whole PayNow / package chain is GONE — it shipped 2026-08-09 as Chunk 2.** What is
-left is the two foundations, and each is one migration:
+**Chunks 1, 2 and 3 are DONE.** One item is left in the wave, and it is the only one that
+touches money:
 
-1. **Direct writes to `students` are audited by nobody** — an `AFTER UPDATE` trigger is
-   inherited free by every future writer. Every screen shipped first writes unaudited.
-   ⚠ It **must be `SECURITY DEFINER`** or it refuses every student edit in the product;
-   `docs/plans/WAVE_1_PLAN.md` RISK 2 carries the three abort vectors.
-2. **An inactive CLASS is invisible to billing and to the block** (**M**) — must precede
+1. **An inactive CLASS is invisible to billing and to the block** (**M**) — must precede
    any class-deactivation path, and *Disable a coach* forces class reassignment. Decided
    into the engine fix **plus** a real class-deactivation feature, which is what makes it
-   an M.
+   an M. `docs/plans/WAVE_1_PLAN.md` Chunk 4 — read **⚠ RISK 1** first: widening the
+   engine's class scan widens what **blocks** it, on a class no screen can show.
 
-_(Seven items have now left this wave. **Pay and claim from the parent's invoice LIST**
+_(Eight items have now left this wave. **Direct writes to `students` are audited by
+nobody** shipped 2026-08-09 as Chunk 3 — an `AFTER UPDATE … WHEN (OLD.* IS DISTINCT FROM
+NEW.*)` trigger, `SECURITY DEFINER`, recording `to_jsonb(OLD)`/`to_jsonb(NEW)`. It left one
+disclosed hole behind, filed separately below as *Deleting an admin destroys the audit
+history*. **Pay and claim from the parent's invoice LIST**
 shipped 2026-08-08 alongside the Schedule tab. **Check column geometry on every admin
 table** and **`verify-levels.mjs` is not hermetic** shipped 2026-08-09 as Chunk 1 of
 `docs/plans/WAVE_1_PLAN.md`. **Give package requests a reference number**, **demote the
@@ -261,8 +272,13 @@ copy/templates (S).
 
 **Three sit here but carry one edge each:**
 
-- **Attendance edit history view** (S) — after Wave 1 #5. Build the audit *writers* before
-  the audit *reader*.
+- **Attendance edit history view** (S) — **its blocker cleared 2026-08-09**: the writers
+  shipped (Wave 1 Chunk 3, `20260809000200`), so `audit_log` now records student edits as
+  well as attendance saves, every row is tenant-stamped, and the reader is buildable. Two
+  things to know before building it: rows written by a backend path carry **no** actor by
+  design, so the screen must render "system" rather than blank; and `prepare_admin_delete()`
+  purges a deleted admin's rows, so the history has holes with a known cause — see
+  *Deleting an admin destroys the audit history*.
 - **Convert a trial into an enrolled student** (S) and **Book a make-up from the
   Attendance page** (S) — after Wave 2, which changes what an enrolment is.
 - **The class ROSTER hides a lesson whose only attendee is a guest** (S) — no hard edge,
@@ -1192,45 +1208,32 @@ is a reasonable long-term answer for Singapore.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### Direct writes to `students` are audited by nobody — **S**
-Two admin paths update `students` straight from the client and record **nothing**: the
-level picker (`setLevel()`) and, since 2026-07-26, the **parent contact details** modal
-(`CONTACT_DETAILS_PLAN.md`). They wrote no audit row before 2026-08-04 and still write
-none — `20260804000300` stamps rows that *are* written, and cannot conjure one that
-isn't. **This is now the whole of the audit gap.**
+### Deleting an admin destroys the audit history — **S** `[found 2026-08-09, Wave 1 Chunk 3]`
+`prepare_admin_delete()` **purges the target's `audit_log` rows** before the hard delete,
+because `audit_log.actor_id` is a `NOT NULL` FK with no cascade
+(`20260806000100_co_admins.sql:56`). So removing a departing admin erases every record of
+what they did.
 
-**Why:** contact details are not cosmetic. `provisional_contact_phone` and `_email` are
-the top two ranked signals in `find_student_candidates()` — they decide **which parent is
-offered which child**, and once a claim is approved nothing in the product can unlink them
-except that flow's own undo (`docs/GOTCHAS.md` §7.47). "Who changed the number, and when?" is
-exactly the question a disputed claim raises, and today the answer does not exist. A level
-edit matters far less, which is why this sat unnoticed.
+**Why:** as of `20260809000200` every edit to a student is recorded — including
+`provisional_contact_phone` and `_email`, the top two ranked signals in
+`find_student_candidates()`, which decide **which parent is offered which child**. The
+dispute that trail exists for is "who changed the number, and when", and the person most
+likely to be at the centre of it is an admin who has since left. The purge deletes exactly
+the evidence, and the typed-DELETE confirm says so — so this is a known, disclosed hole,
+not a silent one.
 
-**Notes — a TRIGGER on `students`, not an RPC per call site:**
-
-- **This supersedes what `CONTACT_DETAILS_PLAN.md` says.** That file proposes wrapping the
-  contact edit in a `SECURITY DEFINER` RPC so the write and the audit row share a
-  transaction. Correct but narrow: it fixes one screen and leaves `setLevel()` — and every
-  future direct write — unaudited. An `AFTER UPDATE` trigger on `students` is atomic for
-  the same reason, covers both paths at once, needs **no client change**, and is inherited
-  automatically by whatever writes next.
-- It also composes with the item above: derive `tenant_id` from the row (`students` has a
-  real `tenant_id` column), so this one starts life correctly attributed rather than
-  joining the 13.
-- **Do not audit from the browser — and as of 2026-08-04 you no longer can.** This bullet
-  used to say it was *possible but wrong*: wrong twice over, because it is a second round
-  trip that can be lost while the write lands, and because everything except the actor is
-  self-reported. That reasoning stands and is why the trigger is the right shape. What
-  changed is the premise: `20260804000300` narrowed `audit_log_insert` from
-  `actor_id = auth.uid()` — under which any signed-in user could fabricate any audit row —
-  to the single real client case, **a coach on a lesson session they own**. A browser-written
-  audit row for a `students` edit is now refused outright. An audit trail with silent holes
-  is worse than a known-absent one, because it gets trusted.
-- Record the **old and new values** (`to_jsonb(OLD)` / `to_jsonb(NEW)`), not just "edited".
-  The dispute this exists for is *what the number used to be*.
-- Scope it: an `UPDATE` trigger firing on every column change includes the level picker,
-  which is fine, but check the volume before adding one to a table the invoice engine
-  touches under `service_role`.
+**Notes:**
+- **Do NOT make `actor_id` nullable to solve it.** It is depended on elsewhere and §7.50 is
+  the reason it is `NOT NULL`. `20260809000200`'s header carries the same prohibition for
+  the same column.
+- The shapes worth weighing: a `deleted_profiles` tombstone table the FK can point at; or
+  `ON DELETE SET NULL` plus a denormalised actor label captured at write time (which
+  survives the delete and is what a reader actually wants to see); or refusing the hard
+  delete once the admin has audit rows, which `prepare_admin_delete()` already does for
+  *recorded work* and would merely extend.
+- This is a **retention** decision before it is a schema one — how long the trail is meant
+  to outlive the person. Settle that with the user first; every option above is cheap once
+  it is answered.
 
 ### `fixtures-trial-onboarding-teardown.sql` deletes invoices it does not own — **S**
 Its cleanup is `DELETE FROM invoice_items … WHERE i.tenant_id = v_tenant AND

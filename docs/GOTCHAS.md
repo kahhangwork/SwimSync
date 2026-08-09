@@ -1758,6 +1758,21 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       the privileged work.
     - Sibling trap, same shape: `SECURITY DEFINER` also defeats RLS on reads inside the
       function, which is why the packages lifecycle trigger is plain. (2026-08-09.)
+    - **And the other direction, added the same day: a trigger that WRITES to an
+      RLS-protected table MUST be `SECURITY DEFINER`, or it refuses the write that fired
+      it.** `20260809000200`'s `students` audit trigger inserts into `audit_log`, whose
+      INSERT policy permits `authenticated` exactly one `entity_type` (a coach on a lesson
+      session they own — `20260804000300`). Invoker-rights, that insert is refused with
+      `42501`; a raising trigger kills the whole statement (§7.66, §7.67), so **every
+      student edit in the product** — level picker, contact modal, Assign, the parent's own
+      edit-child screen — stops working. So the two halves of this gotcha bite in opposite
+      directions on the same function, and both are live at once: DEFINER is **required**
+      for the write, **and** it silently kills any `current_user` seam placed inside.
+    - **Corollary for the test, not just the code:** assert as the role that actually makes
+      the write. A pgTAP file that updates as `postgres` passes against the broken build —
+      the owner is exempt from the policy the bug trips over — so it proves nothing.
+      `students_audit.test.sql` writes as `authenticated` for exactly this reason.
+      (2026-08-09.)
 
 105. **A BOUNDARY TEST IS ONLY WORTH THE CASES WHERE THE TWO ANSWERS DISAGREE.**
     `WAVE_1_PLAN.md`'s RISK 6 named the assertion itself: *"a pgTAP case inserting with
@@ -1807,3 +1822,24 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       it is shared with every worktree (§7.56) and its short-circuit is load-bearing for
       the slow-attempt race it was written for (§7.62). A local `freshLogin` is the right
       layer. (2026-08-09.)
+
+108. **A DRIVER THAT DIES ON `page.goto(admin/login)` WITH A 30s `networkidle` TIMEOUT IS A
+    COLD NEXT.JS COMPILE — NOT DRIVER ROT, AND NOT A PRODUCT BUG.** §7.73's triage question
+    is *"which moved, the product or the driver's assumption?"* and the honest answer here
+    is **neither**: the dev server had simply never compiled that route in this process, and
+    `waitUntil: "networkidle"` gives it 30 seconds to do a first build it cannot finish.
+    - **Where it bit (2026-08-09):** `verify-trial-visibility.mjs` failed at check 9 —
+      after eight green parent/coach checks — on `loginAdmin` (`lib.mjs:77`). Re-running it
+      unchanged, after one `curl http://localhost:3000/login`, gave **11/11**. Nothing about
+      the driver or the product had moved between the two runs.
+    - **Why it hides:** the drivers that ran before it had already warmed the routes *they*
+      use, so the first driver to touch a cold route is the one that fails, and which driver
+      that is depends on the order you happen to run them in. `run-all-drivers.sh` resets the
+      database between drivers but does not restart the dev servers, so a long sweep warms
+      itself and the symptom is worst on a short `--only` run against a fresh `npm run dev`.
+    - **Fix (do this before triaging anything):** `curl -s -o /dev/null http://localhost:3000/login`
+      and re-run. If it passes, it was this. Only then reach for §7.73.
+    - **Do NOT "fix" it by raising the timeout in `lib.mjs`** — that file is shared with
+      every worktree (§7.56), and a longer timeout buys nothing on CI, where each job starts
+      cold anyway and a genuinely hung page then takes proportionally longer to fail.
+      (2026-08-09.)

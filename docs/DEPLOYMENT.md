@@ -132,6 +132,18 @@ still point at the local stack for dev.
    audit queued in `BACKLOG.md`; do not close individual cells of it one migration at a
    time.**
 
+   **Fourth confirmation, 2026-08-09 (`20260809000200`).** The rule now predicts the dump
+   exactly. That migration creates one function, `audit_student_update()`, and writes no
+   grant of its own; the dump came back with
+   `REVOKE ALL … FROM PUBLIC` + `GRANT ALL … TO "service_role"` — the PUBLIC half is
+   `20260804000400` still holding, the `service_role` half is the cloud default. The `anon`
+   EXECUTE count stayed at **18**. Left as-is for the same reason as
+   `pin_parent_package_reference`: it matches its sibling trigger functions, and trigger
+   functions are neither privilege-checked by Postgres nor exposed by PostgREST. **Predicting
+   the dump is not a substitute for taking it** — §7.39 is that the local stack cannot
+   reproduce cloud's defaults at all, so the prediction is only ever a hypothesis until the
+   dump confirms it.
+
 8. **Production's client-role grants are a DECLARED SET now, and the dump is how you check
    it.** Since `20260804000600` `authenticated` holds a table privilege only where a policy
    could permit it. Verified on production 2026-08-04: **zero** `GRANT ALL ON TABLE … TO

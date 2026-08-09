@@ -472,6 +472,19 @@ package QR path is exercised by a driver.
 
 ## Chunk 3 — Migration 2 of 3: the students audit trigger
 
+> **✅ SHIPPED AND DEPLOYED 2026-08-09** (`dfea380`, migration `20260809000200`). HANDOVER
+> §8.38. **RISK 2 was the whole of the difficulty and its three abort vectors were all
+> real** — each is closed in the migration and asserted in `students_audit.test.sql`
+> (11 assertions, proven red both ways). Its *call-site list* was wrong in both directions
+> and is corrected in place below. §7.104 gained the mirror-image paragraph (DEFINER is
+> **required** for a trigger writing to an RLS-protected table) and **§7.108** is new, from
+> triaging a driver failure that was neither the product nor the driver.
+>
+> **RISK 2b's known limitation shipped as stated, not fixed:** `prepare_admin_delete()`
+> purges the target's `audit_log` rows, so hard-deleting a departing admin destroys exactly
+> the contact history this trigger preserves. It is named in the migration header and filed
+> in `BACKLOG.md`.
+
 **~half a session, 3–4h.** Branch `db/students-audit`.
 
 ### Step 3.1 — `AFTER UPDATE` trigger on `students` (BACKLOG #5)
@@ -506,10 +519,22 @@ except that flow's own undo (§7.47).
 > to insert **only** `entity_type = 'lesson_session' AND coach_owns_session(entity_id)`. An
 > `entity_type = 'Student'` row is refused → `42501` → **the `students` UPDATE aborts**
 > (§7.88: post-`20260804000600` a disallowed write raises rather than matching zero rows, and
-> §7.66/§7.67: a raising trigger kills the whole statement). That breaks the admin level picker,
-> the admin contact-details modal, the coach roster (`(coach)/classes/[id]/roster.tsx:295`) and
-> the **parent's own edit-child screen** (`(parent)/home/edit-child.tsx:93` — §7.86: parents
-> PATCH `students` directly).
+> §7.66/§7.67: a raising trigger kills the whole statement).
+>
+> **CORRECTED WHEN CHUNK 3 WAS BUILT (2026-08-09) — this list was wrong in both directions,
+> and the correction is the reusable part: ask the code for a call-site list, never inherit
+> one from a plan.**
+> ```
+> grep -rn -A2 'from("students")' SwimSyncAdmin/app SwimSyncApp/app | grep '\.update('
+> ```
+> The four real client writers are the admin level picker
+> (`SwimSyncAdmin/app/(admin)/students/page.tsx:237`), the admin contact-details modal
+> (`:462`), the admin **Assign** action (`(admin)/unassigned/page.tsx:215` — which this list
+> MISSED), and the **parent's own edit-child screen**
+> (`(parent)/home/edit-child.tsx:94` — §7.86: parents PATCH `students` directly).
+> The **coach roster is NOT one**: `(coach)/classes/[id]/roster.tsx:295` is a `.select(`, and
+> the coach app writes to `students` nowhere at all — its only write path is marking
+> attendance (`HANDOVER.md` §3 already said so).
 > `20260804000300:69-74` states the design explicitly: *"Every other writer is inside a SECURITY
 > DEFINER function, which runs as the table owner and is not subject to policies."*
 >
