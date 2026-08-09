@@ -1,37 +1,31 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-09 (4th session) — **Wave 1 Chunk 3 is LIVE: every edit to a child's
-record is now recorded (§8.38).** An `AFTER UPDATE` trigger on `students` writes the full
-`to_jsonb(OLD)`/`to_jsonb(NEW)` to `audit_log`, so the four client paths that changed a
-child and told nobody — the admin level picker, the admin contact modal, the admin Assign
-action and the parent's own edit-child screen — now answer *"what was the phone number
-before?"*, which is the question a disputed claim raises. Migration `20260809000200`
-deployed, remote grant dump taken and diffed, CI green. **Wave 1 is down to ONE item**, and
-it is Chunk 4, the only one that touches money (§9).
+_Last updated: 2026-08-09 (5th session) — **WAVE 1 IS COMPLETE. Chunk 4 is LIVE: a class can
+be RETIRED, and retiring it no longer loses money (§8.39).** `classes.is_active` means
+scheduling and nothing else — the engine used to scan `.eq("is_active", true)`, so retiring a
+class at month end silently dropped its already-taught lessons *and* stopped it blocking, a
+hole exactly where someone is tidying up. Migrations `20260809000300` + `20260809000400`,
+engine **v18 → v19**, both apps, grant dump diffed, CI green, UI confirmed on production._
 
-**The risk was never the audit row; it was the refused edit.** `audit_log_insert` permits
-`authenticated` exactly one `entity_type`, so an invoker-rights version of this trigger is
-refused with `42501` and — a raising trigger killing the statement — **stops every student
-edit in the product**. Proven by breaking the live function, not argued. So §7.104 now
-carries **both directions on the same function**: `SECURITY DEFINER` is *required* for a
-trigger that writes to an RLS-protected table, **and** it silently kills any `current_user`
-seam placed inside. Its corollary is about tests, not code — a pgTAP file that writes as
-`postgres` passes against the broken build, because the owner is exempt from the policy the
-bug trips over.
+_**The fix could not be a `.eq()` deletion, and that is the whole chunk.** That scan also
+feeds the completeness gate, so widening it lets an inactive class expect a lesson on every
+weekly date and block the month — no override by design, invisible to every screen that could
+clear it (**§7.109**). Closed three ways: `classes.deactivated_at` clamps how far an inactive
+class is expected to have run; `deactivate_class()` refuses to create the state (three
+refusals, no overrides); and the Classes page gained *Show retired* **in the same deploy**._
 
-**Two corrections to the plan's own RISK 2, both from asking the code.** The coach roster is
-**not** a writer (`roster.tsx:295` is a `.select(`, and the coach app writes to `students`
-nowhere at all), and the list **missed** `unassigned/page.tsx:215`. `WAVE_1_PLAN.md` is
-corrected in place with the grep that produces the list, because Chunk 4 reads the same
-file. The plan's volume premise was wrong too, in the safe direction: the engine only
-SELECTs `students`.
+_**Three of this session's own assertions were passing for the wrong reason**, and only
+breaking the code found them — §7.111 (a test helper that satisfies the gate under test),
+§7.112 (`throws_ok(…, NULL, …)` matches any `P0001`, so a subject that trips a second guard
+proves nothing) and a fixture span that let a different refusal do the refusing. §7.110 fired
+exactly as the plan predicted: `makeups.test.ts:370` went vacuous, and its union arm turned
+out **unreachable** rather than untested, so it was deleted._
 
-**Filed, not fixed, and disclosed rather than silent:** `prepare_admin_delete()` purges a
-deleted admin's `audit_log` rows, so removing a departing admin destroys exactly the history
-this preserves (`BACKLOG.md`; the migration header says so). **§7.108** is new and is a
-triage rule: a driver dying on `page.goto(admin/login)` with a 30s `networkidle` timeout is
-a cold Next.js compile — neither the product nor the driver moved, which is the answer
-§7.73's question does not have._
+_**Filed, not fixed, and confirmed by measurement:** `core.ts`'s two `continue` guards ignore
+`bookingsByDate`, so an unmarked booking in a class with no active enrolments is neither
+billed nor blocking — and the month **SEALS** over it. Pre-existing and unchanged here, but
+every retired class now sits in that state by construction. **Zero on production**, and it is
+`BACKLOG.md`'s top find with the audit any fix must gate on (§9)._
 
 _Previously, 2026-08-09 (3rd session) — **Wave 1 Chunk 2 is LIVE: a package purchase is
 now numbered and QR-payable like an invoice (§8.37).** `parent_packages` carries
@@ -134,7 +128,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.108** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.113** |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
@@ -523,6 +517,27 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   work. Coach/parent logins are refused at the panel door with "use the SwimSync app"
   (§7.91). Escalation guards pin the privilege columns client-side writes used to reach
   (PRD §4.3, `docs/ARCHITECTURE.md` §6, §8.31).
+- **A class can be RETIRED, and retiring it no longer loses money (verified local: pgTAP 23 +
+  Deno 5 ×2 + a 21-check UI driver, and audited against production — LIVE 2026-08-09)** —
+  `classes.is_active` means **scheduling**, never billing. The invoice engine scanned
+  `.eq("is_active", true)`, so deactivating a class at month end silently dropped its
+  already-taught lessons *and* stopped it blocking generation. It now bills every class in
+  the tenant, and the admin **Classes** page gained **Retire** / **Restore** and a
+  *Show retired classes* toggle. Retiring is refused — with the reason rendered, naming the
+  child, the guest or the dates — while children are still on the roster (by enrolment
+  **span**, not `is_active` — §7.66), a guest is booked into a future lesson (trials **and**
+  make-ups), or lessons are still owed a mark. **No overrides on any of the three.** An empty
+  class retires, decided deliberately (§7.17). PRD §7.3, `docs/ARCHITECTURE.md` §6, §8.39.
+  > **`classes.deactivated_at` is what makes the engine change safe, and a boolean cannot
+  > replace it.** The same scan feeds the completeness gate, so widening it naively makes an
+  > inactive class expect a weekly lesson for ever and block the month with no override and
+  > **no screen able to clear it** — the coach class list and Schedule tab still filter
+  > `is_active` (§7.109). The date answers *"was this class running on the 13th?"*: lessons
+  > before it still block, dates after it are not expected, and a legacy row with a NULL date
+  > expects nothing at all. **`reactivate_class()` takes no refusals and must never grow
+  > one** — it is the only exit.
+  > **Dormant in the sense that matters:** production had **zero** inactive classes on deploy
+  > day (audited), so no class has been retired on real data yet.
 - **Automated tests** — pgTAP + Deno on the backend, vitest + jest-expo on the two apps, all
   in CI on push to `main`. **Counts are deliberately not written here**: the two frontend
   numbers that used to be (162 and 109) had drifted to 198 and 174 by 2026-08-01 while
@@ -648,6 +663,62 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.39 (2026-08-09, 5th session) — WAVE 1 IS COMPLETE: A CLASS CAN BE RETIRED, AND RETIRING IT NO LONGER LOSES MONEY
+
+**`classes.is_active` means SCHEDULING now, and nothing else.** The engine scanned
+`.eq("is_active", true)`, so retiring a class at month end silently dropped its
+already-taught lessons *and* stopped it blocking generation — a hole exactly where someone
+is tidying up (BACKLOG #6, filed since July). The engine bills every class in the tenant,
+the admin can retire and restore one from the Classes page, and **Wave 1 is done**.
+Deployed in full: `20260809000300` + `20260809000400`, engine **v18 → v19**, both apps,
+remote grant dump diffed, CI green, and the UI confirmed on production.
+
+**The fix could not be a `.eq()` deletion, and that is the whole chunk.** That scan also
+feeds the completeness gate, so widening it lets an inactive class expect a lesson on every
+weekly date and block the month — no override by design, and the class is invisible to
+every screen that could clear it (**§7.109**). Closed three ways, because the failure is a
+whole business unbilled: `classes.deactivated_at` clamps how far an inactive class is
+expected to have run so the unclearable expectation is never generated; `deactivate_class()`
+refuses to create the state at all (three refusals, no overrides); and the Classes page
+gained *Show retired* **in the same deploy**, so `reactivate_class()` always has a screen.
+A boolean cannot do the first — *"was this class running on the 13th?"* needs a date.
+
+**Nothing was trusted that could be broken instead.** All three refusals were proven red by
+**breaking them in the database**, and the engine clamp red **both ways** — a naive `.eq()`
+deletion and a blanket exemption. That is what caught the session's real lesson: **three
+separate assertions of mine were passing for the wrong reason**, and none was visible in a
+green run. Two Deno cases called `completeMonth()`, which satisfies the very gate under test
+(**§7.111**); the §7.66 enrolment case was being refused by a *different* guard until its
+fixture span was narrowed to one marked date; and the cross-tenant case went green from an
+unrelated `P0001`, because `throws_ok(…, NULL, …)` matches any message (**§7.112**).
+
+**Two predictions from the plan were right, and one finding was not predicted at all.**
+`makeups.test.ts:370` went vacuous exactly as forecast — with the `home_class_id` union arm
+deleted the file still passed 12/12 — and the arm turned out to be *unreachable*, not merely
+untested, so it was **deleted** rather than kept (**§7.110**; its failure mode is a loud
+throw, never a silent underbill). The unpredicted one came out of the pre-commit review and
+is the more serious: **`core.ts`'s two `continue` guards ignore `bookingsByDate`**, so an
+unmarked booking in a class with no active enrolments is neither billed nor blocking — and
+with a second class billing, the month **SEALS** over it. Confirmed by running it, twice.
+
+**Filed, not fixed, and disclosed rather than silent.** That underbill is **pre-existing and
+unchanged by this work** — a retired class was skipped outright before, same outcome — but
+every retired class now sits in that state by construction, and `book_trial()` lacks
+`book_makeup()`'s `is_active` guard, which is the other half of the chain. It is in
+`BACKLOG.md` **with the production audit any fix must gate on**, because making an unmarked
+booking block is a change to what *blocks* a month. **Measured zero on production**, so
+nothing is leaking today. Also filed: retired classes cost three queries per run for ever.
+
+**Verified:** production audit **zero rows on all three** RISK 1/7 queries, run before a line
+was written; pgTAP **604** (`class_deactivation.test.sql` 23/23); Deno **135 ×2** (§7.15);
+vitest 255; jest 308; both typechecks; `verify-class-deactivation` **21/21** across three
+consecutive runs, proven red by restoring the page's `is_active` filter; `check-teardowns`
+19/19 and `check-fixture-roundtrip` clean three times; rollback file executed; CI green;
+and on production the grant dump shows `class_unmarked_lesson_dates` callable by **nobody**,
+`anon` EXECUTE still **18**, zero `GRANT ALL ON TABLE … TO "authenticated"`.
+
+---
+
 ## 8.38 (2026-08-09, 4th session) — WAVE 1 CHUNK 3 IS LIVE: EVERY EDIT TO A CHILD IS RECORDED
 
 **Four client paths changed a child's record and told nobody.** The admin level picker, the
@@ -707,68 +778,10 @@ production, the trigger present with its `WHEN` clause, `anon` EXECUTE still **1
 
 ---
 
-## 8.37 (2026-08-09, 3rd session) — WAVE 1 CHUNK 2 IS LIVE: PACKAGES ARE PAID LIKE INVOICES
-
-**A package purchase was the one payment left in the product that nobody could attribute.**
-The parent scanned a static image and typed the amount by hand — the exact unattributable
-payment `INV-YYYY-NNNN` was introduced to remove. `parent_packages` now carries
-**`PKG-YYYY-NNNN`** and its PayNow screen builds the same amount-and-reference-locked
-dynamic QR an invoice has had since 2026-08-02; the admin's Packages page shows the
-reference on both tables so a bank line can be matched. Deployed in full: migration
-`20260809000100`, both apps, remote grant dump taken and diffed, CI green.
-
-**Four backlog items closed in one commit** (the whole PayNow/package chain), so **Wave 1
-is down to two items, each one migration** — see §9.
-
-**Three of the plan's inlined mitigations were load-bearing, and all three were proven by
-breaking them, not by argument.** RISK 4 was the outage: rename the reference trigger so it
-sorts before `trg_parent_package_lifecycle` and **every parent package request fails at the
-insert**, because that trigger is what fills `tenant_id`. RISK 6's year source is now pinned
-at a boundary that actually discriminates. RISK 3's dead end is closed from both ends — the
-parent gets a payable PayNow ID instead of *"contact your coach directly"*, and the coach's
-fallback upload is **collapsed, never conditionally hidden**.
-
-**What the work found that the plan did not predict — and one of them was the plan's own
-assertion being wrong.**
-- **RISK 6's named test case cannot fail.** The plan specified `'2025-12-31 23:30:00+08'`
-  → `PKG-2025-…`. That is 15:30 UTC on the same day, so the correct and the broken
-  derivations **both answer 2025** and it passes against the bug it was written for. The
-  discriminating case is `'2026-01-01 00:30:00+08'`, still 2025 in UTC (**§7.105**).
-- **`current_user = 'authenticated'` is dead code inside `SECURITY DEFINER`, and it fails
-  OPEN** (**§7.104**). The first version of the assignment trigger used that seam — the one
-  `pin_invoice_public_fields` uses — to refuse a client-supplied reference. It never fired,
-  because `current_user` there is the owner. A parent could have named their own reference,
-  which does not just mislabel their row: the counter stays behind it, so the **next genuine
-  request dies on the unique constraint** and the buy-a-package path breaks for that whole
-  business. Caught only because the pgTAP case expected a raise and got a row.
-- Two smaller ones, both cheap to hit again: `.select("a, " + "b")` untypes the query and
-  blames the schema (**§7.106**), and `loginExpo` short-circuits when already signed in, so
-  a driver changing persona silently runs as the previous user (**§7.107**).
-
-**The step that would have shipped blind now has coverage.** Nothing in either test suite
-and no other driver touched `app/(coach)/settings` — the only writer of
-`tenants.paynow_qr_url` anywhere. `verify-paynow-fallback.mjs` (21 checks) drives all three
-PayNow states including the **stored-but-unencodable** proxy, and is proven red both ways.
-
-**Deliberately not done:** the unencodable-PayNow-ID problem itself is **filed, not fixed**
-(`BACKLOG.md`) — this chunk makes it survivable, not impossible. `pin_parent_package_reference`
-was left holding cloud's default `GRANT … TO service_role`, matching eight sibling pin
-triggers; closing that cell one migration at a time is what the standing `service_role`
-audit exists to prevent (`docs/DEPLOYMENT.md` §11.7). The admin panel's Reference column is
-**not** string-verified on production — its chunk is behind auth and code-split, so the
-served-bundle grep (§7.31) covered the mobile app only.
-
-**Verified:** pgTAP **570** (`package_references.test.sql` 12/12, `function_grants` now 4);
-Deno **130 ×2** (§7.15); vitest 255; jest 308; both typechecks clean; `verify-packages`
-**22/22** (was 21); `verify-paynow-fallback` **21/21**, new; `check-teardowns` 18/18;
-`check-fixture-roundtrip` 18/18 alone **and** stacked; the rollback file **executed** and the
-migration re-applied on top of it (§7.93); CI green on `main`.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.37** | 2026-08-09 | **A package purchase is numbered and QR-payable like an invoice** — `PKG-YYYY-NNNN` on `parent_packages`, the parent's PayNow screen builds the same amount-and-reference-locked dynamic QR an invoice has, the admin Packages page shows the reference so a bank line can be matched. **Four backlog items closed in one commit.** Three of the plan's mitigations were load-bearing and all three were proven by BREAKING them: renaming the reference trigger so it sorts before `trg_parent_package_lifecycle` fails **every** package request (that trigger fills `tenant_id`). The plan's own RISK 6 test case **could not fail** — `'2025-12-31 23:30+08'` is 2025 in both zones; the discriminating case is `'2026-01-01 00:30+08'`. And `current_user = 'authenticated'` — the seam three other functions use — is **dead code inside `SECURITY DEFINER`, failing OPEN**: a parent could have named their own reference, stranding the counter and breaking the buy-a-package path for a whole business. Nothing anywhere touched `app/(coach)/settings`, the only writer of `tenants.paynow_qr_url`, so a 21-check driver now covers all three PayNow states including the stored-but-**unencodable** ID | **§7.104–§7.107** · PRD §7.16 · `docs/TESTING.md` §5 · `BACKLOG.md` *(the unencodable PayNow ID, filed not fixed)* · `docs/DEPLOYMENT.md` §11.7 |
 | **8.36** | 2026-08-09 | **Wave 1 got a PLAN, and its first chunk shipped — tooling only, nothing deployed.** `docs/plans/WAVE_1_PLAN.md` sequences the wave into four chunks with **17 mitigations inlined next to the steps they govern**, because a trailing Risks section is read once at planning time and never again; seven decisions were settled so they are not re-litigated, two of which changed the shape of the work (item #6 became engine fix **plus** a real class-deactivation feature; migrations run **strictly serially, no worktrees**). Two review findings would have broken chunks not yet built: a plain `AFTER UPDATE` audit trigger on `students` **refuses every student edit in the product** (it must be `SECURITY DEFINER` — this landed as Chunk 3, §8.38), and widening the engine's class scan widens what **blocks** it on a class invisible to all three clearing screens. Chunk 1: `verify-levels.mjs` made hermetic (its real failure was worse than filed — a second same-day run died after one check of nine, on a modal backdrop the refused create left open) and `verify-admin-table-geometry.mjs` took the §7.54 measurement from one admin table to **15 of 16**. A positional locator wrote a level onto **a child the driver did not own** while its own checks stayed green | **§7.101, §7.102** · `docs/TESTING.md` §5 · `docs/plans/WAVE_1_PLAN.md` · `BACKLOG.md` *(the sibling teardown that deletes invoices it does not own)* |
 | **8.35** | 2026-08-09 | **The red nightly was a driver that had been reporting PASS while asserting NOTHING since 2026-07-26.** `verify-trials.mjs` never filled the phone field §8.12 had made mandatory, so `book_trial()` was never called and every later check failed for an unrelated reason. What hid it is the durable part: the driver **skipped itself unless today was the seed class's weekday**, computed from `new Date()` in the RUNNER's zone — and the nightly's `0 20 * * *` cron (04:00 SGT) means **every sweep runs on the previous UTC day**, so the skip fired every time until the first UTC-Saturday sweep. A driver that self-skips exits 0 and is counted PASS, so **a green sweep is not proof a driver ran**. A second finding fell out of the fix: the class roster gates Mark Attendance on enrolments only, so a lesson whose only attendee is a trial or make-up guest renders nothing there — real, filed, not a billing hole (the Schedule tab has no such gate). Caught in review: a reused `RegExp` would have carried `lastIndex` across elements | **§7.100** · `docs/TESTING.md` §5 · `BACKLOG.md` *(the roster gate)* |
 | **8.34** | 2026-08-08 | **The coach's Today tab became a WEEK, parents can pay from the invoice list, and the backlog got its first ranking since July.** Schedule REPLACED Today (tabs: Schedule / Classes / My Pay / Settings), four sections under a Monday-start week selector driven by **marking state, not the calendar**. Two decisions carry the risk: **NEEDS MARKING is floor-scoped and ignores the selector** (week-scoping it hides a straggler nobody would look for, and unmarked attendance blocks billing with no override), and **the week is an OFFSET INTEGER, not a stored Monday** — an absolute date captured at mount goes stale on a PWA surviving a Sunday→Monday boundary, and the symptom is indistinguishable from a quiet day. **Three plan-review predictions were WRONG and the corrections outlived them**: nested Touchables do not double-fire on RN-web, the backlog range *can* grow unbounded for a tenant that never sealed a month, and consolidating two drivers' "identical" `pressByText` copies broke one. A pre-commit review then caught a regression introduced *while writing* §7.97 | PRD §14.2, §7.5 · **§7.95–§7.99** *(and a new paragraph on §7.70)* · `docs/TESTING.md` §5 |
@@ -858,69 +871,55 @@ for one marked inactive.
 
 ### ⚠ ONE THING TO CHECK, AND IT CHECKS ITSELF
 
-**Confirm the nightly sweep went green.** `ui-driver-rot` **issue #3 is still OPEN** as of
-2026-08-09 09:53 UTC — from the 2026-08-08 sweep, `verify-trials` only (34/35). Its cause
-is fixed (§8.35) and two further drivers changed since (§8.36), but **the sweep is the
-evidence, not this sentence**, and no sweep has run since the fixes landed. The first one
-after 2026-08-09 20:00 UTC settles it, and a green run closes the issue itself.
-`gh run list --workflow=ui-drivers.yml` and the issue's own state are the current fact.
-That is exactly what went wrong once already: this section read *"✅ NO RED SIGNALS"* for a
+**Confirm the nightly sweep went green.** `ui-driver-rot` **issue #3 was still OPEN** at the
+close of 2026-08-09 — from the 2026-08-08 sweep, `verify-trials` only (34/35). Its cause is
+fixed (§8.35) but **no sweep has run since**, and the sweep is the evidence, not this
+sentence. `gh run list --workflow=ui-drivers.yml` and the issue's own state are the current
+fact; a green run closes the issue itself. This section once read *"✅ NO RED SIGNALS"* for a
 day after the sweep had gone red beneath it.
 
-*(**Four** drivers changed or arrived on 2026-08-09 and none has faced a sweep yet:
-`verify-levels.mjs`, the new `verify-admin-table-geometry.mjs`, `verify-packages.mjs`
-(+1 check) and the new `verify-paynow-fallback.mjs`. All green locally — three consecutive
-runs, 15/15, 22/22 and 21/21 respectively. `verify-paynow-fallback` is the one to watch on
-its first sweep: it **mutates the seed tenant's PayNow columns** and restores them in a
-`finally`, so if it ever dies hard, later drivers in that run see a business it configured.
-Its teardown re-nulls them as a second layer.)*
+*(**Five** drivers have changed or arrived on 2026-08-09 and **none has faced a sweep yet**:
+`verify-levels.mjs`, `verify-admin-table-geometry.mjs`, `verify-packages.mjs`,
+`verify-paynow-fallback.mjs`, and the new `verify-class-deactivation.mjs`. All green locally
+on three consecutive runs. **Two mutate shared state and are the ones to watch:**
+`verify-paynow-fallback` writes the seed tenant's PayNow columns, and
+`verify-class-deactivation` **retires a seed-adjacent class** — its fixture resets that with
+`ON CONFLICT DO UPDATE` precisely because a run that dies mid-way used to leave the class
+retired and blame the fixture on the next run (§7.113).)*
 
-> **Before triaging any red in that sweep, read §7.108 — it is NEW and it costs a re-run to
-> learn.** A driver that dies on `page.goto(admin/login)` with a 30s `networkidle` timeout
-> is a cold Next.js compile, not driver rot and not a product bug: §7.73's question, *which
-> moved — the product or the driver's assumption?*, has the answer **neither**.
-> `verify-trial-visibility` failed that way on 2026-08-09 after eight green checks and gave
-> **11/11** on a re-run whose only difference was one `curl` of `/login`.
+> **Before triaging any red, read §7.108.** A driver that dies on `page.goto(admin/login)`
+> with a 30s `networkidle` timeout is a cold Next.js compile — not driver rot and not a
+> product bug. `curl` the route and re-run before reaching for §7.73.
 
-**One verification gap from this session, and it is the honest kind.** The admin panel's new
-**Reference** column on `/packages` was **not** confirmed by the served-bundle grep (§7.31):
-that page's chunk is behind auth and code-split, so its hashed URL is not discoverable
-unauthenticated. The mobile app bundle *was* grepped and is confirmed new. Opening
-`https://admin.swimsync.sg/packages` and looking is a two-minute close-out.
+### WAVE 1 IS COMPLETE — the next build is chosen from `BACKLOG.md`
 
-### If you would rather build than onboard — WAVE 1 IS DOWN TO ONE MIGRATION
+**All four chunks shipped (§8.36–§8.39).** `docs/plans/WAVE_1_PLAN.md` is now history, not a
+queue; don't re-read it for work. **`BACKLOG.md` → `## Build order` governs what comes
+next** — the six decisions the ranking rests on are in a table at its top; read them before
+re-opening any.
 
-**`docs/plans/WAVE_1_PLAN.md` is the answer, and Chunks 1, 2 and 3 are done.** Do not
-re-plan it and do not restate it here; that is how the two drift.
+**The highest-value item the wave left behind is the one it FOUND, not one it deferred:**
+*An unmarked BOOKING is invisible when its class has no active enrolments* (**S**). A silent
+permanent underbill, confirmed by running the engine twice, and the month **seals** over it
+when another class bills. Pre-existing and unchanged by Chunk 4 — but every retired class now
+sits in that state by construction, and `book_trial()` still lacks `book_makeup()`'s
+`is_active` guard, which is the other half of the chain.
 
-**Chunk 4 — the inactive-class engine fix plus class deactivation.** Branch
-`db/class-deactivation` in the **root checkout** (a worktree never authors a migration). It
-is the only chunk that touches money, and the only one whose deploy has an ordering rule:
-**migrations → engine → apps, `main` last** (§7.60).
+> **It measured ZERO on production on 2026-08-09, so nothing is leaking today** — and that is
+> exactly why it is worth doing before it can be reached rather than after. **It is not a
+> one-line fix**: making an unmarked booking block changes what *blocks* a billing month, and
+> the block has no override, so any row already in that state would begin blocking the day it
+> deploys. `BACKLOG.md` carries the production audit that has to gate it. **Named prohibition:
+> do not fix it by adding an override to the unmarked-attendance block. Fix the scan.**
 
-> **Read `⚠ RISK 1` before writing a line — it is ranked 1 overall, above everything Chunk 3
-> carried.** Widening `core.ts:352` past `is_active` also widens what enters the
-> **completeness gate**, and an inactive class with live enrolments then blocks the month
-> with **no override and no screen that can clear it** — the coach class list, the coach
-> Schedule tab and the admin Classes page all filter on `is_active`, so the class is
-> invisible to every role who could mark it. `markable_floor()` does not rescue this: that
-> is a *date* gate and the obstruction is *visibility*. **Step 1 is a production data audit
-> and a non-zero result is a blocker, not a caveat** — the query is in the plan.
-
-**`BACKLOG.md` → `## Build order` still governs everything after Wave 1.** The six decisions
-the ranking rests on are in a table at its top; read them before re-opening any. One of
-those rows was **settled** on 2026-08-09 rather than deferred — the static QR upload is
-collapsed, not hidden, so a future native-builds decision inherits a disclosure and not a
-conditional.
-
-**The `authenticated` question from 2026-08-04 is ANSWERED — don't re-open it.** No, it does
-not deserve `anon`'s sweep (§8.29, §3): one database role carries parent, coach and admin, so
-only RLS can separate them. **`service_role` is the one still open**, and it now has a
-**fourth** data point: whatever a migration does not explicitly revoke, cloud grants
-`service_role` by default — `20260809000200` was predicted and then confirmed by the dump
-(`docs/DEPLOYMENT.md` §11.7). Predicting it is not a substitute for taking the dump. It is a
-`BACKLOG.md` item and wants a usage audit of the edge functions and admin server routes
-**first** — do not close cells of it one migration at a time.
+**The `authenticated` question from 2026-08-04 is ANSWERED — don't re-open it** (§8.29, §3):
+one database role carries parent, coach and admin, so only RLS can separate them.
+**`service_role` is the one still open**, and it now has a **fifth** data point which tested
+the rule from the other side: `20260809000300` explicitly revoked its three functions and the
+dump came back with **no `service_role` line at all**. So — *whatever you do not revoke,
+`service_role` gets; whatever you do revoke, stays revoked*, and the fix costs one line
+(`docs/DEPLOYMENT.md` §11.7). It is a `BACKLOG.md` item wanting a usage audit of the edge
+functions and admin server routes **first** — do not close cells of it one migration at a time.
 
 ### Triage rules, when the sweep does redden
 
@@ -937,15 +936,21 @@ only RLS can separate them. **`service_role` is the one still open**, and it now
   — and was in fact a driver that had been broken for two weeks and had been skipping
   itself into a green PASS. Check when the driver last actually asserted anything.
 
-**The migration queue is EMPTY, and Wave 1 will fill it once more.** The latest applied is
-`20260809000200` (the students audit trigger, §8.38), deployed the same day with its grant
-dump taken and diffed within the hour. Nothing is in flight, so Chunk 4's can start
-immediately — still one at a time (§7.55), a worktree never authors one, and budget the
-post-deploy grant check (§7.39, §7.89) **and** the rollback rehearsal (§7.93 — running the
-DOWN file is the half that finds the bugs). **Don't take `supabase db push`'s own output as
-proof it applied:** on 2026-08-09 it printed a `pgdelta` certificate stack trace *and*
-`Finished supabase db push`. `supabase migration list --linked` is the fact — check the
-`remote` column is filled.
+**The migration queue is EMPTY, and nothing is queued to fill it.** The latest applied is
+`20260809000400` (the class-deactivation grant, §8.39). Wave 1 spent three migrations and is
+done. Whatever comes next: still one at a time (§7.55), a worktree never authors one, and
+budget the post-deploy grant check (§7.39, §7.89) **and** the rollback rehearsal (§7.93 —
+running the DOWN file is the half that finds the bugs). **Don't take `supabase db push`'s own
+output as proof it applied:** on 2026-08-09 it printed a `pgdelta` certificate stack trace
+*and* `Finished supabase db push`, twice. `supabase migration list --linked` is the fact —
+check the `remote` column is filled.
+
+> **To hold one migration back from another, MOVE THE FILE out of `supabase/migrations/` and
+> put it back for the second push.** `supabase db push` applies everything pending, so two
+> files present at once is one deploy and the ordering you wrote down did not happen (§7.49,
+> §7.30). §8.39 used this to keep an RPC ungranted until its engine was confirmed live —
+> §7.87 turned into a feature flag, and it is the pattern to copy whenever a new client path
+> is only safe *after* something else deploys.
 
 ### Worth deciding, not urgent
 

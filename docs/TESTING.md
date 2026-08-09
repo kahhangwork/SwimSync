@@ -83,6 +83,7 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `function_grants.test.sql` (4) | **The general rule, asserted over `pg_proc` rather than over a list of names:** *no function in `public` grants EXECUTE to `anon`* — failures name the offenders. Written this way because every earlier grant assertion here pins ONE function, so none of them could fail for a function nobody thought to name, which is exactly how `next_credit_note_ref` sat on the bare `PUBLIC` default with an unauthenticated write path (§7.82). Plus all three reference counters pinned callable-by-**nobody** (`next_credit_note_ref`, `next_invoice_ref`, `next_package_ref`). Catches the LOCAL half only; the cloud half is still §7.39's remote dump |
 | `audit_log_tenant.test.sql` (8) | every audit row knows its business: the stamp follows the **entity** across a tenant boundary (a `Student` row takes the student's business, not the actor's), `lesson_session` resolves through its class, a **supplied `tenant_id` is overwritten** by the derived one, an unknown `entity_type` **RAISES** rather than writing an invisible row, a writer that sets no `tenant_id` (`schedule_extra_lesson`) comes out stamped anyway, and the narrowed INSERT policy **both ways** — a coach may audit a session they own and may **not** fabricate a row about a student |
 | `students_audit.test.sql` (11) | the `students` audit trigger (`20260809000200`). **The "still succeeds" half is the point** — this trigger's failure mode is not a missing audit row, it is a REFUSED STUDENT EDIT, so every write here is made as the role that actually makes it: a test that only writes as `postgres` passes against the broken build, because the owner is exempt from the policy the bug trips over. Assertion 1 (the admin level picker) dies with **42501** the moment the function is `ALTER`ed to `SECURITY INVOKER`, taking the whole transaction and assertions 2–11 with it — which is the honest picture of that bug: not one broken screen, every student edit in the product. Assertions 9–10 (a `postgres` and a `service_role` UPDATE with no JWT) die with **23502** if the NULL-actor guard is removed, which is what would fail the next data-fix migration against production. Also: the parent's own edit-child path asserted separately from the admin's (§7.86 — different RLS route), `to_jsonb(OLD)` carrying **what the phone number used to be**, `tenant_id` arriving from `set_audit_log_tenant`'s derivation rather than from the trigger, and a no-op UPDATE recording nothing |
+| `class_deactivation.test.sql` (23) | retiring a class (`20260809000300`) — `deactivate_class()` / `reactivate_class()` and the `class_unmarked_lesson_dates()` helper. **Every refusal is tested in BOTH directions, and that is the file's structure, not padding**: a guard that refuses everything satisfies all three refusal assertions on its own (`markable_floor.test.sql` is the precedent). Each of the three was proven red by **breaking it in the database and re-running** — enrolment refusal rewritten as `WHERE is_active` (§7.66) kills assertion 5, dropping the `makeup_bookings` arm kills 9, deleting refusal 3 kills 11. Two assertions had to be re-aimed to get there and the reasons are §7.111 and §7.112: assertion 5's fixture enrolment spans **exactly one marked date**, because a wider span let refusal 3 do the refusing and the §7.66 bug went undetected; and the cross-tenant assertion targets the **already-retired** class, because pointed at an enrolled one it went green from the enrolment refusal's own `P0001`. Assertion 2 pins the deliberate decision that an **EMPTY class IS retired** (§7.17 — all three refusals are "nothing went wrong" negatives). Assertions 14–15 reach the helper's enrolment and make-up arms directly, since neither is reachable through `deactivate_class()` once refusals 1 and 2 have passed. Also: `deactivated_at` recorded and cleared, a second press NOT moving it (it is what the engine bills against), and `reactivate_class()` tenant-scoped — its only barrier, since it has no refusals |
 | `parent_link_forgery.test.sql` (9) | the two forged links closed by `20260804000500`, reproduced as HTTP 201/201/200 before the fix: a self-registered **stranger** cannot insert their own `parent_tenants` row naming an arbitrary business (so the `join_code` stays invisible), cannot attach themselves to an arbitrary child, and therefore cannot modify that child — `students_update` is untouched and correct, it was ownership that was forgeable (§7.86). Assertion 1 is the positive control that makes a silently-superuser run visible (§7.16); 7–9 are the **green guard** that the join code and Add Child still work, because the failure this file must not hide is an onboarding outage |
 | `table_grants.test.sql` (6) | the standing invariant behind `20260804000600`, over `pg_class`/`pg_policies` so a table added next month is covered on the day it is created: `authenticated` holds a table privilege **if and only if** a policy could permit it (both directions, failures named), no TRUNCATE/REFERENCES/TRIGGER anywhere, `anon` holds nothing, no postgres-owned default privilege names either role, and nothing escapes the invariant's reach (views/partitions/foreign tables, plus **column-level** ACLs, which `has_table_privilege()` cannot see and a table-level REVOKE does not remove). **Scoped to `authenticated` + `anon` deliberately** — it is false for `service_role` (bypasses RLS) and meaningless for `postgres` (owns the tables), and a test that is red against a correct database gets disabled (§7.87). Excludes extension-owned relations, or pgTAP's own views fail it inside its own harness |
 | `stranger_isolation.test.sql` (4) | the persona no other isolation file covers — a self-registered parent belonging to **nothing**, which is what an attacker is, since signup is open. Sweeps **all 37 tables at once** and asserts they see only their own `profiles` and `parents` row; assertion 1 pins what a real member sees across 15 tables so "sees nothing" can never pass vacuously, assertion 3 proves the sweep covered every table rather than a subset, and assertion 4 proves the one profile they read is *theirs*. One forged link takes it red naming **six** tables, two of which were not on the list when it was written — which is the argument for sweeping rather than naming |
@@ -129,6 +130,19 @@ category scope, package-then-credit precedence, and the ⚠RISK-4 pin:
 fault-injection test (a failed ledger write holds the month open). All verified
 failing on the pre-package engine or a mutated flag. Plus **`../package-emails/email.test.ts`**
 (7) — purchase-email builders (escaping, no-key no-op), run by the same `test.sh`.
+
+_Also in the Deno suite (added 2026-08-09):_ **`classDeactivation.test.ts`** (5) —
+`classes.is_active` means scheduling, never billing. The file's shape is two
+assertions pulling in **opposite directions**, and both are needed: a retired class
+with nothing recorded must NOT block (§7.109's deadlock), and a lesson unmarked
+*before* it was retired must STILL block (the permanent underbill). Proven red **both
+ways** — a naive `.eq("is_active", true)` deletion fails the first pair, a blanket
+exemption instead of a `deactivated_at` date clamp fails the second. Also: a class
+retired at month end still bills what it taught (the BACKLOG item's actual complaint),
+dates after deactivation not expected, and the legacy row (inactive, no date) expecting
+nothing while still billing what it recorded. **No `completeMonth()` in the two gate
+cases, deliberately** — §7.111: it satisfies the gate under test and both cases were
+vacuous until the call was removed.
 
 _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
@@ -275,6 +289,19 @@ second purchase, while Pia (Private-only, same family) wears "Ad-hoc" on both �
 the old by-parent sum labelled identically — plus the child profile's family-shared
 Balances line, and — since 2026-08-09 — that the package's PayNow screen carries its
 `PKG-YYYY-NNNN` reference (22 checks);
+`verify-class-deactivation.mjs` (+ `fixtures-class-deactivation.sql` and its
+`-teardown.sql`) — **21 checks, and check 7 is a DEPLOY GATE, not a regression test.**
+§7.109's whole mitigation is that the retire → reload → restore round trip completes
+**through the UI alone, touching no SQL**; if it cannot be made green, the engine change
+must not ship, because the alternative is a month blocking on a class nobody can see.
+Proven red by restoring `loadClasses()`'s `.eq("is_active", true)` — it fails on exactly
+that check. Check 3 is the §7.28 control (a **known-ACTIVE** class carries no *Retired*
+badge): assert only on the retired one and a page that badges everything passes. Checks
+8–11 drive both refusals and assert the message NAMES the child or the guest, plus that
+nothing was written. Its fixture uses `ON CONFLICT DO UPDATE` to reset `is_active` /
+`deactivated_at` — §7.113, learned when a sabotage run died mid-way and the next run
+blamed the fixture. Three consecutive clean runs.
+
 `verify-paynow-fallback.mjs` (+ `fixtures-paynow-fallback.sql` and its `-teardown.sql`)
 drives the PayNow chain through **all three states a business can be in** (21 checks), and
 exists because before it **nothing in either test suite and no other driver touched

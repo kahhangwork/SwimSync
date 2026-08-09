@@ -1843,3 +1843,98 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       every worktree (§7.56), and a longer timeout buys nothing on CI, where each job starts
       cold anyway and a genuinely hung page then takes proportionally longer to fail.
       (2026-08-09.)
+
+109. **WIDENING WHAT THE INVOICE ENGINE *SCANS* WIDENS WHAT *BLOCKS* IT — AND THE CLASS IT
+    BLOCKS ON MAY BE INVISIBLE TO EVERY SCREEN THAT COULD CLEAR IT.** `core.ts`'s classes
+    query does not only decide what gets tallied; it decides which classes enter the
+    **completeness gate**. Predicted in `docs/plans/WAVE_1_PLAN.md` as RISK 1 and confirmed
+    by reading the code, 2026-08-09.
+    - **The chain**, all of it inside one loop: widen the scan → an inactive class with
+      `student_class_enrolments.is_active = true` re-enters it → `activeStudentIds` is
+      non-empty → `expectedDates` is every weekly date in the month → there are no
+      `lesson_sessions` → everyone is unmarked → the month blocks. The block has **no
+      override, by design** (§8a), so there is no way out through the engine.
+    - **Why it is a deadlock and not merely a bug:** the coach class list, the coach
+      Schedule tab and the admin Classes page **all filtered `is_active`**, so nobody could
+      see the class, let alone mark it. `markable_floor()` does not rescue this — that is a
+      *date* gate and the obstruction is *visibility*. It is §8.32's deadlock reached along
+      a new axis, and the blast radius is every parent of that business, for a month.
+    - **The durable rule: before changing what the engine ENUMERATES, find every screen that
+      could clear the resulting block.** `grep -rn 'is_active' <both apps>` is the search;
+      if the answer is "no screen", the UI change ships in the SAME deploy or the engine
+      change does not ship.
+    - **How it was closed (2026-08-09, the shape to copy):** three ways, because the failure
+      is unrecoverable. A `classes.deactivated_at` **date** clamps how far an inactive class
+      is expected to have run, so the unclearable expectation is never generated; the RPC
+      refuses to create the state; and the admin page gained a *Show retired* affordance in
+      the same deploy. A boolean cannot do the first — "was this class running on the 13th?"
+      needs a date. (2026-08-09.)
+
+110. **A TEST CAN BE MADE VACUOUS BY THE FIX IT WAS WRITTEN TO SURVIVE.** §7.25 says prove a
+    test red when you write it. This is the same rule pointed **forward in time**: re-prove
+    it red after any change to the mechanism it depends on.
+    - **Where it bit (2026-08-09):** `makeups.test.ts:370` pinned the `home_class_id` arm of
+      the `class_rates` union — but **only because deactivating the home class was what
+      dropped that class out of the scan**. §7.109's fix stopped the scan filtering
+      `is_active`, so the class was in it either way, and the test kept passing while
+      guarding nothing. Measured, not argued: with the arm deleted the whole file passed
+      **12/12**.
+    - **The tell:** a test whose setup includes the very condition a change is removing.
+      Predicted at planning time here — the plan named the file and the line — and the
+      prediction was right, so this is cheap to spot if you look.
+    - **What to do when it fires:** first ask whether the guarded code is now *unreachable*
+      rather than merely untested. Here it was: `book_makeup()` derives `home_class_id` from
+      the child's own active enrolment, always same-tenant, and the scan now covers every
+      class in the tenant. Dead code in the money engine with no test behind it reads as
+      load-bearing to the next person, so it was **deleted** rather than kept — helped by
+      its failure mode being a LOUD throw (`rateOn()` has no fallback), never a silent
+      underbill. (2026-08-09.)
+
+111. **A TEST HELPER THAT SATISFIES THE GATE ALSO SATISFIES YOUR ASSERTION ABOUT THE GATE.**
+    `completeMonth()` marks every still-due lesson `cancelled_rain` — non-billable, so the
+    completeness gate passes. Call it in a test whose point is *"these dates are not
+    expected"* and the test passes against an engine that expects them all.
+    - **Where it bit (2026-08-09), twice in one file:** both `classDeactivation.test.ts`
+      cases about the `deactivated_at` clamp called `completeMonth()` out of habit. Caught
+      only by the sabotage run — the naive-engine patch left them **green**. Removing the
+      call made one of them fail under sabotage, which is what made it a test.
+    - **The rule:** in a test about *what the gate demands*, the fixture may not contain
+      anything that satisfies the gate. Helpers named "complete…", "settle…", "seal…" are
+      the ones to look for. A test about billing AMOUNTS may use them freely — there the
+      helper isolates the number under test, which is what it is for.
+    - **Generalises past this repo:** any helper that puts the system into the state your
+      assertion is about is a vacuity risk, and it is invisible in a green run. (2026-08-09.)
+
+112. **`throws_ok(…, 'P0001', NULL, …)` ASSERTS ONLY THAT *SOMETHING* RAISED — SO POINT IT AT
+    A SUBJECT WHERE ONLY THE GUARD UNDER TEST CAN RAISE.** A `NULL` message argument matches
+    any message, and every `RAISE EXCEPTION` in PL/pgSQL is `P0001` by default. Two different
+    guards are therefore indistinguishable to the assertion.
+    - **Where it bit (2026-08-09):** `class_deactivation.test.sql`'s cross-tenant assertion
+      called `deactivate_class()` on a class that **also** had a live enrolment. Delete the
+      `is_tenant_admin()` check entirely and the enrolment refusal still raises `P0001` — the
+      test stays green while any business can retire any other business's class. Found by
+      sabotage, not by reading.
+    - **The fix is the SUBJECT, not the assertion.** It was re-pointed at a class already in
+      the terminal state (retired), where the only reachable outcomes are the tenant refusal
+      or the idempotent `RETURN` — so removing the check flips it to `lives_ok`. Choosing a
+      subject that can only fail one way beats matching on message text, which is brittle.
+    - **The general form:** a permission test whose subject also violates a business rule is
+      testing the business rule. Give permission tests a subject that is otherwise
+      **perfectly valid**. (2026-08-09.)
+
+113. **A DRIVER WHOSE MAIN ACT MUTATES STATE MUST HAVE THAT STATE RESET BY ITS FIXTURE, NOT
+    ONLY BY ITS OWN HAPPY PATH.** A driver that retires, disables, archives or seals
+    something and undoes it at the end is hermetic *only when it finishes*. Kill it in the
+    middle — a red check, a timeout, a sabotage run — and it leaves the mutation behind.
+    - **Where it bit (2026-08-09):** `verify-class-deactivation.mjs` retires a class and
+      restores it. A sabotage run died between the two, so the next run failed its own
+      fixture guard with *"Fixture is not in place"* — a message pointing at the fixture
+      when the real cause was the previous run. `ON CONFLICT (id) DO NOTHING` cannot repair
+      it, because the rows exist; only their state is wrong.
+    - **Fix:** `ON CONFLICT (id) DO UPDATE SET <the mutated columns only>`. Re-applying the
+      fixture becomes the reset, and nothing else the fixture does not own is overwritten.
+    - **Why a `finally` block is not enough:** it does not survive a hard kill, and the
+      nightly sweep re-applies fixtures between drivers anyway — so putting the reset in the
+      fixture makes it free. Same family as §8.36's non-hermetic `verify-levels`, reached
+      through a different door: there the second same-day run died, here the run *after a
+      failure* did. (2026-08-09.)

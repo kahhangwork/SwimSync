@@ -144,6 +144,30 @@ still point at the local stack for dev.
    reproduce cloud's defaults at all, so the prediction is only ever a hypothesis until the
    dump confirms it.
 
+   **Fifth confirmation, 2026-08-09 (`20260809000300`) — and this one tested the rule from
+   the OTHER side.** Every previous data point was a function whose migration wrote no
+   REVOKE, so cloud filled the gap. This migration explicitly revoked all three of its
+   functions from `PUBLIC, anon, authenticated, service_role`, and the dump came back with
+   **no `service_role` line for any of them** — `deactivate_class` and `reactivate_class`
+   carry `REVOKE ALL … FROM PUBLIC` + `GRANT ALL … TO "authenticated"` (from the separate
+   `20260809000400`), and `class_unmarked_lesson_dates` carries the REVOKE and **nothing
+   else**: callable by nobody, which is what an internal `SECURITY DEFINER` helper should
+   be. So the rule holds in both directions — *whatever you do not revoke, `service_role`
+   gets; whatever you do revoke, stays revoked.* An explicit revoke is the whole fix, and
+   it costs one line. `anon` EXECUTE stayed at **18**; `GRANT ALL ON TABLE … TO
+   "authenticated"` stayed at **0**.
+
+   **This is also the first deploy to use the grant itself as the ordering mechanism.**
+   `20260809000300` shipped the RPCs with no grant at all, and `20260809000400` — a
+   separately-numbered file, pushed only *after* `supabase functions list` confirmed the new
+   engine — added `GRANT EXECUTE … TO authenticated`. §7.87 turned into a feature flag:
+   between the two pushes nothing could reach `deactivate_class()`, which was the point,
+   because the old engine still filtered `is_active` and a deactivation in that window would
+   have been a permanent underbill. To hold a migration back, **move the file out of
+   `supabase/migrations/` and put it back for the second push** — `supabase db push` applies
+   everything pending (§7.49, §7.30), so two files present at once is one deploy and the
+   ordering you wrote down did not happen.
+
 8. **Production's client-role grants are a DECLARED SET now, and the dump is how you check
    it.** Since `20260804000600` `authenticated` holds a table privilege only where a policy
    could permit it. Verified on production 2026-08-04: **zero** `GRANT ALL ON TABLE … TO

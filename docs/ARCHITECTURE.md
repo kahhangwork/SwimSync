@@ -254,6 +254,38 @@ the shape of the system changes:_
     and the coach app deliberately carries no invoice figures), so the client gets the
     floor from `markable_window_start()` — a no-arg SECURITY DEFINER RPC returning one
     DATE for the caller's own business. It must keep returning **only a date**.
+- **`classes.is_active` means SCHEDULING, and `classes.deactivated_at` is why it can**
+  (`20260809000300`). The engine scanned `.eq("is_active", true)`, so retiring a class at
+  month end silently dropped its already-taught lessons *and* stopped it blocking — a hole
+  exactly where someone is tidying up. The engine now bills every class in the tenant.
+  - **The date is not decoration, and a boolean cannot replace it.** The same scan feeds
+    the completeness gate, so widening it naively makes an inactive class expect a lesson
+    on every weekly date and block the month for ever (**§7.109** — the class is invisible
+    to every screen that could clear it). `deactivated_at` answers *"was this class running
+    on the 13th?"*, which is the only question that separates a lesson still owed a mark
+    from one that never existed. Lessons before it still block; dates after it are not
+    expected.
+  - **Inactive with a NULL `deactivated_at` means "expects nothing at all"**, not "expects
+    everything". Those rows predate the RPC, so nothing is known about when they stopped —
+    and that is both the conservative side of the deadlock and exactly how they behaved
+    before, when the scan skipped them. Do not "fix" this by defaulting the column to
+    `created_at` or to the month start.
+  - **`reactivate_class()` must never grow a refusal.** It is the only exit from a class
+    that is blocking a month while being invisible everywhere else; anything that can
+    refuse it can strand a business. Its counterpart `deactivate_class()` carries three
+    refusals and none of them takes an override — the enrolment one reads the enrolment
+    **span**, never `is_active` (§7.66).
+  - **The admin Classes page is the only screen that shows an inactive class.** The coach
+    class list and the coach Schedule tab both still filter `is_active`, deliberately — a
+    retired class is not on anyone's schedule. That makes the *Show retired* toggle
+    load-bearing rather than cosmetic; it must not be removed without giving the exit
+    somewhere else to live.
+  - **Known hole, filed not fixed** (`BACKLOG.md`): `core.ts`'s two `continue` guards
+    ignore `bookingsByDate`, so an unmarked booking in a class with **no active enrolments**
+    is neither billed nor blocking, and the month seals over it. Pre-existing and unchanged
+    by this work, but every retired class now sits in that state by construction. Measured
+    zero on production 2026-08-09.
+
   - **Completeness rule — now ONE definition** (`lib/attendanceCompleteness.ts`, extracted
     2026-07-18). A lesson counts as marked only when its session exists **and every
     actively-enrolled student has an attendance row on it**, and **a lesson with no session
