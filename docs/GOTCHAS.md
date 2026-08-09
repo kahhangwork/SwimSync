@@ -1663,10 +1663,11 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     - **The skip is what made it invisible for two weeks.** The driver had been broken since
       §8.12 made a parent's contact number **mandatory** on the booking form (2026-07-26):
       it never filled the phone, so the form refused before `book_trial()` was reached and
-      every later assertion failed for an unrelated reason. Three nightly sweeps reported
-      `trials PASS` in between — all on a UTC Tuesday or Friday, all having exited before
-      the first coach check. **A driver that can skip must say what it skipped, and a
-      sweep's PASS is only worth the checks it actually ran.**
+      every later assertion failed for an unrelated reason. **Every scheduled sweep between
+      those dates counted `trials` as PASS** — the two green ones (both 2026-08-07, a UTC
+      Friday) and the red one before them (2026-08-05, a UTC Wednesday) alike, none having
+      reached the first coach check. **A driver that can skip must say what it skipped, and
+      a sweep's PASS is only worth the checks it actually ran.**
     - **Fix the axis, not the instance.** Compare **ISO option values** against
       `toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" })` — never rendered
       labels, which are a locale away from being a different string. Better still, remove

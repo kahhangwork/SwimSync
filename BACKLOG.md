@@ -1,6 +1,13 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-08 (second pass) — **`## Build order` is no longer empty.** It had
+_Last updated: 2026-08-09 — **one item added:** *The class ROSTER hides a lesson whose only
+attendee is a guest* (**S**, Billing and payments; also in the unordered pool). Found while
+fixing `verify-trials.mjs` — the roster gates its Mark Attendance button on enrolments
+alone, so a trial-only lesson is invisible there while the Schedule tab shows it. **Not a
+billing hole**, which is why it is unranked: the lesson stays reachable and markable. No
+item shipped, so nothing was removed._
+
+_Previously, 2026-08-08 (second pass) — **`## Build order` is no longer empty.** It had
 been since 2026-07-19. The queue is now ranked by **rework cost** rather than value or size
 — each item placed so finishing it never sends you back into something already built
 (method: `.claude/skills/backlog-prioritisation/SKILL.md`). Five waves, plus an unordered

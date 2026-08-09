@@ -335,6 +335,33 @@ Unassigned Children **excludes** an upcoming trial while **keeping** a past one;
 two checks book a trial *while the admin page is already open* and prove the enrolment
 guard refuses the first press **and wrote nothing** (11 checks). **It found two RLS gaps
 that would have shipped the parent card completely dead** — see §7.48;
+`verify-trials.mjs` (no fixture — it drives the seed's one class and writes through the
+UI, so a reset is its cleanup) covers the admin half: the unpriced-category reminder
+disappearing **per category**, the trial price saving as a new effective-dated row, the
+lesson picker offering only that class's weekday, the booking landing on the Trials page,
+and then the coach half — the trial child is **not** on the class roster (a booking is not
+an enrolment) but **is** on the attendance screen for their own lesson, labelled *Trial*
+(11 checks; both servers).
+> **It had been asserting nothing for two weeks, and the sweep called it PASS — §7.100.**
+> Two independent defects. It never filled the booking form's **phone**, mandatory since
+> §8.12, so the form refused before `book_trial()` was reached; and it skipped itself
+> unless today was the class's weekday, computed from `new Date()` in the **runner's** zone,
+> which is UTC. The nightly's cron is 20:00 UTC — already the next SGT day — so the skip
+> fired on the wrong days and the driver only truly ran when the UTC date was a Saturday.
+> Every scheduled sweep in between counted it PASS without reaching the first coach check.
+> **Two changes made it run daily rather than one day in seven.** The target lesson is now
+> the most recent that has fallen due, chosen by comparing ISO option **values** against
+> today-in-SGT (never rendered labels). And marking is reached through the Schedule tab's
+> **NEEDS MARKING**, not the class roster: the roster gates its button on
+> `activeStudentIds.length > 0` — enrolments only — so a lesson whose only attendee is a
+> guest is invisible there, and the seed has zero enrolments, meaning that route could
+> never have worked from a clean reset (the gap itself is a `BACKLOG.md` item).
+> Assertions read `visibleText()`, and the unreachable SKIP is now a **FAIL** — exiting 0
+> without asserting is the whole lesson. Scores **6/10 → 11/11**; the phone fix alone is
+> 7/10, so both halves are proven load-bearing (§7.25).
+> `lib.mjs` gained **`pressByTextMatch(page, /re/)`** for it — visible-only like
+> `pressByText`, but regex, and it presses **only on a unique match** (§7.98's walk rule),
+> because a label carrying a date has no exact string to match on;
 `verify-parent-claim.mjs` (+ `fixtures-parent-claim.sql`) drives the whole claim + merge
 loop across both real UIs — the popup OPENS (slice 1 shipped an invisible modal, §8.10),
 the candidate is masked, Confirm is inert until one is chosen, the parent is **blocked**

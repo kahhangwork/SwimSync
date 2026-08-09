@@ -1,6 +1,20 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-08 — **the coach's Today tab is gone: SCHEDULE replaced it, parents
+_Last updated: 2026-08-09 — **the nightly sweep went red, and the red was a DRIVER that had
+been reporting PASS while asserting nothing for two weeks. Fixed and LIVE on `main`, CI
+green (§8.35).** `verify-trials.mjs` never filled the booking form's phone — mandatory
+since §8.12 — so the form refused before `book_trial()` was reached. That survived because
+the driver **skipped itself six days in seven**, on a weekday it computed from `new Date()`
+in the **runner's** zone: the nightly's cron is 20:00 UTC, already the next SGT day, so
+2026-08-08 was simply the first time the skip failed to fire. **§7.100** is the durable
+part, and it generalises past this driver: *a sweep's PASS is worth only the checks it
+actually ran, and any driver that asks "what day is it" is on the wrong side of the UTC/SGT
+boundary for the whole run.* The driver now runs **daily** at 11/11, reaching marking
+through the Schedule tab rather than the class roster — because the roster's button is
+gated on enrolments, so a lesson whose only attendee is a guest is invisible there. That
+gap is a new `BACKLOG.md` item: real, bounded, **not** a billing hole._
+
+_Previously, 2026-08-08 — **the coach's Today tab is gone: SCHEDULE replaced it, parents
 can pay and claim straight from their invoice list, and `BACKLOG.md`'s build order is
 ranked again for the first time since 2026-07-19. All LIVE — five commits on `main`, CI
 green (§8.34).** The Schedule tab is a Monday-start week selector over NEEDS MARKING /
@@ -58,12 +72,6 @@ FK between two tables breaks every bare PostgREST embed between them — caught 
 provisioning driver within the hour, both embeds hinted. **The standing headline is
 unchanged: chase the outstanding invoices, keep marking August, bill it in early
 September — §9.**_
-
-_Previously, 2026-08-04 (second session) — **auditing whether `authenticated` deserved
-the sweep `anon` got found three LIVE forgery paths instead, all closed and DEPLOYED
-(§8.29)**: a self-registered stranger could join any business with no join code, attach
-themselves to any child by UUID, and rename that child. The grant set became a declared
-whitelist CI re-proves. Full account and pointers: the **§8.29** ledger row._
 
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
@@ -459,11 +467,12 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   `ui-driver-rot` issue that a green run closes. Protocol and triage rule:
   `docs/TESTING.md` §5. **Its first scheduled sweep found a LIVE product bug that had been
   invisible to four green manual runs — see §8.33 and §7.94. That is the whole argument for
-  the nightly, made on its first outing.** The fix is confirmed by the mechanism that found
-  it: the sweep has run **green twice since** (2026-08-07 00:53Z and 20:47Z, both inside the
-  04:00 SGT window the bug lived in) and closed issue #2 itself. `gh run
-  list --workflow=ui-drivers.yml` is the current fact; an open `ui-driver-rot` issue means
-  red right now.
+  the nightly, made on its first outing.** Its **fourth** sweep made the argument again from
+  the other direction (§8.35): `verify-trials` had been reporting PASS while asserting
+  nothing since 2026-07-26, and only a sweep landing on a UTC Saturday exposed it. **So a
+  green sweep is not proof a driver ran** — a driver that self-skips exits 0 and is counted
+  as PASS (§7.100). `gh run list --workflow=ui-drivers.yml` is the current fact; an open
+  `ui-driver-rot` issue means red right now.
 
 > **"CLEAN SLATE" IS A BANNED PHRASE FOR THIS DATABASE — it has now been wrong twice.**
 > The first time (corrected 2026-07-25) it claimed production held "only the superadmin +
@@ -569,6 +578,53 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.35 (2026-08-09) — THE RED NIGHTLY WAS A DRIVER THAT HAD BEEN REPORTING *PASS* WHILE ASSERTING NOTHING
+
+**The first triage answer was wrong, and the right one is worse.** The Schedule tab had
+shipped the day before, `verify-trials.mjs` died on a `waitFor visible` timeout, and §7.98
+— written the day before, about the Schedule screen staying mounted under the Classes tab
+— fits that shape exactly. It was not that. The driver had been broken since **2026-07-26**,
+when §8.12 made a parent's contact number mandatory on the booking form: it never filled
+the phone, so the form refused before `book_trial()` was ever called and every later check
+failed for an unrelated reason.
+
+**What hid it is the part worth carrying, and it is not specific to this driver.** The
+driver skipped itself unless today was the seed class's weekday — defensible — but computed
+that weekday from `new Date()` in the **runner's** zone. The nightly's cron is `0 20 * * *`,
+chosen as 04:00 SGT, so **every sweep runs on the previous UTC day**. Every scheduled sweep
+since the nightly began had counted `trials` PASS without reaching a coach assertion;
+2026-08-08 was simply the first UTC-Saturday sweep, and the skip failed to fire.
+**§7.100**: a sweep's PASS is worth only the checks it
+actually ran, and any driver that asks "what day is it" is on the wrong side of that
+boundary for its whole run.
+
+**A second finding fell out of the fix.** The class roster gates its Mark Attendance button
+on `activeStudentIds.length > 0` — **enrolments only** — so a lesson whose only attendee is
+a trial or make-up guest renders nothing there. The seed has zero enrolments, so the
+driver's roster route could never have worked from a clean reset. The Schedule tab has no
+such gate (`expectedStudentsOn()` counts bookings), so marking is reached that way now and
+the driver runs **daily** instead of one day in seven. The roster gap is a `BACKLOG.md`
+item — real, but **not a billing hole**: the lesson is reachable and markable, and NEEDS
+MARKING is floor-scoped so it cannot fall off the list.
+
+**Caught in review, both in the fix itself:** `pressByTextMatch` reused one `RegExp` across
+every element, so a `/g` pattern would have carried `lastIndex` and silently skipped half
+the matches (flags now stripped); and the old `SKIP … exit 0` branch, now unreachable
+because the picker offers three weeks back, still *read* as live — converted to a **FAIL**,
+since exiting 0 without asserting is the entire subject of this session.
+
+**Deliberately not done:** no `run-all-drivers.sh` sweep locally (~45 min, resets the DB per
+driver) — the `lib.mjs` change is purely additive, so the nightly is the evidence, same call
+as §8.34. No audit of the other 34 drivers for the same UTC/SGT assumption; §7.100 names
+the class of bug, and the nightly now has one known-good day to compare against.
+
+**Verified:** `verify-trials` **11/11** against a fresh `supabase db reset`, proven
+load-bearing both ways (6/10 via the roster route, 7/10 without the phone fill — §7.25).
+CI green on the push. The rolling `ui-driver-rot` issue #3 stays open until the sweep
+itself closes it.
+
+---
+
 ## 8.34 (2026-08-08) — THE COACH'S TODAY TAB BECAME A WEEK, PARENTS CAN PAY FROM THE LIST, AND THE BACKLOG GOT ITS FIRST RANKING SINCE JULY
 
 **Schedule REPLACED Today rather than joining it.** The coach's only date-bound surfaces
@@ -614,45 +670,10 @@ three pushes.
 
 ---
 
-## 8.33 (2026-08-07) — TRIAGING TWO RED DRIVERS FOUND A LIVE BUG THAT REFUSED EVERY CLASS EDIT FOR EIGHT HOURS A DAY
-
-**`CURRENT_DATE` is the SESSION's time zone — UTC here — and nobody had looked at that end
-of the wire.** §7.7 taught this repo to distrust dates derived on the *client*, and every
-client is correct (`todayInSg()`). `set_class_terms()` refused terms dated in the future
-via `v_from > CURRENT_DATE`, so between 00:00 and 08:00 SGT the admin's own SGT date read
-as tomorrow and **every class edit failed** with `P0001: terms cannot start in the future`.
-Live since 20260719001000. `sync_class_display_price()` had the same clock (a rate
-effective today didn't display until 08:00). Both now use `today_sg()`; a `pg_proc` scan
-found exactly those two, and `class_terms.test.sql` now asserts that scan returns nothing.
-
-**Why a 14-test file on that exact function missed it — §7.94, and the part worth
-carrying.** Three places had independently made the same UTC assumption and therefore
-**agreed**: the RPC, the pgTAP file, and `verify-class-terms.mjs` all said `CURRENT_DATE`.
-Fixing only the RPC turned **five** pgTAP assertions and two driver checks red — they had
-been green *by agreement with the bug*. The existing guard test also dated terms a month
-out, while the whole bug lives in a one-day gap: **test a date guard AT its boundary.**
-
-**Why it hid for three weeks, and the vindication of §8.30.** The nightly sweep fires at
-04:00 SGT — inside the window — and went red the first time it ran on schedule. Four manual
-runs that week went green because they ran in the evening, and §8.30 recorded the pipeline
-as healthy on that basis. **A green run proves the code worked at the time it ran.**
-
-**Caught in review before it could bite:** the migration's `pg_proc` probe matched pgTAP's
-own `_def_is`, which would have **aborted `supabase db push`** on any database with pgTAP
-installed. Probe and test now exclude extension-owned functions; verified by applying the
-migration to a pgTAP-installed database.
-
-**Verified:** pgTAP **557** in 32 files (`class_terms` 14 → 17, the new three proven red
-against the unfixed DB), Deno 130 ×2, fixture round-trip 16/16, `verify-class-edit` 5/5
-(was 4/5), `verify-class-terms` 10/10 (was a crash). Rollback **executed** per §7.93 — both
-functions restore byte-identically. Production confirmed *inside* the broken window:
-`CURRENT_DATE` 2026-08-06 vs `today_sg()` 2026-08-07, and 0 functions left on a UTC date.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.33** | 2026-08-07 | **Triaging two red nightly drivers found a LIVE bug that refused every class edit for eight hours a day.** `CURRENT_DATE` in a function is the SESSION's time zone — UTC here — so between 00:00 and 08:00 SGT `set_class_terms()` read the admin's own SGT date as tomorrow and raised *terms cannot start in the future*; live since 20260719001000, with `sync_class_display_price()` on the same clock. Both moved to `today_sg()`, and `class_terms.test.sql` now asserts a `pg_proc` scan for UTC-dated functions returns nothing. **A 14-test file on that exact function stayed green because the RPC, the pgTAP file and the driver had all made the same assumption and therefore AGREED** — fixing only the RPC turned five assertions red. Both red drivers were that one bug, not driver rot. Its `pg_proc` probe also matched pgTAP's own `_def_is`, which would have aborted `supabase db push` on any pgTAP-installed database | **§7.94** *(and: test a date guard AT its boundary)* · §8.30 *(the nightly's first scheduled sweep is what found it)* · `docs/TESTING.md` §5 |
 | **8.32** | 2026-08-07 | **The marking floor follows `billing_periods`, not the calendar** — `markable_floor(tenant)` = `LEAST(1st of last month, month after that business's latest seal, else `created_at`)`. Built as insurance ahead of its own stated trigger: billing a month LATE made the gate name a lesson **nobody could record any more**, with no override by design, so the month could never be billed. `LEAST` is the safety argument — the floor only ever moves EARLIER — asserted as a property over a matrix of tenant states, not case by case. All three production tenants read `2026-07-01` unchanged on deploy day. The filed fix was **wrong in one detail**: "the earliest UNSEALED month" leaves no floor at all, because a month with nothing recorded is never sealed (§8a.1). Found by EXECUTING the rollback file rather than writing it | PRD §7.6 · `docs/ARCHITECTURE.md` §6 *(why the LATEST seal, not the earliest unsealed)* · **§7.92, §7.93** · `supabase/rollback/20260806_markable_floor_DOWN.sql` |
 | **8.31** | 2026-08-06 | **Co-admins:** the first admin of a tenant is its **owner** (`tenants.owner_profile_id` — ownership is a COLUMN, not a role); only the owner invites, deactivates and deletes co-admins, who otherwise hold identical authority. Deactivation is one clause in `is_tenant_admin()` plus an auth-layer ban for pure admins; a coach-admin keeps coaching. Guard triggers closed a pre-existing hole — `profiles_update` let ANY tenant admin rewrite any profile's **role**, harmless with one admin and an escalation path with two. Coach/parent logins refused at the panel door | PRD §4.3 · `docs/ARCHITECTURE.md` §6 *(why not an enum role, why not `tenant_members`)* · **§7.90, §7.91** · `supabase/rollback/20260806_co_admins_DOWN.sql` |
 |---|---|---|---|
@@ -736,29 +757,16 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### ⚠ THE COACH'S TAB BAR CHANGED — AND IT IS ALREADY LIVE
+### ⚠ ONE THING TO CHECK, AND IT CHECKS ITSELF
 
-`git push … :main` **is** the web deploy, so the Schedule tab reached `swimsync.sg` the
-moment it landed. The coach opens the app to a different first screen than yesterday. It
-is app-only — no migration, no edge function, no grant change — so the §7.60 ordering trap
-did not apply, and the migration queue is still **EMPTY**.
+**Confirm tonight's nightly sweep went green.** The 2026-08-08 sweep was red on
+`verify-trials` only (34/35); the driver is fixed and 11/11 locally, but the sweep is the
+evidence, not this sentence. `gh run list --workflow=ui-drivers.yml`, and the rolling
+`ui-driver-rot` **issue #3 closes itself** on a green run — if it is still open, it is red
+*right now*.
 
-**Two things worth doing early, neither urgent:**
-
-1. **Grep the served bundle** for `NEEDS MARKING` (§7.31 — a 200 proves nothing). Not yet
-   done from this session.
-2. **Watch the nightly sweep.** Eight drivers changed and `run-all-drivers.sh` was **not**
-   run end to end locally — it resets the DB per driver and takes ~45 minutes — so the
-   04:00 SGT sweep is the first full-suite evidence. Two drivers are new
-   (`verify-schedule-week`, `verify-parent-pay-claim`) and both are registered in
-   `run-all-drivers.sh`'s fixture map.
-
-**And the queue is ranked again.** `BACKLOG.md → ## Build order` had been empty since
-2026-07-19; it is now five waves ordered by **rework cost**, with the six decisions the
-ranking rests on recorded in a table at the top of it. **Read that table before
-re-litigating any of them** — coach-per-lesson, trainee pay, multiple classes per child,
-and native builds were all settled 2026-08-08. Wave 1 is eight **S** items, roughly two
-weeks, and nothing in it is blocked.
+*(The Schedule tab's own post-deploy check is done: the served bundle at `swimsync.sg` was
+grepped for `NEEDS MARKING` on 2026-08-09 and carries it — §7.31, a 200 proves nothing.)*
 
 ### If you would rather build than onboard
 
@@ -781,13 +789,18 @@ only RLS can separate them. **What replaced it as an open question is `service_r
 `authenticated` ("no policy could permit this") is useless for a role that bypasses RLS, so
 it needs a usage audit of the edge functions and the admin's server routes first.
 
-### ✅ NO RED SIGNALS
+### ⚠ ONE OPEN RED SIGNAL, AND IT IS EXPECTED TO CLEAR ITSELF
 
-The nightly UI sweep has been green since the §8.33 `CURRENT_DATE` fix, and CI is green on
-all three of 2026-08-08's pushes. `gh run list --workflow=ui-drivers.yml` and the rolling
-`ui-driver-rot` issue are always the current fact — an open issue means red *right now*.
+**`ui-driver-rot` issue #3 is OPEN**, from the 2026-08-08 sweep: `verify-trials` FAIL, the
+other 34 drivers PASS. The cause is fixed (§8.35, §7.100) and the driver is 11/11 locally,
+but **only the sweep can close the issue**, so the first green run after 2026-08-09 04:00
+SGT is what settles it. Push CI itself is green.
 
-**Two triage rules worth keeping, both bought with real time:**
+**Do not read this section as the current fact** — `gh run list --workflow=ui-drivers.yml`
+and the issue's own state are. That is exactly what went wrong once already: this section
+read *"✅ NO RED SIGNALS"* for a day after the sweep had gone red beneath it.
+
+**Three triage rules worth keeping, all bought with real time:**
 
 - **A job that dies before checkout is not your code.** Three CI runs on 2026-08-06 failed
   in *"Set up job"* during a GitHub Actions major outage. Check `githubstatus.com` before
@@ -795,6 +808,10 @@ all three of 2026-08-08's pushes. `gh run list --workflow=ui-drivers.yml` and th
 - **When the sweep reddens, ask which moved — the product or the driver's assumption.**
   §7.73 is the calendar case; §8.33 is the product case, and it was a live bug that four
   green *manual* runs had missed because they ran outside the broken window.
+- **The change that shipped yesterday is the SUSPECT, never the verdict** (§8.35). The
+  2026-08-08 red looked exactly like §7.98 — written the day before, about the same screen
+  — and was in fact a driver that had been broken for two weeks and had been skipping
+  itself into a green PASS. Check when the driver last actually asserted anything.
 
 **The migration queue is EMPTY.** The latest, `20260806000200` (the marking floor, §8.32),
 deployed 2026-08-07 with its grant grid checked against production the same hour. Nothing is
