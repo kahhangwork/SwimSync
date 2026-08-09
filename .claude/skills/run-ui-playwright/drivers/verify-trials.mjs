@@ -12,7 +12,15 @@
 // Setup: supabase running + seed; SwimSyncAdmin npm run dev; SwimSyncApp expo web.
 import os from "node:os";
 import path from "node:path";
-import { launch, loginAdmin, loginExpo, tap, ADMIN } from "./lib.mjs";
+import {
+  launch,
+  loginAdmin,
+  loginExpo,
+  tap,
+  pressByTextMatch,
+  visibleText,
+  ADMIN,
+} from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -66,31 +74,65 @@ check(
   dateOptions.slice(1, 4).join(" | ")
 );
 
-// Book TODAY's lesson, so the coach's attendance screen — which defaults to
-// the most recent expected lesson — lands on exactly this date. Booking an
-// arbitrary Saturday would leave the roster check below testing nothing.
-const todayLabel = new Date().toLocaleDateString("en-SG", {
-  weekday: "short", day: "numeric", month: "short",
+// Book the most recent lesson that has already fallen due, because that is what
+// the coach has to MARK — an unmarked one blocks the month, which is this
+// driver's whole subject. Booking an arbitrary future Saturday would put the
+// lesson in COMING UP, where none of the checks below have anything to read.
+//
+// ⚠ THIS USED TO REQUIRE TODAY TO *BE* A SATURDAY, AND EXITED 0 OTHERWISE — so
+// the coach half ran one day in seven and the nightly reported PASS on the other
+// six without reaching a single check. Worse, the day came from `new Date()` in
+// the RUNNER's zone (§7.100, §7.7 on the driver's side of the wire): CI is UTC,
+// so it "found" Saturday while Singapore was already Sunday.
+//
+// Compare ISO option VALUES, never the rendered labels — a label is a locale
+// away from being a different string, and the value is the date itself.
+const dateValues = await selects
+  .nth(1)
+  .locator("option")
+  .evaluateAll((os) => os.map((o) => o.value));
+const todaySg = new Date().toLocaleDateString("en-CA", {
+  timeZone: "Asia/Singapore",
 });
-const todayIdx = dateOptions.findIndex(
-  (d) => d.replace(/\s+/g, " ").trim() === todayLabel.replace(/\s+/g, " ").trim()
-);
-if (todayIdx < 1) {
-  console.log(`SKIP  today is not a lesson day for this class (looked for "${todayLabel}")`);
-  console.log(`      options: ${dateOptions.slice(1, 5).join(" | ")}`);
-  await browser.close();
-  process.exit(0);
+let targetIdx = -1;
+for (let i = 1; i < dateValues.length; i++) {
+  if (dateValues[i] && dateValues[i] <= todaySg) targetIdx = i;
 }
-await selects.nth(1).selectOption({ index: todayIdx });
+// A FAILURE, NOT A SKIP — and that distinction is the point of §7.100. The
+// picker offers three weeks BACK (`trials/page.tsx` datesFor: shift(-21)), so a
+// weekly class always has a past lesson to book and this branch cannot be
+// reached by the calendar. Reaching it means the picker changed. Exiting 0 here
+// would hand the sweep a PASS for a run that asserted nothing, which is exactly
+// how the phone-field bug below survived two weeks of green nightlies.
+check(
+  "the picker offers a lesson that has already fallen due",
+  targetIdx >= 1,
+  `today SGT ${todaySg} · options: ${dateOptions.slice(1, 5).join(" | ")}`
+);
+if (targetIdx < 1) {
+  await browser.close();
+  process.exit(1);
+}
+await selects.nth(1).selectOption({ index: targetIdx });
 await page.getByPlaceholder("Child's name").fill(KID);
+// ⚠ THE PHONE IS REQUIRED, AND THIS DRIVER SILENTLY DID NOT FILL IT FOR TWO
+// WEEKS. §8.12 made a contact number mandatory on both create forms — a name is
+// written too many ways to be the matching signal — and the form refuses with
+// "A contact number is needed…" before book_trial() is ever called. Every check
+// after this one then fails for a reason that has nothing to do with what they
+// assert. It hid because the driver skipped itself six days in seven (below).
+await page.getByPlaceholder(/Parent's phone/i).fill("91234567");
 await tap(page.getByRole("button", { name: /Book the trial/i }).first(), "book");
 await page.waitForTimeout(3000);
 
+// "Listed", not "under Upcoming": the target lesson is the most recent one that
+// has fallen due, so it is normally in the past and lands under "Past — needs
+// marking". Both halves are the same page and the same assertion.
 text = await page.evaluate(() => document.body.innerText);
-check("the booking appears under Upcoming", text.includes(KID));
+check("the booking is listed on the Trials page", text.includes(KID));
 await page.screenshot({ path: shot("trials-02-booked.png"), fullPage: true });
 
-const bookedDate = dateOptions[todayIdx];
+const bookedDate = `${dateOptions[targetIdx]} (${dateValues[targetIdx]})`;
 
 // ── COACH: the child is expected on THAT lesson, and only that one ──────────
 await loginExpo(page, "coach@swimsync.test");
@@ -100,7 +142,11 @@ await page.waitForTimeout(1200);
 await tap(page.getByText(/Saturday Beginners/i).first(), "the seed class");
 await page.waitForTimeout(1500);
 
-const roster = await page.evaluate(() => document.body.innerText);
+// visibleText, not body.innerText: the Schedule tab stays MOUNTED underneath
+// this screen (§7.98), and it lists trial bookings — so a stale mount can both
+// break this negative check and satisfy the positive ones below without the
+// screen under test ever having loaded.
+const roster = await visibleText(page);
 check(
   "the class ROSTER does not list the trial child as a regular student",
   !roster.includes(KID),
@@ -109,9 +155,31 @@ check(
 
 // ⚠ THE LOAD-BEARING ONE. They must appear on the lesson they were booked for,
 // or the trial can never be marked and the billing month can never close.
-await tap(page.getByText(/Mark Attendance|Take Attendance/i).first(), "mark attendance");
+//
+// REACHED FROM THE SCHEDULE TAB, NOT FROM THIS ROSTER, AND THAT IS A PRODUCT
+// FACT RATHER THAN A DRIVER PREFERENCE. The roster's "Mark Attendance" button
+// is gated on `activeStudentIds.length > 0` (roster.tsx) — ENROLMENTS only — so
+// a class whose only attendee on a date is a guest renders no lessons and no
+// button. The Schedule tab has no such gate: it derives who is expected from
+// `expectedStudentsOn()`, which counts bookings, so a trial-only lesson lands
+// in NEEDS MARKING. That is the coach's route to it, so it is the one to pin.
+//
+// A NEEDS MARKING row's button reads "Mark", not "Mark Attendance", so
+// `pressClassButton` cannot reach it — its regex ignores "Mark" on purpose, to
+// keep a walk that starts at a NEEDS MARKING copy of a title from climbing out
+// and pressing a different card's button (§7.98). Press the label itself, on
+// the VISIBLE screen and only when it is unique: "Mark" is exact, so neither
+// "Not marked" nor "NEEDS MARKING (1)" nor a TODAY row's "Mark Attendance"
+// collides with it.
+await tap(page.getByText(/^Schedule$/).first(), "Schedule tab");
+await page.waitForTimeout(2000);
+check(
+  "the trial-only lesson is reachable from NEEDS MARKING",
+  await pressByTextMatch(page, /^Mark$/),
+  "a class with no enrolled students still has a guest to mark"
+);
 await page.waitForTimeout(2500);
-const marking = await page.evaluate(() => document.body.innerText);
+const marking = await visibleText(page);
 check(
   "the booked child IS on the attendance screen for their own lesson",
   marking.includes(KID),

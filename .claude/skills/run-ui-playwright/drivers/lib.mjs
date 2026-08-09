@@ -193,6 +193,53 @@ export async function pressByText(page, label, index = 0, { includeHidden = fals
 }
 
 /**
+ * Press a Pressable whose label MATCHES a pattern, on the VISIBLE screen only.
+ *
+ * `pressByText` needs the exact string, which a label carrying a date cannot
+ * give: the roster's button reads "Mark Attendance — Sat, 8 Aug". Same
+ * visibility rule and the same reason (§7.98) — the screen you left stays
+ * mounted, so a raw `page.getByText(...).first()` resolves to ITS copy of the
+ * button, which is hidden, and Playwright then waits for a visibility that
+ * never comes. The driver dies on a TIMEOUT rather than on an assertion, which
+ * reads as "the button is gone" when the button is fine.
+ *
+ * Presses only on a UNIQUE visible match, per §7.98's walk rule: more than one
+ * means the pattern is too loose, and pressing hits[0] would be picking a
+ * stranger's button while reporting success.
+ */
+export async function pressByTextMatch(page, pattern, { includeHidden = false } = {}) {
+  const res = await page.evaluate(
+    ({ source, flags, visibleSrc, includeHidden }) => {
+      const visible = eval(visibleSrc);
+      // ⚠ `g` STRIPPED. One RegExp is reused across every element, and a global
+      // one carries `lastIndex` from call to call — `.test()` would resume
+      // mid-string and skip roughly every other match, silently. The count this
+      // function returns is the whole safety property, so it must not depend on
+      // which flags the caller happened to type.
+      const re = new RegExp(source, flags.replace(/[gy]/g, ""));
+      const hits = [...document.querySelectorAll("*")].filter(
+        (e) =>
+          e.children.length === 0 &&
+          re.test(e.textContent.trim()) &&
+          (includeHidden || visible(e))
+      );
+      if (hits.length !== 1) return { ok: false, n: hits.length };
+      const target = hits[0].parentElement;
+      const opts = { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, button: 0 };
+      target.dispatchEvent(new PointerEvent("pointerdown", opts));
+      target.dispatchEvent(new PointerEvent("pointerup", opts));
+      target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      return { ok: true, n: 1 };
+    },
+    { source: pattern.source, flags: pattern.flags, visibleSrc: VISIBLE_FN, includeHidden }
+  );
+  console.log(
+    `pressed: /${pattern.source}/${res.ok ? "" : ` (${res.n} visible matches, need exactly 1)`}`
+  );
+  return res.ok;
+}
+
+/**
  * Press the action button inside the card for a named class.
  *
  * Scoped to the CARD, not to an index into the whole page. An index broke the

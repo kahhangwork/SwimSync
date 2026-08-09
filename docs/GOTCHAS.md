@@ -1645,3 +1645,36 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       worth one cheap experiment before you design around it. The mitigation here was
       harmless, but the *comment* asserting a bug that does not exist would have been
       copied forward and believed. (2026-08-08.)
+100. **A DRIVER THAT SELF-SKIPS ON A DATE CONDITION REPORTS *PASS* WHILE ASSERTING NOTHING —
+    AND `new Date()` IN CI IS UTC, SO IT SKIPS ON THE WRONG DAYS.** Two bugs that only
+    matter together, and the second is what hid the first. `verify-trials.mjs` needed the
+    seed's Saturday class to have a lesson it could book *and* mark, so it exited **0**
+    ("SKIP  today is not a lesson day") on any other day. That is a defensible design. What
+    is not: the day came from `new Date().toLocaleDateString("en-SG", …)` with **no
+    `timeZone`**, which is the *runner's* zone.
+    - **This is §7.7 on the DRIVER's side of the wire.** §7.7 taught this repo to distrust
+      dates derived on the client, and every product client is correct (`todayInSg()`,
+      `today_sg()` after §7.94). The drivers were never audited the same way. **The
+      nightly's cron is `0 20 * * *` — chosen as 04:00 SGT, which means every sweep runs on
+      the PREVIOUS UTC day**, and this driver's turn came 86 minutes in, at 21:26 UTC. So on
+      2026-08-08 it read "Sat, 8 Aug" from UTC while Singapore was already Sunday the 9th,
+      failed to skip, and booked a lesson the coach's screens had moved past. Any driver
+      that asks "what day is it" is on the wrong side of that boundary for the whole run.
+    - **The skip is what made it invisible for two weeks.** The driver had been broken since
+      §8.12 made a parent's contact number **mandatory** on the booking form (2026-07-26):
+      it never filled the phone, so the form refused before `book_trial()` was reached and
+      every later assertion failed for an unrelated reason. Three nightly sweeps reported
+      `trials PASS` in between — all on a UTC Tuesday or Friday, all having exited before
+      the first coach check. **A driver that can skip must say what it skipped, and a
+      sweep's PASS is only worth the checks it actually ran.**
+    - **Fix the axis, not the instance.** Compare **ISO option values** against
+      `toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" })` — never rendered
+      labels, which are a locale away from being a different string. Better still, remove
+      the date condition: this driver now reaches marking through the Schedule tab's NEEDS
+      MARKING, which is floor-scoped, so it runs **every day** instead of one in seven.
+    - **A related trap on the way out.** The class ROSTER gates its "Mark Attendance" button
+      on `activeStudentIds.length > 0` — **enrolments only** — so a class whose only
+      attendee on a date is a trial or make-up guest renders no lessons and no button
+      there. The Schedule tab has no such gate (it derives who is expected from
+      `expectedStudentsOn()`, which counts bookings). A driver that reaches marking via the
+      roster cannot test a guest-only lesson at all. (2026-08-09.)

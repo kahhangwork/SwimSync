@@ -243,6 +243,10 @@ copy/templates (S).
   the audit *reader*.
 - **Convert a trial into an enrolled student** (S) and **Book a make-up from the
   Attendance page** (S) — after Wave 2, which changes what an enrolment is.
+- **The class ROSTER hides a lesson whose only attendee is a guest** (S) — no hard edge,
+  but it rewrites the roster's date derivation, which Waves 2 and 3 both rework. Cheapest
+  folded into whichever of those opens `roster.tsx` first; standalone only if a coach
+  actually reports it. Raised 2026-08-09 (§7.100).
 
 ### The email / scheduler chain — strict internal order, start any time
 
@@ -703,6 +707,30 @@ that the header can show a date the records do not belong to.
 session by `(class_id, date)` and ignore the param, or verify it matches before trusting it.
 Not worth a migration on its own; do it the next time that screen is opened.
 `ATTENDANCE_WINDOW_PLAN.md` §10.3.
+
+### The class ROSTER hides a lesson whose only attendee is a guest — **S**
+`(coach)/classes/[id]/roster.tsx` builds its lesson list and its "Mark Attendance" target
+inside `if (activeStudentIds.length > 0)` — **enrolments only**. A class with no active
+enrolment renders no lessons and no button, even on a date where a trial or make-up guest
+is booked and expected.
+
+**Why:** the two coach surfaces disagree about who counts. The Schedule tab derives who is
+expected from `expectedStudentsOn()`, which counts bookings, so the same lesson appears
+under NEEDS MARKING with a **Mark** button. The roster says the class has nothing to do.
+A coach who opens the class rather than the Schedule tab sees a lesson that does not exist.
+
+**Not a billing hole**, and that is why it is **S** and not urgent: the lesson is reachable
+and markable from the Schedule tab, which is the coach's landing surface since 2026-08-08
+(PRD §14.2), and NEEDS MARKING is floor-scoped so it cannot fall off the list. The engine's
+block is unaffected either way.
+
+**Notes:** found 2026-08-09 while fixing `verify-trials.mjs`, which could not test a
+guest-only lesson through the roster at all — see **§7.100**. The seed has one class and
+zero enrolments, so this is the *default* local state, not an edge case. Fix is to derive
+the roster's date list from `expectedStudentsOn()` like the Schedule tab does, rather than
+gating on the enrolment count — one derivation of "who was expected here", per the
+`schedule/index.tsx` comment on §7.18. Worth folding into whichever item next opens that
+screen.
 
 ### Give package requests a reference number, so they get a dynamic QR too — **S**
 A `parent_packages` row gets its own payment reference, the way an invoice does, so the
