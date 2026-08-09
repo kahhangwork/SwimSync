@@ -169,36 +169,61 @@ Deno.test("a lesson date after deactivation is not expected", async () => {
   }
 });
 
-// ── The legacy row: inactive, with no date recorded ────────────────────────
-// A class made inactive before deactivate_class() existed. Nothing is known
-// about when it stopped, so it expects nothing — the conservative side of the
-// deadlock, and identical to how it behaved when the scan skipped it. Its
-// RECORDED lessons still bill, which is the part that changed.
-Deno.test("legacy inactive class (no deactivated_at) expects nothing but still bills what it recorded", async () => {
+// ── The legacy row can no longer be CREATED, and that is the assertion ─────
+// This test used to construct `is_active = false` with no `deactivated_at` —
+// a class made inactive before deactivate_class() existed — and assert the
+// engine's conservative branch for it: expects nothing, still bills what it
+// recorded.
+//
+// Since 20260810000100 that shape is refused by
+// `classes_inactive_requires_deactivated_at`, so the old test asserted engine
+// behaviour for a state the database will not hold. Rewritten rather than
+// deleted, because the constraint is now load-bearing for the ENGINE and
+// deserves an assertion from the engine's own side:
+//
+// `lastScheduledDate` is null exactly when `is_active = false AND
+// deactivated_at IS NULL`, and null means "expect nothing". That is correct for
+// a DERIVED weekday date and would be a silent underbill if it ever reached a
+// booking — which is precisely why `bookingsByDate` is never clamped (core.ts).
+// The constraint is what makes that prohibition structural instead of a comment
+// someone has to remember, so if it is ever dropped, THIS is what goes red.
+//
+// ⚠ The null branch in core.ts's `lastScheduledDate` is deliberately KEPT even
+// though this constraint makes it unreachable. Removing it would leave
+// `new Date(String(null))` → Invalid Date on any future row that slips through,
+// which fails silently. Unreachable defence with a loud alternative is worth
+// its two lines; §7.110 removed an unreachable arm whose failure mode was a
+// loud throw, and that asymmetry is the whole reason.
+Deno.test("the legacy inactive-with-no-date shape cannot be created at all", async () => {
   const s = await newScenario({ price: 40, billing: monthEnded("2029-06") });
   try {
-    // NO completeMonth(), for the same reason as the case above: it marks every
-    // still-due lesson `cancelled_rain`, which satisfies the gate on its own and
-    // leaves `sealed === true` true whether the legacy branch returns null or
-    // windowTo. With it, this test passed against an engine that expects the
-    // full window for a legacy row — asserting only the `gross` half.
     const sess = await s.addSession("2029-06-02");
     await s.mark(sess, "present");
 
-    // Deliberately is_active alone — the pre-RPC shape. Do not add
-    // deactivated_at here; that is what `retire()` is for.
-    await s.db.from("classes").update({ is_active: false }).eq("id", s.classId);
+    // service_role does NOT bypass a CHECK constraint — it bypasses RLS. This
+    // is the same write the old version of this test performed silently.
+    const { error } = await s.db
+      .from("classes")
+      .update({ is_active: false })
+      .eq("id", s.classId);
 
-    const res = await generateInvoices(s.db, {
-      tenant_id: s.tenantId,
-      mode: "manual",
-      billing_month: "2029-06",
-      now: s.now,
-    });
+    assertEquals(
+      error?.code,
+      "23514",
+      "retiring a class without recording WHEN must be refused by the database, not merely avoided by the UI",
+    );
 
-    assertEquals(res.sealed, true, "no expected dates, so nothing to block on");
-    const inv = await getInvoice(s.db, s.parentId, "2029-06");
-    assertEquals(inv!.gross, 40, "the recorded lesson still bills");
+    // The write was REFUSED, not silently partially applied — so the class is
+    // still running and the engine still treats it as such. Asserted because
+    // the old version of this test performed the same update and never checked
+    // its error: it would have gone on believing the class was retired.
+    const { data: after } = await s.db
+      .from("classes")
+      .select("is_active, deactivated_at")
+      .eq("id", s.classId)
+      .single();
+    assertEquals(after!.is_active, true, "the class is untouched");
+    assertEquals(after!.deactivated_at, null, "and no date was written either");
   } finally {
     await s.teardown();
   }

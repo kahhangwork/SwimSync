@@ -104,10 +104,18 @@ SELECT 'cf000000-0000-0000-0000-000000000003', co.id, 'Mkp Private Mon', 'monday
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'mkp-home-coach@test.local';
 
+-- ⚠ `deactivated_at` IS NOT DECORATION HERE. Since 20260810000100,
+-- `classes_inactive_requires_deactivated_at` refuses `is_active = false` with a
+-- null date: the engine reads that column to decide how far an inactive class
+-- was expected to run, and a NULL means "expect nothing". Without the date this
+-- INSERT raises 23514 and the whole file dies before its first assertion —
+-- which is exactly how the constraint found this fixture.
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id, is_active)
+                     location_name, price_per_lesson, category_id, is_active,
+                     deactivated_at)
 SELECT 'cf000000-0000-0000-0000-000000000004', co.id, 'Mkp Retired Sat', 'saturday',
-       '10:00','11:00','Test Pool', 40.00, 'cc000000-0000-0000-0000-000000000001', FALSE
+       '10:00','11:00','Test Pool', 40.00, 'cc000000-0000-0000-0000-000000000001', FALSE,
+       now()
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'mkp-host-coach@test.local';
 

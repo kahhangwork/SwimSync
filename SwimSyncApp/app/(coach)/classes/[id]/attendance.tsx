@@ -106,11 +106,21 @@ export default function MarkAttendanceScreen() {
   const { id } = useLocalSearchParams<{
     id: string;
     date: string;
-    sessionId?: string;
   }>();
-  const { date, sessionId: sessionIdParam, from } = useLocalSearchParams<{
+  // ⚠ THERE IS DELIBERATELY NO `sessionId` PARAM ANY MORE. This screen used to
+  // accept one from the URL and trust it, without checking that it belonged to
+  // this class or to the date on screen. Supplying a real session id satisfied
+  // the "this session already exists" branch, which SKIPS the weekday check —
+  // so the screen rendered a markable roster for a date it should have refused.
+  // Never a billing hole (records attach to the session that id names, and the
+  // database guard reads that session's OWN date, so every write stayed inside
+  // the window), but the header could show a date the records did not belong
+  // to. The session is now always resolved from `(class_id, date)`, which is
+  // UNIQUE — `lesson_sessions` carries `ON CONFLICT (class_id, session_date)`
+  // (20260727000100) — so the lookup cannot disagree with what a caller would
+  // have passed, and there is nothing left to trust.
+  const { date, from } = useLocalSearchParams<{
     date: string;
-    sessionId?: string;
     from?: string;
   }>();
 
@@ -174,7 +184,7 @@ export default function MarkAttendanceScreen() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, date, sessionIdParam]);
+  }, [id, date]);
 
   async function load() {
     const token = ++loadToken.current;
@@ -250,17 +260,16 @@ export default function MarkAttendanceScreen() {
     // so leaving it in flight cannot become an unhandled rejection.
     const markableFloorPromise = fetchMarkableFloor();
 
-    // Resolve session id — use param, or look up existing, or leave null (create on save)
-    let sid = sessionIdParam ?? null;
-    if (!sid) {
-      const { data: existingSession } = await supabase
-        .from("lesson_sessions")
-        .select("id")
-        .eq("class_id", id)
-        .eq("session_date", date)
-        .maybeSingle();
-      sid = existingSession?.id ?? null;
-    }
+    // Resolve the session from (class_id, date) — or leave null, which means
+    // "create it on save". Never from a URL param; see the note on the params
+    // above. The pair is unique, so this is the only answer there is.
+    const { data: existingSession } = await supabase
+      .from("lesson_sessions")
+      .select("id")
+      .eq("class_id", id)
+      .eq("session_date", date)
+      .maybeSingle();
+    const sid: string | null = existingSession?.id ?? null;
 
     if (token !== loadToken.current) return;
 

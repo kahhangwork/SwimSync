@@ -1,6 +1,17 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-09 (4th) — **the last of the audit gap SHIPPED and was removed**
+_Last updated: 2026-08-10 — **THREE items SHIPPED and were removed**, all in one commit
+because they were one entanglement: *An unmarked BOOKING is invisible when its class has no
+active enrolments*, *The class ROSTER hides a lesson whose only attendee is a guest*, and
+*The attendance screen trusts a `sessionId` handed to it in the URL* — struck from the Build
+order, from Wave 3's fold-in list, from Later, **and** from their own sections. The first was
+Wave 1's parting find and the most valuable thing it left behind: a silent permanent
+underbill. **No item was added** — the two things this work found that it did not fix were
+both already filed (`service_role`, whose usage audit is now DONE and carries a
+recommendation NOT to build the whitelist; and `classCoverage.ts` not unioning session
+dates, added below)._
+
+_Previously, 2026-08-09 (4th) — **the last of the audit gap SHIPPED and was removed**
 (Wave 1 Chunk 3, `20260809000200`): *Direct writes to `students` are audited by nobody* is
 struck from the Build order **and** its own section. **Wave 1 is now ONE item** — Chunk 4,
 the inactive-class engine fix, the only one that touches money. **One item added**, and it
@@ -195,8 +206,14 @@ an inactive class is expected to have run, the RPC refuses to create the blockin
 the Classes page can show and restore a retired class. The production audit it gated on
 returned zero rows on all three queries.
 
-**What it did NOT close is below** — see *An unmarked BOOKING is invisible when its class
-has no active enrolments*.
+**And what it did not close is now closed too.** *An unmarked BOOKING is invisible when its
+class has no active enrolments* shipped **2026-08-10** — `core.ts`'s two early guards now
+consult `bookingsByDate`, so a guest-only class reaches the completeness gate instead of
+being skipped and sealed over. It went out with the two coach-screen items it was entangled
+with (the roster's guest-only lesson, the attendance screen's trusted `sessionId`) and with
+migration `20260810000100`, which shuts the doors that could re-create the blocking state:
+`book_trial()` and `schedule_extra_lesson()` now refuse a retired class, and
+`classes.is_active = false` requires a `deactivated_at` date.
 
 _(Eight items have now left this wave. **Direct writes to `students` are audited by
 nobody** shipped 2026-08-09 as Chunk 3 — an `AFTER UPDATE … WHEN (OLD.* IS DISTINCT FROM
@@ -234,8 +251,10 @@ distinction rather than a substitute column later widened:
    `taught_by_coach_id`; pay follows it. `session_pay_overrides` **cannot** express this.
 10. **Trainee coaches shadow the main coach** — one main coach plus N trainees, each paid
     at their own rate, so a lesson produces more than one payout row.
-11. Fold in **the attendance screen trusts a `sessionId` in the URL** (S) — same file, and
-    its own note says "do it the next time that screen is opened".
+_(The third item that used to sit here — **the attendance screen trusts a `sessionId` in
+the URL** — shipped 2026-08-10 instead, because the same change removed the caller that
+passed it. The screen now resolves the session from `(class_id, date)` and accepts no
+param.)_
 
 ⚠ **The blast radius is coach RLS, not the roster.** A coach reaches a class today via
 `classes.coach_id`; a substitute or trainee must open a lesson of a class they do not own.
@@ -283,10 +302,6 @@ copy/templates (S).
   *Deleting an admin destroys the audit history*.
 - **Convert a trial into an enrolled student** (S) and **Book a make-up from the
   Attendance page** (S) — after Wave 2, which changes what an enrolment is.
-- **The class ROSTER hides a lesson whose only attendee is a guest** (S) — no hard edge,
-  but it rewrites the roster's date derivation, which Waves 2 and 3 both rework. Cheapest
-  folded into whichever of those opens `roster.tsx` first; standalone only if a coach
-  actually reports it. Raised 2026-08-09 (§7.100).
 
 ### The email / scheduler chain — strict internal order, start any time
 
@@ -705,109 +720,35 @@ recorded. Those lessons are unbillable and, today, **invisible**.
   `already_exists` guard.
 - The line must **persist until acted on**. A one-time warning was considered and rejected:
   the entire failure mode is silence, and a message that is dismissed is gone.
-- ⚠ **`schedule_extra_lesson()`'s comment is WRONG and must be corrected in the same
-  pass.** It reads *"The FLOOR still applies — scheduling a lesson into an already-invoiced
-  month would create a lesson that can never bill."* It does not: `markable_floor()` is
-  `LEAST(1st of last month, month after the latest seal, …)` and `LEAST` takes the
-  **earlier**, so in August the floor sits at 1 July whether or not July is sealed. The
-  check tests the floor and the comment describes testing the seal. Pre-existing — not
-  introduced by §8.32. An applied migration is never edited, so the correction goes in the
-  new migration and in the function's `COMMENT`.
-- `book_makeup()` and `book_trial()` check the same floor and carry the same gap.
+- ✅ **`schedule_extra_lesson()`'s wrong comment was corrected on 2026-08-10**
+  (`20260810000100`), which rewrote that function for an unrelated reason. It had claimed
+  the floor check stopped "scheduling a lesson into an already-invoiced month"; the check
+  tests `markable_floor()`, and `LEAST` means that sits at 1 July in August whether or not
+  July is sealed. The function now carries a `COMMENT` saying so. Nothing else about this
+  item changed — `book_makeup()` and `book_trial()` check the same floor and the same gap
+  is still open for them.
 
-### An unmarked BOOKING is invisible when its class has no active enrolments — **S**
-**Confirmed by measurement 2026-08-09**, in a pre-commit review of Chunk 4 — not predicted,
-and it is a **silent permanent underbill**, the shape this project treats as its worst.
+### The admin's invoice pre-flight misses an unmarked EXTRA lesson — **S**
+`SwimSyncAdmin/lib/classCoverage.ts` and `generate-invoices/core.ts` are two copies of one
+rule, and on 2026-08-10 they were brought into line in ONE direction only. The engine unions
+`sessionByDate.keys()` into `datesToCheck` (`core.ts`); `classCoverage.ts` unions only
+`bookedByDate.keys()`. So an unmarked **off-schedule extra lesson** (`schedule_extra_lesson`,
+which sits off the class's weekday and therefore never appears in the weekday series) blocks
+the engine while the admin's Generate-invoices dialog reports the month as complete.
 
-`core.ts` bails out of the class loop at two `continue` guards — *"nothing recorded and
-nothing due"* and *"nobody enrolled and nobody marked"* — and **neither consults
-`bookingsByDate`**, even though the completeness gate twelve lines further down explicitly
-unions booking dates in. So a class with no ACTIVE enrolments and an unmarked trial or
-make-up booking is skipped whole: the guest is neither billed nor blocked.
+**Why it matters:** the dialog is what the admin reads *before* pressing the button. Being
+told "all marked" and then refused is the confusing half; the dangerous half is that the
+dialog is also where the missing dates are NAMED, so the admin has no list to act on.
 
-**Proven, twice, against the local engine.** Alone, the run reports `nothing_to_bill` and
-the month stays open — survivable. Alongside a second class that does bill, the month
-**SEALS**: `sealed: true`, `classes_still_incomplete: 0`, and that guest's lesson can never
-be invoiced afterwards (§11.6).
+**Why it is S and not urgent:** it over-reports readiness, never under-bills — the engine's
+block is unaffected and no money is lost. Found 2026-08-10 while fixing the divergence
+running the other way (a guest-only class was named by the dialog and skipped by the engine).
 
-**Pre-existing, and Chunk 4 neither caused it nor worsened it** — a retired class was
-skipped outright before, with the identical outcome. What changed is reachability: retiring
-a class is now a product action, and `deactivate_class()`'s first refusal *requires* zero
-open enrolments, so **every** retired class sits permanently in exactly this state. This is
-the same concern the old *TRIAL BOOKINGS SHARPEN THIS* / *MAKE-UP BOOKINGS WIDEN IT AGAIN*
-notes raised in 2026-07-25 and 2026-08-02: the deactivation path now refuses when a class
-holds live bookings, which closes the front door, but the engine hole itself is untouched.
-
-**The second half of the chain: `book_trial()` has no `is_active` guard**, unlike
-`book_makeup()` (`20260802000200:45`). So a trial can be booked into an already-retired
-class over PostgREST, and the admin Trials picker filtering `is_active` is not a limit
-(§7.32). Fix both or neither.
-
-**⚠ WHY THIS IS NOT A ONE-LINE FIX, AND MUST NOT BE TREATED AS ONE.** Making an unmarked
-booking block is a change to what BLOCKS a billing month, and the block has no override by
-design. Any production row already in this state would begin blocking that business's next
-run the day it deploys. It therefore needs the same treatment RISK 1 got — a **production
-audit first**, and a non-zero result is a blocker, not a caveat:
-
-```sql
-SELECT c.id, c.title, c.is_active, b.session_date, b.kind
-  FROM (SELECT class_id, session_date, 'trial' AS kind FROM trial_bookings WHERE cancelled_at IS NULL
-        UNION ALL
-        SELECT class_id, session_date, 'makeup'     FROM makeup_bookings WHERE cancelled_at IS NULL) b
-  JOIN classes c ON c.id = b.class_id
- WHERE NOT EXISTS (SELECT 1 FROM student_class_enrolments e
-                    WHERE e.class_id = c.id AND e.is_active);
-```
-
-**Named prohibition:** do not fix this by adding an override to the unmarked-attendance
-block. Fix the scan.
-
-Probably: bill from
-classes that had sessions in the month regardless of `is_active`, and keep `is_active` for
-*scheduling* only.
-
-### The attendance screen trusts a `sessionId` handed to it in the URL — **S**
-`(coach)/classes/[id]/attendance.tsx` takes `sessionId` from the query string and never checks
-that it belongs to the class or the date on screen.
-
-**Why:** supplying a real session id satisfies the screen's "this session already exists"
-branch, which skips the weekday check — so it renders a markable roster for a date it should
-refuse. **Not a billing hole:** records attach to the session that id names, and the database
-guard reads *that session's own* date, so every write is still inside the window. The defect is
-that the header can show a date the records do not belong to.
-
-**Notes:** pre-existing, and pre-dates the 2026-07-27 guard. Fix is one query — resolve the
-session by `(class_id, date)` and ignore the param, or verify it matches before trusting it.
-Not worth a migration on its own; do it the next time that screen is opened.
-`ATTENDANCE_WINDOW_PLAN.md` §10.3.
-
-### The class ROSTER hides a lesson whose only attendee is a guest — **S**
-`(coach)/classes/[id]/roster.tsx` builds its lesson list and its "Mark Attendance" target
-inside `if (activeStudentIds.length > 0)` — **enrolments only**. A class with no active
-enrolment renders no lessons and no button, even on a date where a trial or make-up guest
-is booked and expected.
-
-**Why:** the two coach surfaces disagree about who counts. The Schedule tab derives who is
-expected from `expectedStudentsOn()`, which counts bookings, so the same lesson appears
-under NEEDS MARKING with a **Mark** button. The roster says the class has nothing to do.
-A coach who opens the class rather than the Schedule tab sees a lesson that does not exist.
-
-**Not a billing hole**, and that is why it is **S** and not urgent: the lesson is reachable
-and markable from the Schedule tab, which is the coach's landing surface since 2026-08-08
-(PRD §14.2), and NEEDS MARKING is floor-scoped so it cannot fall off the list. The engine's
-block is unaffected either way.
-
-**Notes:** found 2026-08-09 while fixing `verify-trials.mjs`, which could not test a
-guest-only lesson through the roster at all — see **§7.100**. The seed has one class and
-zero enrolments, so this is the *default* local state, not an edge case. Fix is to derive
-the roster's date list from `expectedStudentsOn()` like the Schedule tab does, rather than
-gating on the enrolment count — one derivation of "who was expected here", per the
-`schedule/index.tsx` comment on §7.18. Worth folding into whichever item next opens that
-screen.
-
----
-
-## Parent experience
+**Notes:** the fix is one line in `classCoverage.ts` — union the session dates the caller
+already fetches. Do it the next time anything opens that file, and add the case to
+`SwimSyncAdmin`'s vitest coverage of `computeClassCoverage`. §7.18 is the standing reason
+these two must not drift: hand-written copies of "who was expected here" caused a live
+underbill.
 
 ### Upcoming lessons view for parents — **S** `[PRD §7.5]`
 Show parents the lessons that are scheduled next, not just the history of marked ones.
@@ -1310,18 +1251,64 @@ from `anon` and `authenticated`.
 - **The `authenticated` argument does not transfer, and that is the point.** There, the
   oracle was "no policy could ever permit this", which made 50 of 148 grants provably dead.
   `service_role` has no policies by design, so that oracle returns *everything* and is
-  useless. A whitelist here would have to be derived from **actual usage** — the edge
-  functions (`generate-invoices`, `package-emails`, `public-invoice`) and the admin's
-  `createAdminClient()` routes — which is a genuine audit, not a query.
-- Known writers to start from: `generate-invoices` touches most billing tables under
-  `service_role`; `SwimSyncAdmin/app/api/provision-tenant/route.ts` inserts and deletes
-  `tenants`; `invite-parent` writes profiles. Any narrowing must not break the invoice
-  engine, which is the one thing in this repo that must never fail silently.
-- **Do not extend `table_grants.test.sql` to cover it.** That file is scoped to
-  `authenticated` and `anon` on purpose (§7.87): the invariant is false for a role that
-  bypasses RLS, and a test that is red against a correct database gets disabled.
-- Prerequisite: an honest answer to "what does each service-role caller actually touch?".
-  Until that exists, this is a question, not a task.
+  useless. A whitelist here would have to be derived from **actual usage** — which is a
+  genuine audit, not a query. **That audit now exists; see below.**
+- **Do not extend `table_grants.test.sql` to cover it.** That file asserts *no privilege
+  exists where no policy could permit it*, and `service_role` bypasses RLS entirely — the
+  file cannot express service-role scope at all (§7.87). A test that is red against a
+  correct database gets disabled, which costs the coverage it already has.
+
+#### THE USAGE AUDIT — done 2026-08-10, read from the code
+
+The prerequisite is answered. **Every caller was read; nothing was inherited from the
+earlier note in this item, which was wrong in both directions** — it said "`invite-parent`
+writes profiles" (it does not; it only reads them, and the write goes through
+`link_invited_parent()` on the CALLER's client) and it missed the six admin-management
+routes entirely. §8.38 made the same mistake with a different list: ask the code.
+
+**There are 11 call sites, not 10.** `createAdminClient()` is imported by five routes plus
+`lib/adminManagementGate.ts` — and the gate **returns its `adminClient` to its callers**, so
+the six admin-management routes use `service_role` too, through a key they do not hold
+themselves. Any narrowing that reads only the importer list will miss them.
+
+| Caller | Tables (R = read, W = write) | Also uses |
+|---|---|---|
+| `generate-invoices/core.ts` | **W:** `invoices`, `invoice_items`, `billing_periods`, `credit_notes`, `credit_applications`, `parent_packages`, `package_applications`, `parent_tenant_balances` · **R:** `app_settings`, `attendance`, `class_rates`, `classes`, `lesson_sessions`, `makeup_bookings`, `parent_students`, `student_class_enrolments`, `student_settlements`, `students`, `tenants`, `trial_bookings`, `trial_rates` | — |
+| `generate-invoices/email.ts` | **R:** `app_settings`, `parents`, `profiles`, `students`, `tenants` | Resend |
+| `public-invoice` | **W:** `invoices` (the "I've paid" claim stamp) · **R:** `invoices` | — |
+| `package-emails` | **R:** `parent_packages`, `profiles` | Resend |
+| `api/invite-parent` | **R:** `students`, `attendance`, `profiles` | `auth.admin` getUserById / generateLink / deleteUser |
+| `api/create-coach` | **R+W:** `profiles` | `auth.admin.createUser` |
+| `api/provision-tenant` | **R:** `profiles` · **W:** `tenants` (DELETE — the failed-provision unwind only) | `provision_tenant()`, `auth.admin.generateLink` |
+| `api/resend-invite` | **R:** `profiles`, `tenants` | `auth.admin` getUserById / generateLink |
+| `api/generate-invoices` | **R:** `profiles` | `fetch` → the edge function |
+| `lib/adminManagementGate` | **R:** `profiles`, `tenants`, `coaches` | — |
+| …and its six callers | `invite-admin` **R:** `profiles`, `tenants` · `list-admins` **R:** `profiles`, `coaches` · `resend-admin-invite` **R:** `profiles`, `tenants` · `deactivate-admin` / `reactivate-admin` / `delete-admin`: **no table access at all** — `deactivate_admin()`, `reactivate_admin()`, `prepare_admin_delete()` | `auth.admin` getUserById / updateUserById / deleteUser / generateLink |
+
+**RECOMMENDATION: do not build the whitelist. Close the default instead.**
+
+- **The surface is not small enough to be worth it.** `generate-invoices` alone touches 21 of
+  37 tables and writes 8. A whitelist would exclude roughly a dozen tables — `audit_log`,
+  `coach_payouts`, `coach_rates`, `class_categories`, `package_products`, `payment_records`,
+  `student_claims`, `tenant_levels`, `parent_tenants`, `trial_rates`' siblings — and every one
+  of them is a table a future feature plausibly reaches from the engine or an admin route.
+  The failure mode of getting it wrong is `permission denied` **inside the invoice engine**,
+  the one thing in this repo that must never fail silently.
+- **The exposure it would reduce is already bounded by the key.** `service_role` is reachable
+  only with the secret, which lives in Vercel and Supabase env vars and is never shipped to a
+  browser. A whitelist does not defend against a leaked key holding `auth.admin` —
+  `deleteUser` and `updateUserById` are not table grants and no `GRANT` can restrain them.
+  That is the actual worst case, and it is unaffected.
+- **What IS worth doing is the one-liner already identified** (`docs/DEPLOYMENT.md` §11.7):
+  whatever a migration does not explicitly revoke, cloud grants `service_role` — proven a
+  fifth time by `20260809000300`, which revoked its three functions and came back with no
+  `service_role` line at all. Turning off the default-privilege grant for `service_role`, the
+  way `20260804000400` did for `anon` and `PUBLIC`, stops new objects being handed to it
+  silently. That is a small, testable change with a loud failure mode, and it does not
+  require deciding anything about the 37 existing tables.
+- **If the whitelist is ever built anyway**, the table above is the input, and it must be
+  regenerated rather than trusted: it is a snapshot of 2026-08-10 and goes stale on the next
+  feature. Do not close it one migration at a time.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`

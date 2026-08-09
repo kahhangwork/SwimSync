@@ -13,13 +13,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import {
   todayInSg,
-  expectedLessonDates,
   backlogWindowStart,
   toSgDate,
   formatSgDate,
   ageFromDob,
   type DayOfWeek,
 } from "@/lib/lessonDates";
+import { lessonDatesInRange } from "@/lib/scheduleWeek";
 import { fetchMarkableFloor } from "@/lib/markableFloor";
 import {
   type EnrolmentSpan,
@@ -112,10 +112,11 @@ export default function ClassRosterScreen() {
     { id: string; session_date: string; reason: string }[]
   >([]);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [markTarget, setMarkTarget] = useState<{
-    date: string;
-    sessionId: string | null;
-  } | null>(null);
+  // DATE ONLY. This used to carry the resolved `sessionId` and pass it to the
+  // attendance screen in the URL; that screen no longer accepts one (it resolves
+  // the session from (class_id, date) itself), so keeping the field here would
+  // be a dead value whose name invites putting the param back.
+  const [markTarget, setMarkTarget] = useState<{ date: string } | null>(null);
   const [windowStart, setWindowStart] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -239,7 +240,6 @@ export default function ClassRosterScreen() {
     );
 
     const totalStudents = activeStudents.length;
-    const activeStudentIds = activeStudents.map((s) => s.id);
 
     // Who was expected at a lesson is a question about THAT LESSON'S date, so
     // an enrolment is a span, not a flag. Built from every enrolment row (not
@@ -254,22 +254,49 @@ export default function ClassRosterScreen() {
       until: e.unenrolled_at ? toSgDate(e.unenrolled_at) : null,
     }));
 
+    // The marking floor, awaited HERE rather than further down because the
+    // booking queries below are bounded by it. It has been in flight since the
+    // top of this function, so this await costs nothing.
+    //
+    // ⚠ FLOOR ONLY — `null` for the enrolment date, NOT this class's earliest
+    // enrolment (§7.97, and the Schedule tab does the same at
+    // `schedule/index.tsx:328`). A class that trialled a child on 15 Jul but
+    // took its first enrolment on 1 Aug would otherwise lose that unmarked
+    // trial from this screen entirely, while generate-invoices unions booking
+    // dates with no enrolment floor at all and still blocks the month over it.
+    // Weekday dates from before anyone enrolled are still suppressed, by the
+    // `expectedHere.length === 0` skip below — which is the same division of
+    // labour the Schedule tab uses.
+    const markableFloor = await markableFloorPromise;
+    const winStart = backlogWindowStart(todayDate, null, markableFloor);
+
     // Trial AND make-up bookings for this class. A booked child is expected at
     // ONE lesson and is not enrolled here, so the counts below would read
     // "3 of 3 marked" while the invoice engine refuses to close the month over
     // an unmarked fourth.
+    //
+    // ⚠ BOUNDED BELOW, AND DELIBERATELY NOT ABOVE. These rows feed two things:
+    // the backlog list (past, from winStart) and the *upcoming guests* panel
+    // (future), so an upper bound would empty the panel. The lower bound is the
+    // real fix — unbounded, this fetched every booking the class has ever held,
+    // which is both the §7.70 max_rows exposure the Schedule tab already closed
+    // on these same two tables and, now that the date list below is derived
+    // FROM booking dates, a route to rendering a Mark tile for a lesson below
+    // the floor that can only ever answer "that lesson is closed".
     const [{ data: bookingRows }, { data: makeupBookingRows }] =
       await Promise.all([
         supabase
           .from("trial_bookings")
           .select("student_id, session_date")
           .eq("class_id", id)
-          .is("cancelled_at", null),
+          .is("cancelled_at", null)
+          .gte("session_date", winStart),
         supabase
           .from("makeup_bookings")
           .select("student_id, session_date")
           .eq("class_id", id)
-          .is("cancelled_at", null),
+          .is("cancelled_at", null)
+          .gte("session_date", winStart),
       ]);
 
     // The same rows, read the other way: who is coming, and when.
@@ -368,49 +395,66 @@ export default function ClassRosterScreen() {
     // stays markable after the calendar has rolled past it — which is what stops
     // a late-billed month from stranding a lesson nobody may record. A failed
     // fetch returns null and falls back to the old calendar rule.
-    const markableFloor = await markableFloorPromise;
-    const enrolments = (cls.student_class_enrolments ?? []) as any[];
-    let winStart: string | null = null;
-    let target: { date: string; sessionId: string | null } | null = null;
+    let target: { date: string } | null = null;
 
-    if (activeStudentIds.length > 0) {
-      const earliest = enrolments.map((e) => toSgDate(e.enrolled_at)).sort()[0];
-      winStart = backlogWindowStart(todayDate, earliest ?? null, markableFloor);
+    // ⚠ NOT GATED ON `activeStudentIds.length > 0` — THAT GATE HID A LESSON
+    // THE ENGINE BLOCKS ON. Until 20260810 both the synthesised rows and the
+    // Mark Attendance target lived inside `if (activeStudentIds.length > 0)`,
+    // so a class with no active enrolment rendered no lessons and no button —
+    // even on a date where a trial or make-up guest was booked and expected.
+    // The Schedule tab disagreed, listing that same lesson under NEEDS MARKING
+    // with a Mark button, because it derives who is expected from
+    // `expectedStudentsOn()` rather than from a head-count. Two coach surfaces
+    // answering "is there a lesson here?" differently is the §7.18 shape, and
+    // the seed's default state (one class, zero enrolments) sat on the wrong
+    // side of it.
+    //
+    // ONE derivation of who was expected, shared with the Schedule tab and the
+    // engine: `lessonDatesInRange` unions weekday dates, booking dates and
+    // recorded session dates within the window, and `expectedStudentsOn` then
+    // decides whether anyone was actually due. Do not re-inline either — §7.18
+    // is four hand-written copies of this union causing a live underbill.
+    // Built ONCE. `sessionData` has no lower bound (every past session this
+    // class has ever held), and the loop below runs over every date in the
+    // window, so a `.find()` per date is O(dates x sessions) on every open.
+    const sessionIdByDate = new Map<string, string>(
+      (sessionData ?? []).map((s: any) => [s.session_date as string, s.id as string])
+    );
+    const sessionDates = [...sessionIdByDate.keys()];
+    const seen = new Set(rows.map((r) => r.session_date));
 
-      const expected = expectedLessonDates(
-        cls.day_of_week as DayOfWeek,
-        winStart,
-        todayDate
-      );
+    for (const date of lessonDatesInRange(
+      cls.day_of_week as DayOfWeek,
+      winStart,
+      todayDate,
+      bookedByDate.keys(),
+      sessionDates
+    )) {
+      // Nobody due here. This is what suppresses weekday dates from before the
+      // class had any enrolments — the job the per-class enrolment floor used
+      // to do, moved to where it can distinguish "no students yet" from "a
+      // guest is booked". A guest-only date survives it; an empty one does not.
+      const expectedHere = expectedStudentsOn(date, enrolmentSpans, bookedByDate);
+      if (expectedHere.length === 0) continue;
 
-      // Primary action targets the most recent expected lesson in the window:
-      // today if today is a class day, else the last class day that has passed.
-      // No expected lesson yet = nothing has fallen due since the class started.
-      if (expected.length > 0) {
-        const date = expected[expected.length - 1];
-        const sessId =
-          (sessionData ?? []).find((s: any) => s.session_date === date)?.id ?? null;
-        target = { date, sessionId: sessId };
-      }
+      // Primary action targets the most recent lesson anyone was due at.
+      // `lessonDatesInRange` returns ascending, so the last write wins — and
+      // because this now runs over the FILTERED list, the button can no longer
+      // point at a weekday date with nobody on it while a guest's real lesson
+      // goes untargeted.
+      target = { date };
 
-      const seen = new Set(rows.map((r) => r.session_date));
-      for (const date of expected) {
-        if (seen.has(date)) continue;
-        rows.push({
-          id: null,
-          session_date: date,
-          // Span-derived, like the rows above, rather than the class's CURRENT
-          // head-count. A synthesised row used `totalStudents`, so a lesson from
-          // before a child joined showed them in its denominator — the §8.15
-          // mid-month-joiner mistake, surviving on this one code path.
-          progress: lessonProgress(
-            expectedStudentsOn(date, enrolmentSpans, bookedByDate),
-            undefined,
-            { hasEnded: true }
-          ),
-          summary: "",
-        });
-      }
+      if (seen.has(date)) continue;
+      rows.push({
+        id: null,
+        session_date: date,
+        // Span-derived, like the rows above, rather than the class's CURRENT
+        // head-count. A synthesised row used `totalStudents`, so a lesson from
+        // before a child joined showed them in its denominator — the §8.15
+        // mid-month-joiner mistake, surviving on this one code path.
+        progress: lessonProgress(expectedHere, undefined, { hasEnded: true }),
+        summary: "",
+      });
     }
 
     setMarkTarget(target);
@@ -497,10 +541,7 @@ export default function ClassRosterScreen() {
                 }`}
                 onPress={() =>
                   router.push(
-                    `/(coach)/classes/${id}/attendance?date=${markTarget.date}&from=roster` +
-                      (markTarget.sessionId
-                        ? `&sessionId=${markTarget.sessionId}`
-                        : "")
+                    `/(coach)/classes/${id}/attendance?date=${markTarget.date}&from=roster`
                   )
                 }
               />
@@ -744,8 +785,7 @@ export default function ClassRosterScreen() {
                   key={session.session_date}
                   onPress={() =>
                     router.push(
-                      `/(coach)/classes/${id}/attendance?date=${session.session_date}&from=roster` +
-                        (session.id ? `&sessionId=${session.id}` : "")
+                      `/(coach)/classes/${id}/attendance?date=${session.session_date}&from=roster`
                     )
                   }
                   activeOpacity={0.8}

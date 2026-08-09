@@ -623,10 +623,14 @@ export default function ScheduleScreen() {
       return next;
     });
 
+  // ⚠ `sessionId` IS DELIBERATELY NOT PASSED. The attendance screen resolves
+  // the session from (class_id, date) itself and no longer accepts one from the
+  // URL — it used to trust it without checking that it belonged to this class
+  // or this date. `l.sessionId` is still carried in the item because the
+  // sections use it to render marking state; it is simply not navigation input.
   const openAttendance = (l: { classId: string; date: string; sessionId: string | null }) =>
     router.push(
-      `/(coach)/classes/${l.classId}/attendance?date=${l.date}&from=schedule` +
-        (l.sessionId ? `&sessionId=${l.sessionId}` : "")
+      `/(coach)/classes/${l.classId}/attendance?date=${l.date}&from=schedule`
     );
 
   /** A collapsed day, expandable. Used by COMING UP and DONE. */

@@ -711,6 +711,18 @@ reachable, so restore has no conditions attached — it is the way out. A class 
 sitting idle across a lesson date will then ask for that lesson to be marked; a lesson that
 did not run is recorded as *cancelled*, never skipped (§7.6).
 
+**Nothing new can be put INTO a retired class** *(implemented 2026-08-10)*. A trial booking,
+a make-up booking and an admin-scheduled extra lesson are all refused with *"<class> is no
+longer running"*. Each of the three would otherwise create a lesson that only a retired class
+knows about: nobody can mark it, because a retired class appears on no coach screen, and an
+unmarked lesson blocks the whole business from billing with no override (§7.7). Restore the
+class first if the lesson is real.
+
+Retiring is also **only ever done through this screen**. The three refusals above are
+enforced by the database rather than by the page, so there is no second route that skips
+them, and a retired class always records the date it was retired — which is what lets billing
+tell "this class was running on the 13th" from "this class had already stopped".
+
 #### Changing the price or coach asks *when* it takes effect *(implemented)*
 
 A class's **schedule** (title, day, time, location) is a plain fact that can simply be
@@ -821,6 +833,14 @@ than materialising rows ahead of time. This is what makes a forgotten lesson vis
 - The **coach's Schedule tab** leads with **NEEDS MARKING** (past lessons not fully
   marked) and links straight to marking them; the class roster shows expected-but-missing
   dates as a distinct *"Not marked"* state.
+  > **A lesson whose only attendee is a GUEST counts on both screens** *(corrected
+  > 2026-08-10)*. A trial or make-up guest makes a lesson real even when nobody is enrolled
+  > in that class — a class between intakes, or one whose students have all moved on, still
+  > has that one lesson to teach and mark. Until this was corrected the class roster asked
+  > whether anyone was *enrolled* and so showed no lessons and no Mark button at all, while
+  > the Schedule tab asked who was *expected* and listed the same lesson under NEEDS
+  > MARKING. Two coach screens disagreeing about whether a lesson exists is the confusing
+  > half; the expensive half is that the same lesson blocks billing with no override.
   > **That list is FLOOR-scoped, not week-scoped, and the distinction is load-bearing.**
   > It spans the business's `markable_floor` up to today whatever week the selector
   > shows, so a straggler three weeks back stays visible. Week-scoping it would hide a
@@ -1041,6 +1061,15 @@ reports any gaps — per class, `N of M lessons marked`, naming the missing date
 *(implemented — updated)* The check **blocks rather than warns**, in **every** mode. If any
 lesson in the billing month has unmarked attendance, **no invoices are generated at all**
 and the admin is shown which lessons to fix. There is **no override**.
+
+*(implemented — corrected 2026-08-10)* **A booked guest counts even when nobody is enrolled
+in that class.** The engine used to decide whether a class had any bearing on the month by
+looking only at its enrolments and its recorded lessons, so a class with no active
+enrolments but an unmarked trial or make-up booking was skipped entirely — the guest was
+neither billed nor treated as a gap. On its own that only left the month open; alongside any
+other class that billed, the month was **sealed** over the guest and their lesson could never
+be invoiced afterwards. It is now the same rule everywhere: a lesson someone was expected at
+must be marked before the month can be billed, and *expected* includes a guest.
 
 *(implemented — corrected 2026-07-18)* The **billing engine derives the expected lesson
 dates itself**, rather than inspecting only the lesson records that happen to exist. Until

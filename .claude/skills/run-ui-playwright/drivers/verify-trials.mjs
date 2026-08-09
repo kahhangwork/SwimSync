@@ -153,16 +153,47 @@ check(
   "a trial is not an enrolment — they belong to one lesson, not the class"
 );
 
+// ⚠ THE ROSTER MUST OFFER THE LESSON TOO — AND UNTIL 2026-08-10 IT DID NOT.
+// Both the roster's lesson list and its "Mark Attendance" target lived inside
+// `if (activeStudentIds.length > 0)` (roster.tsx) — ENROLMENTS only — so a class
+// whose only attendee on a date is a guest rendered no lessons and no button,
+// while the Schedule tab listed that same lesson under NEEDS MARKING with a
+// Mark button, because it derives who is expected from `expectedStudentsOn()`.
+// Two coach surfaces answering "is there a lesson here?" differently is §7.18's
+// shape, and the SEED sits on the wrong side of it: one class, zero enrolments.
+//
+// THIS PAIR IS THE ASSERTION, NOT EITHER HALF ALONE. Checking only the Schedule
+// tab cannot see a regression on the roster, and vice versa — so both are
+// checked in this one run, and both must reach the SAME lesson.
+check(
+  "the roster no longer says there is nothing to mark",
+  !/No lessons to mark yet/i.test(roster),
+  "a guest-only class has a lesson; the enrolment head-count is not what decides that"
+);
+check(
+  "the roster offers Mark Attendance for the guest's lesson",
+  /Mark Attendance/i.test(roster),
+  "gated on activeStudentIds before 2026-08-10, so this rendered nothing"
+);
+await page.screenshot({ path: shot("trials-03-roster.png"), fullPage: true });
+
+// Press it, and prove it lands on the GUEST'S lesson rather than some other
+// weekday date with nobody on it — the failure a target picked from the
+// unfiltered weekday list would produce.
+await tap(
+  page.getByText(/Mark Attendance/i).first(),
+  "roster → Mark Attendance"
+);
+await page.waitForTimeout(2500);
+const fromRoster = await visibleText(page);
+check(
+  "and it opens the lesson the guest is booked for",
+  fromRoster.includes(KID),
+  "the roster's target must be the date someone is actually due at"
+);
+
 // ⚠ THE LOAD-BEARING ONE. They must appear on the lesson they were booked for,
 // or the trial can never be marked and the billing month can never close.
-//
-// REACHED FROM THE SCHEDULE TAB, NOT FROM THIS ROSTER, AND THAT IS A PRODUCT
-// FACT RATHER THAN A DRIVER PREFERENCE. The roster's "Mark Attendance" button
-// is gated on `activeStudentIds.length > 0` (roster.tsx) — ENROLMENTS only — so
-// a class whose only attendee on a date is a guest renders no lessons and no
-// button. The Schedule tab has no such gate: it derives who is expected from
-// `expectedStudentsOn()`, which counts bookings, so a trial-only lesson lands
-// in NEEDS MARKING. That is the coach's route to it, so it is the one to pin.
 //
 // A NEEDS MARKING row's button reads "Mark", not "Mark Attendance", so
 // `pressClassButton` cannot reach it — its regex ignores "Mark" on purpose, to
@@ -173,6 +204,19 @@ check(
 // collides with it.
 await tap(page.getByText(/^Schedule$/).first(), "Schedule tab");
 await page.waitForTimeout(2000);
+
+// Captured BEFORE marking, because the "it clears" check at the bottom is
+// worthless without it. NEEDS MARKING lists the class and the date — it never
+// renders the child's NAME — so an `!includes(KID)` assertion after saving is
+// true whether or not anything was cleared. Measured, not assumed: this pair is
+// the §7.111 shape, and the first version of the check below was vacuous.
+const beforeMark = await visibleText(page);
+check(
+  "NEEDS MARKING lists the guest's lesson before it is marked",
+  /NEEDS MARKING \(\d+\)/i.test(beforeMark),
+  "the baseline the clear-check below is measured against"
+);
+
 check(
   "the trial-only lesson is reachable from NEEDS MARKING",
   await pressByTextMatch(page, /^Mark$/),
@@ -190,7 +234,56 @@ check(
   /Trial/.test(marking),
   "the status the coach picks decides what the family is charged"
 );
-await page.screenshot({ path: shot("trials-03-coach-marking.png"), fullPage: true });
+await page.screenshot({ path: shot("trials-04-coach-marking.png"), fullPage: true });
+
+// ── The lesson can actually be CLEARED, which is what makes the block safe ──
+// generate-invoices now BLOCKS a billing month over an unmarked booking, with
+// no override by design (§8a). That is only safe if the coach has a screen that
+// can clear it — so "the guest is reachable" is not enough on its own; marking
+// them must actually remove the lesson from NEEDS MARKING. If this check ever
+// fails, the engine's block has no exit and a business goes unbilled.
+// ⚠ "SET ALL", NOT ONE ROW'S "Present" — AND THIS DRIVER GOT IT WRONG FIRST.
+// The save refuses until EVERY student on the lesson has a status. This driver
+// leaves a booking behind on each run (it has no fixture; the seed is its
+// fixture), so by the second run the lesson holds several guests, tapping one
+// `Present` marks one of them, and Save is refused — leaving THIS run's guest
+// unmarked too. Three consecutive runs then failed the check below while the
+// product was correct, which is §7.113's shape arriving through a driver rather
+// than a fixture. Set all marks everyone on the lesson in one tap, so the step
+// is independent of how many previous runs left something here.
+//
+// `.last()`, not `.first()`: the dropdown is rendered LAST in the DOM so it
+// stacks above the list (attendance.tsx), so the first `Present` on the page is
+// a student row's own button and the last is the menu item.
+await tap(page.getByText("Set all").first(), "open Set all");
+await page.waitForTimeout(700);
+await tap(page.getByText(/^Present$/).last(), "Set all → Present");
+await page.waitForTimeout(900);
+await tap(page.getByText(/Save/).first(), "Save attendance");
+await page.waitForTimeout(3000);
+await page.screenshot({ path: shot("trials-05-saved.png"), fullPage: true });
+
+await tap(page.getByText(/^Schedule$/).first(), "back to Schedule");
+await page.waitForTimeout(2500);
+const afterSave = await visibleText(page);
+
+// COUNTED, NOT PRESENT/ABSENT. The heading is `NEEDS MARKING (N)` and the count
+// is asserted on elsewhere too (§ the note in schedule/index.tsx). Comparing the
+// number rather than the mere presence of the section is what keeps this honest
+// when the backlog holds anything else — including leftovers from an earlier run
+// of this very driver. An earlier version asserted `!includes(KID)`, which is
+// true whether or not anything cleared: NEEDS MARKING renders the class and the
+// date, never the child's name.
+const needsMarkingCount = (t) => {
+  const m = /NEEDS MARKING \((\d+)\)/i.exec(t);
+  return m ? Number(m[1]) : 0;
+};
+check(
+  "marking the guest CLEARS the lesson from NEEDS MARKING",
+  needsMarkingCount(afterSave) < needsMarkingCount(beforeMark),
+  `${needsMarkingCount(beforeMark)} → ${needsMarkingCount(afterSave)} · an unmarked booking blocks the month with no override, so this is the only exit`
+);
+await page.screenshot({ path: shot("trials-06-cleared.png"), fullPage: true });
 
 await browser.close();
 

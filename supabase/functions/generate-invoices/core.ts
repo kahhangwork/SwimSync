@@ -658,8 +658,49 @@ async function generateForTenant(
       ? expectedLessonDates(String(cls.day_of_week), windowFrom, expectedTo)
       : [];
 
-    // Nothing recorded and nothing due — this class has no bearing on the month.
-    if (!sessionIds.length && !expectedDates.length) continue;
+    // Nothing recorded, nothing due AND NOBODY BOOKED — this class has no
+    // bearing on the month.
+    //
+    // ⚠ `bookingsByDate` IS THE THIRD TERM AND IT IS NOT OPTIONAL. Until
+    // 20260810 this guard read enrolments and sessions only, so a class with no
+    // ACTIVE enrolments but holding an unmarked trial or make-up booking was
+    // skipped WHOLE — before the completeness gate below, which does union
+    // booking dates in (see `datesToCheck`). The guest was neither billed nor
+    // blocking; alone the run reported `nothing_to_bill`, but alongside a second
+    // class that billed, the month SEALED and that lesson could never be
+    // invoiced afterwards (§11.6). A silent permanent underbill, confirmed by
+    // running it twice.
+    //
+    // THIS IS NOT ONLY ABOUT RETIRED CLASSES. An ACTIVE class whose students
+    // have all been removed, holding one booked trial, is in exactly this state
+    // — and that is the local seed's default shape (§7.100). Retiring a class
+    // made it reachable by construction; it was never confined to it.
+    //
+    // The admin's pre-flight already had this right and the engine did not,
+    // which is §7.18's divergence in its live form: `SwimSyncAdmin/lib/
+    // classCoverage.ts` skips only when `activeStudentIds.length === 0 &&
+    // bookedByDate.size === 0`. So for a guest-only class the Generate dialog
+    // NAMED the missing date while the engine sailed past it. That file is the
+    // reference implementation this line is being brought up to.
+    //
+    // ⚠ NAMED PROHIBITION — `bookingsByDate` MUST NOT BE CLAMPED. Not by
+    // `lastScheduledDate`, not by `is_active`, not by anything. `expectedDates`
+    // is clamped because it is a GUESS the engine makes from a weekday; a
+    // booking row is explicit evidence that a named child was expected on a
+    // named date, so it can never be spuriously generated and needs no bound.
+    // A clamp was drafted and rejected: `lastScheduledDate` is null whenever
+    // `is_active = false AND deactivated_at IS NULL`, so clamping would drop
+    // every booking date for such a class and seal over the guest — trading a
+    // loud block for the silent underbill this whole change exists to close.
+    // That state is now impossible anyway (`classes_inactive_requires_
+    // deactivated_at`, 20260810000100), and the state a clamp would have
+    // defended against — a booking dated after `deactivated_at` — cannot be
+    // created either: `book_makeup()`, `book_trial()` and
+    // `schedule_extra_lesson()` all refuse an inactive class, and
+    // `deactivate_class()` refuses to retire one that still owes a mark.
+    if (!sessionIds.length && !expectedDates.length && !bookingsByDate.size) {
+      continue;
+    }
 
     // All attendance rows for these sessions
     const { data: attRows } = sessionIds.length
@@ -681,8 +722,26 @@ async function generateForTenant(
       ...new Set([...activeStudentIds, ...attendedStudentIds]),
     ];
 
-    // Nobody enrolled and nobody marked — nothing to bill or check.
-    if (!billableStudentIds.length) continue;
+    // Nobody enrolled, nobody marked AND NOBODY BOOKED — nothing to bill or
+    // check. Same hole as the guard above, one step further down: a guest-only
+    // class clears that one via `bookingsByDate` and would then have died here,
+    // because a booked-but-unmarked guest is in neither `activeStudentIds` nor
+    // `attendedStudentIds`.
+    //
+    // ⚠ NAMED PROHIBITION — DO NOT FIX THIS BY WIDENING `billableStudentIds`.
+    // The obvious edit is to union the booked ids into it. Do not: four things
+    // downstream read that set — the `parent_students` lookup, the student-name
+    // snapshot, `deferrableParentIds`, and the item loop — and widening it is
+    // safe TODAY only by coincidence of the item loop iterating `parentStudents`
+    // rather than `billableStudentIds`. Nothing pins that invariant, so the next
+    // edit to the item loop turns a correct set into a wrong one silently.
+    // Widen the GUARD, keep the SET's single meaning: "who can appear on an
+    // invoice line for this class".
+    //
+    // A booked guest still reaches billing when they are MARKED, through
+    // `attendedStudentIds` — which is the existing route and needs no help.
+    // Unmarked, they must reach the gate and block, which is what this allows.
+    if (!billableStudentIds.length && !bookingsByDate.size) continue;
 
     // ── Gate: every active student marked on every lesson that should have run ──
     // Checked over the UNION of expected dates and dates that actually have a
@@ -721,17 +780,32 @@ async function generateForTenant(
     // Parents of this class's students. Queried BEFORE the gate check because
     // the incomplete branch needs it to record who must be deferred. Covers
     // the billable set, which is wider than the enrolled set (see above).
-    const { data: parentStudents } = await supabase
-      .from("parent_students")
-      .select("parent_id, student_id")
-      .in("student_id", billableStudentIds);
+    //
+    // ⚠ BOTH QUERIES ARE SKIPPED ON AN EMPTY SET, AND THAT IS NEW. Until
+    // 20260810 the guard above guaranteed `billableStudentIds` was non-empty by
+    // the time execution reached here. A guest-only class — nobody enrolled,
+    // nobody marked, one booked guest — now reaches this point with an EMPTY
+    // set, and `.in("student_id", [])` renders as PostgREST `in.()`, which is
+    // not a filter that matches nothing: it is a request the server rejects.
+    // supabase-js surfaces that as `data: null`, which the `?? []` below would
+    // quietly swallow — so the class would go on to block correctly and the
+    // failure would never surface. Skipped explicitly instead, in the same
+    // shape the `attRows` fetch above already uses for `sessionIds`.
+    const { data: parentStudents } = billableStudentIds.length
+      ? await supabase
+          .from("parent_students")
+          .select("parent_id, student_id")
+          .in("student_id", billableStudentIds)
+      : { data: [] as { parent_id: string; student_id: string }[] };
 
     // Names to snapshot onto each line (see InvoiceItem.student_name). Scoped
     // to the billable set, which is the same set the items are built from.
-    const { data: billedStudents } = await supabase
-      .from("students")
-      .select("id, full_name")
-      .in("id", billableStudentIds);
+    const { data: billedStudents } = billableStudentIds.length
+      ? await supabase
+          .from("students")
+          .select("id, full_name")
+          .in("id", billableStudentIds)
+      : { data: [] as { id: string; full_name: string }[] };
     const studentNameById = new Map(
       (billedStudents ?? []).map((s) => [s.id as string, s.full_name as string])
     );
