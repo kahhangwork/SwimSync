@@ -1,18 +1,23 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-09 — **the nightly sweep went red, and the red was a DRIVER that had
-been reporting PASS while asserting nothing for two weeks. Fixed and LIVE on `main`, CI
-green (§8.35).** `verify-trials.mjs` never filled the booking form's phone — mandatory
-since §8.12 — so the form refused before `book_trial()` was reached. That survived because
-the driver **skipped itself six days in seven**, on a weekday it computed from `new Date()`
-in the **runner's** zone: the nightly's cron is 20:00 UTC, already the next SGT day, so
-2026-08-08 was simply the first time the skip failed to fire. **§7.100** is the durable
-part, and it generalises past this driver: *a sweep's PASS is worth only the checks it
-actually ran, and any driver that asks "what day is it" is on the wrong side of the UTC/SGT
-boundary for the whole run.* The driver now runs **daily** at 11/11, reaching marking
-through the Schedule tab rather than the class roster — because the roster's button is
-gated on enrolments, so a lesson whose only attendee is a guest is invisible there. That
-gap is a new `BACKLOG.md` item: real, bounded, **not** a billing hole._
+_Last updated: 2026-08-09 (2nd session) — **Wave 1 has a plan, and its first chunk is
+SHIPPED on `main`, CI green (§8.36).** `docs/plans/WAVE_1_PLAN.md` sequences the eight
+Wave 1 backlog items into four chunks with mitigations inlined next to the steps they
+govern; **Chunk 1 landed** (`ed05fbe`) — tooling only, nothing deployed.
+`verify-levels.mjs` is hermetic (it removes its own levels through the admin UI, so a
+crashed run self-heals), and `verify-admin-table-geometry.mjs` now measures **15 of the 16
+admin tables** against the §7.54 nesting bug, up from one. Three gotchas graduated:
+**§7.101–§7.103**. The durable one is **§7.101** — on a shared database `nth(n)` is a
+data-corruption bug, not a brittle-selector nit: it wrote a level onto a child the driver
+did not own and the cleanup then blanked it (measured 3 → 2), and it applies to **every
+driver in the suite**. Two backlog items shipped and were struck from **both** places; two new ones were
+filed, both found by the tooling itself._
+
+_The scope grew for a reason worth knowing: Wave 1's item #6 was **decided** into engine
+fix **plus** a real class-deactivation feature, so the wave now carries **three**
+migrations and is ~3 weeks, not the backlog's ~2. Chunks 2–4 are each one migration,
+strictly serial, no worktrees. **Everything the next session needs is in the plan file** —
+§9 points at it rather than restating it._
 
 _Previously, 2026-08-08 — **the coach's Today tab is gone: SCHEDULE replaced it, parents
 can pay and claim straight from their invoice list, and `BACKLOG.md`'s build order is
@@ -467,8 +472,10 @@ invoice generation → credit-note corrections → PayNow QR payment display.
   `ui-driver-rot` issue that a green run closes. Protocol and triage rule:
   `docs/TESTING.md` §5. **Its first scheduled sweep found a LIVE product bug that had been
   invisible to four green manual runs — see §8.33 and §7.94. That is the whole argument for
-  the nightly, made on its first outing.** Its **fourth** sweep made the argument again from
-  the other direction (§8.35): `verify-trials` had been reporting PASS while asserting
+  the nightly, made on its first outing.** Since 2026-08-09 the sweep also measures **column
+  GEOMETRY on 15 of the 16 admin tables**, not just Levels — the §7.54 class of bug that
+  every text assertion passes straight through (§8.36). Its **fourth** sweep made the
+  argument again from the other direction (§8.35): `verify-trials` had been reporting PASS while asserting
   nothing since 2026-07-26, and only a sweep landing on a UTC Saturday exposed it. **So a
   green sweep is not proof a driver ran** — a driver that self-skips exits 0 and is counted
   as PASS (§7.100). `gh run list --workflow=ui-drivers.yml` is the current fact; an open
@@ -578,6 +585,63 @@ migrations (`core.ts` and `20260727000100_…sql` both say `§8a`), so a missing
 dangling reference. They cost ~25 tokens each; if the table ever passes ~100 rows, move the
 table to `docs/SESSIONS.md` and point at it from here — still one hop.
 
+## 8.36 (2026-08-09, 2nd session) — WAVE 1 GOT A PLAN, AND ITS FIRST CHUNK SHIPPED
+
+**The plan is the deliverable as much as the code.** `docs/plans/WAVE_1_PLAN.md` sequences
+Wave 1's eight items into four chunks; a `/plan-review` pass then rewrote it with **17
+mitigations inlined next to the steps they govern**, because a trailing Risks section is
+read once at planning time and never again. Seven decisions were settled and recorded so
+they are not re-litigated — the two that changed the shape of the work are that **item #6
+became engine fix PLUS a real class-deactivation feature** (so the wave carries **three**
+migrations, ~3 weeks, not the backlog's ~2) and that migrations run **strictly serially
+with no worktrees**.
+
+**Two of the review's findings would have broken chunks that have not been built yet**, and
+both are now steps in the plan rather than warnings: a plain `AFTER UPDATE` audit trigger on
+`students` would have **refused every student edit in the product** (`audit_log_insert`
+permits `authenticated` exactly one `entity_type`, so an invoker-rights trigger aborts the
+originating write — it must be `SECURITY DEFINER`), and widening the engine's class scan
+widens what **blocks** it, on a class that is invisible to all three screens that could
+clear the block.
+
+**Chunk 1 shipped — tooling only, nothing deployed.** `verify-levels.mjs` was not hermetic,
+and the real failure was worse than the backlog said: a second run in the same day reported
+**one check of nine and then died** on a 30s timeout, because the refused create left a
+modal open whose backdrop intercepted every later click. It now removes its own levels
+**through the admin UI** before check 1 and again on exit, so the empty state it asserts is
+one it created and a crashed run self-heals — chosen over a SQL teardown after discovering
+that a lone teardown file is invisible to both CI guards (**§7.102**).
+`verify-admin-table-geometry.mjs` takes the §7.54 geometry measurement from one admin table
+to **15 of 16**, and its fixture exists because the bare seed leaves **ten** of them empty —
+without it the sweep would report green while checking six pages and skipping ten.
+
+**What the work found that the plan did not predict.** A positional locator (`nth(2)`,
+commented "Maya Tan is the 3rd student alphabetically") wrote a level onto **a child the
+driver did not own**, and cleanup then blanked it via `ON DELETE SET NULL` — measured 3 → 2,
+while the driver's own checks stayed green (**§7.101**, and it applies to every driver).
+The CI round-trip then caught two bugs in the new fixture that loading it alone never
+would: a `lesson_sessions` collision with `fixtures-parent-claim.sql`, and an unordered
+`LIMIT 1` over `coaches`. It also exposed a **latent** one in a sibling —
+`fixtures-trial-onboarding-teardown.sql` deletes every invoice in the tenant for its
+billing month, rows it does not own (`BACKLOG.md`).
+
+**Deliberately not done:** the sibling teardown was **not** fixed — this fixture stands clear
+of it instead, and the real fix is filed. `/platform` is excluded from the sweep (a
+platform-admin page, a missing *role* not missing data, and `superadmin@` carries its own
+seed-login trap). Only the **first** `<table>` on a page is measured, recorded as a known
+gap rather than closed. `check(label, ok)` vs `check(ok, label)` still differs between the
+two geometry drivers; each is internally consistent and swapping either risks a silent green.
+
+**Verified:** `verify-levels` 9/9 on three consecutive runs with no reset;
+`verify-levels-table` **12/12, identical to its pre-change baseline** (it keeps its own
+inline copy of the measurement on purpose — it is the calibrated reference); the sweep 46
+passed / 0 failed, 15/15 measured, **proven load-bearing at 675px against a 2px tolerance**
+by injecting §7.54's nesting into `/parents`; all **17** fixtures load, own only their own
+rows and tear down clean; `check-teardowns` green; admin typecheck clean; CI green on
+`main`.
+
+---
+
 ## 8.35 (2026-08-09) — THE RED NIGHTLY WAS A DRIVER THAT HAD BEEN REPORTING *PASS* WHILE ASSERTING NOTHING
 
 **The first triage answer was wrong, and the right one is worse.** The Schedule tab had
@@ -625,54 +689,10 @@ itself closes it.
 
 ---
 
-## 8.34 (2026-08-08) — THE COACH'S TODAY TAB BECAME A WEEK, PARENTS CAN PAY FROM THE LIST, AND THE BACKLOG GOT ITS FIRST RANKING SINCE JULY
-
-**Schedule REPLACED Today rather than joining it.** The coach's only date-bound surfaces
-were one day and a nag list of what had already gone wrong; nothing showed what was
-*coming*, and unmarked attendance blocks billing outright with no override. Tabs are now
-Schedule / Classes / My Pay / Settings — a private coach still sees three. Four sections
-under a Monday-start week selector, driven by **marking state rather than the calendar**,
-because a purely calendar split collapses into one undifferentiated list on exactly the
-weeks a selector exists to reach. The Classes tab and its roster are untouched.
-
-**Two decisions carry the risk, and both are now pinned by a driver or a test.** NEEDS
-MARKING is **floor-scoped and ignores the selector**; week-scoping it would hide a
-straggler nobody would go looking for. The week is a **`weekOffset` integer, not a stored
-Monday** — §7.95, a new axis on §7.7: not a wrong clock, a *frozen* one, whose symptom is
-indistinguishable from a quiet day.
-
-**Two plan-review predictions were wrong, and the corrections outlived the predictions.**
-Nested Touchables were said to double-fire; re-nesting them deliberately still scored
-16/16, because RN's responder system stops at the innermost view (**§7.99**). And "the
-backlog range cannot grow without bound" was false for a tenant that has never sealed a
-month, whose floor is its `created_at` (**§7.70**, extended). The one prediction that held
-was the expensive one: `verify-stale-screen.mjs` really was about to become a permanent
-false pass, asserting `/today\s*·/i` against the Classes tab while the Schedule screen sat
-mounted underneath rendering its own `TODAY ·` heading (**§7.98**).
-
-**A review then caught a regression I had introduced while writing §7.97.** Extracting the
-lesson-date union into a helper applied a lower bound to *booking* dates that the old
-screen never had, dropping a trial taken before a class's first enrolment while the engine
-still blocked the month over it. Fixed to the business-wide floor — strictly better than
-the original, which also surfaced lessons below the floor that nobody can mark.
-
-**Deliberately not done:** no configurable first-day-of-week (`weekOrder.ts` is Monday-first
-*because* it mirrors the Postgres enum, and today-first already overrides most of what the
-setting would buy); no `run-all-drivers.sh` sweep locally — seven drivers were run
-individually, so the nightly is the first full-suite evidence.
-
-**Verified:** jest **308** (was 256), vitest 255, pgTAP 557, Deno 130 ×2, both typechecks,
-fixture round-trip 16/16, and eight UI drivers green — `stale-screen` 22/22 against a
-*measured* 22/22 baseline (labels diffed: two renames, nothing lost), `schedule-week`
-19/19 new, `parent-pay-claim` 17/17 new, `attendance-guard` 22/22, `tz-saturday` 6/6,
-`unmarked-lessons` 12/12, `bulk-setall` 10/10, `tenant-branding` 6/6. CI green on all
-three pushes.
-
----
-
 ### Older sessions — the ledger
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.34** | 2026-08-08 | **The coach's Today tab became a WEEK, parents can pay from the invoice list, and the backlog got its first ranking since July.** Schedule REPLACED Today (tabs: Schedule / Classes / My Pay / Settings), four sections under a Monday-start week selector driven by **marking state, not the calendar**. Two decisions carry the risk: **NEEDS MARKING is floor-scoped and ignores the selector** (week-scoping it hides a straggler nobody would look for, and unmarked attendance blocks billing with no override), and **the week is an OFFSET INTEGER, not a stored Monday** — an absolute date captured at mount goes stale on a PWA surviving a Sunday→Monday boundary, and the symptom is indistinguishable from a quiet day. **Three plan-review predictions were WRONG and the corrections outlived them**: nested Touchables do not double-fire on RN-web, the backlog range *can* grow unbounded for a tenant that never sealed a month, and consolidating two drivers' "identical" `pressByText` copies broke one. A pre-commit review then caught a regression introduced *while writing* §7.97 | PRD §14.2, §7.5 · **§7.95–§7.99** *(and a new paragraph on §7.70)* · `docs/TESTING.md` §5 |
 | **8.33** | 2026-08-07 | **Triaging two red nightly drivers found a LIVE bug that refused every class edit for eight hours a day.** `CURRENT_DATE` in a function is the SESSION's time zone — UTC here — so between 00:00 and 08:00 SGT `set_class_terms()` read the admin's own SGT date as tomorrow and raised *terms cannot start in the future*; live since 20260719001000, with `sync_class_display_price()` on the same clock. Both moved to `today_sg()`, and `class_terms.test.sql` now asserts a `pg_proc` scan for UTC-dated functions returns nothing. **A 14-test file on that exact function stayed green because the RPC, the pgTAP file and the driver had all made the same assumption and therefore AGREED** — fixing only the RPC turned five assertions red. Both red drivers were that one bug, not driver rot. Its `pg_proc` probe also matched pgTAP's own `_def_is`, which would have aborted `supabase db push` on any pgTAP-installed database | **§7.94** *(and: test a date guard AT its boundary)* · §8.30 *(the nightly's first scheduled sweep is what found it)* · `docs/TESTING.md` §5 |
 | **8.32** | 2026-08-07 | **The marking floor follows `billing_periods`, not the calendar** — `markable_floor(tenant)` = `LEAST(1st of last month, month after that business's latest seal, else `created_at`)`. Built as insurance ahead of its own stated trigger: billing a month LATE made the gate name a lesson **nobody could record any more**, with no override by design, so the month could never be billed. `LEAST` is the safety argument — the floor only ever moves EARLIER — asserted as a property over a matrix of tenant states, not case by case. All three production tenants read `2026-07-01` unchanged on deploy day. The filed fix was **wrong in one detail**: "the earliest UNSEALED month" leaves no floor at all, because a month with nothing recorded is never sealed (§8a.1). Found by EXECUTING the rollback file rather than writing it | PRD §7.6 · `docs/ARCHITECTURE.md` §6 *(why the LATEST seal, not the earliest unsealed)* · **§7.92, §7.93** · `supabase/rollback/20260806_markable_floor_DOWN.sql` |
 | **8.31** | 2026-08-06 | **Co-admins:** the first admin of a tenant is its **owner** (`tenants.owner_profile_id` — ownership is a COLUMN, not a role); only the owner invites, deactivates and deletes co-admins, who otherwise hold identical authority. Deactivation is one clause in `is_tenant_admin()` plus an auth-layer ban for pure admins; a coach-admin keeps coaching. Guard triggers closed a pre-existing hole — `profiles_update` let ANY tenant admin rewrite any profile's **role**, harmless with one admin and an escalation path with two. Coach/parent logins refused at the panel door | PRD §4.3 · `docs/ARCHITECTURE.md` §6 *(why not an enum role, why not `tenant_members`)* · **§7.90, §7.91** · `supabase/rollback/20260806_co_admins_DOWN.sql` |
@@ -759,28 +779,37 @@ for one marked inactive.
 
 ### ⚠ ONE THING TO CHECK, AND IT CHECKS ITSELF
 
-**Confirm tonight's nightly sweep went green.** The 2026-08-08 sweep was red on
-`verify-trials` only (34/35); the driver is fixed and 11/11 locally, but the sweep is the
-evidence, not this sentence. `gh run list --workflow=ui-drivers.yml`, and the rolling
-`ui-driver-rot` **issue #3 closes itself** on a green run — if it is still open, it is red
-*right now*.
+**Confirm the nightly sweep went green.** `ui-driver-rot` **issue #3 is still OPEN** as of
+2026-08-09 09:53 UTC — from the 2026-08-08 sweep, `verify-trials` only (34/35). Its cause
+is fixed (§8.35) and two further drivers changed since (§8.36), but **the sweep is the
+evidence, not this sentence**, and no sweep has run since the fixes landed. The first one
+after 2026-08-09 20:00 UTC settles it, and a green run closes the issue itself.
+`gh run list --workflow=ui-drivers.yml` and the issue's own state are the current fact.
+That is exactly what went wrong once already: this section read *"✅ NO RED SIGNALS"* for a
+day after the sweep had gone red beneath it.
 
-*(The Schedule tab's own post-deploy check is done: the served bundle at `swimsync.sg` was
-grepped for `NEEDS MARKING` on 2026-08-09 and carries it — §7.31, a 200 proves nothing.)*
+*(Two drivers changed on 2026-08-09 and neither has faced a sweep yet: `verify-levels.mjs`
+and the new `verify-admin-table-geometry.mjs`. Both are green locally, three consecutive
+runs and 15/15 respectively.)*
 
-### If you would rather build than onboard
+### If you would rather build than onboard — WAVE 1 IS IN FLIGHT
 
-**`BACKLOG.md` → `## Build order` is the answer, and it is ranked again** (2026-08-08, by
-rework cost — five waves). Do not restate it here; that is how the two drift. Two things
-about it that are not obvious from reading the list:
+**`docs/plans/WAVE_1_PLAN.md` is the answer, and Chunk 1 is done.** Do not re-plan it and
+do not restate it here; that is how the two drift. What the next session needs:
 
-- **Wave 1 is eight `S` items, nothing blocked, roughly two weeks**, and every one of them
-  is paid for again by each screen shipped before it lands — the audit trigger, the
-  inactive-class hole, the geometry check, the non-hermetic driver.
-- **The six decisions the ranking rests on are in a table at the top of it.** Read them
-  before re-opening any: coach-per-lesson (not per-class), trainee pay (own rate),
-  substitute pay (whoever taught), multiple classes per child (yes, soon), co-admin
-  permission splitting (yes, not now), native builds (not yet).
+1. **Start Chunk 2 — package references + the PayNow chain.** Branch
+   `db/package-references` in the **root checkout** (a worktree never authors a migration).
+   It mints `PKG-YYYY-NNNN` on `parent_packages`, unlocks the dynamic QR for package
+   payments, and folds in the two coach-Settings items. Read the `⚠ RISK n MITIGATION`
+   blocks — **RISK 4 is the one that bites**: same-timing triggers fire in **alphabetical**
+   name order, and the existing lifecycle trigger is what sets `tenant_id`, so the obvious
+   trigger name breaks every package request.
+2. **Chunks 3 and 4 follow, one migration each, strictly serial.** Chunk 3's audit trigger
+   **must be `SECURITY DEFINER`** or it refuses every student edit in the product. Chunk 4
+   is the only one that touches money — migrations → engine → apps, `main` last.
+
+**`BACKLOG.md` → `## Build order` still governs everything after Wave 1.** The six decisions
+the ranking rests on are in a table at its top; read them before re-opening any.
 
 **The `authenticated` question from 2026-08-04 is ANSWERED — don't re-open it.** No, it does
 not deserve `anon`'s sweep (§8.29, §3): one database role carries parent, coach and admin, so
@@ -789,16 +818,7 @@ only RLS can separate them. **What replaced it as an open question is `service_r
 `authenticated` ("no policy could permit this") is useless for a role that bypasses RLS, so
 it needs a usage audit of the edge functions and the admin's server routes first.
 
-### ⚠ ONE OPEN RED SIGNAL, AND IT IS EXPECTED TO CLEAR ITSELF
-
-**`ui-driver-rot` issue #3 is OPEN**, from the 2026-08-08 sweep: `verify-trials` FAIL, the
-other 34 drivers PASS. The cause is fixed (§8.35, §7.100) and the driver is 11/11 locally,
-but **only the sweep can close the issue**, so the first green run after 2026-08-09 04:00
-SGT is what settles it. Push CI itself is green.
-
-**Do not read this section as the current fact** — `gh run list --workflow=ui-drivers.yml`
-and the issue's own state are. That is exactly what went wrong once already: this section
-read *"✅ NO RED SIGNALS"* for a day after the sweep had gone red beneath it.
+### Triage rules, when the sweep does redden
 
 **Three triage rules worth keeping, all bought with real time:**
 
@@ -813,11 +833,12 @@ read *"✅ NO RED SIGNALS"* for a day after the sweep had gone red beneath it.
   — and was in fact a driver that had been broken for two weeks and had been skipping
   itself into a green PASS. Check when the driver last actually asserted anything.
 
-**The migration queue is EMPTY.** The latest, `20260806000200` (the marking floor, §8.32),
-deployed 2026-08-07 with its grant grid checked against production the same hour. Nothing is
-in flight, so the next schema change can start immediately — still one at a time (§7.55), a
-worktree never authors one, and budget the post-deploy grant check (§7.39, §7.89) **and** the
-rollback rehearsal (§7.93 — running the DOWN file is the half that finds the bugs).
+**The migration queue is EMPTY, and Wave 1 will fill it three times.** The latest applied,
+`20260806000200` (the marking floor, §8.32), deployed 2026-08-07 with its grant grid checked
+against production the same hour. Nothing is in flight, so Chunk 2's can start immediately —
+still one at a time (§7.55), a worktree never authors one, and budget the post-deploy grant
+check (§7.39, §7.89) **and** the rollback rehearsal (§7.93 — running the DOWN file is the
+half that finds the bugs). Each of Chunks 2, 3 and 4 carries exactly one.
 
 ### Worth deciding, not urgent
 

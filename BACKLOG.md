@@ -1,11 +1,19 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-09 — **one item added:** *The class ROSTER hides a lesson whose only
+_Last updated: 2026-08-09 (2nd) — **two items SHIPPED and removed** (Wave 1 Chunk 1,
+`docs/plans/WAVE_1_PLAN.md`): *Check column geometry on every admin table* and
+*`verify-levels.mjs` is not hermetic*. **Struck from the Build order as well as their own
+sections** — that is the two-places rule this file's own ⚠ is about. **Two items added**,
+both found by the tooling that shipped: *`fixtures-trial-onboarding-teardown.sql` deletes
+invoices it does not own* (**S** — it breaks the "owns only its own rows" rule the CI
+round-trip enforces, and the next fixture to touch invoices hits it) and *`/makeups` and
+`/trials` render a 79px DATE column* (**S**, measured not guessed)._
+
+_Previously, 2026-08-09 — one item added: *The class ROSTER hides a lesson whose only
 attendee is a guest* (**S**, Billing and payments; also in the unordered pool). Found while
 fixing `verify-trials.mjs` — the roster gates its Mark Attendance button on enrolments
 alone, so a trial-only lesson is invisible there while the Schedule tab shows it. **Not a
-billing hole**, which is why it is unranked: the lesson stays reachable and markable. No
-item shipped, so nothing was removed._
+billing hole**, which is why it is unranked: the lesson stays reachable and markable._
 
 _Previously, 2026-08-08 (second pass) — **`## Build order` is no longer empty.** It had
 been since 2026-07-19. The queue is now ranked by **rework cost** rather than value or size
@@ -157,7 +165,7 @@ below, because an unrecorded decision is re-litigated.)_
 | Multiple classes per child? | **Yes, and soon** | Promoted to Wave 2. It drops `one_active_enrolment_per_student`, so every enrolment-shaped surface built after it inherits the new model — and everything built before it gets reworked |
 | Native store builds ($99/yr)? | **Not yet — stay web-only** | *Push notifications* stays blocked. *Demote the static PayNow QR upload* must **hide** the upload, never delete it — the native fallback path stays alive |
 
-#### Wave 1 — cheap, independent, and inherited by everything after (8 × **S**, ~2 weeks)
+#### Wave 1 — cheap, independent, and inherited by everything after (5 × **S** + 1 **M** left)
 
 Nothing here is blocked by anything, and each one is paid for again by every screen shipped
 before it lands. Two chains, run in either order.
@@ -171,19 +179,20 @@ before it lands. Two chains, run in either order.
 4. **A link to the admin panel from coach Settings** — same `(coach)/settings` screen as
    #2; batch it.
 
-**The foundations:**
+**The foundations (the other two shipped 2026-08-09 — see the note below):**
 
 5. **Direct writes to `students` are audited by nobody** — an `AFTER UPDATE` trigger is
    inherited free by every future writer. Every screen shipped first writes unaudited.
 6. **An inactive CLASS is invisible to billing and to the block** — must precede any
    class-deactivation path, and *Disable a coach* forces class reassignment.
-7. **Check column geometry on every admin table** — a UI redesign is planned; worth
-   ~14 tables of protection during it and near zero after.
-8. **`verify-levels.mjs` is not hermetic** — the nightly sweep is now the primary signal
-   (§8.30, §8.33); one non-hermetic driver makes it lie.
-
-_(**Pay and claim from the parent's invoice LIST** headed this wave and **SHIPPED
-2026-08-08** alongside the Schedule tab, covered by `verify-parent-pay-claim.mjs`.)_
+_(Three items have left this wave. **Pay and claim from the parent's invoice LIST** shipped
+2026-08-08 alongside the Schedule tab (`verify-parent-pay-claim.mjs`). **Check column
+geometry on every admin table** and **`verify-levels.mjs` is not hermetic** both shipped
+2026-08-09 as Chunk 1 of `docs/plans/WAVE_1_PLAN.md` — `verify-admin-table-geometry.mjs`
+now measures 15 of the 16 admin tables, and `verify-levels.mjs` cleans up after itself
+through the UI. **Six items remain** — #1–#6 below. Note #6 is now an **M**, not an S:
+it was decided into the engine fix PLUS a real class-deactivation feature
+(`docs/plans/WAVE_1_PLAN.md`).)_
 
 #### Wave 2 — **Multiple classes per child** (M)
 
@@ -1251,22 +1260,41 @@ edit matters far less, which is why this sat unnoticed.
   which is fine, but check the volume before adding one to a table the invoice engine
   touches under `service_role`.
 
-### Check column geometry on every admin table, not just Levels — **S**
-`verify-levels-table.mjs` measures each `<th>`'s rect against its column's `<td>` and fails
-if they diverge. Point the same check at the other 13 admin table pages.
+### `fixtures-trial-onboarding-teardown.sql` deletes invoices it does not own — **S**
+Its cleanup is `DELETE FROM invoice_items … WHERE i.tenant_id = v_tenant AND
+i.billing_month = <its month>` — every invoice in the tenant for that month, not just the
+ones it created. Same for the `invoices` and `billing_periods` deletes beneath it.
 
-**Why:** the Levels table shipped with its header row nested inside another row and stayed
-broken in production for a week (`docs/GOTCHAS.md` §7.54). **Every text-based assertion passed** —
-the labels were all present, correctly spelled and in the right order, merely in the wrong
-place. Only a human eventually noticed. The geometry check catches that class of bug, and
-right now exactly one of fourteen tables has it.
+**Why:** `check-fixture-roundtrip.sh` pass 2 exists to enforce "each fixture owns only its
+own rows", and this one silently breaks that rule. It went unnoticed for as long as no
+sibling put a row in those tables. On 2026-08-09
+`fixtures-admin-table-geometry.sql` became the first fixture to hold a **credit note**
+against an invoice item, and the over-broad `DELETE` immediately hit
+`credit_notes_invoice_item_id_fkey` and failed the entire stacked unwind — six tables left
+dirty, while every fixture still reported "loads fine". The next fixture to touch invoices
+hits the same wall.
 
-**Notes:** the assertion is ~15 lines and already written; the work is fixtures, because
-several admin tables are empty on the seed stack and a table with no body row has nothing
-to compare a header against. **Skip-and-log rather than silently pass** on an empty table —
-a page reported as "checked" when it had no rows is how this bug survives a second time.
-`components/Table.test.tsx` already covers the *static* form of the mistake (a `<Tr>` inside
-a `<Thead>`); this covers layouts that break for other reasons.
+**Notes:** the new fixture worked around it by putting its invoice **four months back**,
+which is a dodge, not a fix — the teardown is still wrong and the workaround is a comment
+someone will delete. Scope the three deletes to the parent/class the fixture owns (it
+already knows both). Do **not** widen `check-fixture-roundtrip.sh` to tolerate it. Proving
+the fix is cheap: run the full round-trip, then move that fixture's billing month back to
+last month and confirm the unwind still passes.
+
+### `/makeups` and `/trials` render a 79px DATE column — **S**
+Both pages squeeze their date column to 79px at a 1280px viewport, reported by
+`verify-admin-table-geometry.mjs`'s width probe.
+
+**Why:** narrow enough that a date wraps or truncates on the two screens where the date
+*is* the information — a guest is expected at one lesson, on one day, and nowhere else.
+Cosmetic today; it is filed because it was measured rather than guessed, and because
+nothing else will notice it.
+
+**Notes:** the geometry check reports width but deliberately does **not** assert on it
+(§7.71) — a table whose columns all carry `w-full` renders one at ~110px while every
+alignment and text assertion still passes, so width is a human-judgement signal, not a
+pass/fail one. Do not "fix" this by adding a width assertion to the driver; fix the two
+pages' column classes. The threshold in the driver is 80px and is arbitrary.
 
 ### Decide whether `service_role` deserves the whitelist treatment — **M**
 `20260804000600` made `authenticated`'s table grants a declared whitelist derived from
@@ -1296,19 +1324,6 @@ from `anon` and `authenticated`.
   bypasses RLS, and a test that is red against a correct database gets disabled.
 - Prerequisite: an honest answer to "what does each service-role caller actually touch?".
   Until that exists, this is a question, not a task.
-
-### `verify-levels.mjs` is not hermetic — **S**
-It asserts an empty-ladder state as its first check, then creates levels and leaves them
-behind, so the second run of the day fails on the first run's data.
-
-**Why:** every other driver in the suite self-seeds and tears down. This one silently
-depends on being run against a clean `tenant_levels`, which cost real time this session:
-it failed, looked like a regression in the change under test, and needed a run against the
-*unfixed* code to prove it was pre-existing.
-
-**Notes:** it also drives Expo, so a fix should keep the admin half runnable alone — an
-admin-only failure should not require port 8081. Delete the tenant's levels in a setup step
-and again on exit, the way `fixtures-*-teardown.sql` does elsewhere.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`

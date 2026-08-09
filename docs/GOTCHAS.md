@@ -1679,3 +1679,59 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       there. The Schedule tab has no such gate (it derives who is expected from
       `expectedStudentsOn()`, which counts bookings). A driver that reaches marking via the
       roster cannot test a guest-only lesson at all. (2026-08-09.)
+
+101. **ON A SHARED DATABASE, `nth(n)` IS A DATA-CORRUPTION BUG, NOT A BRITTLE-SELECTOR
+    NIT — IT WRITES TO A ROW YOU DO NOT OWN, AND THE TEARDOWN THEN DESTROYS THAT ROW'S
+    DATA.** `verify-levels.mjs` picked its student with `page.locator("select").nth(2)`,
+    commented *"Maya Tan is the 3rd student alphabetically (Ethan, Ethan, Maya, Noah)"* —
+    true of the bare seed and of nothing else. `fixtures-levels-table.sql` adds three
+    `LvlTbl Child …` rows to the **same tenant**, which shifts the ordering, so `nth(2)`
+    resolved to somebody else's child. The driver set *its* level on that child; its
+    cleanup then deleted that level, and `students.level_id` is `ON DELETE SET NULL`
+    (§7.69), so the victim's level was silently blanked with nothing recording what it had
+    been. **Measured, not theorised: `LvlTbl` children holding a level went 3 → 2**, while
+    the driver still reported its own checks green.
+    - **The ordinal is not the bug; the dependency is.** `nth(n)` over a list whose length
+      depends on which fixtures happen to be loaded is a shared-stack bug (§7.55) wearing a
+      locator's clothes. It is invisible in review because the comment explaining it is
+      *correct about the seed*.
+    - **Fix:** reach the row by something it owns —
+      `page.getByRole("row").filter({ hasText: "Maya Tan" }).locator("select")` — and assert
+      the match count is exactly 1 before writing, so an ambiguous match throws instead of
+      picking. If a row has no name to match on, **that** is the finding.
+    - Applies to **every driver in the suite**, not just this one — the count is
+      `ls drivers/verify-*.mjs`, not a number written here. (2026-08-09.)
+
+102. **A `fixtures-*-teardown.sql` WITH NO `fixtures-*.sql` BESIDE IT IS INVISIBLE TO BOTH
+    CI GUARDS.** `check-teardowns.sh` and `check-fixture-roundtrip.sh` both open with
+    `for f in fixtures-*.sql; do case "$f" in *-teardown.sql) continue ;; esac` — they
+    iterate **fixtures**, and a teardown is only ever reached as the *sibling* of one. So a
+    lone teardown file is neither required, nor loaded, nor round-tripped: it looks like
+    covered cleanup and is checked by nothing. A plan written on the assumption that
+    committing one buys CI coverage was wrong, and the error survived a review because the
+    two scripts *are* the coverage for every other teardown.
+    - **Consequence for cleanup design:** a SQL teardown is only as good as the human who
+      remembers to run it. Where a driver can undo its own writes **through the UI it
+      already drives**, that is strictly better — it needs no file, no prereq line, and a
+      crashed run self-heals on the next one because the cleanup also runs at *setup*.
+      `verify-levels.mjs`'s `cleanupOwnLevels()` is the pattern.
+    - Adding a paired `fixtures-<name>.sql` *does* buy the coverage — but check
+      `run-all-drivers.sh`'s `fixture_for()` first: its default branch resolves
+      `fixtures-<driver>.sql` by name, so creating one silently changes which fixture the
+      nightly loads for that driver. (2026-08-09.)
+
+103. **A FIXTURE THAT BACK-DATES AN ENROLMENT INVENTS UNMARKED LESSONS, AND UNMARKED
+    ATTENDANCE BLOCKS BILLING WITH NO OVERRIDE.** `fixtures-admin-table-geometry.sql`
+    enrolled its child from `markable_floor(tenant)` — the 1st of last month — on a
+    **weekly** class, while marking exactly one lesson. The engine derives expected lessons
+    from the class weekday across the enrolment span (`expectedLessonDates()` in `core.ts`)
+    and *any* unmarked expected date stops the whole run by design. So merely having that
+    fixture loaded left the **seed tenant unbillable**, on the database every worktree
+    shares (§7.55).
+    - **Neither harness would have caught it.** `run-all-drivers.sh` resets per driver, and
+      `check-fixture-roundtrip.sh` compares row *counts* — a fixture can be perfectly
+      reversible and still put the database in a state no billing run can leave.
+    - **Rule:** enrol on the date of the lesson the fixture actually marks, so expected ==
+      marked. Reach for the marking floor only when the fixture is *about* the floor.
+    - The same asymmetry is why `is_active` and lesson dates are worth a second look in any
+      fixture touching a weekly class. (2026-08-09.)

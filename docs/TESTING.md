@@ -393,7 +393,24 @@ Swimming Levels table's **column geometry** — it MEASURES each `th`'s rect aga
 column's `td` and fails if they diverge by more than 2px. Written because §7.54's bug was
 invisible to every text assertion: the labels were all correct and merely in the wrong
 place. **It fails on the pre-fix code with a worst offset of 488px, which is the point**
-(12 checks; admin-only, port 3100);
+(12 checks; admin-only, port 3100). **It deliberately keeps its own inline copy of the
+measurement** rather than importing `lib.mjs`'s: it is the *calibrated reference*, and an
+edit to the shared helper must not be able to move what it asserts;
+`verify-admin-table-geometry.mjs` (+ `fixtures-admin-table-geometry.sql` and its
+`-teardown.sql`) applies that same measurement to the **other admin tables** — 15 of the 16
+routes that render a `<Table>`, via `lib.mjs`'s `measureTableGeometry()` /
+`TABLE_GEOMETRY_TOLERANCE`. `/platform` is excluded because it is a *platform-admin* page
+and renders nothing for a tenant admin — a missing role, not missing data. Three checks per
+route: header row not nested, cell count matches the header, and every header within 2px of
+its column (46 checks, 15/15 measured, admin-only). **Proven load-bearing by injecting
+§7.54's nesting into `/parents`: 675px, two checks red.** Two rules it is built around —
+**an empty table is SKIPPED and listed, never counted as a pass**, and a run that measures
+zero tables FAILS; and **a route that THROWS is a failure, not a skip**, because collapsing
+"empty" and "blew up" into one non-failing bucket is how a half-dead sweep exits 0 (§7.100).
+Column *width* is reported, never asserted (§7.71) — it currently prints `/makeups` and
+`/trials` at 79px. **Only the first `<table>` on a page is measured**, a known gap.
+Its fixture exists because the bare seed leaves **ten of sixteen** admin tables empty, so
+without it the sweep checks six pages and silently skips ten;
 `verify-contact-details.mjs` (+ `fixtures-contact-details.sql` and its `-teardown.sql`)
 drives all four states of the admin's parent-contact modal — an unclaimed child edits and
 persists (a cleared field lands as **NULL, not `''`**, matching the creation path); a
