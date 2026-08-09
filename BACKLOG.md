@@ -185,16 +185,18 @@ below, because an unrecorded decision is re-litigated.)_
 | Multiple classes per child? | **Yes, and soon** | Promoted to Wave 2. It drops `one_active_enrolment_per_student`, so every enrolment-shaped surface built after it inherits the new model — and everything built before it gets reworked |
 | Native store builds ($99/yr)? | **Not yet — stay web-only** | *Push notifications* stays blocked. **Settled by what shipped 2026-08-09:** the static PayNow QR upload was neither deleted nor hidden — it is **collapsed behind a disclosure and always present**, which keeps the native fallback path alive *and* survives a stored-but-unencodable PayNow ID. Any future native decision inherits that, not a conditional |
 
-#### Wave 1 — cheap, independent, and inherited by everything after (**1 × M left**)
+#### Wave 1 — cheap, independent, and inherited by everything after (**COMPLETE**)
 
-**Chunks 1, 2 and 3 are DONE.** One item is left in the wave, and it is the only one that
-touches money:
+**All four chunks are DONE.** Chunk 4 shipped 2026-08-09: `classes.is_active` means
+scheduling and nothing else, the engine bills retired classes, and the admin can retire and
+restore one from the Classes page (`deactivate_class()` / `reactivate_class()`, three
+refusals, no overrides). RISK 1 was closed three ways — a `deactivated_at` date clamps what
+an inactive class is expected to have run, the RPC refuses to create the blocking state, and
+the Classes page can show and restore a retired class. The production audit it gated on
+returned zero rows on all three queries.
 
-1. **An inactive CLASS is invisible to billing and to the block** (**M**) — must precede
-   any class-deactivation path, and *Disable a coach* forces class reassignment. Decided
-   into the engine fix **plus** a real class-deactivation feature, which is what makes it
-   an M. `docs/plans/WAVE_1_PLAN.md` Chunk 4 — read **⚠ RISK 1** first: widening the
-   engine's class scan widens what **blocks** it, on a class no screen can show.
+**What it did NOT close is below** — see *An unmarked BOOKING is invisible when its class
+has no active enrolments*.
 
 _(Eight items have now left this wave. **Direct writes to `students` are audited by
 nobody** shipped 2026-08-09 as Chunk 3 — an `AFTER UPDATE … WHEN (OLD.* IS DISTINCT FROM
@@ -713,31 +715,52 @@ recorded. Those lessons are unbillable and, today, **invisible**.
   new migration and in the function's `COMMENT`.
 - `book_makeup()` and `book_trial()` check the same floor and carry the same gap.
 
-### An inactive CLASS is invisible to billing and to the block — **S**
-`core.ts` only scans `classes.is_active = true`.
+### An unmarked BOOKING is invisible when its class has no active enrolments — **S**
+**Confirmed by measurement 2026-08-09**, in a pre-commit review of Chunk 4 — not predicted,
+and it is a **silent permanent underbill**, the shape this project treats as its worst.
 
-**Why:** deactivating a class at month end silently drops its billable lessons *and* stops
-it blocking generation — so the safety net has a hole exactly where someone is tidying up.
-Pre-existing, but the hard block makes the asymmetry sharper: everything else about a
-half-finished month now refuses loudly, and this one case stays quiet.
+`core.ts` bails out of the class loop at two `continue` guards — *"nothing recorded and
+nothing due"* and *"nobody enrolled and nobody marked"* — and **neither consults
+`bookingsByDate`**, even though the completeness gate twelve lines further down explicitly
+unions booking dates in. So a class with no ACTIVE enrolments and an unmarked trial or
+make-up booking is skipped whole: the guest is neither billed nor blocked.
 
-**Notes:** no UI deactivates a class today (the admin Classes page edits but doesn't
-deactivate), which is why it has never bitten — **re-confirmed 2026-07-25**: `is_active` is
-only ever set `true`, on create.
+**Proven, twice, against the local engine.** Alone, the run reports `nothing_to_bill` and
+the month stays open — survivable. Alongside a second class that does bill, the month
+**SEALS**: `sealed: true`, `classes_still_incomplete: 0`, and that guest's lesson can never
+be invoiced afterwards (§11.6).
 
-**TRIAL BOOKINGS SHARPEN THIS (2026-07-25).** A booked trial on a deactivated class is
-worse than a dropped enrolled lesson: the child is expected there and nowhere else, so
-deactivating the class makes that trial neither billable nor blocking — invisible in
-exactly the way this whole feature exists to prevent. Whoever builds class deactivation
-must therefore ALSO refuse, or at least warn with a count, when the class has live
-`trial_bookings`. Recorded here rather than mitigated in the trial work, because there is
-no deactivation path to attach a warning to.
+**Pre-existing, and Chunk 4 neither caused it nor worsened it** — a retired class was
+skipped outright before, with the identical outcome. What changed is reachability: retiring
+a class is now a product action, and `deactivate_class()`'s first refusal *requires* zero
+open enrolments, so **every** retired class sits permanently in exactly this state. This is
+the same concern the old *TRIAL BOOKINGS SHARPEN THIS* / *MAKE-UP BOOKINGS WIDEN IT AGAIN*
+notes raised in 2026-07-25 and 2026-08-02: the deactivation path now refuses when a class
+holds live bookings, which closes the front door, but the engine hole itself is untouched.
 
-**MAKE-UP BOOKINGS WIDEN IT AGAIN (2026-08-02).** `makeup_bookings` has the same shape
-and the same consequence — a booked guest on a deactivated HOST class neither bills nor
-blocks (accepted in the make-up plan, the trials analog). `book_makeup()` at least
-refuses an already-inactive host; what nothing guards is deactivating a class that
-already holds live bookings. The future deactivation path must count BOTH tables.
+**The second half of the chain: `book_trial()` has no `is_active` guard**, unlike
+`book_makeup()` (`20260802000200:45`). So a trial can be booked into an already-retired
+class over PostgREST, and the admin Trials picker filtering `is_active` is not a limit
+(§7.32). Fix both or neither.
+
+**⚠ WHY THIS IS NOT A ONE-LINE FIX, AND MUST NOT BE TREATED AS ONE.** Making an unmarked
+booking block is a change to what BLOCKS a billing month, and the block has no override by
+design. Any production row already in this state would begin blocking that business's next
+run the day it deploys. It therefore needs the same treatment RISK 1 got — a **production
+audit first**, and a non-zero result is a blocker, not a caveat:
+
+```sql
+SELECT c.id, c.title, c.is_active, b.session_date, b.kind
+  FROM (SELECT class_id, session_date, 'trial' AS kind FROM trial_bookings WHERE cancelled_at IS NULL
+        UNION ALL
+        SELECT class_id, session_date, 'makeup'     FROM makeup_bookings WHERE cancelled_at IS NULL) b
+  JOIN classes c ON c.id = b.class_id
+ WHERE NOT EXISTS (SELECT 1 FROM student_class_enrolments e
+                    WHERE e.class_id = c.id AND e.is_active);
+```
+
+**Named prohibition:** do not fix this by adding an override to the unmarked-attendance
+block. Fix the scan.
 
 Probably: bill from
 classes that had sessions in the month regardless of `is_active`, and keep `is_active` for

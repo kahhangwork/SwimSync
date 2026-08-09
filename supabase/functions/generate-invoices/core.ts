@@ -346,22 +346,35 @@ async function generateForTenant(
   // ── Phase 1: tally billable items across ALL classes ──────────────────────
   // Ordered so a mixed-class invoice's line items land in a stable order (they
   // are persisted to invoice_items and rendered in the email).
+  //
+  // INACTIVE CLASSES ARE INCLUDED, and `is_active` no longer means anything to
+  // billing — it is SCHEDULING state. A class retired at month end used to drop
+  // its already-taught lessons out of the run silently, a hole exactly where
+  // someone is tidying up (BACKLOG #6).
+  //
+  // What this scan feeds is not only the tally: it also decides which classes
+  // enter the completeness gate below, so widening it widens what can BLOCK a
+  // month. That half is deliberately NOT widened — see `lastScheduledDate` in
+  // the loop. Retired classes with nothing recorded and nothing due fall out at
+  // the `continue` there — but THREE queries in, not one: sessions, bookings and
+  // enrolments all run above it. A tenant that has retired sixty classes over
+  // the years pays that on every run, for ever, and nothing prunes it. Filed
+  // rather than fixed here: it is a cost, not a correctness bug, and the shape
+  // that would fix it (a `deactivated_at` cut-off in the scan) is one more place
+  // for the RISK 1 deadlock to hide.
   const { data: classes, error: clsErr } = await supabase
     .from("classes")
-    .select("id, title, price_per_lesson, day_of_week, category_id")
-    .eq("is_active", true)
+    .select(
+      "id, title, price_per_lesson, day_of_week, category_id, is_active, deactivated_at"
+    )
     .eq("tenant_id", tenantId)   // isolation: RLS does not apply to service_role
     .order("id");
 
   if (clsErr) throw new Error(clsErr.message);
 
   // ── Make-up bookings: a child guests into ONE lesson of another class ─────
-  // Loaded ONCE for the tenant (not per class like trials) because the rates
-  // fetch below must also cover every booking's HOME class: an ad-hoc guest
-  // bills at their home class's rate, and that class can be deactivated (or
-  // the child transferred and it retired) between booking and generation —
-  // the active-classes scan above would then miss it and rateOn() would kill
-  // the whole run.
+  // Loaded ONCE for the tenant, not per class like trials, because a booking
+  // is resolved against its HOME class as well as its host.
   const { data: makeupRows, error: makeupErr } = await supabase
     .from("makeup_bookings")
     .select("student_id, class_id, session_date, category_id, home_class_id")
@@ -375,15 +388,31 @@ async function generateForTenant(
   // Effective-dated terms for those classes, fetched once rather than per
   // lesson. Scoped transitively by class_id — the classes query above is
   // already tenant-filtered, and RLS does not apply to service_role, so this
-  // filter is the isolation. Make-up HOME classes are unioned in — see above.
+  // filter is the isolation.
+  //
+  // ⚠ IF YOU EVER RE-NARROW THE CLASSES SCAN ABOVE, RESTORE THE UNION HERE.
+  // Until 2026-08-09 this `.in()` also carried
+  // `...(makeupRows ?? []).map((m) => m.home_class_id)`, because the scan
+  // filtered `.eq("is_active", true)`: a retired home class fell out of it, and
+  // rateOn() (rates.ts — a hard throw, no fallback) then killed the whole run
+  // for that tenant. The scan is no longer filtered, and book_makeup() derives
+  // home_class_id from the child's own active enrolment — same tenant, by
+  // construction — so every home class is already in `classes` and the arm was
+  // unreachable.
+  //
+  // Removed rather than kept, and the reasoning is worth carrying: the arm's
+  // guard was `makeups.test.ts:370`, which went VACUOUS the moment the scan
+  // widened — measured, not predicted (with the arm deleted the makeups file
+  // still passed 12/12, WAVE_1_PLAN.md's RISK 1 vacuity step). Dead code with
+  // no test behind it, sitting in the money engine, reads as load-bearing to
+  // the next person and is not. Its failure mode also argues for deletion:
+  // a missing rate THROWS and stops the run — loud, and never a silent
+  // underbill, which is the failure this whole change exists to prevent.
   const { data: classRates, error: rateErr } = await supabase
     .from("class_rates")
     .select("class_id, price_per_lesson, paid_coach_id, effective_from")
     .in("class_id", [
-      ...new Set([
-        ...(classes ?? []).map((c) => c.id as string),
-        ...(makeupRows ?? []).map((m) => m.home_class_id as string),
-      ]),
+      ...new Set((classes ?? []).map((c) => c.id as string)),
     ]);
 
   if (rateErr) throw new Error(rateErr.message);
@@ -589,8 +618,44 @@ async function generateForTenant(
         ? earliestEnrolment
         : monthStart;
     const windowTo = todayDate < monthEnd ? todayDate : monthEnd;
-    const expectedDates = activeStudentIds.length
-      ? expectedLessonDates(String(cls.day_of_week), windowFrom, windowTo)
+
+    // ── ...and clamped at the day the class stopped being SCHEDULABLE ───────
+    // The tally above bills every class, active or not. This half must not
+    // follow it. An inactive class with a live enrolment and no sessions would
+    // otherwise expect a lesson on every weekly date, find nobody marked, and
+    // block the month — and there is no way out: the block has no override by
+    // design (§8a), and the class is invisible to every role who could clear it
+    // (the coach class list, the coach Schedule tab and the admin Classes page
+    // all filter `is_active`). That is §8.32's deadlock on a visibility axis
+    // instead of a date axis, so markable_floor() does not rescue it.
+    //
+    // Three cases, and the third is why this is a date and not a boolean:
+    //   active                     → schedulable to the end of the window
+    //   deactivated on a date      → schedulable up to that date, not past it
+    //   inactive, no date recorded → predates deactivate_class(); nothing is
+    //                                known about when it stopped, so it expects
+    //                                nothing. That is the conservative side of
+    //                                the deadlock and it is also exactly how
+    //                                such a class behaved before this change,
+    //                                when the scan skipped it outright.
+    //
+    // Recorded sessions are unaffected either way: they stay in datesToCheck
+    // below, so an unmarked lesson that genuinely ran still blocks.
+    const lastScheduledDate: string | null = cls.is_active
+      ? windowTo
+      : cls.deactivated_at
+      ? dateInTimeZone(new Date(String(cls.deactivated_at)), APP_TIMEZONE)
+      : null;
+
+    const expectedTo =
+      lastScheduledDate === null || lastScheduledDate < windowFrom
+        ? null
+        : lastScheduledDate < windowTo
+        ? lastScheduledDate
+        : windowTo;
+
+    const expectedDates = activeStudentIds.length && expectedTo !== null
+      ? expectedLessonDates(String(cls.day_of_week), windowFrom, expectedTo)
       : [];
 
     // Nothing recorded and nothing due — this class has no bearing on the month.

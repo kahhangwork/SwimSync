@@ -1,0 +1,36 @@
+-- ============================================================
+-- The grant for 20260809000300's RPCs, ON ITS OWN, AND THAT IS THE POINT.
+--
+-- RISK 11 in docs/plans/WAVE_1_PLAN.md. Between the RPC migration and the
+-- engine deploy, the OLD invoice engine is still live and still scanning
+-- `.eq("is_active", true)`. A class deactivated in that window silently drops
+-- its billable lessons out of the month — a PERMANENT underbill (§7.8, §7.13,
+-- §7.32), and because sealing is irreversible there is nothing to unwind
+-- afterwards. The window is narrow only because no UI calls the RPCs yet; that
+-- is luck, not a mitigation.
+--
+-- So §7.87 is turned into a feature flag: a function is callable by nobody
+-- until its own migration grants it. Nothing can reach deactivate_class()
+-- before the engine that makes it safe is confirmed live.
+--
+-- DEPLOY ORDER — this file is step 3 of 4 (§7.60, got wrong twice):
+--   1. supabase db push          → 20260809000300 only
+--   2. supabase functions deploy generate-invoices, CONFIRMED with
+--      `supabase functions list`, and the four engine numbers re-checked
+--      against the pre-deploy dry run (RISK 7)
+--   3. supabase db push          → this file
+--   4. git push … :main          → the apps, LAST
+--
+-- DO NOT push this alongside 20260809000300. `supabase db push` applies
+-- everything pending, so two files pushed together are one deploy and the
+-- ordering above did not happen (§7.49, §7.30).
+--
+-- `class_unmarked_lesson_dates()` stays callable by nobody: it is an internal
+-- guard for deactivate_class(), reached through it as SECURITY DEFINER, and
+-- nothing client-side has a reason to call it. `service_role` and `anon` get
+-- nothing here either — no caller needs them, and the engine reads `classes`
+-- directly rather than through these RPCs.
+-- ============================================================
+
+GRANT EXECUTE ON FUNCTION public.deactivate_class(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.reactivate_class(UUID) TO authenticated;

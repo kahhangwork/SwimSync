@@ -672,6 +672,11 @@ SwimSync shall allow superadmin to manage classes.
 - Set class active/inactive status
 - Assign a coach to a class
 
+*(implemented 2026-08-09)* **"Active" means SCHEDULING, and never billing.** A class that
+stops running is **retired**, not deleted, and the lessons it already taught still bill
+exactly as before — that is the whole point of the distinction, and it used not to hold.
+See *Retiring a class* below.
+
 *(implemented)* The admin **Classes** page supports both create and edit: each class row has
 an **Edit** action that opens the same form pre-filled, so day, time, coach, location, and
 rate can be changed in-panel (no dashboard SQL). The **day of week is a required, explicit
@@ -679,6 +684,32 @@ choice** — the form no longer defaults it, so a class cannot be created on the
 by leaving the picker untouched. (A class is a *recurring weekly* definition keyed by
 `day_of_week`; there is no single class date — dated `lesson_sessions` are created lazily
 when attendance is marked, per §7.5.)
+
+#### Retiring a class *(implemented 2026-08-09)*
+
+A class that has stopped running is **retired** from the admin Classes page. Retiring it
+takes it off the schedule — it disappears from the coach's class list and Schedule tab, and
+no new lessons can be marked on it — while **everything it already taught still bills**.
+Retired classes are hidden behind a **Show retired classes** tick-box, carry a *Retired*
+badge with the date, and can be **restored** at any time.
+
+**SwimSync refuses to retire a class when something is still expected of it**, and always
+says what. There is no override on any of the three:
+
+| Refusal | Why | What to do |
+|---|---|---|
+| Children are still on the roster | Their leave date decides what they are billed, so it is never implied | Remove each from the class first |
+| A guest is booked into a lesson that has not happened | They are expected there and nowhere else | Cancel the booking, or teach and mark it |
+| Lessons are still waiting to be marked | An unmarked lesson blocks the whole month from billing, and a retired class is invisible to the coach who would mark it | Mark them, then retire |
+
+An **empty** class — nobody enrolled, nothing booked, nothing recorded — retires without
+argument. That is the deliberate answer, not an oversight: it is precisely the class an
+admin wants to tidy away, and there is nothing left to strand.
+
+**Restoring is never refused.** A retired class that is holding up a billing month has to be
+reachable, so restore has no conditions attached — it is the way out. A class restored after
+sitting idle across a lesson date will then ask for that lesson to be marked; a lesson that
+did not run is recorded as *cancelled*, never skipped (§7.6).
 
 #### Changing the price or coach asks *when* it takes effect *(implemented)*
 

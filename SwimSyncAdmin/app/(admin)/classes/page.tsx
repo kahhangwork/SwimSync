@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, CalendarPlus, Users } from "lucide-react";
+import { Plus, Pencil, CalendarPlus, Users, Archive, RotateCcw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
@@ -32,6 +32,16 @@ type ClassRow = {
   price_per_lesson: number;
   category_id: string | null;
   student_count: number;
+  /** ⚠ THE CLASS's OWN FLAG — NOT the enrolment's. `is_active` exists on
+   *  `students`, on `student_class_enrolments` AND on `classes`, and this page
+   *  embeds `student_class_enrolments(id, is_active)`. Reading the flag off the
+   *  wrong nesting level typechecks clean and renders every class retired
+   *  (§7.28). Mapped from the TOP-LEVEL row in loadClasses(). */
+  is_active: boolean;
+  /** When it was retired — NULL while active, and also NULL for a class made
+   *  inactive before deactivate_class() existed. Shown so "retired" has a date
+   *  attached rather than being a bare state. */
+  deactivated_at: string | null;
 };
 
 type Coach = { id: string; full_name: string };
@@ -143,6 +153,16 @@ export default function ClassesPage() {
   const [extraError, setExtraError] = useState<string | null>(null);
   const [extraDone, setExtraDone] = useState<string | null>(null);
 
+  // ── Retiring a class ──────────────────────────────────────────────────────
+  // Hidden by DEFAULT, not absent: a retired class is ordinary clutter on a
+  // busy page right up until the month it blocks, and then it is the only
+  // thing that matters.
+  const [showRetired, setShowRetired] = useState(false);
+  const [retireFor, setRetireFor] = useState<ClassRow | null>(null);
+  const [retireSaving, setRetireSaving] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [retireError, setRetireError] = useState<string | null>(null);
+
   useEffect(() => {
     loadClasses();
     loadCoaches();
@@ -225,14 +245,22 @@ export default function ClassesPage() {
     setCategories(data ?? []);
   }
 
+  // ⚠ RETIRED CLASSES ARE LOADED, AND THAT IS LOAD-BEARING, NOT COSMETIC.
+  // This used to be `.eq("is_active", true)`. Since the invoice engine stopped
+  // skipping inactive classes, one of them CAN block a billing month — and the
+  // coach class list and the coach Schedule tab both still filter `is_active`,
+  // so this page is the only screen in the product that can show such a class
+  // at all. Filter it here and `reactivate_class()` has nowhere to be called
+  // from: the month blocks, nobody can see why, and there is no override on the
+  // block by design. Retired rows are hidden behind the toggle below, never by
+  // the query.
   async function loadClasses() {
     setLoading(true);
     const { data } = await supabase
       .from("classes")
       .select(
-        "id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id, coaches(profiles(full_name)), student_class_enrolments(id, is_active)"
+        "id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id, is_active, deactivated_at, coaches(profiles(full_name)), student_class_enrolments(id, is_active)"
       )
-      .eq("is_active", true)
       .order("day_of_week")
       .order("start_time");
 
@@ -251,6 +279,11 @@ export default function ClassesPage() {
         student_count: (c.student_class_enrolments ?? []).filter(
           (e: any) => e.is_active
         ).length,
+        // c.is_active, NOT e.is_active — see the note on ClassRow (§7.28). The
+        // line directly above reads the enrolment's flag; these two are one
+        // character apart and mean entirely different things.
+        is_active: c.is_active !== false,
+        deactivated_at: c.deactivated_at ?? null,
       }))
     );
     setLoading(false);
@@ -418,10 +451,64 @@ export default function ClassesPage() {
     setExtraDate("");
   }
 
+  // ── Retire / restore ──────────────────────────────────────────────────────
+  // Both refusal messages come from deactivate_class() itself and are RENDERED,
+  // never swallowed: each one names the children, the booked guests or the
+  // unmarked dates standing in the way, which is the whole difference between
+  // an instruction and a dead end. Pre-empting them here would be a second copy
+  // of three rules that already live in one place.
+  async function handleRetire() {
+    if (!retireFor) return;
+    setRetireSaving(true);
+    setRetireError(null);
+
+    const { error } = await supabase.rpc("deactivate_class", {
+      p_class_id: retireFor.id,
+    });
+
+    setRetireSaving(false);
+    if (error) {
+      setRetireError(error.message);
+      return;
+    }
+    setRetireFor(null);
+    // Reload rather than patch in place: the row does not disappear, it changes
+    // state, and the reload is what proves the round trip works from this page
+    // alone.
+    await loadClasses();
+  }
+
+  // No confirm, no refusal, no error surface it can get stuck behind. This is
+  // the emergency exit from a class that is blocking a billing month while
+  // being invisible everywhere else — anything that can stop it can strand a
+  // business.
+  async function handleRestore(cls: ClassRow) {
+    // Guarded rather than disabled-on-a-shared-flag: two different rows must
+    // never block each other, and reactivate_class() is idempotent anyway — the
+    // in-flight id exists so the row can SAY something is happening.
+    if (restoringId) return;
+    setRestoringId(cls.id);
+    setRetireError(null);
+
+    const { error } = await supabase.rpc("reactivate_class", {
+      p_class_id: cls.id,
+    });
+
+    setRestoringId(null);
+    if (error) {
+      // Named, because the banner sits at the top of a table that can be long
+      // enough to scroll the message out of view.
+      setRetireError(`Could not restore ${cls.title}: ${error.message}`);
+      return;
+    }
+    await loadClasses();
+  }
+
   const filtered = classes.filter(
     (c) =>
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      c.coach_name.toLowerCase().includes(search.toLowerCase())
+      (showRetired || c.is_active) &&
+      (c.title.toLowerCase().includes(search.toLowerCase()) ||
+        c.coach_name.toLowerCase().includes(search.toLowerCase()))
   );
 
   // One roster per class, derived once. The badge's "+N" and the drawer's
@@ -455,11 +542,19 @@ export default function ClassesPage() {
     trials: [],
   };
 
+  const activeCount = classes.filter((c) => c.is_active).length;
+  const retiredCount = classes.length - activeCount;
+
   return (
     <div>
       <PageHeader
         title="Classes"
-        subtitle={`${classes.length} active classes`}
+        // Counted, not `classes.length` — that array now carries retired classes
+        // too, and this line would have quietly started overstating the number
+        // of classes the business actually runs.
+        subtitle={`${retiredCount > 0
+          ? `${activeCount} active · ${retiredCount} retired`
+          : `${activeCount} active classes`}`}
         action={
           <Button
             onClick={() => {
@@ -473,7 +568,7 @@ export default function ClassesPage() {
         }
       />
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-4">
         <input
           type="text"
           placeholder="Search by class name or coach..."
@@ -481,7 +576,32 @@ export default function ClassesPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full max-w-sm rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
         />
+        {/* Always offered, even at zero, so the answer to "where did that class
+            go?" is on the page rather than in someone's memory. */}
+        <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+          <input
+            type="checkbox"
+            checked={showRetired}
+            onChange={(e) => setShowRetired(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-400"
+          />
+          Show retired classes
+          {retiredCount > 0 && (
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+              {retiredCount}
+            </span>
+          )}
+        </label>
       </div>
+
+      {/* reactivate_class() cannot refuse, so this only ever carries a network
+          or permission failure — but a restore that silently did nothing is
+          exactly the dead end this page exists to prevent. */}
+      {retireError && retireFor === null && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {retireError}
+        </div>
+      )}
 
       <Table>
         <Thead>
@@ -510,7 +630,28 @@ export default function ClassesPage() {
           ) : (
             visible.map((cls) => (
               <Tr key={cls.id}>
-                <Td className="font-medium text-gray-900">{cls.title}</Td>
+                <Td className="font-medium text-gray-900">
+                  {cls.title}
+                  {!cls.is_active && (
+                    <span
+                      className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 align-middle"
+                      title={
+                        cls.deactivated_at
+                          // toSgDate takes the ISO string and converts in SGT.
+                          // new Date(...).toISOString().split("T")[0] here would
+                          // be the UTC date — a day early before 08:00 (§7.7).
+                          ? `Retired on ${formatSgDate(toSgDate(cls.deactivated_at), {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}`
+                          : "Retired before SwimSync recorded retirement dates"
+                      }
+                    >
+                      Retired
+                    </span>
+                  )}
+                </Td>
                 <Td className="text-gray-600">{cls.coach_name}</Td>
                 <Td>{capitalize(cls.day_of_week)}</Td>
                 <Td className="text-gray-500">
@@ -556,14 +697,51 @@ export default function ClassesPage() {
                       <Pencil className="h-3.5 w-3.5" />
                       Edit
                     </button>
-                    <button
-                      onClick={() => openExtra(cls)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                      title="Schedule a lesson on a day this class does not normally run"
-                    >
-                      <CalendarPlus className="h-3.5 w-3.5" />
-                      Extra lesson
-                    </button>
+                    {/* NOT offered on a retired class. schedule_extra_lesson()
+                        has no is_active guard of its own, so this would write a
+                        lesson_sessions row on a class the coach's class list and
+                        Schedule tab both filter out: a lesson that exists, can
+                        never be marked, and can never bill. It would not even
+                        block the month — the engine bails on an empty billable
+                        set — so it fails silently in both directions. Hiding the
+                        button is the UI half; §7.32 says a limit only the admin
+                        screen applies is not a limit, and the server-side half
+                        is filed rather than fixed here. Restore first. */}
+                    {cls.is_active && (
+                      <button
+                        onClick={() => openExtra(cls)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                        title="Schedule a lesson on a day this class does not normally run"
+                      >
+                        <CalendarPlus className="h-3.5 w-3.5" />
+                        Extra lesson
+                      </button>
+                    )}
+                    {cls.is_active ? (
+                      <button
+                        onClick={() => {
+                          setRetireError(null);
+                          setRetireFor(cls);
+                        }}
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                        title="Stop scheduling this class. Lessons it already taught still bill."
+                      >
+                        <Archive className="h-3.5 w-3.5 shrink-0" />
+                        Retire
+                      </button>
+                    ) : (
+                      // No confirm on the way back. This is the exit from a
+                      // class that can block a billing month while being
+                      // invisible to every other screen.
+                      <button
+                        onClick={() => handleRestore(cls)}
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100"
+                        title="Put this class back on the schedule"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+                        {restoringId === cls.id ? "Restoring…" : "Restore"}
+                      </button>
+                    )}
                   </div>
                 </Td>
               </Tr>
@@ -571,6 +749,55 @@ export default function ClassesPage() {
           )}
         </Tbody>
       </Table>
+
+      {/* Retire a class.
+          The three refusals are enforced in deactivate_class() and their
+          messages are shown verbatim below — they name the children, the booked
+          guests or the unmarked dates in the way. This is an ordinary React
+          dialog, not Alert.alert: this is the Next.js panel, and the RN-web
+          no-op does not apply here. */}
+      <Modal
+        title={retireFor ? `Retire ${retireFor.title}?` : "Retire class"}
+        open={retireFor !== null}
+        onClose={() => {
+          setRetireFor(null);
+          setRetireError(null);
+        }}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            This class stops being scheduled. It disappears from the coach&apos;s
+            app, and no new lessons can be marked on it.
+          </p>
+          <p className="text-sm text-gray-600">
+            <span className="font-medium text-gray-900">
+              Lessons it has already taught still bill as normal.
+            </span>{" "}
+            You can put it back at any time with <em>Restore</em>.
+          </p>
+
+          {retireError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {retireError}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRetireFor(null);
+                setRetireError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleRetire} disabled={retireSaving}>
+              {retireSaving ? "Retiring…" : "Retire class"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Schedule an extra lesson */}
       <Modal

@@ -380,9 +380,20 @@ Deno.test("unenrolled after booking + home class DEACTIVATED: still bills at the
     await s.completeMonth("2029-09");
     await s.completeMonth("2029-09", home);
 
-    // The family leaves and the home class is retired. Without the rates
-    // fetch covering home_class_id, rateOn() would THROW here and kill the
-    // entire run — the widened .in() is what this test pins.
+    // The family leaves and the home class is retired.
+    //
+    // THIS NO LONGER PINS THE RATES FETCH, and the comment that said it did was
+    // removed rather than left to mislead. It pinned the `home_class_id` arm of
+    // the class_rates .in() ONLY because deactivating the home class was what
+    // dropped it out of the classes scan; since 2026-08-09 that scan is not
+    // filtered by is_active, the arm was unreachable, and it was deleted
+    // (core.ts). Measured: with the arm still present, deleting it left this
+    // whole file passing 12/12.
+    //
+    // What it pins now is the SNAPSHOT: a guest whose enrolment has closed and
+    // whose home class has been retired still bills at that home class's
+    // effective-dated rate. Both of those are ordinary end-of-term states, so
+    // this case is worth keeping on its own terms.
     await s.db
       .from("student_class_enrolments")
       .update({ is_active: false, unenrolled_at: new Date().toISOString() })
