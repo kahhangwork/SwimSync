@@ -276,8 +276,8 @@ Balances line, and — since 2026-08-09 — that the package's PayNow screen car
 `PKG-YYYY-NNNN` reference (22 checks);
 `verify-paynow-fallback.mjs` (+ `fixtures-paynow-fallback.sql` and its `-teardown.sql`)
 drives the PayNow chain through **all three states a business can be in** (21 checks), and
-exists because before it **nothing in either test suite and none of the other 38 drivers
-touched `app/(coach)/settings`** — the only writer of `tenants.paynow_qr_url` anywhere in
+exists because before it **nothing in either test suite and no other driver touched
+`app/(coach)/settings`** — the only writer of `tenants.paynow_qr_url` anywhere in
 the product. It flips the seed tenant's `paynow_uen`/`paynow_mobile`/`paynow_qr_url`
 between cases and **restores them in a `finally`** (plus again in its teardown), because
 those are rows it does not own. **Case B is the one that earns the file**: a

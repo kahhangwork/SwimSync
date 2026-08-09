@@ -1,6 +1,16 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-09 (2nd) — **two items SHIPPED and removed** (Wave 1 Chunk 1,
+_Last updated: 2026-08-09 (3rd) — **the entire PayNow / package chain SHIPPED and was
+removed** (Wave 1 Chunk 2, `docs/plans/WAVE_1_PLAN.md`): *Give package requests a
+reference number*, *Demote the static PayNow QR upload*, *The PayNow screen calls the
+business "Coach"* and *A link to the admin panel from coach Settings* — struck from the
+Build order **and** their own sections. **Wave 1 is now two items**, both migrations.
+The *native store builds* decision row was settled rather than deferred: the upload is
+**collapsed, not hidden**, and the row says why. **One item added**: *A PayNow ID can be
+saved that no QR can be built from* (**S**) — a nine-digit mobile or a garbage UEN saves
+cleanly, looks configured everywhere, and silently produces no QR._
+
+_Previously, 2026-08-09 (2nd) — **two items SHIPPED and removed** (Wave 1 Chunk 1,
 `docs/plans/WAVE_1_PLAN.md`): *Check column geometry on every admin table* and
 *`verify-levels.mjs` is not hermetic*. **Struck from the Build order as well as their own
 sections** — that is the two-places rule this file's own ⚠ is about. **Two items added**,
@@ -163,36 +173,32 @@ below, because an unrecorded decision is re-litigated.)_
 | Trainee coach pay? | **Paid at their own rate** | A shadowed lesson produces two payout rows — the payroll half of the accounting page must come after it |
 | Substitute pay? | **Whoever actually taught it** | The session override moves money, so it is a wages change, not just a roster label |
 | Multiple classes per child? | **Yes, and soon** | Promoted to Wave 2. It drops `one_active_enrolment_per_student`, so every enrolment-shaped surface built after it inherits the new model — and everything built before it gets reworked |
-| Native store builds ($99/yr)? | **Not yet — stay web-only** | *Push notifications* stays blocked. *Demote the static PayNow QR upload* must **hide** the upload, never delete it — the native fallback path stays alive |
+| Native store builds ($99/yr)? | **Not yet — stay web-only** | *Push notifications* stays blocked. **Settled by what shipped 2026-08-09:** the static PayNow QR upload was neither deleted nor hidden — it is **collapsed behind a disclosure and always present**, which keeps the native fallback path alive *and* survives a stored-but-unencodable PayNow ID. Any future native decision inherits that, not a conditional |
 
-#### Wave 1 — cheap, independent, and inherited by everything after (5 × **S** + 1 **M** left)
+#### Wave 1 — cheap, independent, and inherited by everything after (1 × **S** + 1 **M** left)
 
-Nothing here is blocked by anything, and each one is paid for again by every screen shipped
-before it lands. Two chains, run in either order.
+**The whole PayNow / package chain is GONE — it shipped 2026-08-09 as Chunk 2.** What is
+left is the two foundations, and each is one migration:
 
-**The PayNow / package chain — strict internal order, one screen:**
-
-1. **Give package requests a reference number** — the stated blocker for #2.
-2. **Demote the static PayNow QR upload** — needs #1. **Hide, do not delete**: the native
-   fallback stays, per the decision above.
-3. **The PayNow screen calls the business "Coach"** — copy-only, folds into #1 or #2.
-4. **A link to the admin panel from coach Settings** — same `(coach)/settings` screen as
-   #2; batch it.
-
-**The foundations (the other two shipped 2026-08-09 — see the note below):**
-
-5. **Direct writes to `students` are audited by nobody** — an `AFTER UPDATE` trigger is
+1. **Direct writes to `students` are audited by nobody** — an `AFTER UPDATE` trigger is
    inherited free by every future writer. Every screen shipped first writes unaudited.
-6. **An inactive CLASS is invisible to billing and to the block** — must precede any
-   class-deactivation path, and *Disable a coach* forces class reassignment.
-_(Three items have left this wave. **Pay and claim from the parent's invoice LIST** shipped
-2026-08-08 alongside the Schedule tab (`verify-parent-pay-claim.mjs`). **Check column
-geometry on every admin table** and **`verify-levels.mjs` is not hermetic** both shipped
-2026-08-09 as Chunk 1 of `docs/plans/WAVE_1_PLAN.md` — `verify-admin-table-geometry.mjs`
-now measures 15 of the 16 admin tables, and `verify-levels.mjs` cleans up after itself
-through the UI. **Six items remain** — #1–#6 below. Note #6 is now an **M**, not an S:
-it was decided into the engine fix PLUS a real class-deactivation feature
-(`docs/plans/WAVE_1_PLAN.md`).)_
+   ⚠ It **must be `SECURITY DEFINER`** or it refuses every student edit in the product;
+   `docs/plans/WAVE_1_PLAN.md` RISK 2 carries the three abort vectors.
+2. **An inactive CLASS is invisible to billing and to the block** (**M**) — must precede
+   any class-deactivation path, and *Disable a coach* forces class reassignment. Decided
+   into the engine fix **plus** a real class-deactivation feature, which is what makes it
+   an M.
+
+_(Seven items have now left this wave. **Pay and claim from the parent's invoice LIST**
+shipped 2026-08-08 alongside the Schedule tab. **Check column geometry on every admin
+table** and **`verify-levels.mjs` is not hermetic** shipped 2026-08-09 as Chunk 1 of
+`docs/plans/WAVE_1_PLAN.md`. **Give package requests a reference number**, **demote the
+static PayNow QR upload**, **the PayNow screen calls the business "Coach"** and **a link
+to the admin panel from coach Settings** all shipped 2026-08-09 as Chunk 2 — see PRD
+§7.10, §7.16, §7.21. The "hide, do not delete" decision in the table above was honoured
+**and then strengthened**: the upload is not hidden at all, only collapsed behind a
+disclosure, because a stored-but-unencodable PayNow ID makes "hide when a proxy exists"
+one typo away from a business that cannot be paid.)_
 
 #### Wave 2 — **Multiple classes per child** (M)
 
@@ -524,23 +530,35 @@ unambiguous, because pay attribution, RLS and the roster all resolve to one pers
   together.
 - **This supersedes _Multiple coaches per class_**: the need is per-lesson, not per-class.
 
-### A link to the admin panel from coach Settings — **S**
-A coach who also holds `tenant_admin` gets a link to `admin.swimsync.sg` from their
-Settings screen.
-
-**Why:** a private coach is a tenant of one and holds both roles (`docs/ARCHITECTURE.md`
-§6), and since payment collection shipped, the things they most often need — the
-reference, the QR, the WhatsApp queue, mark-paid — are **only** on the admin panel. There
-is currently no bridge between the two, so the coach retypes the URL. This matters more
-now that the coach app deliberately shows no billing at all.
-
-**Notes:** gate it on `profiles.role === 'tenant_admin'`, the check
-`(coach)/settings/index.tsx` already performs for the PayNow QR (`canEditQr`). A school
-coach without the role must not see it.
-
 ---
 
 ## Billing and payments
+
+### A PayNow ID can be saved that no QR can be built from — **S** `[found 2026-08-09]`
+Tell the admin, at save time, that the PayNow UEN or mobile they just entered cannot be
+encoded — instead of letting them find out from a parent who could not pay.
+
+**Why:** `paynow_uen` is stored **completely raw** (`invoices/page.tsx` uses
+`blankToNull(raw)` and nothing else), and `paynow_mobile` goes through
+`normalizeSgPhone`, which only **strips non-digits** — `checkSgPhone` is advisory and
+"never blocks", and there is no DB `CHECK` (`20260802000600:44-47`, deliberately, so a
+blocked save cannot strand anyone). So `912345678` — nine digits, one typo — saves
+cleanly and looks configured on every screen, while `buildPayNowPayload` throws on
+`!/^\d{8}$/` and no parent at that business ever sees a dynamic QR. Today the damage is
+bounded: `verify-paynow-fallback.mjs` pins that the parent still gets a payable PayNow ID
++ amount + reference, and the coach can still upload a fallback image. But **nobody is
+ever told the QR is broken**, so the business quietly collects nothing through the
+mechanism it thinks it configured.
+
+**Notes:** the UEN half is worse than the mobile half — a garbage UEN produces a
+*valid-looking* QR that pays nowhere, which is `lib/paynow.ts`'s "wrong-yet-valid" RISK 2
+case, and no amount of advisory phone checking touches it. **The right shape is almost
+certainly a dry run, not a validator**: call `buildPayNowPayload()` with a $1 amount and
+the entered proxy at save time and show a warning if it throws — that reuses the one
+authority instead of adding a second copy of the rule (§7.18). Keep it **advisory**: the
+sgPhone doctrine is deliberate and a blocked save helps nobody. Ideally show the admin
+the QR that would be generated, which makes the failure self-evident. Do **not** add a DB
+`CHECK`. Raised while building Wave 1 Chunk 2, where this was explicitly out of scope.
 
 ### Automatic PayNow payment detection — **L** `[MVP-excluded]` `[Phase 3]`
 Reconcile incoming PayNow transfers against outstanding invoices automatically.
@@ -747,52 +765,6 @@ the roster's date list from `expectedStudentsOn()` like the Schedule tab does, r
 gating on the enrolment count — one derivation of "who was expected here", per the
 `schedule/index.tsx` comment on §7.18. Worth folding into whichever item next opens that
 screen.
-
-### Give package requests a reference number, so they get a dynamic QR too — **S**
-A `parent_packages` row gets its own payment reference, the way an invoice does, so the
-PayNow screen can build a locked-amount QR for it.
-
-**Why:** payment collection (PRD §7.21) gave every *invoice* an `INV-YYYY-NNNN` reference
-and a dynamic QR with the amount and reference locked. A **package purchase gets
-neither** — `(parent)/billing/paynow.tsx` returns early on the `packageId` path before it
-ever reaches `buildPayNowPayload()`, because a package has no reference to lock in. So a
-parent buying a package still scans a static image and types the amount by hand, which is
-the exact failure mode the reference was introduced to remove: an unattributable payment
-the admin has to match up manually.
-
-**Notes:** the trigger pattern already exists — `20260802000800` mints
-`INV-YYYY-NNNN` on `invoices` and `next_credit_note_ref` does the same for credit notes,
-both with a pad that grows past 9999. A third counter is the same shape. **This is the
-blocker for retiring the static QR upload below — do this one first.**
-
-### Demote the static PayNow QR upload — **S** — _depends on package references above_
-Show the QR upload in `(coach)/settings` only when the business has no PayNow UEN or
-mobile configured, instead of always.
-
-**Why:** since 2026-08-02 the QR that matters is **computed**, per invoice, with the
-amount and reference locked (`lib/paynow.ts`). The uploaded image is a worse artifact —
-no amount, no reference, no per-invoice attribution — and offering it as a first-class
-setting invites a business to configure the weaker of the two and think it is done.
-
-**Notes:** ⚠ **do not simply delete it.** Two live consumers remain: **native builds**,
-where `paynow.tsx` skips the dynamic path entirely (`Platform.OS === "web"` gate) — dormant
-while the product is web-only but not gone — and **package payments**, until the item
-above ships. Retiring the upload before both are closed breaks paying for a package.
-Raised 2026-08-02.
-
-### The PayNow screen calls the business "Coach" — **S**
-Fix the copy on `(parent)/billing/paynow.tsx`, which labels the QR
-*"{name}'s PayNow QR Code"* where `name` is the **business** display name.
-
-**Why:** the QR stopped being the coach's and became the business's in PRD §7.10 — a
-school with three coaches has one bank account. The screen was never updated, so a parent
-at a multi-coach school reads their school's name possessed by the word "Coach". The
-empty state is wronger still: *"QR not uploaded yet. Contact your coach directly"* now
-describes a business that has not configured PayNow, and tells the parent to chase a
-person who may not be the one who can fix it.
-
-**Notes:** copy-only, no logic. Same screen as the two items above — worth folding into
-whichever of them ships first rather than making its own change.
 
 ---
 

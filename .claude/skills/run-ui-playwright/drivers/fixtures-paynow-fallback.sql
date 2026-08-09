@@ -6,9 +6,8 @@
 -- paid: a PayNow ID that is stored but cannot be encoded (sgPhone normalises by
 -- stripping non-digits and never blocks, so a nine-digit typo saves fine),
 -- buildPayNowPayload throws, and if the upload had been REMOVED rather than
--- collapsed there is no image either. Nothing in either test suite and none of
--- the other 38 drivers touches app/(coach)/settings, so without this the step
--- ships blind.
+-- collapsed there is no image either. Nothing in either test suite and no other
+-- driver touches app/(coach)/settings, so without this the step ships blind.
 --
 -- Shape: one parent in the seed tenant with a PENDING package request — which
 -- carries a PKG-YYYY-NNNN reference (20260809000100) and is therefore reachable

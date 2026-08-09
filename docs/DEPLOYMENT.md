@@ -117,6 +117,21 @@ still point at the local stack for dev.
    catalog reads), but it is a standing local/cloud drift: don't read a service_role grant
    in a remote dump as evidence someone granted it.
 
+   **Confirmed a third time 2026-08-09, and the shape is now clear enough to predict.**
+   `20260809000100` shipped three functions. The two its migration wrote explicit REVOKEs
+   for — `next_package_ref` and `assign_parent_package_reference` — came out of the dump
+   with **no grant lines at all**. The one it didn't, `pin_parent_package_reference`, came
+   out with `GRANT ALL … TO "service_role"`. So the rule is simply: **whatever you do not
+   revoke, `service_role` gets.** The dump's `anon` count stayed at **18**, unchanged,
+   which is `20260804000400` doing its job. `pin_parent_package_reference` was left as-is
+   because it matches eight sibling pin/enforce trigger functions
+   (`pin_parent_identity`, `pin_student_tenant`, `pin_package_product_terms`, …) and
+   trigger functions are not privilege-checked and not exposed by PostgREST — but the
+   inconsistency with `pin_invoice_public_fields`, which *does* carry a
+   `REVOKE … FROM PUBLIC`, is real. **This is the evidence base for the `service_role`
+   audit queued in `BACKLOG.md`; do not close individual cells of it one migration at a
+   time.**
+
 8. **Production's client-role grants are a DECLARED SET now, and the dump is how you check
    it.** Since `20260804000600` `authenticated` holds a table privilege only where a policy
    could permit it. Verified on production 2026-08-04: **zero** `GRANT ALL ON TABLE … TO

@@ -161,6 +161,12 @@ is the *pre-change* number and would mean the new one went missing — CI green.
 
 ## Chunk 2 — Migration 1 of 3: package references and the PayNow chain
 
+> **✅ SHIPPED AND DEPLOYED 2026-08-09** (`74fb16e`, migration `20260809000100`). HANDOVER
+> §8.37. Mitigations that were **wrong or superseded** are struck in place below rather
+> than deleted — the corrections are the durable part. Three new gotchas came out of it:
+> **§7.104** (`current_user` is dead inside `SECURITY DEFINER`), **§7.105** (a boundary
+> case is only worth the values where the two answers disagree), **§7.106**, **§7.107**.
+
 **~1.5 sessions, 8–10h.** Branch `db/package-references` **in the root checkout** — a
 worktree never authors a migration.
 
@@ -232,6 +238,21 @@ introduced to remove.
 >   DEFINER`**, and `next_package_ref` is callable by **nobody, including `service_role`**. If
 >   a future permission error appears on `next_package_ref`, the bug is that the DEFINER hop
 >   was flattened — do NOT "fix" it with a `GRANT`.
+> - **⚠ CONSEQUENCE DISCOVERED WHILE IMPLEMENTING, 2026-08-09 — §7.104.** Because that
+>   function is DEFINER, `current_user` inside it is the **owner**, so the codebase's
+>   standard client seam `current_user = 'authenticated'` is **dead code there and fails
+>   open**. The first version used it to refuse a client-supplied `reference_number`; the
+>   refusal never fired. That matters more than it sounds: `parent_packages_insert` lets the
+>   owning PARENT insert, the counter is only advanced by `next_package_ref`, so a squatted
+>   number leaves the counter behind it and the **next genuine request dies on
+>   `parent_packages_tenant_reference_key`** — the buy-a-package path breaks for that whole
+>   business. Fixed by minting unconditionally (no role test needed at all). **Do not
+>   reintroduce an `IS NULL` guard or a `current_user` check in that function.**
+> - **Confirmed by the remote dump:** `next_package_ref` and
+>   `assign_parent_package_reference` came out of production with **no grant lines at all**;
+>   `pin_parent_package_reference`, which the migration wrote no REVOKE for, came out with
+>   cloud's default `GRANT ALL … TO service_role`. Whatever you do not revoke, `service_role`
+>   gets (`docs/DEPLOYMENT.md` §11.7).
 > - **Assertion (pass/fail):** extend `supabase/tests/function_grants.test.sql` (currently
 >   `plan(3)`) with a fourth assertion — *"next_package_ref is callable by NOBODY"* — checking
 >   anon **and** authenticated **and** service_role, matching lines 58-71 exactly. Assertion 1
@@ -258,9 +279,19 @@ introduced to remove.
 >   defaults are applied before BEFORE triggers, so `NEW.requested_at` is always populated.
 >   `CURRENT_DATE` and `NOW()` in a function are the **session's** time zone, UTC here (§7.94),
 >   and `today_sg()` would put a backfilled or late-inserted row in the wrong year.
-> - **Assertion (pass/fail):** a pgTAP case inserting with `requested_at` set to
->   `'2025-12-31 23:30:00+08'` must mint `PKG-2025-…`, not `PKG-2026-…`. Test the guard **at
->   its boundary** — §7.94's 14-test file missed a live bug because every test sat far from it.
+> - ~~**Assertion (pass/fail):** a pgTAP case inserting with `requested_at` set to
+>   `'2025-12-31 23:30:00+08'` must mint `PKG-2025-…`, not `PKG-2026-…`.~~ **THIS ASSERTION
+>   CANNOT FAIL — corrected 2026-08-09 while implementing.** 23:30 SGT on 31 Dec is 15:30
+>   **UTC on the same day**, so the SGT-correct and the UTC-broken derivations *both* answer
+>   2025. Written that way it passes against the exact bug it was written to catch; verified
+>   by running it against `to_char(NEW.requested_at, 'YYYY')`, where it stayed green.
+>   **The discriminating case is `'2026-01-01 00:30:00+08'`** — still 2025 in UTC — which
+>   goes red under the broken version and green under the correct one. Both cases are in
+>   `package_references.test.sql`; the second is the one doing the work. Generalised as
+>   **§7.105**: before writing a boundary case, ask which value would *differ* if the guard
+>   were wrong. Test the guard **at its boundary** — §7.94's 14-test file missed a live bug
+>   because every test sat far from it — but pick the side of the boundary where the two
+>   answers disagree.
 > - **Assertion:** `LPAD(v_n::TEXT, GREATEST(4, length(v_n::TEXT)), '0')` — copy
 >   `20260802000800_reference_overflow.sql:38` byte-for-byte, and pin the 10,000th reference in
 >   pgTAP the way `payment_collection.test.sql:158` does. Plain `LPAD(…, 4, '0')` **truncates**.
@@ -360,6 +391,13 @@ minting: an incoming PayNow line has to be matchable to a request.
 >    business can pay.** A blank `display_name` reaches the same place via `paynow.ts:75`, and on
 >    native the `Platform.OS === "web"` gate (`paynow.tsx:109`) sends **every** parent there
 >    unconditionally.
+>
+> **✅ THE STRUCTURAL OPTION WAS TAKEN.** The upload is collapsed behind
+> *"Fallback QR image — advanced"*, always present. The conditional-hide branch below was
+> **not** built, so its mandatory dry-run gate never applied. `verify-paynow-fallback.mjs`
+> asserts the disclosure survives all three PayNow states and was proven red by applying the
+> naive `hasPaynowId` hide. The `paynow_uen`-has-no-validation watch item is filed in
+> `BACKLOG.md` as *"A PayNow ID can be saved that no QR can be built from"*.
 >
 > - **Structural mitigation — prefer this and say why if you don't take it:** do NOT gate on
 >   *"a proxy string exists"*. **Collapse the upload behind a disclosure ("Fallback QR image —

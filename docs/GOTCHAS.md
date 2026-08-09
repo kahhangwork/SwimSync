@@ -1735,3 +1735,75 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       marked. Reach for the marking floor only when the fixture is *about* the floor.
     - The same asymmetry is why `is_active` and lesson dates are worth a second look in any
       fixture touching a weekly class. (2026-08-09.)
+
+104. **`current_user = 'authenticated'` IS DEAD CODE INSIDE A `SECURITY DEFINER` FUNCTION,
+    AND IT FAILS OPEN.** That comparison is the codebase's standard client seam —
+    `pin_invoice_public_fields`, `pin_parent_identity` and `enforce_parent_package_lifecycle`
+    all use it, and all three are deliberately *plain* functions for exactly this reason
+    (`20260720000100:365` says so out loud). Inside a DEFINER function `current_user` is the
+    function's **owner**, so every such branch reads `postgres` and waves the client
+    straight through.
+    - **Where it bit (2026-08-09):** `assign_parent_package_reference()` must be DEFINER —
+      it is the only thing allowed to call `next_package_ref`. Its first version refused a
+      client-supplied `reference_number` with this seam. The refusal never fired; a parent
+      could name their own reference, which does not merely mislabel their row — the
+      tenant's counter stays behind it, so the **next genuine request draws the squatted
+      number and dies on the unique constraint**, breaking the buy-a-package path for that
+      whole business.
+    - **Caught only because the pgTAP case expected a raise and got a successful insert.**
+      A test asserting the happy path would have been green.
+    - **Rule:** a DEFINER function may not ask *who is calling*. Either make the rule
+      unconditional (the fix here: mint the reference always, discarding whatever arrived),
+      or put the role check in a **separate plain trigger** and let the DEFINER one do only
+      the privileged work.
+    - Sibling trap, same shape: `SECURITY DEFINER` also defeats RLS on reads inside the
+      function, which is why the packages lifecycle trigger is plain. (2026-08-09.)
+
+105. **A BOUNDARY TEST IS ONLY WORTH THE CASES WHERE THE TWO ANSWERS DISAGREE.**
+    `WAVE_1_PLAN.md`'s RISK 6 named the assertion itself: *"a pgTAP case inserting with
+    `requested_at` set to `'2025-12-31 23:30:00+08'` must mint `PKG-2025-…`"*. That case
+    **passes under the bug it was written to catch** — 23:30 SGT on 31 Dec is 15:30 UTC on
+    31 Dec, so the SGT-correct and UTC-broken derivations both answer 2025.
+    - The discriminating case is the other side of midnight: **`'2026-01-01 00:30:00+08'`**
+      is still **2025** in UTC. Written that way it goes red on
+      `to_char(NEW.requested_at, 'YYYY')` and green on
+      `to_char(NEW.requested_at AT TIME ZONE 'Asia/Singapore', 'YYYY')` — verified both ways.
+    - **This generalises past time zones.** §7.94 is the same lesson from the other
+      direction: an RPC, its pgTAP file and its driver all shared the UTC assumption and
+      therefore *agreed*, so 14 tests on that exact function stayed green over a live bug.
+      Before writing a boundary case, ask **which value would differ if the guard were
+      wrong** — if none would, the case is decoration.
+    - Applies to the whole SGT family (§7.7): the interesting window is 00:00–08:00 SGT,
+      where SGT and UTC disagree about the **date**, and 00:00–08:00 SGT on 1 January,
+      where they disagree about the **year**. (2026-08-09.)
+
+106. **`.select("a, " + "b")` SILENTLY UNTYPES A SUPABASE QUERY — the error names the
+    wrong thing.** `supabase-js` parses the select string at the *type* level, which needs
+    a string **literal**. TypeScript widens `"a" + "b"` to plain `string`, the parser gives
+    up, and every field access on the result fails with
+    `Property 'total_value' does not exist on type 'GenericStringError'` — which reads like
+    a schema problem and is actually a formatting one.
+    - Wrapping a long select across lines with `+` is the natural thing to do and the
+      existing invoice branch got away with it only because its result was already `any`.
+    - **Rule:** keep a `.select()` on one line however long it gets, or use a template
+      literal with no interpolation. Do not "fix" a `GenericStringError` by casting the
+      row — that is §7.76, where a renamed field then reads blank forever with no error.
+      (2026-08-09.)
+
+107. **`loginExpo` SHORT-CIRCUITS WHEN THE PAGE IS ALREADY SIGNED IN, SO A DRIVER THAT
+    CHANGES PERSONA KEEPS THE PREVIOUS USER AND REPORTS SUCCESS.** Its `authed()` guard
+    asks only *"are we on the app and off /login"* — correct for its own retry loop
+    (§7.62's fix), wrong for a second call with a different email. It logs
+    `loginExpo -> <current url>` and returns, having done nothing.
+    - **The symptom is not a login error.** The run continues as the wrong role, so the
+      failure surfaces as a missing element several checks later —
+      `verify-paynow-fallback.mjs` died on a 12s `waitFor Settings` while still logged in
+      as a parent, on the PayNow screen.
+    - **Fix:** clear the persisted session first —
+      `page.goto(EXPO + "/login"); page.evaluate(() => window.localStorage.clear());`
+      then `loginExpo`. `verify-admins.mjs` has had the admin-panel half of this as
+      `freshLogin()` since 2026-08-06; the Expo half is the same shape.
+    - **Do NOT "fix" this in `lib.mjs`** by making `loginExpo` compare the signed-in email:
+      it is shared with every worktree (§7.56) and its short-circuit is load-bearing for
+      the slow-attempt race it was written for (§7.62). A local `freshLogin` is the right
+      layer. (2026-08-09.)

@@ -5,8 +5,7 @@
 // packages, and demoted the uploaded static image to a collapsed disclosure on
 // the coach's Settings screen. That screen is the ONLY writer of
 // tenants.paynow_qr_url anywhere in the product, and before this file nothing
-// in either test suite and none of the other 38 drivers touched
-// app/(coach)/settings at all.
+// in either test suite and no other driver touched app/(coach)/settings at all.
 //
 // The failure being guarded against is a business with NO way to be paid:
 //   1. an admin types a PayNow mobile with a typo. normalizeSgPhone only

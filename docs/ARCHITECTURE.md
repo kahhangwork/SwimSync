@@ -142,6 +142,29 @@ the shape of the system changes:_
     invisible had a certain cost. **If a second tenant ever exists and a child is moved,
     do not repeat this reasoning for a fresh backfill** — the trigger already stamps
     everything new, so there will never be a reason to.
+- **A TRIGGER'S NAME IS PART OF ITS CONTRACT ON `parent_packages`, AND RENAMING IT IS AN
+  OUTAGE** (2026-08-09, `20260809000100`). Postgres fires same-timing row triggers in
+  **alphabetical order by trigger name**. `trg_parent_package_lifecycle` is what sets
+  `NEW.tenant_id` from the product — the client never sends one, because *"the product
+  decides the business and the terms"* (`20260720000100:268`). So
+  `trg_parent_package_reference` is named to sort **after** it (`…_l` < `…_r`), and that
+  name is the mitigation, not a convention.
+  - **What a rename costs:** a reference trigger sorting first sees `tenant_id = NULL`,
+    `next_package_ref` raises, and **every parent package request fails at the insert**.
+    Verified by doing it: renamed to `trg_a_package_reference`, the parent's insert died
+    with *"cannot number a package for unknown tenant"*.
+  - **Three things defend it, deliberately at different layers**, because ordering is
+    invisible in a schema dump: the name itself; a `RAISE` inside the function naming the
+    expected order if `tenant_id` arrives NULL; and a `pg_trigger` assertion in
+    `package_references.test.sql` that fails on a rename even if the runtime path ever
+    becomes forgiving.
+  - **The pgTAP case must insert AS THE PARENT with no `tenant_id`.** An admin-shaped
+    insert supplies one and passes against the broken name, proving nothing — which is
+    also why the admin path could historically mint a reference against a *different*
+    tenant's counter than the row ends up in.
+  - Generalises: any new `BEFORE INSERT` trigger on a table whose existing trigger
+    *populates* a column you depend on has this constraint. Check `\d <table>` for
+    siblings before choosing a name.
 - **A BUSINESS IS CREATED BY ONE RPC, AND ONLY THE PLATFORM ADMIN MAY CALL IT**
   (2026-07-21, PRD §4.4, `TENANT_PROVISIONING_PLAN.md`). The rules that must not be
   re-derived wrongly:
@@ -484,6 +507,9 @@ the shape of the system changes:_
 | `SwimSyncApp/lib/attendanceSummary.ts` | What a coach's list SAYS about a lesson: the five states, the status breakdown, and the wording. **The display layer's answer, deliberately not the billing gate's** — an empty roster is `no-students` here and vacuously *complete* to `attendanceCompleteness.ts`, and that asymmetry is load-bearing for invoicing (§7.68) |
 | `SwimSyncApp/lib/weekOrder.ts` | Groups the coach's classes by weekday with **today first**. The weekday is a **parameter**, never read from a clock inside — the same shape `timeOfDay.ts` forced after §7.7. Also pins `WEEK_ORDER` to the Postgres `day_of_week` enum's declaration order, which is why `.order("day_of_week")` sorts in week order rather than alphabetically. An unrecognised weekday is **kept and sorted last, never dropped** — losing a class silently is worse than showing it oddly |
 | `SwimSyncApp/lib/invoiceLabel.ts` | The single answer to "what is this invoice called" for the parent app — the `INV-YYYY-NNNN` reference, falling back to the legacy UUID fragment only for rows that predate the trigger. Shared by the invoice list and the detail so the two cannot drift; before it, both printed a UUID fragment while the QR, the reminder and the bank statement said something else (PRD §7.21) |
+| `supabase/migrations/20260809000100_package_references.sql` | `PKG-YYYY-NNNN` on `parent_packages`: counter, `next_package_ref`, the assignment trigger **named to sort after the lifecycle trigger** (see §6), and the pin. The header is the design record — read it before renaming anything on that table |
+| `supabase/rollback/20260809_package_references_DOWN.sql` | Purely additive migration, so purely DROPs — but running it **destroys every minted reference**, and re-applying renumbers from 1. Export `reference_number` first if any package payment has been collected |
+| `.claude/skills/run-ui-playwright/drivers/verify-paynow-fallback.mjs` | The only coverage anywhere for `app/(coach)/settings`. Drives all three PayNow states, including the **stored-but-unencodable** proxy that decides whether the fallback upload may ever be conditionally hidden (it may not). Restores the seed tenant's PayNow columns in a `finally` |
 | `SwimSyncApp/lib/useCoachHasPayouts.ts` | Whether the **My Pay** tab exists. ⚠ Runs in the coach ROOT layout, so its blast radius is the whole coach app — every failure path resolves to `false` and it **never gates render**. Keyed to the session because the layout mounts during the post-login redirect, and an anonymous read would otherwise pin "no payouts" for the whole session. Uses `coach_payouts` and **not** a rate: `coach_rates` is admin-only RLS, so a coach cannot read their own rate at all |
 | `SwimSyncApp/lib/timeOfDay.ts` | Time of day in Singapore. Coach-only, **not** in the `lessonDates.ts` twins. Only `nowMinutesInSg()` knows about timezones; everything comparing times takes a plain number, so it **cannot** read a clock and therefore cannot read the wrong one (§7.7) |
 | `SwimSyncAdmin/lib/tableSort.ts` | One comparison rule for all 22 admin tables. Blanks last in **both** directions, numeric-aware, weekdays in week order, stable, and ISO dates compared as text so nothing constructs a `Date` (§7.7-proof by construction) |

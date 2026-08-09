@@ -1154,6 +1154,16 @@ individual coach's QR would send a parent's payment to the wrong person. A priva
 is their own business, so nothing changes for them. A *school* coach sees the QR
 read-only and is told to ask their admin.
 
+*(implemented 2026-08-09 — the QR image is no longer the primary mechanism)* Since
+§7.21 the primary way a parent pays is a **computed QR built from the business's PayNow
+ID**, entered on the admin panel. The coach-Settings card therefore leads with whether
+that ID is set, and the image upload sits **collapsed behind "Fallback QR image —
+advanced"** — always present, never conditionally removed (§7.21 explains the outage
+that hiding it would cause). The same screen gained an **Open admin panel** link to
+`admin.swimsync.sg`, shown only to a coach who is also a tenant admin — a plain coach
+does not see it at all, because the panel's own door refuses them (a disabled link would
+still advertise a tool they cannot use).
+
 ### 7.11 Parent Portal
 
 SwimSync shall provide parent-facing views.
@@ -1444,6 +1454,16 @@ cash paid always equals value granted — nothing to reconcile.
   the app, pays the business's QR, and the admin confirms receipt — which activates the
   package and starts its validity clock. Admins can also record offline sales directly.
   Both steps email the parent (business-branded, best-effort, isolated).
+  *(implemented 2026-08-09)* **A package request is now identified like an invoice.** It
+  carries **`PKG-YYYY-NNNN`**, numbered within the business — the year from the request's
+  own timestamp in Singapore time, never the clock — and its PayNow screen builds the
+  same **dynamic QR with amount and reference locked** that an invoice has had since
+  §7.21. The admin's Packages page shows the reference on the pending queue and on held
+  packages, which is the point of minting it: an incoming bank line has to be matchable
+  to a request. Before this, a package purchase was the one payment in the product a
+  parent made by scanning a static image and typing the amount by hand — the exact
+  unattributable payment §7.21 exists to remove. The reference is assigned by a database
+  trigger and is not client-writable, on insert or update.
 - **Multiple packages draw earliest-expiry-first.** Expiry is checked against the
   **lesson's own date** — a package that expires between the lesson and the invoice run
   still pays for lessons taken while it was live, and coverage starts at confirmation
@@ -1851,8 +1871,24 @@ directly, and no gateway takes a percentage. What the product supplies is
   invoice then renders an EMVCo QR with the **amount and reference locked in**,
   computed client-side (`SwimSyncApp/lib/paynow.ts`, pinned to an independent
   generator's test vector). The generator **throws on dubious input** rather than
-  encode a wrong-but-scannable QR. The uploaded static QR image remains as the
-  fallback for package requests and unconfigured tenants.
+  encode a wrong-but-scannable QR.
+  *(implemented 2026-08-09)* **A package request now gets the same QR** — see §7.16 —
+  so "the static image is the fallback for package requests" is no longer true. What
+  the static image is now: the fallback for **native builds** (no canvas) and for a
+  business whose stored PayNow ID cannot be encoded. The coach-Settings upload that
+  writes it is **collapsed behind a disclosure but never removed**, and the reason is
+  the failure it prevents: `normalizeSgPhone` only strips non-digits and `checkSgPhone`
+  never blocks, so a nine-digit mobile saves cleanly, `selectPayNowProxy` calls the
+  business *configured*, the generator throws, and a business whose upload had been
+  hidden would have **no way to be paid at all**.
+  *(implemented 2026-08-09)* **The no-QR state is payable rather than a dead end.**
+  When neither QR can be produced but the business has a PayNow ID, the parent's screen
+  shows that **ID, the amount and the reference as selectable text** under *"Transfer to
+  this PayNow ID"* — the flow every SwimSync parent used before 2026-08-02. A business
+  that has genuinely configured nothing gets distinct copy naming the fix (*"This
+  business hasn't set up PayNow yet"*), replacing *"QR not uploaded yet. Contact your
+  coach directly"*, which sent the parent to chase someone who might not be able to fix
+  it.
 - **A tokenized public invoice page** — `swimsync.sg/invoice/<128-bit token>`, no
   login, served by the `public-invoice` Edge Function (deliberately not an anon RPC —
   §7.39). Shows business name, month, child **first names only**, amount, reference
