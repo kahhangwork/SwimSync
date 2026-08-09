@@ -324,3 +324,78 @@ export async function pressClassButton(page, classTitle, maxLevels = 12) {
   console.log(`pressed card button: ${classTitle}${ok ? "" : " (NOT FOUND / AMBIGUOUS)"}`);
   return ok;
 }
+
+// ── Table column geometry ───────────────────────────────────────────────────
+// LIFTED VERBATIM from verify-levels-table.mjs on 2026-08-09 so more than one
+// of the sixteen admin tables can be measured.
+//
+// ⚠ THAT DRIVER STILL HAS ITS OWN INLINE COPY, AND DELIBERATELY SO. It was NOT
+// rewritten to import this — it is the CALIBRATED REFERENCE, measured against a
+// real 488px-broken page, and an edit to this shared helper must not be able to
+// change what it asserts (its 12/12 is the regression baseline). So there are
+// two copies on purpose. If you change the measurement here, re-measure there
+// before assuming they still agree — §7.98 is exactly the cost of assuming two
+// "identical" helpers are identical.
+//
+// WHY GEOMETRY AND NOT TEXT. levels/page.tsx once wrapped its <Th>s in a <Tr>
+// while <Thead> already emitted one, producing <tr> inside <tr>: the headers
+// collapsed into a single anonymous cell and drifted hundreds of pixels from
+// the data they name. EVERY TEXT ASSERTION PASSED — the labels were present,
+// correctly spelled, in the right order, and in the wrong place. It shipped
+// visibly broken for a week (§7.54). So this measures rects from the DOM.
+//
+// CALIBRATION — measured, not guessed (1280px viewport):
+//   broken → worst header/data offset 488px    fixed → 0px
+// TOLERANCE is 2px: a ~244x margin against the broken value while still
+// absorbing sub-pixel layout and font rounding. DO NOT raise it without
+// re-measuring the broken case — a tolerance that no longer separates the two
+// states is a check that has quietly stopped checking.
+//
+// ⚠ DO NOT "improve" this by asserting on React's validateDOMNesting warning.
+// Against the known-broken page React logged NOTHING and that check passed —
+// a green tick on a page that was visibly wrong.
+export const TABLE_GEOMETRY_TOLERANCE = 2; // px — see CALIBRATION above
+
+// Measures the first table on the page. Returns null when there is nothing to
+// measure — no <table>, or no data row with more than one cell (an empty state
+// renders a single full-width "nothing here" cell, which has no column to be
+// misaligned against). A null is a SKIP, and a skip must be logged and must
+// never be counted as a pass: a page reported as "checked" when it had no rows
+// is exactly how §7.54 survived a week, and how §7.100 survived two weeks.
+export async function measureTableGeometry(page) {
+  return page.evaluate(() => {
+    const table = document.querySelector("table");
+    if (!table) return null;
+    const ths = [...table.querySelectorAll("thead th")];
+    if (ths.length === 0) return null;
+    const firstDataRow = [...table.querySelectorAll("tbody tr")].find(
+      (tr) => tr.querySelectorAll("td").length > 1
+    );
+    if (!firstDataRow) return null;
+    const tds = [...firstDataRow.querySelectorAll("td")];
+    return {
+      headerTexts: ths.map((t) => t.innerText.trim()),
+      thCount: ths.length,
+      tdCount: tds.length,
+      nestedTrInThead: table.querySelectorAll("thead tr tr").length,
+      cols: ths.map((th, i) => ({
+        header: th.innerText.trim(),
+        thLeft: Math.round(th.getBoundingClientRect().left),
+        tdLeft: tds[i] ? Math.round(tds[i].getBoundingClientRect().left) : null,
+        // Width is REPORTED, never asserted. §7.71: a table whose columns all
+        // carry `w-full` renders one of them at ~110px while every text
+        // assertion still passes. Alignment cannot see that — the header and
+        // its data are both squeezed, together — so a caller prints narrow
+        // columns for a human and does not fail on them.
+        thWidth: Math.round(th.getBoundingClientRect().width),
+      })),
+    };
+  });
+}
+
+// Settle the page before measuring. A webfont landing between layout and
+// measurement is the likeliest source of drift in every number above.
+export async function settleForMeasurement(page, ms = 300) {
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(ms);
+}
