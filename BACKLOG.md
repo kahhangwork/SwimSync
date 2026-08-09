@@ -728,6 +728,29 @@ recorded. Those lessons are unbillable and, today, **invisible**.
   item changed — `book_makeup()` and `book_trial()` check the same floor and the same gap
   is still open for them.
 
+### `verify-schedule-week.mjs` fails two COMING UP checks — **S** `[driver]`
+Two checks are red: *"a COMING UP row never opens the attendance screen"* and *"…it opens the
+class roster instead"*. The row it presses lands on
+`/classes/<id>/attendance?date=<last Monday>&from=schedule` instead of the roster.
+
+**PRE-EXISTING, and measured as such on 2026-08-10** — reproduced with the day's app changes
+`git stash`ed and the fixture freshly loaded: identical 17/19 both ways. It is **not** the
+`sessionId` removal and not the roster change.
+
+**Most likely the driver, not the product.** It expands a day with
+`getByText(/^\w{3}, \d+ \w{3}$/).last()` and then presses `getByText("Stale Screen Club").last()`.
+`fixtures-stale-screen.sql` derives its dates from today, and the run that exposed this was a
+**Monday**, which puts the fixture's unmarked straggler (*Mon, 3 Aug*) one clean week back — so
+a NEEDS MARKING copy of the same class title is on screen and `.last()` can walk to it instead
+of the COMING UP row. That is §7.98's shape exactly, and §7.73's calendar dependence.
+
+**Notes:** confirm which it is before changing anything — the check itself guards something
+real (a future lesson cannot be marked, so its row must not reach the attendance screen, whose
+only exit is a replace back). If it is the locator, scope it to the COMING UP section rather
+than relaxing the assertion. The last full nightly (2026-08-08) was red on `verify-trials`
+only, so this either started with the 2026-08-09 changes or is weekday-dependent — both
+distinguishable by running it on a non-Monday.
+
 ### The admin's invoice pre-flight misses an unmarked EXTRA lesson — **S**
 `SwimSyncAdmin/lib/classCoverage.ts` and `generate-invoices/core.ts` are two copies of one
 rule, and on 2026-08-10 they were brought into line in ONE direction only. The engine unions
