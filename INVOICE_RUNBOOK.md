@@ -191,6 +191,13 @@ Billing is based on **actual attendance**, so make sure last month is complete:
   `billing_periods` and later runs skip it with *"already_complete"*. The
   result message says **"This month is complete and now closed."** A month with
   unmarked attendance is deliberately **left open** so a later run can finish it.
+  - **A class with NOBODY ENROLLED can block the month, and that is not a bug**
+    *(2026-08-10)*. If a trial or make-up guest was booked into a lesson and nobody
+    marked it, that lesson holds the month open even though the class has no
+    students on its roster. Mark it the way you would any other — the coach's
+    **NEEDS MARKING** list shows it, and so does the class's own page. Before this
+    the guest's lesson was silently skipped and the month closed over it, which
+    lost that money for good.
   - **A month with nothing recorded is never closed.** Running generation before
     any attendance is marked reports *"No lessons are recorded … the month is
     still open"* and seals nothing. (Until 2026-07-18 it sealed such a month and

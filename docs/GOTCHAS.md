@@ -1938,3 +1938,93 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       fixture makes it free. Same family as §8.36's non-hermetic `verify-levels`, reached
       through a different door: there the second same-day run died, here the run *after a
       failure* did. (2026-08-09.)
+
+114. **`.in("col", [])` IS NOT AN EMPTY FILTER — IT IS A REJECTED REQUEST, AND `?? []`
+    SWALLOWS IT.** supabase-js renders an empty array as PostgREST `col=in.()`, which the
+    server refuses. supabase-js reports that as `data: null`, and the near-universal
+    `(data ?? [])` idiom then turns a failed request into an empty result set that reads
+    exactly like "nothing matched".
+    - **Where it nearly bit (2026-08-10):** widening `core.ts`'s per-class guards let a
+      *guest-only* class — nobody enrolled, nobody marked, one booked guest — reach two
+      queries that had always been protected by an earlier `continue`:
+      `.in("student_id", billableStudentIds)` and `.in("id", billableStudentIds)`. The class
+      would still have blocked the month correctly, so **the broken request would have
+      produced no visible symptom at all** — the worst kind, because the next feature to rely
+      on those rows inherits a silent hole.
+    - **Fix:** skip the query on an empty set, in the shape the file already uses elsewhere —
+      `const { data } = ids.length ? await supabase… : { data: [] as Row[] }`. Do not "fix"
+      it by defaulting the array to a sentinel id; that is a real query returning real
+      nothing, which is slower and lies in a different direction.
+    - **Where else to look:** any `.in()` whose array is built by filtering. The guard that
+      made it non-empty is often several screens away from the query. (2026-08-10.)
+
+115. **READ A FUNCTION BODY FROM `pg_get_functiondef()`, NEVER FROM THE MIGRATION THAT
+    FIRST CREATED IT.** `CREATE OR REPLACE` means the newest definition can live in any
+    later migration, and grep finds the oldest one first.
+    - **Where it bit (2026-08-10):** both `BACKLOG.md` and an adversarial review stated that
+      `book_trial()` had no `markable_floor()` guard, citing `20260725000800_book_trial.sql`.
+      It has had one since `20260806000200_markable_floor.sql`. A planned migration step —
+      "add the floor guard" — was therefore about to re-add a guard that existed, and the
+      review's risk rating was built on it. Caught only because the plan carried its own
+      instruction to take the body from the live database.
+    - **Fix:** `docker exec supabase_db_SwimSync psql -U postgres -d postgres -At -c "SELECT
+      pg_get_functiondef('public.<fn>'::regproc);"` before editing, and diff against it after
+      applying. The same command is the §7.93 rollback check, so it costs nothing extra.
+    - **The general form:** this is §8.38's "ask the code, never inherit a list" applied to a
+      single function. An inherited claim about code is a claim about code *as it once was*.
+      (2026-08-10.)
+
+116. **`service_role` BYPASSES RLS, NOT CHECK CONSTRAINTS — AND A NEW CONSTRAINT WILL KILL
+    ANY FIXTURE THAT BUILDS A STATE THE PRODUCT CANNOT.** Test fixtures and seed files write
+    as `postgres` or `service_role` and get used to nothing ever refusing them. A table
+    constraint refuses them exactly like anyone else.
+    - **Where it bit (2026-08-10):** `20260810000100` added
+      `CHECK (is_active = true OR deactivated_at IS NOT NULL)` to `classes`.
+      `makeup_bookings.test.sql` had been inserting a retired class with no `deactivated_at`
+      to exercise `book_makeup()`'s refusal. The INSERT raised `23514`, the transaction
+      aborted, and the file reported **"You planned 26 tests but ran 0"** — a parse-error
+      shape that names neither the constraint nor the line.
+    - **How to read that symptom:** `Bad plan. You planned N but ran 0` means the file died
+      before its first assertion, which is almost always the fixture. Run the file directly
+      through `psql` and read the first `ERROR:`; `supabase test db` summarises it away.
+    - **And the finding is worth more than the fix:** a fixture that constructs a state the
+      product can no longer produce is testing a fiction. Fix it by building the state the
+      way a user would — here, adding the date — not by dropping the constraint for tests.
+      (2026-08-10.)
+
+117. **A `throws_ok` / `lives_ok` PAIR CAN BE POISONED BY A UNIQUE INDEX WHEN YOU SABOTAGE
+    IT.** The §7.112 fix is to pair every refusal with a `lives_ok` on an otherwise-identical
+    subject, so deleting the guard flips the pair. But if the guarded call WRITES on success,
+    the sabotage run's `throws_ok` now succeeds and inserts a row — and the partner, re-running
+    the identical call, dies on a duplicate key instead of passing.
+    - **Where it bit (2026-08-10):** `booking_class_active.test.sql` paired
+      "`book_trial()` refuses a retired class" with the same call after `reactivate_class()`.
+      `trial_bookings_live_slot_uniq` is `UNIQUE (student_id, class_id, session_date) WHERE
+      cancelled_at IS NULL`, so the sabotage run turned BOTH red. The partner's red was
+      collateral — it says nothing about the guard, and it would mask a genuine regression in
+      the partner itself.
+    - **Fix:** give the partner its own key — here, the same class and weekday one week later.
+      It still proves the subject is otherwise valid, and now only the `throws_ok` moves.
+    - **How to notice:** an idempotent function (`ON CONFLICT DO NOTHING`) has no such problem,
+      so a file with two pairs can show one clean and one poisoned — which is exactly what
+      happened. **Record the measured sabotage signature in the file header** (which assertions
+      go red), so a future change producing a *different* set is visibly not the same change.
+      (2026-08-10.)
+
+118. **A UI DRIVER THAT LEAVES A ROW BEHIND WILL BREAK ITS OWN NEXT RUN — AND THE FAILURE
+    WILL LOOK LIKE A PRODUCT BUG.** §7.113 is the same lesson for fixtures; this is the case
+    where the driver has **no fixture at all** and treats the seed as one.
+    - **Where it bit (2026-08-10):** `verify-trials.mjs` books a trial with a unique name each
+      run and never removes it. Run 1 marks its guest and passes. Run 2 books a second guest
+      onto the *same lesson*, and the driver's `getByText(/^Present$/).first()` marks only one
+      of them — **the attendance screen refuses to save until every student on the lesson has a
+      status**, so nothing saved and run 2's own guest stayed unmarked. Three consecutive runs
+      failed a check the product was satisfying perfectly.
+    - **Two fixes, both needed.** Use the **"Set all" menu** rather than one row's button, so
+      the step does not depend on how many rows previous runs left. And assert on a **count**
+      (`NEEDS MARKING (N)` before vs after) rather than presence/absence, so the assertion
+      still means something when the backlog holds unrelated leftovers.
+    - **The vacuity trap sitting next to it:** the first version asserted
+      `!afterSave.includes(KID)`. NEEDS MARKING renders the class and the date and **never the
+      child's name**, so that expression was true before marking as well — a check that could
+      not fail. Before asserting a string is absent, confirm it was ever present. (2026-08-10.)

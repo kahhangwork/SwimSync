@@ -270,6 +270,36 @@ the shape of the system changes:_
     and that is both the conservative side of the deadlock and exactly how they behaved
     before, when the scan skipped them. Do not "fix" this by defaulting the column to
     `created_at` or to the month start.
+    > **Since `20260810000100` that row CANNOT EXIST** —
+    > `CHECK (is_active = true OR deactivated_at IS NOT NULL)`. The branch is kept in
+    > `core.ts` anyway, because removing it leaves `new Date(String(null))` → Invalid Date
+    > for anything that ever slips through, which fails silently; unreachable defence with a
+    > loud alternative is worth two lines (contrast §7.110, where the unreachable arm's
+    > failure mode was a loud throw and it was deleted). The constraint is also what makes
+    > `deactivate_class()` the ONLY way to retire a class: `classes_write` is `FOR ALL TO
+    > authenticated` and `20260804000600` grants UPDATE, so a raw PostgREST write could
+    > otherwise skip all three refusals (§7.32 — the screen was the only limit).
+- **A BOOKING IS EXPLICIT EVIDENCE, AND THE ENGINE MUST NEVER CLAMP ONE** (`20260810000100`,
+  `core.ts`). `expectedDates` is a *guess* the engine derives from a weekday, so it is
+  clamped by `lastScheduledDate`. A `trial_bookings` / `makeup_bookings` row is a statement
+  that a **named child was expected at a named lesson**, made by an admin through an RPC; it
+  cannot be spuriously generated, so it needs no bound and must always reach the
+  completeness gate.
+  - **Why this is written down rather than left to taste:** a clamp was drafted, and it
+    would have re-created the exact underbill the change existed to close — dropping every
+    booking date for any class with a null `lastScheduledDate` and sealing over the guest.
+  - **The prohibition is structural, not advisory.** The CHECK constraint above means no row
+    with a null `lastScheduledDate` exists, so a future clamp has nothing to clamp *and* no
+    reachable state to justify itself with. If anyone re-adds one, they must first record a
+    product path that can create the state it defends against.
+  - The two `continue` guards at the top of the per-class loop each carry the third term
+    `!bookingsByDate.size` for the same reason. **Do not instead widen
+    `billableStudentIds`** — four consumers read that set, and widening it is safe only by
+    coincidence of the item loop iterating `parentStudents`.
+  - **`SwimSyncAdmin/lib/classCoverage.ts` is the same rule, second copy** (§7.18). It had
+    this right before the engine did, which is why the admin's Generate dialog *named* a
+    guest-only class's missing lesson while the engine skipped it. They still differ in the
+    other direction — `classCoverage` does not union session dates — filed in `BACKLOG.md`.
   - **`reactivate_class()` must never grow a refusal.** It is the only exit from a class
     that is blocking a month while being invisible everywhere else; anything that can
     refuse it can strand a business. Its counterpart `deactivate_class()` carries three

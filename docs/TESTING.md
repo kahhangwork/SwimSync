@@ -84,6 +84,7 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `audit_log_tenant.test.sql` (8) | every audit row knows its business: the stamp follows the **entity** across a tenant boundary (a `Student` row takes the student's business, not the actor's), `lesson_session` resolves through its class, a **supplied `tenant_id` is overwritten** by the derived one, an unknown `entity_type` **RAISES** rather than writing an invisible row, a writer that sets no `tenant_id` (`schedule_extra_lesson`) comes out stamped anyway, and the narrowed INSERT policy **both ways** — a coach may audit a session they own and may **not** fabricate a row about a student |
 | `students_audit.test.sql` (11) | the `students` audit trigger (`20260809000200`). **The "still succeeds" half is the point** — this trigger's failure mode is not a missing audit row, it is a REFUSED STUDENT EDIT, so every write here is made as the role that actually makes it: a test that only writes as `postgres` passes against the broken build, because the owner is exempt from the policy the bug trips over. Assertion 1 (the admin level picker) dies with **42501** the moment the function is `ALTER`ed to `SECURITY INVOKER`, taking the whole transaction and assertions 2–11 with it — which is the honest picture of that bug: not one broken screen, every student edit in the product. Assertions 9–10 (a `postgres` and a `service_role` UPDATE with no JWT) die with **23502** if the NULL-actor guard is removed, which is what would fail the next data-fix migration against production. Also: the parent's own edit-child path asserted separately from the admin's (§7.86 — different RLS route), `to_jsonb(OLD)` carrying **what the phone number used to be**, `tenant_id` arriving from `set_audit_log_tenant`'s derivation rather than from the trigger, and a no-op UPDATE recording nothing |
 | `class_deactivation.test.sql` (23) | retiring a class (`20260809000300`) — `deactivate_class()` / `reactivate_class()` and the `class_unmarked_lesson_dates()` helper. **Every refusal is tested in BOTH directions, and that is the file's structure, not padding**: a guard that refuses everything satisfies all three refusal assertions on its own (`markable_floor.test.sql` is the precedent). Each of the three was proven red by **breaking it in the database and re-running** — enrolment refusal rewritten as `WHERE is_active` (§7.66) kills assertion 5, dropping the `makeup_bookings` arm kills 9, deleting refusal 3 kills 11. Two assertions had to be re-aimed to get there and the reasons are §7.111 and §7.112: assertion 5's fixture enrolment spans **exactly one marked date**, because a wider span let refusal 3 do the refusing and the §7.66 bug went undetected; and the cross-tenant assertion targets the **already-retired** class, because pointed at an enrolled one it went green from the enrolment refusal's own `P0001`. Assertion 2 pins the deliberate decision that an **EMPTY class IS retired** (§7.17 — all three refusals are "nothing went wrong" negatives). Assertions 14–15 reach the helper's enrolment and make-up arms directly, since neither is reachable through `deactivate_class()` once refusals 1 and 2 have passed. Also: `deactivated_at` recorded and cleared, a second press NOT moving it (it is what the engine bills against), and `reactivate_class()` tenant-scoped — its only barrier, since it has no refusals |
+| `booking_class_active.test.sql` (14) | nothing new can be put into a RETIRED class (`20260810000100`) — `book_trial()` and `schedule_extra_lesson()` refuse one, plus the `classes` CHECK that makes `deactivate_class()` the only way to retire. **Every refusal is paired with a `lives_ok` on the same subject after `reactivate_class()`**, because `book_trial()` carries six other refusals and `throws_ok(…, 'P0001', NULL, …)` matches any of them (§7.112); the message is asserted, and assertions 1–2 pin that the subject date is above the floor and IS the class's weekday, so neither of those guards can be what fires. The fixture retires its subjects through `deactivate_class()` rather than a raw UPDATE — the product's own path, and the only one the new constraint permits. **The measured sabotage signature is in the file header** (red: 4, 5, 7, 8, 10, 11, 13; green: 6, 9, 12, 14) so a change producing a different set is visibly not this change. The trial partner books **one week later** on purpose: on a sabotage run the refusal does not fire, the call succeeds, and an identical re-run dies on `trial_bookings_live_slot_uniq` instead of passing — §7.117 |
 | `parent_link_forgery.test.sql` (9) | the two forged links closed by `20260804000500`, reproduced as HTTP 201/201/200 before the fix: a self-registered **stranger** cannot insert their own `parent_tenants` row naming an arbitrary business (so the `join_code` stays invisible), cannot attach themselves to an arbitrary child, and therefore cannot modify that child — `students_update` is untouched and correct, it was ownership that was forgeable (§7.86). Assertion 1 is the positive control that makes a silently-superuser run visible (§7.16); 7–9 are the **green guard** that the join code and Add Child still work, because the failure this file must not hide is an onboarding outage |
 | `table_grants.test.sql` (6) | the standing invariant behind `20260804000600`, over `pg_class`/`pg_policies` so a table added next month is covered on the day it is created: `authenticated` holds a table privilege **if and only if** a policy could permit it (both directions, failures named), no TRUNCATE/REFERENCES/TRIGGER anywhere, `anon` holds nothing, no postgres-owned default privilege names either role, and nothing escapes the invariant's reach (views/partitions/foreign tables, plus **column-level** ACLs, which `has_table_privilege()` cannot see and a table-level REVOKE does not remove). **Scoped to `authenticated` + `anon` deliberately** — it is false for `service_role` (bypasses RLS) and meaningless for `postgres` (owns the tables), and a test that is red against a correct database gets disabled (§7.87). Excludes extension-owned relations, or pgTAP's own views fail it inside its own harness |
 | `stranger_isolation.test.sql` (4) | the persona no other isolation file covers — a self-registered parent belonging to **nothing**, which is what an attacker is, since signup is open. Sweeps **all 37 tables at once** and asserts they see only their own `profiles` and `parents` row; assertion 1 pins what a real member sees across 15 tables so "sees nothing" can never pass vacuously, assertion 3 proves the sweep covered every table rather than a subset, and assertion 4 proves the one profile they read is *theirs*. One forged link takes it red naming **six** tables, two of which were not on the list when it was written — which is the argument for sweeping rather than naming |
@@ -139,10 +140,27 @@ with nothing recorded must NOT block (§7.109's deadlock), and a lesson unmarked
 ways** — a naive `.eq("is_active", true)` deletion fails the first pair, a blanket
 exemption instead of a `deactivated_at` date clamp fails the second. Also: a class
 retired at month end still bills what it taught (the BACKLOG item's actual complaint),
-dates after deactivation not expected, and the legacy row (inactive, no date) expecting
-nothing while still billing what it recorded. **No `completeMonth()` in the two gate
+dates after deactivation not expected, and — since 2026-08-10 — the legacy row
+(inactive, no date) asserted as **unconstructible** rather than as an engine behaviour:
+`classes_inactive_requires_deactivated_at` refuses that shape, so the case now proves the
+UPDATE raises `23514` and the class is untouched. **`service_role` does not bypass a CHECK
+constraint** (§7.116), and the old version performed the same write without checking its
+error, so it would have gone on believing the class was retired. **No `completeMonth()` in the two gate
 cases, deliberately** — §7.111: it satisfies the gate under test and both cases were
 vacuous until the call was removed.
+
+_And (added 2026-08-10):_ **`guestOnlyClass.test.ts`** (4) — the unmarked-booking
+underbill. A class with no ACTIVE enrolments but an unmarked trial or make-up booking was
+skipped by both of `core.ts`'s early guards, so the guest was neither billed nor blocking
+and any other class billing **sealed** the month over them. **Only cases 1 and 2 are
+evidence the bug existed** (proven red by reverting both guards; case 1 fails with
+`sealed === true`, which is the bug itself). Cases 3 and 4 pass without the fix and that is
+correct: 3 is the counterweight — an entirely empty class must still not block, the
+mirror-image failure WAVE_1_PLAN ranked first overall — and 4 pins that a MARKED guest
+still bills, which a naive "widen `billableStudentIds`" fix would have put at risk. Do not
+"strengthen" 3 or 4 into failing cases. Case 1 uses `completeMonth()` on the **other**
+class deliberately: without it that class blocks too and `sealed === false` would be true
+whatever the guest class did (§7.111 applies only to the class under test).
 
 _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
@@ -397,10 +415,22 @@ an enrolment) but **is** on the attendance screen for their own lesson, labelled
 > **Two changes made it run daily rather than one day in seven.** The target lesson is now
 > the most recent that has fallen due, chosen by comparing ISO option **values** against
 > today-in-SGT (never rendered labels). And marking is reached through the Schedule tab's
-> **NEEDS MARKING**, not the class roster: the roster gates its button on
+> **NEEDS MARKING**, not the class roster: at the time, the roster gated its button on
 > `activeStudentIds.length > 0` — enrolments only — so a lesson whose only attendee is a
-> guest is invisible there, and the seed has zero enrolments, meaning that route could
-> never have worked from a clean reset (the gap itself is a `BACKLOG.md` item).
+> guest was invisible there, and the seed has zero enrolments, meaning that route could
+> never have worked from a clean reset.
+> **That gate was removed on 2026-08-10 and the driver now covers BOTH surfaces** (11 → 16
+> checks). The roster half asserts it no longer reads *"No lessons to mark yet"*, offers
+> *Mark Attendance*, and that pressing it lands on the **guest's own** lesson; the Schedule
+> half is unchanged. Checking one surface alone cannot see a regression on the other, which
+> is the whole point of the pair — the bug was the two disagreeing. Proven red by restoring
+> the enrolment gate: both roster checks fail, the Schedule checks stay green.
+> The last check closes the loop the engine opened — **marking the guest CLEARS the lesson
+> from NEEDS MARKING**, because as of 2026-08-10 an unmarked booking blocks the billing
+> month with no override, and a block with no exit strands a whole business. It is asserted
+> as a **count** (`NEEDS MARKING (N)` before vs after) with the baseline captured first, and
+> marking goes through **Set all** rather than one row's Present — both for reasons that
+> cost real time and are written up as §7.118.
 > Assertions read `visibleText()`, and the unreachable SKIP is now a **FAIL** — exiting 0
 > without asserting is the whole lesson. Scores **6/10 → 11/11**; the phone fix alone is
 > 7/10, so both halves are proven load-bearing (§7.25).
