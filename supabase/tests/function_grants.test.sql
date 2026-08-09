@@ -22,7 +22,7 @@
 -- helpers that had no ACL of their own (§7.25).
 
 BEGIN;
-SELECT plan(3);
+SELECT plan(4);
 
 -- ── 1. THE GENERAL RULE ───────────────────────────────────────────────────────
 -- has_function_privilege() resolves a NULL proacl to the Postgres default
@@ -69,6 +69,18 @@ SELECT ok(
   AND NOT has_function_privilege('authenticated', 'public.next_invoice_ref(uuid,text)', 'EXECUTE')
   AND NOT has_function_privilege('service_role', 'public.next_invoice_ref(uuid,text)', 'EXECUTE'),
   'next_invoice_ref is callable by NOBODY');
+
+-- ── 4. THE THIRD COUNTER, ADDED 2026-08-09 ────────────────────────────────────
+-- next_package_ref (20260809000100) is the same clone again, for
+-- parent_packages. Named for the same reason as the two above: assertion 1
+-- catches it generically, but a named failure says what to fix. Its only
+-- caller is assign_parent_package_reference(), a SECURITY DEFINER trigger that
+-- reaches it as the owner — so service_role must NOT hold EXECUTE either.
+SELECT ok(
+  NOT has_function_privilege('anon', 'public.next_package_ref(uuid,text)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.next_package_ref(uuid,text)', 'EXECUTE')
+  AND NOT has_function_privilege('service_role', 'public.next_package_ref(uuid,text)', 'EXECUTE'),
+  'next_package_ref is callable by NOBODY');
 
 SELECT * FROM finish();
 ROLLBACK;

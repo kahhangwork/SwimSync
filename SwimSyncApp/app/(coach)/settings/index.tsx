@@ -8,6 +8,7 @@ import {
   Alert,
   Image,
   Platform,
+  Linking,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +18,10 @@ import { supabase } from "@/lib/supabase";
 import { confirmAction } from "@/lib/confirm";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
+
+/** The admin panel is a SEPARATE deployment on its own domain — this screen is
+ *  the Expo app, so a relative route would resolve inside the wrong site. */
+const ADMIN_PANEL_URL = "https://admin.swimsync.sg";
 
 export default function CoachSettingsScreen() {
   const session = useAppStore((s) => s.session);
@@ -32,6 +37,19 @@ export default function CoachSettingsScreen() {
   // the QR but cannot change it.
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [canEditQr, setCanEditQr] = useState(false);
+  // Since 2026-08-02 the PRIMARY way a parent pays is a computed dynamic QR
+  // built from the business's PayNow ID (uen/mobile), set on the admin panel.
+  // The uploaded image is the fallback for native builds and for a business
+  // that has not entered an ID yet.
+  const [hasPaynowId, setHasPaynowId] = useState(false);
+  // The upload is ALWAYS reachable, just collapsed. Deliberately not hidden
+  // when a PayNow ID exists: a stored-but-unencodable ID (sgPhone normalises
+  // by stripping non-digits and never blocks, so a nine-digit typo saves
+  // fine) makes buildPayNowPayload throw, the parent's screen falls back to
+  // the image — and if this upload had been removed there is no image, and
+  // NOBODY at that business can be paid. Hiding it is one typo away from an
+  // outage; a disclosure is not.
+  const [showQrUpload, setShowQrUpload] = useState(false);
 
   const loadCoach = useCallback(async () => {
     if (!session) return;
@@ -48,7 +66,7 @@ export default function CoachSettingsScreen() {
     const [{ data: tenant }, { data: profile }] = await Promise.all([
       supabase
         .from("tenants")
-        .select("paynow_qr_url")
+        .select("paynow_qr_url, paynow_uen, paynow_mobile")
         .eq("id", data.tenant_id)
         .maybeSingle(),
       supabase
@@ -59,8 +77,21 @@ export default function CoachSettingsScreen() {
     ]);
 
     setPaynowUrl(tenant?.paynow_qr_url ?? null);
+    setHasPaynowId(
+      Boolean(tenant?.paynow_uen?.trim() || tenant?.paynow_mobile?.trim())
+    );
     setCanEditQr(profile?.role === "tenant_admin");
   }, [session]);
+
+  function openAdminPanel() {
+    if (Platform.OS === "web") {
+      // New tab: this is a different site, and losing the app's state to
+      // navigate away from it is not what "open my admin panel" means.
+      window.open(ADMIN_PANEL_URL, "_blank", "noopener,noreferrer");
+      return;
+    }
+    Linking.openURL(ADMIN_PANEL_URL);
+  }
 
   useEffect(() => {
     loadCoach();
@@ -180,38 +211,101 @@ export default function CoachSettingsScreen() {
             </Text>
           </View>
 
-          {paynowUrl ? (
-            <View className="items-center mb-4">
-              <Image
-                source={{ uri: paynowUrl }}
-                className="w-36 h-36 rounded-2xl mb-3"
-                resizeMode="contain"
-              />
-              <Text className="text-xs text-gray-500">
-                Parents see this QR on their invoices.
+          {hasPaynowId ? (
+            <View className="bg-green-50 rounded-xl p-3 mb-4">
+              <Text className="text-sm text-green-700">
+                Your PayNow ID is set. Parents get a QR with the amount and
+                reference already filled in, so payments arrive matched to the
+                right bill.
               </Text>
             </View>
           ) : (
             <View className="bg-yellow-50 rounded-xl p-3 mb-4">
               <Text className="text-sm text-yellow-700">
-                No PayNow QR uploaded yet. Parents cannot make PayNow payments
-                until you upload your QR code.
+                No PayNow ID set yet. Add your PayNow UEN or mobile in the admin
+                panel (Invoices → PayNow) and parents get a QR with the amount
+                and reference filled in automatically.
               </Text>
             </View>
           )}
 
-          <PrimaryButton
-            label={
-              uploading
-                ? "Uploading…"
-                : paynowUrl
-                ? "Replace QR Code"
-                : "Upload QR Code"
-            }
-            variant="outline"
-            onPress={handleUploadQR}
-          />
+          {/* The uploaded image. ALWAYS present, never conditionally removed —
+              it is the only writer of tenants.paynow_qr_url anywhere in the
+              product, and it is the last resort for native builds and for a
+              PayNow ID that cannot be encoded. Collapsed, so it stops being
+              the primary affordance without becoming unreachable. */}
+          <TouchableOpacity
+            onPress={() => setShowQrUpload((v) => !v)}
+            className="flex-row items-center gap-1 py-1"
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={showQrUpload ? "chevron-down" : "chevron-forward"}
+              size={14}
+              color="#6b7280"
+            />
+            <Text className="text-xs text-gray-500">
+              Fallback QR image — advanced
+            </Text>
+          </TouchableOpacity>
+
+          {showQrUpload && (
+            <View className="mt-3">
+              <Text className="text-xs text-gray-500 mb-3">
+                Used only when a PayNow ID is not set or cannot be turned into a
+                QR. The amount and reference are not filled in, so parents type
+                them by hand.
+              </Text>
+
+              {paynowUrl ? (
+                <View className="items-center mb-4">
+                  <Image
+                    source={{ uri: paynowUrl }}
+                    className="w-36 h-36 rounded-2xl mb-3"
+                    resizeMode="contain"
+                  />
+                  <Text className="text-xs text-gray-500">
+                    Parents see this when no PayNow ID QR can be built.
+                  </Text>
+                </View>
+              ) : null}
+
+              <PrimaryButton
+                label={
+                  uploading
+                    ? "Uploading…"
+                    : paynowUrl
+                    ? "Replace QR Code"
+                    : "Upload QR Code"
+                }
+                variant="outline"
+                onPress={handleUploadQR}
+              />
+            </View>
+          )}
         </Card>
+
+        {/* The admin panel. Gated on the SAME predicate that decides whether
+            this coach may edit the QR (profile.role === 'tenant_admin'), which
+            is also what the panel's own door checks (§7.91) — so a plain coach
+            must not see this at all. Absence is the point: a disabled-looking
+            link still tells them the panel exists. Do NOT loosen the panel's
+            entry gate if this is ever reported as "broken"; that gate is
+            deliberate. */}
+        {canEditQr && (
+          <Card className="mb-4">
+            <MenuItem
+              icon="desktop-outline"
+              label="Open admin panel"
+              onPress={openAdminPanel}
+              last
+            />
+            <Text className="text-xs text-gray-500 mt-2">
+              Classes, students, invoices and your PayNow ID are managed at
+              admin.swimsync.sg.
+            </Text>
+          </Card>
+        )}
 
         {/* Account */}
         <Card className="mb-4">

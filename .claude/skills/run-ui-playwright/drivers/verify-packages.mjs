@@ -77,6 +77,12 @@ try {
   check(/S\$150\.00/.test(text),
     "the PayNow screen asks for the PACKAGE price (5 × $30)");
   check(/5 Lesson Starter/.test(text), "…and names the package");
+  // Since 20260809000100 a package request is numbered like an invoice, so an
+  // incoming PayNow line can be matched back to it. The seed tenant has no
+  // PayNow ID configured, so this run exercises the NO-QR path — the reference
+  // must render there too, or the fallback is unpayable in practice.
+  check(/Reference:\s*PKG-\d{4}-\d{4,}/.test(text),
+    "…and carries its PKG-YYYY-NNNN reference", text.slice(0, 400));
 
   await page.goBack();
   await page.waitForTimeout(3000);

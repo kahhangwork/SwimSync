@@ -14,31 +14,57 @@ import QRCode from "qrcode";
 import { supabase } from "@/lib/supabase";
 import { buildPayNowPayload, selectPayNowProxy } from "@/lib/paynow";
 
-type CoachQR = {
-  coach_name: string;
+/** The business being paid. Named for what it IS: the QR belongs to the
+ *  BUSINESS, not the coach who taught the lesson (PRD §7.10). It used to be
+ *  called coach_name, which then had to be apologised for in the UI copy. */
+type Payee = {
+  business_name: string | null;
   paynow_qr_url: string | null;
 };
+
+type PayeeTenant = {
+  display_name: string | null;
+  paynow_qr_url: string | null;
+  paynow_uen: string | null;
+  paynow_mobile: string | null;
+};
+
+/** PostgREST returns an embedded row as an object or a one-element array
+ *  depending on the shape it infers. Normalised in one place. */
+function embeddedTenant(row: any): PayeeTenant | null {
+  const t = Array.isArray(row?.tenants) ? row.tenants[0] : row?.tenants;
+  return t ?? null;
+}
 
 export default function PayNowScreen() {
   const { invoiceId, coachId, packageId } = useLocalSearchParams<{
     invoiceId: string;
     coachId: string;
     /** Paying for a PACKAGE REQUEST instead of an invoice. Same payee logic:
-     *  the QR is the business's. */
+     *  the QR is the business's. Since 20260809000100 a package carries its
+     *  own PKG-YYYY-NNNN reference, so it takes the same dynamic-QR path an
+     *  invoice does — it used to return early and fall back to the static
+     *  image, which is the unattributable payment the reference exists to
+     *  remove. */
     packageId: string;
   }>();
 
   const [netAmount, setNetAmount] = useState<number | null>(null);
   const [billingMonth, setBillingMonth] = useState<string | null>(null);
   const [packageName, setPackageName] = useState<string | null>(null);
-  const [coachQR, setCoachQR] = useState<CoachQR | null>(null);
+  const [payee, setPayee] = useState<Payee | null>(null);
   const [loading, setLoading] = useState(true);
-  // Web + invoice + configured PayNow proxy → a per-invoice QR with amount
-  // and reference LOCKED, computed via lib/paynow. Native and packages keep
-  // the uploaded static image (no canvas on native; packages have no
-  // invoice reference).
+  // Web + a configured PayNow proxy + a reference → a QR with amount and
+  // reference LOCKED, computed via lib/paynow. Native keeps the uploaded
+  // static image (no canvas there).
   const [dynamicQr, setDynamicQr] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
+  // The business's PayNow ID, kept even when a QR cannot be built. Without
+  // this the no-QR state is a dead end: "contact your coach directly", to a
+  // parent who is holding a bill and a banking app and needs neither.
+  const [proxy, setProxy] = useState<{ type: "uen" | "mobile"; value: string } | null>(
+    null
+  );
 
   useEffect(() => {
     async function load() {
@@ -48,83 +74,79 @@ export default function PayNowScreen() {
       // A school with three coaches has one bank account; showing an
       // individual coach's QR would send a parent's money to the wrong person.
       // For a private coach the tenant is theirs, so nothing changes for them.
+      //
+      // Both branches resolve the SAME three things — amount, reference,
+      // tenant — and then share one QR-building block below. Four hand-written
+      // copies of one rule is what caused a live underbill (§7.18); two is how
+      // that starts.
+      let amount: number | null = null;
+      let ref: string | null = null;
+      let tenant: PayeeTenant | null = null;
+
       if (packageId) {
         const { data: pkg } = await supabase
           .from("parent_packages")
-          .select("name, total_value, status, tenants(display_name, paynow_qr_url)")
+          // Kept on ONE line on purpose: `"a" + "b"` widens to `string`, and
+          // the typed client can only parse a select it sees as a literal.
+          .select("name, total_value, reference_number, tenants(display_name, paynow_qr_url, paynow_uen, paynow_mobile)")
           .eq("id", packageId)
           .single();
         if (pkg) {
-          setNetAmount(Number(pkg.total_value));
+          amount = Number(pkg.total_value);
+          ref = pkg.reference_number ?? null;
           setPackageName(pkg.name);
-          const t: any = Array.isArray((pkg as any).tenants)
-            ? (pkg as any).tenants[0]
-            : (pkg as any).tenants;
-          if (t) {
-            setCoachQR({
-              coach_name: t.display_name ?? "Your coach",
-              paynow_qr_url: t.paynow_qr_url ?? null,
-            });
-          }
+          tenant = embeddedTenant(pkg);
         }
-        setLoading(false);
-        return;
+      } else if (invoiceId) {
+        const { data: inv } = await supabase
+          .from("invoices")
+          .select("net_amount, billing_month, reference_number, tenants(display_name, paynow_qr_url, paynow_uen, paynow_mobile)")
+          .eq("id", invoiceId)
+          .single();
+        if (inv) {
+          amount = Number(inv.net_amount);
+          ref = inv.reference_number ?? null;
+          const [year, month] = inv.billing_month.split("-");
+          const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+          setBillingMonth(
+            date.toLocaleDateString("en-SG", { month: "long", year: "numeric" })
+          );
+          tenant = embeddedTenant(inv);
+        }
       }
 
-      const invoiceRes = invoiceId
-        ? await supabase
-            .from("invoices")
-            .select(
-              "net_amount, billing_month, reference_number, " +
-                "tenants(display_name, paynow_qr_url, paynow_uen, paynow_mobile)"
-            )
-            .eq("id", invoiceId)
-            .single()
-        : { data: null as any };
+      if (amount !== null) setNetAmount(amount);
+      setReference(ref);
 
-      if (invoiceRes.data) {
-        const amount = Number(invoiceRes.data.net_amount);
-        setNetAmount(amount);
-        setReference(invoiceRes.data.reference_number ?? null);
-        const [year, month] = invoiceRes.data.billing_month.split("-");
-        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-        setBillingMonth(
-          date.toLocaleDateString("en-SG", { month: "long", year: "numeric" })
-        );
+      if (tenant) {
+        setPayee({
+          business_name: tenant.display_name ?? null,
+          paynow_qr_url: tenant.paynow_qr_url ?? null,
+        });
 
-        const t: any = Array.isArray((invoiceRes.data as any).tenants)
-          ? (invoiceRes.data as any).tenants[0]
-          : (invoiceRes.data as any).tenants;
-        if (t) {
-          setCoachQR({
-            coach_name: t.display_name ?? "Your coach",
-            paynow_qr_url: t.paynow_qr_url ?? null,
-          });
+        const selected = selectPayNowProxy({
+          paynow_uen: tenant.paynow_uen ?? null,
+          paynow_mobile: tenant.paynow_mobile ?? null,
+        });
+        setProxy(selected);
 
-          const proxy = selectPayNowProxy({
-            paynow_uen: t.paynow_uen ?? null,
-            paynow_mobile: t.paynow_mobile ?? null,
-          });
-          if (
-            Platform.OS === "web" &&
-            proxy &&
-            invoiceRes.data.reference_number &&
-            amount > 0
-          ) {
-            try {
-              // Throws on anything dubious (RISK 2) — then we simply keep
-              // the static-image path instead of showing a wrong QR.
-              const payload = buildPayNowPayload({
-                proxyType: proxy.type,
-                proxyValue: proxy.value,
-                amount,
-                merchantName: t.display_name ?? "SwimSync",
-                reference: invoiceRes.data.reference_number,
-              });
-              setDynamicQr(await QRCode.toDataURL(payload, { width: 512, margin: 2 }));
-            } catch {
-              // fall through to the uploaded static QR
-            }
+        if (Platform.OS === "web" && selected && ref && amount !== null && amount > 0) {
+          try {
+            // Throws on anything dubious (RISK 2) — then we simply keep
+            // the static-image path instead of showing a wrong QR.
+            const payload = buildPayNowPayload({
+              proxyType: selected.type,
+              proxyValue: selected.value,
+              amount,
+              merchantName: tenant.display_name ?? "SwimSync",
+              reference: ref,
+            });
+            setDynamicQr(await QRCode.toDataURL(payload, { width: 512, margin: 2 }));
+          } catch {
+            // fall through to the uploaded static QR, then to the payable
+            // PayNow-ID block below. Do NOT widen or remove this catch: the
+            // lib throws rather than encode a wrong-yet-valid payload that
+            // would pay the wrong amount silently.
           }
         }
       }
@@ -135,8 +157,15 @@ export default function PayNowScreen() {
     load();
     // coachId is still accepted in the route params for backwards
     // compatibility with existing links, but is no longer used to resolve the
-    // payee — the invoice's tenant is authoritative.
+    // payee — the invoice's (or package's) tenant is authoritative.
   }, [invoiceId, packageId]);
+
+  const businessName = payee?.business_name?.trim() || null;
+  // A QR of either kind is absent but the business has a PayNow ID: the parent
+  // can still pay by hand, which is what every SwimSync parent did before
+  // 2026-08-02. Distinct from a business that has configured nothing.
+  const showPayableId = !dynamicQr && !payee?.paynow_qr_url && !!proxy;
+  const unconfigured = !dynamicQr && !payee?.paynow_qr_url && !proxy;
 
   return (
     <SafeAreaView className="flex-1 bg-sky-50">
@@ -173,7 +202,7 @@ export default function PayNowScreen() {
           {/* QR Code */}
           <View className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 items-center mb-6 w-full">
             <Text className="text-sm font-medium text-gray-500 mb-4">
-              {coachQR?.coach_name ?? "Coach"}'s PayNow QR Code
+              {businessName ? `${businessName}'s PayNow` : "PayNow"}
             </Text>
 
             {dynamicQr ? (
@@ -182,17 +211,34 @@ export default function PayNowScreen() {
                 className="w-52 h-52 rounded-2xl mb-4"
                 resizeMode="contain"
               />
-            ) : coachQR?.paynow_qr_url ? (
+            ) : payee?.paynow_qr_url ? (
               <Image
-                source={{ uri: coachQR.paynow_qr_url }}
+                source={{ uri: payee.paynow_qr_url }}
                 className="w-52 h-52 rounded-2xl mb-4"
                 resizeMode="contain"
               />
+            ) : showPayableId ? (
+              /* No QR of either kind, but the business HAS a PayNow ID — so
+                 the parent can pay by hand. Selectable, because they are going
+                 to retype it into a banking app. */
+              <View className="w-full bg-sky-50 border border-sky-100 rounded-2xl p-4 mb-4">
+                <Text className="text-xs text-sky-700 mb-2">
+                  Transfer to this PayNow ID
+                </Text>
+                <Text selectable className="text-xl font-bold text-gray-900 mb-3">
+                  {proxy!.type === "mobile" ? `+65 ${proxy!.value}` : proxy!.value}
+                </Text>
+                <Text className="text-xs text-sky-700 mb-1">Amount</Text>
+                <Text selectable className="text-base font-semibold text-gray-900">
+                  S${netAmount?.toFixed(2) ?? "—"}
+                </Text>
+              </View>
             ) : (
               <View className="w-52 h-52 bg-gray-100 rounded-2xl items-center justify-center mb-4">
                 <Ionicons name="qr-code-outline" size={80} color="#9ca3af" />
                 <Text className="text-xs text-gray-400 mt-2 text-center px-4">
-                  QR not uploaded yet. Contact your coach directly.
+                  This business hasn't set up PayNow yet. Ask them to add their
+                  PayNow ID in SwimSync.
                 </Text>
               </View>
             )}
@@ -205,32 +251,49 @@ export default function PayNowScreen() {
             <Text className="text-xs text-gray-400 text-center leading-relaxed">
               {dynamicQr
                 ? "Scan with your banking app — the amount and reference are locked into this QR."
+                : showPayableId
+                ? "Enter the PayNow ID, amount and reference in your banking app."
+                : unconfigured
+                ? "PayNow is not available for this business yet."
                 : "Scan the QR code above with your banking app to make a PayNow transfer. The amount shown above is for reference only."}
             </Text>
           </View>
 
           {/* Instructions */}
-          <View className="w-full bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-            <Text className="text-sm font-bold text-gray-900 mb-3">
-              Payment Instructions
-            </Text>
-            {[
-              "Open your banking app",
-              "Tap Scan to Pay or QR",
-              "Scan the QR code above",
-              dynamicQr
-                ? "Check the amount matches this invoice"
-                : "Enter the exact amount shown",
-              "Complete the transfer",
-            ].map((step, i) => (
-              <View key={i} className="flex-row gap-3 mb-2 items-start">
-                <View className="w-5 h-5 rounded-full bg-sky-100 items-center justify-center mt-0.5">
-                  <Text className="text-xs font-bold text-sky-600">{i + 1}</Text>
+          {!unconfigured && (
+            <View className="w-full bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              <Text className="text-sm font-bold text-gray-900 mb-3">
+                Payment Instructions
+              </Text>
+              {(showPayableId
+                ? [
+                    "Open your banking app",
+                    "Tap PayNow, then Enter PayNow ID",
+                    "Enter the PayNow ID shown above",
+                    "Enter the exact amount shown",
+                    reference
+                      ? `Put ${reference} in the reference or comments field`
+                      : "Complete the transfer",
+                  ]
+                : [
+                    "Open your banking app",
+                    "Tap Scan to Pay or QR",
+                    "Scan the QR code above",
+                    dynamicQr
+                      ? "Check the amount matches this bill"
+                      : "Enter the exact amount shown",
+                    "Complete the transfer",
+                  ]
+              ).map((step, i) => (
+                <View key={i} className="flex-row gap-3 mb-2 items-start">
+                  <View className="w-5 h-5 rounded-full bg-sky-100 items-center justify-center mt-0.5">
+                    <Text className="text-xs font-bold text-sky-600">{i + 1}</Text>
+                  </View>
+                  <Text className="text-sm text-gray-600 flex-1">{step}</Text>
                 </View>
-                <Text className="text-sm text-gray-600 flex-1">{step}</Text>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )}
         </View>
       )}
     </SafeAreaView>

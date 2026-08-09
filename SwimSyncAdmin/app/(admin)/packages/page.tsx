@@ -56,6 +56,11 @@ type Purchase = {
   status: string;
   requested_at: string;
   expires_on: string | null;
+  /** PKG-YYYY-NNNN (20260809000100). What an incoming PayNow line is matched
+   *  back to — the parent's QR carries it as the bill reference. NOT NULL in
+   *  the database; typed nullable only so a stale cached row cannot crash the
+   *  page. */
+  reference_number: string | null;
 };
 
 type ParentOption = { id: string; name: string };
@@ -113,7 +118,7 @@ export default function PackagesPage() {
       supabase
         .from("parent_packages")
         .select(
-          "id, parent_id, name, lesson_count, rate_per_lesson, total_value, value_remaining, status, requested_at, expires_on, class_categories(name), parents(profiles(full_name, email))"
+          "id, parent_id, name, lesson_count, rate_per_lesson, total_value, value_remaining, status, requested_at, expires_on, reference_number, class_categories(name), parents(profiles(full_name, email))"
         )
         .order("status")
         .order("requested_at", { ascending: false }),
@@ -176,6 +181,7 @@ export default function PackagesPage() {
         status: p.status,
         requested_at: p.requested_at,
         expires_on: p.expires_on,
+        reference_number: p.reference_number ?? null,
       }))
     );
 
@@ -426,6 +432,7 @@ export default function PackagesPage() {
             <Thead>
               <Th sort={pendingSort} sortKey="parent_name">Parent</Th>
               <Th sort={pendingSort} sortKey="name">Package</Th>
+              <Th sort={pendingSort} sortKey="reference_number">Reference</Th>
               <Th sort={pendingSort} sortKey="total_value" firstDir="desc">Price</Th>
               <Th sort={pendingSort} sortKey="requested_at">Requested</Th>
               <Th>&nbsp;</Th>
@@ -440,6 +447,12 @@ export default function PackagesPage() {
                       {" "}
                       · {p.lesson_count} × {money(p.rate_per_lesson)}
                     </span>
+                  </Td>
+                  {/* The whole point of the column: this string is what
+                      appears on the bank statement, so it must be readable
+                      and copyable, not summarised. */}
+                  <Td className="font-mono text-xs text-gray-600">
+                    {p.reference_number ?? "—"}
                   </Td>
                   <Td className="text-gray-900">{money(p.total_value)}</Td>
                   <Td className="text-gray-500">
@@ -557,6 +570,7 @@ export default function PackagesPage() {
             <Thead>
               <Th sort={heldSort} sortKey="parent_name">Parent</Th>
               <Th sort={heldSort} sortKey="name">Package</Th>
+              <Th sort={heldSort} sortKey="reference_number">Reference</Th>
               <Th sort={heldSort} sortKey="remaining">Remaining</Th>
               <Th sort={heldSort} sortKey="expires_on">Expires</Th>
               <Th sort={heldSort} sortKey="status">Status</Th>
@@ -581,6 +595,11 @@ export default function PackagesPage() {
                         {" "}
                         · {p.category_name ?? "all classes"}
                       </span>
+                    </Td>
+                    {/* Kept here too so a payment can still be reconciled
+                        after the request has been confirmed. */}
+                    <Td className="font-mono text-xs text-gray-600">
+                      {p.reference_number ?? "—"}
                     </Td>
                     <Td>
                       {p.status === "active" &&
