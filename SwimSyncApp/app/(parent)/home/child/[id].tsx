@@ -33,10 +33,15 @@ type ChildDetail = {
   // (students.is_active), so a departed child must not read "Unassigned".
   assignment_status: "unassigned" | "assigned";
   is_active: boolean;
-  coach_name: string | null;
-  class_day: string | null;
-  class_time: string | null;
-  class_location: string | null;
+  /** EVERY class, not "the" class — a child may hold several active enrolments
+   *  since Wave 2 (`20260811000100`). This screen is where a parent goes to
+   *  check the detail, so showing one of two is the worst of both. */
+  classes: {
+    coach_name: string | null;
+    day: string | null;
+    time: string | null;
+    location: string | null;
+  }[];
   outstanding_amount: number;
   credit_balance: number;
 };
@@ -116,11 +121,17 @@ export default function ChildProfileScreen() {
       return;
     }
 
-    const activeEnrolment = (student.student_class_enrolments ?? []).find(
-      (e: any) => e.is_active
-    );
-    const cls: any = activeEnrolment?.classes ?? null;
-    const coachProfile = cls?.coaches?.profiles ?? null;
+    const classes = (student.student_class_enrolments ?? [])
+      .filter((e: any) => e.is_active && e.classes)
+      .map((e: any) => {
+        const cls: any = e.classes;
+        return {
+          coach_name: cls?.coaches?.profiles?.full_name ?? null,
+          day: cls?.day_of_week ?? null,
+          time: `${formatTime(cls.start_time)} – ${formatTime(cls.end_time)}`,
+          location: cls?.location_name ?? null,
+        };
+      });
 
     // Fetch outstanding invoices for the parent linked to this student
     const { data: parentStudentLink } = await supabase
@@ -175,12 +186,7 @@ export default function ChildProfileScreen() {
       notes: student.notes,
       assignment_status: student.assignment_status,
       is_active: student.is_active,
-      coach_name: coachProfile?.full_name ?? null,
-      class_day: cls?.day_of_week ?? null,
-      class_time: cls
-        ? `${formatTime(cls.start_time)} – ${formatTime(cls.end_time)}`
-        : null,
-      class_location: cls?.location_name ?? null,
+      classes,
       outstanding_amount: outstandingAmount,
       credit_balance: creditBalance,
     });
@@ -317,11 +323,23 @@ export default function ChildProfileScreen() {
             Class Assignment
           </Text>
           {child.is_active && child.assignment_status === "assigned" ? (
+            /* One group of rows per class, separated by a rule so two classes
+               cannot read as one muddled set of details. A child with a single
+               class renders exactly as before — no divider, no heading. */
             <View className="gap-2">
-              <Row label="Coach"    value={child.coach_name ?? "—"} />
-              <Row label="Day"      value={capitalize(child.class_day)} />
-              <Row label="Time"     value={child.class_time ?? "—"} />
-              <Row label="Location" value={child.class_location ?? "—"} />
+              {child.classes.map((c, i) => (
+                <View
+                  key={`${c.day}-${c.time}-${i}`}
+                  className={
+                    i > 0 ? "gap-2 pt-3 mt-1 border-t border-gray-200" : "gap-2"
+                  }
+                >
+                  <Row label="Coach"    value={c.coach_name ?? "—"} />
+                  <Row label="Day"      value={capitalize(c.day)} />
+                  <Row label="Time"     value={c.time ?? "—"} />
+                  <Row label="Location" value={c.location ?? "—"} />
+                </View>
+              ))}
             </View>
           ) : !child.is_active ? (
             <View className="bg-gray-100 rounded-xl p-4">

@@ -167,25 +167,33 @@ export default function AttendanceScreen() {
 
     setRecords(mapped);
 
-    // Has any lesson fallen due since this child joined? Derived from the class's
-    // weekday + the enrolment date (the same read-time logic the coach screens
-    // use), so an empty history can distinguish "no lessons yet" from "unmarked".
-    const { data: enr } = await supabase
+    // Has any lesson fallen due since this child joined? Derived from each
+    // class's weekday + that enrolment's own date (the same read-time logic the
+    // coach screens use), so an empty history can distinguish "no lessons yet"
+    // from "unmarked".
+    //
+    // ⚠ THIS WAS `.maybeSingle()` UNTIL WAVE 2, AND IT FAILED QUIETLY. maybeSingle
+    // ERRORS on more than one row; the error was discarded, `enr` came back null,
+    // and a child in two classes was told "no lessons yet" — the emptiest
+    // possible answer, on the screen whose whole job is telling the two apart.
+    // Now every active enrolment is read and ANY of them having had a lesson is
+    // enough, which is what the question actually means.
+    const { data: enrolments } = await supabase
       .from("student_class_enrolments")
       .select("enrolled_at, classes(day_of_week)")
       .eq("student_id", selectedChildId)
-      .eq("is_active", true)
-      .maybeSingle();
+      .eq("is_active", true);
 
-    const cls: any = enr
-      ? Array.isArray((enr as any).classes)
-        ? (enr as any).classes[0]
-        : (enr as any).classes
-      : null;
-    const day = cls?.day_of_week as DayOfWeek | undefined;
     setHasExpectedLesson(
-      !!day && !!enr?.enrolled_at &&
-        expectedLessonDates(day, toSgDate(enr.enrolled_at), todayInSg()).length > 0
+      (enrolments ?? []).some((enr: any) => {
+        const cls = Array.isArray(enr.classes) ? enr.classes[0] : enr.classes;
+        const day = cls?.day_of_week as DayOfWeek | undefined;
+        return (
+          !!day &&
+          !!enr.enrolled_at &&
+          expectedLessonDates(day, toSgDate(enr.enrolled_at), todayInSg()).length > 0
+        );
+      })
     );
 
     setLoadingRecords(false);

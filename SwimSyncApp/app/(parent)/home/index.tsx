@@ -28,17 +28,42 @@ type Child = {
   // (students.is_active), so a departed child must not read "Unassigned".
   assignment_status: "unassigned" | "assigned";
   is_active: boolean;
-  coach_name: string | null;
-  class_day: string | null;
-  class_time: string | null;
+  /** EVERY class the child attends, not "the" class. A child may hold several
+   *  active enrolments since Wave 2 (`20260811000100`), and a keen swimmer
+   *  taking two sessions a week is the ordinary case this exists for. The card
+   *  renders one block each: a family's question is "when is my child
+   *  swimming?", and answering it for only one of two classes is worse than
+   *  not answering, because nothing on screen says a second one exists. */
+  classes: ChildClass[];
   /** An upcoming, uncancelled trial: the class title and the date. */
   trial: { class_title: string; session_date: string } | null;
   /** An upcoming, uncancelled make-up: one lesson in ANOTHER class of the
-   *  same kind. Rendered IN ADDITION to the class block — an enrolled child
-   *  keeps their weekly class, the make-up is extra. */
+   *  same kind. Rendered IN ADDITION to the class blocks — an enrolled child
+   *  keeps their weekly classes, the make-up is extra. */
   makeup: { class_title: string; session_date: string } | null;
-  class_location: string | null;
 };
+
+type ChildClass = {
+  coach_name: string | null;
+  day: string | null;
+  time: string | null;
+  location: string | null;
+};
+
+/** Monday-first, matching how the coach's week reads. Used only to order a
+ *  child's classes on screen — an unknown day sorts last via indexOf's -1
+ *  becoming the largest value only if handled, so the comparator below treats
+ *  it as -1 and puts it first, which is fine: a null day means a class row that
+ *  failed to embed, and burying it would hide the failure. */
+const WEEKDAY_ORDER = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
 
 /** A claim the coach has not decided yet, or has declined. */
 type PendingClaim = {
@@ -132,25 +157,34 @@ export default function ParentHomeScreen() {
 
       const mapped: Child[] = (parent.parent_students ?? []).map((ps: any) => {
         const s = ps.students;
-        const activeEnrolment = (s.student_class_enrolments ?? []).find(
-          (e: any) => e.is_active
-        );
-        const cls = activeEnrolment?.classes ?? null;
-        const coachProfile = cls?.coaches?.profiles ?? null;
+        // EVERY active enrolment, not `.find()`. Sorted by weekday so two
+        // classes read in the order the week runs rather than in whatever order
+        // PostgREST returned them — an unordered list of a family's week looks
+        // like a bug even when every row in it is right.
+        const classes: ChildClass[] = (s.student_class_enrolments ?? [])
+          .filter((e: any) => e.is_active && e.classes)
+          .map((e: any) => {
+            const cls = e.classes;
+            return {
+              coach_name: cls?.coaches?.profiles?.full_name ?? null,
+              day: cls?.day_of_week ?? null,
+              time: `${formatTime(cls.start_time)} – ${formatTime(cls.end_time)}`,
+              location: cls?.location_name ?? null,
+            };
+          })
+          .sort(
+            (a: ChildClass, b: ChildClass) =>
+              WEEKDAY_ORDER.indexOf(a.day ?? "") - WEEKDAY_ORDER.indexOf(b.day ?? "")
+          );
 
         return {
           id: s.id,
           full_name: s.full_name,
           assignment_status: s.assignment_status,
           is_active: s.is_active,
-          coach_name: coachProfile?.full_name ?? null,
+          classes,
           trial: null, // filled below
           makeup: null, // filled below
-          class_day: cls?.day_of_week ?? null,
-          class_time: cls
-            ? `${formatTime(cls.start_time)} – ${formatTime(cls.end_time)}`
-            : null,
-          class_location: cls?.location_name ?? null,
         };
       });
 
@@ -446,26 +480,36 @@ export default function ParentHomeScreen() {
 
                   {child.is_active && child.assignment_status === "assigned" ? (
                     <>
-                      <View className="bg-sky-50 rounded-xl p-3 gap-1">
-                        <View className="flex-row items-center gap-1.5">
-                          <Ionicons name="person-outline" size={13} color="#0284c7" />
-                          <Text className="text-xs text-sky-700">
-                            {child.coach_name ?? "—"}
-                          </Text>
+                      {/* ONE BLOCK PER CLASS. A child in two classes gets two,
+                          in weekday order. The key is day+time rather than the
+                          array index: a child can legitimately hold two classes
+                          on the same weekday at different times, so the day
+                          alone is not unique. */}
+                      {child.classes.map((c, i) => (
+                        <View
+                          key={`${c.day}-${c.time}-${i}`}
+                          className={`bg-sky-50 rounded-xl p-3 gap-1 ${i > 0 ? "mt-2" : ""}`}
+                        >
+                          <View className="flex-row items-center gap-1.5">
+                            <Ionicons name="person-outline" size={13} color="#0284c7" />
+                            <Text className="text-xs text-sky-700">
+                              {c.coach_name ?? "—"}
+                            </Text>
+                          </View>
+                          <View className="flex-row items-center gap-1.5">
+                            <Ionicons name="calendar-outline" size={13} color="#0284c7" />
+                            <Text className="text-xs text-sky-700">
+                              {capitalize(c.day)} · {c.time}
+                            </Text>
+                          </View>
+                          <View className="flex-row items-center gap-1.5">
+                            <Ionicons name="location-outline" size={13} color="#0284c7" />
+                            <Text className="text-xs text-sky-700">
+                              {c.location ?? "—"}
+                            </Text>
+                          </View>
                         </View>
-                        <View className="flex-row items-center gap-1.5">
-                          <Ionicons name="calendar-outline" size={13} color="#0284c7" />
-                          <Text className="text-xs text-sky-700">
-                            {capitalize(child.class_day)} · {child.class_time}
-                          </Text>
-                        </View>
-                        <View className="flex-row items-center gap-1.5">
-                          <Ionicons name="location-outline" size={13} color="#0284c7" />
-                          <Text className="text-xs text-sky-700">
-                            {child.class_location ?? "—"}
-                          </Text>
-                        </View>
-                      </View>
+                      ))}
                       {child.makeup && (
                         /* IN ADDITION to the class block — the weekly class
                            stands; this one lesson is extra. Says WHEN and

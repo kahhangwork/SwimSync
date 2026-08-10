@@ -50,9 +50,11 @@ type ClassRow = {
 type EligibleKid = {
   id: string;
   full_name: string;
-  home_class_id: string;
-  home_class_title: string;
-  home_category_id: string;
+  /** EVERY class the child is in. Since Wave 2 (`20260811000100`) a make-up
+   *  needs to know WHICH of them it replaces — book_makeup() refuses to guess
+   *  once there is more than one, because the class it picked would price the
+   *  invoice line and decide package coverage. */
+  home_classes: { id: string; title: string; category_id: string }[];
 };
 
 type LivePackage = {
@@ -76,6 +78,9 @@ export default function MakeupsPage() {
   // dropdown stops working at a few dozen children (lib/makeupSearch.ts).
   const [kidQuery, setKidQuery] = useState("");
   const [bookClass, setBookClass] = useState("");
+  // WHICH of the child's classes this make-up replaces. Empty when the child has
+  // one (the RPC derives it) or before the admin has chosen.
+  const [bookHome, setBookHome] = useState("");
   const [bookDate, setBookDate] = useState("");
   const [bookBusy, setBookBusy] = useState(false);
   const [bookError, setBookError] = useState<string | null>(null);
@@ -167,16 +172,18 @@ export default function MakeupsPage() {
       (kids ?? [])
         .filter((k: any) => k.is_active)
         .map((k: any) => {
-          const enr = (k.student_class_enrolments ?? []).find(
-            (e: any) => e.is_active && e.classes
-          );
-          if (!enr) return null;
+          const enrolled = (k.student_class_enrolments ?? [])
+            .filter((e: any) => e.is_active && e.classes)
+            .map((e: any) => ({
+              id: e.classes.id,
+              title: e.classes.title,
+              category_id: e.classes.category_id,
+            }));
+          if (enrolled.length === 0) return null;
           return {
             id: k.id,
             full_name: k.full_name,
-            home_class_id: enr.classes.id,
-            home_class_title: enr.classes.title,
-            home_category_id: enr.classes.category_id,
+            home_classes: enrolled,
           };
         })
         .filter(Boolean) as EligibleKid[]
@@ -219,14 +226,28 @@ export default function MakeupsPage() {
 
   const kid = eligible.find((k) => k.id === bookKid);
 
-  // Same-category classes, minus the child's own — their own class is an
-  // "Extra lesson" on the Classes page, not a make-up.
+  // WHICH class this make-up replaces. Auto-selected when there is only one, so
+  // the single-class case is unchanged; asked when there is a choice.
+  const homeClass =
+    kid?.home_classes.find((c) => c.id === bookHome) ??
+    (kid?.home_classes.length === 1 ? kid.home_classes[0] : undefined);
+
+  // Same-category classes, minus EVERY class the child is in.
+  //
+  // ⚠ THE EXCLUSION IS "ALL THEIR CLASSES", NOT "THE HOME CLASS". Excluding only
+  // the chosen home would leave the child's OTHER class in this list — and it is
+  // the likeliest pick, since the list is already filtered to their category.
+  // Booking that is not a billing bug (enrolment-wins prices it correctly as a
+  // member) but it SILENTLY VOIDS the make-up: the child attends the lesson they
+  // were already attending. book_makeup() refuses it; this keeps it off screen.
+  // Category comes from the CHOSEN home class, so switching home re-filters.
   const hostChoices = useMemo(() => {
-    if (!kid) return [];
+    if (!kid || !homeClass) return [];
+    const ownIds = new Set(kid.home_classes.map((c) => c.id));
     return classes.filter(
-      (c) => c.category_id === kid.home_category_id && c.id !== kid.home_class_id
+      (c) => c.category_id === homeClass.category_id && !ownIds.has(c.id)
     );
-  }, [classes, kid]);
+  }, [classes, kid, homeClass]);
 
   /** Real lesson dates for the host class: its weekday pattern (a short look
    *  back, a couple of months ahead) PLUS any admin-scheduled off-schedule
@@ -255,7 +276,7 @@ export default function MakeupsPage() {
     const familyPkgs = livePackages.filter(
       (p) =>
         parentIds.has(p.parent_id) &&
-        (p.category_id === null || p.category_id === kid.home_category_id)
+        (p.category_id === null || p.category_id === homeClass?.category_id)
     );
     if (familyPkgs.length === 0) return null;
     const covering = familyPkgs.some((p) => p.expires_on >= bookDate);
@@ -268,7 +289,14 @@ export default function MakeupsPage() {
   // children doesn't render a wall. The cap is display-only — narrowing the
   // query is the intended way to find someone, and the cut is announced.
   const kidMatches = useMemo(
-    () => filterEligibleKids(eligible, kidQuery),
+    () =>
+      filterEligibleKids(
+        eligible.map((k) => ({
+          ...k,
+          home_class_titles: k.home_classes.map((c) => c.title),
+        })),
+        kidQuery
+      ),
     [eligible, kidQuery]
   );
   const KID_RESULTS_CAP = 8;
@@ -284,6 +312,9 @@ export default function MakeupsPage() {
       p_class_id: bookClass,
       p_session_date: bookDate,
       p_student_id: bookKid,
+      // Named, never derived, once the child has more than one class. NULL is
+      // fine for a single-class child and the RPC derives it there.
+      p_home_class_id: homeClass?.id ?? null,
     });
     setBookBusy(false);
     if (error) {
@@ -293,6 +324,7 @@ export default function MakeupsPage() {
     setBookOpen(false);
     setBookKid("");
     setKidQuery("");
+    setBookHome("");
     setBookClass("");
     setBookDate("");
     await loadAll();
@@ -417,7 +449,10 @@ export default function MakeupsPage() {
               <div className="mt-1 flex items-center justify-between rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
                 <span className="text-sm text-sky-900">
                   <span className="font-semibold">{kid.full_name}</span>
-                  <span className="text-sky-700"> — {kid.home_class_title}</span>
+                  <span className="text-sky-700">
+                    {" "}
+                    — {kid.home_classes.map((c) => c.title).join(" · ")}
+                  </span>
                 </span>
                 <button
                   onClick={() => {
@@ -451,6 +486,7 @@ export default function MakeupsPage() {
                         key={k.id}
                         onClick={() => {
                           setBookKid(k.id);
+                          setBookHome("");
                           setBookClass("");
                           setBookDate("");
                         }}
@@ -460,7 +496,7 @@ export default function MakeupsPage() {
                           {k.full_name}
                         </span>
                         <span className="shrink-0 text-xs text-gray-500">
-                          {k.home_class_title}
+                          {k.home_classes.map((c) => c.title).join(" · ")}
                         </span>
                       </button>
                     ))
@@ -480,15 +516,56 @@ export default function MakeupsPage() {
             )}
           </div>
 
-          {kid && hostChoices.length === 0 ? (
-            // The private-coach shape: no other class in this category. The
-            // answer that exists is an extra lesson of the child's own class.
+          {/* WHICH class this replaces. Only asked when the answer is not forced
+              — a child with one class sees nothing here, exactly as before.
+              book_makeup() refuses to guess for a multi-class child, and it is
+              right to: the class chosen here is snapshotted onto the booking and
+              prices the invoice line. */}
+          {kid && kid.home_classes.length > 1 && (
+            <label className="block">
+              <span className="text-xs font-semibold text-gray-600">
+                Which class is this making up?
+              </span>
+              <select
+                value={bookHome}
+                onChange={(e) => {
+                  setBookHome(e.target.value);
+                  // The host list and the package advisory are both derived from
+                  // this, so a stale host choice would silently belong to the
+                  // wrong category.
+                  setBookClass("");
+                  setBookDate("");
+                }}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="">Choose the class they missed…</option>
+                {kid.home_classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {kid && kid.home_classes.length > 1 && !homeClass ? (
+            <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+              {kid.full_name} is in {kid.home_classes.length} classes. Pick the one
+              they missed and the rest of the form will follow.
+            </p>
+          ) : kid && homeClass && hostChoices.length === 0 ? (
+            // No other class in this category to guest into. Two shapes reach
+            // here: the private-coach one (only one class of its kind exists),
+            // and — since Wave 2 — a child who is already in EVERY class of
+            // their kind. Both have the same answer.
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
               <p className="text-xs font-semibold text-amber-800">
                 No other class of the same kind to join.
               </p>
               <p className="mt-1 text-xs text-amber-700">
-                {kid.home_class_title} is the only class of its kind, so there is
+                {kid.home_classes.length > 1
+                  ? `${kid.full_name} is already in every class of this kind, so there is`
+                  : `${homeClass.title} is the only class of its kind, so there is`}{" "}
                 nothing to guest into. Schedule an <strong>Extra lesson</strong>{" "}
                 of the child&apos;s own class instead, on the{" "}
                 <Link href="/classes" className="font-semibold underline">

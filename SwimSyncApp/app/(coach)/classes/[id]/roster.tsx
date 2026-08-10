@@ -483,10 +483,13 @@ export default function ClassRosterScreen() {
   const handleRemove = (student: Student) => {
     confirmAction(
       "Remove from class?",
-      `${student.full_name} will be removed from this class and returned to the admin's unassigned list. Lessons they have already attended are still billed, and their history is kept.`,
+      `${student.full_name} will be removed from THIS class. Any other class they attend is untouched, and they return to the admin's unassigned list only if this was their last one. Lessons they have already attended are still billed, and their history is kept.`,
       async () => {
         setRemovingId(student.id);
-        const { error } = await removeFromClass(supabase, student.id);
+        // `id` — this screen's own class, never the child's "the" class. Since
+        // Wave 2 a child may be in several, and the roster a coach is looking at
+        // is the only one they have any business closing.
+        const { error } = await removeFromClass(supabase, student.id, id);
         setRemovingId(null);
         if (error) {
           showToast(`Could not remove ${student.full_name}.`, "error");

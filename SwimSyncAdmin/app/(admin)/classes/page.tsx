@@ -10,6 +10,7 @@ import { Modal } from "@/components/Modal";
 import { Drawer } from "@/components/Drawer";
 import { todayInSg, toSgDate, formatSgDate } from "@/lib/lessonDates";
 import { dayOfWeekOrder } from "@/lib/tableSort";
+import { formatTime } from "@/lib/utils";
 import {
   buildClassRoster,
   formatStudentCount,
@@ -49,12 +50,6 @@ type Coach = { id: string; full_name: string };
 const DAYS = [
   "monday","tuesday","wednesday","thursday","friday","saturday","sunday",
 ];
-
-function formatTime(t: string): string {
-  const [h, m] = t.split(":");
-  const hour = parseInt(h, 10);
-  return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
-}
 
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);

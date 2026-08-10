@@ -24,6 +24,7 @@ import {
   type StudentCoverage,
 } from "@/lib/packageCoverage";
 import { PackageChip } from "@/components/PackageChip";
+import { formatTime } from "@/lib/utils";
 
 type StudentRow = {
   id: string;
@@ -36,11 +37,43 @@ type StudentRow = {
   inactivated_at: string | null;
   parent_id: string | null;
   parent_name: string;
+  /** EVERY active enrolment. Since Wave 2 (`20260811000100`) a child may hold
+   *  several, and this page is the one surface that owns the many-to-many:
+   *  adding a class, and removing ONE of them. */
+  classes: EnrolledClass[];
+  /** The FIRST class's title and coach, kept only as sort keys so the Class and
+   *  Coach columns still sort (§8.19). Never rendered — the cells render
+   *  `classes`. A child in two classes sorts by their earliest in the week,
+   *  which is the only ordering that is stable as classes are added. */
   class_title: string | null;
   coach_name: string | null;
   /** Attendance rows. Decides which of a duplicate pair must survive a merge. */
   lessons: number;
 };
+
+type EnrolledClass = {
+  id: string;
+  title: string;
+  coach_name: string | null;
+  day: string | null;
+  /** Pre-formatted "5:00pm" — the chip has no room for a range. */
+  start: string | null;
+};
+
+/** "monday" → "Mon". The chip has room for a weekday and a time, not both in
+ *  full, and the day is what an admin scans for. */
+const capitalizeDay = (d: string) => d.charAt(0).toUpperCase() + d.slice(1, 3);
+
+/** Monday-first. Orders a child's chips the way their week runs. */
+const WEEKDAY_ORDER = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
 
 const STATUS_FILTERS = ["All", "Assigned", "Unassigned", "Inactive"];
 
@@ -54,9 +87,13 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  // `cls` is set only for mode "remove", and it is WHICH class — a child may be
+  // in several, so "remove from class" is not a question the student id can
+  // answer on its own.
   const [pending, setPending] = useState<{
     student: StudentRow;
     mode: "remove" | "inactive";
+    cls?: EnrolledClass;
   } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   // Siblings are READ before anything is written, so the admin confirms a named
@@ -95,6 +132,52 @@ export default function StudentsPage() {
     await load();
   }
 
+  // ── Add a class to a child who already has one ────────────────────────────
+  // The Unassigned page still owns FIRST assignment; this is the second and
+  // third. Both write the same row, and neither validates the schedule itself:
+  // enforce_enrolment_schedule() refuses a retired class and a time clash, and
+  // its messages are written for the admin, so they are surfaced verbatim.
+  const [addClassFor, setAddClassFor] = useState<StudentRow | null>(null);
+  const [addClassChoice, setAddClassChoice] = useState("");
+  const [addClassBusy, setAddClassBusy] = useState(false);
+  const [addClassError, setAddClassError] = useState<string | null>(null);
+
+  function openAddClass(student: StudentRow) {
+    setAddClassFor(student);
+    setAddClassChoice("");
+    setAddClassError(null);
+    loadClasses();
+  }
+
+  async function handleAddClass() {
+    if (!addClassFor || !addClassChoice) return;
+    setAddClassBusy(true);
+    setAddClassError(null);
+
+    const { error } = await supabase.from("student_class_enrolments").insert({
+      student_id: addClassFor.id,
+      class_id: addClassChoice,
+      is_active: true,
+    });
+
+    if (!error) {
+      // Only ever moves TOWARD assigned. close_student_enrolment() owns the
+      // other direction, and only when the last class goes.
+      await supabase
+        .from("students")
+        .update({ assignment_status: "assigned" })
+        .eq("id", addClassFor.id);
+    }
+
+    setAddClassBusy(false);
+    if (error) {
+      setAddClassError(error.message);
+      return;
+    }
+    setAddClassFor(null);
+    await load();
+  }
+
   async function openInactive(student: StudentRow) {
     setTakeSiblings(false);
     setFamily([]);
@@ -112,8 +195,17 @@ export default function StudentsPage() {
 
   async function handleStatusChange(
     student: StudentRow,
-    mode: "remove" | "inactive"
+    mode: "remove" | "inactive",
+    cls?: EnrolledClass
   ) {
+    // "Set inactive" still ends EVERY enrolment — that is the point of it, and
+    // set_students_active() owns that path. "Remove" is per class and cannot
+    // proceed without one; the RPC refuses a NULL anyway, but failing here
+    // keeps the reason in the admin's language.
+    if (mode === "remove" && !cls) {
+      setActionError("Which class? Press the × on the class to remove.");
+      return;
+    }
     setBusyId(student.id);
     setActionError(null);
     const ids =
@@ -123,7 +215,7 @@ export default function StudentsPage() {
     const { error } =
       mode === "inactive"
         ? await setStudentsActive(supabase, ids, false)
-        : await removeFromClass(supabase, student.id);
+        : await removeFromClass(supabase, student.id, cls!.id);
     setBusyId(null);
     setPending(null);
     if (error) {
@@ -541,7 +633,7 @@ export default function StudentsPage() {
         parent_students(parents(id, profiles(full_name))),
         student_class_enrolments(
           is_active,
-          classes(title, coaches(profiles(full_name)))
+          classes(id, title, day_of_week, start_time, coaches(profiles(full_name)))
         )
       `)
       .order("full_name");
@@ -557,9 +649,26 @@ export default function StudentsPage() {
 
     setStudents(
       (data ?? []).map((s: any) => {
-        const activeEnrolment = (s.student_class_enrolments ?? []).find(
-          (e: any) => e.is_active
-        );
+        // ALL of them, weekday-ordered — not `.find()`. The chips are the only
+        // place the admin can see that a child is in more than one class, so a
+        // first-match read here would hide the state this whole wave creates.
+        const classes: EnrolledClass[] = (s.student_class_enrolments ?? [])
+          .filter((e: any) => e.is_active && e.classes)
+          .map((e: any) => ({
+            id: e.classes.id,
+            title: e.classes.title,
+            coach_name: e.classes.coaches?.profiles?.full_name ?? null,
+            day: e.classes.day_of_week ?? null,
+            start: e.classes.start_time
+              ? formatTime(e.classes.start_time)
+              : null,
+          }))
+          .sort(
+            (a: EnrolledClass, b: EnrolledClass) =>
+              WEEKDAY_ORDER.indexOf(a.day ?? "") -
+                WEEKDAY_ORDER.indexOf(b.day ?? "") ||
+              (a.start ?? "").localeCompare(b.start ?? "")
+          );
         return {
           id: s.id,
           full_name: s.full_name,
@@ -579,9 +688,10 @@ export default function StudentsPage() {
           parent_id: s.parent_students?.[0]?.parents?.id ?? null,
           parent_name:
             s.parent_students?.[0]?.parents?.profiles?.full_name ?? "—",
-          class_title: activeEnrolment?.classes?.title ?? null,
-          coach_name:
-            activeEnrolment?.classes?.coaches?.profiles?.full_name ?? null,
+          classes,
+          // Sort keys only — see the type. First in weekday order.
+          class_title: classes[0]?.title ?? null,
+          coach_name: classes[0]?.coach_name ?? null,
           lessons: lessonCount.get(s.id) ?? 0,
         };
       })
@@ -866,8 +976,59 @@ export default function StudentsPage() {
                 <Td>
                   <StatusBadge status={statusLabel(s)} />
                 </Td>
-                <Td className="text-gray-500">{s.class_title ?? "—"}</Td>
-                <Td className="text-gray-500">{s.coach_name ?? "—"}</Td>
+                {/* ONE CHIP PER CLASS, each with its own ×. This cell is the
+                    only place in the product that shows a child is in more than
+                    one class, and the only place one of them can be ended.
+                    "Add class" is offered for any ACTIVE child, including an
+                    unassigned one — the Unassigned page still handles first
+                    assignment, but an admin already looking at this row should
+                    not have to go and find it. */}
+                <Td className="text-gray-500">
+                  {s.classes.length === 0 ? (
+                    "—"
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {s.classes.map((c) => (
+                        <span
+                          key={c.id}
+                          title={`${c.title}${c.coach_name ? ` · ${c.coach_name}` : ""}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-2 pr-1 text-xs text-gray-700"
+                        >
+                          {c.day ? capitalizeDay(c.day) : c.title}
+                          {c.start ? ` ${c.start}` : ""}
+                          {s.is_active && (
+                            <button
+                              onClick={() =>
+                                setPending({ student: s, mode: "remove", cls: c })
+                              }
+                              disabled={busyId === s.id}
+                              aria-label={`Remove ${s.full_name} from ${c.title}`}
+                              className="rounded-full px-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700 disabled:opacity-50"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {s.is_active && (
+                    <button
+                      onClick={() => openAddClass(s)}
+                      disabled={busyId === s.id}
+                      className="mt-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-50"
+                    >
+                      + Add class
+                    </button>
+                  )}
+                </Td>
+                <Td className="text-gray-500">
+                  {/* DISTINCT coaches. Two classes with the same coach must not
+                      print the name twice. */}
+                  {[...new Set(s.classes.map((c) => c.coach_name).filter(Boolean))].join(
+                    ", "
+                  ) || "—"}
+                </Td>
                 <Td>
                   <div className="flex gap-2">
                     {s.is_active && isUnclaimed(s) && (
@@ -898,15 +1059,11 @@ export default function StudentsPage() {
                     >
                       Contact details
                     </button>
-                    {s.is_active && s.class_title && (
-                      <button
-                        onClick={() => setPending({ student: s, mode: "remove" })}
-                        disabled={busyId === s.id}
-                        className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Remove from class
-                      </button>
-                    )}
+                    {/* "Remove from class" USED TO LIVE HERE, one button per
+                        child. It cannot: with several classes there is no "the"
+                        class to remove them from. It is now the × on each chip
+                        in the Class column, which is also the only place that
+                        says which class is going. */}
                     {s.is_active && (
                       <button
                         onClick={() => openInactive(s)}
@@ -1295,7 +1452,7 @@ export default function StudentsPage() {
         title={
           pending?.mode === "inactive"
             ? `Set ${pending.student.full_name} inactive?`
-            : `Remove ${pending?.student.full_name} from their class?`
+            : `Remove ${pending?.student.full_name} from ${pending?.cls?.title}?`
         }
         open={pending !== null}
         onClose={() => setPending(null)}
@@ -1304,8 +1461,12 @@ export default function StudentsPage() {
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
               {pending.mode === "inactive"
-                ? "They stop appearing on rosters and stop counting toward attendance. Any active class enrolment is closed at the same time."
-                : "They return to Unassigned for you to place in another class. Their enrolment is closed, not deleted."}
+                ? "They stop appearing on rosters and stop counting toward attendance. EVERY active class enrolment is closed at the same time."
+                : `They come off this class's roster only. ${
+                    (pending.student.classes.length ?? 0) > 1
+                      ? "Their other classes are untouched."
+                      : "This is their only class, so they return to Unassigned for you to place elsewhere."
+                  } The enrolment is closed, not deleted.`}
             </p>
             {/* Siblings are a CHOICE — the admin may be removing one child
                 while the others keep attending. Only shown when there are any. */}
@@ -1370,7 +1531,9 @@ export default function StudentsPage() {
               <Button
                 className="flex-1"
                 disabled={busyId !== null}
-                onClick={() => handleStatusChange(pending.student, pending.mode)}
+                onClick={() =>
+                  handleStatusChange(pending.student, pending.mode, pending.cls)
+                }
               >
                 {pending.mode === "inactive" ? "Set inactive" : "Remove"}
               </Button>
@@ -1384,6 +1547,78 @@ export default function StudentsPage() {
           {actionError}
         </p>
       )}
+
+      {/* ── Add a class ─────────────────────────────────────────────────────
+          Deliberately thin. Every rule about WHICH classes may be combined
+          lives in enforce_enrolment_schedule(), so this form does not
+          pre-filter by weekday or time: a filtered list that disagreed with
+          the trigger would be a second, quieter rule (§7.32 — the picker is an
+          affordance, the trigger is the guard). What it does do is show the
+          refusal verbatim, because those sentences name the clashing class. */}
+      <Modal
+        title={`Add a class for ${addClassFor?.full_name ?? ""}`}
+        open={addClassFor !== null}
+        onClose={() => setAddClassFor(null)}
+      >
+        {addClassFor && (
+          <div className="space-y-4">
+            {addClassFor.classes.length > 0 && (
+              <p className="text-sm text-gray-600">
+                Already in{" "}
+                <strong>
+                  {addClassFor.classes.map((c) => c.title).join(", ")}
+                </strong>
+                . This adds another — it does not move them.
+              </p>
+            )}
+            <label className="block text-sm font-medium text-gray-700">
+              Class
+              <select
+                value={addClassChoice}
+                onChange={(e) => setAddClassChoice(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="">Choose a class…</option>
+                {classOptions
+                  .filter(
+                    (c) => !addClassFor.classes.some((ec) => ec.id === c.id)
+                  )
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+              An enrolled child is expected at this class <strong>every week</strong>,
+              and an unmarked lesson blocks invoicing for the whole business. For a
+              one-off visit, book a make-up instead.
+            </p>
+            {addClassError && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {addClassError}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setAddClassFor(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={addClassBusy || !addClassChoice}
+                onClick={handleAddClass}
+              >
+                {addClassBusy ? "Adding…" : "Add class"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* ── Merge: the one action that repoints a child's records ─────────── */}
       <Modal

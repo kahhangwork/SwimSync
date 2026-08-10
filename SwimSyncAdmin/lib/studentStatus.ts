@@ -29,22 +29,32 @@ export type FamilyChild = {
 };
 
 /**
- * Remove a child from their class. They return to the Unassigned pool for the
- * admin to reassign; the enrolment is CLOSED, never deleted, so attendance and
- * billing history survive (PRD 11.5) and any credit is untouched (PRD 11.8).
- * Lessons they already attended still bill — the invoice engine reads
- * attendance rows, not current enrolment.
+ * Remove a child from ONE class. The enrolment is CLOSED, never deleted, so
+ * attendance and billing history survive (PRD 11.5) and any credit is untouched
+ * (PRD 11.8). Lessons they already attended still bill — the invoice engine
+ * reads attendance rows, not current enrolment.
  *
- * This does NOT change whether they are an active customer. A child can be
- * active but unassigned — a new signup waiting for a class is exactly that.
+ * ⚠ `classId` IS REQUIRED, AND THAT IS THE POINT. Since Wave 2
+ * (`20260811000100`) a child may be in several classes, so "remove from class"
+ * has to say which. The RPC gives `p_class_id` no default and refuses an
+ * explicit NULL, so a forgotten argument is an error rather than a silent
+ * removal from every class — including another coach's. Callers pass the class
+ * whose screen they are on: the coach roster passes its own class, the admin's
+ * Students page passes the chip that was pressed.
+ *
+ * This does NOT change whether they are an active customer, and it only returns
+ * them to the Unassigned pool if it was their LAST class. A child can be active
+ * but unassigned — a new signup waiting for a class is exactly that.
  */
 export async function removeFromClass(
   db: RpcClient,
-  studentId: string
+  studentId: string,
+  classId: string
 ): Promise<{ error?: string }> {
   const { error } = await db.rpc("close_student_enrolment", {
     p_student_id: studentId,
     p_set_inactive: false,
+    p_class_id: classId,
   });
   return error ? { error: error.message } : {};
 }
