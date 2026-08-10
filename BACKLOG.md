@@ -362,6 +362,28 @@ because a missed lesson never billed in the first place. Three follow-ups filed 
 *Book a make-up from the Attendance page*, *A different-coach PRIVATE make-up*, and the
 `book_trial` date-floor asymmetry.
 
+### A child in EVERY class of their kind has no per-child make-up — **S/M** `[Wave 2 fallout]`
+When a child is enrolled in every class of their category, there is nowhere to guest them
+into, so a missed lesson has no per-child remedy at all.
+
+**Why:** Wave 2 (`20260811000100`) did not create this gap — it *revealed* one the dropped
+constraint was hiding. `book_makeup()` now refuses every class the child is actively in
+(it must: booking into their other class bills correctly but **silently voids** the
+make-up — the child attends the lesson they were already attending and gets nothing
+replacing the missed one). The Make-ups modal shows the existing "no other class of the
+same kind" panel and routes to **Extra lesson** — but `schedule_extra_lesson(class_id,
+date, reason)` is **class-wide**: it creates an off-schedule session that *every* enrolled
+child is then expected at. That is not a per-child make-up, and each of those children
+becomes a lesson someone must mark or the month blocks.
+
+**Notes:** the honest workarounds today are a whole-class extra lesson, or marking the
+miss non-billable so the family is not charged. A real fix is probably a per-child
+off-schedule session — one child, one date, priced at their home rate — which is close to
+the guest-pass shape already in `makeup_bookings` but with the child's own class as host.
+**Do not "fix" it by relaxing the own-class refusal**; that is the silent-void case, and
+it is pinned by `multi_class.test.sql`. Only bites a business whose category has few
+classes and a keen swimmer in all of them, which is why it is filed rather than built.
+
 ### Book a make-up from the Attendance page — **S**
 The admin Attendance page can filter to `absent` / `cancelled_*` rows but has no action
 column — the most natural moment to offer "book a make-up" is while looking at the miss.
