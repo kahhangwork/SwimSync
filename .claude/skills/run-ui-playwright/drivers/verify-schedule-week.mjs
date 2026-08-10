@@ -33,6 +33,37 @@
 // Reuses fixtures-stale-screen.sql: it is weekday-agnostic (it derives the
 // class weekday from today) and already builds exactly what this needs — two
 // classes running today plus one UNMARKED lesson exactly a week ago.
+//
+// ⚠ THE FIXTURE IS WEEKDAY-AGNOSTIC; THE SCREEN IS NOT. The seed gives this
+// same coach a SATURDAY class the fixture never mentions, so the week always
+// holds a day this driver does not own. Address the fixture's own day by NAME
+// (NEXT_LABEL) — a `.last()` over a bare day-header regex picks whichever day
+// sorts latest, which is the seed's. §7.75 and §7.101 are the same bug in two
+// other drivers: never take an ordinal over a list you do not control.
+// Measured: the nightly that EXECUTED on Sunday 2026-08-09 SGT (labelled
+// 2026-08-08, cron is 20:00 UTC = 04:00 SGT next day) was 19/19, and the one
+// that executed Monday 2026-08-10 SGT (labelled 2026-08-09) was 17/19 — with no
+// code change between them. Date a nightly by its SGT execution day or this
+// story inverts.
+//
+// ⚠ AND DO NOT BUILD A DAY LABEL IN SQL. `to_char(…,'Mon')` renders September
+// as `Sep`; the screen renders it through `formatSgDate` →
+// `toLocaleDateString("en-SG", {month:"short"})`, and ICU/CLDR renders English
+// September as `Sept`. The other eleven months agree, so a SQL-built label
+// looks correct for eleven twelfths of the year and then matches NOTHING —
+// which under `exact: true` is a THROWN driver, not a failed check. Measured
+// 2026-08-10: PG `Mon, 7 Sep` vs Chrome `Mon, 7 Sept` for 2026-09-07. Labels
+// are built by `sgLabel()` below, in the same formatter family as the screen.
+// This is §7.100's "compare ISO values, never rendered labels" in miniature.
+//
+// SABOTAGE SIGNATURE, measured 2026-08-10 on a Monday. Restore the old
+// `getByText(/^\w{3}, \d+ \w{3}$/).last()` in place of the NEXT_LABEL locator
+// and this file must report:
+//     FAIL  expanding the COMING UP day reveals its lesson — title matches 2 -> 2 after expanding <NEXT_LABEL>
+//     FAIL  a COMING UP row never opens the attendance screen — …/attendance?date=<D_PREV>
+//     FAIL  …it opens the class roster instead
+//     18/21 checks passed
+// If sabotage still passes, the reveal guard has gone vacuous — fix that first.
 
 import { execSync } from "node:child_process";
 import { launch, loginExpo, visibleText, tap } from "./lib.mjs";
@@ -50,14 +81,25 @@ function sql(q) {
   ).trim();
 }
 
+/**
+ * "Sat, 1 Aug" — byte-for-byte what `formatSgDate` puts on the screen.
+ * Deliberately the SAME call the app makes (`SwimSyncApp/lib/lessonDates.ts`):
+ * parse as UTC, render `en-SG`. Building this in SQL instead is the `Sept` trap
+ * in the header comment.
+ */
+const sgLabel = (iso, opts = { weekday: "short", day: "numeric", month: "short" }) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-SG", { ...opts, timeZone: "UTC" });
+
 const TODAY = sql("SELECT (now() AT TIME ZONE 'Asia/Singapore')::date");
 const D_PREV = sql(`SELECT '${TODAY}'::date - 7`);
-/** "Sat, 1 Aug" — how formatSgDate renders a backlog row's date. */
-const PREV_LABEL = sql(
-  `SELECT to_char('${D_PREV}'::date, 'Dy, FMDD Mon')`
-);
+const PREV_LABEL = sgLabel(D_PREV);
+// The fixture's own lesson NEXT week — the COMING UP day this driver drives.
+// TODAY + 7 is the same weekday one week on, so it lands in next week whatever
+// day it is run, and it is the ONE day header that belongs to this fixture.
+const D_NEXT = sql(`SELECT '${TODAY}'::date + 7`);
+const NEXT_LABEL = sgLabel(D_NEXT);
 
-console.log({ TODAY, D_PREV, PREV_LABEL });
+console.log({ TODAY, D_PREV, PREV_LABEL, D_NEXT, NEXT_LABEL });
 
 // A hand-rolled context, NOT launch({ mobile: true }) — deliberately. That
 // helper does not set `timezoneId`, and pinning the browser to Asia/Singapore
@@ -141,9 +183,52 @@ try {
   const comingUp = /COMING UP/.test(t);
   check("next week lists COMING UP lessons", comingUp, "");
   if (comingUp) {
-    await tap(page.getByText(/^\w{3}, \d+ \w{3}$/).last(), "expand a coming-up day");
+    // ⚠ EXPAND THE FIXTURE'S OWN DAY BY NAME. NEVER `.last()` OVER A BARE
+    // DAY-HEADER REGEX — that picks the LATEST day rendered in the week, and
+    // the seed hands this coach a SATURDAY class ("Saturday Beginners") the
+    // fixture knows nothing about. On any run whose weekday sorts before
+    // Saturday, `.last()` expanded that seed day instead, "Stale Screen Club"
+    // was never revealed, and the tap below fell through to the NEEDS MARKING
+    // straggler — opening /attendance for D_PREV and failing both checks below
+    // for a product that was correct. It passed only when the fixture's own
+    // weekday sorted last in a Monday-start week (Sat/Sun), which is exactly
+    // why the 2026-08-09 nightly (Sunday SGT) was green and 2026-08-10
+    // (Monday SGT) was red. §7.75, §7.98, §7.101.
+    const seenBefore = await page.getByText("Stale Screen Club").count();
+    // ⚠ ASSERT THE HEADER IS THERE BEFORE PRESSING IT. `tap()` waits for
+    // visibility and THROWS when the locator is empty, which aborts the whole
+    // driver — the remaining checks never run and the denominator silently
+    // shrinks from 21 to 11, the same lie §7.100 is about. A missing day must
+    // be one legible FAIL naming the label it wanted. §7.101 prescribes exactly
+    // this: assert the match count before acting on it.
+    const header = page.getByText(NEXT_LABEL, { exact: true });
+    const headerCount = await header.count();
+    check(
+      "the fixture's own COMING UP day is on screen",
+      headerCount === 1,
+      `${NEXT_LABEL} matched ${headerCount} element(s)`
+    );
+    if (headerCount === 1) {
+      await tap(header, `expand the coming-up day ${NEXT_LABEL}`);
+    }
     await page.waitForTimeout(2500);
+    // The expand must actually REVEAL the lesson, and that is asserted rather
+    // than assumed. A COMING UP day renders collapsed, so if the wrong header
+    // is pressed the title never enters the DOM and the two checks below stop
+    // testing COMING UP at all while still reporting a result (§7.100).
+    const seenAfter = await page.getByText("Stale Screen Club").count();
+    check(
+      "expanding the COMING UP day reveals its lesson",
+      seenAfter > seenBefore,
+      `title matches ${seenBefore} -> ${seenAfter} after expanding ${NEXT_LABEL}`
+    );
     const before = page.url();
+    // `.last()` is correct here ONLY because of section render order in
+    // `schedule/index.tsx`: NEEDS MARKING → TODAY → COMING UP → DONE, and next
+    // week has no DONE group (nothing future is marked). Reorder those sections
+    // or give next week a DONE group and this walks to the wrong row again
+    // while the reveal guard above stays green — they are not locked to the
+    // same element.
     await tap(page.getByText("Stale Screen Club").last(), "a coming-up lesson");
     await page.waitForTimeout(4000);
     check(
@@ -161,6 +246,11 @@ try {
     await page.goBack();
     await page.waitForTimeout(4000);
   } else {
+    // Fail all four, not one. A shrinking denominator is how a driver reports
+    // a healthier score for testing less (§7.100).
+    check("the fixture's own COMING UP day is on screen", false, "no COMING UP to test");
+    check("expanding the COMING UP day reveals its lesson", false, "no COMING UP to test");
+    check("a COMING UP row never opens the attendance screen", false, "no COMING UP to test");
     check("…it opens the class roster instead", false, "no COMING UP to test");
   }
 
