@@ -10,7 +10,7 @@ description: Get up to speed at the start of a SwimSync session — read HANDOVE
 That is the whole method, and it is deliberately not "read the documentation". Until
 2026-07-26 this skill told you to read four documents cover to cover — about **131,000
 tokens** before any work began, half of it a session-by-session changelog. `HANDOVER.md` is
-now an index: ~11,000 tokens, pointing at everything else. Fetching a reference document
+now an index: ~9,500 tokens, pointing at everything else. Fetching a reference document
 when the task touches it is both cheaper *and* more accurate than carrying all of them —
 recall degrades as context grows, and stale material sitting *near* the right answer
 competes with it.
@@ -26,9 +26,10 @@ competes with it.
   the session's work starts.
 - **§3 (what works)** is the verified-state list — what actually runs end to end, as
   distinct from what the PRD *specifies*.
-- **§8** holds the last two sessions in full, then a **ledger** of everything older: one
-  line each, naming where that session's reasoning now lives. Follow a ledger pointer only
-  if the task touches that area. Don't read the table top to bottom.
+- **§8** holds the last two sessions in full and nothing else. Every older session is one
+  row in **`docs/SESSIONS.md`** (moved 2026-08-10, numbers unchanged — `§8a` and `§8.n` are
+  cited from `core.ts` and applied migrations and still resolve). Follow a row's pointer only
+  if the task touches that area, and don't read the table top to bottom.
 - The **"Where everything lives"** table at the top is the index. Use it in Step 2.
 
 ---

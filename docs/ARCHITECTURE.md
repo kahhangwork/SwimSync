@@ -18,7 +18,9 @@ the shape of the system changes:_
 
 > **Resolving a section number you see cited anywhere:**
 > §3 → `HANDOVER.md` · §5 → `docs/TESTING.md` · §6 → `docs/ARCHITECTURE.md` ·
-> §7 → `docs/GOTCHAS.md` · §8 → `HANDOVER.md` (session log) · §9 → `HANDOVER.md` ·
+> §7 → `docs/GOTCHAS.md` · §8 → the **two most recent** sessions are in `HANDOVER.md`, every
+> older one (including `§8a`, cited from `core.ts` and `20260727000100_…sql`) is one row in
+> **`docs/SESSIONS.md`** — moved 2026-08-10, numbers unchanged · §9 → `HANDOVER.md` ·
 > §10, §12 → `docs/ARCHITECTURE.md` · §11 → `docs/DEPLOYMENT.md`.
 > A bare `§11.6`-style number inside a PRD sentence means the **PRD's** §11 (edge cases) —
 > check which document the sentence is about before following it.

@@ -1,18 +1,19 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-10 — **the unmarked-guest underbill is closed and LIVE (§8.40).**
-A class with no active enrolments but an unmarked trial or make-up booking was skipped
-whole, so any other class billing **SEALED** the month over it. `20260810000100`, engine
-**v19 → v20**, both apps, grant dump diffed, CI green, bundle grepped._
+_Last updated: 2026-08-10 (2nd session) — **this file's growth mechanism was found and
+cut: 91 KB → 39 KB, nothing lost (§8.41).** The ledger is now `docs/SESSIONS.md`, §3 keeps
+only what a PRD cannot say, and `/update-docs` enforces three countable limits. **§7.119**
+is the durable lesson. Docs only — no code, no migration, no deploy._
 
-_Previously, 2026-08-09 — **Wave 1 complete; a class can be RETIRED without losing money
-(§8.39).** `classes.is_active` means scheduling and nothing else. `20260809000300` +
-`000400`, engine **v18 → v19**._
+_Previously, 2026-08-10 — **the unmarked-guest underbill is closed and LIVE (§8.40).** A
+class with no active enrolments but an unmarked trial or make-up booking was skipped whole,
+so any other class billing **SEALED** the month over it. `20260810000100`, engine
+**v19 → v20**._
 
-_**One `_Previously,_` line, maximum** — that is the rule as of 2026-08-10, when this block
-had stacked five sessions deep and 138 lines. A dateline is a *third* copy of a session that
-§8 already holds as a full entry and `docs/SESSIONS.md` holds as a ledger row; three copies
-are not read three times, they just disagree. Older state: §8, then `docs/SESSIONS.md`._
+_**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
+2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
+copy of a session that §8 already holds in full and `docs/SESSIONS.md` holds as a row; three
+copies are not read three times, they just disagree. Older state: §8, then `docs/SESSIONS.md`._
 
 
 > **If you are the human driving this, read `01_SESSION_WORKFLOW.md` first.**
@@ -319,6 +320,40 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.41 (2026-08-10, 2nd session) — THE HANDOVER'S GROWTH MECHANISM, FOUND AND CUT
+
+**91 KB → 39 KB, nothing lost.** The file was 38 KB after the 2026-07-26 trim and 91 KB
+nine days later — the same trajectory that had already produced one 290 KB rewrite. **The
+mechanism and the rule that failed are §7.119**, which is the durable half of this session;
+the short version is that every session was written **three times** (dateline, full §8
+entry, permanent ledger row) and only the middle copy was ever deleted.
+
+**Three cuts.** The ledger moved to **`docs/SESSIONS.md`** — 51 rows verbatim, numbers
+intact, and the section-number resolver in `docs/ARCHITECTURE.md` was corrected to match,
+because `§8a` is cited from `core.ts` and an applied migration and must still resolve. The
+dateline chain went **5 → 1**. §3 went **469 → ~205 lines**, keeping only what a PRD cannot
+say: the verified-vs-specified table, a new **DORMANT** list (shipped but never exercised on
+real data), and every prohibition.
+
+**A live self-contradiction fell out of the mapping.** §3 claimed *"production has 0
+attendance rows"* while a blockquote 170 lines below it recorded July billed for real with
+money collected. The first had been false since 2026-07-26. That is the cost of restating a
+fact instead of pointing at one — corrected in place, with the query that answers it.
+
+**Deliberately not done: the CI gate.** A byte-ratchet was built and *proven to fail
+correctly*, then reverted at the user's call — disproportionate for a documentation
+byte-count, and seeded at the file's exact size it would have reddened the next session's
+first legitimate §9 addition. Reasoning and the restore path are in `BACKLOG.md` →
+*Deliberately not doing*. What replaced it: `/update-docs` carries the limits as three
+countable commands measured at the **start** of the write. **This is the third attempt at
+discipline-by-instruction and the first two failed**, which is why the Final check names the
+escalation rather than re-wording the plea.
+
+**Two things this session did NOT touch, deliberately.** `PRD.md` — no shipped behaviour
+changed. And the working tree's other two changes (`verify-schedule-week.mjs`, now
+`287142b` on `fix/schedule-week-driver-locator`, and the nested
+`SwimSync/attendance-edit-history-view` worktree) belong to another session; they were never
+staged.
 ## 8.40 (2026-08-10) — AN UNMARKED GUEST CAN NO LONGER BE SEALED OVER
 
 **`core.ts` bailed out of its per-class loop at two guards that never consulted
@@ -373,62 +408,6 @@ gate; `stale-screen` 22/22, `bulk-setall` 10/10, `unmarked-lessons` 12/12; 19 fi
 round-trip and tear down clean; rollback file **executed** and byte-identical to pre-migration
 (§7.93); and on production `anon` EXECUTE still **18**, zero `GRANT ALL ON TABLE … TO
 "authenticated"`, both functions `authenticated`-only with no `service_role` line.
-
----
-
-## 8.39 (2026-08-09, 5th session) — WAVE 1 IS COMPLETE: A CLASS CAN BE RETIRED, AND RETIRING IT NO LONGER LOSES MONEY
-
-**`classes.is_active` means SCHEDULING now, and nothing else.** The engine scanned
-`.eq("is_active", true)`, so retiring a class at month end silently dropped its
-already-taught lessons *and* stopped it blocking generation — a hole exactly where someone
-is tidying up (BACKLOG #6, filed since July). The engine bills every class in the tenant,
-the admin can retire and restore one from the Classes page, and **Wave 1 is done**.
-Deployed in full: `20260809000300` + `20260809000400`, engine **v18 → v19**, both apps,
-remote grant dump diffed, CI green, and the UI confirmed on production.
-
-**The fix could not be a `.eq()` deletion, and that is the whole chunk.** That scan also
-feeds the completeness gate, so widening it lets an inactive class expect a lesson on every
-weekly date and block the month — no override by design, and the class is invisible to
-every screen that could clear it (**§7.109**). Closed three ways, because the failure is a
-whole business unbilled: `classes.deactivated_at` clamps how far an inactive class is
-expected to have run so the unclearable expectation is never generated; `deactivate_class()`
-refuses to create the state at all (three refusals, no overrides); and the Classes page
-gained *Show retired* **in the same deploy**, so `reactivate_class()` always has a screen.
-A boolean cannot do the first — *"was this class running on the 13th?"* needs a date.
-
-**Nothing was trusted that could be broken instead.** All three refusals were proven red by
-**breaking them in the database**, and the engine clamp red **both ways** — a naive `.eq()`
-deletion and a blanket exemption. That is what caught the session's real lesson: **three
-separate assertions of mine were passing for the wrong reason**, and none was visible in a
-green run. Two Deno cases called `completeMonth()`, which satisfies the very gate under test
-(**§7.111**); the §7.66 enrolment case was being refused by a *different* guard until its
-fixture span was narrowed to one marked date; and the cross-tenant case went green from an
-unrelated `P0001`, because `throws_ok(…, NULL, …)` matches any message (**§7.112**).
-
-**Two predictions from the plan were right, and one finding was not predicted at all.**
-`makeups.test.ts:370` went vacuous exactly as forecast — with the `home_class_id` union arm
-deleted the file still passed 12/12 — and the arm turned out to be *unreachable*, not merely
-untested, so it was **deleted** rather than kept (**§7.110**; its failure mode is a loud
-throw, never a silent underbill). The unpredicted one came out of the pre-commit review and
-is the more serious: **`core.ts`'s two `continue` guards ignore `bookingsByDate`**, so an
-unmarked booking in a class with no active enrolments is neither billed nor blocking — and
-with a second class billing, the month **SEALS** over it. Confirmed by running it, twice.
-
-**Filed, not fixed, and disclosed rather than silent.** That underbill is **pre-existing and
-unchanged by this work** — a retired class was skipped outright before, same outcome — but
-every retired class now sits in that state by construction, and `book_trial()` lacks
-`book_makeup()`'s `is_active` guard, which is the other half of the chain. It is in
-`BACKLOG.md` **with the production audit any fix must gate on**, because making an unmarked
-booking block is a change to what *blocks* a month. **Measured zero on production**, so
-nothing is leaking today. Also filed: retired classes cost three queries per run for ever.
-
-**Verified:** production audit **zero rows on all three** RISK 1/7 queries, run before a line
-was written; pgTAP **604** (`class_deactivation.test.sql` 23/23); Deno **135 ×2** (§7.15);
-vitest 255; jest 308; both typechecks; `verify-class-deactivation` **21/21** across three
-consecutive runs, proven red by restoring the page's `is_active` filter; `check-teardowns`
-19/19 and `check-fixture-roundtrip` clean three times; rollback file executed; CI green;
-and on production the grant dump shows `class_unmarked_lesson_dates` callable by **nobody**,
-`anon` EXECUTE still **18**, zero `GRANT ALL ON TABLE … TO "authenticated"`.
 
 ---
 
@@ -489,8 +468,11 @@ run since*, and the sweep is the evidence, not this sentence.
 run closes the issue itself. This section once read *"✅ NO RED SIGNALS"* for a day after the
 sweep had gone red beneath it.
 
-**2. `verify-schedule-week` is 17/19 and it is NOT from 2026-08-10's work.** Two COMING UP
-checks fail. Proven pre-existing by re-running with that session's app changes `git stash`ed
+**2. `verify-schedule-week` is 17/19 on `main` — but a FIX IS IN FLIGHT, not yet merged.**
+Commit `287142b` (*"verify-schedule-week addresses its own day, not the seed's"*) sits on
+branch **`fix/schedule-week-driver-locator`**, one commit ahead of `main`, authored by
+another session on 2026-08-10. Check whether it landed before re-triaging this. What follows
+describes the state on `main`: two COMING UP checks fail. Proven pre-existing by re-running with that session's app changes `git stash`ed
 and the fixture freshly loaded — identical 17/19 both ways. It is filed in `BACKLOG.md` with
 the likely cause (a `.last()` locator reaching a NEEDS MARKING copy of the class title, which a
 **Monday** makes possible because the fixture derives its dates from today — §7.98 + §7.73).
@@ -521,7 +503,8 @@ user has said to build soon and which every later wave sits on top of.
 - *The admin's invoice pre-flight misses an unmarked EXTRA lesson* (**S**) — `classCoverage.ts`
   unions booking dates but not session dates, so it over-reports readiness. **Never
   under-bills**, which is why it is S.
-- *`verify-schedule-week.mjs` fails two COMING UP checks* (**S**) — see above.
+- *`verify-schedule-week.mjs` fails two COMING UP checks* (**S**) — see above; a fix is in
+  flight on `fix/schedule-week-driver-locator`, so check before picking this up.
 - *Deleting an admin destroys the audit history* (**S**) — unchanged from 2026-08-09.
 
 **The `service_role` question is now ANSWERED, and the answer is "don't build the whitelist"**
@@ -567,6 +550,24 @@ file, and grep finds the oldest first. That cost a wrong risk rating on 2026-08-
 > §7.30). §8.39 used this to keep an RPC ungranted until its engine was confirmed live —
 > §7.87 turned into a feature flag, and it is the pattern to copy whenever a new client path
 > is only safe *after* something else deploys.
+
+### The documents are on a THIRD attempt at discipline-by-instruction — watch it
+
+`HANDOVER.md` is **37 KB against a 45,000-byte budget** after 2026-08-10's cut (§8.41). The
+two previous attempts to hold a limit by writing it down both failed, reaching 290 KB and
+then 91 KB — **§7.119** is why, and it is worth reading before the next `/update-docs`, not
+after. Three commands are the whole of the discipline and take ten seconds:
+
+```bash
+wc -c HANDOVER.md                                              # budget 45000
+grep -c '^_Previously,' HANDOVER.md                            # must be ≤ 1
+awk '/^\| \*\*8/ && length($0)>200 {print length($0)}' HANDOVER.md   # must print NOTHING
+```
+
+**Nothing in CI checks these** — the byte-ratchet was built, proven to fail correctly, and
+reverted deliberately (`BACKLOG.md` → *Deliberately not doing*). **If the file passes 45 KB
+again, restore `scripts/check-doc-budget.sh` from `cb70808` rather than re-wording the rule
+a fourth time.**
 
 ### Worth deciding, not urgent
 

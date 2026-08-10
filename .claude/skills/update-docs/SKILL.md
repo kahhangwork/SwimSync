@@ -258,10 +258,11 @@ awk '/^\| \*\*8/ && length($0)>200 {print length($0), $0}' HANDOVER.md | sort -r
    - **Never delete a ledger row.** They are cited by number from source files and applied
      migrations (`core.ts` says `§8a`), so a missing row is a dangling reference.
    - **Verify each pointer resolves before you write it.** `grep` the target for the number.
-     §8.38's row cites `§7.108` for a `SECURITY DEFINER` audit-trigger lesson, and §7.108 is
-     about a Playwright cold-compile timeout — the row carries the full narrative *because*
-     the delegation it claims was never checked. A wrong pointer is what turns a ledger back
-     into a changelog.
+     §8.38's row cited `§7.108` for a `SECURITY DEFINER` audit-trigger lesson; §7.108 is about
+     a Playwright cold-compile timeout, and **no gotcha covered the lesson at all** — so the
+     row carried the full narrative *because* the delegation it claimed was never checked.
+     Found and fixed 2026-08-10 (the missing gotcha is now §7.120). A wrong pointer is what
+     turns a ledger back into a changelog.
    - **The ledger lives in `docs/SESSIONS.md`** (moved 2026-08-10 at 21.5 KB / 51 rows).
      Its old move-out trigger was "~100 rows", which at August's row sizes would have meant
      a **100 KB** ledger — the table would have become the entire file long before a

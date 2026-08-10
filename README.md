@@ -43,6 +43,7 @@ log:
 | **[docs/TESTING.md](docs/TESTING.md)** | What does each suite and UI driver cover? | §5 |
 | **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | What's live, and what config traps bit us? | §11 |
 | **[docs/WORKTREES.md](docs/WORKTREES.md)** | How do I run two sessions at once without clashing? | — |
+| **[docs/SESSIONS.md](docs/SESSIONS.md)** | What shipped in an older session? | §8 ledger |
 
 And **[CLAUDE.md](CLAUDE.md)** — loaded automatically into every Claude Code session, so
 it holds only the commands, the boundaries, and the handful of rules whose violation is
@@ -81,7 +82,7 @@ categorised by what it *is*:
 | `CLAUDE.md` | Auto-loaded every session: commands, boundaries, the rules that bite |
 | `README.md` `PRD.md` `BACKLOG.md` `HANDOVER.md` `LOCAL_DEV_GUIDE.md` | The living documents |
 | `AVAIL_SKILLS.md` `INVOICE_RUNBOOK.md` | Reference and procedure |
-| **`docs/`** | `GOTCHAS.md` (§7), `ARCHITECTURE.md` (§6/§10/§12), `TESTING.md` (§5), `DEPLOYMENT.md` (§11) — split out of `HANDOVER.md`, section numbers preserved |
+| **`docs/`** | `GOTCHAS.md` (§7), `ARCHITECTURE.md` (§6/§10/§12), `TESTING.md` (§5), `DEPLOYMENT.md` (§11), `SESSIONS.md` (§8 ledger, moved 2026-08-10) — split out of `HANDOVER.md`, section numbers preserved |
 | **`docs/design/`** | Designs of record — the settled decisions for a subsystem. `TENANCY_DESIGN.md`, `PACKAGES_DESIGN.md` |
 | **`docs/plans/`** | Per-feature plans, with their ranked risks and pre-commit gates. Read the one for the area you're changing |
 | **`docs/database/`** | `Database_AccessRuleSummary.md` — a historical artefact of the original build |

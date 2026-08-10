@@ -2028,3 +2028,58 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       `!afterSave.includes(KID)`. NEEDS MARKING renders the class and the date and **never the
       child's name**, so that expression was true before marking as well — a check that could
       not fail. Before asserting a string is absent, confirm it was ever present. (2026-08-10.)
+
+119. **A RULE WRITTEN AS A *SHAPE* HAS NO SIZE, AND WILL BE OBEYED PERFECTLY WHILE THE THING
+    IT GOVERNS GROWS TEN-FOLD.** This is a documentation gotcha, and it has now cost this repo
+    two full rewrites — `HANDOVER.md` reached **3,972 lines / 290 KB** before the 2026-07-26
+    trim, then **1,001 lines / 91 KB** by 2026-08-10, nine days after being cut to 38 KB.
+    - **The mechanism, and it is not laziness.** Every rule governing the file's growth
+      specified a *shape*: "everything older becomes a ledger **line**", "`_Last updated:` →
+      today's date and a **one-line** summary", "prefer **deleting a stale line** to adding
+      one". Each was followed to the letter the whole way up. A markdown table row is still
+      "one row" at **1,446 characters** — July's rows cost ~130, August's averaged ~1,050. A
+      dateline is still "a summary" at 138 lines. Nothing was violated; the rules simply did
+      not bound anything.
+    - **"Delete what's stale" is not a rule, it is an unbounded judgement call** handed to the
+      person least able to make it — whoever just wrote the material. The proof is exact: a
+      note was added to the top of §3 on 2026-08-08 reading *"§3 is now ~400 lines — half this
+      file... the next graduation candidate... prefer editing a line here to adding one."*
+      §3 was **410 lines** then and **469** four sessions later. The instruction was in the
+      file, at the point of edit, in a section `/session-start` tells you to read — and it was
+      read past every time.
+    - **The fix is a size, countable in one command.** Ledger row ≤200 chars
+      (`awk 'length($0)>200'`), ≤1 `_Previously,_` (`grep -c`), whole file ≤45,000 bytes
+      (`wc -c`). And **measure at the START of the write, not the end**: the old rule asked
+      "did it grow past ~700 lines?" in a *Final check*, which five consecutive sessions
+      answered and waived, because by then the only remedy is a restructure.
+    - **The duplication test that was missing.** The graduation rule tested only whether
+      anything would be *lost* if the session entry were deleted. An entry that faithfully
+      **re-tells** the gotcha it just filed passes that test perfectly — nothing is lost, it is
+      all safely in `docs/` — while duplicating every word. That is precisely what the
+      1,400-character ledger rows were. **Graduating a fact means MOVING it, not copying it.**
+    - **A CI byte-ratchet was built, proven to fail correctly, and then deliberately reverted**
+      (`cb70808`) — gating a build on a documentation byte-count was judged disproportionate.
+      So the rules above are enforced by nothing but the next person to read them, which is
+      the third attempt at discipline-by-instruction. If it regrows a third time, restore
+      `scripts/check-doc-budget.sh` from that commit rather than re-wording the rule again.
+      (2026-08-10.)
+
+120. **AN AUDIT TRIGGER THAT WRITES THROUGH AN RLS-PROTECTED TABLE MUST BE `SECURITY
+    DEFINER`, OR IT TAKES THE WRITE IT WAS OBSERVING DOWN WITH IT.** A trigger runs inside
+    the host statement's transaction, so a policy that refuses the *trigger's* INSERT does not
+    merely skip the audit row — it raises, and the original UPDATE dies too.
+    - **Where it bit (2026-08-09, §8.38):** the `AFTER UPDATE … WHEN (OLD.* IS DISTINCT FROM
+      NEW.*)` trigger on `students`. With invoker rights, `audit_log`'s INSERT policy refuses
+      the row and **every student edit in the product stops working** — the admin level
+      picker, the admin contact modal, the admin Assign action, the parent's own edit-child
+      screen. Proven by breaking the live function twice.
+    - **The accepted consequence, and it is deliberate:** a write with no JWT actor
+      (migration, `psql`, seed, edge function) records **nothing and is allowed through**. An
+      audit gap on a backend path is recoverable; a refused student write is not. A reader
+      must therefore render "system", not blank.
+    - **Filed 2026-08-10, and the reason it is this late is the lesson.** §8.38's ledger row
+      claimed this reasoning lived at **§7.108** — which is about a Playwright cold-compile
+      timeout. Nothing was ever written here, and nobody noticed for a day because the row
+      carried the full narrative itself. **Verify a pointer resolves before you write it**
+      (`grep` the target for the number); an unverified pointer does not delegate anything, it
+      just looks like it did. See **§7.119**. (2026-08-10.)

@@ -52,6 +52,7 @@ document when the task touches it; don't read them all up front.
 | Why is it built this way? | `docs/ARCHITECTURE.md` (§6, §10, §12) |
 | What do the tests cover? | `docs/TESTING.md` (§5) |
 | What's live, and how? | `docs/DEPLOYMENT.md` (§11) |
+| What shipped in an older session (`§8a`, `§8.n`)? | `docs/SESSIONS.md` |
 | **Working in a worktree / two sessions at once** | **`docs/WORKTREES.md`** |
 | How do I bill a month? | `INVOICE_RUNBOOK.md` |
 
