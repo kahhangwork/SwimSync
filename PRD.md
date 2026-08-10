@@ -802,8 +802,30 @@ SwimSync shall allow **parents to create student profiles** and **superadmin to 
   coach type lands, a private coach keeps this and a school coach's admin takes it over.)*
 - Newly created profiles default to **Unassigned**
 - Superadmin can view all unassigned profiles in the **Unassigned Children** section
-- Superadmin can assign or reassign student to one class
-- SwimSync shall prevent more than one active class enrolment per student for MVP
+- Superadmin can assign or reassign a student to a class
+- **A student may attend MORE THAN ONE class a week** *(implemented 2026-08-11)*. The MVP
+  rule was one active enrolment per student, enforced by a unique index; a keen swimmer
+  taking two sessions a week is an ordinary case it could not represent, and the workaround
+  was a second child profile. The rule that replaced it is **one active enrolment per
+  student PER CLASS**, plus two schedule guards:
+  - **A child cannot hold two enrolments that overlap in time** — same weekday, overlapping
+    start/end. Refused by the database, naming the clashing class.
+  - **A class cannot be MOVED onto a time that clashes** for a child already enrolled in
+    both. Refused by the database, naming the children. A price-only or title-only edit is
+    untouched, so a class never becomes uneditable.
+  - **Nothing may be enrolled into a RETIRED class.** The guard is written as "refuse entry
+    to an inactive class", deliberately, rather than "ignore inactive classes when checking
+    overlap" — the latter is escapable via `reactivate_class()`, which takes no refusals
+    (§7.3).
+  - The escape from either refusal is the same screen that creates the state: **Students →
+    the × on a class chip**, which ends one enrolment and leaves the others alone.
+- **The admin's Students page owns the many-to-many.** Each child's Class column is one chip
+  per active class, each with its own ×; **+ Add class** adds another. The Unassigned
+  Children section still handles a child's FIRST assignment. There is deliberately no
+  "remove from class" button per child any more — with several classes there is no *the*
+  class to remove them from, and the chip is the only control that says which one is going.
+- **A child is `Unassigned` only when they are in NO class.** Dropping one of two leaves
+  them `Assigned`.
 
 ### 7.5 Lesson Session Generation
 
@@ -1871,16 +1893,29 @@ must not be enrolled; a make-up child must be (active, actively enrolled).
 **Booked by the admin, from the Make-ups page** (the Trials mirror, including its
 "Past — needs marking" list). The form is child-first — one search box finds the child
 by **their name or their class's name** (a dropdown stops working at a few dozen
-children; the admin often knows the class, not the spelling), then the child's own
-class decides the category, and the class list offers same-category classes *minus
-their own*. The
+children; the admin often knows the class, not the spelling — and the search matches
+**any** of their classes, not just the first), then the child's home class decides the
+category, and the class list offers same-category classes *minus every class the child
+is in*. **Which class is "home" is asked, not guessed, once a child has more than one**
+*(implemented 2026-08-11)*: it is snapshotted onto the booking and therefore decides both
+the price and the package category, so a derived answer would have been an arbitrary one.
+A child with a single class is not asked. The
 date list is the host's real lesson days plus any admin-scheduled off-schedule session
 (`book_makeup()` accepts those — an existing session proves the lesson is real). Every
 refusal lives in the RPC, not the screen: unenrolled or inactive child, inactive host
-class, cross-category, the child's own class ("use Extra lesson instead" — which is how
-a **private-category** make-up is done, since there is no other private class to guest
-into), a date the class doesn't meet, a date inside an already-billed month, a duplicate
-live slot. Cancelling is soft, and a cancelled slot can be re-booked.
+class, cross-category, **any class the child is already in** ("use Extra lesson instead" —
+which is how a **private-category** make-up is done, since there is no other private class
+to guest into), a home class the child is not actually in, a missing home class where the
+child has several, a date the class doesn't meet, a date inside an already-billed month, a
+duplicate live slot.
+**The refusal is EVERY class the child attends, not merely the one named as home**
+*(2026-08-11)* — and that is not a billing rule. Enrolment wins over a stray booking
+(below), so booking a make-up into the child's *other* class prices perfectly correctly as
+a member; what it does is **silently void the make-up**, because the child attends the
+lesson they were already attending, receives nothing replacing the one they missed, and the
+Make-ups page reports the booking as arranged. A child who is already in every class of
+their kind therefore has no make-up host at all, and the booking form says so and points at
+Extra lesson — see `BACKLOG.md` for the gap that reveals. Cancelling is soft, and a cancelled slot can be re-booked.
 
 **What it costs follows who the family is, with two snapshots on the booking (§7.45):**
 

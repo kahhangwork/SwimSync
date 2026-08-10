@@ -1,6 +1,13 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-10 (3rd session) — ***`verify-schedule-week` fails two COMING UP
+_Last updated: 2026-08-11 — **Wave 2, *Multiple classes per child*, SHIPPED and was
+removed** (`936e3bd`, live). Its Build-order entry is marked COMPLETE rather than deleted,
+because two later items were held behind it and both are now unblocked: *Convert a trial
+into an enrolled student* and *Book a make-up from the Attendance page*. One new item, the
+gap the wave **revealed rather than created**: *a child in EVERY class of their kind has no
+per-child make-up*. Two stale rationales corrected in place — Wave 4's "after Wave 2", and
+*Cross-tenant students*, which rested on an index that no longer exists.
+Previously, 2026-08-10 (3rd session) — ***`verify-schedule-week` fails two COMING UP
 checks* SHIPPED and was removed** (`287142b`): driver rot, not a product bug, and the item's
 own guess was right — the locator, scoped. §7.121 is the trap the fix nearly introduced.
 **Two settled shape decisions were also recovered into *Attendance edit history view*** from
@@ -205,7 +212,7 @@ below, because an unrecorded decision is re-litigated.)_
 | Coach per class or per lesson? | **Per lesson, on top of class assignment** | A permanent handover already works. A **temporary substitute** and **trainee/shadow coaches** are new lesson-level items; *Multiple coaches per class* is superseded |
 | Trainee coach pay? | **Paid at their own rate** | A shadowed lesson produces two payout rows — the payroll half of the accounting page must come after it |
 | Substitute pay? | **Whoever actually taught it** | The session override moves money, so it is a wages change, not just a roster label |
-| Multiple classes per child? | **Yes, and soon** | Promoted to Wave 2. It drops `one_active_enrolment_per_student`, so every enrolment-shaped surface built after it inherits the new model — and everything built before it gets reworked |
+| Multiple classes per child? | **Yes, and soon** | **SHIPPED 2026-08-11** as Wave 2 (PRD §7.4). The ranking was right: it dropped `one_active_enrolment_per_student`, and three pieces of code turned out to be correct only because that index held. Everything enrolment-shaped built after this inherits the new model |
 | Native store builds ($99/yr)? | **Not yet — stay web-only** | *Push notifications* stays blocked. **Settled by what shipped 2026-08-09:** the static PayNow QR upload was neither deleted nor hidden — it is **collapsed behind a disclosure and always present**, which keeps the native fallback path alive *and* survives a stored-but-unencodable PayNow ID. Any future native decision inherits that, not a conditional |
 
 #### Wave 1 — cheap, independent, and inherited by everything after (**COMPLETE**)
@@ -242,17 +249,17 @@ to the admin panel from coach Settings** all shipped 2026-08-09 as Chunk 2 — s
 disclosure, because a stored-but-unencodable PayNow ID makes "hide when a proxy exists"
 one typo away from a business that cannot be paid.)_
 
-#### Wave 2 — **Multiple classes per child** (M)
+#### Wave 2 — **Multiple classes per child** (M) — **COMPLETE 2026-08-11**
 
-The single largest retrofit tax in the backlog, and the user's answer is *build it soon*.
-It drops the `one_active_enrolment_per_student` constraint and reworks the enrolment UI,
-`expectedStudentsOn()` and the attendance rosters. Billing needs less than expected —
-the engine already sums per attendance record.
+Shipped and live: migration `20260811000100`, PRD §7.4 and §7.20. The retrofit tax was
+paid where predicted (enrolment UI, five `.find(e => e.is_active)` read sites) and **not**
+where the item had guessed: the invoice engine needed nothing at all, because it already
+loops per class — `expectedStudentsOn()` was never the problem, and that claim was stale
+when it was written. What it *did* cost was three RPC repairs nobody had listed, all of
+them correct only because the dropped index held (§7.124, §7.127).
 
-**It goes before Waves 3–5 because every one of them touches enrolment or the roster.**
-*Convert a trial into an enrolled student* and *Book a make-up from the Attendance page*
-both sit on this ground and are deliberately held until after it. Trials and make-ups
-themselves are unaffected — a booking was never an enrolment.
+**Waves 3–5 inherit the new model.** *Convert a trial into an enrolled student* and *Book a
+make-up from the Attendance page* were held until after this and are now unblocked.
 
 #### Wave 3 — **The lesson-level coach roster** (M/L)
 
@@ -284,7 +291,7 @@ param.)_
 #### Wave 4 — **A lesson recorded into an already-BILLED month is reported, and settled** (S/M)
 
 Placed after Wave 2 because a **backdated enrolment** is its main trigger, and Wave 2
-rewrites enrolment. Reuses the `unclaimed_billable` reporting shape and
+rewrote enrolment (done 2026-08-11, so this is unblocked). Reuses the `unclaimed_billable` reporting shape and
 `student_settlements`; adds no invoice concept and no override. Correct
 `schedule_extra_lesson()`'s comment in the same pass — it claims the floor blocks this and
 it does not.
@@ -313,7 +320,10 @@ copy/templates (S).
   purges a deleted admin's rows, so the history has holes with a known cause — see
   *Deleting an admin destroys the audit history*.
 - **Convert a trial into an enrolled student** (S) and **Book a make-up from the
-  Attendance page** (S) — after Wave 2, which changes what an enrolment is.
+  Attendance page** (S) — were held until Wave 2, which changed what an enrolment is.
+  **Wave 2 shipped 2026-08-11, so both are unblocked.** Note for the make-up one: the
+  Attendance page now has to ask WHICH class the make-up replaces when the child has more
+  than one, exactly as the Make-ups page does (PRD §7.20).
 
 ### The email / scheduler chain — strict internal order, start any time
 
@@ -945,17 +955,6 @@ lane. A lighter middle ground: let the parent express a *preference* at signup t
 superadmin approves, which removes the back-and-forth without giving up control.
 Related: coach-assisted assignment below.
 
-### Multiple classes per child — **M** `[MVP-excluded]` `[Phase 3]`
-Let one student attend more than one class a week.
-
-**Why:** a keen swimmer taking two sessions a week is an ordinary case that SwimSync
-simply can't represent — the parent needs a second child profile as a workaround.
-
-**Notes:** MVP enforces one active enrolment per student with a DB constraint (§5.3,
-§7.4) that's covered by a pgTAP test. Billing already sums per attendance record, so the
-invoice engine may need less work than expected — the constraint, the enrolment UI, and
-the attendance screens are where the work is. Often wanted together with makeup lessons;
-they share the "a student can appear in more than one place" problem.
 
 ### Maps integration — **S** `[MVP-excluded]`
 Tap a class location to open it in Maps.
@@ -1549,7 +1548,7 @@ Kept so the reasoning doesn't get re-litigated.
 | **Wiring anything to `tenants.kind`** | The column is an enum defaulting to `'private'` that **nothing sets, changes or reads** — the tenancy backfill hardcoded it in July 2026 and no screen, RPC or admin control has touched it since. It is reserved for future *pricing*, and §6 forbids it reaching an RLS policy. It briefly appeared as a "Type" column on the Platform page and was replaced 2026-07-19 with a **derived** shape (one coach who is also the admin = a private coach), because the stored value would have read "private" for an actual swim school and nobody would have noticed. **Don't display it, and don't branch on it** — if a business's shape matters, derive it. If pricing eventually needs a stored kind, give it a writer and a UI at the same time, or it will drift again. |
 | **A browsable directory of coaches / schools for parents** | Considered as the way a parent picks their business, rejected 2026-07-19 in favour of **join codes** (PRD §5.1). A list publishes SwimSync's entire customer roster to every parent and every competing school; worse, a mis-tap puts a child on a stranger's roster where that business's admin can see and bill them, because nothing in the flow proves the family deals with them. **Possession of a code is that proof.** It also stops scaling at a few hundred tenants. If a discovery feature is ever wanted, make it search-by-exact-name so the full list is never enumerable. |
 | **A "view as tenant" impersonation mode for the platform admin** | Rejected 2026-07-19 while building the platform page. It means scoping *every* admin screen to a chosen tenant rather than the caller's own — far larger than the support need, which is answered by a cross-tenant business list plus the ability to **move a student** between businesses (PRD §4.4). Revisit only if support actually gets stuck without it. |
-| **Cross-tenant students** (one child taking lessons at two businesses) | Out of scope 2026-07-19. A student belongs to one business, and `one_active_enrolment_per_student` already enforces one active class. Note this **is** a real thing in Singapore, so this is a "not yet" rather than a "never" — but it touches enrolment, billing and the tenant boundary at once. Revisit on actual demand, not in anticipation. |
+| **Cross-tenant students** (one child taking lessons at two businesses) | Out of scope 2026-07-19. A student belongs to one business. *(The old wording added "and `one_active_enrolment_per_student` already enforces one active class" — that index was dropped by Wave 2 on 2026-08-11 and a child may now hold several enrolments. The tenant boundary is what makes this out of scope; the enrolment count never was.)* Note this **is** a real thing in Singapore, so this is a "not yet" rather than a "never" — but it touches enrolment, billing and the tenant boundary at once. Revisit on actual demand, not in anticipation. |
 | **Platform billing (SwimSync charging the schools)** | Deliberately unbuilt 2026-07-19: the pilot is free. `tenants` is the natural billing subject when it arrives, so nothing in the current schema blocks it — but building it now would be a second money model with no payer. |
 | **Putting the SwimSync mark on the invoice email** | Rejected 2026-07-19 while adding the logo. That header is the **tenant's** logo and business name by design (PRD §7.10): a parent pays their coach or school, and an invoice headed "SwimSync" reads as a platform bill — actively confusing for a family with children at two businesses. SwimSync is named in the footer as sender of record, and that is the whole of its billing there. The *recovery* email is a separate case and also stays wordmark-only: SVG does not render in most mail clients, and a hosted PNG adds a broken-image failure mode to the one message a locked-out user needs. (HANDOVER §8.2, `brand/README.md`.) |
 | **A non-calendar wage cycle** (e.g. 16th–15th) | Wages assume **calendar months**, with only the *pay day* configurable (PRD §7.13). A different period boundary is a new period concept rather than a setting, and would need its own sealing and adjustment rules. Nobody has asked for it. |

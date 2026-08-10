@@ -2131,3 +2131,90 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     - **Date a nightly by its SGT execution day, with the UTC label in brackets**, in issue
       comments and in `HANDOVER.md`. Same family as §7.7: the bug is never the timezone, it is
       two clocks quietly disagreeing about which day it is. (2026-08-10.)
+
+123. **DROPPING A FUNCTION SIGNATURE BREAKS THE CURRENTLY-DEPLOYED APP FROM THE MOMENT THE
+    MIGRATION LANDS, AND §7.60's "MIGRATIONS FIRST" IS WHAT PUTS YOU THERE.** §7.60 says a
+    backend-first change deploys migrations → engine → apps, with `main` last. That is right
+    for a **backward-compatible** backend change and wrong for one that removes a signature.
+    Wave 2 dropped `close_student_enrolment(uuid, boolean)` and replaced it with a 3-arg form
+    whose new parameter has **no default**. Between `supabase db push` and the push to `main`,
+    the live admin panel and coach app were still calling the 2-arg form — PostgREST could not
+    resolve it, and **"Remove from class" was broken in production** on both. Measured, not
+    theorised: it happened on 2026-08-11.
+    - **`book_makeup` survived the same window** because its new 4th parameter *has* a
+      default, so PostgREST still matched the old 3-argument call. That is the whole
+      difference, and it is the test: **a dropped signature is only safe across the window if
+      the surviving one can be called with the OLD argument list.**
+    - **So decide the order by compatibility, not by layer.** Either (a) keep the old
+      signature as a thin shim through the window and drop it in a follow-up migration — real
+      expand/contract, which `CLAUDE.md` already mandates and which this change skipped — or
+      (b) deploy the apps FIRST and the migration second, the ordering §8's tenancy phase 4
+      used for exactly this reason.
+    - The window is short (a Vercel build) and the blast radius here was one admin action,
+      not billing. It is in this file because **nothing warned about it**: the plan, the
+      adversarial review and the pre-flight all passed, because every one of them checked the
+      migration against the *database* and none checked it against the *deployed client*.
+      (2026-08-11.)
+
+124. **ADDING A DEFAULTED PARAMETER DOES NOT REPLACE A POSTGRES FUNCTION — IT CREATES A
+    SECOND ONE, AND POSTGREST MAY GO ON CALLING THE OLD BODY.** `CREATE OR REPLACE FUNCTION
+    f(a, b, c DEFAULT NULL)` does not replace `f(a, b)`; overload resolution is by argument
+    *list*, so both now exist. PostgREST resolves an RPC by parameter **name**, so a client
+    still sending the old argument set keeps hitting the old row in `pg_proc`. **Nothing
+    errors.** In Wave 2 that would have left `book_makeup`'s pre-change body live — the one
+    whose home-class `SELECT INTO` was deterministic *only* because of the constraint being
+    dropped in the same migration, and which takes an arbitrary row with no `ORDER BY` on
+    multi-row. Both values it derives are money: the make-up's price (`core.ts` `rateOn`) and
+    its package category.
+    - **Always `DROP FUNCTION <old exact signature>` before creating the new one**, and
+      assert it afterwards: `\df <name>` must show exactly one row. That assertion is in the
+      Wave 2 pre-commit gate for this reason.
+    - **Then re-`GRANT`** — the new signature is a new `pg_proc` row and §7.87 applies.
+    - Related, and the reason this was caught at all: the pgTAP file that probes grants named
+      the OLD signature in `has_function_privilege()`, which **errors** rather than fails once
+      the signature is gone, aborting the whole file with a bad plan. A grant probe is a
+      signature reference; grep for the old one when you change it. (2026-08-11.)
+
+125. **A TRIGGER FUNCTION THAT ENFORCES A CROSS-ROW RULE MUST BE `SECURITY DEFINER`, OR RLS
+    CAN HIDE THE ROW THAT WOULD HAVE FAILED IT.** A plain `LANGUAGE plpgsql` trigger function
+    runs with the *caller's* privileges, so its `SELECT` over sibling rows is filtered by the
+    same RLS policies the caller sees. A row the caller cannot read is a row the check cannot
+    count — and the check then **silently passes**, which is the exact failure a uniqueness or
+    overlap trigger exists to prevent. Wave 2's `enforce_enrolment_schedule()` scans a child's
+    *other* enrolments while `enrolments_select` can legitimately hide some of them from a
+    coach. It is `SECURITY DEFINER SET search_path = public` for that reason, and the reason
+    is in the migration beside it.
+    - The tell is that the failure is invisible in local testing, where you are usually
+      superuser or the policy happens to permit the read. Same family as §7.16.
+    - `SET search_path` is not optional on a `SECURITY DEFINER` function. (2026-08-11.)
+
+126. **A `BEFORE INSERT` TRIGGER THAT COMPARES A ROW AGAINST ITS SIBLINGS MUST EXCLUDE THE
+    ROW'S OWN NATURAL KEY, OR A DUPLICATE REPORTS A NONSENSE CLASH *AND* MASKS THE UNIQUE
+    VIOLATION.** A `BEFORE INSERT` trigger runs **before** the unique index is checked. Wave
+    2's overlap trigger initially excluded only `e2.id <> NEW.id`, so inserting a child into a
+    class they were already in found the existing row, compared the class against **itself**,
+    and raised *"Mon 5pm clashes with Mon 5pm"* — replacing the `23505` the test suite
+    asserts and the admin would understand. Adding `e2.class_id <> NEW.class_id` restores the
+    division of labour: **the trigger owns "two different rows conflict", the index owns "the
+    same row twice"**. Found by smoke-testing the migration's ten cases before writing any
+    pgTAP, which is the cheap way to find it. (2026-08-11.)
+
+127. **BEFORE YOU DROP A CONSTRAINT, ASK WHAT WAS RELYING ON IT TO *FAIL*.** A constraint is
+    not only a product rule; other machinery quietly uses its rejections as a detector, and
+    removing it removes the detector silently — no test goes red, because the thing that used
+    to raise now succeeds. §7.63's fixture bug (an unscoped `CROSS JOIN students` that enrolled
+    and marked present **every child in the database**, i.e. billable attendance attributed to
+    someone else's child) was caught in the first place because
+    `one_active_enrolment_per_student` **aborted** the statement. Wave 2 replaced that index
+    with `(student_id, class_id)`, so a stray child enrolled into a class they are *not*
+    already in now inserts without complaint.
+    - **Re-prove the dependent guard, do not reason about it.** Done on 2026-08-11 by
+      sabotaging a fixture with an unscoped `CROSS JOIN` and re-running
+      `check-fixture-roundtrip.sh`: it still catches it, on **delta divergence** rather than
+      on the abort — `student_class_enrolments +6` alone versus **+16** stacked, exit 1,
+      naming the fixture. Had that come back green, the wave would have removed a live guard
+      against stray billable rows.
+    - The sabotage must be the shape the *new* schema cannot catch. The first attempt
+      cross-joined into a class a sibling fixture also used, so the new unique index fired and
+      the run "passed" — proving nothing about the divergence detector. Target a class no
+      sibling touches. (2026-08-11.)

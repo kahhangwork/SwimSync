@@ -1,13 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-10 (3rd session) — **the nightly's remaining red is fixed:
-`verify-schedule-week` is 21/21, `287142b` on `main` (§8.42).** Driver rot, **not** §8.40 —
-proven by reproducing 17/19 at `eb010fd~1`. The fix's own first version would have crashed
-every September (**§7.121**). Driver only: no product change, no migration, no deploy._
+_Last updated: 2026-08-11 — **Wave 2 is LIVE: a child can attend more than one class
+(§8.43).** Migration `20260811000100` + both web apps deployed and verified in the bundle.
+Five gotchas, **§7.123–§7.127**; one of them is a real production breakage this shipped._
 
-_Previously, 2026-08-10 (2nd session) — **this file's growth mechanism was found and cut:
-91 KB → 39 KB, nothing lost (§8.41).** The ledger is now `docs/SESSIONS.md`; **§7.119** is
-the durable lesson._
+_Previously, 2026-08-10 (3rd session) — **`verify-schedule-week` fixed to 21/21** (§8.42):
+driver rot, not §8.40, proven by reproducing the failure at `eb010fd~1`. **§7.121–§7.122**._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -30,7 +28,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.118** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.127** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -143,6 +141,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | Co-admins, managed by the business's OWNER | pgTAP 38 + vitest + driver, LIVE | PRD §4.3 · §8.31 |
 | A class can be RETIRED without losing money | pgTAP 23, LIVE | PRD §7.3 · §8.39 |
 | An unmarked GUEST holds the month open; nothing new enters a retired class | pgTAP + Deno, LIVE 2026-08-10 | PRD §7.3 · §8.40 |
+| **A child can attend MORE THAN ONE class a week** | pgTAP 637 + vitest + jest + 17-check driver, LIVE 2026-08-11 | PRD §7.4, §7.20 · §8.43 |
 | Automated tests — pgTAP + Deno backend, vitest + jest-expo apps, all in CI on push | CI | `docs/TESTING.md` §5 |
 
 **Counts are deliberately not written here.** The runner is the fact; a number in prose is
@@ -162,6 +161,11 @@ is a guard whose first real firing is still ahead of you.
   re-confirmed 2026-08-10), so no class has been retired on real data.
 - **Guest bookings** — production holds **zero** live trial or make-up bookings, so §8.40's
   new block has never fired there. Which is exactly why it was safe to ship.
+- **Multiple classes per child** — no production child holds two enrolments yet, so neither
+  schedule guard has ever refused anything real and no admin has pressed *+ Add class*. The
+  first real one is worth watching: it is also the first time `'mixed'` package coverage
+  becomes reachable on real data (PRD §7.16), a code path that was unreachable-by-construction
+  for its whole life until 2026-08-11.
 
 *(Corrected 2026-08-10: this list also carried "production has 0 attendance rows", which
 had been false since 2026-07-26 and directly contradicted the REAL BILLING note below.
@@ -183,9 +187,13 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
 - **The package-reference trigger's NAME is part of the contract** — it must sort after
   `trg_parent_package_lifecycle`, which fills `tenant_id`. Renaming it breaks **every**
   package request. `docs/ARCHITECTURE.md` §6.
-- **The coach app calls no RPCs at all** — its only write path is marking attendance. A
-  private coach arranges trials through their tenant-admin account. `add_unclaimed_student()`
-  still accepts a coach caller server-side (pgTAP pins it), but no UI reaches it. §8.10/§8.11.
+- **The coach app calls almost no RPCs** — attendance marking, plus `close_student_enrolment()`
+  and `set_students_active()` from the roster (`SwimSyncApp/lib/studentStatus.ts`). *(This
+  bullet read "no RPCs at all" until 2026-08-11 and was simply false — caught only because
+  Wave 2 changed one of those signatures and the grep found the caller. A prohibition that is
+  wrong is worse than none: it is why §7.123's breakage was not anticipated.)* A private coach
+  arranges trials through their tenant-admin account; `add_unclaimed_student()` still accepts
+  a coach caller server-side (pgTAP pins it), but no UI reaches it. §8.10/§8.11.
 - **NEEDS MARKING is FLOOR-scoped and deliberately ignores the week selector** — week-scoping
   hides a straggler the coach has no reason to look for, and unmarked attendance blocks
   billing with no override (§8i). `verify-schedule-week.mjs` pins it, proven red by scoping
@@ -193,23 +201,32 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
 - **The coach's week is an offset integer, not a stored Monday** (§7.95) — an absolute Monday
   captured at mount goes stale on a PWA surviving a Sunday→Monday boundary, and the symptom
   is indistinguishable from a quiet day.
-- **The student-audit trigger is `SECURITY DEFINER`, and that is not style** — invoker-rights,
-  the `audit_log` INSERT policy refuses the row and the student UPDATE dies with it, so every
-  student edit in the product stops working (§7.104). A write with no JWT actor records
-  nothing and is allowed through, on purpose: an audit gap on a backend path is recoverable,
-  a refused student write is not. Two holes disclosed rather than silent — backend writes are
-  unattributed (render "system", not blank), and `prepare_admin_delete()` purges a deleted
-  admin's rows (`BACKLOG.md`). §8.38.
+- **The student-audit trigger is `SECURITY DEFINER`, and that is not style** — invoker-rights
+  breaks every student edit in the product. Two holes are disclosed, not silent: backend
+  writes are unattributed (render "system"), and `prepare_admin_delete()` purges a deleted
+  admin's rows. Full reasoning: **§7.104** · `BACKLOG.md` · §8.38.
 - **`classes.deactivated_at` is a DATE and a boolean cannot replace it.** The same scan feeds
   the completeness gate, so widening it naively makes an inactive class expect a weekly lesson
   for ever and block the month with no override and **no screen able to clear it** (§7.109).
   The date answers *"was this class running on the 13th?"*. **`reactivate_class()` takes no
   refusals and must never grow one** — it is the only exit.
 - **`bookingsByDate` is NEVER clamped — a prohibition, not a preference.** `expectedDates` is
-  a guess derived from a weekday and is clamped; a booking row is evidence that a named child
-  was expected at a named lesson. A clamp was drafted and would have re-created the underbill.
-  The CHECK constraint now makes the state it would have mishandled impossible, so the
-  prohibition is structural. `docs/ARCHITECTURE.md` §6 · §8.40.
+  a guess and is clamped; a booking is evidence. A clamp was drafted and would have re-created
+  the underbill. `docs/ARCHITECTURE.md` §6 · §8.40.
+- **The enrolment overlap trigger must NOT consult the counterparty class's `is_active`, and
+  `reactivate_class()` must never grow a refusal.** The obvious form ("skip the check if
+  either class is retired") is escapable: an enrolment can be added to a retired class after
+  it is retired, and reactivating it then takes no refusals by standing prohibition. The rule
+  is inverted instead — refuse *entry* to a retired class — so an inactive class provably
+  holds none. It is also `SECURITY DEFINER`, because RLS can hide the sibling row that would
+  have failed the check (§7.125). §8.43.
+- **`close_student_enrolment()`'s `p_class_id` has NO default and NULL is refused.** There is
+  deliberately no spelling that means "every class": the dangerous value must not be the one
+  a forgotten argument produces. Its per-class authorization is `coach_owns_class()`, **never
+  `coach_serves_student()`** — the latter is true for any class the child is in and would let
+  one coach close a row on another's roster. §8.43.
+- **`book_makeup()` refuses EVERY class the child attends, not just the named home.** Booking
+  into their other class bills correctly and silently voids the make-up. PRD §7.20 · §8.43.
 - **`billableStudentIds` is not widened** — four consumers read it, and widening is safe only
   by coincidence of the item loop's shape. §8.40.
 
@@ -319,6 +336,51 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.43 (2026-08-11) — WAVE 2: A CHILD CAN ATTEND MORE THAN ONE CLASS
+
+**Shipped and live** — `20260811000100`, `936e3bd` on `main`, both web apps deployed and
+confirmed by grepping the served bundles, not by a status code (§7.31). PRD §7.4 and §7.20
+carry the behaviour; `docs/plans/WAVE_2_PLAN.md` carries the decisions and the ranked risk
+review it was built from.
+
+**The feature was the small half.** `one_active_enrolment_per_student` was load-bearing for
+three pieces of code that had nothing to do with the product rule, and each would have
+failed silently: `book_makeup()` derived its home class with a `SELECT INTO` whose
+determinism came only from that index, and that value prices an invoice line; the same
+function's "own class" refusal covered every class a child was in *only because* there was
+one; and `close_student_enrolment()` closed "the" enrolment by closing all of them. The
+engine, by contrast, needed **nothing** — it already loops per class, so `BACKLOG.md`'s
+"reworks `expectedStudentsOn()`" was stale when it was written.
+
+**A real production breakage, and it is the most valuable thing here (§7.123).** Dropping
+`close_student_enrolment(uuid, boolean)` broke "Remove from class" on the live admin and
+coach app for the window between `supabase db push` and the push to `main` — the deployed
+client called a signature that no longer existed. §7.60's "migrations first" is right for a
+backward-*compatible* change and wrong for one that removes a signature; `book_makeup`
+survived the same window only because its new parameter has a default. The plan, the
+adversarial review and the pre-flight all passed, because every one of them checked the
+migration against the database and none against the deployed client.
+
+**Two things were found by running rather than reading**, which is the reproducible lesson.
+Smoke-testing the migration's ten cases before writing any pgTAP caught an overlap trigger
+that reported *"Mon 5pm clashes with Mon 5pm"* and masked a `23505` (§7.126). Measuring the
+new driver's sabotage signature caught a check of its own that counted a coach name the seed
+does not use — it matched zero times and passed while testing nothing.
+
+**Deliberately not done.** No compatibility shim for the dropped signature: the window was
+one Vercel build and the blast radius one admin action, so it was accepted rather than
+engineered around — but §7.123 is why the next one gets ordered differently. `book_trial()`
+still refuses a child with an active enrolment in any class; under multi-class that is a
+policy choice rather than a mechanical one, and the user's call was to leave it (that
+business will not trial an existing customer).
+
+**Verified:** pgTAP **637** (was 617, incl. new `multi_class.test.sql`, proven red by running
+the DOWN file); Deno **139 ×2** (§7.15); vitest 259; jest 308; `verify-multi-class` **17/17**;
+`check-fixture-roundtrip.sh` exit 0; rollback rehearsed; remote grant dump re-checked —
+`anon` EXECUTE still 18, both old signatures gone.
+
+---
+
 ## 8.42 (2026-08-10, 3rd session) — THE NIGHTLY'S LAST RED WAS THE DRIVER, NOT §8.40
 
 **`verify-schedule-week` is 21/21 and on `main` as `287142b`.** It had been 17/19, and the
@@ -358,42 +420,6 @@ announces a sibling that shares the *root* checkout rather than taking a worktre
 **Verified:** 21/21 on a Monday, the failing case; sabotage **18/21** with the reveal guard
 reporting `2 -> 2`, signature recorded in the file header; Node and Chrome ICU agree on all
 12 months; pre-existence proven at `eb010fd~1`; `287142b` fast-forwarded onto `main`.
-
----
-
-## 8.41 (2026-08-10, 2nd session) — THE HANDOVER'S GROWTH MECHANISM, FOUND AND CUT
-
-**91 KB → 39 KB, nothing lost.** The file was 38 KB after the 2026-07-26 trim and 91 KB
-nine days later — the same trajectory that had already produced one 290 KB rewrite. **The
-mechanism and the rule that failed are §7.119**, which is the durable half of this session;
-the short version is that every session was written **three times** (dateline, full §8
-entry, permanent ledger row) and only the middle copy was ever deleted.
-
-**Three cuts.** The ledger moved to **`docs/SESSIONS.md`** — 51 rows verbatim, numbers
-intact, and the section-number resolver in `docs/ARCHITECTURE.md` was corrected to match,
-because `§8a` is cited from `core.ts` and an applied migration and must still resolve. The
-dateline chain went **5 → 1**. §3 went **469 → ~205 lines**, keeping only what a PRD cannot
-say: the verified-vs-specified table, a new **DORMANT** list (shipped but never exercised on
-real data), and every prohibition.
-
-**A live self-contradiction fell out of the mapping.** §3 claimed *"production has 0
-attendance rows"* while a blockquote 170 lines below it recorded July billed for real with
-money collected. The first had been false since 2026-07-26. That is the cost of restating a
-fact instead of pointing at one — corrected in place, with the query that answers it.
-
-**Deliberately not done: the CI gate.** A byte-ratchet was built and *proven to fail
-correctly*, then reverted at the user's call — disproportionate for a documentation
-byte-count, and seeded at the file's exact size it would have reddened the next session's
-first legitimate §9 addition. Reasoning and the restore path are in `BACKLOG.md` →
-*Deliberately not doing*. What replaced it: `/update-docs` carries the limits as three
-countable commands measured at the **start** of the write. **This is the third attempt at
-discipline-by-instruction and the first two failed**, which is why the Final check names the
-escalation rather than re-wording the plea.
-
-**Two things this session did NOT touch, deliberately.** `PRD.md` — no shipped behaviour
-changed. And another session's work in the same checkout: `verify-schedule-week.mjs` (which
-landed on `main` as `287142b` mid-pass, so §9's entry for it was corrected after the push)
-and the nested `SwimSync/attendance-edit-history-view` worktree. Neither was ever staged.
 
 ---
 
@@ -459,11 +485,20 @@ did include §8.40:
   and the issue is open only because the sweep as a whole was red.
 - **The one red was `schedule-week`, 17/19**, and that is fixed on `main` as `287142b`
   (21/21 locally, §8.42). So the next sweep is expected all-green.
+- **There are 39 drivers now**, not 38: `verify-multi-class` landed 2026-08-11 (17/17 locally,
+  §8.43). It has never faced a sweep. Both harnesses auto-discover by glob, so it needed no
+  registration — and its fixture name matches the driver, so `fixture_for`'s default case
+  finds it.
 - **All six drivers that had never faced a sweep faced this one and passed** —
   `verify-levels`, `verify-admin-table-geometry`, `verify-packages`, `verify-paynow-fallback`,
   `verify-class-deactivation`, `verify-trials`. That paragraph is retired.
 
-**Three still mutate shared state**, which is why a sweep is not a substitute for a reset:
+**`verify-multi-class` is not re-runnable by hand** — it removes a class through the UI, and
+its fixture's `NOT EXISTS` guard is keyed on `(student, class)` regardless of `is_active`, so
+a second run finds the row present-but-closed and does not restore it. Apply the teardown
+first. The sweep resets per driver, so this only bites a hand-run.
+
+**Three others mutate SHARED state**, which is why a sweep is not a substitute for a reset:
 `verify-paynow-fallback` writes the seed tenant's PayNow columns, `verify-class-deactivation`
 retires a seed-adjacent class, and `verify-trials` **leaves a booking behind on every run**
 because it has no fixture at all — hence its *Set all* marking step and a final assertion that
@@ -482,21 +517,30 @@ counts rather than tests presence (§7.118).
 
 ### THE NEXT BUILD IS CHOSEN FROM `BACKLOG.md` — nothing is queued
 
-**Wave 1 is complete (§8.36–§8.39) and its parting find shipped on 2026-08-10 (§8.40).**
-`docs/plans/WAVE_1_PLAN.md` and `docs/plans/UNMARKED_BOOKING_PLAN.md` are both history, not
+**Waves 1 and 2 are both complete** (§8.36–§8.40, §8.43). `docs/plans/WAVE_1_PLAN.md`,
+`docs/plans/UNMARKED_BOOKING_PLAN.md` and `docs/plans/WAVE_2_PLAN.md` are history, not
 queues; don't re-read them for work. **`BACKLOG.md` → `## Build order` governs what comes
 next** — the six decisions the ranking rests on are in a table at its top; read them before
-re-opening any. The next ranked thing is **Wave 2, multiple classes per child (M)**, which the
-user has said to build soon and which every later wave sits on top of.
+re-opening any.
 
-**Three things this session filed rather than fixed**, all small and all in `BACKLOG.md`:
+**Next ranked is Wave 3, the lesson-level coach roster (M/L)** — a substitute coach per
+session and trainee coaches paid at their own rate. Its blast radius is **coach RLS, not the
+roster**: `current_coach_id()` feeds the policy set, and pgTAP comes before any UI. The
+Schedule tab's exposure is already measured in `BACKLOG.md`; don't re-derive it.
+**Wave 2 just made that warning concrete** — `coach_serves_student()` was fine while a child
+had one class and became an authorization hole the moment they could have two (§8.43, and the
+pgTAP that pins it is `multi_class.test.sql`). Wave 3 touches the same function.
+
+**Two small items still filed rather than fixed**, both in `BACKLOG.md`:
 - *The admin's invoice pre-flight misses an unmarked EXTRA lesson* (**S**) — `classCoverage.ts`
   unions booking dates but not session dates, so it over-reports readiness. **Never
   under-bills**, which is why it is S.
 - *Deleting an admin destroys the audit history* (**S**) — unchanged from 2026-08-09.
 
-*(The third, *`verify-schedule-week.mjs` fails two COMING UP checks*, **shipped** on
-2026-08-10 as `287142b` and is struck from `BACKLOG.md` — §8.42.)*
+**And one Wave 2 revealed rather than created:** *a child in EVERY class of their kind has no
+per-child make-up* (**S/M**) — `schedule_extra_lesson()` is class-wide, so there is no
+one-child remedy. **Do not "fix" it by relaxing `book_makeup()`'s own-class refusal**; that
+is the silent-void case, and `multi_class.test.sql` pins it.
 
 **The `service_role` question is now ANSWERED, and the answer is "don't build the whitelist"**
 (`BACKLOG.md` carries the 11-call-site audit). `generate-invoices` alone touches 21 of 37 tables
@@ -529,7 +573,10 @@ function this session touched (`docs/DEPLOYMENT.md` §11.7).
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **The migration queue is EMPTY, and nothing is queued to fill it.** The latest applied is
-`20260810000100` (the booking / class-active guards, §8.40). Whatever comes next: still one at
+`20260811000100` (multiple classes per child, §8.43) — production confirmed caught up on
+2026-08-11, 0 pending. **Wave 3 will need one, and §7.123 is the new thing to budget for:
+decide the deploy ORDER by compatibility, not by layer.** If it drops or narrows a function
+signature the deployed client still calls, either ship a shim or deploy the apps first. Whatever comes next: still one at
 a time (§7.55), a worktree never authors one, and budget the post-deploy grant check (§7.39,
 §7.89) **and** the rollback rehearsal (§7.93 — running the DOWN file is the half that finds the
 bugs). **Don't take `supabase db push`'s own output as proof it applied:** it printed a

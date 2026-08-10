@@ -108,6 +108,16 @@ still point at the local stack for dev.
    alone** — nothing in this repo creates objects as `supabase_admin`, and on cloud
    `postgres` may not hold the membership to change them. Don't "fix" them.
 
+   **Re-run 2026-08-11 after `20260811000100`** (Wave 2 — created two trigger functions and
+   re-created two RPCs under new signatures): `anon` EXECUTE still **18**, unchanged from the
+   2026-08-04 baseline, so the automatic leak stayed closed across a migration that creates
+   functions. The dump also confirmed the half a `db push` cannot: **both old signatures are
+   gone** (`book_makeup(uuid,date,uuid)`, `close_student_enrolment(uuid,boolean)`) and both
+   new ones carry `TO "authenticated"`. That check is worth copying whenever a signature
+   changes — the grant is only half of it, and a surviving old overload is the other half
+   (§7.124). ⚠ **Grep the dump with QUOTED identifiers** (`"public"."book_makeup"`): a
+   `public.book_makeup` pattern matches nothing and reads exactly like a failed deploy.
+
    **`service_role` still gets a default EXECUTE on every new function, and that is the
    untouched-by-design cell** (§8.29 scoped the sweep to the client roles). Observed
    2026-08-06: `is_tenant_owner()` and `profile_reference_columns()` came out of
