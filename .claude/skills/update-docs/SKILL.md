@@ -184,20 +184,47 @@ reuse a number** — 781 references cite these by bare number, including from **
 migrations** that can never be corrected. Retire an item by striking it in place. The bar
 is "cost real time or shipped a bug", not "was mildly surprising".
 
-**The test:** after this step, the session log entry you are about to write should contain
-**nothing that would be lost if you deleted it.** If it would, you haven't graduated
-everything — go back. An audit of all 29 historical entries found exactly four facts that
-had never graduated, and every one of them was a *prohibition* ("do not turn this into a
-trigger") — the highest-value, easiest-to-lose kind.
+**Test 1 — nothing LOST.** After this step, the session log entry you are about to write
+should contain **nothing that would be lost if you deleted it.** If it would, you haven't
+graduated everything — go back. An audit of all 29 historical entries found exactly four
+facts that had never graduated, and every one of them was a *prohibition* ("do not turn
+this into a trigger") — the highest-value, easiest-to-lose kind.
+
+**Test 2 — nothing DUPLICATED. This is the one that was missing, and it is why the file
+doubled in nine days.** Test 1 only detects *under*-graduation. A session entry that
+faithfully **re-tells** the gotcha it just filed passes Test 1 perfectly — nothing would be
+lost, because it is all safely in `docs/` — while duplicating every word of it. That is
+exactly what the 1,400-character ledger rows are.
+
+So, for each sentence you are about to write into §8: **is this fact now in `docs/`, the
+PRD, or `BACKLOG.md`?** If yes, delete the sentence and keep the pointer. The graduated
+copy is the one that gets maintained; the copy in §8 is the one that goes stale and then
+competes with it. **Graduating a fact means MOVING it, not copying it.**
 
 ---
 
 ## Step 5 — HANDOVER.md — every session
 
-`HANDOVER.md` is an **index plus the current state**. It is not a changelog. Keep it under
-roughly **700 lines**; if it grows past that, something belongs in `docs/`.
+`HANDOVER.md` is an **index plus the current state**. It is not a changelog.
 
-1. **`_Last updated:`** → today's date, with a one-line summary of the session.
+> **Run `scripts/check-doc-budget.sh` BEFORE you write, not after.** It prints the headroom
+> you have left. This used to be a "keep it under ~700 lines" line here and a question in
+> the Final check, and that failed completely: the file crossed 700 on 2026-08-06 and
+> reached **1,001 lines** by 2026-08-10, through five `/update-docs` runs that each asked
+> the question at the end — when the only remedy left is a restructure — and waived it.
+> **The budget is now a CI ratchet.** If you have no headroom, your first job this session
+> is to cut, not to append. **Never raise the number in the script.**
+
+**Every rule below is a SIZE, not a shape.** That distinction is the whole reason this
+section exists: the old rules ("one ledger *line*", "a *one-line* summary") were obeyed
+to the letter all the way from 38 KB to 91 KB, because a markdown row and a dateline have
+no length limit. Shapes do not bound anything.
+
+1. **`_Last updated:`** → today's date, and a summary of **at most 3 lines**.
+   - **Keep at most ONE `_Previously,_` dateline below it, then delete the rest.** They had
+     stacked **five sessions deep, 138 lines**, before the budget guard was written. A
+     `_Previously,_` block is a *third* copy of a session that §8 already holds as a full
+     entry and again as a ledger row — nobody reads three copies, and they disagree first.
 2. **Write the new session entry** at the top of §8, numbered as the next `§8.N`.
    - **The two most recent entries stay in full. Everything older becomes a ledger line**
      in the *Older sessions* table — one row: number, date, what shipped, and **where its
@@ -205,18 +232,41 @@ roughly **700 lines**; if it grows past that, something belongs in `docs/`.
    - Lead with the headline in bold, then what was found, what was fixed, and **what was
      deliberately not done and why**. Keep it to what a reader needs *before* the pointers
      take over; the reasoning itself is already in `docs/` by Step 4.
-   - **Never delete a ledger line.** They are cited by number from source files and applied
-     migrations (`core.ts` says `§8a`), so a missing row is a dangling reference. They cost
-     ~25 tokens. If the table passes ~100 rows, move it wholesale to `docs/SESSIONS.md` and
-     point at it from §8 — still one hop, no reference broken.
+   - **A ledger row has a HARD CAP of 200 characters** — number, date, what shipped in one
+     clause, and the pointers. It is a *pointer*, not a summary. Measure it; do not eyeball
+     it. The July rows cost ~130 chars, which is the ~25 tokens this rule always claimed.
+     The rows written across August average **1,050 chars and peak at 1,446** — ten times
+     the stated budget, every one of them still technically "one row". A row that needs
+     more than 200 chars is a row whose reasoning has **not** been graduated: go back to
+     Step 4 and give it a home, then point at that home.
+   - **Never delete a ledger row.** They are cited by number from source files and applied
+     migrations (`core.ts` says `§8a`), so a missing row is a dangling reference.
+   - **Verify each pointer resolves before you write it.** `grep` the target for the number.
+     §8.38's row cites `§7.108` for a `SECURITY DEFINER` audit-trigger lesson, and §7.108 is
+     about a Playwright cold-compile timeout — the row carries the full narrative *because*
+     the delegation it claims was never checked. A wrong pointer is what turns a ledger back
+     into a changelog.
+   - **When the ledger passes 12 KB, move it wholesale to `docs/SESSIONS.md`** and point at
+     it from §8 — still one hop, no reference broken. This trigger used to be "~100 rows",
+     which at August's row sizes would have meant a **100 KB** ledger: the table would have
+     become the entire file long before a row-count trigger fired. It is 21.5 KB at 51 rows
+     today, so this move is already due.
 3. **Rewrite §9 (Next steps).** This is the section that rots fastest.
    - **The 2–3 things to actually pick up next**, no more. For the wider queue, **point at
      `BACKLOG.md`** rather than restating it — restating is how the two drift.
    - Move anything finished this session out of the "open" list, and delete DONE tails:
      git history is the record of what shipped.
-4. **Keep §3 ("what works") honest.** If the session changed what is live or verified, §3
-   is the first thing a new session reads. It is also the largest section left in the file
-   — prefer editing a line to adding one.
+4. **Keep §3 ("what works") honest — and pay for a new bullet by removing one.**
+   §3 is **469 lines, 42% of the file**, and it is append-only by construction: every
+   session adds what it verified and nothing prunes, because "prefer editing a line to
+   adding one" is advice with no counter. Since 2026-07-26 exactly **one** bullet has ever
+   been graduated out.
+   - A bullet earns its place in §3 only if it carries a **prohibition** ("don't re-add a
+     count", "no rate is the finished state") or a **verified-vs-specified** distinction —
+     something `PRD.md` cannot tell you. If the PRD already specifies the behaviour in full
+     and there is no prohibition, **the PRD is the home**: cite it and delete the bullet.
+   - So: adding a bullet is fine. Adding a bullet **without deleting one** needs a reason
+     you can say out loud.
 5. **Check the index table** at the top ("Where everything lives") if a document was added,
    moved or retired.
 
@@ -287,9 +337,12 @@ Before declaring done, re-read what you wrote and ask:
   Duplication between these files is the thing that eventually makes them disagree.
 - **Would your §8 entry lose anything if it were deleted tomorrow?** If yes, Step 4 isn't
   finished — the durable part still needs a home in `docs/`, the PRD, or `BACKLOG.md`.
-- **Did you demote the third-newest §8 entry to a ledger line?** Two full entries, no more.
-- **Did `HANDOVER.md` grow past ~700 lines, or `CLAUDE.md` past 200?** Both are always-read
-  files; growth there is paid on every future session.
+- **Did you demote the third-newest §8 entry to a ledger row, and is that row ≤200 chars?**
+  Two full entries, no more. Demotion is a **compression**, not a rename — a 4 KB entry that
+  becomes a 1.4 KB row has been renamed, and the file still grows every session forever.
+- **Run `scripts/check-doc-budget.sh`.** It is CI, so this is a courtesy check, not the
+  gate — but finding it red here is much cheaper than finding it red on `main`. If it is
+  red, **cut; do not raise the budget.** The script ranks the oversized units for you.
 
 Then tell the user plainly which documents you changed and which you deliberately
 didn't, and why. "PRD untouched — nothing shipped a behaviour change" is a useful
