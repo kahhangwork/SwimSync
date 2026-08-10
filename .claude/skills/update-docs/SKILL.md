@@ -242,9 +242,9 @@ awk '/^\| \*\*8/ && length($0)>200 {print length($0), $0}' HANDOVER.md | sort -r
      `_Previously,_` block is a *third* copy of a session that §8 already holds as a full
      entry and again as a ledger row — nobody reads three copies, and they disagree first.
 2. **Write the new session entry** at the top of §8, numbered as the next `§8.N`.
-   - **The two most recent entries stay in full. Everything older becomes a ledger line**
-     in the *Older sessions* table — one row: number, date, what shipped, and **where its
-     reasoning now lives**. So each session you demote the third-newest entry.
+   - **The two most recent entries stay in full. Everything older becomes one row in
+     `docs/SESSIONS.md`** — number, date, what shipped, and **where its reasoning now
+     lives**. So each session you demote the third-newest entry out of this file entirely.
    - Lead with the headline in bold, then what was found, what was fixed, and **what was
      deliberately not done and why**. Keep it to what a reader needs *before* the pointers
      take over; the reasoning itself is already in `docs/` by Step 4.
@@ -262,11 +262,10 @@ awk '/^\| \*\*8/ && length($0)>200 {print length($0), $0}' HANDOVER.md | sort -r
      about a Playwright cold-compile timeout — the row carries the full narrative *because*
      the delegation it claims was never checked. A wrong pointer is what turns a ledger back
      into a changelog.
-   - **When the ledger passes 12 KB, move it wholesale to `docs/SESSIONS.md`** and point at
-     it from §8 — still one hop, no reference broken. This trigger used to be "~100 rows",
-     which at August's row sizes would have meant a **100 KB** ledger: the table would have
-     become the entire file long before a row-count trigger fired. It is 21.5 KB at 51 rows
-     today, so this move is already due.
+   - **The ledger lives in `docs/SESSIONS.md`** (moved 2026-08-10 at 21.5 KB / 51 rows).
+     Its old move-out trigger was "~100 rows", which at August's row sizes would have meant
+     a **100 KB** ledger — the table would have become the entire file long before a
+     row-count trigger fired. Keep it there; §8 holds the two full entries and a pointer.
 3. **Rewrite §9 (Next steps).** This is the section that rots fastest.
    - **The 2–3 things to actually pick up next**, no more. For the wider queue, **point at
      `BACKLOG.md`** rather than restating it — restating is how the two drift.
