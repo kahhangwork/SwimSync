@@ -575,7 +575,9 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       list where the fetch errored is indistinguishable from a class with nobody in it.
 53. **`ON CONFLICT DO NOTHING` DOES NOT MAKE A FIXTURE IDEMPOTENT WHEN THE ONLY UNIQUE
     INDEX IS PARTIAL.** Two of this schema's uniqueness rules are deliberately partial —
-    `one_active_enrolment_per_student` (`WHERE is_active`) and
+    `one_active_enrolment_per_student_class` (`WHERE is_active`; it was
+    `one_active_enrolment_per_student` on `(student_id)` alone until Wave 2,
+    `20260811000100`) and
     `trial_bookings_live_slot_uniq` (`WHERE cancelled_at IS NULL`) — precisely so that
     closed enrolments and cancelled bookings may repeat. A fixture row that is *inactive*
     or *cancelled* therefore conflicts with nothing and **re-inserts on every run**, which
@@ -774,10 +776,19 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     present** every student in the database. Measured: 6 children enrolled and marked
     instead of 2, four of them belonging to another fixture.
     **The second-order failure is worse than the first.** Enrolling a student who already
-    has an enrolment violates `one_active_enrolment_per_student`, which aborts the whole
+    has an enrolment violated `one_active_enrolment_per_student`, which aborts the whole
     `INSERT` — so when any sibling fixture was loaded first, this fixture's *own* two
     children were **never enrolled at all**. It silently produced the exact opposite of the
     scenario it exists to build, and the driver's low score read as a product regression.
+    **⚠ THAT ABORT NO LONGER HAPPENS FOR THE GENERAL CASE, AND THE ABORT WAS THE
+    DETECTOR.** Wave 2 (`20260811000100`) replaced the index with
+    `(student_id, class_id)`, so a stray child enrolled into a class they are *not*
+    already in inserts **silently**. Re-proven rather than assumed on 2026-08-10:
+    `check-fixture-roundtrip.sh` still catches it on **delta divergence** — a sabotaged
+    `fixtures-class-students.sql` read `student_class_enrolments +6` alone and **+16**
+    stacked, exit 1, naming the fixture. That harness is now the *only* thing standing
+    between an unscoped fixture write and a billable lesson attributed to someone else's
+    child, so it is the pre-commit gate for any change to a fixture's write scope.
     Attendance is worse still: those rows are what billing is derived from, so a stray
     `present` is a **billable lesson attributed to someone else's child**.
     **The rule: every `INSERT … SELECT` in a fixture must be scoped to identifiers the

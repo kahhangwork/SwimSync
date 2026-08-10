@@ -366,7 +366,10 @@ RESET ROLE;
 
 -- ── 26. anon is locked out (§7.39, layer one) ───────────────────────────────
 SELECT is(
-  (SELECT has_function_privilege('anon', 'public.book_makeup(uuid,date,uuid)', 'EXECUTE')
+  -- 4-arg since Wave 2 (20260811000100). Naming a signature that does not exist
+  -- does not FAIL here — has_function_privilege ERRORS, which aborts the whole
+  -- file with a bad plan and takes 25 unrelated assertions down with it.
+  (SELECT has_function_privilege('anon', 'public.book_makeup(uuid,date,uuid,uuid)', 'EXECUTE')
        OR has_function_privilege('anon', 'public.cancel_makeup_booking(uuid)', 'EXECUTE')
        OR has_table_privilege('anon', 'makeup_bookings', 'SELECT')),
   FALSE,

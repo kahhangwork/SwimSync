@@ -4,7 +4,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(4);
+SELECT plan(6);
 
 -- Multi-tenancy scaffolding: coaches and students now require a tenant. This
 -- fixture creates its own so the test stays independent of the seed. The rule
@@ -77,11 +77,46 @@ SELECT throws_ok($$
   SELECT '99999999-0000-0000-0000-000000000001', p.id, '2026-01', 99, 0, 99, 'outstanding' FROM parents p WHERE p.profile_id='a0000000-0000-0000-0000-0000000000d2'
 $$, '23505', NULL, 'a parent cannot have two invoices for the same billing month');
 
--- ── 2. One active enrolment per student ─────────────────────────────────────
+-- ── 2. One active enrolment per student PER CLASS ───────────────────────────
+-- Reworded for Wave 2 (20260811000100), and the wording matters: until then the
+-- assertion read "a student cannot have two active class enrolments", which is
+-- now FALSE — that is the whole feature. The statement below is unchanged and
+-- still raises 23505, so this test would have gone on PASSING while describing a
+-- rule that no longer exists. Tests 2a and 2b are what actually pin the new one.
 SELECT throws_ok($$
   INSERT INTO student_class_enrolments (student_id, class_id, is_active)
   VALUES ('c0000000-0000-0000-0000-000000000002','b0000000-0000-0000-0000-000000000002', TRUE)
-$$, '23505', NULL, 'a student cannot have two active class enrolments');
+$$, '23505', NULL, 'a student cannot be enrolled in the SAME class twice');
+
+-- ── 2a. A SECOND, non-overlapping class is now allowed ──────────────────────
+-- The positive half. Con Class is Saturday 10-11; this one is Saturday 14-15,
+-- so it shares a weekday and still does not overlap.
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+SELECT 'b0000000-0000-0000-0000-00000000000c', co.id, 'Con Class Two', 'saturday','14:00','15:00','Pool', 30,
+       (SELECT cc.id FROM class_categories cc
+         WHERE cc.tenant_id = co.tenant_id
+           AND lower(trim(cc.name)) = 'default group')
+FROM coaches co WHERE co.profile_id='a0000000-0000-0000-0000-0000000000c2';
+
+SELECT lives_ok($$
+  INSERT INTO student_class_enrolments (student_id, class_id, is_active)
+  VALUES ('c0000000-0000-0000-0000-000000000002','b0000000-0000-0000-0000-00000000000c', TRUE)
+$$, 'a student CAN hold a second active enrolment in a different class');
+
+-- ── 2b. …but not one that overlaps a class they are already in ──────────────
+-- Saturday 10:30-11:30 straddles Con Class's 10-11. Refused by
+-- enforce_enrolment_schedule(), not by an index, so the code is P0001.
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+SELECT 'b0000000-0000-0000-0000-00000000000d', co.id, 'Con Class Clash', 'saturday','10:30','11:30','Pool', 30,
+       (SELECT cc.id FROM class_categories cc
+         WHERE cc.tenant_id = co.tenant_id
+           AND lower(trim(cc.name)) = 'default group')
+FROM coaches co WHERE co.profile_id='a0000000-0000-0000-0000-0000000000c2';
+
+SELECT throws_ok($$
+  INSERT INTO student_class_enrolments (student_id, class_id, is_active)
+  VALUES ('c0000000-0000-0000-0000-000000000002','b0000000-0000-0000-0000-00000000000d', TRUE)
+$$, 'P0001', NULL, 'a student cannot be in two classes at the same time');
 
 -- ── 3. Credit applications must be for a positive amount ─────────────────────
 SELECT throws_ok($$

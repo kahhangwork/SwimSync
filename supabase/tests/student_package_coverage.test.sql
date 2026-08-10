@@ -25,7 +25,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(20);
+SELECT plan(21);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -96,12 +96,24 @@ SELECT 'bf000000-0000-0000-0000-000000000002', co.id, 'Cov Private Sun', 'sunday
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'cov-admin-a@test.local';
 
+-- A second Group class, so a child can hold two enrolments in the SAME category
+-- (Kid Y below). Wednesday, so it cannot overlap Cov Group Sat.
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
+                     location_name, price_per_lesson, category_id)
+SELECT 'bf000000-0000-0000-0000-000000000003', co.id, 'Cov Group Wed', 'wednesday',
+       '10:00','11:00','Test Pool', 50.00, 'bc000000-0000-0000-0000-000000000001'
+FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
+WHERE pr.email = 'cov-admin-a@test.local';
+
 -- Parent 1's children, tenant A:
 --   Kid G — Group class only  (the discriminating child)
 --   Kid P — Private class only
---   Kid M — ACTIVE in Group, INACTIVE in Private (the is_active discriminator;
---           one_active_enrolment_per_student forbids two active — see below)
+--   Kid M — ACTIVE in Group, INACTIVE in Private (the is_active discriminator)
 --   Kid U — no enrolments     (the fallback child)
+--   Kid X — ACTIVE in Group AND Private — the 'mixed' child (Wave 2)
+--   Kid Y — ACTIVE in two GROUP classes — two enrolments, ONE category, so
+--           NOT 'mixed'. The common multi-class shape, and the one that would
+--           quietly mislabel if 'mixed' keyed off enrolment count.
 -- Parent 2's child, tenant A:
 --   Kid N — Group class only, family holds NO package (pure ad_hoc control)
 -- And one UNCLAIMED child (no parent_students row).
@@ -117,14 +129,20 @@ INSERT INTO students (id, full_name, date_of_birth, assignment_status, tenant_id
   ('b5000000-0000-0000-0000-000000000005','Cov Kid N','2018-05-05','assigned',
    'ba000000-0000-0000-0000-000000000001','bb000000-0000-0000-0000-000000000002'),
   ('b5000000-0000-0000-0000-000000000006','Cov Kid Unclaimed','2018-06-06','unassigned',
-   'ba000000-0000-0000-0000-000000000001','bd000000-0000-0000-0000-000000000001');
+   'ba000000-0000-0000-0000-000000000001','bd000000-0000-0000-0000-000000000001'),
+  ('b5000000-0000-0000-0000-000000000007','Cov Kid X','2018-07-07','assigned',
+   'ba000000-0000-0000-0000-000000000001','bb000000-0000-0000-0000-000000000001'),
+  ('b5000000-0000-0000-0000-000000000008','Cov Kid Y','2018-08-08','assigned',
+   'ba000000-0000-0000-0000-000000000001','bb000000-0000-0000-0000-000000000001');
 
 INSERT INTO parent_students (parent_id, student_id)
 SELECT p.id, s.sid FROM (VALUES
   ('b5000000-0000-0000-0000-000000000001'::uuid),
   ('b5000000-0000-0000-0000-000000000002'::uuid),
   ('b5000000-0000-0000-0000-000000000003'::uuid),
-  ('b5000000-0000-0000-0000-000000000004'::uuid)) AS s(sid),
+  ('b5000000-0000-0000-0000-000000000004'::uuid),
+  ('b5000000-0000-0000-0000-000000000007'::uuid),
+  ('b5000000-0000-0000-0000-000000000008'::uuid)) AS s(sid),
   parents p JOIN profiles pr ON pr.id = p.profile_id
 WHERE pr.email = 'cov-parent-1@test.local';
 
@@ -137,7 +155,13 @@ INSERT INTO student_class_enrolments (student_id, class_id) VALUES
   ('b5000000-0000-0000-0000-000000000001','bf000000-0000-0000-0000-000000000001'),
   ('b5000000-0000-0000-0000-000000000002','bf000000-0000-0000-0000-000000000002'),
   ('b5000000-0000-0000-0000-000000000003','bf000000-0000-0000-0000-000000000001'),
-  ('b5000000-0000-0000-0000-000000000005','bf000000-0000-0000-0000-000000000001');
+  ('b5000000-0000-0000-0000-000000000005','bf000000-0000-0000-0000-000000000001'),
+  -- Kid X: two categories, one covered by the Private package and one not.
+  ('b5000000-0000-0000-0000-000000000007','bf000000-0000-0000-0000-000000000001'),
+  ('b5000000-0000-0000-0000-000000000007','bf000000-0000-0000-0000-000000000002'),
+  -- Kid Y: two enrolments, both Group. Two classes, ONE category.
+  ('b5000000-0000-0000-0000-000000000008','bf000000-0000-0000-0000-000000000001'),
+  ('b5000000-0000-0000-0000-000000000008','bf000000-0000-0000-0000-000000000003');
 -- Kid M USED to be in the covered Private class, and left. If the is_active
 -- filter is ever dropped, this row makes Kid M read "package" — wrongly.
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, unenrolled_at) VALUES
@@ -184,15 +208,31 @@ SELECT is(
   'an INACTIVE enrolment in a covered class does not cover — only the class '
   'the child attends NOW counts');
 
--- WHY THERE IS NO 'mixed' ASSERTION: one_active_enrolment_per_student means a
--- child has at most ONE active class, so at most one category — the function's
--- 'mixed' arm (some categories covered, some not) is structurally unreachable
--- today. It stays in the SQL as fail-visible behaviour for the day the
--- constraint is lifted; this pin makes that day loud instead of silent.
+-- ⚠ 'mixed' IS REACHABLE AS OF WAVE 2 (20260811000100), AND THIS IS THE PIN
+-- THAT SAID SO. Until then this slot held an assertion that
+-- one_active_enrolment_per_student still existed — deliberately, so that the day
+-- the constraint was lifted would be LOUD rather than silent. It worked: the
+-- index drop turned this file red on the first run, which is how the arm below
+-- got a real test instead of staying dead code in the money path.
+--
+-- Kid X is in Group AND Private. The family's package is Private-scoped, so one
+-- of the two categories is covered and the other is not.
 SELECT is(
-  (SELECT count(*)::int FROM pg_indexes
-    WHERE indexname = 'one_active_enrolment_per_student'),
-  1, 'the one-active-enrolment index still stands — ''mixed'' stays unreachable');
+  (SELECT c.coverage FROM student_package_coverage() c
+    WHERE c.student_id = 'b5000000-0000-0000-0000-000000000007'),
+  'mixed',
+  'a child in a covered category AND an uncovered one reads ''mixed''');
+
+-- The counter-case, and the more common one. Kid Y holds TWO enrolments but they
+-- are both Group, so there is ONE category and nothing is mixed. `cats` is
+-- DISTINCT (student_id, category_id) — if 'mixed' ever keyed off the number of
+-- ENROLMENTS instead, every two-class family would be mislabelled and this is
+-- the assertion that catches it.
+SELECT is(
+  (SELECT c.coverage FROM student_package_coverage() c
+    WHERE c.student_id = 'b5000000-0000-0000-0000-000000000008'),
+  'ad_hoc',
+  'two classes in the SAME category is one category — ad_hoc, never ''mixed''');
 
 SELECT is(
   (SELECT c.coverage || ':' || c.lessons_remaining::text FROM student_package_coverage() c
@@ -294,9 +334,11 @@ SELECT is(
   'ad_hoc',
   '⚠ RLS PARITY: the parent-role verdict for the Group-only child matches too');
 
+-- G, P, M, U, X, Y. Six since Wave 2 added the 'mixed' pair; the number is the
+-- assertion, so it moves whenever the fixture's family does.
 SELECT is(
   (SELECT count(*)::int FROM student_package_coverage() c),
-  4, 'a parent sees exactly their own four children — nobody else''s');
+  6, 'a parent sees exactly their own six children — nobody else''s');
 
 -- ── 16. The other parent's view is equally scoped ──────────────────────────
 SET LOCAL "request.jwt.claims" TO '{"sub":"bb000000-0000-0000-0000-000000000002","role":"authenticated"}';

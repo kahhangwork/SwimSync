@@ -81,12 +81,14 @@ ON CONFLICT (id) DO NOTHING;
 -- Anna's enrolled_at is fixed so the driver can assert the rendered date
 -- rather than "some date". Noon +08 so no timezone reading can move the day.
 -- ⚠ NOT `ON CONFLICT DO NOTHING` — IT DOES NOT MAKE THIS IDEMPOTENT.
--- The only unique index here is PARTIAL: one_active_enrolment_per_student on
--- (student_id) WHERE is_active. Chloe's enrolment is INACTIVE, so it falls
--- outside the index, conflicts with nothing, and a second run inserts a
--- SECOND copy — silently turning the closed-enrolment control into two rows.
--- The same trap applies to the cancelled booking below. An explicit NOT
--- EXISTS is keyed on what the fixture actually means by "already there".
+-- The only unique index here is PARTIAL: since Wave 2 (20260811000100) it is
+-- one_active_enrolment_per_student_class on (student_id, class_id) WHERE
+-- is_active — it was on (student_id) alone until a child could hold more than
+-- one enrolment. Either way Chloe's enrolment is INACTIVE, so it falls outside
+-- the index, conflicts with nothing, and a second run inserts a SECOND copy —
+-- silently turning the closed-enrolment control into two rows. The same trap
+-- applies to the cancelled booking below. An explicit NOT EXISTS is keyed on
+-- what the fixture actually means by "already there".
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at,
                                       is_active, unenrolled_at)
 SELECT v.student_id, v.class_id, v.enrolled_at, v.is_active, v.unenrolled_at
