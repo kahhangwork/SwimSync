@@ -350,10 +350,9 @@ discipline-by-instruction and the first two failed**, which is why the Final che
 escalation rather than re-wording the plea.
 
 **Two things this session did NOT touch, deliberately.** `PRD.md` — no shipped behaviour
-changed. And the working tree's other two changes (`verify-schedule-week.mjs`, now
-`287142b` on `fix/schedule-week-driver-locator`, and the nested
-`SwimSync/attendance-edit-history-view` worktree) belong to another session; they were never
-staged.
+changed. And another session's work in the same checkout: `verify-schedule-week.mjs` (which
+landed on `main` as `287142b` mid-pass, so §9's entry for it was corrected after the push)
+and the nested `SwimSync/attendance-edit-history-view` worktree. Neither was ever staged.
 ## 8.40 (2026-08-10) — AN UNMARKED GUEST CAN NO LONGER BE SEALED OVER
 
 **`core.ts` bailed out of its per-class loop at two guards that never consulted
@@ -468,11 +467,12 @@ run since*, and the sweep is the evidence, not this sentence.
 run closes the issue itself. This section once read *"✅ NO RED SIGNALS"* for a day after the
 sweep had gone red beneath it.
 
-**2. `verify-schedule-week` is 17/19 on `main` — but a FIX IS IN FLIGHT, not yet merged.**
-Commit `287142b` (*"verify-schedule-week addresses its own day, not the seed's"*) sits on
-branch **`fix/schedule-week-driver-locator`**, one commit ahead of `main`, authored by
-another session on 2026-08-10. Check whether it landed before re-triaging this. What follows
-describes the state on `main`: two COMING UP checks fail. Proven pre-existing by re-running with that session's app changes `git stash`ed
+**2. `verify-schedule-week` — a FIX LANDED on `main` on 2026-08-10 and has NOT been swept.**
+Commit `287142b` (*"verify-schedule-week addresses its own day, not the seed's"*), authored
+by another session. **Nobody has run it since**, so its score is unknown, not fixed — and a
+green sweep is the evidence, not this sentence (§8.35). What follows is the state it was
+filed at, kept because it is the triage if the two checks are still red: two COMING UP checks
+fail. Proven pre-existing by re-running with that session's app changes `git stash`ed
 and the fixture freshly loaded — identical 17/19 both ways. It is filed in `BACKLOG.md` with
 the likely cause (a `.last()` locator reaching a NEEDS MARKING copy of the class title, which a
 **Monday** makes possible because the fixture derives its dates from today — §7.98 + §7.73).
@@ -503,8 +503,9 @@ user has said to build soon and which every later wave sits on top of.
 - *The admin's invoice pre-flight misses an unmarked EXTRA lesson* (**S**) — `classCoverage.ts`
   unions booking dates but not session dates, so it over-reports readiness. **Never
   under-bills**, which is why it is S.
-- *`verify-schedule-week.mjs` fails two COMING UP checks* (**S**) — see above; a fix is in
-  flight on `fix/schedule-week-driver-locator`, so check before picking this up.
+- *`verify-schedule-week.mjs` fails two COMING UP checks* (**S**) — a fix landed on `main`
+  (`287142b`) but has not been swept; confirm before picking this up, and close the item if
+  it is green.
 - *Deleting an admin destroys the audit history* (**S**) — unchanged from 2026-08-09.
 
 **The `service_role` question is now ANSWERED, and the answer is "don't build the whitelist"**
