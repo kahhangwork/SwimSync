@@ -6,10 +6,13 @@ active enrolments*, *The class ROSTER hides a lesson whose only attendee is a gu
 *The attendance screen trusts a `sessionId` handed to it in the URL* — struck from the Build
 order, from Wave 3's fold-in list, from Later, **and** from their own sections. The first was
 Wave 1's parting find and the most valuable thing it left behind: a silent permanent
-underbill. **No item was added** — the two things this work found that it did not fix were
-both already filed (`service_role`, whose usage audit is now DONE and carries a
-recommendation NOT to build the whitelist; and `classCoverage.ts` not unioning session
-dates, added below)._
+underbill. **Four items added**, three of them things this work found and deliberately
+did not fix: *the admin's invoice pre-flight misses an unmarked EXTRA lesson* (the same
+divergence running the other way), *sealing a LATER month strands an earlier unsealed one*
+(§8.32's failure mode through a door it did not close), *`verify-schedule-week` fails two
+COMING UP checks* (pre-existing, proven so), and *`HANDOVER.md` §3 needs graduating*. The
+`service_role` usage audit is now **DONE** and carries a recommendation NOT to build the
+whitelist._
 
 _Previously, 2026-08-09 (4th) — **the last of the audit gap SHIPPED and was removed**
 (Wave 1 Chunk 3, `20260809000200`): *Direct writes to `students` are audited by nobody* is
@@ -750,6 +753,75 @@ only exit is a replace back). If it is the locator, scope it to the COMING UP se
 than relaxing the assertion. The last full nightly (2026-08-08) was red on `verify-trials`
 only, so this either started with the 2026-08-09 changes or is weekday-dependent — both
 distinguishable by running it on a non-Monday.
+
+### Sealing a LATER month strands an earlier unsealed one — **S**
+`markable_floor()` takes `LEAST(session_window_start(), month after MAX(billing_month))`.
+**`MAX` is the latest sealed month, not the latest CONTIGUOUS one**, so sealing a month while
+an earlier one is still unsealed pushes the floor past the earlier month, and its lessons
+become unmarkable for ever. The month can then never be billed — the completeness gate names
+a lesson nobody may record, and it has no override by design.
+
+**Worked example**, September, a business that has sealed nothing since June:
+- July blocked (an unmarked lesson), August complete. Floor today =
+  `LEAST(1 Aug, 1 Jul)` = **1 Jul** — July is still markable, which is correct and is what
+  §8.32 built.
+- Bill and seal **August**. `MAX` becomes `2026-08`, so the seal term becomes 1 Sep and the
+  floor becomes `LEAST(1 Aug, 1 Sep)` = **1 Aug**. July's dates are now below the floor.
+  Nobody can mark them, so July can never be billed.
+
+**Why:** it is §8.32's own failure mode — *"a month billed LATE is permanently unbillable"* —
+reached through the door §8.32 did not close. Nothing forces the admin to bill in order; the
+picker caps at the last completed month but happily offers August while July is outstanding.
+That is a plausible sequence: July is blocked on one forgotten lesson, September arrives, and
+billing August is the obvious thing to do.
+
+**Notes:**
+- ⚠ **The obvious fix was already tried and is WRONG.** "Floor at the earliest UNSEALED
+  month" leaves no floor at all, because a month with **nothing recorded is never sealed**
+  (§8a.1) — so every business that ever had a quiet month floors at the beginning of time.
+  §8.32 recorded this; do not re-derive it.
+- The shape that probably works is *the month after the latest **contiguous** run of sealed
+  months*, which needs a gap scan over `billing_periods`, not a `MAX`. Cheap in SQL, but it
+  changes what `markable_floor()` returns for every business, so it wants the same treatment
+  §8.32 got: a property assertion over a matrix of tenant states, plus the production
+  read-out before and after.
+- **Measure production before touching it** — a non-zero result changes this from insurance
+  into an incident:
+  ```sql
+  SELECT bp.tenant_id, MAX(bp.billing_month) AS latest_sealed,
+         count(*) AS sealed_months
+    FROM billing_periods bp GROUP BY 1
+   HAVING count(*) <> (
+     EXTRACT(YEAR  FROM age(to_date(MAX(bp.billing_month),'YYYY-MM'),
+                            to_date(MIN(bp.billing_month),'YYYY-MM'))) * 12
+   + EXTRACT(MONTH FROM age(to_date(MAX(bp.billing_month),'YYYY-MM'),
+                            to_date(MIN(bp.billing_month),'YYYY-MM'))) + 1);
+  -- rows = businesses with a GAP in their sealed months. Expect none today:
+  -- production has sealed exactly one month (July 2026) and recorded no
+  -- attendance before 2026-07-26, so there is no earlier month to strand.
+  ```
+- Found 2026-08-10 while writing `20260810000100`; noted in
+  `docs/plans/UNMARKED_BOOKING_PLAN.md` as explicitly out of that change's scope, and filed
+  here rather than fixed because it moves `markable_floor()` for every business.
+
+### `HANDOVER.md` §3 needs graduating — **S** `[docs]`
+`HANDOVER.md` is **~1000 lines against its own ~700 target**, and §3 ("what works") is about
+40% of it. The file has carried a note flagging this since 2026-07-26.
+
+**Why:** `HANDOVER.md` is read in full at the start of every session, so every line is paid
+repeatedly — and stale content that sits *next to* the right answer competes with it, which
+is the exact failure §8.17 fixed for the rest of the file. Most §3 bullets restate behaviour
+`PRD.md` already specifies in full.
+
+**Notes:** the graduation is not "delete §3". What is load-bearing there and exists **nowhere
+else** is (a) the **prohibitions** — *don't re-add an invoice count to the coach app*, *no
+rate is the finished state*, *"clean slate" is a banned phrase*, *don't read a count out of
+this paragraph* — and (b) the **verified-vs-specified** distinction, including every
+*"dormant in the sense that matters"* qualifier, which records what has and has not been
+exercised on real data. Keep those, point at the PRD for the rest. Three bullets were
+graduated this way on 2026-08-10 (password reset, attendance marking, parent empty states) as
+the pattern to copy. Do it in one pass rather than a bullet at a time, or the remainder reads
+as arbitrary.
 
 ### The admin's invoice pre-flight misses an unmarked EXTRA lesson — **S**
 `SwimSyncAdmin/lib/classCoverage.ts` and `generate-invoices/core.ts` are two copies of one
