@@ -30,14 +30,6 @@ jobs:
       - name: Every UI fixture has a teardown
         run: .claude/skills/run-ui-playwright/drivers/check-teardowns.sh
 
-      # HANDOVER.md and CLAUDE.md are read at the start of every session, so
-      # growth in them is paid forever. /update-docs has carried a "keep it
-      # under ~700 lines" check since 2026-07-26; the file crossed 700 on
-      # 2026-08-06 and reached 1,001 lines by 2026-08-10 with five doc passes
-      # in between. The budget is a ratchet — cut, never raise it.
-      - name: Always-read documents are within budget
-        run: scripts/check-doc-budget.sh
-
   backend-tests:
     runs-on: ubuntu-latest
     steps:

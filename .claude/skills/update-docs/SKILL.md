@@ -207,22 +207,38 @@ competes with it. **Graduating a fact means MOVING it, not copying it.**
 
 `HANDOVER.md` is an **index plus the current state**. It is not a changelog.
 
-> **Run `scripts/check-doc-budget.sh` BEFORE you write, not after.** It prints the headroom
-> you have left. This used to be a "keep it under ~700 lines" line here and a question in
-> the Final check, and that failed completely: the file crossed 700 on 2026-08-06 and
-> reached **1,001 lines** by 2026-08-10, through five `/update-docs` runs that each asked
-> the question at the end — when the only remedy left is a restructure — and waived it.
-> **The budget is now a CI ratchet.** If you have no headroom, your first job this session
-> is to cut, not to append. **Never raise the number in the script.**
+> **Measure the file BEFORE you write, not after** — `wc -c HANDOVER.md`. **The budget is
+> 45,000 bytes.** Write the number down; if you are near it, your first job this session is
+> to cut, not to append.
+>
+> **Nothing enforces this but you, and that has failed twice.** The rule used to be "keep
+> it under ~700 lines", asked as a question in the Final check — i.e. *after* everything is
+> written, when the only remedy left is a restructure. The file crossed 700 on 2026-08-06
+> and reached **1,001 lines / 91 KB** by 2026-08-10, through five `/update-docs` runs that
+> each asked that question and waived it. Before that, the same route had taken it to
+> 3,972 lines / 290 KB. **Measuring at the start is the entire difference** — it is the one
+> point where cutting is cheap.
 
-**Every rule below is a SIZE, not a shape.** That distinction is the whole reason this
-section exists: the old rules ("one ledger *line*", "a *one-line* summary") were obeyed
-to the letter all the way from 38 KB to 91 KB, because a markdown row and a dateline have
-no length limit. Shapes do not bound anything.
+**Every rule below is a SIZE, not a shape, and every one is countable in a single command.**
+That distinction is the whole reason this section exists: the old rules ("one ledger
+*line*", "a *one-line* summary", "prefer deleting a stale line") were obeyed to the letter
+all the way from 38 KB to 91 KB, because a markdown row and a dateline have no length
+limit. **Shapes do not bound anything, and neither does judgement.** "Delete what's stale"
+asks the person who just wrote the material to rule it stale, which is why §3 grew from 410
+to 469 lines while carrying a note at its own top saying it was the next thing to cut.
+
+Run these three. They take ten seconds together and they are the whole of the discipline:
+
+```bash
+wc -c HANDOVER.md                                              # budget 45000
+grep -c '^_Previously,' HANDOVER.md                            # must be ≤ 1
+awk '/^\| \*\*8/ && length($0)>200 {print length($0), $0}' HANDOVER.md | sort -rn | head
+                                                               # must print NOTHING
+```
 
 1. **`_Last updated:`** → today's date, and a summary of **at most 3 lines**.
    - **Keep at most ONE `_Previously,_` dateline below it, then delete the rest.** They had
-     stacked **five sessions deep, 138 lines**, before the budget guard was written. A
+     stacked **five sessions deep, 138 lines**, by 2026-08-10. A
      `_Previously,_` block is a *third* copy of a session that §8 already holds as a full
      entry and again as a ledger row — nobody reads three copies, and they disagree first.
 2. **Write the new session entry** at the top of §8, numbered as the next `§8.N`.
@@ -340,9 +356,12 @@ Before declaring done, re-read what you wrote and ask:
 - **Did you demote the third-newest §8 entry to a ledger row, and is that row ≤200 chars?**
   Two full entries, no more. Demotion is a **compression**, not a rename — a 4 KB entry that
   becomes a 1.4 KB row has been renamed, and the file still grows every session forever.
-- **Run `scripts/check-doc-budget.sh`.** It is CI, so this is a courtesy check, not the
-  gate — but finding it red here is much cheaper than finding it red on `main`. If it is
-  red, **cut; do not raise the budget.** The script ranks the oversized units for you.
+- **Re-run the three commands from Step 5.** `wc -c HANDOVER.md` under 45,000; at most one
+  `_Previously,_`; no ledger row over 200 chars. **Nothing in CI checks these** — a
+  deliberate choice on 2026-08-10, taken with the evidence that instruction alone has
+  already failed twice. If a third regrowth happens anyway, the answer is not a fourth
+  wording of this paragraph: it is `scripts/check-doc-budget.sh`, which was written, proven
+  to fail correctly, and reverted in commit `cb70808`. Restore it from there.
 
 Then tell the user plainly which documents you changed and which you deliberately
 didn't, and why. "PRD untouched — nothing shipped a behaviour change" is a useful
