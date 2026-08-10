@@ -1,6 +1,11 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-10 — the refused **CI gate on documentation size** filed under *Deliberately not doing* (§7.119 holds the reasoning; `cb70808` holds the code). Earlier that day: **THREE items SHIPPED and were removed**, all in one commit
+_Last updated: 2026-08-10 (3rd session) — ***`verify-schedule-week` fails two COMING UP
+checks* SHIPPED and was removed** (`287142b`): driver rot, not a product bug, and the item's
+own guess was right — the locator, scoped. §7.121 is the trap the fix nearly introduced.
+Earlier that day: the refused **CI gate on documentation size** filed under *Deliberately not
+doing* (§7.119 holds the reasoning; `cb70808` holds the code). And before that: **THREE items
+SHIPPED and were removed**, all in one commit
 because they were one entanglement: *An unmarked BOOKING is invisible when its class has no
 active enrolments*, *The class ROSTER hides a lesson whose only attendee is a guest*, and
 *The attendance screen trusts a `sessionId` handed to it in the URL* — struck from the Build
@@ -10,7 +15,8 @@ underbill. **Four items added**, three of them things this work found and delibe
 did not fix: *the admin's invoice pre-flight misses an unmarked EXTRA lesson* (the same
 divergence running the other way), *sealing a LATER month strands an earlier unsealed one*
 (§8.32's failure mode through a door it did not close), *`verify-schedule-week` fails two
-COMING UP checks* (pre-existing, proven so), and *`HANDOVER.md` §3 needs graduating*. The
+COMING UP checks* (pre-existing, proven so — **since shipped, see above**), and
+*`HANDOVER.md` §3 needs graduating*. The
 `service_role` usage audit is now **DONE** and carries a recommendation NOT to build the
 whitelist._
 
@@ -730,29 +736,6 @@ recorded. Those lessons are unbillable and, today, **invisible**.
   July is sealed. The function now carries a `COMMENT` saying so. Nothing else about this
   item changed — `book_makeup()` and `book_trial()` check the same floor and the same gap
   is still open for them.
-
-### `verify-schedule-week.mjs` fails two COMING UP checks — **S** `[driver]`
-Two checks are red: *"a COMING UP row never opens the attendance screen"* and *"…it opens the
-class roster instead"*. The row it presses lands on
-`/classes/<id>/attendance?date=<last Monday>&from=schedule` instead of the roster.
-
-**PRE-EXISTING, and measured as such on 2026-08-10** — reproduced with the day's app changes
-`git stash`ed and the fixture freshly loaded: identical 17/19 both ways. It is **not** the
-`sessionId` removal and not the roster change.
-
-**Most likely the driver, not the product.** It expands a day with
-`getByText(/^\w{3}, \d+ \w{3}$/).last()` and then presses `getByText("Stale Screen Club").last()`.
-`fixtures-stale-screen.sql` derives its dates from today, and the run that exposed this was a
-**Monday**, which puts the fixture's unmarked straggler (*Mon, 3 Aug*) one clean week back — so
-a NEEDS MARKING copy of the same class title is on screen and `.last()` can walk to it instead
-of the COMING UP row. That is §7.98's shape exactly, and §7.73's calendar dependence.
-
-**Notes:** confirm which it is before changing anything — the check itself guards something
-real (a future lesson cannot be marked, so its row must not reach the attendance screen, whose
-only exit is a replace back). If it is the locator, scope it to the COMING UP section rather
-than relaxing the assertion. The last full nightly (2026-08-08) was red on `verify-trials`
-only, so this either started with the 2026-08-09 changes or is weekday-dependent — both
-distinguishable by running it on a non-Monday.
 
 ### Sealing a LATER month strands an earlier unsealed one — **S**
 `markable_floor()` takes `LEAST(session_window_start(), month after MAX(billing_month))`.

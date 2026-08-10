@@ -44,6 +44,28 @@ conflict is most expensive to resolve — you cannot tell which half is true wit
 both sessions. Serialising them on `main` costs nothing, because the documentation pass
 happens *after* the code has landed anyway.
 
+> ### ⚠ THE CASE THIS GUIDE DOES NOT COVER: TWO SESSIONS IN THE **ROOT** CHECKOUT
+>
+> Everything above assumes the second session took a worktree. On **2026-08-10** two ran in
+> the root checkout at once (§8.42), and every protection here was silently absent — there is
+> no `WORKTREE.md` declaring ownership, no port claim, and nothing to read before writing.
+> What actually happened, none of it caught by tooling:
+> - One session ran **`supabase db reset` three times** while the other was setting up. No
+>   damage, and only by luck — the other had loaded no fixtures yet.
+> - `HEAD` moved **four times** under an in-progress session, twice mid-`/update-docs`,
+>   including a branch switch that made an edited file look reverted on disk.
+> - Both sessions wrote `HANDOVER.md` §9 within minutes of each other, and one committed
+>   while the other's edits sat uncommitted in the same file.
+>
+> **The tells, since nothing announces this:** `git worktree list` shows a sibling; `git log
+> --oneline -1` differs from what you last saw; `git status` lists files you did not touch.
+> Check all three **before** `supabase db reset`, before `git checkout`, and before writing a
+> living document. If you find a sibling in the root checkout, say so and agree who writes
+> what — `docs/SESSIONS.md` and `HANDOVER.md` §8 both serialise badly.
+>
+> **A worktree is strictly safer than sharing the root**, which is the argument for
+> `/worktree-start` even when the task looks small enough not to need one.
+
 ---
 
 ## Phase 0 — Before you create anything

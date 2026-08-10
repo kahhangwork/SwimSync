@@ -1,14 +1,13 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-10 (2nd session) — **this file's growth mechanism was found and
-cut: 91 KB → 39 KB, nothing lost (§8.41).** The ledger is now `docs/SESSIONS.md`, §3 keeps
-only what a PRD cannot say, and `/update-docs` enforces three countable limits. **§7.119**
-is the durable lesson. Docs only — no code, no migration, no deploy._
+_Last updated: 2026-08-10 (3rd session) — **the nightly's remaining red is fixed:
+`verify-schedule-week` is 21/21, `287142b` on `main` (§8.42).** Driver rot, **not** §8.40 —
+proven by reproducing 17/19 at `eb010fd~1`. The fix's own first version would have crashed
+every September (**§7.121**). Driver only: no product change, no migration, no deploy._
 
-_Previously, 2026-08-10 — **the unmarked-guest underbill is closed and LIVE (§8.40).** A
-class with no active enrolments but an unmarked trial or make-up booking was skipped whole,
-so any other class billing **SEALED** the month over it. `20260810000100`, engine
-**v19 → v20**._
+_Previously, 2026-08-10 (2nd session) — **this file's growth mechanism was found and cut:
+91 KB → 39 KB, nothing lost (§8.41).** The ledger is now `docs/SESSIONS.md`; **§7.119** is
+the durable lesson._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -320,6 +319,48 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.42 (2026-08-10, 3rd session) — THE NIGHTLY'S LAST RED WAS THE DRIVER, NOT §8.40
+
+**`verify-schedule-week` is 21/21 and on `main` as `287142b`.** It had been 17/19, and the
+suspicion on record was that §8.40 (shipped hours earlier, touching the same screen) had
+broken it. It had not. Proven rather than argued: the driver, its fixture and `lib.mjs` are
+**byte-identical at `eb010fd~1`**, and that commit reproduces 17/19 with the *same* failing
+URL — so §8.40 is exonerated and the two COMING UP checks had been asserting nothing about
+COMING UP on five weekdays out of seven.
+
+**The cause was an ordinal over a list the driver does not own** (§7.75, §7.101): `.last()`
+on a bare day-header regex takes whichever day sorts latest in the week, which is the
+**seed's** Saturday class, not the fixture's. COMING UP days render collapsed, so the lesson
+was never revealed and the next tap fell through to the NEEDS MARKING straggler. It passed
+only when the fixture's own weekday sorted last — Sat/Sun. What each check now covers, and
+the sabotage signature, are in `docs/TESTING.md` §5.
+
+**The review earned its keep by finding a bug in the fix itself.** The first version built
+its label with Postgres `to_char`, which renders September `Sep` while the screen renders
+`Sept` — green in August, matching **nothing** for a month from 2026-08-25, and under
+`exact:` a *thrown* driver rather than a failed check. That is **§7.121**, and it is the
+durable half of this session. **§7.122** is the second: a nightly labelled in UTC executes in
+SGT, so its real weekday is the day after its name — reading the label instead produced a
+confident wrong conclusion mid-triage.
+
+**Deliberately not done.** No `testID` was added to `DaySection` — it is the cleaner fix and
+would make the locator locale-free, but it is product code changed to suit a test, and the
+formatter-parity fix removes the need. The final `.last()` on the class title still depends
+on section render order; that dependency is now a comment in the file rather than a silent
+assumption.
+
+**Two coordination facts, both cheap to lose.** A second session was driving this same root
+checkout throughout — it committed, merged and pushed here — and `supabase db reset` was run
+three times against the shared database before that was noticed. No damage: nothing of theirs
+was loaded. `docs/WORKTREES.md` exists to prevent exactly this and did not, because nothing
+announces a sibling that shares the *root* checkout rather than taking a worktree.
+
+**Verified:** 21/21 on a Monday, the failing case; sabotage **18/21** with the reveal guard
+reporting `2 -> 2`, signature recorded in the file header; Node and Chrome ICU agree on all
+12 months; pre-existence proven at `eb010fd~1`; `287142b` fast-forwarded onto `main`.
+
+---
+
 ## 8.41 (2026-08-10, 2nd session) — THE HANDOVER'S GROWTH MECHANISM, FOUND AND CUT
 
 **91 KB → 39 KB, nothing lost.** The file was 38 KB after the 2026-07-26 trim and 91 KB
@@ -353,60 +394,6 @@ escalation rather than re-wording the plea.
 changed. And another session's work in the same checkout: `verify-schedule-week.mjs` (which
 landed on `main` as `287142b` mid-pass, so §9's entry for it was corrected after the push)
 and the nested `SwimSync/attendance-edit-history-view` worktree. Neither was ever staged.
-## 8.40 (2026-08-10) — AN UNMARKED GUEST CAN NO LONGER BE SEALED OVER
-
-**`core.ts` bailed out of its per-class loop at two guards that never consulted
-`bookingsByDate`.** The completeness gate twelve lines below them *does* union booking dates
-in, so the gate was correct and unreachable: a class with no ACTIVE enrolments but holding an
-unmarked trial or make-up booking was skipped whole. Alone that left the month open; alongside
-any class that billed, the month **SEALED** and that lesson could never be invoiced (§11.6).
-Wave 1's parting find, and the shape this project treats as its worst. Deployed in full:
-`20260810000100`, engine **v19 → v20**, both apps, remote grant dump diffed, CI green, and the
-served bundle grepped.
-
-**It was never confined to retired classes, and that reframing is the useful part.** An
-*active* class whose students have all left, holding one booking, is the same state — and it is
-the local seed's default shape (§7.100). Retiring made it reachable by construction. The admin
-pre-flight (`SwimSyncAdmin/lib/classCoverage.ts`) already had the rule right, so the Generate
-dialog **named** the missing lesson while the engine skipped it — §7.18's divergence, live.
-
-**Two named prohibitions, and one of them reverses a decision made during planning.** Bookings
-are **never clamped** — a clamp was drafted, and it would have dropped every booking date for a
-class with a null `lastScheduledDate` and re-created the underbill. `billableStudentIds` is
-**not widened** — four consumers read it, and widening is safe only by coincidence of the item
-loop's shape. Both are in `docs/ARCHITECTURE.md` §6, and the first is now **structural**: the
-migration's CHECK means no null-`lastScheduledDate` row can exist, so a future clamp has neither
-anything to clamp nor a reachable state to justify itself with.
-
-**The migration is what makes the block safe**, because a block with no exit strands a whole
-business: `book_trial()` and `schedule_extra_lesson()` refuse a retired class, and
-`is_active = false` requires a date — which also makes `deactivate_class()` the only retire
-path, since `classes_write` is `FOR ALL TO authenticated` and a raw PostgREST UPDATE could
-otherwise skip all three refusals (§7.32).
-
-**Three of this session's own assertions were wrong, and only breaking things found them.** A
-pgTAP partner collided on a unique index under sabotage (**§7.117**); a driver check asserted a
-child's name was absent from a screen that never renders it (**§7.118**); and that driver's
-marking step could not save a lesson holding several guests, so three consecutive runs failed
-while the product was correct. Measured sabotage signatures are now written into both files.
-**§7.115** is the one that would have cost most: `book_trial()` already had its floor guard, and
-both `BACKLOG.md` and the risk review said otherwise from a superseded file.
-
-**Deliberately not done.** No whitelist for `service_role` — the audit exists now
-(`BACKLOG.md`, 11 call sites) and argues against it. `classCoverage.ts` still does not union
-session dates, the same divergence running the other way — filed, over-reports readiness, never
-under-bills. `verify-schedule-week` is 17/19 and **pre-existing**, proven by re-running with the
-day's changes stashed; filed with the likely cause.
-
-**Verified:** production audit 0/0/0 before a line was written (**read honestly — two of the
-three passed vacuously, production holds no live booking**); pgTAP **618**
-(`booking_class_active` 14/14, proven red by running the rollback file); Deno **139 ×2**
-(§7.15), `guestOnlyClass` 4 cases, 1+2 proven red; vitest 255; jest 308; both typechecks;
-`verify-trials` **16/16 three consecutive runs**, its roster checks proven red by restoring the
-gate; `stale-screen` 22/22, `bulk-setall` 10/10, `unmarked-lessons` 12/12; 19 fixtures
-round-trip and tear down clean; rollback file **executed** and byte-identical to pre-migration
-(§7.93); and on production `anon` EXECUTE still **18**, zero `GRANT ALL ON TABLE … TO
-"authenticated"`, both functions `authenticated`-only with no `service_role` line.
 
 ---
 
@@ -457,38 +444,41 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### ⚠ TWO THINGS TO CHECK, AND BOTH CHECK THEMSELVES
+### ⚠ ONE THING TO CHECK, AND IT CHECKS ITSELF
 
-**1. Confirm the nightly sweep.** `ui-driver-rot` **issue #3 was still OPEN** at the close of
-2026-08-10 — from the 2026-08-08 sweep, `verify-trials` only. Its cause was fixed on
-2026-08-09 and that driver is now **16/16 on three consecutive local runs**, but *no sweep has
-run since*, and the sweep is the evidence, not this sentence.
-`gh run list --workflow=ui-drivers.yml` and the issue's own state are the current fact; a green
-run closes the issue itself. This section once read *"✅ NO RED SIGNALS"* for a day after the
-sweep had gone red beneath it.
+**Confirm the next nightly sweep — every known red now has a fix on `main`, and no sweep has
+run since the last one landed.** `gh run list --workflow=ui-drivers.yml` and `ui-driver-rot`
+issue #3's own state are the current fact; a green run closes the issue itself. This section
+once read *"✅ NO RED SIGNALS"* for a day after the sweep had gone red beneath it.
 
-**2. `verify-schedule-week` — a FIX LANDED on `main` on 2026-08-10 and has NOT been swept.**
-Commit `287142b` (*"verify-schedule-week addresses its own day, not the seed's"*), authored
-by another session. **Nobody has run it since**, so its score is unknown, not fixed — and a
-green sweep is the evidence, not this sentence (§8.35). What follows is the state it was
-filed at, kept because it is the triage if the two checks are still red: two COMING UP checks
-fail. Proven pre-existing by re-running with that session's app changes `git stash`ed
-and the fixture freshly loaded — identical 17/19 both ways. It is filed in `BACKLOG.md` with
-the likely cause (a `.last()` locator reaching a NEEDS MARKING copy of the class title, which a
-**Monday** makes possible because the fixture derives its dates from today — §7.98 + §7.73).
-**Run it on a non-Monday first**; that alone distinguishes locator rot from a product change.
+Where the last sweep left it — run `31334766457`, which **executed Monday 2026-08-10 SGT**
+(GitHub labels it `2026-08-09`; the cron is 20:00 UTC — **§7.122**), against `e0a868c`, so it
+did include §8.40:
 
-*(Six drivers have changed or arrived since 2026-08-09 and **none has faced a sweep**:
-`verify-levels`, `verify-admin-table-geometry`, `verify-packages`, `verify-paynow-fallback`,
-`verify-class-deactivation`, and now `verify-trials`. **Three mutate shared state** —
+- **37 of 38 drivers PASSED.** `verify-trials` was **16/16** — issue #3's named cause is gone,
+  and the issue is open only because the sweep as a whole was red.
+- **The one red was `schedule-week`, 17/19**, and that is fixed on `main` as `287142b`
+  (21/21 locally, §8.42). So the next sweep is expected all-green.
+- **All six drivers that had never faced a sweep faced this one and passed** —
+  `verify-levels`, `verify-admin-table-geometry`, `verify-packages`, `verify-paynow-fallback`,
+  `verify-class-deactivation`, `verify-trials`. That paragraph is retired.
+
+**Three still mutate shared state**, which is why a sweep is not a substitute for a reset:
 `verify-paynow-fallback` writes the seed tenant's PayNow columns, `verify-class-deactivation`
 retires a seed-adjacent class, and `verify-trials` **leaves a booking behind on every run**
-because it has no fixture at all. That last one is why its marking step uses *Set all* and its
-final assertion counts rather than tests presence — §7.118.)*
+because it has no fixture at all — hence its *Set all* marking step and a final assertion that
+counts rather than tests presence (§7.118).
 
-> **Before triaging any red, read §7.108.** A driver that dies on `page.goto(admin/login)` with
-> a 30s `networkidle` timeout is a cold Next.js compile — not driver rot and not a product bug.
-> `curl` the route and re-run before reaching for §7.73.
+> **Before triaging any red, read §7.108** — a driver dying on `page.goto(admin/login)` with a
+> 30s `networkidle` timeout is a cold Next.js compile, not rot and not a product bug; `curl`
+> the route and re-run first. **Then ask which weekday the run actually saw** (§7.122), and
+> whether the driver takes an ordinal over a list it does not own (§7.75, §7.101) or skips
+> itself on a date condition and reports PASS (§7.100). *(**§7.73 is cited across the repo as
+> the shorthand for "an assumption that held until the data changed"** — that family reading
+> is fine and is how `ui-drivers.yml` and `docs/TESTING.md` use it. But its text is the
+> unordered-`LIMIT 1` fixture bug and contains **no calendar content**, so for a
+> weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
+> renumbered: eight files cite it and the number is permanent.)*
 
 ### THE NEXT BUILD IS CHOSEN FROM `BACKLOG.md` — nothing is queued
 
@@ -503,10 +493,10 @@ user has said to build soon and which every later wave sits on top of.
 - *The admin's invoice pre-flight misses an unmarked EXTRA lesson* (**S**) — `classCoverage.ts`
   unions booking dates but not session dates, so it over-reports readiness. **Never
   under-bills**, which is why it is S.
-- *`verify-schedule-week.mjs` fails two COMING UP checks* (**S**) — a fix landed on `main`
-  (`287142b`) but has not been swept; confirm before picking this up, and close the item if
-  it is green.
 - *Deleting an admin destroys the audit history* (**S**) — unchanged from 2026-08-09.
+
+*(The third, *`verify-schedule-week.mjs` fails two COMING UP checks*, **shipped** on
+2026-08-10 as `287142b` and is struck from `BACKLOG.md` — §8.42.)*
 
 **The `service_role` question is now ANSWERED, and the answer is "don't build the whitelist"**
 (`BACKLOG.md` carries the 11-call-site audit). `generate-invoices` alone touches 21 of 37 tables
@@ -526,12 +516,17 @@ function this session touched (`docs/DEPLOYMENT.md` §11.7).
   in *"Set up job"* during a GitHub Actions major outage. Check `githubstatus.com` before
   reading a diff.
 - **When the sweep reddens, ask which moved — the product or the driver's assumption.**
-  §7.73 is the calendar case; §8.33 is the product case, and it was a live bug that four
-  green *manual* runs had missed because they ran outside the broken window.
+  §7.73 is the assumption case (its family, not its literal text — see the note above);
+  §8.33 is the product case, and it was a live bug that four green *manual* runs had missed
+  because they ran outside the broken window.
 - **The change that shipped yesterday is the SUSPECT, never the verdict** (§8.35). The
   2026-08-08 red looked exactly like §7.98 — written the day before, about the same screen
   — and was in fact a driver that had been broken for two weeks and had been skipping
   itself into a green PASS. Check when the driver last actually asserted anything.
+  **2026-08-10 made the same point twice over** (§8.42): `schedule-week`'s red looked exactly
+  like the §8.40 deploy hours earlier, and was a locator that had never worked on a weekday.
+  **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
+  — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **The migration queue is EMPTY, and nothing is queued to fill it.** The latest applied is
 `20260810000100` (the booking / class-active guards, §8.40). Whatever comes next: still one at

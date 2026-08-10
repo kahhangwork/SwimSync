@@ -588,7 +588,7 @@ has left mounted. Coach app only; no admin server needed.
 `verify-schedule-week.mjs` (reuses `fixtures-stale-screen.sql`) owns the **Schedule tab's
 week selector**, split out of the driver above because driving the selector inside it
 destabilised seven downstream checks — that driver needs the screen left where it starts.
-**19 checks.** The load-bearing one is *"a straggler from ANOTHER week still appears under
+**21 checks.** The load-bearing one is *"a straggler from ANOTHER week still appears under
 NEEDS MARKING"*: that list is **floor-scoped, not week-scoped**, so a lesson from three
 weeks back stays visible whatever the selector shows. Week-scoping it would hide a lesson
 the coach has no reason to go looking for, and unmarked attendance blocks billing with no
@@ -599,6 +599,18 @@ reaches the attendance screen (a future date is refused there, so it would be a 
 **Not** covered here: the week surviving a Sunday→Monday boundary with the app mounted —
 that is why the screen holds an offset rather than a date (§7.95), and only
 `lib/scheduleWeek.test.ts` can move the clock far enough to prove it.
+
+> **Two of the 21 exist because the COMING UP tap silently stopped testing COMING UP**
+> (2026-08-10, `287142b`). The driver expanded a day with `.last()` over a bare day-header
+> regex, which takes whichever day sorts latest — the **seed's** Saturday class, not the
+> fixture's. The lesson was never revealed, the following tap fell through to the NEEDS
+> MARKING straggler, and the two COMING UP checks failed against a correct product on every
+> weekday except Sat/Sun. It now addresses its own day by name (`TODAY + 7`) and asserts
+> **the header matches exactly 1 element** and **that expanding it reveals the lesson** —
+> so a missed expand is a legible FAIL instead of two checks quietly asserting nothing.
+> Labels come from the app's own `toLocaleDateString` call, never SQL (**§7.121**).
+> Sabotage signature is in the file header: restore the old locator → **18/21**, guard
+> reporting `2 -> 2`. §7.75, §7.101.
 
 `verify-parent-pay-claim.mjs` (reuses `fixtures-payment-collection.sql`) covers **Pay via
 PayNow and I've paid on the parent's invoice LIST** (PRD §7.21), which no other driver

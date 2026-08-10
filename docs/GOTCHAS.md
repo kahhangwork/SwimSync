@@ -2083,3 +2083,40 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       carried the full narrative itself. **Verify a pointer resolves before you write it**
       (`grep` the target for the number); an unverified pointer does not delegate anything, it
       just looks like it did. See **§7.119**. (2026-08-10.)
+
+121. **A UI LOCATOR BUILT FROM A DATABASE DATE FORMATTER AGREES WITH THE SCREEN FOR ELEVEN
+    MONTHS OF THE YEAR AND THEN MATCHES NOTHING — AND UNDER `exact: true` THAT IS A THROWN
+    DRIVER, NOT A FAILED CHECK.** Postgres `to_char(d,'Mon')` renders September `Sep`; the app
+    renders it through `formatSgDate` → `toLocaleDateString("en-SG",{month:"short"})`, and
+    ICU/CLDR renders English September **`Sept`**. Measured 2026-08-10 for 2026-09-07: PG
+    `Mon, 7 Sep`, Chrome `Mon, 7 Sept`. The other eleven months agree exactly.
+    - **Where it nearly bit:** the first fix for `verify-schedule-week.mjs` computed its
+      day-header label in SQL. It passed 21/21 in August and would have matched **zero**
+      elements from 2026-08-25 to 2026-09-23 — `tap()` waits for visibility and throws, the
+      outer `catch` collapses the run into one `FAIL driver completed without throwing`, and
+      the remaining checks never execute. Caught in pre-commit review, never shipped.
+    - **Substring comparisons hide it, which is why it survived so long.** The same file's
+      existing `PREV_LABEL` and `floorWeek` are also SQL-built, and they are safe **only by
+      luck**: they are consumed with `t.includes(...)` and `Sep` is a prefix of `Sept`. Moving
+      one of them to `exact:` would arm the same landmine.
+    - **The rule: never cross formatter families for a comparison.** If a driver must match
+      rendered text, build the expected string with the **same call the app makes** — for
+      SwimSync that is `new Date(iso+"T00:00:00Z").toLocaleDateString("en-SG", {...,
+      timeZone:"UTC"})`, mirroring `SwimSyncApp/lib/lessonDates.ts`. Node and Chrome ICU were
+      verified to agree on all 12 months. Better still, match on something that is not a label
+      at all: an ISO `testID`, a `value`, a URL. This is §7.100's "compare ISO option values,
+      never rendered labels" in a new place. (2026-08-10.)
+
+122. **A NIGHTLY CI RUN IS LABELLED IN UTC AND EXECUTES IN SGT, SO THE WEEKDAY IT ACTUALLY
+    SAW IS THE DAY AFTER ITS NAME.** `ui-drivers.yml` is `0 20 * * *` — 20:00 UTC is
+    **04:00 SGT the next day**. The run listed as `2026-08-08` ran on **Sunday 2026-08-09**
+    SGT; the one listed `2026-08-09` ran on **Monday 2026-08-10** SGT.
+    - **Why it matters beyond bookkeeping:** drivers pin their browser to `Asia/Singapore` and
+      compute their dates in SGT, so for any calendar-dependent driver the SGT execution day
+      is the only weekday that explains its result. Reading the UTC label instead inverts the
+      diagnosis by exactly one day — during the 2026-08-10 triage of `verify-schedule-week` it
+      produced the confident and wrong conclusion *"it failed on a Sunday, so the weekday
+      theory is dead"*, when both the green run and the red one fit the theory perfectly.
+    - **Date a nightly by its SGT execution day, with the UTC label in brackets**, in issue
+      comments and in `HANDOVER.md`. Same family as §7.7: the bug is never the timezone, it is
+      two clocks quietly disagreeing about which day it is. (2026-08-10.)
