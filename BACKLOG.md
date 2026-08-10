@@ -3,6 +3,9 @@
 _Last updated: 2026-08-10 (3rd session) — ***`verify-schedule-week` fails two COMING UP
 checks* SHIPPED and was removed** (`287142b`): driver rot, not a product bug, and the item's
 own guess was right — the locator, scoped. §7.121 is the trap the fix nearly introduced.
+**Two settled shape decisions were also recovered into *Attendance edit history view*** from
+a worktree that was closed the same day it was opened, taking its gitignored `WORKTREE.md`
+with it.
 Earlier that day: the refused **CI gate on documentation size** filed under *Deliberately not
 doing* (§7.119 holds the reasoning; `cb70808` holds the code). And before that: **THREE items
 SHIPPED and were removed**, all in one commit
@@ -491,6 +494,26 @@ right when building this:** the rows are visible to the *tenant admin*, not to t
 whose edit they record; and `old_value`/`new_value` are full `to_jsonb(OLD/NEW)` snapshots,
 so the screen must diff them rather than print them — the dispute this exists for is
 *what the number used to be*.
+
+**Two shape decisions are already settled — recovered 2026-08-10, and the recovery is
+itself the lesson.** A worktree was opened for this item, took both decisions, wrote them
+into its `WORKTREE.md`, and was closed the same day with no code written. `WORKTREE.md` is
+**gitignored**, so closing the worktree destroyed the only copy; they survive here because
+they happened to still be in a sibling session's context. That is the exact loss
+`/worktree-close` exists to prevent — *extract the graduate list before the worktree is
+destroyed* — and it failed silently, because a decision nobody wrote down leaves no gap
+where it used to be.
+
+1. **Route `/history`, label "Change History" — deliberately NOT `/audit` or "Audit log".**
+   That name claims a complete legal record, and this trail has holes **by design**:
+   `prepare_admin_delete()` purges a deleted admin's rows, and a write with no JWT actor
+   (migration, `psql`, seed, edge function) records nothing at all and is allowed through
+   (**§7.120**). The label must not promise what the data cannot deliver — and a reader must
+   render an unattributed row as *"system"*, never blank.
+2. **One global filtered list — NOT a per-entity route.** Entity type and a date range are
+   filters, exactly as `attendance/page.tsx` already does it. A per-entity page would need an
+   entry point from all five entity screens and answers a narrower question than *"what
+   changed here recently"*, which is the one a disputed charge actually asks.
 
 ### ~~A coach week view~~ — **SHIPPED 2026-08-08 as the Schedule tab** (PRD §14.2)
 It went further than this item asked. Rather than turning the *Classes* tab into a week
