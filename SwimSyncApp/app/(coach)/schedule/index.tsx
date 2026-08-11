@@ -50,6 +50,17 @@ import {
   lessonDatesInRange,
 } from "@/lib/scheduleWeek";
 import { bucketWeek } from "@/lib/scheduleBuckets";
+import {
+  parseAssignments,
+  assignmentsByLesson,
+  rosteredDatesByClass,
+  lessonRole,
+  canMark,
+  roleBadge,
+  lessonKey,
+  type LessonRole,
+} from "@/lib/coachRoster";
+import { fetchCoveredOutSessions } from "@/lib/sessionMainCoach";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 
@@ -67,6 +78,22 @@ import PrimaryButton from "@/components/PrimaryButton";
  */
 const ROW_LIMIT = 900;
 
+/**
+ * The class columns every card is built from. A COVERED class is fetched with
+ * the same shape as an owned one — the substitute needs the title, the times
+ * and the location just as much, and `classes_select` now returns it to them
+ * (`coach_rostered_in_class`, 20260811000200).
+ */
+const CLASS_SELECT = `
+        id,
+        title,
+        day_of_week,
+        start_time,
+        end_time,
+        location_name,
+        student_class_enrolments(student_id, is_active, enrolled_at, unenrolled_at)
+      `;
+
 /** One lesson on one date — the unit every section renders. */
 type WeekLesson = {
   /** scheduleBuckets sorts on these two; the rest is for the card. */
@@ -81,6 +108,8 @@ type WeekLesson = {
   summary: string;
   students: number;
   guests: number;
+  /** Who is teaching it. `owner` unless an admin has rostered somebody. */
+  role: LessonRole;
 };
 
 /** A lesson that should have happened but has no complete attendance. */
@@ -133,6 +162,28 @@ function ProgressChip({ progress }: { progress: LessonProgress }) {
       <Text className={`text-xs font-semibold ${tone.fg}`}>
         {progressLabel(progress)}
       </Text>
+    </View>
+  );
+}
+
+/**
+ * "Covering" / "Shadowing" / "Covered" — who is teaching a lesson, when it is
+ * not simply the coach reading the screen.
+ *
+ * ⚠ VIOLET, AND NOT ONE OF THE PROGRESS CHIP'S COLOURS. This says something
+ * orthogonal to marking state — a covered lesson can be unmarked, partial or
+ * complete — and reusing amber or green here would read as a fourth status.
+ * `null` for an ordinary lesson: a business that has never rostered anybody
+ * gains no new furniture on its screens.
+ *
+ * Module scope for the same reason as `ProgressChip` and `DaySection` below.
+ */
+function RoleBadge({ role }: { role: LessonRole }) {
+  const label = roleBadge(role);
+  if (!label) return null;
+  return (
+    <View className="self-start rounded-full bg-violet-100 px-2 py-0.5 mt-1">
+      <Text className="text-[10px] font-semibold text-violet-700">{label}</Text>
     </View>
   );
 }
@@ -209,6 +260,7 @@ function DaySection({
                     <Text className="text-xs text-gray-500 mt-0.5">
                       {formatTime(l.startTime)} – {formatTime(l.endTime)}
                     </Text>
+                    <RoleBadge role={l.role} />
                   </View>
                   <ProgressChip progress={l.progress} />
                 </View>
@@ -303,24 +355,6 @@ export default function ScheduleScreen() {
       return;
     }
 
-    const { data: allClasses } = await supabase
-      .from("classes")
-      .select(`
-        id,
-        title,
-        day_of_week,
-        start_time,
-        end_time,
-        location_name,
-        student_class_enrolments(student_id, is_active, enrolled_at, unenrolled_at)
-      `)
-      .eq("coach_id", coach.id)
-      .eq("is_active", true)
-      .order("start_time", { ascending: true });
-
-    const coachClasses = allClasses ?? [];
-    const classIds = coachClasses.map((c: any) => c.id);
-
     // ── THE TWO RANGES, AND WHY THEY ARE UNIONED INTO ONE QUERY ──────────────
     // NEEDS MARKING is floor-scoped: [backlogFrom, today]. The week sections are
     // week-scoped: [weekStart, weekEnd]. One fetch covers both by spanning the
@@ -328,6 +362,71 @@ export default function ScheduleScreen() {
     const backlogFrom = backlogWindowStart(todayDate, null, markableFloor);
     const rangeStart = backlogFrom < weekStart ? backlogFrom : weekStart;
     const rangeEnd = todayDate > weekEnd ? todayDate : weekEnd;
+
+    // ── TWO FETCHES, UNIONED IN JS — NOT ONE WIDENED FILTER ──────────────────
+    // A lesson reaches this coach two ways now, and they have nothing in common
+    // at the query layer:
+    //
+    //   (a) `classes.coach_id = me` — my own classes, every week they run.
+    //   (b) `session_coaches.coach_id = me` — ONE lesson of somebody else's
+    //       class that an admin rostered me onto (20260811000200).
+    //
+    // Widening (a) to "classes I am rostered on" would be wrong twice over: the
+    // week card is built from the CLASS row and its enrolments, and a covered
+    // class must contribute only the dates I was actually assigned — never its
+    // ordinary weekday recurrence, which is a set of lessons that belong to
+    // somebody else.
+    const [classesRes, rosterRes] = await Promise.all([
+      supabase
+        .from("classes")
+        .select(CLASS_SELECT)
+        .eq("coach_id", coach.id)
+        .eq("is_active", true)
+        .order("start_time", { ascending: true }),
+      // ⚠ BOUNDED BY THE SESSION'S DATE, THROUGH THE EMBED. `!inner` is what
+      // makes a filter on the embedded table narrow the parent rows rather than
+      // just the embed, and without it every assignment a coach has ever had
+      // comes back to be discarded on the device.
+      supabase
+        .from("session_coaches")
+        .select("role, lesson_session_id, lesson_sessions!inner(id, class_id, session_date)")
+        .eq("coach_id", coach.id)
+        .gte("lesson_sessions.session_date", rangeStart)
+        .lte("lesson_sessions.session_date", rangeEnd)
+        .limit(ROW_LIMIT),
+    ]);
+    if (!current()) return;
+
+    const ownedClasses = classesRes.data ?? [];
+    const ownedClassIds = new Set(ownedClasses.map((c: any) => c.id as string));
+    const assignments = parseAssignments(rosterRes.data);
+    const assignmentByLesson = assignmentsByLesson(assignments);
+    const rosteredDates = rosteredDatesByClass(assignments);
+
+    // The classes I am covering INTO. Fetched with the same columns, and
+    // deliberately WITHOUT `.eq("is_active", true)`: a roster row names one
+    // real lesson that already has a `lesson_sessions` row, so the billing
+    // engine expects attendance for it whatever later happened to the class.
+    // Hiding it because the class was since deactivated strands a straggler
+    // nobody can clear, and the month blocks with no override (§8i).
+    const coveredClassIds = [...rosteredDates.keys()].filter(
+      (id) => !ownedClassIds.has(id)
+    );
+    const coveredRes =
+      coveredClassIds.length > 0
+        ? await supabase.from("classes").select(CLASS_SELECT).in("id", coveredClassIds)
+        : { data: [] as any[] };
+    if (!current()) return;
+
+    /** Every class a card can come from, each carrying whether it is mine. */
+    const coachClasses: { cls: any; owned: boolean }[] = [
+      ...ownedClasses.map((cls: any) => ({ cls, owned: true })),
+      ...((coveredRes.data ?? []) as any[]).map((cls: any) => ({
+        cls,
+        owned: false,
+      })),
+    ];
+    const classIds = coachClasses.map((c) => c.cls.id as string);
 
     const sessionsRes = classIds.length > 0
       ? await supabase
@@ -419,7 +518,13 @@ export default function ScheduleScreen() {
     setTruncated(
       windowSessions.length >= ROW_LIMIT ||
         bookingRows.length >= ROW_LIMIT ||
-        makeupRows.length >= ROW_LIMIT
+        makeupRows.length >= ROW_LIMIT ||
+        // The roster fetch is capped like the others, and a truncated one drops
+        // lessons a substitute is expected to mark — the same silent shortfall,
+        // one table further on. Counted on the RAW rows, not the parsed ones:
+        // parsing drops a row whose lesson did not come back, which would hide
+        // a response that really did fill its limit.
+        (rosterRes.data?.length ?? 0) >= ROW_LIMIT
     );
 
     const bookedByClassDate = new Map<string, Map<string, string[]>>();
@@ -434,8 +539,11 @@ export default function ScheduleScreen() {
 
     const backlogItems: BacklogItem[] = [];
     const lessons: WeekLesson[] = [];
+    /** Sessions of MY OWN classes that somebody else might have been rostered
+     *  onto — see the probe below for why this list is short. */
+    const probeIds: string[] = [];
 
-    for (const cls of coachClasses as any[]) {
+    for (const { cls, owned } of coachClasses) {
       const enrolments = cls.student_class_enrolments ?? [];
       // Who must be marked is a question about the LESSON'S date — a child who
       // joined last week was not expected at last month's lessons. See
@@ -449,6 +557,38 @@ export default function ScheduleScreen() {
         bookedByClassDate.get(cls.id) ?? new Map<string, string[]>();
       const sessionDates = sessionDatesByClass.get(cls.id) ?? [];
       const bookedDates = [...bookedHere.keys()];
+      const rosteredHere = rosteredDates.get(cls.id) ?? [];
+
+      /**
+       * Which dates of this class are MINE, inside a range.
+       *
+       * ⚠ THE TWO ARMS ARE NOT INTERCHANGEABLE. For my own class it is the
+       * weekday recurrence, plus booking and session dates that fall off it
+       * (an admin's extra lesson). For a class I am covering it is EXACTLY the
+       * dates an admin rostered me onto — never the recurrence. A substitute
+       * who covers one Tuesday is not owed a card for every Tuesday, and RLS
+       * would return them no session for those dates anyway, so a recurrence
+       * card there would be a permanently unmarkable "unmarked" lesson.
+       */
+      const datesIn = (from: string, to: string): string[] =>
+        owned
+          ? lessonDatesInRange(
+              cls.day_of_week as DayOfWeek,
+              from,
+              to,
+              bookedDates,
+              sessionDates
+            )
+          : rosteredHere.filter((d) => d >= from && d <= to);
+
+      /** My role on one date of this class, before the covered-out probe —
+       *  one definition, used by the card and by the NEEDS MARKING filter, so
+       *  a lesson cannot be badged one way and nagged the other. */
+      const roleAt = (date: string) =>
+        lessonRole({
+          ownsClass: owned,
+          assignment: assignmentByLesson.get(lessonKey(cls.id, date))?.role,
+        });
 
       /** One (class, date) -> one card. Exactly ONE expectedStudentsOn call per
        *  pair in this file: two derivations of "who was expected here" is how
@@ -478,6 +618,10 @@ export default function ScheduleScreen() {
           ),
           students: split.students,
           guests: split.guests,
+          // Provisional: `covered` is not known yet for my OWN classes — only
+          // the database can answer that, and it is asked once, below, for the
+          // handful of lessons where the answer can still change anything.
+          role: roleAt(date),
         };
       };
 
@@ -486,14 +630,12 @@ export default function ScheduleScreen() {
       // and a class with nobody enrolled still gets a card reading "No students"
       // rather than silently vanishing. (An empty roster is NOT "Marked": the
       // billing gate calls it complete and a card must not.)
-      for (const date of lessonDatesInRange(
-        cls.day_of_week as DayOfWeek,
-        weekStart,
-        weekEnd,
-        bookedDates,
-        sessionDates
-      )) {
-        lessons.push(lessonAt(date));
+      for (const date of datesIn(weekStart, weekEnd)) {
+        const card = lessonAt(date);
+        lessons.push(card);
+        if (owned && card.sessionId && !isFinished(card.progress)) {
+          probeIds.push(card.sessionId);
+        }
       }
 
       // ── NEEDS MARKING — FLOOR-SCOPED, AND DELIBERATELY WEEK-INDEPENDENT ──
@@ -525,13 +667,7 @@ export default function ScheduleScreen() {
       // pre-extraction behaviour: unbounded-below also surfaced bookings BELOW
       // the marking floor, which nobody can record — a dead tap. Pre-enrolment
       // weekday dates are still suppressed, by `expected.length === 0` below.
-      for (const date of lessonDatesInRange(
-        cls.day_of_week as DayOfWeek,
-        backlogFrom,
-        todayDate,
-        bookedDates,
-        sessionDates
-      )) {
+      for (const date of datesIn(backlogFrom, todayDate)) {
         const sess = sessionByClassDate.get(`${cls.id}:${date}`);
         const expected = expectedStudentsOn(date, enrolmentSpans, bookedHere);
         if (expected.length === 0) continue; // nobody to mark
@@ -539,6 +675,11 @@ export default function ScheduleScreen() {
         // A lesson that has not ENDED yet is not overdue — today's 5pm class at
         // midday is Upcoming, not a straggler.
         if (!hasLessonEnded(date, todayDate, cls.end_time, nowMins)) continue;
+        // A lesson I am only SHADOWING is not mine to clear. The database
+        // refuses my write (attendance_write is `coach_is_main_on_session`), so
+        // nagging me produces a straggler nobody can answer — see canMark().
+        if (!canMark(roleAt(date))) continue;
+        if (owned && sess) probeIds.push(sess.id);
         backlogItems.push({
           class_id: cls.id,
           class_title: cls.title,
@@ -554,10 +695,39 @@ export default function ScheduleScreen() {
       }
     }
 
+    // ── AND THE ONE QUESTION ONLY THE DATABASE CAN ANSWER ────────────────────
+    // Everything above knows my own roster rows. It cannot know that somebody
+    // ELSE was rostered onto a lesson of MY class: `session_coaches_select`
+    // shows a coach only their own rows, deliberately. So ask the definer-rights
+    // gate — the same predicate `attendance_write` uses — about the lessons
+    // where the answer can still change what is on screen.
+    //
+    // ⚠ THE PROBE SET IS BOUNDED BY CONSTRUCTION, AND THAT MATTERS: this is one
+    // round trip per session. Only lessons of MY OWN classes, only ones that
+    // already HAVE a session row (an assignment creates it, so a lesson without
+    // one cannot be covered), and only ones still unfinished. A month of marked
+    // history asks nothing.
+    const coveredOut = await fetchCoveredOutSessions(probeIds);
     if (!current()) return;
-    backlogItems.sort((a, b) => b.date.localeCompare(a.date)); // most recent first
-    setNeedsMarking(backlogItems);
-    setWeekLessons(lessons);
+
+    // A covered lesson LEAVES my NEEDS MARKING list and appears on the covering
+    // coach's. Leaving it here shows a straggler I am not permitted to clear,
+    // and unmarked attendance blocks the billing month with no override (§8i).
+    const ownBacklog = backlogItems.filter(
+      (b) => !(b.session_id && coveredOut.has(b.session_id))
+    );
+    // The week card STAYS — the lesson is still happening and the coach should
+    // see their own class's day — it simply stops claiming to be theirs to mark
+    // and says so through its badge.
+    const weekCards = lessons.map((l) =>
+      l.role === "owner" && l.sessionId && coveredOut.has(l.sessionId)
+        ? { ...l, role: "covered" as LessonRole }
+        : l
+    );
+
+    ownBacklog.sort((a, b) => b.date.localeCompare(a.date)); // most recent first
+    setNeedsMarking(ownBacklog);
+    setWeekLessons(weekCards);
 
     // ⚠ NO INVOICE COUNT HERE, DELIBERATELY. This screen used to show an
     // "Outstanding" tile counting unpaid invoices across every parent the coach
@@ -838,6 +1008,7 @@ export default function ScheduleScreen() {
                                 {l.location}
                               </Text>
                             </View>
+                            <RoleBadge role={l.role} />
                           </View>
                           <ProgressChip progress={l.progress} />
                         </View>
@@ -851,10 +1022,28 @@ export default function ScheduleScreen() {
                             stops asking for marks it still needs is a lesson
                             that never gets marked, and that blocks the month
                             with no override (§8a). Any state added later
-                            inherits the loud button. */}
+                            inherits the loud button.
+
+                            A lesson I am shadowing, or one another coach was
+                            rostered to cover, is the ONE case where the loud
+                            button is wrong: the database refuses my write, so
+                            "Mark Attendance" could only ever end in an error
+                            toast. The screen behind it still opens, read-only,
+                            because knowing who is expected is the reason a
+                            trainee is there at all. */}
                         <PrimaryButton
-                          label={isFinished(l.progress) ? "Edit attendance" : "Mark Attendance"}
-                          variant={isFinished(l.progress) ? "outline" : "primary"}
+                          label={
+                            !canMark(l.role)
+                              ? "View lesson"
+                              : isFinished(l.progress)
+                                ? "Edit attendance"
+                                : "Mark Attendance"
+                          }
+                          variant={
+                            !canMark(l.role) || isFinished(l.progress)
+                              ? "outline"
+                              : "primary"
+                          }
                           onPress={() => openAttendance(l)}
                         />
                       </Card>

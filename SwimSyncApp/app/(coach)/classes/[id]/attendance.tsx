@@ -24,6 +24,14 @@ import {
   type ResolvedSession,
 } from "@/lib/attendanceSession";
 import { toSgDate, todayInSg, type DayOfWeek } from "@/lib/lessonDates";
+import {
+  lessonRole,
+  canMark,
+  roleNotice,
+  type LessonRole,
+  type RosterRole,
+} from "@/lib/coachRoster";
+import { fetchIsMainOnSession } from "@/lib/sessionMainCoach";
 import PrimaryButton from "@/components/PrimaryButton";
 
 type TopStatus = "unmarked" | "present" | "absent" | "cancelled" | "trial";
@@ -171,6 +179,13 @@ export default function MarkAttendanceScreen() {
   // this is so the coach is told why, before filling in a roster that cannot
   // be saved.
   const [blocked, setBlocked] = useState<MarkableCheck | null>(null);
+  // Who is teaching THIS lesson, from this coach's point of view. `owner` until
+  // the load says otherwise, which is the absence rule: no roster row means the
+  // class's own coach. A trainee shadowing, or a coach whose lesson somebody
+  // else was rostered to cover, gets the roster READ-ONLY — `attendance_write`
+  // is `coach_is_main_on_session()` since 20260811000200, so the alternative is
+  // a screen that invites work the database will refuse.
+  const [role, setRole] = useState<LessonRole>("owner");
   // Which load() is the current one. Switching lessons quickly can leave an
   // earlier fetch in flight; without this it lands last and repopulates the
   // screen with the lesson the coach navigated AWAY from.
@@ -198,13 +213,19 @@ export default function MarkAttendanceScreen() {
     setBlocked(null);
     setStudents([]);
     setAttendance({});
+    setRole("owner");
 
-    // Load class title + the students enrolled ON THIS DATE
-    const { data: cls } = await supabase
-      .from("classes")
-      .select(`
+    // Load class title + the students enrolled ON THIS DATE. `coach_id` rides
+    // along because "is this my class?" is half of the roster question below,
+    // and the coach record answers the other half — both fetched together so
+    // the screen does not gain a round trip in front of everything else.
+    const [{ data: cls }, { data: me }] = await Promise.all([
+      supabase
+        .from("classes")
+        .select(`
         title,
         day_of_week,
+        coach_id,
         student_class_enrolments(
           is_active,
           enrolled_at,
@@ -212,8 +233,16 @@ export default function MarkAttendanceScreen() {
           students(id, full_name)
         )
       `)
-      .eq("id", id)
-      .single();
+        .eq("id", id)
+        .single(),
+      session?.id
+        ? supabase
+            .from("coaches")
+            .select("id")
+            .eq("profile_id", session.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null as { id: string } | null }),
+    ]);
 
     if (token !== loadToken.current) return;
 
@@ -276,6 +305,48 @@ export default function MarkAttendanceScreen() {
     // Stamped with the date it was resolved FOR, so nothing downstream can
     // mistake it for this screen's current lesson after a param change.
     setResolved({ date, sessionId: sid });
+
+    // ── WHOSE LESSON IS THIS? ──────────────────────────────────────────────
+    // Two facts, and neither substitutes for the other:
+    //
+    //   · MY row on the roster, if any. `session_coaches_select` returns a
+    //     coach only their own rows, so this is the only way to learn that I am
+    //     a SHADOW rather than the main coach.
+    //   · `coach_is_main_on_session()` — definer rights, so it can see the row
+    //     naming somebody ELSE that RLS hides from me. It is the same predicate
+    //     `attendance_write` enforces, which is why asking it here cannot
+    //     disagree with what the save will do.
+    //
+    // An assignment creates the session row (`assign_session_coach()`), so no
+    // row means no roster, which by the absence rule means the class's coach.
+    // ⚠ AND IF THE COACH RECORD DID NOT COME BACK, ASSUME THE CLASS IS MINE.
+    // Not knowing who I am is not evidence that somebody else is teaching. The
+    // other direction turns one failed lookup into a silently read-only screen
+    // for the coach who owns the class — a lesson that never gets marked, and
+    // the billing month blocks with no override (§8i). This way the roster is
+    // offered, and the database refuses the write LOUDLY if it really is not
+    // mine. The shadow branch and the gate below still narrow it.
+    const ownsClass = !me?.id || cls.coach_id === me.id;
+    const [{ data: myRosterRow }, isMain] = await Promise.all([
+      sid
+        ? supabase
+            .from("session_coaches")
+            .select("role")
+            .eq("lesson_session_id", sid)
+            .maybeSingle()
+        : Promise.resolve({ data: null as { role: RosterRole } | null }),
+      // With no session row there is nothing to ask about.
+      sid ? fetchIsMainOnSession(sid) : Promise.resolve(ownsClass),
+    ]);
+
+    if (token !== loadToken.current) return;
+
+    const lessonIsMine = lessonRole({
+      ownsClass,
+      assignment: myRosterRow?.role as RosterRole | undefined,
+      coveredOut: !isMain,
+    });
+    setRole(lessonIsMine);
 
     // ── Is this date markable at all? ──────────────────────────────────────
     // Checked AFTER the session lookup, because an existing session is itself
@@ -591,6 +662,13 @@ export default function MarkAttendanceScreen() {
     );
   }
 
+  // A lesson I am shadowing, or one another coach was rostered to cover, is
+  // READ-ONLY here — the database refuses my write either way. The roster still
+  // renders: a trainee is on the poolside to learn who is expected, and a coach
+  // whose lesson was covered is entitled to see what happened in their class.
+  const readOnly = !canMark(role);
+  const notice = roleNotice(role);
+
   return (
     <SafeAreaView className="flex-1 bg-sky-50">
       {/* Header */}
@@ -599,12 +677,14 @@ export default function MarkAttendanceScreen() {
           <Ionicons name="chevron-back" size={24} color="#0ea5e9" />
         </TouchableOpacity>
         <View className="flex-1">
-          <Text className="text-lg font-bold text-gray-900">Mark Attendance</Text>
+          <Text className="text-lg font-bold text-gray-900">
+            {readOnly ? "Lesson Attendance" : "Mark Attendance"}
+          </Text>
           <Text className="text-xs text-gray-500">
             {classTitle} · {formatDate(date)}
           </Text>
         </View>
-        {students.length > 0 && (
+        {students.length > 0 && !readOnly && (
           <TouchableOpacity
             onPress={() => setMenuOpen((v) => !v)}
             className="flex-row items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-1.5"
@@ -623,9 +703,26 @@ export default function MarkAttendanceScreen() {
         contentContainerClassName="px-5 pb-10 gap-3"
         showsVerticalScrollIndicator={false}
       >
-        <Text className="text-sm text-gray-500 mb-1">
-          Tap a status for each student
-        </Text>
+        {notice ? (
+          // Said where the work would have happened, exactly like `blocked`
+          // above — and unlike `blocked` the roster still follows it, because
+          // seeing who is expected is the whole reason a shadow is here.
+          <View className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="eye-outline" size={16} color="#6d28d9" />
+              <Text className="text-sm font-bold text-violet-900">
+                {notice.title}
+              </Text>
+            </View>
+            <Text className="text-xs text-violet-800 mt-1 leading-5">
+              {notice.detail}
+            </Text>
+          </View>
+        ) : (
+          <Text className="text-sm text-gray-500 mb-1">
+            Tap a status for each student
+          </Text>
+        )}
 
         {students.length === 0 ? (
           <View className="bg-white rounded-2xl p-6 items-center border border-gray-100">
@@ -708,12 +805,13 @@ export default function MarkAttendanceScreen() {
                     return (
                       <TouchableOpacity
                         key={key}
+                        disabled={readOnly}
                         onPress={() => setTop(student.id, key)}
                         className={`flex-1 py-2 rounded-xl border-2 items-center ${
                           isSelected
                             ? `${ring} ${bg}`
                             : "border-gray-200 bg-gray-50"
-                        }`}
+                        } ${readOnly && !isSelected ? "opacity-50" : ""}`}
                       >
                         <Text
                           className={`text-xs font-semibold ${
@@ -737,6 +835,7 @@ export default function MarkAttendanceScreen() {
                     ].map(({ key, label }) => (
                       <TouchableOpacity
                         key={key}
+                        disabled={readOnly}
                         onPress={() => setSub(student.id, key)}
                         className={`px-4 py-1.5 rounded-full border ${
                           state.sub === key
@@ -766,6 +865,7 @@ export default function MarkAttendanceScreen() {
                     ].map(({ key, label }) => (
                       <TouchableOpacity
                         key={key}
+                        disabled={readOnly}
                         onPress={() => setSub(student.id, key)}
                         className={`px-4 py-1.5 rounded-full border ${
                           state.sub === key
@@ -789,11 +889,16 @@ export default function MarkAttendanceScreen() {
           })
         )}
 
-        <PrimaryButton
-          label={saving ? "Saving…" : "Save Attendance"}
-          onPress={handleSave}
-          className="mt-2"
-        />
+        {/* No save button at all when the lesson is not mine to mark. A
+            disabled one would still read as "this is my job, and it is
+            broken"; its absence plus the notice above says whose job it is. */}
+        {!readOnly && (
+          <PrimaryButton
+            label={saving ? "Saving…" : "Save Attendance"}
+            onPress={handleSave}
+            className="mt-2"
+          />
+        )}
       </ScrollView>
 
       {/* Set-all dropdown (rendered last so it stacks above the list) */}

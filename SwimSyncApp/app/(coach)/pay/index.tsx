@@ -9,6 +9,15 @@ import {
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import {
+  parsePayoutItems,
+  breakdownByPayout,
+  breakdownFor,
+  describeAdjustment,
+  describeLessons,
+  formatPeriod,
+  type PayoutBreakdown,
+} from "@/lib/payoutBreakdown";
 import Card from "@/components/Card";
 
 // ⚠ THIS SCREEN DELIBERATELY SHOWS NO INVOICES.
@@ -38,14 +47,16 @@ type MyPayout = {
   status: "draft" | "paid";
 };
 
-function formatPeriodMonth(ym: string): string {
-  const [year, month] = ym.split("-");
-  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-  return date.toLocaleDateString("en-SG", { month: "long", year: "numeric" });
-}
+/** Twelve months of payouts, and their items bounded below PostgREST's silent
+ *  `max_rows` ceiling — the same discipline the Schedule tab's ROW_LIMIT
+ *  encodes, for the same reason. */
+const ITEM_LIMIT = 900;
 
 export default function CoachPayScreen() {
   const [myPayouts, setMyPayouts] = useState<MyPayout[]>([]);
+  const [breakdowns, setBreakdowns] = useState<Map<string, PayoutBreakdown>>(
+    new Map()
+  );
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -60,14 +71,43 @@ export default function CoachPayScreen() {
       .order("period_month", { ascending: false })
       .limit(12);
 
-    setMyPayouts(
-      (payoutRows ?? []).map((p: any) => ({
-        id: p.id,
-        period_month: p.period_month,
-        gross_amount: Number(p.gross_amount),
-        status: p.status,
-      }))
+    const payouts = (payoutRows ?? []).map((p: any) => ({
+      id: p.id,
+      period_month: p.period_month,
+      gross_amount: Number(p.gross_amount),
+      status: p.status,
+    }));
+    setMyPayouts(payouts);
+
+    // ── AND WHAT THE MONTH IS MADE OF ───────────────────────────────────────
+    // A total on its own stopped being self-explanatory when a lesson could be
+    // covered: a correction to a month that was already PAID lands here, on a
+    // later payout, and moves the number with nothing on screen accounting for
+    // it (the plan's §1.6 — "invisible from every screen"). `is_adjustment` and
+    // `original_period` have carried the answer since 20260719000400; nobody
+    // was reading them. Same RLS as the payout itself, so this asks for nothing
+    // a coach could not already see.
+    const { data: itemRows } =
+      payouts.length > 0
+        ? await supabase
+            .from("coach_payout_items")
+            .select("payout_id, class_title, session_date, amount, is_adjustment, original_period")
+            .in(
+              "payout_id",
+              payouts.map((p) => p.id)
+            )
+            .limit(ITEM_LIMIT)
+        : { data: [] as any[] };
+    // ⚠ A TRUNCATED RESPONSE MEANS NO BREAKDOWN AT ALL, NOT A SHORT ONE.
+    // PostgREST caps every response and does it silently, and these lines are
+    // the numbers a coach checks their total AGAINST — "11 lessons" under a
+    // total covering twelve is worse than saying nothing, because it reads as
+    // the business having miscounted the coach's month.
+    const rows = itemRows ?? [];
+    setBreakdowns(
+      rows.length >= ITEM_LIMIT ? new Map() : breakdownByPayout(parsePayoutItems(rows))
     );
+
     setLoading(false);
   }, []);
 
@@ -124,29 +164,63 @@ export default function CoachPayScreen() {
               Your pay
             </Text>
             <View className="gap-3">
-              {myPayouts.map((p) => (
-                <Card key={p.id}>
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-1 pr-3">
-                      <Text className="text-base font-bold text-gray-900">
-                        {formatPeriodMonth(p.period_month)}
-                      </Text>
-                      <Text className="text-xs text-gray-500 mt-0.5">
-                        {p.status === "paid"
-                          ? "Paid"
-                          : "Draft — may still change until it's paid"}
+              {myPayouts.map((p) => {
+                const b = breakdownFor(breakdowns, p.id);
+                return (
+                  <Card key={p.id}>
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-1 pr-3">
+                        <Text className="text-base font-bold text-gray-900">
+                          {formatPeriod(p.period_month)}
+                        </Text>
+                        <Text className="text-xs text-gray-500 mt-0.5">
+                          {p.status === "paid"
+                            ? "Paid"
+                            : "Draft — may still change until it's paid"}
+                        </Text>
+                      </View>
+                      <Text
+                        className={`text-lg font-bold ${
+                          p.status === "paid" ? "text-green-600" : "text-gray-900"
+                        }`}
+                      >
+                        S${p.gross_amount.toFixed(2)}
                       </Text>
                     </View>
-                    <Text
-                      className={`text-lg font-bold ${
-                        p.status === "paid" ? "text-green-600" : "text-gray-900"
-                      }`}
-                    >
-                      S${p.gross_amount.toFixed(2)}
-                    </Text>
-                  </View>
-                </Card>
-              ))}
+
+                    {/* The lesson count is not decoration: it is the fact a
+                        coach checks the total against. A month that gained a
+                        covered lesson shows one more than the month before. */}
+                    {b.lessons > 0 && (
+                      <Text className="text-xs text-gray-400 mt-2">
+                        {describeLessons(b.lessons)} · S$
+                        {b.lessonTotal.toFixed(2)}
+                      </Text>
+                    )}
+
+                    {/* ⚠ A CORRECTION IS THE ONE LINE THIS SCREEN CANNOT LEAVE
+                        OUT. It is money for a month that has already been paid
+                        — the coach cannot reconcile it against the lessons they
+                        remember teaching THIS month, and until Wave 3 nothing
+                        anywhere told them it existed. */}
+                    {b.adjustments.map((a) => (
+                      <View
+                        key={a.period ?? "unknown"}
+                        className="flex-row items-center gap-1.5 mt-1.5 rounded-xl bg-violet-50 px-2.5 py-1.5"
+                      >
+                        <Ionicons
+                          name="swap-horizontal-outline"
+                          size={13}
+                          color="#6d28d9"
+                        />
+                        <Text className="text-xs text-violet-800 flex-1">
+                          Includes {describeAdjustment(a)}
+                        </Text>
+                      </View>
+                    ))}
+                  </Card>
+                );
+              })}
             </View>
           </>
         )}
