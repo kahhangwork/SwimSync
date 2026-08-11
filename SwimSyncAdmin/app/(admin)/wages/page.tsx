@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
+import { todayInSg, formatSgDate } from "@/lib/lessonDates";
+import {
+  buildLessonLines,
+  summarisePayout,
+  grossMatchesItems,
+  type LessonLine,
+  type PayoutItem,
+  type PayoutSummary,
+  type SessionRosterRow,
+} from "@/lib/payoutItems";
 
 /**
  * Coach wages — the other half of the billing loop.
@@ -20,6 +31,18 @@ import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Tabl
  * PAID ones freeze, because money has left the bank and the record has to
  * reconcile against a statement; a later correction to a frozen month appears
  * as an adjustment on the next one.
+ *
+ * SINCE THE LESSON-LEVEL ROSTER (2026-08-11) A LESSON IS NO LONGER ONE ROW.
+ * A shadowed lesson pays two coaches out of two different payouts, and a
+ * corrected one leaves a second item on the SAME payout. So the breakdown sums
+ * a SET of items per lesson and counts DISTINCT lessons — `lib/payoutItems.ts`
+ * holds that arithmetic, and its header explains why none of it may consult
+ * `classes.coach_id`.
+ *
+ * A COVER IS SHOWN AS A DECISION, NEVER AS A DIFFERENT NUMBER. The expensive
+ * failure here is not a wrong total; it is a right total nobody can explain —
+ * a coach paid $40 less than last month with nothing on screen saying a lesson
+ * was reassigned, which turns into a conversation the admin cannot win.
  */
 
 type CoachRow = {
@@ -34,13 +57,72 @@ type PayoutRow = {
   coach_name: string;
   gross_amount: number;
   status: "draft" | "paid";
-  items: number;
+  /** One entry per LESSON, each summing the items behind it. */
+  lines: LessonLine[];
+  summary: PayoutSummary;
+  /** False when the stored gross and the breakdown disagree — surfaced, not hidden. */
+  grossOk: boolean;
 };
 
+/**
+ * todayInSg(), not the device's calendar. `new Date().getMonth()` is the
+ * browser's month, and an admin on a laptop still set to another timezone gets
+ * a different default period from the one the engine bills (§7.7).
+ */
 function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return todayInSg().slice(0, 7);
 }
+
+/**
+ * A negative wage line is a CLAWBACK, and it has to read as one. `S$-50.00` —
+ * what toFixed() gives you — puts the sign where nobody looks; the minus goes
+ * in front of the currency, as on a bank statement.
+ */
+function money(amount: number): string {
+  return `${amount < 0 ? "−" : ""}S$${Math.abs(amount).toFixed(2)}`;
+}
+
+/**
+ * The small print on one lesson line: how the amount was arrived at, and which
+ * month it corrects. An ADJUSTMENT carries no duration — it is a difference,
+ * not a lesson length — so the minutes are omitted rather than rendered as
+ * "— min", which reads as a lesson whose length nobody recorded.
+ */
+function lineDetail(line: LessonLine): string {
+  const parts: string[] = [];
+
+  if (line.items.length > 1) {
+    parts.push(`${line.items.length} entries`);
+  } else if (line.items[0].basis === "flat") {
+    parts.push("class flat rate");
+  } else if (line.items[0].minutes != null) {
+    parts.push(`${line.items[0].minutes} min`);
+  }
+
+  if (line.adjustedPeriods.length > 0) {
+    parts.push(`correcting ${line.adjustedPeriods.join(", ")}`);
+  }
+
+  return parts.join(" · ");
+}
+
+const LINE_LABELS: Record<LessonLine["kind"], string | null> = {
+  ordinary: null,
+  assigned: "Assigned to cover",
+  shadow: "Shadowing",
+  reassigned: "Reassigned to another coach",
+  // The cover was cleared after the clawback was emitted, so the roster no
+  // longer says who or why — but an unlabelled negative line is worse.
+  corrected: "Correction to a settled month",
+};
+
+const LINE_STYLES: Record<LessonLine["kind"], string> = {
+  ordinary: "",
+  assigned: "bg-amber-100 text-amber-800",
+  shadow: "bg-sky-100 text-sky-800",
+  reassigned: "bg-gray-200 text-gray-700",
+  corrected: "bg-violet-100 text-violet-700",
+};
 
 export default function WagesPage() {
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -51,6 +133,10 @@ export default function WagesPage() {
   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingPayouts, setLoadingPayouts] = useState(false);
+  /** Which payout's per-lesson breakdown is open. One at a time. */
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   // Rate editor
   const [rateFor, setRateFor] = useState<string | null>(null);
@@ -111,28 +197,127 @@ export default function WagesPage() {
     );
   }
 
-  async function loadPayouts() {
+  /**
+   * `isStale` is how a superseded load declines to publish. This is now a
+   * TWO-ROUND-TRIP load (payouts + items, then the roster), so the window in
+   * which the period can change under it is twice what it was — and the row it
+   * would repaint carries a "Mark paid" button. `mark_payout_paid` freezes a
+   * month deliberately and irreversibly, so a stale row here is not a cosmetic
+   * problem: it is the wrong month frozen with one click.
+   */
+  async function loadPayouts(isStale: () => boolean = () => false) {
     if (!tenantId) return;
-    const { data } = await supabase
+
+    // The ITEMS, not a count of them. A lesson's amount for a coach is the sum
+    // of a set now, and the count of items is not the count of lessons.
+    const { data, error } = await supabase
       .from("coach_payouts")
-      .select("id, coach_id, gross_amount, status, coach_payout_items(id)")
+      .select(
+        "id, coach_id, gross_amount, status, coach_payout_items(id, lesson_session_id, class_title, session_date, basis, minutes, amount, is_adjustment, original_period)"
+      )
       .eq("tenant_id", tenantId)
       .eq("period_month", period);
 
+    if (isStale()) return;
+
+    // Surfaced rather than swallowed. An unchecked failure here empties the
+    // table, and an empty payroll table reads as "payroll has not been run
+    // this month" — which invites running it, not investigating it.
+    if (error) {
+      setLoadError(error.message);
+      setPayouts([]);
+      return;
+    }
+
+    const itemsByPayout = new Map<string, PayoutItem[]>(
+      (data ?? []).map((p: any) => [
+        p.id,
+        (p.coach_payout_items ?? []).map((i: any) => ({
+          id: i.id,
+          lesson_session_id: i.lesson_session_id,
+          class_title: i.class_title,
+          session_date: i.session_date,
+          basis: i.basis,
+          minutes: i.minutes,
+          amount: Number(i.amount),
+          is_adjustment: i.is_adjustment,
+          original_period: i.original_period,
+        })),
+      ])
+    );
+
+    // One roster query for the whole month. This is what makes a cover legible:
+    // without it a reassignment is just a number that changed.
+    //
+    // ⚠ FETCHED BY TENANT AND FILTERED HERE, NOT `.in(sessionIds)`. That list
+    // is every distinct lesson across every coach's payout for the month, and
+    // PostgREST sends it in the URL — a few hundred lessons is ~12 KB of query
+    // string, past the usual 8 KB header buffer, and the 414 would surface as
+    // "could not label covers" on the page whose entire job is labelling
+    // covers. `session_coaches` is near-empty by the absence rule, so the whole
+    // tenant's roster is the smaller and unbounded-safe request.
+    const sessionIds = new Set(
+      [...itemsByPayout.values()].flat().map((i) => i.lesson_session_id)
+    );
+
+    let rosterRows: SessionRosterRow[] = [];
+    let rosterError: string | null = null;
+    if (sessionIds.size > 0) {
+      const { data: roster, error: rosterErr } = await supabase
+        .from("session_coaches")
+        .select("lesson_session_id, coach_id, role")
+        .eq("tenant_id", tenantId);
+
+      if (isStale()) return;
+
+      // A failed roster load must NOT fall through to "no covers". Every line
+      // would render as an ordinary lesson, which is exactly the silence this
+      // page exists to break — so the amounts are still shown and the missing
+      // labels are declared.
+      if (rosterErr) rosterError = `Could not label covers: ${rosterErr.message}`;
+      else
+        rosterRows = ((roster ?? []) as SessionRosterRow[]).filter((r) =>
+          sessionIds.has(r.lesson_session_id)
+        );
+    }
+    setLoadError(rosterError);
+
     setPayouts(
-      (data ?? []).map((p: any) => ({
-        id: p.id,
-        coach_id: p.coach_id,
-        coach_name: coaches.find((c) => c.id === p.coach_id)?.name ?? "—",
-        gross_amount: Number(p.gross_amount),
-        status: p.status,
-        items: (p.coach_payout_items ?? []).length,
-      }))
+      (data ?? []).map((p: any) => {
+        const lines = buildLessonLines(
+          itemsByPayout.get(p.id) ?? [],
+          rosterRows,
+          p.coach_id
+        );
+        const summary = summarisePayout(lines);
+        const gross_amount = Number(p.gross_amount);
+        return {
+          id: p.id,
+          coach_id: p.coach_id,
+          coach_name: coaches.find((c) => c.id === p.coach_id)?.name ?? "—",
+          gross_amount,
+          status: p.status,
+          lines,
+          summary,
+          grossOk: grossMatchesItems(gross_amount, summary),
+        };
+      })
     );
   }
 
   useEffect(() => {
-    if (tenantId && coaches.length) loadPayouts();
+    if (!tenantId || !coaches.length) return;
+    let cancelled = false;
+    // Collapse any open breakdown: it is keyed by payout id, and the payouts
+    // are about to be replaced by another month's.
+    setExpanded(null);
+    setLoadingPayouts(true);
+    loadPayouts(() => cancelled).finally(() => {
+      if (!cancelled) setLoadingPayouts(false);
+    });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, period, coaches.length]);
 
@@ -144,24 +329,28 @@ export default function WagesPage() {
       p_tenant_id: tenantId,
       p_period_month: period,
     });
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setMessage(`Could not run payroll: ${error.message}`);
       return;
     }
+    // Reload BEFORE releasing the buttons — re-enabling them for the duration
+    // of the refetch invites a second run against rows about to be replaced.
     await loadPayouts();
+    setBusy(false);
     setMessage("Payroll calculated. Draft payouts recalculate every run.");
   }
 
   async function handleMarkPaid(id: string) {
     setBusy(true);
     const { error } = await supabase.rpc("mark_payout_paid", { p_payout_id: id });
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setMessage(`Could not mark paid: ${error.message}`);
       return;
     }
     await loadPayouts();
+    setBusy(false);
     setMessage(
       "Marked paid and frozen. A later correction to this month becomes an adjustment on the next one."
     );
@@ -222,7 +411,12 @@ export default function WagesPage() {
 
   const payoutSort = useTableSort<PayoutRow>({
     key: "coach_name",
-    accessors: { status: (p) => (p.status === "paid" ? "Paid" : "Draft") },
+    accessors: {
+      status: (p) => (p.status === "paid" ? "Paid" : "Draft"),
+      // DISTINCT lessons. Sorting by a raw item count would order a coach with
+      // one corrected lesson above a coach with two real ones.
+      lessons: (p) => p.summary.lessons,
+    },
   });
   const visiblePayouts = payoutSort.apply(payouts);
 
@@ -281,6 +475,9 @@ export default function WagesPage() {
           A lesson pays when at least one student attended. Everyone absent
           doesn&rsquo;t pay; a lesson the coach cancelled never does. Rain
           follows the setting above, and any single session can be overridden.
+          Where a lesson was covered or shadowed (see Lesson Coaches), each
+          coach is paid their own rate and the coach they replaced is paid
+          nothing for it — expand a payout below to see which lessons those are.
         </p>
       </div>
 
@@ -398,7 +595,22 @@ export default function WagesPage() {
           </div>
         )}
 
-        {payouts.length === 0 ? (
+        {loadError && (
+          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {loadError} The amounts below are the ones that will be paid, but a
+            lesson taught by a substitute may be showing without its label.
+          </div>
+        )}
+
+        {/* "Loading" and "none" are DIFFERENT ANSWERS. Rendering the previous
+            month's rows, or "no payouts yet", while a load is in flight puts a
+            live "Mark paid" beside a month the picker no longer names — and
+            marking paid is irreversible by design. */}
+        {loadingPayouts ? (
+          <p className="py-6 text-center text-sm text-gray-400">
+            Loading payouts…
+          </p>
+        ) : payouts.length === 0 ? (
           <p className="py-6 text-center text-sm text-gray-400">
             No payouts for this month yet.
           </p>
@@ -406,42 +618,133 @@ export default function WagesPage() {
           <Table>
             <Thead>
               <Th sort={payoutSort} sortKey="coach_name">Coach</Th>
-              <Th sort={payoutSort} sortKey="items" firstDir="desc">Lessons</Th>
+              <Th sort={payoutSort} sortKey="lessons" firstDir="desc">Lessons</Th>
               <Th sort={payoutSort} sortKey="gross_amount" firstDir="desc">Amount</Th>
               <Th sort={payoutSort} sortKey="status">Status</Th>
               <Th>Actions</Th>
             </Thead>
             <Tbody>
               {visiblePayouts.map((p) => (
-                <Tr key={p.id}>
-                  <Td>{p.coach_name}</Td>
-                  <Td>{p.items}</Td>
-                  <Td>S${p.gross_amount.toFixed(2)}</Td>
-                  <Td>
-                    <span
-                      className={
-                        p.status === "paid"
-                          ? "rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
-                          : "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
-                      }
-                    >
-                      {p.status === "paid" ? "Paid" : "Draft"}
-                    </span>
-                  </Td>
-                  <Td>
-                    {p.status === "draft" ? (
+                <Fragment key={p.id}>
+                  <Tr>
+                    <Td>
                       <button
-                        onClick={() => handleMarkPaid(p.id)}
-                        disabled={busy}
-                        className="text-sm font-medium text-sky-600 underline disabled:opacity-50"
+                        type="button"
+                        onClick={() =>
+                          setExpanded(expanded === p.id ? null : p.id)
+                        }
+                        aria-expanded={expanded === p.id}
+                        className="inline-flex items-center gap-1.5 font-medium text-gray-900 hover:text-sky-600"
                       >
-                        Mark paid
+                        {expanded === p.id ? (
+                          <ChevronDown className="h-4 w-4 text-gray-400" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                        )}
+                        {p.coach_name}
                       </button>
-                    ) : (
-                      <span className="text-xs text-gray-400">Frozen</span>
-                    )}
-                  </Td>
-                </Tr>
+                    </Td>
+                    <Td>
+                      {p.summary.lessons}
+                      {/* The adjustment is called out beside the count rather
+                          than folded into it: a correction to an already-paid
+                          month is the one line an admin has to be able to
+                          explain to the coach receiving it. */}
+                      {p.summary.adjustmentTotal !== 0 && (
+                        <span className="ml-1.5 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                          {p.summary.adjustmentTotal > 0 ? "+" : ""}
+                          {money(p.summary.adjustmentTotal)} correction
+                        </span>
+                      )}
+                    </Td>
+                    <Td>
+                      {money(p.gross_amount)}
+                      {!p.grossOk && (
+                        <span
+                          className="ml-1.5 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700"
+                          title={`The lessons below add up to ${money(p.summary.itemTotal)}. A draft payout rebuilds completely on every run, so re-running payroll for this month is the fix.`}
+                        >
+                          re-run payroll
+                        </span>
+                      )}
+                    </Td>
+                    <Td>
+                      <span
+                        className={
+                          p.status === "paid"
+                            ? "rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+                            : "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
+                        }
+                      >
+                        {p.status === "paid" ? "Paid" : "Draft"}
+                      </span>
+                    </Td>
+                    <Td>
+                      {p.status === "draft" ? (
+                        <button
+                          onClick={() => handleMarkPaid(p.id)}
+                          disabled={busy}
+                          className="text-sm font-medium text-sky-600 underline disabled:opacity-50"
+                        >
+                          Mark paid
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">Frozen</span>
+                      )}
+                    </Td>
+                  </Tr>
+
+                  {expanded === p.id && (
+                    <Tr>
+                      <Td colSpan={5} className="bg-gray-50">
+                        {p.lines.length === 0 ? (
+                          <p className="py-2 text-sm text-gray-500">
+                            This payout has no lesson lines.
+                          </p>
+                        ) : (
+                          <div className="py-1">
+                            <table className="w-full text-sm">
+                              <tbody>
+                                {p.lines.map((line) => (
+                                  <tr
+                                    key={line.lesson_session_id}
+                                    className="border-b border-gray-200 last:border-0"
+                                  >
+                                    <td className="py-1.5 pr-4 text-gray-500 whitespace-nowrap">
+                                      {formatSgDate(line.session_date)}
+                                    </td>
+                                    <td className="py-1.5 pr-4 text-gray-900">
+                                      {line.class_title}
+                                      {LINE_LABELS[line.kind] && (
+                                        <span
+                                          className={`ml-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${LINE_STYLES[line.kind]}`}
+                                        >
+                                          {LINE_LABELS[line.kind]}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-1.5 pr-4 text-xs text-gray-500 whitespace-nowrap">
+                                      {lineDetail(line)}
+                                    </td>
+                                    <td
+                                      className={`py-1.5 text-right font-medium whitespace-nowrap ${
+                                        line.amount < 0
+                                          ? "text-red-700"
+                                          : "text-gray-900"
+                                      }`}
+                                    >
+                                      {money(line.amount)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </Td>
+                    </Tr>
+                  )}
+                </Fragment>
               ))}
             </Tbody>
           </Table>

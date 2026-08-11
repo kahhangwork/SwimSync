@@ -40,6 +40,7 @@ import {
   UserCheck,
   RefreshCcw,
   ShieldCheck,
+  ArrowLeftRight,
 } from "lucide-react";
 
 /** A page's audience. `tenant` = shows ONE business. `platform` = cross-tenant. */
@@ -64,6 +65,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/levels",       label: "Swimming Levels",      icon: Waves,           scope: "tenant"   },
   { href: "/parents",      label: "Parents",              icon: UsersRound,      scope: "tenant"   },
   { href: "/attendance",   label: "Attendance",           icon: CalendarCheck,   scope: "tenant"   },
+  { href: "/lesson-coaches", label: "Lesson Coaches",     icon: ArrowLeftRight,  scope: "tenant"   },
   { href: "/trials",       label: "Trials",               icon: Sparkles,        scope: "tenant"   },
   { href: "/makeups",      label: "Make-ups",             icon: RefreshCcw,      scope: "tenant"   },
   { href: "/invoices",     label: "Invoices",             icon: Receipt,         scope: "tenant"   },
