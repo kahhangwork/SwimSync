@@ -470,28 +470,23 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### ⚠ ONE THING TO CHECK, AND IT CHECKS ITSELF
+### THE NIGHTLY SWEEP IS GREEN — nothing outstanding, and it stays true only until the next run
 
-**Confirm the next nightly sweep — every known red now has a fix on `main`, and no sweep has
-run since the last one landed.** `gh run list --workflow=ui-drivers.yml` and `ui-driver-rot`
-issue #3's own state are the current fact; a green run closes the issue itself. This section
-once read *"✅ NO RED SIGNALS"* for a day after the sweep had gone red beneath it.
+Run **`31430917020` succeeded** against **`160cb09`** — i.e. current `main`, Wave 2 included.
+It **executed Tuesday 2026-08-11 SGT** (GitHub labels it `2026-08-10`; the cron is 20:00 UTC —
+**§7.122**). It closed `ui-driver-rot` **issue #3 itself**, which had been open since the
+2026-08-08 red.
 
-Where the last sweep left it — run `31334766457`, which **executed Monday 2026-08-10 SGT**
-(GitHub labels it `2026-08-09`; the cron is 20:00 UTC — **§7.122**), against `e0a868c`, so it
-did include §8.40:
+- **All 39 drivers passed**, including **`verify-multi-class` on its first sweep** (§8.43).
+  Both harnesses auto-discover by glob, so it needed no registration — and its fixture name
+  matches the driver, so `fixture_for`'s default case found it.
+- The two-sweep red streak (`31277289374`, `31334766457`) is closed: `verify-trials` was
+  already fixed, and `schedule-week` 17/19 → 21/21 landed as `287142b` (§8.42).
+- **Every driver has now faced a sweep.** There is no never-yet-swept set left to watch.
 
-- **37 of 38 drivers PASSED.** `verify-trials` was **16/16** — issue #3's named cause is gone,
-  and the issue is open only because the sweep as a whole was red.
-- **The one red was `schedule-week`, 17/19**, and that is fixed on `main` as `287142b`
-  (21/21 locally, §8.42). So the next sweep is expected all-green.
-- **There are 39 drivers now**, not 38: `verify-multi-class` landed 2026-08-11 (17/17 locally,
-  §8.43). It has never faced a sweep. Both harnesses auto-discover by glob, so it needed no
-  registration — and its fixture name matches the driver, so `fixture_for`'s default case
-  finds it.
-- **All six drivers that had never faced a sweep faced this one and passed** —
-  `verify-levels`, `verify-admin-table-geometry`, `verify-packages`, `verify-paynow-fallback`,
-  `verify-class-deactivation`, `verify-trials`. That paragraph is retired.
+> **Re-read the run, not this paragraph.** `gh run list --workflow=ui-drivers.yml` and issue
+> #3's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a full day
+> after the sweep had gone red beneath it, which is exactly what a green heading invites.
 
 **`verify-multi-class` is not re-runnable by hand** — it removes a class through the UI, and
 its fixture's `NOT EXISTS` guard is keyed on `(student, class)` regardless of `is_active`, so
@@ -596,7 +591,9 @@ file, and grep finds the oldest first. That cost a wrong risk rating on 2026-08-
 
 ### The documents are on a THIRD attempt at discipline-by-instruction — watch it
 
-`HANDOVER.md` is **37 KB against a 45,000-byte budget** after 2026-08-10's cut (§8.41). The
+`HANDOVER.md` is **41 KB against a 45,000-byte budget** (37 KB after 2026-08-10's cut, §8.41;
+§8.43 spent 3.8 KB of the 7.4 KB that was left — **one session ate half the headroom**, which
+is the ratchet the two previous attempts lost to). The
 two previous attempts to hold a limit by writing it down both failed, reaching 290 KB and
 then 91 KB — **§7.119** is why, and it is worth reading before the next `/update-docs`, not
 after. Three commands are the whole of the discipline and take ten seconds:
