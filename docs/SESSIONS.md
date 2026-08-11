@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.42** | 2026-08-10 | `verify-schedule-week` 17/19 → **21/21** — driver rot, not §8.40; exonerated by re-running at the suspect's parent | **§7.121, §7.122** · `docs/TESTING.md` §5 |
 | **8.41** | 2026-08-10 | **`HANDOVER.md` 91 KB → 39 KB, nothing lost** — this ledger split out here, datelines 5→1, §3 halved | **§7.119** · `BACKLOG.md` *(the refused CI byte-gate)* |
 | **8.40** | 2026-08-10 | **An unmarked GUEST blocks the month**; retired classes refuse bookings — `20260810000100`, engine v20 | **§7.114–§7.118** · PRD §7.5 · `docs/ARCHITECTURE.md` §6 |
 | **8.39** | 2026-08-09 | **A class can be RETIRED without losing money** — `is_active` means scheduling, never billing | **§7.109–§7.112** · PRD §7.3 · `docs/ARCHITECTURE.md` §6 |

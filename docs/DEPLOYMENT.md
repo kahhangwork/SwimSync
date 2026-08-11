@@ -198,6 +198,29 @@ still point at the local stack for dev.
    out to be wrong in a way the migration's own probes did not catch:
    `supabase/rollback/20260804_authenticated_grants_DOWN.sql`. (2026-08-04.)
 
+9. **THE APPS SHIPPED AHEAD OF THEIR MIGRATION, AND NOBODY IN THE CHAIN COULD HAVE SEEN IT**
+   (2026-08-11, Wave 3). Two worktrees each pushed their branch to `main` — which **is** the
+   app deploy (§7.60) — and both correctly believed they were finished: a worktree may not
+   author a migration, so neither owned `20260811000200`, and each verified its own deploy by
+   grepping the served bundle. Production therefore ran an admin page calling
+   `assign_session_coach()` and a coach app calling `coach_is_main_on_session()` against a
+   database that had neither. Found only by running `supabase migration list --linked` in the
+   root session afterwards and seeing an **empty `remote` column** — the check this file has
+   told you to run after every backend change since §8.
+   - **The structural gap: splitting a wave across worktrees splits the deploy, and no
+     worktree can see the whole of it.** The migration is the root checkout's to push, and
+     it must go **before** the first app branch lands, not after the last.
+   - Fixed forward, which was the right call: the migration is purely additive, ships an
+     empty table, and its one narrowing needs roster data that did not exist — so applying it
+     late was safe where rolling back two app deploys would not have been. **That safety was
+     a property of this particular migration, not of the mistake.**
+   - Verified after the fact: `remote` filled, 0 pending, all 9 new objects present, the 8
+     widened policies each carrying their roster branch in production, `session_pay_amount`
+     at exactly two arities (§7.124), `anon` EXECUTE still **18** and no new object granted to
+     it, and **0** blanket `GRANT ALL ON TABLE … authenticated`.
+   - `supabase db push` printed the `pgdelta` certificate stack trace **and** `Finished` for
+     the **fourth** time. It is normal output. `supabase migration list --linked` is the fact.
+
 **A committed rollback file is not a verified one — EXECUTE it before shipping the
 migration it undoes** (§7.93, added 2026-08-07). The pattern the row above established is
 right and should continue; what it was missing is the run. Doing it for

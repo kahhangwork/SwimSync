@@ -924,6 +924,24 @@ SwimSync shall allow coach to record attendance per student per lesson session.
 - If an attendance edit changes a billable status to non-billable on an already-invoiced lesson, SwimSync shall **automatically generate a credit note**
 - An audit log entry must be created for every attendance edit
 
+#### Who may mark a lesson follows the lesson's roster *(implemented 2026-08-11)*
+
+Marking belongs to the lesson's **main** coach — the class's own coach normally, or whoever
+the admin recorded as covering it (§7.13).
+
+- A **substitute** sees only the lessons they were rostered onto, in a class they do not
+  otherwise see, and marks them — including **both guest types** (trial and make-up), without
+  which the guest could not be marked and the billing month could never close (§7.7).
+- The **class's own coach keeps the lesson card**, badged **Covered** and read-only, and it
+  **leaves their NEEDS MARKING list** — a straggler they are not permitted to clear would be a
+  nag with no available action.
+- A **shadow** reads the lesson and never marks it, so the main coach stays unambiguous for
+  marking exactly as they are for pay.
+- A substitute gains **nothing else**: they cannot remove a child from the class, set a child
+  inactive, or see the class's other lessons.
+
+**My Pay** names a correction for an earlier month rather than quietly moving the total.
+
 #### The marking window is a rule, not a convention *(implemented 2026-07-27)*
 
 Attendance may be recorded only for a lesson that **falls on the class's own weekday**
@@ -1278,6 +1296,38 @@ rebuilt by hand each month from attendance the app already holds. This closes th
 **A coach is on payroll when they have a rate.** There is no private-vs-school flag: a
 private coach simply has no rate, because their income *is* their parents' invoices and
 there is nobody upstream to pay them. The distinction is data, not a rule.
+
+**Who a lesson pays is answered per LESSON, not per class** *(implemented 2026-08-11)*. A
+lesson has one **main** coach plus any number of **shadow** (trainee) coaches, recorded on
+the lesson itself. **No record means the class's coach is the main coach** — so nothing
+changed for any lesson nobody has touched, and there was no backfill.
+
+- A **substitute** is paid **their own rate**, not the class's terms; a senior covering a
+  junior's class costs what the senior costs. The coach they replaced is paid **nothing** for
+  that lesson.
+- A **shadow** is paid their own rate too, so **one lesson can produce more than one payout
+  row**. Their rate comes from the same effective-dated `coach_rates` — there is no second
+  rate concept.
+- A **class flat-rate override applies only when the class's own paid coach teaches it.** A
+  substitute always falls through to their own rate, because that is what "paid their own
+  rate" means. *(No flat-rate class exists yet; this is the rule the first one will meet.)*
+- Recording a cover **after** the month's payout was already paid is allowed: the replaced
+  coach is clawed back and the substitute paid, both as adjustments carried **once** onto the
+  next payout, leaving the paid record intact (§7.13's draft/freeze model, unchanged).
+
+**Admins assign; coaches do not.** The admin panel's **Lesson Coaches** page picks a class and
+a month and shows who is teaching each lesson, with assign / change / clear for the main coach
+and add / remove for shadows. Lessons come from the class's weekly pattern **unioned with**
+lesson rows that already exist, so an extra or rescheduled lesson is assignable and is badged
+*Extra*. Assigning a cover to a date with no lesson row **creates** it — the admin never
+handles a lesson id — and a date the class does not run on is refused.
+
+**Coach Wages** expands each payout into a per-lesson breakdown: it sums the **set** of items
+per lesson, counts **distinct** lessons (a clawback-only line is not a lesson taught), and
+labels every line — *Assigned to cover*, *Shadowing*, *Reassigned to another coach*,
+*Correction to a settled month* — with a ±S$ chip naming the month it corrects. It also now
+surfaces two failures it previously swallowed: a payout that failed to load (it used to render
+as "no payouts this month yet") and a stored gross that disagrees with its items.
 
 #### What a lesson pays
 

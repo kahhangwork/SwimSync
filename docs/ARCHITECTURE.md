@@ -559,6 +559,11 @@ the shape of the system changes:_
 | `supabase/tests/coach_wages.test.sql` | The pay-decision table, pro-rata, effective dating, draft→freeze, adjustments |
 | `SwimSyncApp/lib/landing.ts` | Where a signed-in user lands. Routes on **extension rows**, not the role enum (§7.19) |
 | `SwimSyncApp/lib/attendanceCompleteness.ts` | The completeness rule, shared. **Twin in SwimSyncAdmin; a third copy in the Deno engine — three edits** |
+| `SwimSyncApp/lib/coachRoster.ts` | Pure role resolution for a lesson: am I the main, a shadow, or covered? No I/O |
+| `SwimSyncApp/lib/sessionMainCoach.ts` | The `SECURITY DEFINER` probe behind §7.134 — a coach cannot *see* the roster row that replaced them, so this asks the database. **Fails towards "I am the main coach"**, so a probe outage leaves the coach able to mark rather than silently locked out |
+| `SwimSyncApp/lib/payoutBreakdown.ts` | Splits a payout into lessons taught vs corrections to earlier months |
+| `SwimSyncAdmin/lib/sessionRoster.ts` | The Lesson Coaches page's model — the **access** axis, so it uses `classes.coach_id` |
+| `SwimSyncAdmin/lib/payoutItems.ts` | The Coach Wages breakdown — the **money** axis, and it never mentions `classes.coach_id`. **The pair above disagree deliberately**: access follows the current coach, money follows history (`20260719000800`) |
 | `docs/plans/TRIAL_ONBOARDING_PLAN.md` | A child before their parent: the plan, its ranked risks inlined as mitigations, and the pre-commit gate. **Read before merging §8.10** |
 | `docs/plans/PARENT_CLAIM_PLAN.md` | **The parent-claiming design of record** — the settled decisions (including the two the user reversed mid-planning), seven ranked risks with mitigations inlined beside the step each governs, and the pre-commit gate. Read before changing matching, the claim queue, or `merge_students()` |
 | `SwimSyncApp/lib/attendanceRoster.ts` | Who appears on Mark Attendance: enrolled **∪** already-marked-on-this-session. Why a closed trial enrolment doesn't hide the child it marked |

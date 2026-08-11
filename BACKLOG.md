@@ -261,32 +261,22 @@ them correct only because the dropped index held (§7.124, §7.127).
 **Waves 3–5 inherit the new model.** *Convert a trial into an enrolled student* and *Book a
 make-up from the Attendance page* were held until after this and are now unblocked.
 
-#### Wave 3 — **The lesson-level coach roster** (M/L)
+#### ~~Wave 3 — The lesson-level coach roster~~ — **SHIPPED 2026-08-11**
 
-One schema change (`CLAUDE.md`: one in flight at a time), built once with a main/shadow
-distinction rather than a substitute column later widened:
+Both items are built and live: `20260811000200`, PRD §7.13/§7.20/§14.3,
+`docs/plans/WAVE_3_PLAN.md`. Nothing is queued here.
 
-9. **A lesson can have a substitute coach, temporarily** — a per-session
-   `taught_by_coach_id`; pay follows it. `session_pay_overrides` **cannot** express this.
-10. **Trainee coaches shadow the main coach** — one main coach plus N trainees, each paid
-    at their own rate, so a lesson produces more than one payout row.
-_(The third item that used to sit here — **the attendance screen trusts a `sessionId` in
-the URL** — shipped 2026-08-10 instead, because the same change removed the caller that
-passed it. The screen now resolves the session from `(class_id, date)` and accepts no
-param.)_
+_(A third item once sat here — **the attendance screen trusts a `sessionId` in the URL** —
+and shipped 2026-08-10 instead, because the same change removed the caller that passed it.
+The screen resolves the session from `(class_id, date)` and accepts no param. Recorded so it
+is not re-filed as an oversight.)_
 
-⚠ **The blast radius is coach RLS, not the roster.** A coach reaches a class today via
-`classes.coach_id`; a substitute or trainee must open a lesson of a class they do not own.
-`current_coach_id()` feeds that policy set — pgTAP before any UI.
-
-> **The Schedule tab's exposure here is already measured, so do not re-derive it.** It
-> resolves "my lessons" from `classes.coach_id` and will show the wrong week for a
-> substitute — but the entire coupling is **two lines of one query** in
-> `schedule/index.tsx`'s `loadData` (the `coaches` lookup, then `.eq("coach_id", coach.id)`
-> on `classes`). **`lib/scheduleWeek.*` and `lib/scheduleBuckets.*` need NO change at all** —
-> they are pure date and bucket maths with zero code references to a coach. Wave 3 changes
-> only *which class ids the query selects*; the sections, week arithmetic and marking-state
-> logic are inherited unchanged. (Checked 2026-08-08.)
+**One prediction in this section was wrong and the correction is worth keeping:** it said
+the Schedule tab's coupling was "two lines of one query". `:317` filters **`classes`**, and
+`classes_select` did not let a substitute read that row at all — so changing which ids the
+query asks for returned nothing until **five** further policies were widened. `lib/scheduleWeek.*`
+and `lib/scheduleBuckets.*` did need no change, as predicted. Measuring one line of a query
+does not measure what the row behind it is permitted to be.
 
 #### Wave 4 — **A lesson recorded into an already-BILLED month is reported, and settled** (S/M)
 
@@ -571,61 +561,50 @@ Deliberately NOT built: a configurable first-day-of-week. `weekOrder.ts` is Mond
 rendering already overrides most of what the setting would buy. Considered and dropped
 with the user 2026-08-08; do not file it as an oversight.
 
-### A lesson can have a substitute coach, temporarily — **M**
-Record that Coach B taught one lesson of Coach A's class, without changing who the class
-belongs to. Pay follows **whoever actually taught it**.
+### ~~A lesson can have a substitute coach~~ · ~~Trainee coaches shadow the main coach~~
+**SHIPPED 2026-08-11** — both, as one schema change, exactly as this section insisted.
+Behaviour is in `PRD.md` §7.13/§7.20; the decisions and the ranked risk review are in
+`docs/plans/WAVE_3_PLAN.md`. Kept as a stub only because *Multiple coaches per class* is
+recorded below as superseded by them.
 
-**Why:** a permanent handover already works — `set_class_terms()` takes a coach, updates
-`classes.coach_id` and writes a `class_rates` row with `paid_coach_id` + `effective_from`,
-so the outgoing coach keeps their pay for lessons before the change date. What has no
-representation at all is a **one-off cover**: Coach A cannot make Wednesday, Coach B
-teaches it, and the class assignment must not move. Today Coach A is paid and Coach B has
-no record of having worked.
+### `assign_session_coach`'s shadow branch can demote a lesson's main — **S** `[found 2026-08-11]`
+Its `ON CONFLICT (lesson_session_id, coach_id) DO UPDATE SET role = 'shadow'` will silently
+turn the session's **main** coach into a shadow if an admin adds that same coach as a shadow.
 
-**Notes — the previously filed answer was wrong, and this is why:**
+**Why:** the demoted lesson then has no main, so the absence rule takes over and pay reverts
+to the class's own coach — a quiet re-attribution of money nobody asked for. Only a
+**client-side** re-check guards it today, so any other caller of the RPC is unprotected.
 
-- **`session_pay_overrides` cannot express this.** It is
-  `(lesson_session_id PK, pays_coach BOOLEAN, set_by, set_at)` — it can say a lesson *does
-  not* pay its coach, and cannot say *who else* it pays. The *Deliberately not doing* row
-  on substitute coaches asserted "the schema already supports it"; that row is now a
-  pointer here.
-- **This changes coach RLS, which is the blast radius.** A coach reaches a class today via
-  `classes.coach_id`. A substitute must be able to open and mark a lesson of a class they
-  do not own — so the coach's read/write path becomes "assigned to the class **or** named
-  on this session". `current_coach_id()` feeds that policy set; ⚠ same blast-radius rule as
-  ever — pgTAP before any UI.
-- **Pay attribution:** `class_rates.paid_coach_id` is `NOT NULL` and resolves per date, so
-  the payout path currently asks the class, not the session. A session-level override must
-  take precedence over `class_rate_on()` for that one lesson, and must be visible in the
-  pay-decision table rather than silently altering a total.
-- Decide whether a cover can span a **date range** (Coach A is away for three weeks) or
-  only one lesson at a time. A range is the same record repeated; the reason to decide up
-  front is the UI, not the schema.
+**Notes:** `set_session_main_coach()` deliberately refuses `ON CONFLICT DO NOTHING` for the
+mirror of exactly this reason, so the asymmetry is an oversight in `20260811000200`, not a
+design. **Needs a root-checkout migration** — a worktree found it and correctly could not fix
+it. Cheapest form: raise in the shadow branch when the coach already holds `role = 'main'`
+on that session, forcing the admin to reassign the main explicitly.
 
-### Trainee coaches shadow the main coach on a lesson — **M**
-A lesson has exactly **one main coach** plus any number of trainee/shadow coaches.
-Trainees are **paid at their own rate**.
+### The Attendance page's Coach column can name someone who did not teach — **S** `[found 2026-08-11]`
+`SwimSyncAdmin/app/(admin)/attendance/page.tsx:162` reads the **class's** coach, so a covered
+lesson shows the wrong name.
 
-**Why:** shadowing is how a school brings a coach on, and today SwimSync cannot represent
-it — a trainee is either the class's coach or invisible. The main coach must stay
-unambiguous, because pay attribution, RLS and the roster all resolve to one person.
+**Why:** it is the read-only audit page an admin opens when wages look odd — the one place the
+wrong name is most likely to be believed. Nothing downstream consumes it, so no money moves.
 
-**Notes:**
+**Notes:** deliberately not fixed in wt-admin: outside its declared scope, and the fix carries
+a product choice (show the roster main, or show both with the cover annotated, as Coach Wages
+now does). Wages is the model to copy.
 
-- **Sequence this AFTER the substitute item above** — both add "who taught this lesson" to
-  `lesson_sessions`, and they are one schema change, not two (`CLAUDE.md`: one schema
-  change in flight at a time). Build the session coach roster once, with a main/shadow
-  distinction, rather than adding a substitute column and then widening it.
-- **Paid at their own rate is the decision (2026-08-08), and it is the expensive half.**
-  A shadowed lesson produces **two** `coach_payouts` rows, which breaks the current
-  assumption that a lesson pays one coach via `class_rates.paid_coach_id`. The trainee's
-  rate comes from the existing effective-dated `coach_rates`, so no new rate concept — but
-  the payout builder, the pay-decision table and the coach's My Pay screen all now sum a
-  set rather than a single row.
-- A trainee must be able to **see** the lesson without being able to change the class —
-  same RLS widening as the substitute item, which is the other reason to build them
-  together.
-- **This supersedes _Multiple coaches per class_**: the need is per-lesson, not per-class.
+### A set-returning gate for the coach's roster probes — **S** `[found 2026-08-11]`
+`sessions_i_am_main_on(uuid[]) RETURNS SETOF uuid` would collapse the coach app's per-session
+`coach_is_main_on_session()` calls into one round trip.
+
+**Why:** §7.134 forces a `SECURITY DEFINER` probe per session, because RLS hides the row that
+would answer the question. The Schedule tab bounds the set (own classes, session row exists,
+not finished) so a month of history costs nothing today — this is latency insurance, not a
+fix.
+
+**Notes:** not written by the worktree that wanted it, because **a worktree never authors a
+migration** and the bounded loop is correct as it stands. Do it in the same migration as the
+`assign_session_coach` guard above rather than on its own.
+
 
 ---
 

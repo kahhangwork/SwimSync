@@ -1,11 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-11 — **Wave 2 is LIVE: a child can attend more than one class
-(§8.43).** Migration `20260811000100` + both web apps deployed and verified in the bundle.
-Five gotchas, **§7.123–§7.127**; one of them is a real production breakage this shipped._
+_Last updated: 2026-08-11 (2nd session) — **Wave 3 is LIVE: a lesson has its own coaches**
+(§8.44). `20260811000200` + both apps. Nine gotchas, **§7.128–§7.136**; the apps shipped
+AHEAD of their migration (`docs/DEPLOYMENT.md` §11.9) and three defects were found by running._
 
-_Previously, 2026-08-10 (3rd session) — **`verify-schedule-week` fixed to 21/21** (§8.42):
-driver rot, not §8.40, proven by reproducing the failure at `eb010fd~1`. **§7.121–§7.122**._
+_Previously, 2026-08-11 — **Wave 2: a child can attend more than one class** (§8.43),
+`20260811000100`. **§7.123–§7.127**._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -28,7 +28,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.128** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.136** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -116,7 +116,6 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | Coach wages — effective-dated rates, the pay-decision surface | UI + backend, LIVE | PRD §7.13 · §8.3 |
 | Active/inactive families and children, per business | UI + backend, LIVE | PRD §7.14 · §8.4 |
 | Effective-dated class terms — a lesson is priced by its OWN date | UI + backend, LIVE | PRD §7.3 · §8.3 |
-| Child identity (name + DOB, age derived never stored), levels, family address | UI + backend, LIVE | PRD §5.1, §7.15 · §8 |
 | Prepaid lesson packages | pgTAP + Deno + driver, LIVE | PRD §7.16 · §8.8 |
 | Package purchases numbered + QR-payable (`PKG-YYYY-NNNN`) | pgTAP 12 + 2 drivers, LIVE 2026-08-09 | PRD §7.16 · §8.37 |
 | Every child's name carries their payment method (per-child, category-aware) | pgTAP + vitest, LIVE | PRD §7.16 · §8.23 |
@@ -141,7 +140,8 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | Co-admins, managed by the business's OWNER | pgTAP 38 + vitest + driver, LIVE | PRD §4.3 · §8.31 |
 | A class can be RETIRED without losing money | pgTAP 23, LIVE | PRD §7.3 · §8.39 |
 | An unmarked GUEST holds the month open; nothing new enters a retired class | pgTAP + Deno, LIVE 2026-08-10 | PRD §7.3 · §8.40 |
-| **A child can attend MORE THAN ONE class a week** | pgTAP 637 + vitest + jest + 17-check driver, LIVE 2026-08-11 | PRD §7.4, §7.20 · §8.43 |
+| **A child can attend MORE THAN ONE class a week** | pgTAP + vitest + jest + 17-check driver, LIVE 2026-08-11 | PRD §7.4, §7.20 · §8.43 |
+| **A LESSON has its own coaches — a substitute, and shadows paid their own rate** | pgTAP 40 + vitest + jest + UI gate, LIVE 2026-08-11 | PRD §7.13, §7.6 · §8.44 |
 | Automated tests — pgTAP + Deno backend, vitest + jest-expo apps, all in CI on push | CI | `docs/TESTING.md` §5 |
 
 **Counts are deliberately not written here.** The runner is the fact; a number in prose is
@@ -161,6 +161,13 @@ is a guard whose first real firing is still ahead of you.
   re-confirmed 2026-08-10), so no class has been retired on real data.
 - **Guest bookings** — production holds **zero** live trial or make-up bookings, so §8.40's
   new block has never fired there. Which is exactly why it was safe to ship.
+- **The lesson coach roster** — production holds **zero** `session_coaches` rows, so no cover
+  or shadow has ever been recorded on real data and the clawback path has never fired. Two
+  consequences worth knowing before the first one: production's coach is **also its tenant
+  admin**, so the attendance-write narrowing can never lock them out (§7.131); and a second
+  coach on payroll is what makes any of this reachable at all, since `generate_coach_payouts`
+  skips a coach with no `coach_rates` row — production has none, so **no payout has ever been
+  generated there.**
 - **Multiple classes per child** — no production child holds two enrolments yet, so neither
   schedule guard has ever refused anything real and no admin has pressed *+ Add class*. The
   first real one is worth watching: it is also the first time `'mixed'` package coverage
@@ -336,6 +343,40 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.44 (2026-08-11, 2nd session) — WAVE 3: A LESSON HAS ITS OWN COACHES
+
+**Shipped and LIVE** — `20260811000200` + both apps. Plan and its ranked risk review:
+`docs/plans/WAVE_3_PLAN.md`. Behaviour: PRD §7.13 (pay, Lesson Coaches, Wages) and §7.6
+(who may mark). Built as **Phase A in the root checkout, then two parallel worktrees**
+(`wt-admin`, `wt-coach`), which is the shape to copy — and the shape that produced the
+deploy failure below.
+
+**Three defects were found by RUNNING, and each was invisible to reading.** §7.129 (a pay
+function that answers "what would this rate produce" cannot drive a clawback — the business
+paid twice), §7.130 (a rewrite deleted the guard whose whole job is to refuse), §7.133 (a
+refetch outside its staleness guard routed a *write* to the wrong class). The first two were
+caught before any pgTAP existed, by smoke-testing the migration's cases by hand.
+
+**The apps deployed AHEAD of their migration — read `docs/DEPLOYMENT.md` §11.9.** No
+worktree could have prevented it: a worktree may not author a migration, so neither owned
+the one their code needed, and each verified its own bundle correctly. **Splitting a wave
+across worktrees splits the deploy, and nobody sees the whole of it.** Push the migration
+before the first app branch lands.
+
+**Both graduate lists were nearly lost and were recovered from the session transcripts** —
+§7.136 has the method. `WORKTREE.md` is gitignored, so it is in no commit and no reflog.
+
+**Deliberately not done:** the `assign_session_coach` shadow-branch guard, the Attendance
+page's Coach column, and a set-returning roster gate — all three in `BACKLOG.md`, all three
+needing a migration a worktree may not write.
+
+**Verified:** pgTAP **677** (was 637; +40, proven red by the DOWN file); Deno 139 ×2 (§7.15);
+vitest **299**; jest **348**; typecheck both; fixture round-trip exit 0; rollback rehearsed
+(all 637 pre-wave tests pass under it); `verify-schedule-week` 21/21 against the real app;
+production grant dump re-checked — `anon` EXECUTE still 18, 0 blanket table grants.
+
+---
+
 ## 8.43 (2026-08-11) — WAVE 2: A CHILD CAN ATTEND MORE THAN ONE CLASS
 
 **Shipped and live** — `20260811000100`, `936e3bd` on `main`, both web apps deployed and
@@ -381,47 +422,6 @@ the DOWN file); Deno **139 ×2** (§7.15); vitest 259; jest 308; `verify-multi-c
 
 ---
 
-## 8.42 (2026-08-10, 3rd session) — THE NIGHTLY'S LAST RED WAS THE DRIVER, NOT §8.40
-
-**`verify-schedule-week` is 21/21 and on `main` as `287142b`.** It had been 17/19, and the
-suspicion on record was that §8.40 (shipped hours earlier, touching the same screen) had
-broken it. It had not. Proven rather than argued: the driver, its fixture and `lib.mjs` are
-**byte-identical at `eb010fd~1`**, and that commit reproduces 17/19 with the *same* failing
-URL — so §8.40 is exonerated and the two COMING UP checks had been asserting nothing about
-COMING UP on five weekdays out of seven.
-
-**The cause was an ordinal over a list the driver does not own** (§7.75, §7.101): `.last()`
-on a bare day-header regex takes whichever day sorts latest in the week, which is the
-**seed's** Saturday class, not the fixture's. COMING UP days render collapsed, so the lesson
-was never revealed and the next tap fell through to the NEEDS MARKING straggler. It passed
-only when the fixture's own weekday sorted last — Sat/Sun. What each check now covers, and
-the sabotage signature, are in `docs/TESTING.md` §5.
-
-**The review earned its keep by finding a bug in the fix itself.** The first version built
-its label with Postgres `to_char`, which renders September `Sep` while the screen renders
-`Sept` — green in August, matching **nothing** for a month from 2026-08-25, and under
-`exact:` a *thrown* driver rather than a failed check. That is **§7.121**, and it is the
-durable half of this session. **§7.122** is the second: a nightly labelled in UTC executes in
-SGT, so its real weekday is the day after its name — reading the label instead produced a
-confident wrong conclusion mid-triage.
-
-**Deliberately not done.** No `testID` was added to `DaySection` — it is the cleaner fix and
-would make the locator locale-free, but it is product code changed to suit a test, and the
-formatter-parity fix removes the need. The final `.last()` on the class title still depends
-on section render order; that dependency is now a comment in the file rather than a silent
-assumption.
-
-**Two coordination facts, both cheap to lose.** A second session was driving this same root
-checkout throughout — it committed, merged and pushed here — and `supabase db reset` was run
-three times against the shared database before that was noticed. No damage: nothing of theirs
-was loaded. `docs/WORKTREES.md` exists to prevent exactly this and did not, because nothing
-announces a sibling that shares the *root* checkout rather than taking a worktree.
-
-**Verified:** 21/21 on a Monday, the failing case; sabotage **18/21** with the reveal guard
-reporting `2 -> 2`, signature recorded in the file header; Node and Chrome ICU agree on all
-12 months; pre-existence proven at `eb010fd~1`; `287142b` fast-forwarded onto `main`.
-
----
 
 ### Older sessions — the ledger
 
@@ -470,16 +470,17 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### THE NIGHTLY SWEEP IS GREEN — nothing outstanding, and it stays true only until the next run
+### ⚠ THE NEXT SWEEP HAS NEVER SEEN WAVE 3 — and there is no driver for it yet
 
-Run **`31430917020` succeeded** against **`160cb09`** — i.e. current `main`, Wave 2 included.
-It **executed Tuesday 2026-08-11 SGT** (GitHub labels it `2026-08-10`; the cron is 20:00 UTC —
-**§7.122**). It closed `ui-driver-rot` **issue #3 itself**, which had been open since the
-2026-08-08 red.
+The last sweep, **`31430917020`, was GREEN**: all 39 drivers, against `160cb09` — i.e. Wave 2,
+not Wave 3. It executed Tuesday 2026-08-11 SGT (GitHub labels it `2026-08-10`; the cron is
+20:00 UTC — **§7.122**) and closed `ui-driver-rot` issue #3 itself.
 
-- **All 39 drivers passed**, including **`verify-multi-class` on its first sweep** (§8.43).
-  Both harnesses auto-discover by glob, so it needed no registration — and its fixture name
-  matches the driver, so `fixture_for`'s default case found it.
+- **Wave 3 shipped after it, and shipped NO driver.** Plan Step 4's `verify-coach-roster` was
+  not built — the two worktrees proved their halves with unit tests and a manual UI walk
+  instead. **The next sweep is therefore the first test of Wave 3 in a browser**, and the
+  fixture it needs must be scoped `(class, month)`, not by id (**§7.132**).
+- `gh run list --workflow=ui-drivers.yml` and issue #3's own state are the fact.
 - The two-sweep red streak (`31277289374`, `31334766457`) is closed: `verify-trials` was
   already fixed, and `schedule-week` 17/19 → 21/21 landed as `287142b` (§8.42).
 - **Every driver has now faced a sweep.** There is no never-yet-swept set left to watch.
@@ -510,32 +511,29 @@ counts rather than tests presence (§7.118).
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD IS CHOSEN FROM `BACKLOG.md` — nothing is queued
+### THE NEXT BUILD — one thing is genuinely queued, and it is small
 
-**Waves 1 and 2 are both complete** (§8.36–§8.40, §8.43). `docs/plans/WAVE_1_PLAN.md`,
-`docs/plans/UNMARKED_BOOKING_PLAN.md` and `docs/plans/WAVE_2_PLAN.md` are history, not
-queues; don't re-read them for work. **`BACKLOG.md` → `## Build order` governs what comes
-next** — the six decisions the ranking rests on are in a table at its top; read them before
-re-opening any.
+**Waves 1, 2 and 3 are all complete** (§8.36–§8.40, §8.43, §8.44). Their plans in
+`docs/plans/` are history, not queues. **`BACKLOG.md` → `## Build order` governs what comes
+next** — the decisions the ranking rests on are in a table at its top.
 
-**Next ranked is Wave 3, the lesson-level coach roster (M/L)** — a substitute coach per
-session and trainee coaches paid at their own rate. Its blast radius is **coach RLS, not the
-roster**: `current_coach_id()` feeds the policy set, and pgTAP comes before any UI. The
-Schedule tab's exposure is already measured in `BACKLOG.md`; don't re-derive it.
-**Wave 2 just made that warning concrete** — `coach_serves_student()` was fine while a child
-had one class and became an authorization hole the moment they could have two (§8.43, and the
-pgTAP that pins it is `multi_class.test.sql`). Wave 3 touches the same function.
+**⚠ ONE MIGRATION IS OWED, and it should be the next thing built.** Wave 3 shipped an
+asymmetry: **`assign_session_coach`'s shadow branch can demote a lesson's main**
+(`ON CONFLICT … DO UPDATE SET role = 'shadow'`), which silently re-attributes that lesson's
+pay back to the class's coach. Only a **client-side** re-check guards it in production today.
+`set_session_main_coach()` refuses `ON CONFLICT DO NOTHING` for the mirror of exactly this
+reason. **S**, in `BACKLOG.md`, and worth bundling with the set-returning roster gate
+(`sessions_i_am_main_on`) so one migration closes both.
 
-**Two small items still filed rather than fixed**, both in `BACKLOG.md`:
-- *The admin's invoice pre-flight misses an unmarked EXTRA lesson* (**S**) — `classCoverage.ts`
-  unions booking dates but not session dates, so it over-reports readiness. **Never
-  under-bills**, which is why it is S.
-- *Deleting an admin destroys the audit history* (**S**) — unchanged from 2026-08-09.
+**Three small items filed rather than fixed**, all in `BACKLOG.md`:
+- *The Attendance page's Coach column can name someone who did not teach* (**S**) — new, and
+  it is the page an admin checks when wages look odd.
+- *The admin's invoice pre-flight misses an unmarked EXTRA lesson* (**S**) — over-reports
+  readiness; **never under-bills**, which is why it is S.
+- *Deleting an admin destroys the audit history* (**S**) — unchanged since 2026-08-09.
 
-**And one Wave 2 revealed rather than created:** *a child in EVERY class of their kind has no
-per-child make-up* (**S/M**) — `schedule_extra_lesson()` is class-wide, so there is no
-one-child remedy. **Do not "fix" it by relaxing `book_makeup()`'s own-class refusal**; that
-is the silent-void case, and `multi_class.test.sql` pins it.
+**Wave 4 is next in the ranking** — a lesson recorded into an already-BILLED month, reported
+and settled. Wave 2 unblocked it; Wave 3 did not touch it.
 
 **The `service_role` question is now ANSWERED, and the answer is "don't build the whitelist"**
 (`BACKLOG.md` carries the 11-call-site audit). `generate-invoices` alone touches 21 of 37 tables
@@ -567,11 +565,13 @@ function this session touched (`docs/DEPLOYMENT.md` §11.7).
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY, and nothing is queued to fill it.** The latest applied is
-`20260811000100` (multiple classes per child, §8.43) — production confirmed caught up on
-2026-08-11, 0 pending. **Wave 3 will need one, and §7.123 is the new thing to budget for:
-decide the deploy ORDER by compatibility, not by layer.** If it drops or narrows a function
-signature the deployed client still calls, either ship a shim or deploy the apps first. Whatever comes next: still one at
+**The migration queue is empty but ONE IS OWED** — see the shadow-branch item above. The
+latest applied is `20260811000200` (the lesson coach roster, §8.44); production confirmed
+caught up 2026-08-11, 0 pending. **The new rule this session bought is about ORDER, not
+content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must
+land BEFORE the first app branch does.** A worktree cannot author one, so no worktree can see
+that the deploy is incomplete — and both here pushed correct code onto a database that did not
+have the schema yet. §7.123 still applies to signatures. Whatever comes next: still one at
 a time (§7.55), a worktree never authors one, and budget the post-deploy grant check (§7.39,
 §7.89) **and** the rollback rehearsal (§7.93 — running the DOWN file is the half that finds the
 bugs). **Don't take `supabase db push`'s own output as proof it applied:** it printed a
@@ -591,9 +591,11 @@ file, and grep finds the oldest first. That cost a wrong risk rating on 2026-08-
 
 ### The documents are on a THIRD attempt at discipline-by-instruction — watch it
 
-`HANDOVER.md` is **41 KB against a 45,000-byte budget** (37 KB after 2026-08-10's cut, §8.41;
-§8.43 spent 3.8 KB of the 7.4 KB that was left — **one session ate half the headroom**, which
-is the ratchet the two previous attempts lost to). The
+`HANDOVER.md` is **40 KB against a 45,000-byte budget**. §8.43 spent 3.8 KB of the 7.4 KB
+that was left after 2026-08-10's cut (§8.41) — half the headroom in one session. §8.44 cost
+**nothing net**: it graduated everything first, then demoted §8.42 to a ledger row and paid
+for its §3 row by deleting one. **That is the mechanism working — a session can add a wave
+and leave the file smaller.** The
 two previous attempts to hold a limit by writing it down both failed, reaching 290 KB and
 then 91 KB — **§7.119** is why, and it is worth reading before the next `/update-docs`, not
 after. Three commands are the whole of the discipline and take ten seconds:

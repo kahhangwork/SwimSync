@@ -2240,3 +2240,95 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     - **When a cross-check disagrees with your arithmetic, suspect the tool before the
       arithmetic.** The arithmetic was right and the "check" was wrong — the instinct to defer
       to the command is exactly what makes this one land. (2026-08-11.)
+
+129. **A FUNCTION THAT ANSWERS "WHAT WOULD THIS ACTOR'S RATE PRODUCE" CANNOT DRIVE A
+    CLAWBACK — IT MUST ANSWER "WHAT IS THIS ACTOR OWED".** Wave 3's
+    `session_pay_amount(session, coach)` computed any coach's rate × duration for any
+    session, ignoring whether that coach was attributed to it. Every forward path looked
+    right, because the *selection* query filtered by attribution first. The adjustment loop
+    does not: it asks what an already-paid coach is owed **now**, and got their full rate
+    back for a lesson somebody else had taken over — difference zero, no clawback, and the
+    business pays twice. Measured before any pgTAP existed: **A 30.00 + B 50.00 on one 50.00
+    lesson.**
+    - The fix is one predicate (`coach_attributed_to_session`) shared by the pay function
+      **and** the selection query, so the two cannot disagree. Two copies of the same rule is
+      the bug waiting to happen.
+    - **The general shape: a "what is owed" function must encode entitlement, not
+      arithmetic.** Any caller that asks about a *past* state — corrections, reversals,
+      audits — sees the difference; forward-only callers never will. (2026-08-11.)
+
+130. **REWRITING AN AGGREGATE CAN DELETE A GUARD WHOSE ENTIRE PURPOSE IS TO REFUSE, AND
+    NOTHING LOOKS DIFFERENT.** `generate_coach_payouts` opens with a pre-flight that raises
+    if any lesson in the period has no class terms — its own comment says the failure "must
+    not be reintroduced by a quiet skip". Wave 3's first draft moved attribution into the
+    selection query's `WHERE`, where a NULL `paid_coach_id` simply fails to match: the lesson
+    left payroll in silence, which is precisely the skip the guard forbids.
+    - **Read the WHOLE function before replacing it.** The rewrite was written having read
+      from line 55 of 170; the guard was at 33–46. `pg_get_functiondef` output is not a
+      diff — scroll to the top.
+    - It was caught only because `coach_wages.test.sql` 33 asserts the *refusal*. **A test
+      that asserts an error is the one that survives a rewrite**; the happy-path tests all
+      stayed green. (2026-08-11.)
+
+131. **THE SEED COACH IS ALSO THE TENANT ADMIN, SO NO RLS *NARROWING* CAN BE DEMONSTRATED ON
+    SEED DATA.** `coach@swimsync.test` is deliberately both (`LOCAL_DEV_GUIDE.md` — it models
+    a private coach). Any policy of the form `coach_branch OR can_admin_tenant(...)` therefore
+    passes for him through the admin branch, whatever the coach branch says. A Wave 3 probe
+    "proved" the substitute narrowing had failed; `coach_is_main_on_session()` was returning
+    FALSE correctly all along.
+    - **To test a coach narrowing you must create a NON-admin coach.** pgTAP does; the seed
+      cannot.
+    - **The production consequence is the valuable half:** production *is* a private coach who
+      is also the admin, so the Wave 3 narrowing can never lock them out of a covered lesson.
+      It only bites a business with non-admin coaches — none exists yet. (2026-08-11.)
+
+132. **A RESOLVE-OR-CREATE RPC MAKES A FIXTURE TEARDOWN INCOMPLETE BY CONSTRUCTION.**
+    `assign_session_coach()` creates the `lesson_sessions` row when none exists, so a driver
+    assigning a cover to an unmarked date produces rows the fixture never named. A teardown
+    keyed to the fixture's own fixed UUIDs left **two orphan empty lesson rows** behind, found
+    only by listing the roster *before* tearing down rather than after.
+    - **Scope the teardown to `(class, month)`, not to ids, whenever the surface under test
+      calls an RPC that can create rows.**
+    - **`check-fixture-roundtrip.sh` does NOT catch this** — it diffs the fixture, and the
+      orphans come from the *driver*. (2026-08-11, wt-admin.)
+
+133. **A REFETCH THAT RUNS OUTSIDE ITS EFFECT'S STALENESS GUARD CAN ROUTE THE NEXT *WRITE* TO
+    THE WRONG ENTITY.** Not merely a stale table: a `reload()` after save repainted class X's
+    dates while the picker had already moved to Y, and the next assignment called
+    `assign_session_coach(Y, X's date)`. Two classes on the same weekday both satisfy
+    `assert_class_runs_on`, so it lands **silently** and the wrong lesson gets a coach.
+    - **One generation counter must cover every load path, not one per effect.** A guard on
+      the mount effect and none on the post-save refetch is the same as no guard.
+      (2026-08-11, wt-admin.)
+
+134. **A POLICY THAT NARROWS A TABLE TO "YOUR OWN ROWS" SILENTLY REMOVES THE ABILITY TO DETECT
+    THE ABSENCE YOU CARE ABOUT.** `session_coaches_select` is `admin OR coach_id =
+    current_coach_id()`. Correct — and it means the coach who was *replaced* can never derive
+    "somebody else has my Tuesday" from any query, because the row naming the substitute is
+    not theirs. Yet theirs is the screen that must stop nagging them to mark it.
+    - The only answer is a `SECURITY DEFINER` probe (`coach_is_main_on_session()`) that sees
+      the row RLS hides — which costs **one round trip per session**. Bound the set before
+      you loop it.
+    - Ask this at design time: *whose screen needs to know about a row they cannot see?*
+      (2026-08-11, wt-coach.)
+
+135. **A HAND-INSERTED *DRAFT* `coach_payouts` ROW DOES NOT SURVIVE A SIBLING WORKTREE.**
+    `generate_coach_payouts` deletes and rebuilds draft payout items for the period, and every
+    worktree shares one `supabase_db_SwimSync` (§7.55). A fixture payout vanished twice
+    mid-session because the sibling ran payroll. **Any fixture standing in for generated pay
+    must be `status = 'paid'`** (which freezes it), or be re-inserted immediately before the
+    assertion. (2026-08-11, wt-coach.)
+
+136. **`WORKTREE.md`'S GRADUATE LIST DIES WITH THE WORKTREE, AND NOTHING FORWARDS IT — BUT IT
+    IS RECOVERABLE FROM THE SESSION TRANSCRIPT.** The file is gitignored on purpose, so it is
+    in no commit and no reflog; sessions do not share context, so a worktree session's
+    findings reach nobody. Two Wave 3 worktrees closed with their lists intact **in their own
+    conversations only**, and the root session had no way to see them.
+    - **Recovery, and it worked completely:** transcripts live at
+      `~/.claude/projects/<path-mangled-repo>/<session-uuid>.jsonl`. A session that ran
+      `/worktree-start` keeps writing to the **root** project directory, not a worktree one —
+      identify it by the first user message, then extract the assistant messages containing
+      "graduate list".
+    - **The cheap prevention is `/worktree-close` step 4, done literally**: paste the list
+      into the root session, or write it to a file *outside* the worktree, before
+      `ExitWorktree`. (2026-08-11.)
