@@ -581,6 +581,25 @@ design. **Needs a root-checkout migration** — a worktree found it and correctl
 it. Cheapest form: raise in the shadow branch when the coach already holds `role = 'main'`
 on that session, forcing the admin to reassign the main explicitly.
 
+### Wave 3 shipped with no UI driver — **S** `[found 2026-08-11]`
+`verify-coach-roster.mjs` + `fixtures-coach-roster.sql` + teardown. Wave 3's behaviour is
+covered by 40 pgTAP checks, 40 vitest and 40 jest tests and a manual UI walk, and by **nothing
+in the nightly sweep**.
+
+**Why:** every other shipped surface has a driver, so the sweep is the standing answer to "did
+a change three weeks from now break this?" Wave 3 is the one feature that would fail silently
+— and it is the feature whose failure mode is an unmarkable guest and a billing month that
+will not close, which no unit test can reach because it needs the real RLS path in a browser.
+
+**Notes:** independent of the migration owed above — a driver needs no schema change, so do
+not wait for one. Two constraints, both bought the hard way: the **teardown must be scoped
+`(class, month)`, not by id** (§7.132 — `assign_session_coach()` creates lesson rows the
+fixture never named, and `check-fixture-roundtrip.sh` cannot catch the orphans because the
+driver creates them); and the fixture needs a **non-admin** coach, because the seed coach is
+also the tenant admin and no narrowing can be demonstrated on him (§7.131). The walk to
+automate is in `docs/plans/WAVE_3_PLAN.md` Step 4, and the manual version already passed:
+owner 7/7, trainee 5/5, substitute 12/12.
+
 ### The Attendance page's Coach column can name someone who did not teach — **S** `[found 2026-08-11]`
 `SwimSyncAdmin/app/(admin)/attendance/page.tsx:162` reads the **class's** coach, so a covered
 lesson shows the wrong name.

@@ -476,10 +476,11 @@ The last sweep, **`31430917020`, was GREEN**: all 39 drivers, against `160cb09` 
 not Wave 3. It executed Tuesday 2026-08-11 SGT (GitHub labels it `2026-08-10`; the cron is
 20:00 UTC — **§7.122**) and closed `ui-driver-rot` issue #3 itself.
 
-- **Wave 3 shipped after it, and shipped NO driver.** Plan Step 4's `verify-coach-roster` was
-  not built — the two worktrees proved their halves with unit tests and a manual UI walk
-  instead. **The next sweep is therefore the first test of Wave 3 in a browser**, and the
-  fixture it needs must be scoped `(class, month)`, not by id (**§7.132**).
+- **Wave 3 shipped after it, and shipped NO driver** — the two worktrees proved their halves
+  with unit tests and a manual UI walk instead. **Nothing in the sweep covers Wave 3 at all**,
+  so it is the one shipped surface that would rot silently. Filed as *Wave 3 shipped with no
+  UI driver* (**S**) in **`BACKLOG.md`** — which is where it is tracked, **not** in the plan;
+  plans here are history, not queues.
 - `gh run list --workflow=ui-drivers.yml` and issue #3's own state are the fact.
 - The two-sweep red streak (`31277289374`, `31334766457`) is closed: `verify-trials` was
   already fixed, and `schedule-week` 17/19 → 21/21 landed as `287142b` (§8.42).
