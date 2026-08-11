@@ -2218,3 +2218,25 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       cross-joined into a class a sibling fixture also used, so the new unique index fired and
       the run "passed" — proving nothing about the divergence detector. Target a class no
       sibling touches. (2026-08-11.)
+
+128. **macOS `date -j` CANNOT CONVERT BETWEEN TIMEZONES — IT IS A FORMATTER, AND IT ANSWERS A
+    UTC→SGT QUESTION WITH THE INPUT HOUR AND A STRAIGHT FACE.** `date -j` parses *and* formats
+    in one zone, so `TZ=` and `-u` move both halves together and the conversion never happens.
+    The trailing `Z` in the format string is consumed as a literal character, not read as UTC.
+    Verified on 2026-08-11:
+    ```bash
+    TZ=Asia/Singapore date -jf "%Y-%m-%dT%H:%M:%SZ" "2026-08-10T20:49:39Z" "+%A %F %H:%M"
+    #   -> Monday 2026-08-10 20:49          ← WRONG, and -u gives the same answer
+    python3 -c "import datetime;d=datetime.datetime.fromisoformat('2026-08-10T20:49:39').replace(tzinfo=datetime.timezone.utc);print(d.astimezone(datetime.timezone(datetime.timedelta(hours=8))))"
+    #   -> Tuesday 2026-08-11 04:49 SGT     ← the truth
+    ```
+    - **The tell costs one glance: the output hour equals the input hour.** A real conversion
+      to SGT moves it by 8. If they match, no conversion happened. `gdate` is not installed on
+      this machine, so **use `python3`** — it is the only correct tool here by default.
+    - This is **§7.122's tool-shaped twin**, and it bites in the same place: reading the real
+      weekday of a nightly sweep, whose GitHub label is a day behind its SGT execution. It came
+      within one command of writing a wrong weekday into `HANDOVER.md` §9, which is a file
+      other sessions then trust.
+    - **When a cross-check disagrees with your arithmetic, suspect the tool before the
+      arithmetic.** The arithmetic was right and the "check" was wrong — the instinct to defer
+      to the command is exactly what makes this one land. (2026-08-11.)
