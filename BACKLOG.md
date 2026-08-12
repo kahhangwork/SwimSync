@@ -293,13 +293,6 @@ query asks for returned nothing until **five** further policies were widened. `l
 and `lib/scheduleBuckets.*` did need no change, as predicted. Measuring one line of a query
 does not measure what the row behind it is permitted to be.
 
-#### ⚠ NEXT, AND IT IS OWED: **drop the `assign_session_coach` compat shim** (S)
-
-**This is a migration, and it is ahead of Wave 4 in the queue** — not because it is valuable
-but because it is a deliberate piece of temporary scaffolding with nothing else holding it up.
-Its own section is *A compat shim and a dead enum are still live* below. It cannot be started
-until `20260812000200`'s app half is confirmed live on Vercel.
-
 #### Wave 4 — **A lesson recorded into an already-BILLED month is reported, and settled** (S/M)
 
 Placed after Wave 2 because a **backdated enrolment** is its main trigger, and Wave 2
@@ -633,43 +626,13 @@ a change three weeks from now break this?" Wave 3 is the one feature that would 
 — and it is the feature whose failure mode is an unmarkable guest and a billing month that
 will not close, which no unit test can reach because it needs the real RLS path in a browser.
 
-**Notes:** independent of the migration owed above — a driver needs no schema change, so do
-not wait for one. Two constraints, both bought the hard way: the **teardown must be scoped
+**Notes:** a driver needs no schema change, so it waits on no migration. Two constraints, both bought the hard way: the **teardown must be scoped
 `(class, month)`, not by id** (§7.132 — `assign_session_coach()` creates lesson rows the
 fixture never named, and `check-fixture-roundtrip.sh` cannot catch the orphans because the
 driver creates them); and the fixture needs a **non-admin** coach, because the seed coach is
 also the tenant admin and no narrowing can be demonstrated on him (§7.131). The walk to
 automate is in `docs/plans/WAVE_3_PLAN.md` Step 4, and the manual version already passed:
 owner 7/7, trainee 5/5, substitute 12/12.
-
-### A compat shim and a dead enum are still live — **S** `[owed 2026-08-12]`
-`20260812000200` left a **4-argument `assign_session_coach(uuid, date, uuid, session_coach_role)`**
-in place on purpose, and `session_coach_role` survives only to be its argument type. Both should
-be dropped by a follow-up migration.
-
-**Why it exists at all.** Migrations go out BEFORE Vercel builds `main`, so between
-`supabase db push` and that build the deployed admin panel is still calling the 4-arg form. Drop
-it in the same migration and assigning any coach to any lesson is broken in production for the
-length of that window — the same failure, on the same page, that §7.123 already cost this repo
-once. The shim raises loudly on `'shadow'` rather than silently treating it as a main assignment,
-because that would move a lesson's pay.
-
-**Do not start it until the app deploy is confirmed live.** The precondition is not "the push
-succeeded" — it is Step 7's user-visible string grep of the served bundle (§7.31, §7.51). A 200
-proves nothing.
-
-**What it does, and the whole of it:**
-- `DROP FUNCTION public.assign_session_coach(uuid, date, uuid, session_coach_role);`
-- `DROP TYPE public.session_coach_role;` — it will refuse while any signature still names it,
-  and that refusal is the useful one. Do not work around it by leaving the type.
-- Update `class_shadow_coaches.test.sql`'s CASE 12: it asserts **exactly two**
-  `assign_session_coach` rows and that the shim is granted. After this it is **one**, and the
-  shim assertion is deleted rather than inverted.
-
-**Notes.** A separate `db/…` branch on a separate day — one schema change in flight (§7.55), and
-it is the next one, not a parallel one. `DROP` does not need a re-grant; the 3-arg form already
-has its own. Filed BEFORE `20260812000200` landed, deliberately: a shim nobody filed is a shim
-nobody removes, and this one is indistinguishable from a real API once the reason is forgotten.
 
 ### ~~`Clear` can leave a lesson unmarkable AND un-nagged~~ — **SUPERSEDED 2026-08-12**
 Not fixed — made unbuildable. `20260812000200` moved shadows off the lesson entirely: a shadow

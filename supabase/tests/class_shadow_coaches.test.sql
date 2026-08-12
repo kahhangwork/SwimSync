@@ -11,7 +11,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(50);
+SELECT plan(49);
 
 -- ── fixture ────────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code, rain_pays_coach)
@@ -526,14 +526,14 @@ SELECT ok(has_function_privilege('authenticated',
     'public.assign_session_coach(uuid,date,uuid)', 'EXECUTE'),
   'CASE 12 — the NEW 3-arg assign_session_coach is granted to authenticated');
 
-SELECT ok(has_function_privilege('authenticated',
-    'public.assign_session_coach(uuid,date,uuid,session_coach_role)', 'EXECUTE'),
-  'CASE 12 — and the 4-arg COMPAT SHIM still is, across the §7.123 deploy window');
-
+-- The 4-arg COMPAT SHIM had its own assertion here across the §7.123 deploy
+-- window. 20260812000300 dropped it (and session_coach_role with it), so the
+-- assertion is DELETED rather than inverted — the count below is what proves
+-- the shim is gone, and it cannot pass by accident the way a NOT ok() could.
 SELECT is(
   (SELECT count(*)::INT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname='public' AND p.proname='assign_session_coach'),
-  2, 'CASE 12 — exactly TWO assign_session_coach rows: the new form and the shim');
+  1, 'CASE 12 — exactly ONE assign_session_coach row: the shim is DROPPED (20260812000300)');
 
 SELECT ok(
   bool_and(has_function_privilege('authenticated', p.oid, 'EXECUTE')),

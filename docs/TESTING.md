@@ -671,7 +671,8 @@ Touchables. Do not cite them as the nesting guard.
 
 ### Class-level shadow coaches (2026-08-12)
 
-- **`class_shadow_coaches.test.sql` (50)** — the assignment, the absence, the shadow rate, the
+- **`class_shadow_coaches.test.sql` (49; was 50 until `20260812000300` dropped the compat shim
+  and its grant assertion with it)** — the assignment, the absence, the shadow rate, the
   seals, precedence, and the two RLS-hiding cases. Each proven red by *targeted* sabotage; the
   campaign is worth copying rather than re-inventing. **Three of its cases exist only because
   nothing on any screen would show them failing**: an absence restored after a month is paid,
