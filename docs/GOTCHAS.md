@@ -2332,3 +2332,83 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     - **The cheap prevention is `/worktree-close` step 4, done literally**: paste the list
       into the root session, or write it to a file *outside* the worktree, before
       `ExitWorktree`. (2026-08-11.)
+
+137. **A PRE-CHECK THAT GUARDS AN UPSERT IS TOCTOU BY CONSTRUCTION — THE GUARD BELONGS INSIDE
+    THE STATEMENT THAT TAKES THE LOCK.** `assign_session_coach`'s shadow branch had to stop
+    demoting a lesson's main. The obvious form is `IF EXISTS (… role='main') THEN RAISE`, and
+    it refuses the easy case while letting the hard one through: admin A promotes X to main
+    while admin B adds X as a shadow; B's `EXISTS` cannot see A's uncommitted row, B's INSERT
+    then blocks on the unique index, A commits, and `DO UPDATE` demotes the main B was just
+    told did not exist.
+    - The race-free form is one statement — `ON CONFLICT … DO UPDATE SET … WHERE
+      session_coaches.role <> 'main'` — because `ON CONFLICT` waits on the conflicting row's
+      **lock**, so the `WHERE` sees the committed row. Then `IF NOT FOUND THEN RAISE`.
+    - **Measured, so nobody has to re-derive it** (2026-08-12, local stack, rolled back):
+      fresh insert → `FOUND`; re-insert over an existing `shadow` → `FOUND`; insert over an
+      existing `main`, `DO UPDATE` excluded by its `WHERE` → **`NOT FOUND`**, row unchanged.
+    - **Nothing may sit between the INSERT and the `IF NOT FOUND`**: `FOUND` is clobbered by
+      the next `SELECT`/`PERFORM`, and a clobbered `FOUND` is a guard that still looks like one.
+    - Without the `IF NOT FOUND` the RPC returns success having done nothing — `ON CONFLICT DO
+      NOTHING` wearing a different hat, which `set_session_main_coach` already refuses. (2026-08-12.)
+
+138. **WHEN A PER-ITEM PROBE BECOMES A BATCH, THE FAIL-LOUD DIRECTION INVERTS — AND "ABSENT
+    FROM THE ANSWER" SILENTLY BECOMES THE UNSAFE VERDICT.** `fetchIsMainOnSession` failed
+    towards TRUE ("I am the main coach"), per session, and every failure path reached it.
+    Batched as `sessions_i_am_main_on(uuid[])`, the caller computes *covered out = asked minus
+    returned* — so every way the response can be short or reshaped now HIDES a lesson from the
+    coach's NEEDS MARKING list, and unmarked attendance blocks the billing month with no
+    override (§8i).
+    - Four ways the response is an array and still wrong: elements are objects rather than ids
+      (`RETURNS TABLE` instead of `RETURNS SETOF`); PostgREST truncated it (`max-rows`, 1000
+      on this stack); an id appears that was never asked about; a null element.
+    - **The rule: validate that the answer is about exactly what was asked BEFORE subtracting
+      anything from it**, and collapse anything unvouchable to the empty set. Do not "filter
+      out" the bad elements — a filter turns a wrong-shaped response into a *confident* wrong
+      answer, which is the whole failure.
+    - Deleting the old `CHUNK = 8` does not remove a bound, it hands the bound to PostgREST,
+      which enforces it by truncating. A caller-side cap that refuses to send is the
+      replacement. (2026-08-12.)
+
+139. **A CLIENT-SIDE FILTER THAT REMOVES AN OPTION MAKES THE CORRESPONDING DRIVER CHECK
+    UNREACHABLE — AND AN UNREACHABLE CHECK REPORTS PASS.** `assignableShadows()` drops the
+    lesson's effective main from the shadow dropdown, so no click path in one tab can offer
+    it. A driver written to "pick the main from the shadow dropdown" either throws on a
+    missing option or — worse — takes a neighbour by ordinal and passes while testing nothing
+    (§7.101).
+    - Split it: assert the **absence from the options** (reachable, and it is what protects a
+      real admin), and reach the server guard through a genuine **stale-tab race** in a second
+      page, which is what two admins working at once actually produce (§7.133).
+    - **Both stale selections must be armed BEFORE the state changes.** The filter drops the
+      coach the moment they become main, so a tab opened afterwards cannot select the coach
+      whose demotion is under test at all.
+    - Assert the **server's own sentence**, never the shared `Could not assign:` prefix — both
+      guards render through that line, so it cannot say which one fired. (2026-08-12.)
+
+140. **A DRIVER'S ABSENCE CHECK CAN PASS FOR A SECOND REASON, AND ORDER IS WHAT DECIDES IT.**
+    `verify-coach-roster`'s "the covered lesson has left the class coach's NEEDS MARKING list"
+    scored green with `sessions_i_am_main_on` **dropped entirely** — because the substitute had
+    already marked the lesson two checks earlier, and a fully marked lesson leaves the backlog
+    whatever its roster says.
+    - **Run the absence check while the lesson is still unmarked.** Reordering was the whole
+      fix; no assertion changed.
+    - Its sibling failed the same way for a different reason: the Schedule tab only PROBES a
+      backlog lesson that already has a `lesson_sessions` row, so with no row the covered-out
+      answer cannot affect it — sabotaging the client to hide *everything* changed nothing on
+      screen and the driver scored full marks over a broken client.
+    - **Both were found only by measuring the sabotage signature**, and neither is visible by
+      reading the driver. Name the sabotages, run them, and paste the scores into the header.
+      (2026-08-12.)
+
+141. **A DEEP-LINKED RN-WEB SCREEN CAN RENDER PERFECTLY AND STILL NOT BE OPERABLE.** The coach
+    attendance screen reached by `page.goto(.../attendance?date=…)` shows the roster and the
+    guest correctly, and a press on a status button does nothing at all — normal click, forced
+    click and `dispatchEvent` alike. Reached by tapping the NEEDS MARKING row instead, the same
+    press works. Every driver in this repo that marks attendance navigates in-app.
+    - **`pressByText`, not a Playwright click.** RN-web's handler lives on the Pressable and
+      `getByText` resolves to the Text CHILD; a click there is swallowed silently.
+    - **The default 1280×900 viewport, not `mobile: true`.** Every marking driver uses it.
+    - **`handleSave()` refuses the whole save if ANY student is unmarked**, with a toast — and
+      on RN-web that is easy to miss. Marking one of two students wrote zero rows and looked
+      exactly like an RLS refusal of the substitute, which was the thing under test.
+    - A bare `page.reload()` of a nested route bounces to `/login` while the session
+      rehydrates; `gotoAuthed` retries it. (2026-08-12.)

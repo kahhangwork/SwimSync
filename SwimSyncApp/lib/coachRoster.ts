@@ -182,3 +182,65 @@ export function roleNotice(
       return null;
   }
 }
+
+/** The most sessions the covered-out probe will ever ask about in one request.
+ *
+ *  ⚠ THIS IS A BOUND, NOT A PERFORMANCE KNOB, AND REMOVING IT DOES NOT REMOVE
+ *  THE BOUND — it hands it to PostgREST, whose `max-rows` (1000 on this stack)
+ *  enforces itself by TRUNCATING the answer. Under "covered out = asked minus
+ *  returned" a truncated answer means "somebody else has the rest of your
+ *  week". This cap fails the other way: over it, we answer nothing at all.
+ *
+ *  It replaced a `CHUNK = 8` that split the probe across several requests
+ *  (20260812000100 made one round trip enough). The reasoning that made 8 safe
+ *  still holds and is why 200 is never approached: the caller passes only
+ *  sessions that already EXIST and are still unmarked — covers, partially
+ *  marked lessons and admin-scheduled extras — not a month of history. */
+export const MAX_PROBE = 200;
+
+/**
+ * Sessions somebody ELSE is rostered to teach = what we asked about, minus what
+ * the database said is mine (`sessions_i_am_main_on`, 20260812000100).
+ *
+ * ⚠ AN ANSWER THAT IS NOT EXACTLY ABOUT WHAT WE ASKED IS NOT AN ANSWER.
+ * Because this is a SUBTRACTION, every way the response can be short or
+ * reshaped reads as "covered out" — which HIDES a lesson from the coach's NEEDS
+ * MARKING list, and unmarked attendance blocks the billing month with no
+ * override (§8i) and nothing on any screen saying why. So the answer is
+ * validated before anything is subtracted from it, and anything it cannot vouch
+ * for collapses to the empty set — "nobody else has any of these", the loud
+ * verdict. Four real ways an array can be wrong, all refused rather than
+ * believed:
+ *
+ *   · elements are objects (`[{sessions_i_am_main_on: id}]`) rather than ids
+ *   · an id we never asked about appears
+ *   · a null or non-string element
+ *
+ * ⚠ TRUNCATION IS THE ONE IT CANNOT DETECT, AND `MAX_PROBE` IS WHY IT NEVER
+ * HAPPENS. A response cut short by PostgREST's `max-rows` survives every check
+ * below — each surviving element is still a string that was asked about — so
+ * the cap is not a performance knob, it is the whole defence. Raising it above
+ * the deployed `db-max-rows` (1000; `supabase/config.toml`) silently converts
+ * truncation into hidden lessons.
+ *
+ * ⚠ DO NOT relax these into a `.filter(...)` or a `?? []`. Filtering turns a
+ * wrong-shaped response into a CONFIDENT wrong answer, which is the whole
+ * failure. Answering nothing means the coach sees lessons that may not be
+ * theirs — loud, and the database refuses those saves visibly.
+ *
+ * Lives HERE rather than beside its fetch because `lib/sessionMainCoach.ts`
+ * imports supabase, and importing that into jest fails on AsyncStorage — which
+ * is the mechanical reason every tested thing in `lib/` is IO-free.
+ */
+export function coveredOutFrom(
+  asked: readonly string[],
+  mine: readonly unknown[]
+): Set<string> {
+  const askedSet = new Set(asked);
+  if (askedSet.size === 0 || askedSet.size > MAX_PROBE) return new Set();
+  if (!mine.every((x) => typeof x === "string" && askedSet.has(x))) {
+    return new Set();
+  }
+  const mineSet = new Set(mine as string[]);
+  return new Set([...askedSet].filter((id) => !mineSet.has(id)));
+}

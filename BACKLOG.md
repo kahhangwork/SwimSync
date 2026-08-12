@@ -264,7 +264,17 @@ make-up from the Attendance page* were held until after this and are now unblock
 #### ~~Wave 3 — The lesson-level coach roster~~ — **SHIPPED 2026-08-11**
 
 Both items are built and live: `20260811000200`, PRD §7.13/§7.20/§14.3,
-`docs/plans/WAVE_3_PLAN.md`. Nothing is queued here.
+`docs/plans/WAVE_3_PLAN.md`.
+
+**Its follow-up is also done, 2026-08-12** — `20260812000100` (the shadow-branch guard plus
+`sessions_i_am_main_on`) and `verify-coach-roster.mjs`, all three struck below.
+`docs/plans/WAVE_3_FOLLOWUP_PLAN.md`. *(This heading read "Nothing is queued here" while three
+Wave-3-descended items sat unbuilt further down — the exact drift the ⚠ at the top of this
+section warns about, found by `/session-start` on 2026-08-12. Struck in both places this time.)*
+
+**What is still open from Wave 3:** *The Attendance page's Coach column can name someone who
+did not teach* (**S**), below. It carries a product choice — show the roster main, or show both
+with the cover annotated as Coach Wages does — so it was left rather than guessed.
 
 _(A third item once sat here — **the attendance screen trusts a `sessionId` in the URL** —
 and shipped 2026-08-10 instead, because the same change removed the caller that passed it.
@@ -567,9 +577,19 @@ Behaviour is in `PRD.md` §7.13/§7.20; the decisions and the ranked risk review
 `docs/plans/WAVE_3_PLAN.md`. Kept as a stub only because *Multiple coaches per class* is
 recorded below as superseded by them.
 
-### `assign_session_coach`'s shadow branch can demote a lesson's main — **S** `[found 2026-08-11]`
-Its `ON CONFLICT (lesson_session_id, coach_id) DO UPDATE SET role = 'shadow'` will silently
-turn the session's **main** coach into a shadow if an admin adds that same coach as a shadow.
+### ~~`assign_session_coach`'s shadow branch can demote a lesson's main~~ — **SHIPPED 2026-08-12**
+`20260812000100_session_roster_guard.sql`. The guard covers **both** ways a lesson has a main,
+not just the one this item described: the ROW main (a `session_coaches` row) and the
+**ABSENCE** main (no roster row, so the class's own coach teaches it). A row-only guard misses
+the second entirely — `assignableShadows()` filters by the *effective* main, so the client
+already refused both and only the server half was missing. Plan and its ranked risk review:
+`docs/plans/WAVE_3_FOLLOWUP_PLAN.md`. Two things it bought that outlive it: **§7.137** (the
+pre-check form is TOCTOU; the guard belongs inside the statement that takes the lock) and the
+driver's stale-tab race, **§7.139**.
+
+Original entry, kept because the reasoning is still the reason:
+Its `ON CONFLICT (lesson_session_id, coach_id) DO UPDATE SET role = 'shadow'` would silently
+turn the session's **main** coach into a shadow if an admin added that same coach as a shadow.
 
 **Why:** the demoted lesson then has no main, so the absence rule takes over and pay reverts
 to the class's own coach — a quiet re-attribution of money nobody asked for. Only a
@@ -581,7 +601,17 @@ design. **Needs a root-checkout migration** — a worktree found it and correctl
 it. Cheapest form: raise in the shadow branch when the coach already holds `role = 'main'`
 on that session, forcing the admin to reassign the main explicitly.
 
-### Wave 3 shipped with no UI driver — **S** `[found 2026-08-11]`
+### ~~Wave 3 shipped with no UI driver~~ — **SHIPPED 2026-08-12**
+`verify-coach-roster.mjs` + `fixtures-coach-roster.sql` + teardown, **25 checks**, in the
+nightly sweep. Both constraints this entry named held: the teardown is scoped by CLASS across
+every month — wider than the `(class, month)` §7.132 asks for, because a lesson at `today - 7`
+straddles two months near the 1st — and the fixture builds two NON-admin coaches (§7.131). Two more were found by
+measuring its sabotage signature, and both had it scoring full marks over broken code —
+**§7.140**. The walk is wider than the manual one: it also covers the new guard's two server
+branches through a stale-tab race (§7.139) and the substitute actually marking the lesson,
+guest included.
+
+Original entry:
 `verify-coach-roster.mjs` + `fixtures-coach-roster.sql` + teardown. Wave 3's behaviour is
 covered by 40 pgTAP checks, 40 vitest and 40 jest tests and a manual UI walk, and by **nothing
 in the nightly sweep**.
@@ -600,6 +630,30 @@ also the tenant admin and no narrowing can be demonstrated on him (§7.131). The
 automate is in `docs/plans/WAVE_3_PLAN.md` Step 4, and the manual version already passed:
 owner 7/7, trainee 5/5, substitute 12/12.
 
+### `Clear` can leave a lesson unmarkable AND un-nagged — **M** `[found 2026-08-12]`
+The class's own coach holding a **shadow** row on a lesson with **no main** is a contradictory
+state: `coach_is_main_on_session()` says they ARE the main (absence rule), while `lessonRole()`
+reads their shadow row and says they may not mark it. The lesson leaves their NEEDS MARKING
+list and the attendance screen renders read-only — a lesson the database insists they must
+mark, that they cannot mark and are never reminded about.
+
+**Why it matters:** unmarked attendance blocks the billing month outright, with no override
+(§8i) and nothing on any screen saying why. This is the silent version of that block.
+
+**Reachable in three clicks, all legitimate:** assign B as the main → add the class's coach A
+as a shadow (a real arrangement — `assignableShadows()` documents "A shadows the substitute")
+→ press **Clear** on B. The same state also appears if `classes.coach_id` is re-pointed at a
+coach who already holds a shadow row on one of that class's lessons.
+
+**Notes:** `20260812000100` established the invariant *"the class's coach must never hold a
+shadow row on a main-less lesson"* and enforces it on the **add** path only; `Clear` is a plain
+`DELETE` from the client (`lesson-coaches/page.tsx`'s `handleRemove`), so nothing consults it.
+Found in that change's `/commit-review`, not by the change itself — it is **pre-existing**, not
+a regression. Two candidate fixes, and the choice is a product one: route `Clear` through an
+RPC that refuses while such a shadow exists, or have it delete the class coach's shadow row
+along with the main. **Needs a root-checkout migration** either way. The same RPC should
+reject the `classes.coach_id` re-point, or accept it and clean up.
+
 ### The Attendance page's Coach column can name someone who did not teach — **S** `[found 2026-08-11]`
 `SwimSyncAdmin/app/(admin)/attendance/page.tsx:162` reads the **class's** coach, so a covered
 lesson shows the wrong name.
@@ -611,7 +665,15 @@ wrong name is most likely to be believed. Nothing downstream consumes it, so no 
 a product choice (show the roster main, or show both with the cover annotated, as Coach Wages
 now does). Wages is the model to copy.
 
-### A set-returning gate for the coach's roster probes — **S** `[found 2026-08-11]`
+### ~~A set-returning gate for the coach's roster probes~~ — **SHIPPED 2026-08-12**
+`sessions_i_am_main_on(uuid[]) RETURNS SETOF uuid`, in the same migration as the guard above
+exactly as this entry asked. Its body is `coach_is_main_on_session()` and nothing else — two
+copies of "who is main" is the bug §7.129 already charged this wave for. `SwimSyncApp` consumes
+it; `CHUNK = 8` is gone. **It was not the cheap change it looks like**: the caller subtracts
+the answer from what it asked, so the fail-loud direction INVERTS when a per-item probe becomes
+a batch, and every short or reshaped response now hides a lesson that needs marking. **§7.138.**
+
+Original entry:
 `sessions_i_am_main_on(uuid[]) RETURNS SETOF uuid` would collapse the coach app's per-session
 `coach_is_main_on_session()` calls into one round trip.
 

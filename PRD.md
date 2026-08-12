@@ -1315,6 +1315,14 @@ changed for any lesson nobody has touched, and there was no backfill.
   coach is clawed back and the substitute paid, both as adjustments carried **once** onto the
   next payout, leaving the paid record intact (§7.13's draft/freeze model, unchanged).
 
+**A lesson's main coach cannot be demoted by being added as a shadow** *(guard added
+2026-08-12)*. Adding the coach who is already teaching a lesson as its shadow is refused, and
+the refusal names them — otherwise the lesson would be left with no main at all, the absence
+rule would take over, and the pay would move back to the class's coach with nobody asking for
+it. **This includes the class's OWN coach on a lesson with no assignment**, which is the half a
+reader would assume is still allowed: they are the main by the absence rule, so shadowing them
+would say two different things about one person.
+
 **Admins assign; coaches do not.** The admin panel's **Lesson Coaches** page picks a class and
 a month and shows who is teaching each lesson, with assign / change / clear for the main coach
 and add / remove for shadows. Lessons come from the class's weekly pattern **unioned with**

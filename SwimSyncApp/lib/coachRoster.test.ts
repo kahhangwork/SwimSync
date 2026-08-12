@@ -1,4 +1,5 @@
 import {
+  coveredOutFrom,
   parseAssignments,
   assignmentsByLesson,
   rosteredDatesByClass,
@@ -170,5 +171,84 @@ describe("roleBadge / roleNotice", () => {
   it("explains a read-only screen rather than showing dead buttons", () => {
     expect(roleNotice("shadow")?.title).toMatch(/shadow/i);
     expect(roleNotice("covered")?.title).toMatch(/another coach/i);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// coveredOutFrom — the SUBTRACTION, and why its failure direction is the
+// expensive one.
+//
+// covered out = asked minus mine. Under a subtraction, every way the server's
+// answer can be short or reshaped reads as "somebody else is teaching these",
+// which REMOVES lessons from the coach's NEEDS MARKING list. Unmarked
+// attendance blocks the billing month with no override (§8i) and nothing on any
+// screen says why, so an answer that cannot be vouched for must produce the
+// EMPTY set — "nobody else has any of these" — not a confident wrong one.
+//
+// The four hardening cases were each proven red against the naive
+// implementation they replaced —
+//   asked.filter((id) => !mine.includes(id))
+// — before they counted as coverage (§7.25). The one that changes behaviour
+// rather than merely covering it is "an id we never asked about": under
+// `.includes()` an unasked id is harmlessly ignored, which is exactly how a
+// wrong-SHAPED response becomes a confident "you are main on nothing".
+
+const CO_A = "aaaaaaaa-0000-0000-0000-000000000001";
+const CO_B = "bbbbbbbb-0000-0000-0000-000000000002";
+const CO_C = "cccccccc-0000-0000-0000-000000000003";
+
+const coveredOut = (asked: string[], mine: unknown[]) => [
+  ...coveredOutFrom(asked, mine),
+];
+
+describe("coveredOutFrom — the ordinary answers", () => {
+  it("drops the ids the database did not name as mine", () => {
+    expect(coveredOut([CO_A, CO_B, CO_C], [CO_A, CO_C])).toEqual([CO_B]);
+  });
+
+  it("treats an empty answer as 'every probed lesson is somebody else's'", () => {
+    expect(coveredOut([CO_A, CO_B], [])).toEqual([CO_A, CO_B]);
+  });
+
+  it("returns nothing when every asked session is mine", () => {
+    expect(coveredOut([CO_A, CO_B], [CO_A, CO_B])).toEqual([]);
+  });
+
+  it("collapses duplicates in the asked set", () => {
+    expect(coveredOut([CO_A, CO_A, CO_B], [CO_A])).toEqual([CO_B]);
+  });
+
+  it("asks nothing, answers nothing", () => {
+    expect(coveredOut([], [])).toEqual([]);
+  });
+});
+
+describe("coveredOutFrom — an answer it cannot vouch for is NOT an answer", () => {
+  it("refuses a response of objects rather than ids, instead of hiding everything", () => {
+    // What `RETURNS TABLE(id uuid)` would produce. Measured 2026-08-12: the
+    // real function returns bare strings — this is what happens if that ever
+    // changes underneath us.
+    expect(coveredOut([CO_A, CO_B], [{ sessions_i_am_main_on: CO_A }])).toEqual(
+      []
+    );
+  });
+
+  it("refuses an answer naming a session we never asked about", () => {
+    expect(coveredOut([CO_A, CO_B], [CO_A, CO_C])).toEqual([]);
+  });
+
+  it("refuses a null element", () => {
+    expect(coveredOut([CO_A, CO_B], [CO_A, null])).toEqual([]);
+  });
+
+  it("refuses a probe large enough that PostgREST could truncate the answer", () => {
+    const many = Array.from(
+      { length: 201 },
+      (_, i) => `dddddddd-0000-0000-0000-${String(i).padStart(12, "0")}`
+    );
+    expect(coveredOutFrom(many, many.slice(0, 100)).size).toBe(0);
+    // …and one under the cap still answers normally, so the cap is a cap and
+    // not an off-by-one that disables the feature.
+    expect(coveredOutFrom(many.slice(0, 200), many.slice(0, 199)).size).toBe(1);
   });
 });

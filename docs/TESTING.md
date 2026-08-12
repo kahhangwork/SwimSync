@@ -472,6 +472,26 @@ six checks are database checks that those three rows EXIST**, because an absence
 against a row that was never created passes while proving nothing (32 checks). Admin-only:
 no Expo server needed. Run it on **port 3100**, not 3000 — the stack and ports are shared
 with other worktrees: `ADMIN_URL=http://localhost:3100 node drivers/verify-class-students.mjs`;
+`verify-coach-roster.mjs` (+ `fixtures-coach-roster.sql` and its `-teardown.sql`) drives
+**Wave 3's lesson-level coach roster** end to end — **25 checks**, across the admin panel and
+the coach app, as three personas. Wave 3 shipped with none of this: 40 pgTAP, 40 vitest, 40
+jest and a manual walk, and nothing in the nightly sweep. What only a browser can reach is the
+**substitute's RLS path** — the class title rendering at all, the enrolled child, and above all
+the **trial guest**, whose invisibility is a billing month that will not close with no override
+and nothing on any screen saying why. The two coaches are deliberately NOT admins (§7.131 — the
+seed coach is also the tenant admin, so no narrowing can be observed on him), and the teardown
+is CLASS-scoped across every month, because `assign_session_coach()` creates lesson rows the
+fixture never named (§7.132) and a lesson at `today - 7` straddles two months near the 1st. **Its sabotage signature is measured, and measuring it found two checks
+that were decorative**: with the client sabotaged to hide every lesson it still scored 25/25
+until the fixture gave the second class's lesson a `lesson_sessions` row (the Schedule tab only
+probes a lesson that has one), and with `sessions_i_am_main_on` dropped entirely it scored
+25/25 until the replaced-coach checks were moved BEFORE the substitute marks the lesson — a
+fully marked lesson leaves the backlog whatever its roster says (§7.140). The signature now
+reads: revert the guard → abort at 6b; delete only the absence branch → 6c; hide everything →
+17; drop the RPC → 16. ⚠ **Not re-runnable by hand** — check 14 marks the lesson and check 0
+needs it unmarked; apply the teardown and the fixture between runs. Log in as
+`coach@swimsync.test` for the admin half; the two roster coaches are `roster-sub@` and
+`roster-shadow@swimsync.test`, `password123`;
 `verify-multi-class.mjs` (+ `fixtures-multi-class.sql` and its `-teardown.sql`) drives
 **a child in two classes** (Wave 2) across admin, database and parent app — 17 checks. The
 one that carries the weight is the **reveal guard**: it counts remove-buttons *inside

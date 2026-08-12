@@ -1,11 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-11 (2nd session) — **Wave 3 is LIVE: a lesson has its own coaches**
-(§8.44). `20260811000200` + both apps. Nine gotchas, **§7.128–§7.136**; the apps shipped
-AHEAD of their migration (`docs/DEPLOYMENT.md` §11.9) and three defects were found by running._
+_Last updated: 2026-08-12 — **The Wave 3 follow-up shipped** (§8.45): the guard
+`assign_session_coach` owed, `sessions_i_am_main_on`, and `verify-coach-roster.mjs` (25 checks).
+`20260812000100` + both apps. Five gotchas, **§7.137–§7.141**._
 
-_Previously, 2026-08-11 — **Wave 2: a child can attend more than one class** (§8.43),
-`20260811000100`. **§7.123–§7.127**._
+_Previously, 2026-08-11 — **Wave 3: a lesson has its own coaches** (§8.44), `20260811000200`._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -141,7 +140,8 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | A class can be RETIRED without losing money | pgTAP 23, LIVE | PRD §7.3 · §8.39 |
 | An unmarked GUEST holds the month open; nothing new enters a retired class | pgTAP + Deno, LIVE 2026-08-10 | PRD §7.3 · §8.40 |
 | **A child can attend MORE THAN ONE class a week** | pgTAP + vitest + jest + 17-check driver, LIVE 2026-08-11 | PRD §7.4, §7.20 · §8.43 |
-| **A LESSON has its own coaches — a substitute, and shadows paid their own rate** | pgTAP 40 + vitest + jest + UI gate, LIVE 2026-08-11 | PRD §7.13, §7.6 · §8.44 |
+| **A LESSON has its own coaches — a substitute, and shadows paid their own rate** | pgTAP 56 + vitest + jest + **25-check driver** | PRD §7.13, §7.6 · §8.44, §8.45 |
+| **…and its main coach cannot be demoted by being shadowed** — row main *and* absence main | pgTAP 16, `20260812000100` | PRD §7.13 · §8.45 |
 | Automated tests — pgTAP + Deno backend, vitest + jest-expo apps, all in CI on push | CI | `docs/TESTING.md` §5 |
 
 **Counts are deliberately not written here.** The runner is the fact; a number in prose is
@@ -343,6 +343,43 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.45 (2026-08-12) — THE WAVE 3 FOLLOW-UP: THE OWED GUARD, AND THE DRIVER
+
+**Shipped** — `20260812000100` + both apps + `verify-coach-roster.mjs`. Closes all three
+Wave-3-descended `BACKLOG.md` items except the Attendance page's Coach column, which carries an
+unmade product choice. Plan and its ranked risk review: `docs/plans/WAVE_3_FOLLOWUP_PLAN.md`.
+
+**The guard is WIDER than the backlog item described, and that is the finding.** A lesson has
+two ways to have a main — a `session_coaches` row, and the **absence rule** (no row, so the
+class's own coach teaches it) — and the shadow branch could demote either. A row-only guard
+misses the second entirely. `assignableShadows()` already filtered by the *effective* main, so
+the client refused both and only the server half was missing.
+
+**Four things were found by RUNNING, and none was visible by reading** — the same lesson Wave 3
+recorded, at a higher rate. §7.137 (the obvious pre-check form is TOCTOU, and the race is the
+exact bug being fixed — the correct form is one statement, measured). §7.138 (the fail-loud
+direction INVERTS when a per-item probe becomes a batch: "absent from the answer" silently
+becomes the unsafe verdict). §7.140 (**two driver checks were decorative**: one scored 25/25
+with the client sabotaged to hide every lesson, the other scored 25/25 with the RPC dropped —
+found only by measuring the sabotage signature, fixed by a fixture row and by reordering).
+§7.141 (a deep-linked RN-web screen renders perfectly and cannot be operated).
+
+**The plan was wrong about the fixture, and being wrong loudly is why it was cheap.** It
+specified times derived from `now()` so the lesson had "already ended". At 01:19 SGT that puts
+the lesson on *yesterday's* weekday, which the Schedule tab renders as **Upcoming** — a green
+fixture with an empty NEEDS MARKING list. Last week's same-weekday lesson is both weekday- and
+time-of-day-agnostic; `end_time` went back to a literal.
+
+**Verified:** pgTAP **693** (was 677; +16, each proven red by a *targeted* sabotage — guard
+removed → 1,2,6,7; absence branch only → 6,7; function dropped → 8–16); Deno 139 ×2 (§7.15);
+jest **357** (+9, the four hardening cases proven red against the naive implementation);
+vitest 299 unchanged; typecheck both; `verify-coach-roster` **25/25** with its signature
+measured; `verify-schedule-week` 21/21 **before and after** Step 3; fixture round-trip all 21
+clean; rollback rehearsed (677/677 under the DOWN, and the DOWN's body proven byte-identical to
+`pg_get_functiondef` by diff); `anon` EXECUTE 13 → 13 local.
+
+---
+
 ## 8.44 (2026-08-11, 2nd session) — WAVE 3: A LESSON HAS ITS OWN COACHES
 
 **Shipped and LIVE** — `20260811000200` + both apps. Plan and its ranked risk review:
@@ -376,52 +413,6 @@ vitest **299**; jest **348**; typecheck both; fixture round-trip exit 0; rollbac
 production grant dump re-checked — `anon` EXECUTE still 18, 0 blanket table grants.
 
 ---
-
-## 8.43 (2026-08-11) — WAVE 2: A CHILD CAN ATTEND MORE THAN ONE CLASS
-
-**Shipped and live** — `20260811000100`, `936e3bd` on `main`, both web apps deployed and
-confirmed by grepping the served bundles, not by a status code (§7.31). PRD §7.4 and §7.20
-carry the behaviour; `docs/plans/WAVE_2_PLAN.md` carries the decisions and the ranked risk
-review it was built from.
-
-**The feature was the small half.** `one_active_enrolment_per_student` was load-bearing for
-three pieces of code that had nothing to do with the product rule, and each would have
-failed silently: `book_makeup()` derived its home class with a `SELECT INTO` whose
-determinism came only from that index, and that value prices an invoice line; the same
-function's "own class" refusal covered every class a child was in *only because* there was
-one; and `close_student_enrolment()` closed "the" enrolment by closing all of them. The
-engine, by contrast, needed **nothing** — it already loops per class, so `BACKLOG.md`'s
-"reworks `expectedStudentsOn()`" was stale when it was written.
-
-**A real production breakage, and it is the most valuable thing here (§7.123).** Dropping
-`close_student_enrolment(uuid, boolean)` broke "Remove from class" on the live admin and
-coach app for the window between `supabase db push` and the push to `main` — the deployed
-client called a signature that no longer existed. §7.60's "migrations first" is right for a
-backward-*compatible* change and wrong for one that removes a signature; `book_makeup`
-survived the same window only because its new parameter has a default. The plan, the
-adversarial review and the pre-flight all passed, because every one of them checked the
-migration against the database and none against the deployed client.
-
-**Two things were found by running rather than reading**, which is the reproducible lesson.
-Smoke-testing the migration's ten cases before writing any pgTAP caught an overlap trigger
-that reported *"Mon 5pm clashes with Mon 5pm"* and masked a `23505` (§7.126). Measuring the
-new driver's sabotage signature caught a check of its own that counted a coach name the seed
-does not use — it matched zero times and passed while testing nothing.
-
-**Deliberately not done.** No compatibility shim for the dropped signature: the window was
-one Vercel build and the blast radius one admin action, so it was accepted rather than
-engineered around — but §7.123 is why the next one gets ordered differently. `book_trial()`
-still refuses a child with an active enrolment in any class; under multi-class that is a
-policy choice rather than a mechanical one, and the user's call was to leave it (that
-business will not trial an existing customer).
-
-**Verified:** pgTAP **637** (was 617, incl. new `multi_class.test.sql`, proven red by running
-the DOWN file); Deno **139 ×2** (§7.15); vitest 259; jest 308; `verify-multi-class` **17/17**;
-`check-fixture-roundtrip.sh` exit 0; rollback rehearsed; remote grant dump re-checked —
-`anon` EXECUTE still 18, both old signatures gone.
-
----
-
 
 ### Older sessions — the ledger
 
@@ -470,21 +461,21 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### ⚠ THE NEXT SWEEP HAS NEVER SEEN WAVE 3 — and there is no driver for it yet
+### ⚠ THE NEXT SWEEP HAS NEVER SEEN WAVE 3 — but there IS a driver for it now
 
 The last sweep, **`31430917020`, was GREEN**: all 39 drivers, against `160cb09` — i.e. Wave 2,
 not Wave 3. It executed Tuesday 2026-08-11 SGT (GitHub labels it `2026-08-10`; the cron is
 20:00 UTC — **§7.122**) and closed `ui-driver-rot` issue #3 itself.
 
-- **Wave 3 shipped after it, and shipped NO driver** — the two worktrees proved their halves
-  with unit tests and a manual UI walk instead. **Nothing in the sweep covers Wave 3 at all**,
-  so it is the one shipped surface that would rot silently. Filed as *Wave 3 shipped with no
-  UI driver* (**S**) in **`BACKLOG.md`** — which is where it is tracked, **not** in the plan;
-  plans here are history, not queues.
+- **Wave 3 shipped after it with no driver; `verify-coach-roster.mjs` closed that on
+  2026-08-12** (§8.45, 25 checks). **The next sweep is its first**, so watch it: it is the
+  newest driver and the only one that has never faced one. It is also **not re-runnable by
+  hand** — check 14 marks the lesson and check 0 needs it unmarked; apply the teardown and the
+  fixture between runs. The sweep resets per driver, so this only bites a hand-run.
 - `gh run list --workflow=ui-drivers.yml` and issue #3's own state are the fact.
 - The two-sweep red streak (`31277289374`, `31334766457`) is closed: `verify-trials` was
   already fixed, and `schedule-week` 17/19 → 21/21 landed as `287142b` (§8.42).
-- **Every driver has now faced a sweep.** There is no never-yet-swept set left to watch.
+- Every OTHER driver has faced a sweep; `verify-coach-roster` is the one exception, above.
 
 > **Re-read the run, not this paragraph.** `gh run list --workflow=ui-drivers.yml` and issue
 > #3's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a full day
@@ -518,17 +509,15 @@ counts rather than tests presence (§7.118).
 `docs/plans/` are history, not queues. **`BACKLOG.md` → `## Build order` governs what comes
 next** — the decisions the ranking rests on are in a table at its top.
 
-**⚠ ONE MIGRATION IS OWED, and it should be the next thing built.** Wave 3 shipped an
-asymmetry: **`assign_session_coach`'s shadow branch can demote a lesson's main**
-(`ON CONFLICT … DO UPDATE SET role = 'shadow'`), which silently re-attributes that lesson's
-pay back to the class's coach. Only a **client-side** re-check guards it in production today.
-`set_session_main_coach()` refuses `ON CONFLICT DO NOTHING` for the mirror of exactly this
-reason. **S**, in `BACKLOG.md`, and worth bundling with the set-returning roster gate
-(`sessions_i_am_main_on`) so one migration closes both.
+**THE MIGRATION THAT WAS OWED IS PAID** (§8.45, `20260812000100`): the shadow branch can no
+longer demote a lesson's main — in **either** of the two ways a lesson has one, the roster row
+*and* the absence rule, which is wider than the item described. `sessions_i_am_main_on` shipped
+in the same migration and the coach app consumes it. **The migration queue is empty again.**
 
-**Three small items filed rather than fixed**, all in `BACKLOG.md`:
-- *The Attendance page's Coach column can name someone who did not teach* (**S**) — new, and
-  it is the page an admin checks when wages look odd.
+**Three small items remain filed rather than fixed**, all in `BACKLOG.md`:
+- *The Attendance page's Coach column can name someone who did not teach* (**S**) — the page an
+  admin checks when wages look odd. Left deliberately: the fix carries a product choice (show
+  the roster main, or show both with the cover annotated as Coach Wages does).
 - *The admin's invoice pre-flight misses an unmarked EXTRA lesson* (**S**) — over-reports
   readiness; **never under-bills**, which is why it is S.
 - *Deleting an admin destroys the audit history* (**S**) — unchanged since 2026-08-09.

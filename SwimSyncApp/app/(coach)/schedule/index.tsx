@@ -702,11 +702,14 @@ export default function ScheduleScreen() {
     // gate — the same predicate `attendance_write` uses — about the lessons
     // where the answer can still change what is on screen.
     //
-    // ⚠ THE PROBE SET IS BOUNDED BY CONSTRUCTION, AND THAT MATTERS: this is one
-    // round trip per session. Only lessons of MY OWN classes, only ones that
-    // already HAVE a session row (an assignment creates it, so a lesson without
-    // one cannot be covered), and only ones still unfinished. A month of marked
-    // history asks nothing.
+    // ⚠ THE PROBE SET IS BOUNDED BY CONSTRUCTION, AND THAT STILL MATTERS even
+    // though it is now ONE round trip for the whole array
+    // (`sessions_i_am_main_on`, 20260812000100): the answer is subtracted from
+    // what was asked, so an over-generous probe set is what would eventually
+    // meet PostgREST's truncating `max-rows`. Only lessons of MY OWN classes,
+    // only ones that already HAVE a session row (an assignment creates it, so a
+    // lesson without one cannot be covered), and only ones still unfinished. A
+    // month of marked history asks nothing.
     const coveredOut = await fetchCoveredOutSessions(probeIds);
     if (!current()) return;
 

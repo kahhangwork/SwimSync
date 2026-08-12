@@ -280,7 +280,10 @@ export default function LessonCoachesPage() {
     // filters them out of the dropdown, but that list is built from state, and
     // a second admin (or a second tab) can make somebody main after this tab
     // rendered. set_session_main_coach() refuses DO NOTHING for exactly this
-    // class of reason; the mirror case has no server-side guard yet.
+    // class of reason, and since 20260812000100 the server refuses this one too
+    // — in BOTH directions, the row main and the absence-rule main. This check
+    // stays because it names the coach and costs no round trip; the server's
+    // message is the one a real race produces.
     const lesson = lessons.find((l) => l.session_date === date);
     if (role === "shadow" && lesson?.main.coach_id === pickedCoach) {
       setMessage(
