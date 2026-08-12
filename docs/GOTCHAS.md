@@ -2412,3 +2412,20 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       exactly like an RLS refusal of the substitute, which was the thing under test.
     - A bare `page.reload()` of a nested route bounces to `/login` while the session
       rehydrates; `gotoAuthed` retries it. (2026-08-12.)
+
+142. **A GREP NARROWER THAN THE CALL FORM MISSES EXACTLY THE CALL SITES THAT MATTER, AND
+    "I GREPPED FOR IT" THEN READS AS PROOF.** `HANDOVER.md` carried a prohibition naming the
+    coach app's RPC callers. It said "no RPCs at all" (false, and that is why §7.123's live
+    breakage was not anticipated), was corrected to a list, and the list was stale one day
+    later. Replacing it with a command was the right move — and the first command written was
+    `grep -rn 'supabase.rpc(' SwimSyncApp`, which returns 9 hits and **misses 6**, including
+    `close_student_enrolment()`: four call sites go through an injected client (`db.rpc`,
+    `lib/studentStatus.ts`, a thenable-query-builder wrapper). The missed call is the very one
+    whose dropped signature took down the live admin.
+    - **The pattern is `\.rpc(`.** 13 distinct RPCs, 15 call sites, as of 2026-08-12.
+    - **The general shape: grep for the METHOD, not for the receiver.** A receiver is a local
+      variable name and can be anything — `supabase`, `db`, `client`, a parameter. Any
+      dependency-injected or wrapped client defeats a receiver-anchored pattern silently, and
+      silence from grep is indistinguishable from absence.
+    - **Sanity-check a "complete" grep against one call site you already know exists.** That
+      is a two-second check and it is what caught this. (2026-08-12.)

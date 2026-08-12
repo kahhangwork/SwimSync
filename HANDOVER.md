@@ -2,7 +2,7 @@
 
 _Last updated: 2026-08-12 — **The Wave 3 follow-up shipped** (§8.45): the guard
 `assign_session_coach` owed, `sessions_i_am_main_on`, and `verify-coach-roster.mjs` (25 checks).
-`20260812000100` + both apps. Five gotchas, **§7.137–§7.141**._
+`20260812000100` + both apps. Six gotchas, **§7.137–§7.142**._
 
 _Previously, 2026-08-11 — **Wave 3: a lesson has its own coaches** (§8.44), `20260811000200`._
 
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.136** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.142** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -194,13 +194,18 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
 - **The package-reference trigger's NAME is part of the contract** — it must sort after
   `trg_parent_package_lifecycle`, which fills `tenant_id`. Renaming it breaks **every**
   package request. `docs/ARCHITECTURE.md` §6.
-- **The coach app calls almost no RPCs** — attendance marking, plus `close_student_enrolment()`
-  and `set_students_active()` from the roster (`SwimSyncApp/lib/studentStatus.ts`). *(This
-  bullet read "no RPCs at all" until 2026-08-11 and was simply false — caught only because
-  Wave 2 changed one of those signatures and the grep found the caller. A prohibition that is
-  wrong is worse than none: it is why §7.123's breakage was not anticipated.)* A private coach
-  arranges trials through their tenant-admin account; `add_unclaimed_student()` still accepts
-  a coach caller server-side (pgTAP pins it), but no UI reaches it. §8.10/§8.11.
+- **Before changing an RPC signature, GREP for the coach app's callers — do not trust a list,
+  including this one.** `grep -rn 'supabase.rpc(' SwimSyncApp` is the fact. This bullet said
+  "no RPCs at all" until 2026-08-11 (false — that is why §7.123's live breakage was not
+  anticipated), was corrected to an enumeration, and **the enumeration was stale within one
+  day**: 2026-08-12 added two more callers. A list of call sites drifts; the command that
+  produces it does not. **⚠ The pattern is `\.rpc(`, NOT `supabase.rpc(`** — four call sites
+  including `close_student_enrolment()` go through an injected client (`db.rpc`,
+  `SwimSyncApp/lib/studentStatus.ts`), so the narrower pattern misses the very call whose
+  signature change caused §7.123. Found while writing this bullet, which is the third time
+  this fact has been wrong. A private coach arranges trials through their tenant-admin
+  account; `add_unclaimed_student()` still accepts a coach caller server-side (pgTAP pins it),
+  but no UI reaches it. §8.10/§8.11.
 - **NEEDS MARKING is FLOOR-scoped and deliberately ignores the week selector** — week-scoping
   hides a straggler the coach has no reason to look for, and unmarked attendance blocks
   billing with no override (§8i). `verify-schedule-week.mjs` pins it, proven red by scoping
@@ -275,8 +280,7 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **Production was fully caught up as of 2026-08-10** — every migration through
-> `20260810000100` applied. THREE edge functions exist: `generate-invoices`,
+> **Production was fully caught up as of 2026-08-12**, through `20260812000100`. THREE edge functions exist: `generate-invoices`,
 > `package-emails` (verify_jwt ON) and **`public-invoice` (verify_jwt false, deliberately —
 > the invoice token is the access control)**. *(Version numbers used to be written here and
 > went stale twice. `supabase functions list` and `supabase migration list --linked` are the
@@ -556,8 +560,10 @@ function this session touched (`docs/DEPLOYMENT.md` §11.7).
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **The migration queue is empty but ONE IS OWED** — see the shadow-branch item above. The
-latest applied is `20260811000200` (the lesson coach roster, §8.44); production confirmed
-caught up 2026-08-11, 0 pending. **The new rule this session bought is about ORDER, not
+latest applied is `20260812000100` (the roster guard + `sessions_i_am_main_on`, §8.45);
+production confirmed caught up 2026-08-12, 0 pending — and the ordering gate below was
+followed for the first time deliberately: the migration merged and pushed to `main` ALONE,
+`migration list --linked` was checked, and only then did the app commit land. **The new rule this session bought is about ORDER, not
 content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must
 land BEFORE the first app branch does.** A worktree cannot author one, so no worktree can see
 that the deploy is incomplete — and both here pushed correct code onto a database that did not

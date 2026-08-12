@@ -118,6 +118,15 @@ still point at the local stack for dev.
    (§7.124). ⚠ **Grep the dump with QUOTED identifiers** (`"public"."book_makeup"`): a
    `public.book_makeup` pattern matches nothing and reads exactly like a failed deploy.
 
+   **Re-run 2026-08-12 after `20260812000100`** (the roster guard — creates one function,
+   `sessions_i_am_main_on(uuid[])`, and replaces `assign_session_coach`): `anon` EXECUTE
+   still **18**, unchanged from the 2026-08-04 baseline for the third migration running, so
+   the closed leak has now survived three function-creating migrations. The new function
+   carries `REVOKE ALL … FROM PUBLIC` plus `TO "service_role"` and `TO "authenticated"` and
+   nothing else. **Nothing about this one needed the signature half of the check** — it adds
+   an overload-free new name and replaces an existing signature in place, so there was no old
+   overload to strand (contrast Wave 2, above, where that half was the point).
+
    **`service_role` still gets a default EXECUTE on every new function, and that is the
    untouched-by-design cell** (§8.29 scoped the sweep to the client roles). Observed
    2026-08-06: `is_tenant_owner()` and `profile_reference_columns()` came out of
