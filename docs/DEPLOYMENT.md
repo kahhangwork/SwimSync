@@ -278,3 +278,17 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
       only for the app half). Post-deploy dump: `anon` EXECUTE still 18, zero
       `session_coach_role` remnants. Rollback: `supabase/rollback/20260812000300_…_DOWN.sql`,
       committed before the deploy and rehearsed byte-identical.
+
+11. **Wave 4 deploy record (2026-08-12): the §11.9 order held, and it was additive-only.**
+    `20260812000400` (`326f0f4`) landed on `main` alone; the user ran `supabase db push`
+    themselves (the session's permission layer blocks a production push from the agent —
+    expect to hand that command over); `migration list --linked` remote column filled (the
+    `pgdelta` certificate stack trace printed for the **fifth** time — normal output); grant
+    dump: `anon` EXECUTE still **18**, the new function's remote ACL exactly
+    `REVOKE … FROM PUBLIC` + `GRANT … TO authenticated`. Only then did the app commit
+    (`b81e5bf`) land. Rollback `supabase/rollback/20260812_unbilled_sealed_lessons_DOWN.sql`,
+    committed before the deploy and rehearsed. **The admin serve-check for a
+    renders-only-with-data feature:** the report section proves nothing when production has
+    no orphans, but the Sidebar fires `rpc/unbilled_sealed_lessons` on **every** admin page
+    — DevTools → Network → filter `unbilled`; a 200 with `[]` is the new build seen working
+    (item 10's "a query the page must have made", §7.31).

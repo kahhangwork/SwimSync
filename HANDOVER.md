@@ -1,11 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-12 (3rd) — **The owed shim migration shipped** (§8.47):
-`20260812000300` dropped the 4-arg `assign_session_coach` + `session_coach_role`, LIVE.
-The migration queue is EMPTY; Wave 4 is next._
+_Last updated: 2026-08-12 (4th) — **Wave 4 SHIPPED, LIVE** (§8.48): the orphan-lesson
+report — `20260812000400` + the Invoices-page section + sidebar badge. Nightly-red
+triaged, **issue #4 closed**; the migration queue is empty again._
 
-_Previously, 2026-08-12 (2nd) — class-level shadow coaches (§8.46): `20260812000200` + both
-apps, LIVE. Substitutes stay per-lesson. Four gotchas, **§7.143–§7.146**._
+_Previously, 2026-08-12 (3rd) — the shim drop (§8.47): `20260812000300` removed the 4-arg
+`assign_session_coach` + `session_coach_role`, LIVE, on the schedule it was filed on._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -130,7 +130,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | The attendance window is a DB rule; a mid-month joiner no longer blocks a month | pgTAP, LIVE | PRD §7.5 · §8.15 |
 | A month billed LATE can no longer be permanently unbillable (`markable_floor`) | pgTAP 18, LIVE | PRD §7.6 · §8.32 |
 | The coach's landing tab is a WEEK, not a day | jest 308 + 19-check driver, LIVE | PRD §14.2, §7.5 · §8.34 |
-| Every lesson list says whether it has been marked | driver, LIVE 2026-07-26 | PRD §7.6 · §8.19 |
+| **A lesson recorded into an already-BILLED month is reported, and settled** | pgTAP 18 + vitest + 13-check driver, LIVE 2026-08-12 | PRD §7.17 · §8.48 |
 | The admin's tables sort; student counts mean ACTIVE | LIVE 2026-07-26 | PRD §14.3 · §8.19 |
 | Every audit row knows which business it is about | pgTAP, LIVE | `docs/ARCHITECTURE.md` §6 · §8.28 |
 | Every EDIT to a child is recorded (`SECURITY DEFINER` trigger) | pgTAP 11 + 4 drivers, LIVE 2026-08-09 | §7.104 · §8.38 |
@@ -170,6 +170,10 @@ is a guard whose first real firing is still ahead of you.
   coach is hired; `generate_coach_payouts` also skips a coach with no rate, so **no payout has
   ever been generated on production.** The whole model is verified locally against non-admin
   coaches in a browser (`verify-coach-roster`, 30 checks) — that is the only place it can be.
+- **The orphan-lesson report** — production shows zero lines and the badge has never lit
+  on real data (every July invoice is Paid; nothing has been recorded into July since it
+  was billed). That is the expected state: its first real firing is a backdated
+  enrolment, a backdated make-up/trial, or an absent→present edit after billing.
 - **Multiple classes per child** — no production child holds two enrolments yet, so neither
   schedule guard has ever refused anything real and no admin has pressed *+ Add class*. The
   first real one is worth watching: it is also the first time `'mixed'` package coverage
@@ -349,6 +353,31 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.48 (2026-08-12, 4th) — WAVE 4: A SEALED MONTH CAN NO LONGER LOSE MONEY SILENTLY
+
+**Shipped and LIVE, migration-first** — `20260812000400` (`unbilled_sealed_lessons()`),
+then the Invoices-page standing report + sidebar badge, both settle paths through one
+shared payload builder. Spec: **PRD §7.17** (*recorded into an already-billed month*).
+Deploy record — including the admin serve-check for a feature that renders only with
+data — **`docs/DEPLOYMENT.md` §11.11**. All three suites: `docs/TESTING.md` §5.
+
+**Deliberately:** counts + dates only (pricing stays in the engine — the migration header
+says why); no bulk settle; the predicate is per **(student, lesson)** against
+`invoice_items`, so a billed child's one extra backdated lesson reports too.
+
+**The nightly-red was triaged and issue #4 CLOSED.** The 2026-08-11 abort was a one-off
+Docker reset flake — today's manual dispatch ran the same reset 40× and `invoice-controls`
+passed 18/18. The dispatch's one red was `platform-admin-scope`'s deliberate nav-inventory
+pin, stale since Wave 3 added Lesson Coaches: bumped 16→17 (`dacef7e`), 32/32.
+`verify-coach-roster` passed its first-ever sweep, 30/30.
+
+**Verified:** pgTAP **753** (+18, every clause proven red by 7 measured sabotages) ·
+vitest **304** (payload drift-test proven red) · typecheck · driver **13/13** · fixture
+round-trip 22/22 · rollback rehearsed (DOWN applied, all 735 pre-change checks green) ·
+post-deploy grant dump clean (`anon` EXECUTE still 18) · CI green ×3.
+
+---
+
 ## 8.47 (2026-08-12, 3rd) — THE SHIM IS GONE, ON THE SCHEDULE IT WAS FILED ON
 
 **Shipped and LIVE** — `20260812000300` dropped the 4-arg `assign_session_coach` compat shim
@@ -367,40 +396,6 @@ DOWN applied, restored body byte-identical to `pg_get_functiondef()`, both grant
 `migration list --linked` remote filled · post-deploy dump clean · CI green.
 
 **Nothing deliberately left undone.** The queue of owed migrations is empty.
-
----
-
-## 8.46 (2026-08-12, 2nd) — A SHADOW BELONGS TO THE CLASS, NOT TO ONE LESSON
-
-**Shipped and LIVE** — `20260812000200` + both apps, deployed migration-first.
-Plan and its ranked risk review: `docs/plans/CLASS_SHADOW_COACHES_PLAN.md`. The model, and
-why the two halves take opposite date sources: **`docs/ARCHITECTURE.md` §6z**.
-
-**It supersedes a filed bug instead of fixing it.** `BACKLOG.md`'s *`Clear` can leave a lesson
-unmarkable AND un-nagged* is struck as SUPERSEDED: with shadows off the lesson there is no row
-for `Clear` to strand. That deleted `20260812000100`'s guard whole — **one day old**, with its
-16 pgTAP checks — and nearly took `sessions_i_am_main_on`'s only coverage with it, since both
-lived in one file. Split before deleting (`docs/TESTING.md` §5).
-
-**Two of the four gotchas are mine, found by `/commit-review` after I wrote the rule.**
-§7.143 is *"a seal is only a seal if every writer is behind it"* — graduated by this very
-migration, then violated by it: the assignment table's guards lived only in its RPCs and a
-direct PostgREST write walked past all three, **measured**. §7.144 is two definitions of
-"settled" in one engine. §7.145 (a dropped column silently breaks string-body functions) and
-§7.146 (`me` is null on a deep link, so trust the server-answered input over the fail-open
-one) were both caught before deploy — §7.146 by the driver, which went red the moment I got
-the precedence backwards.
-
-**Deliberately not done:** the compat shim's removal, filed in `BACKLOG.md` **before** the
-shim shipped and blocked on a served-bundle check; and the production smoke, which cannot say
-anything on a single-coach tenant (§3, DORMANT).
-
-**Verified:** pgTAP **736** (was 693; +50 new, +9 recovered, −16 deleted, each new case proven
-red by targeted sabotage) · Deno 139 ×2 (§7.15) · vitest **301** · jest **359** · typecheck
-both · fixture round-trip 21/21 · `verify-coach-roster` **30/30** with its signature measured ·
-`verify-schedule-week` 21/21 · rollback rehearsed (all 693 pre-change checks pass under the
-DOWN, every restored body byte-identical to `pg_get_functiondef()`) · post-deploy grant dump:
-`anon` EXECUTE still **18**, none of them this wave's.
 
 ---
 
@@ -428,10 +423,11 @@ header for what happens when it isn't.
 **2026-08-02: July was billed for real, and real money was collected** (§8.26, §3).
 Everything below is the monthly loop from here on:
 
-1. **Chase the remaining outstanding invoices** — this is what the WhatsApp queue was
-   built for (Invoices → *WhatsApp reminders*; one press of Send per parent; the
-   **Claimed** filter collects "parent says paid" rows to check against the bank).
-   `SELECT status, count(*) FROM invoices GROUP BY 1;` is the honest scoreboard.
+1. **July is fully collected** — the live Invoices page showed every invoice Paid,
+   S$0 outstanding, on 2026-08-12. That is a hint, not a count:
+   `SELECT status, count(*) FROM invoices GROUP BY 1;` is the honest scoreboard. The
+   WhatsApp queue (Invoices → *WhatsApp reminders*, with the **Claimed** filter) is the
+   chasing tool when a future month needs it.
 2. **Keep August marked as it happens** (the coach's **NEEDS MARKING** list on the
    Schedule tab is the tracker), then **bill August in early September** — same runbook, now routine. The
    marking window still floors at the 1st of last month (§8.15): August's lessons are
@@ -451,39 +447,21 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### ⚠ LAST NIGHT'S SWEEP ABORTED ON INFRA — AND NOTHING AFTER WAVE 3 HAS BEEN SWEPT
+### The sweep question is SETTLED — issue #4 closed; tonight is Wave 4's first look
 
-The latest sweep, **`31535086573`, ABORTED**: 12 drivers passed, then `invoice-controls` died
-in 18s on **"db reset failed"** — an infrastructure step, not an assertion — and the remaining
-26 never ran. It executed 2026-08-12 ~04:52 SGT (GitHub labels it `2026-08-11`; the cron is
-20:00 UTC — **§7.122**) against `df5b20a`, i.e. Wave 3 (§8.44) but **nothing after it**.
-**`ui-driver-rot` issue #4 is open.** Watch tonight's run first: a second reset failure is a
-workflow problem, not rot; a one-off was a CI flake. (The last GREEN sweep, all 39 drivers,
-was `31430917020` against Wave 2.)
+The 2026-08-11 abort was a **one-off Docker reset flake** (the 2026-08-12 manual dispatch
+`31581803912` ran the same reset 40×; `invoice-controls`, the driver that died, passed
+18/18). That dispatch scored **39/40**, and its one red was `platform-admin-scope`'s
+deliberate nav-inventory pin, stale since Wave 3 added Lesson Coaches — bumped 16→17
+(`dacef7e`, 32/32 local). Full triage: **issue #4's closing comment**.
+**Tonight's cron is the first sweep to see Wave 4 and `verify-orphan-report`.**
 
-- **`verify-coach-roster.mjs` has still never faced a sweep** — it did not exist in the aborted
-  run's tree. REWRITTEN on 2026-08-12 (§8.46, now 30 checks); the first sweep to include it is
-  also the first to see §8.45–§8.47. Not re-runnable by hand — it marks the lesson, writes an
-  absence, and its shadow assignment is refused a second time by a unique index; apply the
-  teardown and the fixture between runs. It also **collides with `verify-schedule-week`**: both
-  use the same weekday last week, so leaving its fixture in place scores that driver 20/21. The
-  sweep resets per driver, so both only bite a hand-run.
-- `gh run list --workflow=ui-drivers.yml` and issue #4's own state are the fact.
+> **Re-read the run, not this paragraph.** `gh run list --workflow=ui-drivers.yml` and the
+> rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
+> full day after the sweep had gone red beneath it.
 
-> **Re-read the run, not this paragraph.** `gh run list --workflow=ui-drivers.yml` and issue
-> #3's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a full day
-> after the sweep had gone red beneath it, which is exactly what a green heading invites.
-
-**`verify-multi-class` is not re-runnable by hand** — it removes a class through the UI, and
-its fixture's `NOT EXISTS` guard is keyed on `(student, class)` regardless of `is_active`, so
-a second run finds the row present-but-closed and does not restore it. Apply the teardown
-first. The sweep resets per driver, so this only bites a hand-run.
-
-**Three others mutate SHARED state**, which is why a sweep is not a substitute for a reset:
-`verify-paynow-fallback` writes the seed tenant's PayNow columns, `verify-class-deactivation`
-retires a seed-adjacent class, and `verify-trials` **leaves a booking behind on every run**
-because it has no fixture at all — hence its *Set all* marking step and a final assertion that
-counts rather than tests presence (§7.118).
+**Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
+collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
 
 > **Before triaging any red, read §7.108** — a driver dying on `page.goto(admin/login)` with a
 > 30s `networkidle` timeout is a cold Next.js compile, not rot and not a product bug; `curl`
@@ -496,12 +474,14 @@ counts rather than tests presence (§7.118).
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — Wave 4
+### THE NEXT BUILD — Wave 5
 
-**Waves 1, 2 and 3 are all complete, and the shim removal they owed shipped too**
-(§8.36–§8.40, §8.43, §8.44, §8.47). Their plans in
-`docs/plans/` are history, not queues. **`BACKLOG.md` → `## Build order` governs what comes
-next** — the decisions the ranking rests on are in a table at its top.
+**Waves 1–4 are all complete, plus the shim removal they owed** (§8.36–§8.40, §8.43,
+§8.44, §8.47, §8.48). Their plans in `docs/plans/` are history, not queues.
+**`BACKLOG.md` → `## Build order` governs what comes next** — the decisions the ranking
+rests on are in a table at its top. **Wave 5 (admin authority) is next**: owner transfer
+(a lost owner freezes a business today, SQL the only remedy), then disabling a coach
+account.
 
 **Three small items remain filed rather than fixed**, all in `BACKLOG.md`:
 - *The Attendance page's Coach column can name someone who did not teach* (**S**) — the page an
@@ -510,9 +490,6 @@ next** — the decisions the ranking rests on are in a table at its top.
 - *The admin's invoice pre-flight misses an unmarked EXTRA lesson* (**S**) — over-reports
   readiness; **never under-bills**, which is why it is S.
 - *Deleting an admin destroys the audit history* (**S**) — unchanged since 2026-08-09.
-
-**Wave 4 is next in the ranking** — a lesson recorded into an already-BILLED month, reported
-and settled. Wave 2 unblocked it; Wave 3 did not touch it.
 
 **The `service_role` question is now ANSWERED, and the answer is "don't build the whitelist"**
 (`BACKLOG.md` carries the 11-call-site audit). `generate-invoices` alone touches 21 of 37 tables
@@ -545,9 +522,9 @@ function this session touched (`docs/DEPLOYMENT.md` §11.7).
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **The migration queue is EMPTY.** The latest applied is
-`20260812000300` (the shim drop, §8.47); production confirmed caught up 2026-08-12,
-0 pending — and §8.46's deploy followed the ordering gate below
-for the first time deliberately: the migration merged and pushed to `main` ALONE,
+`20260812000400` (Wave 4's report RPC, §8.48); production confirmed caught up 2026-08-12,
+0 pending — and both of the day's deploys followed the ordering gate below
+deliberately: the migration merged and pushed to `main` ALONE,
 `migration list --linked` was checked, and only then did the app commit land. **The new rule this session bought is about ORDER, not
 content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must
 land BEFORE the first app branch does.** A worktree cannot author one, so no worktree can see

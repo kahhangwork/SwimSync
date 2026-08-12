@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.46** | 2026-08-12 | **Class-level shadow coaches** (`20260812000200`), LIVE; subs stay per-lesson | **§7.143–§7.146** · `docs/ARCHITECTURE.md` §6z · `CLASS_SHADOW_COACHES_PLAN.md` |
 | **8.45** | 2026-08-12 | **The owed-main guard** (`20260812000100`) + `verify-coach-roster.mjs`; guard deleted a day later by §8.46 | **§7.137–§7.141** · `WAVE_3_FOLLOWUP_PLAN.md` |
 | **8.44** | 2026-08-11 | **Wave 3 — a lesson has its own coaches** (`20260811000200`); apps deployed ahead of their migration | **§7.129–§7.136** · `WAVE_3_PLAN.md` · §11.9 |
 | **8.43** | 2026-08-11 | **Wave 2 — a child in >1 class** (`20260811000100`); a dropped signature broke the live admin for one build | **§7.123–§7.127** · `docs/plans/WAVE_2_PLAN.md` |

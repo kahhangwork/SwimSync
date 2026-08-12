@@ -688,6 +688,19 @@ they were written to catch was tested by deliberately re-nesting the buttons and
 still scored 16/16, because RN's responder system does not propagate a press to ancestor
 Touchables. Do not cite them as the nesting guard.
 
+**⚠ Hand-run caveats, collected (the sweep resets per driver, so these bite ONLY a
+hand-run).** Three drivers are **not re-runnable without their teardown**:
+`verify-coach-roster` (marks the lesson; its shadow assignment is refused a second time by
+a unique index — it also **collides with `verify-schedule-week`**, same weekday last week,
+leaving that driver 20/21 if its fixture stays in place), `verify-multi-class` (removes a
+class through the UI; the fixture's `NOT EXISTS` guard is keyed regardless of `is_active`,
+so a second run finds the row present-but-closed and does not restore it), and
+`verify-orphan-report` (settling is its whole act). Three more **mutate SHARED seed
+state**: `verify-paynow-fallback` writes the seed tenant's PayNow columns,
+`verify-class-deactivation` retires a seed-adjacent class, and `verify-trials` **leaves a
+booking behind on every run** — it has no fixture at all, hence its *Set all* marking step
+and a final assertion that counts rather than tests presence (§7.118).
+
 ### Class-level shadow coaches (2026-08-12)
 
 - **`class_shadow_coaches.test.sql` (49; was 50 until `20260812000300` dropped the compat shim
