@@ -272,6 +272,9 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
       reachable chunks are login-shared — a grep there is **vacuous**, and the control proves
       it: the *old* string is absent from those chunks too. Confirm the admin by opening the
       screen, or by a query the page must have made (§7.31, §7.101).
-    - **A shim removal is owed.** Filed in `BACKLOG.md` before the shim shipped, blocked on
-      the app deploy being confirmed by a served-bundle check rather than by the push
-      returning 200.
+    - **The shim removal shipped on schedule: `20260812000300` (2026-08-12), applied to
+      production.** The gate was honoured as written — the user opened the live Classes
+      drawer and saw the shadow section (the Expo bundle was also grepped, which counts
+      only for the app half). Post-deploy dump: `anon` EXECUTE still 18, zero
+      `session_coach_role` remnants. Rollback: `supabase/rollback/20260812000300_…_DOWN.sql`,
+      committed before the deploy and rehearsed byte-identical.

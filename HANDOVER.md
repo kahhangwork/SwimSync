@@ -1,11 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-12 (2nd) — **A shadow coach belongs to the CLASS, not to one lesson**
-(§8.46): `20260812000200` + both apps, LIVE. Substitutes stay per-lesson. Shadow rates, an
-absence tick, and a seal on both. Four gotchas, **§7.143–§7.146**._
+_Last updated: 2026-08-12 (3rd) — **The owed shim migration shipped** (§8.47):
+`20260812000300` dropped the 4-arg `assign_session_coach` + `session_coach_role`, LIVE.
+The migration queue is EMPTY; Wave 4 is next._
 
-_Previously, 2026-08-12 — the Wave 3 follow-up (§8.45), `20260812000100` — **whose guard this
-session deleted**: the state it protected is now unbuildable._
+_Previously, 2026-08-12 (2nd) — class-level shadow coaches (§8.46): `20260812000200` + both
+apps, LIVE. Substitutes stay per-lesson. Four gotchas, **§7.143–§7.146**._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -28,7 +28,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.142** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.146** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -141,7 +141,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | A class can be RETIRED without losing money | pgTAP 23, LIVE | PRD §7.3 · §8.39 |
 | An unmarked GUEST holds the month open; nothing new enters a retired class | pgTAP + Deno, LIVE 2026-08-10 | PRD §7.3 · §8.40 |
 | **A child can attend MORE THAN ONE class a week** | pgTAP + vitest + jest + 17-check driver, LIVE 2026-08-11 | PRD §7.4, §7.20 · §8.43 |
-| **A substitute is per-LESSON; a SHADOW is per-CLASS — dated, paid its own shadow rate** | pgTAP 50 + 9 + vitest + jest + **30-check driver**, LIVE 2026-08-12 | PRD §7.13, §7.6 · `docs/ARCHITECTURE.md` §6z · §8.46 |
+| **A substitute is per-LESSON; a SHADOW is per-CLASS — dated, paid its own shadow rate** | pgTAP 49 + 9 + vitest + jest + **30-check driver**, LIVE 2026-08-12 | PRD §7.13, §7.6 · `docs/ARCHITECTURE.md` §6z · §8.46 |
 | Automated tests — pgTAP + Deno backend, vitest + jest-expo apps, all in CI on push | CI | `docs/TESTING.md` §5 |
 
 **Counts are deliberately not written here.** The runner is the fact; a number in prose is
@@ -349,6 +349,27 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.47 (2026-08-12, 3rd) — THE SHIM IS GONE, ON THE SCHEDULE IT WAS FILED ON
+
+**Shipped and LIVE** — `20260812000300` dropped the 4-arg `assign_session_coach` compat shim
+and the `session_coach_role` enum, exactly as the `BACKLOG.md` entry (deleted in the same
+push) specified. Deploy record, the gate as honoured, and the grant-dump result:
+`docs/DEPLOYMENT.md` §11.10.
+
+**The gate worked as designed.** The precondition was a served-bundle check, not a 200: the
+user opened the live Classes drawer and saw the shadow section. (The Expo bundle was also
+grepped, but that counts only for the app half — the admin cannot be grepped, §11.10.) Only
+then was the branch cut.
+
+**Verified:** CASE 12's new count proven red pre-migration (have 2, want 1) · pgTAP **735**
+(was 736; −1, the shim-grant assertion deleted rather than inverted) · rollback rehearsed —
+DOWN applied, restored body byte-identical to `pg_get_functiondef()`, both grants back ·
+`migration list --linked` remote filled · post-deploy dump clean · CI green.
+
+**Nothing deliberately left undone.** The queue of owed migrations is empty.
+
+---
+
 ## 8.46 (2026-08-12, 2nd) — A SHADOW BELONGS TO THE CLASS, NOT TO ONE LESSON
 
 **Shipped and LIVE** — `20260812000200` + both apps, deployed migration-first.
@@ -380,43 +401,6 @@ both · fixture round-trip 21/21 · `verify-coach-roster` **30/30** with its sig
 `verify-schedule-week` 21/21 · rollback rehearsed (all 693 pre-change checks pass under the
 DOWN, every restored body byte-identical to `pg_get_functiondef()`) · post-deploy grant dump:
 `anon` EXECUTE still **18**, none of them this wave's.
-
----
-
-## 8.45 (2026-08-12) — THE WAVE 3 FOLLOW-UP: THE OWED GUARD, AND THE DRIVER
-
-**Shipped** — `20260812000100` + both apps + `verify-coach-roster.mjs`. Closes all three
-Wave-3-descended `BACKLOG.md` items except the Attendance page's Coach column, which carries an
-unmade product choice. Plan and its ranked risk review: `docs/plans/WAVE_3_FOLLOWUP_PLAN.md`.
-
-**The guard is WIDER than the backlog item described, and that is the finding.** A lesson has
-two ways to have a main — a `session_coaches` row, and the **absence rule** (no row, so the
-class's own coach teaches it) — and the shadow branch could demote either. A row-only guard
-misses the second entirely. `assignableShadows()` already filtered by the *effective* main, so
-the client refused both and only the server half was missing.
-
-**Four things were found by RUNNING, and none was visible by reading** — the same lesson Wave 3
-recorded, at a higher rate. §7.137 (the obvious pre-check form is TOCTOU, and the race is the
-exact bug being fixed — the correct form is one statement, measured). §7.138 (the fail-loud
-direction INVERTS when a per-item probe becomes a batch: "absent from the answer" silently
-becomes the unsafe verdict). §7.140 (**two driver checks were decorative**: one scored 25/25
-with the client sabotaged to hide every lesson, the other scored 25/25 with the RPC dropped —
-found only by measuring the sabotage signature, fixed by a fixture row and by reordering).
-§7.141 (a deep-linked RN-web screen renders perfectly and cannot be operated).
-
-**The plan was wrong about the fixture, and being wrong loudly is why it was cheap.** It
-specified times derived from `now()` so the lesson had "already ended". At 01:19 SGT that puts
-the lesson on *yesterday's* weekday, which the Schedule tab renders as **Upcoming** — a green
-fixture with an empty NEEDS MARKING list. Last week's same-weekday lesson is both weekday- and
-time-of-day-agnostic; `end_time` went back to a literal.
-
-**Verified:** pgTAP **693** (was 677; +16, each proven red by a *targeted* sabotage — guard
-removed → 1,2,6,7; absence branch only → 6,7; function dropped → 8–16); Deno 139 ×2 (§7.15);
-jest **357** (+9, the four hardening cases proven red against the naive implementation);
-vitest 299 unchanged; typecheck both; `verify-coach-roster` **25/25** with its signature
-measured; `verify-schedule-week` 21/21 **before and after** Step 3; fixture round-trip all 21
-clean; rollback rehearsed (677/677 under the DOWN, and the DOWN's body proven byte-identical to
-`pg_get_functiondef` by diff); `anon` EXECUTE 13 → 13 local.
 
 ---
 
@@ -467,22 +451,24 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### ⚠ THE NEXT SWEEP HAS NEVER SEEN WAVE 3 — but there IS a driver for it now
+### ⚠ LAST NIGHT'S SWEEP ABORTED ON INFRA — AND NOTHING AFTER WAVE 3 HAS BEEN SWEPT
 
-The last sweep, **`31430917020`, was GREEN**: all 39 drivers, against `160cb09` — i.e. Wave 2,
-not Wave 3. It executed Tuesday 2026-08-11 SGT (GitHub labels it `2026-08-10`; the cron is
-20:00 UTC — **§7.122**) and closed `ui-driver-rot` issue #3 itself.
+The latest sweep, **`31535086573`, ABORTED**: 12 drivers passed, then `invoice-controls` died
+in 18s on **"db reset failed"** — an infrastructure step, not an assertion — and the remaining
+26 never ran. It executed 2026-08-12 ~04:52 SGT (GitHub labels it `2026-08-11`; the cron is
+20:00 UTC — **§7.122**) against `df5b20a`, i.e. Wave 3 (§8.44) but **nothing after it**.
+**`ui-driver-rot` issue #4 is open.** Watch tonight's run first: a second reset failure is a
+workflow problem, not rot; a one-off was a CI flake. (The last GREEN sweep, all 39 drivers,
+was `31430917020` against Wave 2.)
 
-- **`verify-coach-roster.mjs` has still never faced a sweep, and it was REWRITTEN on 2026-08-12**
-  (§8.46, now 30 checks). **The next sweep is its first.** Not re-runnable by hand — it marks
-  the lesson, writes an absence, and its shadow assignment is refused a second time by a unique
-  index; apply the teardown and the fixture between runs. It also **collides with
-  `verify-schedule-week`**: both use the same weekday last week, so leaving its fixture in place
-  scores that driver 20/21. The sweep resets per driver, so both only bite a hand-run.
-- `gh run list --workflow=ui-drivers.yml` and issue #3's own state are the fact.
-- The two-sweep red streak (`31277289374`, `31334766457`) is closed: `verify-trials` was
-  already fixed, and `schedule-week` 17/19 → 21/21 landed as `287142b` (§8.42).
-- Every OTHER driver has faced a sweep; `verify-coach-roster` is the one exception, above.
+- **`verify-coach-roster.mjs` has still never faced a sweep** — it did not exist in the aborted
+  run's tree. REWRITTEN on 2026-08-12 (§8.46, now 30 checks); the first sweep to include it is
+  also the first to see §8.45–§8.47. Not re-runnable by hand — it marks the lesson, writes an
+  absence, and its shadow assignment is refused a second time by a unique index; apply the
+  teardown and the fixture between runs. It also **collides with `verify-schedule-week`**: both
+  use the same weekday last week, so leaving its fixture in place scores that driver 20/21. The
+  sweep resets per driver, so both only bite a hand-run.
+- `gh run list --workflow=ui-drivers.yml` and issue #4's own state are the fact.
 
 > **Re-read the run, not this paragraph.** `gh run list --workflow=ui-drivers.yml` and issue
 > #3's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a full day
@@ -510,17 +496,12 @@ counts rather than tests presence (§7.118).
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — one thing is genuinely queued, and it is small
+### THE NEXT BUILD — Wave 4
 
-**Waves 1, 2 and 3 are all complete** (§8.36–§8.40, §8.43, §8.44). Their plans in
+**Waves 1, 2 and 3 are all complete, and the shim removal they owed shipped too**
+(§8.36–§8.40, §8.43, §8.44, §8.47). Their plans in
 `docs/plans/` are history, not queues. **`BACKLOG.md` → `## Build order` governs what comes
 next** — the decisions the ranking rests on are in a table at its top.
-
-**ONE MIGRATION IS OWED, AND IT IS THE NEXT THING IN THE QUEUE**: drop the 4-arg
-`assign_session_coach` compat shim and the `session_coach_role` enum. Full entry, including the
-pgTAP case that must change with it, is in `BACKLOG.md` — filed *before* the shim shipped, on
-purpose. **Blocked until the app deploy is confirmed by a served-bundle check**, which for the
-admin panel means opening the screen, not grepping chunks (`docs/DEPLOYMENT.md` §11.10).
 
 **Three small items remain filed rather than fixed**, all in `BACKLOG.md`:
 - *The Attendance page's Coach column can name someone who did not teach* (**S**) — the page an
@@ -563,10 +544,10 @@ function this session touched (`docs/DEPLOYMENT.md` §11.7).
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The queue holds exactly one migration — the shim removal above.** The latest applied is
-`20260812000200` (class-level shadows, §8.46); production confirmed caught up 2026-08-12,
-0 pending — and the ordering gate below was
-followed for the first time deliberately: the migration merged and pushed to `main` ALONE,
+**The migration queue is EMPTY.** The latest applied is
+`20260812000300` (the shim drop, §8.47); production confirmed caught up 2026-08-12,
+0 pending — and §8.46's deploy followed the ordering gate below
+for the first time deliberately: the migration merged and pushed to `main` ALONE,
 `migration list --linked` was checked, and only then did the app commit land. **The new rule this session bought is about ORDER, not
 content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must
 land BEFORE the first app branch does.** A worktree cannot author one, so no worktree can see
