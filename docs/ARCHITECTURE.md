@@ -559,10 +559,10 @@ the shape of the system changes:_
 | `supabase/tests/coach_wages.test.sql` | The pay-decision table, pro-rata, effective dating, draft→freeze, adjustments |
 | `SwimSyncApp/lib/landing.ts` | Where a signed-in user lands. Routes on **extension rows**, not the role enum (§7.19) |
 | `SwimSyncApp/lib/attendanceCompleteness.ts` | The completeness rule, shared. **Twin in SwimSyncAdmin; a third copy in the Deno engine — three edits** |
-| `SwimSyncApp/lib/coachRoster.ts` | Pure role resolution for a lesson: am I the main, a shadow, or covered? No I/O |
+| `SwimSyncApp/lib/coachRoster.ts` | Pure role resolution for a lesson: am I the main, a shadow, or covered? No I/O. ⚠ Its input order is a safety rule, not a style — §7.146 |
 | `SwimSyncApp/lib/sessionMainCoach.ts` | The `SECURITY DEFINER` probe behind §7.134 — a coach cannot *see* the roster row that replaced them, so this asks the database. **Fails towards "I am the main coach"**, so a probe outage leaves the coach able to mark rather than silently locked out |
 | `SwimSyncApp/lib/payoutBreakdown.ts` | Splits a payout into lessons taught vs corrections to earlier months |
-| `SwimSyncAdmin/lib/sessionRoster.ts` | The Lesson Coaches page's model — the **access** axis, so it uses `classes.coach_id` |
+| `SwimSyncAdmin/lib/sessionRoster.ts` | The Lesson Coaches page's model — the **access** axis, so it uses `classes.coach_id`. **Substitutes only** since 2026-08-12 |
 | `SwimSyncAdmin/lib/payoutItems.ts` | The Coach Wages breakdown — the **money** axis, and it never mentions `classes.coach_id`. **The pair above disagree deliberately**: access follows the current coach, money follows history (`20260719000800`) |
 | `docs/plans/TRIAL_ONBOARDING_PLAN.md` | A child before their parent: the plan, its ranked risks inlined as mitigations, and the pre-commit gate. **Read before merging §8.10** |
 | `docs/plans/PARENT_CLAIM_PLAN.md` | **The parent-claiming design of record** — the settled decisions (including the two the user reversed mid-planning), seven ranked risks with mitigations inlined beside the step each governs, and the pre-commit gate. Read before changing matching, the claim queue, or `merge_students()` |
@@ -696,6 +696,48 @@ first — it was intentionally removed as unbuilt, not lost.
 were also empty stubs — they are now **wired to a real screen**
 (`components/ChangePasswordScreen.tsx`, routes `…/settings/change-password.tsx` and
 `…/profile/change-password.tsx`). Kept & working: parent **Add Child Profile**.
+
+### 6z. A SUBSTITUTE IS PER-LESSON; A SHADOW IS PER-CLASS — and they take OPPOSITE date sources
+
+*(2026-08-12, `20260812000200`. Wave 3 shipped both on the lesson on 2026-08-11; the shadow
+half was wrong and was moved a day later, cheap only because production held zero roster rows.)*
+
+The two look like one feature and are not:
+
+| | Substitute | Shadow |
+|---|---|---|
+| Scope | ONE lesson | the WHOLE class, dated, until ended |
+| Table | `session_coaches` (≤1 row per lesson) | `class_shadow_coaches` |
+| Managed on | Lesson Coaches | Classes → the class drawer |
+| Sees | only the lesson they were named on | the class's whole recurrence |
+| Marks | yes — `attendance_write` narrows to them | never |
+
+**The date sources are the trap.** A substitute's dates come from their per-lesson rows; a
+shadow holds none at all, so their dates come from the class's recurrence — the same arm an
+*owner* takes. Point the shadow at the substitute's arm and they see an empty week, which is
+indistinguishable from a quiet one. The coach app names this `showsWholeSchedule` rather than
+writing `owned || shadowed` inline, because the adjacent line — whether a lesson enters the
+covered-out probe — asks a *different* question and must stay `owned &&` (§7.138).
+
+**THREE AXES NOW, and merging any two re-creates a bug this repo has already paid for:**
+
+- **ACCESS** — the roster + `classes.coach_id` + *"am I a shadow TODAY?"*
+- **MONEY** — `class_rate_on().paid_coach_id` + *"was I a shadow ON THAT LESSON'S DATE?"*
+- **MARKING** — the roster main, else the class's coach. A shadow never marks.
+
+The two shadow date questions are deliberately two functions (`coach_is_active_class_shadow`
+vs `coach_shadowed_class_on`). Collapse them and either an ex-shadow keeps seeing the class,
+or a current one loses their pay history. `20260719000800` exists because ACCESS and MONEY
+were once the same query and a handover re-priced a class's entire unpaid history.
+
+**Pay attribution is ONE ordered function.** `coach_attribution_kind()` returns
+`substitute | terms | shadow | NULL`, and both the pay predicate and the rate choice read it.
+A coach can satisfy two arms at once — they shadow the class and cover one of its lessons —
+and a boolean predicate cannot say which matched, so the rate would be chosen by a second copy
+of the rule. That is §7.129's shape inside §7.129's own function; it cost a real double
+payment. **Substitute beats shadow**, and the client mirrors the same order.
+
+---
 
 ### 12a. `Alert.alert` is a no-op on the web build (known pattern)
 

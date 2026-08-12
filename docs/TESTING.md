@@ -669,6 +669,28 @@ they were written to catch was tested by deliberately re-nesting the buttons and
 still scored 16/16, because RN's responder system does not propagate a press to ancestor
 Touchables. Do not cite them as the nesting guard.
 
+### Class-level shadow coaches (2026-08-12)
+
+- **`class_shadow_coaches.test.sql` (50)** — the assignment, the absence, the shadow rate, the
+  seals, precedence, and the two RLS-hiding cases. Each proven red by *targeted* sabotage; the
+  campaign is worth copying rather than re-inventing. **Three of its cases exist only because
+  nothing on any screen would show them failing**: an absence restored after a month is paid,
+  the tenant-wide vs per-coach seal, and Adjustments B's class-shadow arm — the last is
+  reachable only by disabling the seal trigger inside the transaction, which the file does
+  deliberately and puts back.
+- **`sessions_i_am_main_on.test.sql` (9)** — split out of `session_roster_guard.test.sql`,
+  which was **deleted** with the guard it tested. Only 7 of that file's 16 checks were about
+  the guard; these nine were the batch roster gate's only coverage, in the migration that
+  rewrote its sole dependency. **When a suite tests two things and one is retired, split
+  before deleting** — a per-file count that drops has lost a test, not passed one.
+- **`verify-coach-roster.mjs` — now 30 checks**, rewritten for the split model: substitutes on
+  Lesson Coaches, shadows on the Classes drawer, and the *Coaches present* tick. Its measured
+  sabotage table is in its header and includes one case that was **green over nothing** on the
+  first run — the assignment was left at today's default date and covered none of the
+  fixture's past lessons, so the list under test was correctly empty. ⚠ It **collides with
+  `verify-schedule-week` on a hand-run**: both put their lesson on the same weekday last week,
+  and leaving this fixture in place scores that driver 20/21. The sweep resets per driver.
+
 See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---

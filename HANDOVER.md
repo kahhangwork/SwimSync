@@ -1,10 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-12 — **The Wave 3 follow-up shipped** (§8.45): the guard
-`assign_session_coach` owed, `sessions_i_am_main_on`, and `verify-coach-roster.mjs` (25 checks).
-`20260812000100` + both apps. Six gotchas, **§7.137–§7.142**._
+_Last updated: 2026-08-12 (2nd) — **A shadow coach belongs to the CLASS, not to one lesson**
+(§8.46): `20260812000200` + both apps, LIVE. Substitutes stay per-lesson. Shadow rates, an
+absence tick, and a seal on both. Four gotchas, **§7.143–§7.146**._
 
-_Previously, 2026-08-11 — **Wave 3: a lesson has its own coaches** (§8.44), `20260811000200`._
+_Previously, 2026-08-12 — the Wave 3 follow-up (§8.45), `20260812000100` — **whose guard this
+session deleted**: the state it protected is now unbuildable._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -140,8 +141,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | A class can be RETIRED without losing money | pgTAP 23, LIVE | PRD §7.3 · §8.39 |
 | An unmarked GUEST holds the month open; nothing new enters a retired class | pgTAP + Deno, LIVE 2026-08-10 | PRD §7.3 · §8.40 |
 | **A child can attend MORE THAN ONE class a week** | pgTAP + vitest + jest + 17-check driver, LIVE 2026-08-11 | PRD §7.4, §7.20 · §8.43 |
-| **A LESSON has its own coaches — a substitute, and shadows paid their own rate** | pgTAP 56 + vitest + jest + **25-check driver** | PRD §7.13, §7.6 · §8.44, §8.45 |
-| **…and its main coach cannot be demoted by being shadowed** — row main *and* absence main | pgTAP 16, `20260812000100` | PRD §7.13 · §8.45 |
+| **A substitute is per-LESSON; a SHADOW is per-CLASS — dated, paid its own shadow rate** | pgTAP 50 + 9 + vitest + jest + **30-check driver**, LIVE 2026-08-12 | PRD §7.13, §7.6 · `docs/ARCHITECTURE.md` §6z · §8.46 |
 | Automated tests — pgTAP + Deno backend, vitest + jest-expo apps, all in CI on push | CI | `docs/TESTING.md` §5 |
 
 **Counts are deliberately not written here.** The runner is the fact; a number in prose is
@@ -161,13 +161,15 @@ is a guard whose first real firing is still ahead of you.
   re-confirmed 2026-08-10), so no class has been retired on real data.
 - **Guest bookings** — production holds **zero** live trial or make-up bookings, so §8.40's
   new block has never fired there. Which is exactly why it was safe to ship.
-- **The lesson coach roster** — production holds **zero** `session_coaches` rows, so no cover
-  or shadow has ever been recorded on real data and the clawback path has never fired. Two
-  consequences worth knowing before the first one: production's coach is **also its tenant
-  admin**, so the attendance-write narrowing can never lock them out (§7.131); and a second
-  coach on payroll is what makes any of this reachable at all, since `generate_coach_payouts`
-  skips a coach with no `coach_rates` row — production has none, so **no payout has ever been
-  generated there.**
+- **Substitutes and shadows** — production holds **zero** `session_coaches` and zero
+  `class_shadow_coaches` rows, and **it cannot usefully hold any yet**: there is one coach,
+  they are also the tenant admin, and every policy is `coach_branch OR can_admin_tenant(…)`,
+  so no narrowing is observable on that account at all (§7.131). The Classes drawer's *Add a
+  shadow* dropdown is therefore **correctly empty** — the class's own coach is excluded, and
+  there is nobody else. **Don't rediscover that as a bug.** It becomes real the day a second
+  coach is hired; `generate_coach_payouts` also skips a coach with no rate, so **no payout has
+  ever been generated on production.** The whole model is verified locally against non-admin
+  coaches in a browser (`verify-coach-roster`, 30 checks) — that is the only place it can be.
 - **Multiple classes per child** — no production child holds two enrolments yet, so neither
   schedule guard has ever refused anything real and no admin has pressed *+ Add class*. The
   first real one is worth watching: it is also the first time `'mixed'` package coverage
@@ -280,7 +282,7 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **Production was fully caught up as of 2026-08-12**, through `20260812000100`. THREE edge functions exist: `generate-invoices`,
+> **Production was fully caught up as of 2026-08-12**, through `20260812000200`. THREE edge functions exist: `generate-invoices`,
 > `package-emails` (verify_jwt ON) and **`public-invoice` (verify_jwt false, deliberately —
 > the invoice token is the access control)**. *(Version numbers used to be written here and
 > went stale twice. `supabase functions list` and `supabase migration list --linked` are the
@@ -347,6 +349,40 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.46 (2026-08-12, 2nd) — A SHADOW BELONGS TO THE CLASS, NOT TO ONE LESSON
+
+**Shipped and LIVE** — `20260812000200` + both apps, deployed migration-first.
+Plan and its ranked risk review: `docs/plans/CLASS_SHADOW_COACHES_PLAN.md`. The model, and
+why the two halves take opposite date sources: **`docs/ARCHITECTURE.md` §6z**.
+
+**It supersedes a filed bug instead of fixing it.** `BACKLOG.md`'s *`Clear` can leave a lesson
+unmarkable AND un-nagged* is struck as SUPERSEDED: with shadows off the lesson there is no row
+for `Clear` to strand. That deleted `20260812000100`'s guard whole — **one day old**, with its
+16 pgTAP checks — and nearly took `sessions_i_am_main_on`'s only coverage with it, since both
+lived in one file. Split before deleting (`docs/TESTING.md` §5).
+
+**Two of the four gotchas are mine, found by `/commit-review` after I wrote the rule.**
+§7.143 is *"a seal is only a seal if every writer is behind it"* — graduated by this very
+migration, then violated by it: the assignment table's guards lived only in its RPCs and a
+direct PostgREST write walked past all three, **measured**. §7.144 is two definitions of
+"settled" in one engine. §7.145 (a dropped column silently breaks string-body functions) and
+§7.146 (`me` is null on a deep link, so trust the server-answered input over the fail-open
+one) were both caught before deploy — §7.146 by the driver, which went red the moment I got
+the precedence backwards.
+
+**Deliberately not done:** the compat shim's removal, filed in `BACKLOG.md` **before** the
+shim shipped and blocked on a served-bundle check; and the production smoke, which cannot say
+anything on a single-coach tenant (§3, DORMANT).
+
+**Verified:** pgTAP **736** (was 693; +50 new, +9 recovered, −16 deleted, each new case proven
+red by targeted sabotage) · Deno 139 ×2 (§7.15) · vitest **301** · jest **359** · typecheck
+both · fixture round-trip 21/21 · `verify-coach-roster` **30/30** with its signature measured ·
+`verify-schedule-week` 21/21 · rollback rehearsed (all 693 pre-change checks pass under the
+DOWN, every restored body byte-identical to `pg_get_functiondef()`) · post-deploy grant dump:
+`anon` EXECUTE still **18**, none of them this wave's.
+
+---
+
 ## 8.45 (2026-08-12) — THE WAVE 3 FOLLOW-UP: THE OWED GUARD, AND THE DRIVER
 
 **Shipped** — `20260812000100` + both apps + `verify-coach-roster.mjs`. Closes all three
@@ -381,40 +417,6 @@ vitest 299 unchanged; typecheck both; `verify-coach-roster` **25/25** with its s
 measured; `verify-schedule-week` 21/21 **before and after** Step 3; fixture round-trip all 21
 clean; rollback rehearsed (677/677 under the DOWN, and the DOWN's body proven byte-identical to
 `pg_get_functiondef` by diff); `anon` EXECUTE 13 → 13 local.
-
----
-
-## 8.44 (2026-08-11, 2nd session) — WAVE 3: A LESSON HAS ITS OWN COACHES
-
-**Shipped and LIVE** — `20260811000200` + both apps. Plan and its ranked risk review:
-`docs/plans/WAVE_3_PLAN.md`. Behaviour: PRD §7.13 (pay, Lesson Coaches, Wages) and §7.6
-(who may mark). Built as **Phase A in the root checkout, then two parallel worktrees**
-(`wt-admin`, `wt-coach`), which is the shape to copy — and the shape that produced the
-deploy failure below.
-
-**Three defects were found by RUNNING, and each was invisible to reading.** §7.129 (a pay
-function that answers "what would this rate produce" cannot drive a clawback — the business
-paid twice), §7.130 (a rewrite deleted the guard whose whole job is to refuse), §7.133 (a
-refetch outside its staleness guard routed a *write* to the wrong class). The first two were
-caught before any pgTAP existed, by smoke-testing the migration's cases by hand.
-
-**The apps deployed AHEAD of their migration — read `docs/DEPLOYMENT.md` §11.9.** No
-worktree could have prevented it: a worktree may not author a migration, so neither owned
-the one their code needed, and each verified its own bundle correctly. **Splitting a wave
-across worktrees splits the deploy, and nobody sees the whole of it.** Push the migration
-before the first app branch lands.
-
-**Both graduate lists were nearly lost and were recovered from the session transcripts** —
-§7.136 has the method. `WORKTREE.md` is gitignored, so it is in no commit and no reflog.
-
-**Deliberately not done:** the `assign_session_coach` shadow-branch guard, the Attendance
-page's Coach column, and a set-returning roster gate — all three in `BACKLOG.md`, all three
-needing a migration a worktree may not write.
-
-**Verified:** pgTAP **677** (was 637; +40, proven red by the DOWN file); Deno 139 ×2 (§7.15);
-vitest **299**; jest **348**; typecheck both; fixture round-trip exit 0; rollback rehearsed
-(all 637 pre-wave tests pass under it); `verify-schedule-week` 21/21 against the real app;
-production grant dump re-checked — `anon` EXECUTE still 18, 0 blanket table grants.
 
 ---
 
@@ -471,11 +473,12 @@ The last sweep, **`31430917020`, was GREEN**: all 39 drivers, against `160cb09` 
 not Wave 3. It executed Tuesday 2026-08-11 SGT (GitHub labels it `2026-08-10`; the cron is
 20:00 UTC — **§7.122**) and closed `ui-driver-rot` issue #3 itself.
 
-- **Wave 3 shipped after it with no driver; `verify-coach-roster.mjs` closed that on
-  2026-08-12** (§8.45, 25 checks). **The next sweep is its first**, so watch it: it is the
-  newest driver and the only one that has never faced one. It is also **not re-runnable by
-  hand** — check 14 marks the lesson and check 0 needs it unmarked; apply the teardown and the
-  fixture between runs. The sweep resets per driver, so this only bites a hand-run.
+- **`verify-coach-roster.mjs` has still never faced a sweep, and it was REWRITTEN on 2026-08-12**
+  (§8.46, now 30 checks). **The next sweep is its first.** Not re-runnable by hand — it marks
+  the lesson, writes an absence, and its shadow assignment is refused a second time by a unique
+  index; apply the teardown and the fixture between runs. It also **collides with
+  `verify-schedule-week`**: both use the same weekday last week, so leaving its fixture in place
+  scores that driver 20/21. The sweep resets per driver, so both only bite a hand-run.
 - `gh run list --workflow=ui-drivers.yml` and issue #3's own state are the fact.
 - The two-sweep red streak (`31277289374`, `31334766457`) is closed: `verify-trials` was
   already fixed, and `schedule-week` 17/19 → 21/21 landed as `287142b` (§8.42).
@@ -513,15 +516,16 @@ counts rather than tests presence (§7.118).
 `docs/plans/` are history, not queues. **`BACKLOG.md` → `## Build order` governs what comes
 next** — the decisions the ranking rests on are in a table at its top.
 
-**THE MIGRATION THAT WAS OWED IS PAID** (§8.45, `20260812000100`): the shadow branch can no
-longer demote a lesson's main — in **either** of the two ways a lesson has one, the roster row
-*and* the absence rule, which is wider than the item described. `sessions_i_am_main_on` shipped
-in the same migration and the coach app consumes it. **The migration queue is empty again.**
+**ONE MIGRATION IS OWED, AND IT IS THE NEXT THING IN THE QUEUE**: drop the 4-arg
+`assign_session_coach` compat shim and the `session_coach_role` enum. Full entry, including the
+pgTAP case that must change with it, is in `BACKLOG.md` — filed *before* the shim shipped, on
+purpose. **Blocked until the app deploy is confirmed by a served-bundle check**, which for the
+admin panel means opening the screen, not grepping chunks (`docs/DEPLOYMENT.md` §11.10).
 
 **Three small items remain filed rather than fixed**, all in `BACKLOG.md`:
 - *The Attendance page's Coach column can name someone who did not teach* (**S**) — the page an
-  admin checks when wages look odd. Left deliberately: the fix carries a product choice (show
-  the roster main, or show both with the cover annotated as Coach Wages does).
+  admin checks when wages look odd. Left deliberately: the fix carries a product choice, and it
+  now has a third option (name the shadows too).
 - *The admin's invoice pre-flight misses an unmarked EXTRA lesson* (**S**) — over-reports
   readiness; **never under-bills**, which is why it is S.
 - *Deleting an admin destroys the audit history* (**S**) — unchanged since 2026-08-09.
@@ -559,9 +563,9 @@ function this session touched (`docs/DEPLOYMENT.md` §11.7).
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is empty but ONE IS OWED** — see the shadow-branch item above. The
-latest applied is `20260812000100` (the roster guard + `sessions_i_am_main_on`, §8.45);
-production confirmed caught up 2026-08-12, 0 pending — and the ordering gate below was
+**The queue holds exactly one migration — the shim removal above.** The latest applied is
+`20260812000200` (class-level shadows, §8.46); production confirmed caught up 2026-08-12,
+0 pending — and the ordering gate below was
 followed for the first time deliberately: the migration merged and pushed to `main` ALONE,
 `migration list --linked` was checked, and only then did the app commit land. **The new rule this session bought is about ORDER, not
 content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must

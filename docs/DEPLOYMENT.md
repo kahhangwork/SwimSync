@@ -250,3 +250,28 @@ to Storage** (GET 200 image/png) → parent sees the QR.
 pick the month → **Generate Invoices** (no cron; a paused free project wouldn't run it).
 
 ---
+
+10. **A SCHEMA CHANGE THAT DROPS A COLUMN OPENS A WINDOW THE §7.123 SHIM DOES NOT COVER.**
+    `20260812000200` (2026-08-12) was deployed migration-first, correctly: `55dd76e` alone to
+    `main`, `db push`, `migration list --linked` showing **0 pending**, then the app commits.
+    The 4-arg `assign_session_coach` shim was written precisely to survive that window — and
+    it did — but the same migration **dropped `session_coaches.role`**, and four `.select()`
+    calls in the still-deployed bundle named that column. Each returns a PostgREST 400, so for
+    the length of the window the admin's **Lesson Coaches page and the coach app's Schedule
+    fetch were both failing**. A signature shim cannot cover a dropped column; nothing can
+    except keeping the window short. **Budget the two pushes back to back, and check the
+    client `.select()` list as carefully as the RPC signatures** (§7.145).
+    - `db push` printed the `pgdelta` certificate stack trace *and* `Finished` for the
+      **fourth** time. It is the normal output. `migration list --linked` is the fact.
+    - Post-deploy grant dump: `anon` EXECUTE still **18**, none of them this wave's; both new
+      tables carry `authenticated` = SELECT/INSERT/UPDATE/DELETE matching their `FOR ALL`
+      policies, and no blanket grant.
+    - **Verifying the served bundle differs by app.** The Expo app is one bundle, so
+      `curl https://swimsync.sg` + grep for a new string is a real check. The Next.js admin
+      code-splits per route and every protected route redirects to `/login` first, so the only
+      reachable chunks are login-shared — a grep there is **vacuous**, and the control proves
+      it: the *old* string is absent from those chunks too. Confirm the admin by opening the
+      screen, or by a query the page must have made (§7.31, §7.101).
+    - **A shim removal is owed.** Filed in `BACKLOG.md` before the shim shipped, blocked on
+      the app deploy being confirmed by a served-bundle check rather than by the push
+      returning 200.

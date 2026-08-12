@@ -2429,3 +2429,70 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       silence from grep is indistinguishable from absence.
     - **Sanity-check a "complete" grep against one call site you already know exists.** That
       is a two-second check and it is what caught this. (2026-08-12.)
+
+143. **A SEAL IS ONLY A SEAL IF EVERY WRITER THAT CAN CHANGE THE ANSWER IS BEHIND IT — AND
+    "EVERY WRITER" INCLUDES POSTGREST.** `20260812000200` made a coach's pay a function of
+    **two** tables (`class_shadow_coaches`, the dated assignment, and `session_coach_absences`,
+    the per-lesson tick). It sealed a settled month against both — but the assignment's seal,
+    the "the class's own coach cannot shadow it" refusal and the never-`DELETE` rule all lived
+    **inside `assign_class_shadow()` / `end_class_shadow()`**, while the table itself carried
+    `FOR ALL … can_admin_tenant(tenant_id)` and the matching DML grants, because a tenant admin
+    genuinely does own those rows.
+    - **Measured, not theorised:** as the seed tenant admin, one direct `INSERT` put the
+      class's own coach on its own shadow roster **inside a sealed month**, and one direct
+      `DELETE` destroyed the row the pay history depends on. Both are ordinary PostgREST calls
+      any admin's browser can make.
+    - The sibling table got its seal as a **trigger** for exactly this reason. The asymmetry
+      was invisible because each guard was individually correct.
+    - **The rule generalises past this wave: whenever a payment becomes a function of two
+      tables, the freeze belongs on BOTH, as a trigger, not in the RPC that happens to be the
+      polite way in.** An RPC guard protects the caller you thought of.
+    - Found by `/commit-review`, in the migration that *graduated this very rule* to §7.
+      (2026-08-12.)
+
+144. **TWO DEFINITIONS OF "SETTLED" IN ONE ENGINE IS A HOLE, NOT A DUPLICATION.** The new
+    backdate guard first tested `coach_payouts … coach_id = <this coach> AND status = 'paid'`.
+    Adjustments B's own settled test (`20260811000200`) has **no `coach_id` filter** — a month
+    is settled if *any* coach in the tenant was paid for it. A coach with **no payout row at
+    all** falls between the two: the per-coach guard says "open", the engine says "closed", so
+    an admin could backdate an assignment into a month nothing will ever pay them for. That is
+    a permanent, silent underpayment, and the new feature *creates* exactly that coach (a
+    trainee added mid-term). **Write the new guard against the engine's existing definition,
+    not a reasonable-looking narrower one** — and if you must narrow it, change both together.
+    (2026-08-12.)
+
+145. **DROPPING A COLUMN SILENTLY BREAKS EVERY CLASSIC STRING-BODY FUNCTION THAT READS IT, AND
+    POSTGRES WILL NOT STOP YOU.** `ALTER TABLE session_coaches DROP COLUMN role` succeeded
+    without a word while **six** live function bodies still said `sc.role`. A `plpgsql`/`sql`
+    body is a string: no dependency is recorded, so the failure is a runtime
+    `column … does not exist` — and for `coach_is_main_on_session()` that is evaluated inside
+    `attendance_write`'s USING **and** WITH CHECK, i.e. **no coach in any business can save
+    attendance**, which blocks the billing month with no override (§8i).
+    - **Enumerate mechanically, before and after:**
+      `SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname='public' AND p.prosrc ~ '<table>';` — the after-list must not mention
+      the dropped column.
+    - **`npm run typecheck` cannot see the client half either.** Three `.select("… role …")`
+      calls in the two apps return a PostgREST **400**, not a type error. Grep the call sites.
+    - Both halves were caught before deploy; the client half was found by the review, not by
+      the compiler. (2026-08-12.)
+
+146. **`me` IS NULL ON A DEEP-LINKED SCREEN, SO A CLIENT-SIDE `coach_id = me.id` FILTER
+    MATCHES NOTHING — AND THE SCREEN THEN FAILS *OPEN*.** Sibling of §7.141, different
+    failure. The coach app resolves `me` from a session that is not hydrated when a screen is
+    reached by URL, so a new "am I a shadow of this class?" query filtered on `me.id`
+    returned zero rows and the coach silently resolved to *"Another coach is teaching this
+    lesson"*. Measured on the live app; invisible to every unit test, because they pass `me`.
+    - **Ask the SERVER who you are.** `coach_is_active_class_shadow()` reads
+      `current_coach_id()`, which cannot be absent, and is admin-proof in a way a table read
+      filtered by a client-held id is not.
+    - **The corollary is a PRECEDENCE rule, and it bit immediately.** `attendance.tsx`
+      computes `ownsClass` as `!me?.id || cls.coach_id === me.id` — deliberately fail-OPEN, so
+      a null `me` makes every coach "own" every class. Reordering `lessonRole()` to check
+      `ownsClass` before the server-answered `isClassShadow` turned a shadow's read-only
+      screen into a marking screen the database then refused: driver check 18 went red on the
+      next run. **When two inputs disagree, trust the one answered server-side over the one
+      that fails open** — even when the fail-open one looks more authoritative.
+    - The unit test that should have pinned this asserted `"shadow"` under a title that said
+      `keeps the OWNER role`. A test whose name contradicts its assertion is worse than either
+      answer; read the two together. (2026-08-12.)
