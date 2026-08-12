@@ -293,13 +293,13 @@ query asks for returned nothing until **five** further policies were widened. `l
 and `lib/scheduleBuckets.*` did need no change, as predicted. Measuring one line of a query
 does not measure what the row behind it is permitted to be.
 
-#### Wave 4 — **A lesson recorded into an already-BILLED month is reported, and settled** (S/M)
+#### Wave 4 — ~~A lesson recorded into an already-BILLED month is reported, and settled~~ ✅ SHIPPED 2026-08-12
 
-Placed after Wave 2 because a **backdated enrolment** is its main trigger, and Wave 2
-rewrote enrolment (done 2026-08-11, so this is unblocked). Reuses the `unclaimed_billable` reporting shape and
-`student_settlements`; adds no invoice concept and no override. Correct
-`schedule_extra_lesson()`'s comment in the same pass — it claims the floor blocks this and
-it does not.
+Shipped as specified (PRD §7.17's *recorded into an already-billed month* subsection):
+`unbilled_sealed_lessons()` + the standing Invoices-page report + sidebar badge, settled
+through `student_settlements`. The item's full text is deleted from this file per the
+doc gate; the reasoning it carried now lives in the PRD subsection and the migration
+header (`20260812000400`).
 
 #### Wave 5 — admin authority
 
@@ -807,42 +807,6 @@ settlements — or vice versa — is worse than no number, because it reads as a
 That is precisely the mistake PRD §4.4 records about the platform pages, which showed
 several businesses' figures added together and labelled as one; the fix there was to show
 nothing rather than something wrong.
-
-### A lesson recorded into an already-BILLED month is reported, and settled — **S/M**
-_(Replaces "A session added AFTER a month is invoiced is never billed". Decided
-2026-08-08 — walked through with the user.)_
-
-The lesson still records. An admin-visible report lists lessons sitting inside a sealed
-billing month with nobody billed for them, and a **settlement** clears the line.
-
-**Why:** the hard block guarantees every lesson is marked *at generation time*. It cannot
-cover a lesson created afterwards. The `unclaimed_billable` net already catches children
-the admin **entered** before billing — their lessons hold the month open. It cannot catch a
-child nobody entered: a family that started swimming on 16 July, registered on 12 August
-after July was billed, whose enrolment is then backdated so their real lessons can be
-recorded. Those lessons are unbillable and, today, **invisible**.
-
-**Notes:**
-
-- **Refusing was considered and rejected**: the coach would be unable to record a lesson a
-  child genuinely attended, the parent would see a gap in their child's history, and
-  §8.32 deliberately left no "reopen this month" escape hatch. A teaching record is not
-  only a billing record.
-- **Reuse the shape that already exists** — this is `unclaimed_billable` pointed at a
-  different cause: collect as a report with earliest/latest lesson dates, never touch
-  `billableStudentIds` or any invoice arithmetic, and release through
-  `student_settlements` (already effective-dated via `settled_through`, so settling once
-  cannot blanket-authorise future lessons). No new invoice concept, no override on the
-  `already_exists` guard.
-- The line must **persist until acted on**. A one-time warning was considered and rejected:
-  the entire failure mode is silence, and a message that is dismissed is gone.
-- ✅ **`schedule_extra_lesson()`'s wrong comment was corrected on 2026-08-10**
-  (`20260810000100`), which rewrote that function for an unrelated reason. It had claimed
-  the floor check stopped "scheduling a lesson into an already-invoiced month"; the check
-  tests `markable_floor()`, and `LEAST` means that sits at 1 July in August whether or not
-  July is sealed. The function now carries a `COMMENT` saying so. Nothing else about this
-  item changed — `book_makeup()` and `book_trial()` check the same floor and the same gap
-  is still open for them.
 
 ### Sealing a LATER month strands an earlier unsealed one — **S**
 `markable_floor()` takes `LEAST(session_window_start(), month after MAX(billing_month))`.

@@ -1807,6 +1807,29 @@ written off must be recoverable. Recording one is the **admin's** decision, not 
 coach's — though a coach marking a lesson as a *paid* trial is what tells the admin there
 is money to account for.
 
+#### A lesson recorded into an already-billed month is reported, and settled *(2026-08-12)*
+
+The hold-the-month-open net above only catches lessons that exist **when the month is
+billed**. A lesson can also enter a month *after* it is sealed — a backdated enrolment for
+a family that registered after billing (the marking window deliberately reopens a billed
+month, §7.6), a backdated make-up or trial, or an absent→present correction (the reverse
+direction auto-issues a credit note; this one is silent). The seal is final by design, so
+no invoice can ever include such a lesson — and refusing to record it was considered and
+rejected: a teaching record is not only a billing record.
+
+Instead the lesson records normally and a **standing report** on the admin's Invoices
+page lists every billable lesson sitting inside a sealed month that no invoice line
+covers and no live settlement clears — one line per child per month, with the lesson
+count and date range. The **Invoices item in the sidebar carries a count badge** whenever
+lines exist, because the report only renders on a page an admin who is not billing may
+not visit for weeks. Each line persists until the admin records what happened to the
+money, using the same settlement instrument as above (*paid outside SwimSync* with the
+amount, or *write off*); a settlement is dated at the line's **latest lesson**, so a
+lesson backdated in later reports again and is decided deliberately. The report is a
+database function (`unbilled_sealed_lessons`), deliberately **counts and dates only** —
+pricing lives in the billing engine, and a second implementation could silently disagree
+with it. There is deliberately **no bulk settle**, mirroring the modal above.
+
 *(That money is recorded, but does not yet appear in any revenue total — SwimSync has no
 revenue reporting at all today. See `BACKLOG.md`.)*
 

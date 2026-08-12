@@ -16,6 +16,7 @@ import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Tabl
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { blankToNull, checkSgPhone, normalizeSgPhone } from "@/lib/sgPhone";
+import { settlementPayload } from "@/lib/settlementPayload";
 import { buildReminderMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { ReminderQueue } from "./ReminderQueue";
 
@@ -51,6 +52,14 @@ type UnclaimedStudent = {
   earliest_session_date: string;
   latest_session_date: string;
 };
+
+/** Mirrors unbilled_sealed_lessons() in the database — one line per
+ *  (student, SEALED month). Same shape as UnclaimedStudent plus the month,
+ *  because the admin needs the same thing in both places: enough to date a
+ *  settlement. These lessons entered the month AFTER it was billed (backdated
+ *  enrolment, backdated make-up, absent→present correction), so the engine can
+ *  never see them — this standing report is the only thing that can. */
+type OrphanLine = UnclaimedStudent & { billing_month: string };
 
 // "Claimed" = outstanding AND the parent has said "I've paid" — the rows an
 // admin should check against the bank first.
@@ -114,6 +123,15 @@ export default function InvoicesPage() {
   // (BACKLOG → Revenue reporting).
   const [settleAmount, setSettleAmount] = useState<Record<string, string>>({});
   const [settleError, setSettleError] = useState<string | null>(null);
+  // Lessons recorded into an already-BILLED month (Wave 4). Separate state from
+  // `unclaimed` — that one is a generation-run result and lives in a modal;
+  // this is a STANDING report that must persist until each line is settled,
+  // because the failure mode it exists for is silence. Keyed per
+  // (student, month): the same child can be orphaned in two sealed months.
+  const [orphans, setOrphans] = useState<OrphanLine[]>([]);
+  const [orphanSettling, setOrphanSettling] = useState<string | null>(null);
+  const [orphanAmount, setOrphanAmount] = useState<Record<string, string>>({});
+  const [orphanError, setOrphanError] = useState<string | null>(null);
   // Lessons the server refused to generate around. Non-empty = blocked.
   const [blockedLessons, setBlockedLessons] = useState<
     {
@@ -157,6 +175,7 @@ export default function InvoicesPage() {
     const tid = (profile?.tenant_id as string | null) ?? null;
     setTenantId(tid);
     if (!tid) return;
+    loadOrphans(tid);
 
     const { data: tenant } = await supabase
       .from("tenants")
@@ -481,15 +500,16 @@ export default function InvoicesPage() {
       .eq("id", u.student_id)
       .single();
 
-    const { error } = await supabase.from("student_settlements").insert({
-      tenant_id: student?.tenant_id,
-      student_id: u.student_id,
-      settled_through: u.latest_session_date,
-      kind,
-      amount: kind === "paid_outside" ? amount : null,
-      method: kind === "paid_outside" ? "Outside SwimSync" : null,
-      recorded_by: user?.id,
-    });
+    const { error } = await supabase.from("student_settlements").insert(
+      settlementPayload({
+        tenantId: student?.tenant_id,
+        studentId: u.student_id,
+        settledThrough: u.latest_session_date,
+        kind,
+        amount,
+        recordedBy: user?.id,
+      })
+    );
 
     setSettling(null);
     if (error) {
@@ -505,6 +525,59 @@ export default function InvoicesPage() {
       `Recorded for ${u.student_name ?? "that student"}. Generate again to close ` +
         `${formatBillingMonth(genMonth)}.`
     );
+  }
+
+  /** The standing orphan-lesson report (Wave 4). Server-computed: the
+   *  predicate ("billable, inside a sealed month, no invoice line, no live
+   *  settlement") lives in unbilled_sealed_lessons() where pgTAP pins it —
+   *  not re-derived here, where it would drift. */
+  async function loadOrphans(tid: string) {
+    const { data, error } = await supabase.rpc("unbilled_sealed_lessons", {
+      p_tenant: tid,
+    });
+    if (!error) setOrphans((data ?? []) as OrphanLine[]);
+  }
+
+  /**
+   * Settle one orphan line. Same mechanism as handleSettle above — the month
+   * is already sealed, so nothing is holding it open; the settlement is purely
+   * the record of what happened to the money.
+   *
+   * `settled_through` is the line's LATEST lesson date: it covers exactly what
+   * was reported and no more, so a lesson backdated in NEXT week reports
+   * again and is decided deliberately.
+   */
+  async function handleSettleOrphan(
+    line: OrphanLine,
+    kind: "paid_outside" | "written_off",
+    amount: number | null
+  ) {
+    if (!tenantId) return;
+    setOrphanSettling(`${line.student_id}:${line.billing_month}`);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { error } = await supabase.from("student_settlements").insert(
+      settlementPayload({
+        tenantId,
+        studentId: line.student_id,
+        settledThrough: line.latest_session_date,
+        kind,
+        amount,
+        recordedBy: user?.id,
+      })
+    );
+
+    setOrphanSettling(null);
+    if (error) {
+      setOrphanError(error.message);
+      return;
+    }
+    setOrphanError(null);
+    // Refetch rather than filter: a settlement dated through this month also
+    // covers the same child's EARLIER sealed months, so other lines can clear.
+    await loadOrphans(tenantId);
   }
 
   async function loadInvoices() {
@@ -645,6 +718,104 @@ export default function InvoicesPage() {
           <strong>Platform admin.</strong> Invoice generation runs for one
           business at a time, and your account is not attached to one. Sign in
           as that business&rsquo;s admin to generate their invoices.
+        </div>
+      )}
+
+      {/* Lessons recorded into an already-BILLED month (Wave 4). A STANDING
+          section, deliberately not a modal or a one-time warning: the failure
+          mode is silence, and a message that can be dismissed is gone. Each
+          line persists until a settlement covers it. No bulk action, same as
+          the unclaimed modal — settling is a decision about money. */}
+      {orphans.length > 0 && (
+        <div
+          data-testid="orphan-report"
+          className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4"
+        >
+          <p className="text-sm font-semibold text-amber-900">
+            Recorded after billing — nobody was billed for these lessons
+          </p>
+          <p className="mt-1 text-xs text-amber-800">
+            These lessons sit inside a month that was already billed and
+            sealed, so no invoice can ever include them. They were recorded
+            afterwards — usually a backdated enrolment, make-up, or an
+            attendance correction. Record what happened to the money; each
+            line stays here until you do.
+          </p>
+
+          <ul className="mt-3 space-y-3">
+            {orphans.map((line) => {
+              const key = `${line.student_id}:${line.billing_month}`;
+              return (
+                <li
+                  key={key}
+                  className="rounded-lg border border-amber-200 bg-white px-3 py-2.5"
+                >
+                  <p className="text-sm font-semibold text-gray-800">
+                    {line.student_name ?? "Unnamed student"}
+                    <span className="ml-2 font-normal text-gray-500">
+                      {formatBillingMonth(line.billing_month)}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-600">
+                    {line.lessons} billable lesson
+                    {line.lessons === 1 ? "" : "s"} ·{" "}
+                    {line.earliest_session_date === line.latest_session_date
+                      ? formatSgDate(line.earliest_session_date)
+                      : `${formatSgDate(line.earliest_session_date)} – ${formatSgDate(
+                          line.latest_session_date
+                        )}`}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                      S$
+                      <input
+                        value={orphanAmount[key] ?? ""}
+                        onChange={(e) =>
+                          setOrphanAmount((prev) => ({
+                            ...prev,
+                            [key]: e.target.value,
+                          }))
+                        }
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        aria-label={`Amount received for ${line.student_name ?? "student"}`}
+                        className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      disabled={
+                        orphanSettling === key ||
+                        !(Number(orphanAmount[key]) > 0)
+                      }
+                      onClick={() =>
+                        handleSettleOrphan(
+                          line,
+                          "paid_outside",
+                          Number(orphanAmount[key])
+                        )
+                      }
+                    >
+                      Paid outside SwimSync
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={orphanSettling === key}
+                      onClick={() => handleSettleOrphan(line, "written_off", null)}
+                    >
+                      Write off
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          {orphanError && (
+            <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {orphanError}
+            </p>
+          )}
         </div>
       )}
 

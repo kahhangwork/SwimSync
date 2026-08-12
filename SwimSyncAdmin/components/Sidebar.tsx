@@ -26,6 +26,13 @@ export function Sidebar() {
   // tells them a family is stuck. Re-read on navigation, since deciding a
   // claim should drop the badge without a page reload.
   const [pendingClaims, setPendingClaims] = useState(0);
+  // Lessons recorded into an already-BILLED month, waiting to be settled
+  // (Wave 4). Same reasoning as the claims badge: nothing emails the admin
+  // about these, the report only renders on the Invoices page, and an admin
+  // who isn't billing right now may not open that page for weeks — this count
+  // is what makes the silence visible from anywhere. Re-read on navigation so
+  // settling a line drops it without a reload.
+  const [orphanLines, setOrphanLines] = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -40,6 +47,14 @@ export function Sidebar() {
       setTenantId((profile?.tenant_id as string | null) ?? null);
     });
   }, []);
+
+  useEffect(() => {
+    // The RPC authorises per tenant (platform admins have none — skip).
+    if (!tenantId) return;
+    supabase
+      .rpc("unbilled_sealed_lessons", { p_tenant: tenantId })
+      .then(({ data }) => setOrphanLines((data ?? []).length));
+  }, [pathname, tenantId]);
 
   useEffect(() => {
     // No tenant filter needed: student_claims_select already scopes this to the
@@ -92,6 +107,16 @@ export function Sidebar() {
                 )}
               />
               {label}
+              {href === "/invoices" && orphanLines > 0 && (
+                <span
+                  className="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white"
+                  title={`${orphanLines} lesson line${
+                    orphanLines === 1 ? "" : "s"
+                  } recorded after billing — nobody has been billed for them`}
+                >
+                  {orphanLines}
+                </span>
+              )}
               {href === "/claims" && pendingClaims > 0 && (
                 <span
                   className="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white"

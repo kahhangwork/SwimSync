@@ -91,6 +91,7 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `table_grants.test.sql` (6) | the standing invariant behind `20260804000600`, over `pg_class`/`pg_policies` so a table added next month is covered on the day it is created: `authenticated` holds a table privilege **if and only if** a policy could permit it (both directions, failures named), no TRUNCATE/REFERENCES/TRIGGER anywhere, `anon` holds nothing, no postgres-owned default privilege names either role, and nothing escapes the invariant's reach (views/partitions/foreign tables, plus **column-level** ACLs, which `has_table_privilege()` cannot see and a table-level REVOKE does not remove). **Scoped to `authenticated` + `anon` deliberately** — it is false for `service_role` (bypasses RLS) and meaningless for `postgres` (owns the tables), and a test that is red against a correct database gets disabled (§7.87). Excludes extension-owned relations, or pgTAP's own views fail it inside its own harness |
 | `stranger_isolation.test.sql` (4) | the persona no other isolation file covers — a self-registered parent belonging to **nothing**, which is what an attacker is, since signup is open. Sweeps **all 37 tables at once** and asserts they see only their own `profiles` and `parents` row; assertion 1 pins what a real member sees across 15 tables so "sees nothing" can never pass vacuously, assertion 3 proves the sweep covered every table rather than a subset, and assertion 4 proves the one profile they read is *theirs*. One forged link takes it red naming **six** tables, two of which were not on the list when it was written — which is the argument for sweeping rather than naming |
 | `admin_management.test.sql` (38) | co-admins (`20260806000100`): the **first** tenant_admin claims `tenants.owner_profile_id` (per tenant, a later one never steals it) and a plain empty-metadata parent signup still works — the control that matters, since `handle_new_user` fires on **every** signup; the escalation guards (`role` / `tenant_id` / `admin_disabled_at` / `owner_profile_id` unwritable by a client while `full_name` stays editable — without them assertion 6's self-promotion **lands**, and 13 assertions fall over downstream of the corruption); deactivation through the one `is_tenant_admin()` clause (writes 0 rows, `audit_log` dark) while a coach-admin's `current_coach_id()` survives, **plus the deliberate residue pinned as chosen**: membership reads via `current_tenant_id()` persist (the ban that ends them is auth-layer, covered by `verify-admins.mjs`); the four owner-gated RPCs (owner-immune, tenant-scoped, deactivate/reactivate **idempotent** because the API route's retry is the recovery for a half-failed ban pair); `prepare_admin_delete` refusing coach-admins and referenced admins via the **catalogue-derived** reference map (pinned to see `students.created_by` — a column the first hardcoded draft missed), purging the target's audit rows and writing an owner-attributed `admin_deleted` row whose `tenant_id` proves the `'Profile'` derivation arm; anon EXECUTE on none of the four; the overview reporting the **owner column**, not the oldest admin |
+| `unbilled_sealed_lessons.test.sql` (18) | the Wave 4 orphan-lesson report (`20260812000400`) — billable attendance inside a SEALED month that no `invoice_items` row covers and no live settlement clears. The fixture seals **last month**, deliberately inside §8.32's reopened marking window (the real trigger shape: July billed on 2 August, July still recordable). Every WHERE clause is pinned by an assertion a targeted sabotage turns red — **seven sabotages, each measured**: drop the billable-status filter, make the seal check tenant-blind or month-blind, match invoices per-student instead of per-(student, lesson), ignore invoices entirely, ignore settlements, demote the authorisation RAISE to a NOTICE. The per-(student, lesson) case is the one that matters most: a child billed for the month who gained ONE extra lesson afterwards reports that lesson alone. Settlement coverage in three acts — full clear, **partial** (`settled_through` mid-range leaves the later lesson reporting), and reversal restoring both. Grants: `authenticated` EXECUTE, `anon` none |
 **Total: 536 across 31 files** — verified by `supabase test db` 2026-08-06 (the previous
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
@@ -169,7 +170,12 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 
 _Frontend tests:_
 `SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **22 files, 299
-tests** (2026-08-11; the runner is the fact, this number is a hint that drifts). Wave 3 added
+tests** (2026-08-11; the runner is the fact, this number is a hint that drifts). Wave 4 added
+`lib/settlementPayload.test.ts` — the settlement INSERT payload, extracted so the unclaimed
+modal and the orphan-lesson report build it through ONE function; it pins the DB CHECK
+`settlement_amount_matches_kind` client-side (paid_outside carries the amount, written_off
+strips it even when one was passed) and that `settled_through` is the line's latest lesson
+passed through untouched. Proven red by sabotaging the builder. Wave 3 added
 `lib/sessionRoster.test.ts` and `lib/payoutItems.test.ts` — the two pure modules behind the
 Lesson Coaches page and the Coach Wages breakdown, which **disagree on purpose**: the roster
 module resolves access and uses `classes.coach_id`, the payout module resolves money and never
@@ -492,6 +498,19 @@ reads: revert the guard → abort at 6b; delete only the absence branch → 6c; 
 needs it unmarked; apply the teardown and the fixture between runs. Log in as
 `coach@swimsync.test` for the admin half; the two roster coaches are `roster-sub@` and
 `roster-shadow@swimsync.test`, `password123`;
+`verify-orphan-report.mjs` (+ `fixtures-orphan-report.sql` and its `-teardown.sql`) drives
+**Wave 4's standing orphan-lesson report** — 13 checks: the sidebar badge from a page that is
+NOT /invoices, both report lines with counts and the sealed month's label, **Write off**
+clearing one line while the other **survives** (the per-line persistence claim), **Paid
+outside** with an amount emptying the section, and the settlement rows checked in the DB —
+`written_off:NULL` and `paid_outside:60.00` dated at the line's **latest lesson**, never
+today. The fixture builds a **dedicated tenant** (`orphan-admin@swimsync.test`) because the
+report needs a SEALED month and sealing one for the seed tenant would short-circuit
+`verify-invoice-controls`' generation flow on a hand-run. Its DB-side RPC probes impersonate
+the fixture admin via the JWT-claims GUC — the RPC refuses psql's superuser (no JWT), which
+is correct and is pinned by pgTAP. ⚠ **Not re-runnable by hand** — settling is the driver's
+whole act and a live settlement is exactly what empties the report; the fixture guard names
+the leftover settlements and says to apply the teardown first;
 `verify-multi-class.mjs` (+ `fixtures-multi-class.sql` and its `-teardown.sql`) drives
 **a child in two classes** (Wave 2) across admin, database and parent app — 17 checks. The
 one that carries the weight is the **reveal guard**: it counts remove-buttons *inside
