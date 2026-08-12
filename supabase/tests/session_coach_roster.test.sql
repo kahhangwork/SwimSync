@@ -62,12 +62,18 @@ SELECT p.id,'56000000-0000-0000-0000-000000000001'
 
 -- Deliberately UNEQUAL rates. Equal ones would let the payout builder ignore
 -- its coach argument entirely and still look right (RISK 2).
-INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from)
-SELECT c.id, 30.00, 60, '2026-01-01' FROM coaches c WHERE c.profile_id='71000000-0000-0000-0000-000000000002';
-INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from)
-SELECT c.id, 50.00, 60, '2026-01-01' FROM coaches c WHERE c.profile_id='71000000-0000-0000-0000-000000000003';
-INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from)
-SELECT c.id, 10.00, 60, '2026-01-01' FROM coaches c WHERE c.profile_id='71000000-0000-0000-0000-000000000004';
+--
+-- Coach T holds a SHADOW rate and NO main rate, which is not incidental: the
+-- payout builder's on-payroll `EXISTS (coach_rates …)` must stay ROLE-BLIND, and
+-- a T with a main rate would keep this file green with `AND role = 'main'`
+-- silently added to it — the shape that skips a shadow's pay before any refusal
+-- can fire (20260812000200 §13).
+INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from, role)
+SELECT c.id, 30.00, 60, '2026-01-01', 'main' FROM coaches c WHERE c.profile_id='71000000-0000-0000-0000-000000000002';
+INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from, role)
+SELECT c.id, 50.00, 60, '2026-01-01', 'main' FROM coaches c WHERE c.profile_id='71000000-0000-0000-0000-000000000003';
+INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from, role)
+SELECT c.id, 10.00, 60, '2026-01-01', 'shadow' FROM coaches c WHERE c.profile_id='71000000-0000-0000-0000-000000000004';
 
 
 -- ═══ 1. ROSTER MECHANICS ═══════════════════════════════════════════════════
@@ -78,7 +84,7 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"71000000-0000-0000-0000-000000000001"
 -- FUTURE lesson has no id to assign against. The assignment resolves-or-creates.
 SELECT lives_ok(
   $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-08',
-       (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003'),'main') $$,
+       (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003')) $$,
   'assigning a cover CREATES the lesson_sessions row the roster needs');
 
 SELECT is(
@@ -88,7 +94,7 @@ SELECT is(
 
 SELECT lives_ok(
   $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-08',
-       (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003'),'main') $$,
+       (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003')) $$,
   'assigning the same cover twice does not raise');
 
 SELECT is(
@@ -99,11 +105,13 @@ SELECT is(
 SELECT is(
   (SELECT count(*)::INT FROM session_coaches sc
      JOIN lesson_sessions ls ON ls.id=sc.lesson_session_id
-    WHERE ls.session_date='2026-08-08' AND sc.role='main'),
-  1, 'and exactly one MAIN row, enforced by the partial unique index');
+    WHERE ls.session_date='2026-08-08'),
+  1, 'and exactly one SUBSTITUTE row, enforced by one_substitute_per_session');
 
--- The main slot is a PARTIAL unique index and .upsert() cannot target one, so
--- a swap has to go through the RPC or the admin gets a raw 23505.
+-- session_coaches is the SUBSTITUTE table now, so the index is a plain UNIQUE
+-- rather than the partial one Wave 3 needed. The swap still goes through the
+-- RPC: a FUTURE lesson has no lesson_sessions row for a direct insert to
+-- reference, which is the reason the RPC exists at all.
 SELECT lives_ok(
   $$ SELECT set_session_main_coach(
        (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08'),
@@ -114,21 +122,24 @@ SELECT is(
   (SELECT p.full_name FROM session_coaches sc
      JOIN coaches c ON c.id=sc.coach_id JOIN profiles p ON p.id=c.profile_id
      JOIN lesson_sessions ls ON ls.id=sc.lesson_session_id
-    WHERE ls.session_date='2026-08-08' AND sc.role='main'),
+    WHERE ls.session_date='2026-08-08'),
   'Coach T', 'the swap actually replaced the main rather than keeping the old one');
 
--- Put B back as main and add T as a shadow — the shape the rest of the file uses.
+-- Put B back as the substitute, and assign T as a shadow of the WHOLE CLASS —
+-- the shape the rest of the file uses. Dated from January so it covers both the
+-- August lesson and July's settled one; it is assigned BEFORE any payout is
+-- marked paid, because assign_class_shadow() is sealed against that (§2.1).
 SELECT set_session_main_coach(
   (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08'),
   (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003'));
-SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-08',
-  (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000004'),'shadow');
+SELECT assign_class_shadow('67000000-0000-0000-0000-000000000001',
+  (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000004'), '2026-01-01');
 
 -- A roster row against a fabricated date is a lesson that will be marked, paid
 -- and BILLED on a day the class never met.
 SELECT throws_ok(
   $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-12',
-       (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003'),'main') $$,
+       (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003')) $$,
   NULL, NULL,
   'a date the class does not run on is REFUSED, not silently created');
 
@@ -144,7 +155,7 @@ SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"71000000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_ok(
   $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-08',
-       (SELECT id FROM _foreign),'shadow') $$,
+       (SELECT id FROM _foreign)) $$,
   NULL, NULL,
   'a coach of ANOTHER business cannot be rostered onto this lesson');
 

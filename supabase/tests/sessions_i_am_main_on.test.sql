@@ -1,4 +1,18 @@
--- pgTAP: the Wave 3 follow-up — 20260812000100_session_roster_guard.sql.
+-- pgTAP: sessions_i_am_main_on() — the batch roster gate the coach app trusts.
+--
+-- ⚠ THIS FILE EXISTS BECAUSE ITS COVERAGE WAS ALMOST DELETED BY ACCIDENT.
+-- These nine checks lived in session_roster_guard.test.sql, whose OTHER half
+-- tested assign_session_coach()'s shadow branch — a branch 20260812000200
+-- removes along with the per-lesson shadow. Deleting the file for that reason
+-- would have taken the only coverage of sessions_i_am_main_on() with it, in the
+-- very migration that rewrites its sole dependency (coach_is_main_on_session).
+--
+-- WHY IT MATTERS MORE THAN ITS SIZE SUGGESTS. The coach app computes "somebody
+-- else has this lesson" as ASKED MINUS RETURNED, so every way this function can
+-- return less than the truth HIDES a lesson that needs marking — and unmarked
+-- attendance blocks the billing month with no override (§8i) and nothing on any
+-- screen saying why. A short answer is the unsafe direction by construction.
+
 --
 -- Plan: docs/plans/WAVE_3_FOLLOWUP_PLAN.md, and its ranked /plan-review. Two
 -- things are under test:
@@ -23,7 +37,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(16);
+SELECT plan(9);
 
 -- ── fixture ────────────────────────────────────────────────────────────────
 -- Two tenants: the one under test, and a foreign one whose session id is what
@@ -79,61 +93,13 @@ INSERT INTO lesson_sessions (id, class_id, session_date)
 VALUES ('46000000-0000-0000-0000-000000000009','68000000-0000-0000-0000-000000000009','2026-08-08');
 
 
--- ═══ 1. THE GUARD — the ROW main ═══════════════════════════════════════════
+-- Guard B covers S1, so S1 has an explicit substitute and S2 has none. That
+-- pair is the whole fixture these checks need: one lesson somebody else holds,
+-- one lesson nobody does.
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"72000000-0000-0000-0000-000000000001","role":"authenticated"}';
-
--- Guard B covers S1. From here S1 has an explicit main row.
 SELECT set_session_main_coach('46000000-0000-0000-0000-000000000001',
   (SELECT id FROM coaches WHERE profile_id='72000000-0000-0000-0000-000000000003'));
-
-SELECT throws_ok(
-  $$ SELECT assign_session_coach('68000000-0000-0000-0000-000000000001','2026-08-08',
-       (SELECT id FROM coaches WHERE profile_id='72000000-0000-0000-0000-000000000003'),'shadow') $$,
-  NULL, 'that coach is already the main coach for this lesson — change the main coach first, or the lesson would be left with none',
-  'shadowing the lesson''s CURRENT MAIN is refused — it would leave the lesson with no main and move the pay');
-
-SELECT is(
-  (SELECT p.full_name FROM session_coaches sc
-     JOIN coaches c ON c.id = sc.coach_id JOIN profiles p ON p.id = c.profile_id
-    WHERE sc.lesson_session_id='46000000-0000-0000-0000-000000000001' AND sc.role='main'),
-  'Guard B',
-  'and the refusal did not half-apply — the main row is still there and still MAIN');
-
-SELECT lives_ok(
-  $$ SELECT assign_session_coach('68000000-0000-0000-0000-000000000001','2026-08-08',
-       (SELECT id FROM coaches WHERE profile_id='72000000-0000-0000-0000-000000000004'),'shadow') $$,
-  'a DIFFERENT coach can still be added as a shadow — the guard is not a blanket refusal');
-
-SELECT lives_ok(
-  $$ SELECT assign_session_coach('68000000-0000-0000-0000-000000000001','2026-08-08',
-       (SELECT id FROM coaches WHERE profile_id='72000000-0000-0000-0000-000000000004'),'shadow') $$,
-  'IDEMPOTENCE SURVIVES — re-adding an existing shadow updates role to what it already holds, so FOUND is true');
-
-SELECT lives_ok(
-  $$ SELECT assign_session_coach('68000000-0000-0000-0000-000000000001','2026-08-08',
-       (SELECT id FROM coaches WHERE profile_id='72000000-0000-0000-0000-000000000004'),'main') $$,
-  'promoting an existing SHADOW to main still works — only the demote direction is a bug');
-
-
--- ═══ 2. THE GUARD — the ABSENCE main ══════════════════════════════════════
--- The half no client path can reach, and the half a row-only guard misses:
--- S2 has no roster row at all, so its main is the class's own coach by the
--- absence rule, and `ON CONFLICT ... WHERE role <> 'main'` has nothing to see.
---
--- 2026-08-22 deliberately has NO lesson_sessions row, so this also proves the
--- resolve-or-create half rolls back with the refusal (§7.132's orphan class).
-SELECT throws_ok(
-  $$ SELECT assign_session_coach('68000000-0000-0000-0000-000000000001','2026-08-22',
-       (SELECT id FROM coaches WHERE profile_id='72000000-0000-0000-0000-000000000002'),'shadow') $$,
-  NULL, 'that coach already teaches this lesson as the class''s coach — adding them as a shadow would say two different things about one person',
-  'shadowing the CLASS''S OWN COACH on a lesson with no roster main is refused too — the ABSENCE main');
-
-SELECT is(
-  (SELECT count(*)::INT FROM lesson_sessions
-    WHERE class_id='68000000-0000-0000-0000-000000000001' AND session_date='2026-08-22'),
-  0,
-  'and NO orphan lesson_sessions row survives the refusal — resolve-or-create rolled back with it');
 
 
 -- ═══ 3. sessions_i_am_main_on — what the client is allowed to trust ════════
