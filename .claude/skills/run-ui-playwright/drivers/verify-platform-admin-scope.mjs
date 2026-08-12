@@ -108,8 +108,10 @@ try {
   // catches, so an exact count is deliberate. It also reddens when a page is
   // legitimately added; the fix then is bumping this number (11 → 15 on
   // 2026-08-05, after claims/parents/trials/makeups/packages landed; 15 → 16
-  // on 2026-08-06 for Admins).
-  check("sidebar shows the 16 business pages", tnav.navLinks.length === 16,
+  // on 2026-08-06 for Admins; 16 → 17 on 2026-08-12 for Lesson Coaches —
+  // Wave 3 shipped it 2026-08-11 and the first sweep to reach this driver
+  // afterwards went red here, exactly as designed).
+  check("sidebar shows the 17 business pages", tnav.navLinks.length === 17,
     `${tnav.navLinks.length}: ${JSON.stringify(tnav.navLinks)}`);
   check("sidebar does NOT show Platform", !tnav.navLinks.includes("/platform"));
 
