@@ -38,12 +38,16 @@ import {
   type DayOfWeek,
 } from "./lessonDates";
 
-/** A `session_coaches` row, as the admin reads it. */
+/** A `session_coaches` row, as the admin reads it.
+ *
+ * ⚠ THERE IS NO `role` ANY MORE. `session_coaches` is the SUBSTITUTE table:
+ * at most one row per lesson, enforced by `one_substitute_per_session`
+ * (20260812000200 §9). Shadows moved to `class_shadow_coaches`, a dated
+ * assignment to the whole class, and this screen no longer touches them. */
 export type SessionCoachRow = {
   id: string;
   lesson_session_id: string;
   coach_id: string;
-  role: "main" | "shadow";
 };
 
 /** An existing `lesson_sessions` row for the class, within the month. */
@@ -73,12 +77,6 @@ export type RosterMain = {
   row_id: string | null;
 };
 
-export type RosterShadow = {
-  row_id: string;
-  coach_id: string;
-  name: string;
-};
-
 export type LessonRoster = {
   session_date: string;
   /**
@@ -86,12 +84,11 @@ export type LessonRoster = {
    * created LAZILY, by the coach, when attendance is first saved (PRD §7.5) —
    * so a future lesson, which is exactly the lesson an admin wants to arrange
    * cover for, has no row and no id at all. That is why assignment goes through
-   * `assign_session_coach(class, DATE, coach, role)`, which resolves-or-creates,
-   * and why this screen never handles a session id when writing.
+   * `assign_session_coach(class, DATE, coach)`, which resolves-or-creates, and
+   * why this screen never handles a session id when writing.
    */
   session_id: string | null;
   main: RosterMain;
-  shadows: RosterShadow[];
   /**
    * A lesson that is not on the class's weekday — an extra or rescheduled one
    * (`schedule_extra_lesson()` waives the weekday rule deliberately). Flagged
@@ -174,10 +171,10 @@ export function buildLessonRosters(input: {
     const session_id = sessionByDate.get(session_date) ?? null;
     const rows = session_id ? rosterBySession.get(session_id) ?? [] : [];
 
-    // At most one, enforced by the `one_main_coach_per_session` partial unique
-    // index. Taken as "the first" rather than asserted: a screen that throws on
-    // impossible data is a screen that goes blank on a bug elsewhere.
-    const mainRow = rows.find((r) => r.role === "main") ?? null;
+    // At most one, enforced by the `one_substitute_per_session` unique
+    // constraint. Taken as "the first" rather than asserted: a screen that
+    // throws on impossible data is a screen that goes blank on a bug elsewhere.
+    const mainRow = rows[0] ?? null;
 
     const main: RosterMain = mainRow
       ? {
@@ -195,51 +192,48 @@ export function buildLessonRosters(input: {
           row_id: null,
         };
 
-    const shadows: RosterShadow[] = rows
-      .filter((r) => r.role === "shadow")
-      .map((r) => ({
-        row_id: r.id,
-        coach_id: r.coach_id,
-        name: coachNames.get(r.coach_id) ?? "Unknown coach",
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
     return {
       session_date,
       session_id,
       main,
-      shadows,
       off_pattern: dayOfWeekOf(session_date) !== dayOfWeek,
     };
   });
 }
 
 /**
- * The coaches still eligible to be added as a shadow on one lesson.
+ * ~~assignableShadows~~ — DELETED with the per-lesson shadow (20260812000200).
  *
- * Excludes the main — `session_coaches` is UNIQUE on (lesson, coach), so
- * offering them would produce a constraint error that reads as a bug rather
- * than as "they are already teaching it". Excludes existing shadows for the
- * same reason.
- *
- * The class's own coach IS offered when somebody else is covering: "A shadows
- * the substitute" is a real arrangement (a coach back from leave, watching), and
- * refusing it here would be this screen inventing a rule the database does not
- * have.
+ * It used to filter the dropdown so the class's own coach could not be offered
+ * as a shadow of a lesson they were already teaching by the absence rule. That
+ * contradictory state is now unbuildable rather than filtered: a shadow belongs
+ * to the CLASS, and `assign_class_shadow()` refuses the class's own coach
+ * outright. The Classes page owns the assignment; this file owns substitutes.
  */
-export function assignableShadows(
-  lesson: LessonRoster,
+
+/**
+ * The coaches still eligible to be added as a SHADOW OF A CLASS.
+ *
+ * The successor to `assignableShadows`, and it filters on the two things the
+ * database refuses rather than on anything this screen invents:
+ *
+ *   • THE CLASS'S OWN COACH. `assign_class_shadow()` raises for them — they
+ *     already teach it, and holding both roles is the contradictory state the
+ *     whole class-level model exists to make unbuildable (a lesson that is
+ *     unmarkable AND un-nagged). Filtered here so the refusal is never met.
+ *   • ANYONE WITH AN ACTIVE ASSIGNMENT, because `one_active_shadow_per_class_coach`
+ *     is a partial unique index and a second one surfaces as a raw 23505.
+ *
+ * ⚠ ENDED ASSIGNMENTS DO NOT EXCLUDE ANYBODY. A coach who shadowed this class
+ * in August and stopped can be assigned again — the index only covers rows with
+ * `effective_to IS NULL`. Excluding them here would invent a rule the database
+ * does not have, and would silently make re-assignment impossible.
+ */
+export function assignableClassShadows(
+  classCoachId: string,
+  activeShadowCoachIds: readonly string[],
   coaches: readonly { id: string; name: string }[]
 ): { id: string; name: string }[] {
-  const taken = new Set<string>([
-    lesson.main.coach_id,
-    ...lesson.shadows.map((s) => s.coach_id),
-  ]);
-  // Excluded by COACH ID, not by roster row, and that is the whole subtlety: a
-  // fallback main holds no row, so a row-based check would happily offer the
-  // class's own coach as a shadow of the lesson they are already teaching. The
-  // resulting session says two contradictory things about the same person —
-  // main by the absence rule, shadow by an actual row — and the write gate and
-  // the pay path would then be reading different halves of it.
+  const taken = new Set<string>([classCoachId, ...activeShadowCoachIds]);
   return coaches.filter((c) => !taken.has(c.id));
 }

@@ -45,11 +45,15 @@ export type PayoutItem = {
   original_period: string | null;
 };
 
-/** A `session_coaches` row for a lesson this payout touches. */
+/** A `session_coaches` row for a lesson this payout touches — the SUBSTITUTE.
+ *
+ * ⚠ NO `role`. Since 20260812000200 `session_coaches` holds substitutes only,
+ * at most one per lesson. A shadow is a dated assignment to the whole CLASS, so
+ * it cannot be read off a per-lesson row at all — the caller resolves which
+ * lessons this coach shadowed and passes the ids in as `shadowedSessionIds`. */
 export type SessionRosterRow = {
   lesson_session_id: string;
   coach_id: string;
-  role: "main" | "shadow";
 };
 
 /**
@@ -62,7 +66,9 @@ export type LessonLineKind =
   | "ordinary"
   /** An admin named this coach as the lesson's main — they taught it. */
   | "assigned"
-  /** An admin added this coach as a shadow — they watched, at their own rate. */
+  /** This coach was an assigned shadow OF THE CLASS on that date — they
+   *  watched, at their own shadow rate. Derived from `class_shadow_coaches`
+   *  by the caller, never from a per-lesson row. */
   | "shadow"
   /**
    * This coach is NOT on the lesson's roster but somebody else is its main.
@@ -112,7 +118,10 @@ function toCents(amount: number): number {
 export function buildLessonLines(
   items: readonly PayoutItem[],
   rosterRows: readonly SessionRosterRow[],
-  coachId: string
+  coachId: string,
+  /** Lessons this coach was an assigned class shadow on, and was not marked
+   *  absent from. Empty by default so every existing caller keeps its meaning. */
+  shadowedSessionIds: ReadonlySet<string> = new Set()
 ): LessonLine[] {
   const bySession = new Map<string, PayoutItem[]>();
   for (const item of items) {
@@ -134,7 +143,13 @@ export function buildLessonLines(
       session_date: group[0].session_date,
       amount: cents / 100,
       items: group,
-      kind: lineKind(rosterRows, lesson_session_id, coachId, group),
+      kind: lineKind(
+        rosterRows,
+        lesson_session_id,
+        coachId,
+        group,
+        shadowedSessionIds
+      ),
       hasAdjustment: adjustments.length > 0,
       adjustedPeriods: [
         ...new Set(
@@ -157,16 +172,22 @@ function lineKind(
   rosterRows: readonly SessionRosterRow[],
   sessionId: string,
   coachId: string,
-  group: readonly PayoutItem[]
+  group: readonly PayoutItem[],
+  shadowedSessionIds: ReadonlySet<string>
 ): LessonLineKind {
   const forSession = rosterRows.filter((r) => r.lesson_session_id === sessionId);
   const mine = forSession.find((r) => r.coach_id === coachId);
 
-  if (mine?.role === "main") return "assigned";
-  if (mine?.role === "shadow") return "shadow";
-  // No row of my own. If somebody ELSE is the lesson's main, this coach was
-  // replaced on it — the usual reason a line goes negative.
-  if (forSession.some((r) => r.role === "main")) return "reassigned";
+  // ⚠ SUBSTITUTE BEATS SHADOW, and the order here MIRRORS
+  // coach_attribution_kind() (20260812000200 §7). A coach can be both — they
+  // shadow the class all term and cover one lesson of it — and the database
+  // pays them the substitute rate for that lesson. A label that said "shadow"
+  // beside a substitute's amount would describe the money wrongly.
+  if (mine) return "assigned";
+  if (shadowedSessionIds.has(sessionId)) return "shadow";
+  // No row of my own. If somebody ELSE is the lesson's substitute, this coach
+  // was replaced on it — the usual reason a line goes negative.
+  if (forSession.length > 0) return "reassigned";
   // Still no explanation, and nothing here but corrections. The roster may have
   // been cleared since the clawback was emitted, so there is no longer anything
   // to point at — but an unlabelled negative line is the worse outcome.

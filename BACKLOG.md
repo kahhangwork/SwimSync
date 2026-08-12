@@ -209,8 +209,8 @@ below, because an unrecorded decision is re-litigated.)_
 | Decision | Answer | Consequence for the order |
 |---|---|---|
 | Split co-admin permissions? | **Yes eventually, not now** | *Split co-admin permissions* moves to Later. The first real need — an **owner-only accounting page** — needs no capability model, because `is_tenant_owner()` already exists |
-| Coach per class or per lesson? | **Per lesson, on top of class assignment** | A permanent handover already works. A **temporary substitute** and **trainee/shadow coaches** are new lesson-level items; *Multiple coaches per class* is superseded |
-| Trainee coach pay? | **Paid at their own rate** | A shadowed lesson produces two payout rows — the payroll half of the accounting page must come after it |
+| Coach per class or per lesson? | **Substitute per LESSON; shadow per CLASS** *(revised 2026-08-12)* | A permanent handover already works. The 2026-08-08 answer was "both per lesson", and the shadow half was **wrong**: a trainee is staffed to a class for a term, not signed up lesson by lesson. Shipped per-lesson on 2026-08-11 and moved to `class_shadow_coaches` on 2026-08-12 — cheap only because production held zero roster rows |
+| Trainee coach pay? | **Their own SHADOW rate** *(revised 2026-08-12)* | A shadowed lesson produces two payout rows. "Their own rate" originally meant their teaching rate, which pays a trainee a full coach's wage; `coach_rates` gained a role so a coach can hold both, and payroll REFUSES rather than fall back when no shadow rate is in force |
 | Substitute pay? | **Whoever actually taught it** | The session override moves money, so it is a wages change, not just a roster label |
 | Multiple classes per child? | **Yes, and soon** | **SHIPPED 2026-08-11** as Wave 2 (PRD §7.4). The ranking was right: it dropped `one_active_enrolment_per_student`, and three pieces of code turned out to be correct only because that index held. Everything enrolment-shaped built after this inherits the new model |
 | Native store builds ($99/yr)? | **Not yet — stay web-only** | *Push notifications* stays blocked. **Settled by what shipped 2026-08-09:** the static PayNow QR upload was neither deleted nor hidden — it is **collapsed behind a disclosure and always present**, which keeps the native fallback path alive *and* survives a stored-but-unencodable PayNow ID. Any future native decision inherits that, not a conditional |
@@ -265,6 +265,11 @@ make-up from the Attendance page* were held until after this and are now unblock
 
 Both items are built and live: `20260811000200`, PRD §7.13/§7.20/§14.3,
 `docs/plans/WAVE_3_PLAN.md`.
+
+*(And `20260812000100`'s guard was **deleted one day later** by `20260812000200`, along with
+its 16 pgTAP checks: the class-level shadow makes the state it guarded unbuildable. Recorded
+because a deleted guard looks like an oversight otherwise. `sessions_i_am_main_on`, which
+shipped in the same migration, survives and now has its own test file.)*
 
 **Its follow-up is also done, 2026-08-12** — `20260812000100` (the shadow-branch guard plus
 `sessions_i_am_main_on`) and `verify-coach-roster.mjs`, all three struck below.
@@ -630,29 +635,17 @@ also the tenant admin and no narrowing can be demonstrated on him (§7.131). The
 automate is in `docs/plans/WAVE_3_PLAN.md` Step 4, and the manual version already passed:
 owner 7/7, trainee 5/5, substitute 12/12.
 
-### `Clear` can leave a lesson unmarkable AND un-nagged — **M** `[found 2026-08-12]`
-The class's own coach holding a **shadow** row on a lesson with **no main** is a contradictory
-state: `coach_is_main_on_session()` says they ARE the main (absence rule), while `lessonRole()`
-reads their shadow row and says they may not mark it. The lesson leaves their NEEDS MARKING
-list and the attendance screen renders read-only — a lesson the database insists they must
-mark, that they cannot mark and are never reminded about.
+### ~~`Clear` can leave a lesson unmarkable AND un-nagged~~ — **SUPERSEDED 2026-08-12**
+Not fixed — made unbuildable. `20260812000200` moved shadows off the lesson entirely: a shadow
+is now a dated assignment to the whole CLASS, so `Clear`, which removes a *lesson's* substitute,
+has no shadow row left to strand. The remaining route in — the class's own coach also being one
+of its shadows — is refused by `assign_class_shadow()`, by `trg_class_shadow_guard` on the table
+itself, and by `set_class_terms()` in the other direction. PRD §7.13, §7.6.
 
-**Why it matters:** unmarked attendance blocks the billing month outright, with no override
-(§8i) and nothing on any screen saying why. This is the silent version of that block.
-
-**Reachable in three clicks, all legitimate:** assign B as the main → add the class's coach A
-as a shadow (a real arrangement — `assignableShadows()` documents "A shadows the substitute")
-→ press **Clear** on B. The same state also appears if `classes.coach_id` is re-pointed at a
-coach who already holds a shadow row on one of that class's lessons.
-
-**Notes:** `20260812000100` established the invariant *"the class's coach must never hold a
-shadow row on a main-less lesson"* and enforces it on the **add** path only; `Clear` is a plain
-`DELETE` from the client (`lesson-coaches/page.tsx`'s `handleRemove`), so nothing consults it.
-Found in that change's `/commit-review`, not by the change itself — it is **pre-existing**, not
-a regression. Two candidate fixes, and the choice is a product one: route `Clear` through an
-RPC that refuses while such a shadow exists, or have it delete the class coach's shadow row
-along with the main. **Needs a root-checkout migration** either way. The same RPC should
-reject the `classes.coach_id` re-point, or accept it and clean up.
+**What the fix would have cost, for the record:** the filed version was an RPC that refused
+`Clear` while such a shadow existed, and it would have had to keep working for every future path
+that could create the state. Removing the state removed the guard too — `20260812000100`, one day
+old, was deleted whole along with its 16 pgTAP checks.
 
 ### The Attendance page's Coach column can name someone who did not teach — **S** `[found 2026-08-11]`
 `SwimSyncAdmin/app/(admin)/attendance/page.tsx:162` reads the **class's** coach, so a covered

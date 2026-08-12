@@ -935,8 +935,13 @@ the admin recorded as covering it (§7.13).
 - The **class's own coach keeps the lesson card**, badged **Covered** and read-only, and it
   **leaves their NEEDS MARKING list** — a straggler they are not permitted to clear would be a
   nag with no available action.
-- A **shadow** reads the lesson and never marks it, so the main coach stays unambiguous for
-  marking exactly as they are for pay.
+- A **shadow** sees the class's **whole schedule**, read-only, for as long as they are
+  assigned — the opposite of a substitute, who sees only the lesson they were named on. They
+  never mark, so the main coach stays unambiguous for marking exactly as they are for pay, and
+  a shadowed lesson never enters anybody's NEEDS MARKING list but the marker's.
+- **Once a shadow assignment ends, the class disappears from that coach's app** — unless they
+  have since become its coach. Their own pay history is unaffected; My Pay reads their payout
+  records, not the class.
 - A substitute gains **nothing else**: they cannot remove a child from the class, set a child
   inactive, or see the class's other lessons.
 
@@ -1297,17 +1302,38 @@ rebuilt by hand each month from attendance the app already holds. This closes th
 private coach simply has no rate, because their income *is* their parents' invoices and
 there is nobody upstream to pay them. The distinction is data, not a rule.
 
-**Who a lesson pays is answered per LESSON, not per class** *(implemented 2026-08-11)*. A
-lesson has one **main** coach plus any number of **shadow** (trainee) coaches, recorded on
-the lesson itself. **No record means the class's coach is the main coach** — so nothing
-changed for any lesson nobody has touched, and there was no backfill.
+**Who a lesson pays is answered per LESSON; who SHADOWS is answered per CLASS**
+*(substitutes implemented 2026-08-11; shadows moved to the class 2026-08-12)*. The two are
+deliberately different shapes, because the arrangements are:
+
+- a **substitute** is a one-off on ONE lesson, recorded on the lesson itself;
+- a **shadow** is a **dated assignment to a whole class**, permanent until it is ended.
+
+**No record means the class's coach is the main coach** — so nothing changed for any lesson
+nobody has touched, and there was no backfill.
 
 - A **substitute** is paid **their own rate**, not the class's terms; a senior covering a
   junior's class costs what the senior costs. The coach they replaced is paid **nothing** for
   that lesson.
-- A **shadow** is paid their own rate too, so **one lesson can produce more than one payout
-  row**. Their rate comes from the same effective-dated `coach_rates` — there is no second
-  rate concept.
+- A **shadow** is paid for **every lesson of the class that ran** while their assignment was
+  in force, so **one lesson can produce more than one payout row**. They are paid a **shadow
+  rate**, which is a second effective-dated rate per coach and NOT their teaching rate
+  *(implemented 2026-08-12)*. **A shadow with no shadow rate in force makes payroll refuse
+  outright** rather than fall back to their teaching rate — falling back would pay a trainee a
+  full coach's wage, which is the thing the second rate exists to prevent.
+- **A coach who both shadows the class and covers one of its lessons is paid the SUBSTITUTE
+  rate for that lesson.** Substitute beats shadow; they taught it.
+- **The main coach records who was actually there.** The attendance screen lists the lesson's
+  shadows, **pre-ticked**, and unticking one drops that single lesson from their pay. Nothing
+  appears for a class with no shadows. Pre-ticked because forgetting an opt-in silently
+  underpays somebody and shows nowhere, while forgetting an opt-out overpays and shows as a
+  line on Coach Wages.
+- **Ending an assignment never changes pay for the lessons inside it.** The record is dated,
+  so a shadow who stops in November keeps every August lesson they were assigned for. What
+  ending it *does* change is visibility — see §7.6.
+- **A month whose coach payouts are already paid is frozen for both.** Neither a shadow
+  assignment nor an attendance tick can be backdated into it, or edited within it, and there
+  is deliberately no override.
 - A **class flat-rate override applies only when the class's own paid coach teaches it.** A
   substitute always falls through to their own rate, because that is what "paid their own
   rate" means. *(No flat-rate class exists yet; this is the rule the first one will meet.)*
@@ -1315,17 +1341,24 @@ changed for any lesson nobody has touched, and there was no backfill.
   coach is clawed back and the substitute paid, both as adjustments carried **once** onto the
   next payout, leaving the paid record intact (§7.13's draft/freeze model, unchanged).
 
-**A lesson's main coach cannot be demoted by being added as a shadow** *(guard added
-2026-08-12)*. Adding the coach who is already teaching a lesson as its shadow is refused, and
-the refusal names them — otherwise the lesson would be left with no main at all, the absence
-rule would take over, and the pay would move back to the class's coach with nobody asking for
-it. **This includes the class's OWN coach on a lesson with no assignment**, which is the half a
-reader would assume is still allowed: they are the main by the absence rule, so shadowing them
-would say two different things about one person.
+**A class's own coach cannot also shadow it** *(2026-08-12)*. They are its main coach by the
+absence rule, so an assignment would say two different things about one person: the lesson
+becomes one the coach is required to mark, is not permitted to mark, and is never reminded
+about. Refused when the shadow is added, and refused again the other way round — **handing a
+class over to a coach who is currently shadowing it is refused until that assignment is
+ended**. An assignment that has **already ended never blocks a handover**, because their past
+pay is kept either way.
 
-**Admins assign; coaches do not.** The admin panel's **Lesson Coaches** page picks a class and
-a month and shows who is teaching each lesson, with assign / change / clear for the main coach
-and add / remove for shadows. Lessons come from the class's weekly pattern **unioned with**
+**Admins assign; coaches do not.** Substitutes and shadows are managed on **different pages**,
+because they are different shapes:
+
+- **Lesson Coaches** picks a class and a month and shows who is teaching each lesson, with
+  assign / change / clear for the substitute. It no longer mentions shadows at all.
+- **Classes → a class → Shadow coaches** adds a shadow with a start date, ends an active one,
+  and lists past assignments with their date ranges. Ended ones stay visible because they
+  still explain money. The class's own coach is not offered.
+
+Lessons come from the class's weekly pattern **unioned with**
 lesson rows that already exist, so an extra or rescheduled lesson is assignable and is badged
 *Extra*. Assigning a cover to a date with no lesson row **creates** it — the admin never
 handles a lesson id — and a date the class does not run on is refused.

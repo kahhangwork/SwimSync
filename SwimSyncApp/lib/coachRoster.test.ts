@@ -14,27 +14,24 @@ import {
 /** The shape PostgREST returns for
  *  `select("role, lesson_session_id, lesson_sessions!inner(id, class_id, session_date)")`. */
 const row = (
-  role: string,
   classId: string,
   date: string,
   sessionId = `s-${classId}-${date}`
 ) => ({
-  role,
   lesson_session_id: sessionId,
   lesson_sessions: { id: sessionId, class_id: classId, session_date: date },
 });
 
 describe("parseAssignments", () => {
-  it("flattens the embed into (session, class, date, role)", () => {
-    expect(parseAssignments([row("main", "c1", "2026-08-11", "s1")])).toEqual([
-      { sessionId: "s1", classId: "c1", date: "2026-08-11", role: "main" },
+  it("flattens the embed into (session, class, date)", () => {
+    expect(parseAssignments([row("c1", "2026-08-11", "s1")])).toEqual([
+      { sessionId: "s1", classId: "c1", date: "2026-08-11" },
     ]);
   });
 
   it("accepts the embed as an array, which PostgREST also produces", () => {
     const [a] = parseAssignments([
       {
-        role: "shadow",
         lesson_session_id: "s1",
         lesson_sessions: [
           { id: "s1", class_id: "c1", session_date: "2026-08-11" },
@@ -45,7 +42,6 @@ describe("parseAssignments", () => {
       sessionId: "s1",
       classId: "c1",
       date: "2026-08-11",
-      role: "shadow",
     });
   });
 
@@ -55,8 +51,18 @@ describe("parseAssignments", () => {
     ).toEqual([]);
   });
 
-  it("drops a role the enum does not have", () => {
-    expect(parseAssignments([row("assistant", "c1", "2026-08-11")])).toEqual([]);
+  it("drops a row whose embed came back without a class id", () => {
+    // The role check this replaced is gone with the column. The malformed-embed
+    // guard is what is left, and it is the one that matters: a row that cannot
+    // be PLACED must be dropped, never guessed onto a date (§7.64's shape).
+    expect(
+      parseAssignments([
+        {
+          lesson_session_id: "s1",
+          lesson_sessions: { id: "s1", session_date: "2026-08-11" },
+        },
+      ])
+    ).toEqual([]);
   });
 
   it("survives null, which is what supabase-js returns on an error", () => {
@@ -66,9 +72,9 @@ describe("parseAssignments", () => {
 
 describe("rosteredDatesByClass", () => {
   const assignments: RosterAssignment[] = parseAssignments([
-    row("main", "c1", "2026-08-11"),
-    row("shadow", "c1", "2026-08-04"),
-    row("main", "c2", "2026-08-12"),
+    row("c1", "2026-08-11"),
+    row("c1", "2026-08-04"),
+    row("c2", "2026-08-12"),
   ]);
 
   it("groups the dates per class, ascending", () => {
@@ -85,8 +91,8 @@ describe("rosteredDatesByClass", () => {
 
   it("de-duplicates a date that arrived twice", () => {
     const twice = parseAssignments([
-      row("main", "c1", "2026-08-11"),
-      row("main", "c1", "2026-08-11"),
+      row("c1", "2026-08-11"),
+      row("c1", "2026-08-11"),
     ]);
     expect(rosteredDatesByClass(twice).get("c1")).toEqual(["2026-08-11"]);
   });
@@ -95,9 +101,9 @@ describe("rosteredDatesByClass", () => {
 describe("assignmentsByLesson", () => {
   it("keys by class:date, the same key the Schedule tab already uses", () => {
     const map = assignmentsByLesson(
-      parseAssignments([row("shadow", "c1", "2026-08-11")])
+      parseAssignments([row("c1", "2026-08-11", "s1")])
     );
-    expect(map.get(lessonKey("c1", "2026-08-11"))?.role).toBe("shadow");
+    expect(map.get(lessonKey("c1", "2026-08-11"))?.sessionId).toBe("s1");
     expect(map.get(lessonKey("c1", "2026-08-04"))).toBeUndefined();
   });
 });
@@ -115,22 +121,54 @@ describe("lessonRole — the absence rule first", () => {
     expect(lessonRole({ ownsClass: true, coveredOut: true })).toBe("covered");
   });
 
-  it("is a cover when I am the roster main on a class I do not own", () => {
-    expect(lessonRole({ ownsClass: false, assignment: "main" })).toBe("cover");
+  it("is a cover when I am the substitute on a class I do not own", () => {
+    expect(lessonRole({ ownsClass: false, isSubstitute: true })).toBe("cover");
   });
 
-  it("is a shadow on someone else's class", () => {
-    expect(lessonRole({ ownsClass: false, assignment: "shadow" })).toBe("shadow");
+  it("is a shadow on a class I am assigned to shadow", () => {
+    expect(lessonRole({ ownsClass: false, isClassShadow: true })).toBe("shadow");
   });
 
-  // The admin can roster a trainee onto a lesson of the trainee's own class.
-  // A shadow row means somebody else is main, so ownership does not win.
-  it("is a shadow even on my own class when my row says shadow", () => {
-    expect(lessonRole({ ownsClass: true, assignment: "shadow" })).toBe("shadow");
+  it("is the owner when I am explicitly rostered onto my own class", () => {
+    expect(lessonRole({ ownsClass: true, isSubstitute: true })).toBe("owner");
   });
 
-  it("is the owner when I am explicitly rostered main on my own class", () => {
-    expect(lessonRole({ ownsClass: true, assignment: "main" })).toBe("owner");
+  // ⚠ SUBSTITUTE BEATS SHADOW, mirroring coach_attribution_kind() exactly.
+  // One coach can be both — they shadow the class all term and cover one lesson
+  // of it. The database PAYS them the substitute rate for that lesson and lets
+  // them MARK it, so resolving to "shadow" here would show a read-only screen
+  // for a lesson they are required to mark: unmarkable AND un-nagged, the exact
+  // shape this whole wave removed.
+  it("is a COVER, not a shadow, when I am both on the same lesson", () => {
+    expect(
+      lessonRole({ ownsClass: false, isSubstitute: true, isClassShadow: true })
+    ).toBe("cover");
+  });
+
+  it("and canMark agrees — being both must not make the lesson read-only", () => {
+    expect(
+      canMark(
+        lessonRole({ ownsClass: false, isSubstitute: true, isClassShadow: true })
+      )
+    ).toBe(true);
+  });
+
+  // The class's own coach shadowing their own class is refused by
+  // assign_class_shadow(), so this input is unbuildable. Kept as an
+  // unreachable-state test: if the guard is ever relaxed, the screen must still
+  // hand the write to the person the database says is main.
+  it("prefers SHADOW over a claimed ownership, because only one of them is trustworthy", () => {
+    // ⚠ THIS TEST'S TITLE ONCE SAID "keeps the OWNER role" WHILE ASSERTING
+    // "shadow" — pinning the opposite of what it claimed, which is worse than
+    // either answer. The honest version: `ownsClass` is a client-side guess
+    // that fails OPEN when the session has not hydrated (`!me?.id ||`), so on a
+    // deep link every coach "owns" every class; `isClassShadow` is answered
+    // server-side and cannot lie. Trusting the guess first showed a shadow a
+    // marking screen the database then refused — measured red on
+    // verify-coach-roster check 18. The pair is unbuildable anyway:
+    // trg_class_shadow_guard refuses a shadow assignment on the class's own
+    // coach at the table, not just in the RPC.
+    expect(lessonRole({ ownsClass: true, isClassShadow: true })).toBe("shadow");
   });
 
   // Not reachable from the Schedule tab, which only builds cards for classes it

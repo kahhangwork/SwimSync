@@ -45,10 +45,18 @@ import {
  * was reassigned, which turns into a conversation the admin cannot win.
  */
 
+type Rate = { amount: number; unit_minutes: number; effective_from: string };
+
 type CoachRow = {
   id: string;
   name: string;
-  rate: { amount: number; unit_minutes: number; effective_from: string } | null;
+  /** The MAIN rate in force — what they are paid for a lesson they teach. */
+  rate: Rate | null;
+  /** The SHADOW rate in force, on its own timeline. Null is the ordinary case
+   *  and is NOT missing setup — most coaches never shadow anything. It becomes
+   *  a problem only once they are assigned as a class shadow, and payroll
+   *  refuses loudly then rather than falling back to the main rate. */
+  shadowRate: Rate | null;
 };
 
 type PayoutRow = {
@@ -143,6 +151,8 @@ export default function WagesPage() {
   const [rateAmount, setRateAmount] = useState("");
   const [rateUnit, setRateUnit] = useState("60");
   const [rateFrom, setRateFrom] = useState("");
+  /** Which rate the editor is writing. Sent explicitly on the insert. */
+  const [rateRole, setRateRole] = useState<"main" | "shadow">("main");
 
   useEffect(() => {
     (async () => {
@@ -171,14 +181,29 @@ export default function WagesPage() {
   async function loadCoaches(tid: string) {
     const { data } = await supabase
       .from("coaches")
-      .select("id, profiles(full_name), coach_rates(amount, unit_minutes, effective_from)")
+      .select("id, profiles(full_name), coach_rates(amount, unit_minutes, effective_from, role)")
       .eq("tenant_id", tid);
 
     setCoaches(
       (data ?? []).map((c: any) => {
         // The rate IN EFFECT is the latest effective_from — rates are
         // effective-dated so a raise never reprices an earlier month.
-        const rates = (c.coach_rates ?? []).slice().sort((a: any, b: any) =>
+        //
+        // ⚠ FILTERED TO role='main' FIRST, AND THAT IS NOT COSMETIC. Since
+        // 20260812000200 a coach can hold a SHADOW rate too, on its own
+        // timeline. Sorting every row by effective_from and taking [0] — which
+        // is what this did — makes the first shadow rate dated after a main
+        // rate display as that coach's rate, while payroll pays the other one.
+        const mainRates = (c.coach_rates ?? []).filter(
+          (r: any) => (r.role ?? "main") === "main"
+        );
+        const shadowRates = (c.coach_rates ?? []).filter(
+          (r: any) => r.role === "shadow"
+        );
+        const rates = mainRates.slice().sort((a: any, b: any) =>
+          b.effective_from.localeCompare(a.effective_from)
+        );
+        const shadowSorted = shadowRates.slice().sort((a: any, b: any) =>
           b.effective_from.localeCompare(a.effective_from)
         );
         const prof = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
@@ -190,6 +215,13 @@ export default function WagesPage() {
                 amount: Number(rates[0].amount),
                 unit_minutes: rates[0].unit_minutes,
                 effective_from: rates[0].effective_from,
+              }
+            : null,
+          shadowRate: shadowSorted[0]
+            ? {
+                amount: Number(shadowSorted[0].amount),
+                unit_minutes: shadowSorted[0].unit_minutes,
+                effective_from: shadowSorted[0].effective_from,
               }
             : null,
         };
@@ -265,7 +297,7 @@ export default function WagesPage() {
     if (sessionIds.size > 0) {
       const { data: roster, error: rosterErr } = await supabase
         .from("session_coaches")
-        .select("lesson_session_id, coach_id, role")
+        .select("lesson_session_id, coach_id")
         .eq("tenant_id", tenantId);
 
       if (isStale()) return;
@@ -280,6 +312,81 @@ export default function WagesPage() {
           sessionIds.has(r.lesson_session_id)
         );
     }
+
+    // ── Which lessons was each coach an assigned CLASS SHADOW on? ───────────
+    // A shadow holds no per-lesson row, so this cannot be read off the roster.
+    // Resolved here, once, into a (coach → lesson ids) map: the assignment is
+    // dated and class-scoped, so a lesson counts when its date falls inside the
+    // range AND no absence was recorded. Mirrors coach_attribution_kind()'s
+    // shadow arm exactly (20260812000200 §7) — including that a SUBSTITUTE row
+    // wins, which buildLessonLines() applies.
+    const shadowedByCoach = new Map<string, Set<string>>();
+    if (sessionIds.size > 0) {
+      const [
+        { data: assigns, error: assignErr },
+        { data: absences, error: absErr },
+      ] = await Promise.all([
+        supabase
+          .from("class_shadow_coaches")
+          .select("class_id, coach_id, effective_from, effective_to")
+          .eq("tenant_id", tenantId),
+        supabase
+          .from("session_coach_absences")
+          .select("lesson_session_id, coach_id")
+          .eq("tenant_id", tenantId),
+      ]);
+
+      if (isStale()) return;
+
+      // ⚠ SCOPED TO THE SHADOWED CLASSES, NOT `.in(sessionIds)`. The rule is
+      // stated 40 lines above for this same set and this code broke it: that
+      // list is every distinct lesson across every coach's payout for the
+      // month, PostgREST puts it in the URL, and a few hundred lessons is past
+      // the header buffer — a 414 on the query whose whole job is labelling.
+      // The shadowed classes are a far smaller and unbounded-safe key, and they
+      // are the only classes whose lessons can possibly matter here.
+      const shadowClassIds = [
+        ...new Set((assigns ?? []).map((a: any) => a.class_id as string)),
+      ];
+      const { data: lessonRows, error: lessonErr } =
+        shadowClassIds.length > 0
+          ? await supabase
+              .from("lesson_sessions")
+              .select("id, class_id, session_date")
+              .in("class_id", shadowClassIds)
+          : { data: [] as any[], error: null };
+
+      if (isStale()) return;
+
+      // ⚠ DECLARED, NOT SWALLOWED — the same reason the roster load above says
+      // so. A failed load here leaves shadowedByCoach empty, and every shadow's
+      // line then falls through lineKind() to "ordinary", or to "reassigned"
+      // when the lesson also has a substitute: a CLAWBACK label on a positive
+      // payment.
+      const shadowErr = assignErr ?? absErr ?? lessonErr;
+      if (shadowErr) {
+        rosterError = [rosterError, `Could not label shadow lessons: ${shadowErr.message}`]
+          .filter(Boolean)
+          .join(" · ");
+      }
+
+      const absent = new Set(
+        (absences ?? []).map((a: any) => `${a.lesson_session_id}:${a.coach_id}`)
+      );
+      for (const ls of lessonRows ?? []) {
+        for (const a of assigns ?? []) {
+          if (a.class_id !== (ls as any).class_id) continue;
+          const d = (ls as any).session_date as string;
+          if (d < a.effective_from) continue;
+          if (a.effective_to && d > a.effective_to) continue;
+          if (absent.has(`${(ls as any).id}:${a.coach_id}`)) continue;
+          const set = shadowedByCoach.get(a.coach_id) ?? new Set<string>();
+          set.add((ls as any).id);
+          shadowedByCoach.set(a.coach_id, set);
+        }
+      }
+    }
+
     setLoadError(rosterError);
 
     setPayouts(
@@ -287,7 +394,8 @@ export default function WagesPage() {
         const lines = buildLessonLines(
           itemsByPayout.get(p.id) ?? [],
           rosterRows,
-          p.coach_id
+          p.coach_id,
+          shadowedByCoach.get(p.coach_id) ?? new Set<string>()
         );
         const summary = summarisePayout(lines);
         const gross_amount = Number(p.gross_amount);
@@ -373,11 +481,15 @@ export default function WagesPage() {
     setBusy(true);
     // INSERT, never UPDATE — a new effective-dated row. Editing the old one in
     // place would reprice every month it had already covered.
+    // ⚠ role IS SENT EXPLICITLY, never left to the column default. The default
+    // is 'main', so a shadow rate saved without it becomes a second main rate
+    // and the two race on effective_from.
     const { error } = await supabase.from("coach_rates").insert({
       coach_id: coachId,
       amount,
       unit_minutes: unit,
       effective_from: rateFrom,
+      role: rateRole,
     });
     setBusy(false);
     if (error) {
@@ -495,6 +607,7 @@ export default function WagesPage() {
             <Th sort={rateSort} sortKey="name">Coach</Th>
             <Th sort={rateSort} sortKey="rate" firstDir="desc">Current rate</Th>
             <Th sort={rateSort} sortKey="effective_from">In effect from</Th>
+            <Th>Shadow rate</Th>
             <Th>Actions</Th>
           </Thead>
           <Tbody>
@@ -508,8 +621,38 @@ export default function WagesPage() {
                 </Td>
                 <Td>{c.rate?.effective_from ?? "—"}</Td>
                 <Td>
+                  {c.shadowRate ? (
+                    <span className="text-gray-900">
+                      S${c.shadowRate.amount.toFixed(2)} per{" "}
+                      {c.shadowRate.unit_minutes} min
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">—</span>
+                  )}
+                </Td>
+                <Td>
                   {rateFor === c.id ? (
                     <div className="flex flex-wrap items-center gap-2">
+                      {/* ⚠ SWITCHING THE ROLE RE-PREFILLS THE AMOUNT. The
+                          editor opens on the coach's TEACHING rate, so leaving
+                          the number alone when the role changes means the
+                          default action for "Shadow rate" is to save the full
+                          teaching rate — handing a trainee a coach's pay, which
+                          is the one thing the shadow rate exists to prevent. */}
+                      <select
+                        value={rateRole}
+                        onChange={(e) => {
+                          const next = e.target.value as "main" | "shadow";
+                          setRateRole(next);
+                          const r = next === "shadow" ? c.shadowRate : c.rate;
+                          setRateAmount(r ? String(r.amount) : "");
+                          setRateUnit(String(r?.unit_minutes ?? 60));
+                        }}
+                        className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                      >
+                        <option value="main">Teaching rate</option>
+                        <option value="shadow">Shadow rate</option>
+                      </select>
                       <input
                         type="number"
                         step="0.01"
@@ -550,6 +693,7 @@ export default function WagesPage() {
                     <button
                       onClick={() => {
                         setRateFor(c.id);
+                        setRateRole("main");
                         setRateAmount(c.rate ? String(c.rate.amount) : "");
                         setRateUnit(String(c.rate?.unit_minutes ?? 60));
                         setRateFrom("");

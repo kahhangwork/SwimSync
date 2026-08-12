@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
@@ -15,7 +14,6 @@ import {
 import {
   lessonDatesInMonth,
   buildLessonRosters,
-  assignableShadows,
   type LessonRoster,
   type SessionCoachRow,
   type LessonSessionRow,
@@ -46,7 +44,14 @@ import {
  *    creates. Reading is a different matter: a roster row that already exists is
  *    deleted by its own id, which it necessarily has.
  *
- * 3. ASSIGNING A COVER MOVES THE LESSON OFF THE CLASS COACH'S MARKING LIST.
+ * 3. SHADOWS ARE NOT HERE ANY MORE. A shadow is a dated assignment to the whole
+ *    CLASS (`class_shadow_coaches`, 20260812000200), managed on the Classes
+ *    page. This screen is substitutes only, and `session_coaches` holds at most
+ *    one row per lesson because of it. The contradictory state the old model
+ *    allowed — the class's own coach holding a shadow row on a main-less lesson,
+ *    unmarkable AND un-nagged — is now unbuildable rather than guarded.
+ *
+ * 4. ASSIGNING A COVER MOVES THE LESSON OFF THE CLASS COACH'S MARKING LIST.
  *    attendance_write narrows to the roster main, so the class's own coach loses
  *    write on that one lesson — intended, and the point of "pay follows whoever
  *    actually taught". It is stated on screen because unmarked attendance blocks
@@ -65,8 +70,8 @@ type ClassRow = {
 
 type Coach = { id: string; name: string };
 
-/** Which row's picker is open, and for what. One at a time, like the rate editor. */
-type Picking = { date: string; kind: "main" | "shadow" } | null;
+/** Which row's picker is open. One at a time, like the rate editor. */
+type Picking = { date: string } | null;
 
 export default function LessonCoachesPage() {
   const [classes, setClasses] = useState<ClassRow[]>([]);
@@ -188,7 +193,7 @@ export default function LessonCoachesPage() {
     if (sessions.length > 0) {
       const { data: rosterData, error: rosterErr } = await supabase
         .from("session_coaches")
-        .select("id, lesson_session_id, coach_id, role")
+        .select("id, lesson_session_id, coach_id")
         .in("lesson_session_id", sessions.map((s) => s.id));
 
       if (isStale()) return;
@@ -265,44 +270,22 @@ export default function LessonCoachesPage() {
     if (gen === loadGen.current) setLoading(false);
   }
 
-  async function handleAssign(date: string, role: "main" | "shadow") {
+  async function handleAssign(date: string) {
     if (!selected || !pickedCoach) {
       setMessage("Choose a coach first.");
-      return;
-    }
-
-    // ⚠ RE-CHECKED HERE, NOT ONLY WHERE THE OPTIONS ARE BUILT.
-    // The shadow branch of assign_session_coach() is
-    // `ON CONFLICT (lesson_session_id, coach_id) DO UPDATE SET role='shadow'`,
-    // so shadowing the lesson's CURRENT MAIN silently demotes them: the lesson
-    // is left with no main and falls back to the class's coach under the
-    // absence rule — a pay reassignment nobody asked for. assignableShadows()
-    // filters them out of the dropdown, but that list is built from state, and
-    // a second admin (or a second tab) can make somebody main after this tab
-    // rendered. set_session_main_coach() refuses DO NOTHING for exactly this
-    // class of reason, and since 20260812000100 the server refuses this one too
-    // — in BOTH directions, the row main and the absence-rule main. This check
-    // stays because it names the coach and costs no round trip; the server's
-    // message is the one a real race produces.
-    const lesson = lessons.find((l) => l.session_date === date);
-    if (role === "shadow" && lesson?.main.coach_id === pickedCoach) {
-      setMessage(
-        `${lesson.main.name} is already teaching ${formatSgDate(date)} — adding them as a shadow would leave the lesson with no main coach. Reload to see the current roster.`
-      );
       return;
     }
 
     setBusy(true);
     setMessage(null);
 
-    // Both roles go through the RPC. The main MUST (partial unique index, see
-    // the header); the shadow does too because a future lesson has no
-    // lesson_sessions row for a direct insert to reference.
+    // Still through the RPC, and rule 2 above is why: a FUTURE lesson — the only
+    // kind anyone arranges cover for — has no lesson_sessions row for a direct
+    // insert to reference. assign_session_coach() resolves-or-creates.
     const { error } = await supabase.rpc("assign_session_coach", {
       p_class_id: selected.id,
       p_session_date: date,
       p_coach_id: pickedCoach,
-      p_role: role,
     });
 
     if (error) {
@@ -320,9 +303,7 @@ export default function LessonCoachesPage() {
     await reload();
     setBusy(false);
     setMessage(
-      role !== "main"
-        ? `${who} is shadowing ${formatSgDate(date)}. They can see the lesson and are paid their own rate; marking stays with the main coach.`
-        : isCover
+      isCover
         ? `${who} is now teaching ${formatSgDate(date)}. This lesson has moved onto their marking list and off ${selected.coach_name}'s.`
         : // Pinning the class's own coach is not a cover, and saying it moved
           // "off Coach A's list" when A is the one assigned reads as a bug.
@@ -347,8 +328,8 @@ export default function LessonCoachesPage() {
   const inputClass =
     "rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400";
 
-  function openPicker(date: string, kind: "main" | "shadow") {
-    setPicking({ date, kind });
+  function openPicker(date: string) {
+    setPicking({ date });
     setPickedCoach("");
     setMessage(null);
   }
@@ -357,7 +338,7 @@ export default function LessonCoachesPage() {
     <div>
       <PageHeader
         title="Lesson Coaches"
-        subtitle="Who is teaching each lesson — assign a substitute, or add a trainee to shadow"
+        subtitle="Who is teaching each lesson — assign a substitute when the class's coach is away"
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -434,19 +415,18 @@ export default function LessonCoachesPage() {
           <Thead>
             <Th>Lesson</Th>
             <Th>Teaching</Th>
-            <Th>Shadowing</Th>
             <Th>Actions</Th>
           </Thead>
           <Tbody>
             {loading ? (
               <Tr>
-                <Td className="py-8 text-center text-gray-400" colSpan={4}>
+                <Td className="py-8 text-center text-gray-400" colSpan={3}>
                   Loading…
                 </Td>
               </Tr>
             ) : lessons.length === 0 ? (
               <Tr>
-                <Td className="py-8 text-center text-gray-400" colSpan={4}>
+                <Td className="py-8 text-center text-gray-400" colSpan={3}>
                   {loadError
                     ? "Could not load the lessons — see the error above."
                     : "This class has no lessons in that month."}
@@ -455,13 +435,6 @@ export default function LessonCoachesPage() {
             ) : (
               lessons.map((lesson) => {
                 const pickingHere = picking?.date === lesson.session_date;
-                // Built only for the row whose picker is open — one Set per
-                // render instead of one per row per render.
-                const options = !pickingHere
-                  ? []
-                  : picking!.kind === "shadow"
-                  ? assignableShadows(lesson, coaches)
-                  : coaches;
 
                 return (
                   <Tr key={lesson.session_date}>
@@ -492,37 +465,6 @@ export default function LessonCoachesPage() {
                     </Td>
 
                     <Td>
-                      {lesson.shadows.length === 0 ? (
-                        <span className="text-sm text-gray-400">—</span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5">
-                          {lesson.shadows.map((s) => (
-                            <span
-                              key={s.row_id}
-                              className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800"
-                            >
-                              {s.name}
-                              <button
-                                type="button"
-                                aria-label={`Remove ${s.name} from ${lesson.session_date}`}
-                                disabled={busy}
-                                onClick={() =>
-                                  handleRemove(
-                                    s.row_id,
-                                    `${s.name} is no longer shadowing ${formatSgDate(lesson.session_date)}.`
-                                  )
-                                }
-                                className="text-sky-500 hover:text-sky-700 disabled:opacity-50"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </Td>
-
-                    <Td>
                       {pickingHere ? (
                         <div className="flex flex-wrap items-center gap-2">
                           <select
@@ -530,12 +472,8 @@ export default function LessonCoachesPage() {
                             onChange={(e) => setPickedCoach(e.target.value)}
                             className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
                           >
-                            <option value="">
-                              {picking?.kind === "main"
-                                ? "Who taught it?"
-                                : "Who is shadowing?"}
-                            </option>
-                            {options.map((c) => (
+                            <option value="">Who taught it?</option>
+                            {coaches.map((c) => (
                               <option key={c.id} value={c.id}>
                                 {c.name}
                               </option>
@@ -544,9 +482,7 @@ export default function LessonCoachesPage() {
                           <Button
                             size="sm"
                             disabled={busy}
-                            onClick={() =>
-                              handleAssign(lesson.session_date, picking!.kind)
-                            }
+                            onClick={() => handleAssign(lesson.session_date)}
                           >
                             Save
                           </Button>
@@ -562,17 +498,10 @@ export default function LessonCoachesPage() {
                         <div className="flex flex-wrap items-center gap-3">
                           <button
                             type="button"
-                            onClick={() => openPicker(lesson.session_date, "main")}
+                            onClick={() => openPicker(lesson.session_date)}
                             className="text-sm font-medium text-sky-600 underline"
                           >
                             {lesson.main.assigned ? "Change" : "Assign a substitute"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openPicker(lesson.session_date, "shadow")}
-                            className="text-sm font-medium text-sky-600 underline"
-                          >
-                            Add shadow
                           </button>
                           {/* Only offered for an ASSIGNED main — there is
                               nothing to clear on a lesson whose teacher is the

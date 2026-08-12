@@ -79,7 +79,7 @@ describe("buildLessonLines — a lesson is a SET of items", () => {
           original_period: "2026-07",
         }),
       ],
-      [{ lesson_session_id: "s1", coach_id: B, role: "main" }],
+      [{ lesson_session_id: "s1", coach_id: B }],
       A
     );
     expect(summarisePayout(lines).lessons).toBe(0);
@@ -132,18 +132,38 @@ describe("buildLessonLines — a lesson is a SET of items", () => {
 
 describe("buildLessonLines — the cover is a visible decision", () => {
   const covered: SessionRosterRow[] = [
-    { lesson_session_id: "s1", coach_id: B, role: "main" },
-    { lesson_session_id: "s1", coach_id: T, role: "shadow" },
+    { lesson_session_id: "s1", coach_id: B },
   ];
+  /** T shadows the CLASS, so the caller resolves the lesson ids and passes them
+   *  in — there is no per-lesson shadow row to read (20260812000200). */
+  const tShadowed = new Set(["s1"]);
 
   it("labels the substitute's own line as assigned", () => {
     const lines = buildLessonLines([item({ id: "i1" })], covered, B);
     expect(lines[0].kind).toBe("assigned");
   });
 
-  it("labels the trainee's line as a shadow", () => {
-    const lines = buildLessonLines([item({ id: "i1", amount: 20 })], covered, T);
+  it("labels the trainee's line as a shadow, from the CLASS assignment", () => {
+    const lines = buildLessonLines(
+      [item({ id: "i1", amount: 20 })],
+      covered,
+      T,
+      tShadowed
+    );
     expect(lines[0].kind).toBe("shadow");
+  });
+
+  it("SUBSTITUTE BEATS SHADOW when one coach is both", () => {
+    // T shadows the class all term and covers this one lesson of it. The
+    // database pays the substitute rate (coach_attribution_kind orders the arms
+    // that way), so a line labelled "shadow" would describe the money wrongly.
+    const lines = buildLessonLines(
+      [item({ id: "i1", amount: 25 })],
+      [{ lesson_session_id: "s1", coach_id: T }],
+      T,
+      tShadowed
+    );
+    expect(lines[0].kind).toBe("assigned");
   });
 
   it("labels the REPLACED coach's clawback as reassigned", () => {
@@ -218,15 +238,17 @@ describe("buildLessonLines — the cover is a visible decision", () => {
     expect(lines[0].kind).toBe("ordinary");
   });
 
-  it("does not call a lesson reassigned when the only roster rows are shadows", () => {
-    // A shadowed lesson with no roster MAIN is still taught by the class's
+  it("does not call a lesson reassigned merely because somebody shadows it", () => {
+    // A shadowed lesson with no SUBSTITUTE is still taught by the class's own
     // coach under the absence rule — they were not replaced, and telling them
-    // they were is the same error as hiding a real cover.
-    const lines = buildLessonLines(
-      [item({ id: "i1" })],
-      [{ lesson_session_id: "s1", coach_id: T, role: "shadow" }],
-      A
-    );
+    // they were is the same error as hiding a real cover. Under the old model
+    // this needed a role check; now it falls out of the shadow living on a
+    // different table entirely, and this test pins that it still holds.
+    //
+    // ⚠ THE SET IS PER-COACH — it is the lessons THIS coach shadowed, not the
+    // lessons anybody shadowed. A is the class's coach and shadows nothing, so
+    // A's set is empty however many trainees are watching.
+    const lines = buildLessonLines([item({ id: "i1" })], [], A, new Set());
     expect(lines[0].kind).toBe("ordinary");
   });
 });

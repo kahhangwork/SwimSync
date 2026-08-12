@@ -369,7 +369,11 @@ export default function ScheduleScreen() {
     //
     //   (a) `classes.coach_id = me` — my own classes, every week they run.
     //   (b) `session_coaches.coach_id = me` — ONE lesson of somebody else's
-    //       class that an admin rostered me onto (20260811000200).
+    //       class that an admin rostered me onto as its SUBSTITUTE.
+    //   (c) `class_shadow_coaches.coach_id = me`, active today — EVERY lesson of
+    //       a class I am shadowing (20260812000200). The OPPOSITE shape to (b):
+    //       no per-lesson rows exist at all, so the dates come from the class's
+    //       own recurrence exactly as they do for (a).
     //
     // Widening (a) to "classes I am rostered on" would be wrong twice over: the
     // week card is built from the CLASS row and its enrolments, and a covered
@@ -389,7 +393,7 @@ export default function ScheduleScreen() {
       // comes back to be discarded on the device.
       supabase
         .from("session_coaches")
-        .select("role, lesson_session_id, lesson_sessions!inner(id, class_id, session_date)")
+        .select("lesson_session_id, lesson_sessions!inner(id, class_id, session_date)")
         .eq("coach_id", coach.id)
         .gte("lesson_sessions.session_date", rangeStart)
         .lte("lesson_sessions.session_date", rangeEnd)
@@ -418,12 +422,47 @@ export default function ScheduleScreen() {
         : { data: [] as any[] };
     if (!current()) return;
 
-    /** Every class a card can come from, each carrying whether it is mine. */
-    const coachClasses: { cls: any; owned: boolean }[] = [
-      ...ownedClasses.map((cls: any) => ({ cls, owned: true })),
+    // ── (c) THE CLASSES I SHADOW ──────────────────────────────────────────
+    // ⚠ ACTIVE TODAY, not "on the lesson's date". Visibility and pay ask
+    // different questions of the same dated record (20260812000200 §4): once an
+    // assignment ENDS the class leaves my app entirely, even though I am still
+    // paid for the lessons inside its range. Filtering by the range here would
+    // keep showing an ex-shadow a class they no longer have anything to do with.
+    const { data: shadowRows } = await supabase
+      .from("class_shadow_coaches")
+      .select("class_id, effective_from, effective_to")
+      .eq("coach_id", coach.id)
+      .lte("effective_from", todayDate)
+      .or(`effective_to.is.null,effective_to.gte.${todayDate}`)
+      .limit(ROW_LIMIT);
+    if (!current()) return;
+
+    const shadowClassIds = [
+      ...new Set((shadowRows ?? []).map((r: any) => r.class_id as string)),
+    ].filter((id) => !ownedClassIds.has(id) && !coveredClassIds.includes(id));
+
+    const shadowRes =
+      shadowClassIds.length > 0
+        ? await supabase.from("classes").select(CLASS_SELECT).in("id", shadowClassIds)
+        : { data: [] as any[] };
+    if (!current()) return;
+
+    const shadowedClassIds = new Set(shadowClassIds);
+
+    /** Every class a card can come from, each carrying whether it is mine and
+     *  whether I merely shadow it. The two flags are never both true — the
+     *  database refuses a shadow assignment on a class the coach owns. */
+    const coachClasses: { cls: any; owned: boolean; shadowed: boolean }[] = [
+      ...ownedClasses.map((cls: any) => ({ cls, owned: true, shadowed: false })),
       ...((coveredRes.data ?? []) as any[]).map((cls: any) => ({
         cls,
         owned: false,
+        shadowed: false,
+      })),
+      ...((shadowRes.data ?? []) as any[]).map((cls: any) => ({
+        cls,
+        owned: false,
+        shadowed: shadowedClassIds.has(cls.id),
       })),
     ];
     const classIds = coachClasses.map((c) => c.cls.id as string);
@@ -543,7 +582,7 @@ export default function ScheduleScreen() {
      *  onto — see the probe below for why this list is short. */
     const probeIds: string[] = [];
 
-    for (const { cls, owned } of coachClasses) {
+    for (const { cls, owned, shadowed } of coachClasses) {
       const enrolments = cls.student_class_enrolments ?? [];
       // Who must be marked is a question about the LESSON'S date — a child who
       // joined last week was not expected at last month's lessons. See
@@ -570,8 +609,15 @@ export default function ScheduleScreen() {
        * would return them no session for those dates anyway, so a recurrence
        * card there would be a permanently unmarkable "unmarked" lesson.
        */
+      // ⚠ ONE NAMED PREDICATE, NOT TWO `||`s AT THE CALL SITE. A shadow sees
+      // the class's WHOLE schedule, so their date source is the recurrence —
+      // the same arm as an owner and the exact OPPOSITE of a substitute's.
+      // Writing it inline invites somebody to widen the probe guard below to
+      // match, and those are two different questions on adjacent lines.
+      const showsWholeSchedule = owned || shadowed;
+
       const datesIn = (from: string, to: string): string[] =>
-        owned
+        showsWholeSchedule
           ? lessonDatesInRange(
               cls.day_of_week as DayOfWeek,
               from,
@@ -587,7 +633,8 @@ export default function ScheduleScreen() {
       const roleAt = (date: string) =>
         lessonRole({
           ownsClass: owned,
-          assignment: assignmentByLesson.get(lessonKey(cls.id, date))?.role,
+          isSubstitute: assignmentByLesson.has(lessonKey(cls.id, date)),
+          isClassShadow: shadowed,
         });
 
       /** One (class, date) -> one card. Exactly ONE expectedStudentsOn call per
@@ -633,6 +680,11 @@ export default function ScheduleScreen() {
       for (const date of datesIn(weekStart, weekEnd)) {
         const card = lessonAt(date);
         lessons.push(card);
+        // ⚠ `owned`, NOT `showsWholeSchedule`. The covered-out probe answers
+        // "has somebody else been made the main on MY lesson", and a shadowed
+        // class is not mine — putting its sessions in would dilute a
+        // subtraction whose every short answer HIDES a lesson that needs
+        // marking (§7.138). Two different questions, adjacent lines.
         if (owned && card.sessionId && !isFinished(card.progress)) {
           probeIds.push(card.sessionId);
         }
@@ -679,6 +731,7 @@ export default function ScheduleScreen() {
         // refuses my write (attendance_write is `coach_is_main_on_session`), so
         // nagging me produces a straggler nobody can answer — see canMark().
         if (!canMark(roleAt(date))) continue;
+        // ⚠ `owned`, NOT `showsWholeSchedule` — see the probe note above.
         if (owned && sess) probeIds.push(sess.id);
         backlogItems.push({
           class_id: cls.id,

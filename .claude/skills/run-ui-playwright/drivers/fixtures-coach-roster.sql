@@ -97,12 +97,20 @@ ON CONFLICT (id) DO NOTHING;
 -- Both need a rate, or generate_coach_payouts skips them entirely — not
 -- asserted by this driver, but a roster fixture whose coaches are unpayable
 -- would quietly mislead the next person who reaches for it.
-INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from)
-SELECT c.id, v.amt, 60, '2026-01-01'
-  FROM (VALUES ('c7000000-0000-0000-0000-000000000001'::uuid, 55.00),
-               ('c7000000-0000-0000-0000-000000000002'::uuid, 15.00)) AS v(pid, amt)
+-- ⚠ THE SHADOW COACH NEEDS A **SHADOW** RATE, NOT A MAIN ONE. Since
+-- 20260812000200 a rate carries a role, and generate_coach_payouts() REFUSES to
+-- run for the whole business when an assigned shadow has no shadow rate in
+-- force. A fixture that gave them a main rate would look fine here and block
+-- payroll for anyone who reached for it.
+INSERT INTO coach_rates (coach_id, amount, unit_minutes, effective_from, role)
+SELECT c.id, v.amt, 60, '2026-01-01', v.rate_role::coach_rate_role
+  FROM (VALUES ('c7000000-0000-0000-0000-000000000001'::uuid, 55.00, 'main'),
+               ('c7000000-0000-0000-0000-000000000002'::uuid, 15.00, 'shadow'))
+         AS v(pid, amt, rate_role)
   JOIN coaches c ON c.profile_id = v.pid
- WHERE NOT EXISTS (SELECT 1 FROM coach_rates r WHERE r.coach_id = c.id);
+ WHERE NOT EXISTS (
+   SELECT 1 FROM coach_rates r
+    WHERE r.coach_id = c.id AND r.role = v.rate_role::coach_rate_role);
 
 -- ── Two classes of the SEED coach's, both on the lesson's weekday ─────────
 -- Class B is not decoration: check 17 asserts the replaced coach's week is

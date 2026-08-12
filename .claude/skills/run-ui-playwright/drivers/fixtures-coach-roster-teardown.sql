@@ -31,9 +31,19 @@ SELECT ls.id
  WHERE ls.class_id IN ('c7000000-0000-0000-0000-00000000000a',
                        'c7000000-0000-0000-0000-00000000000b');
 
-DELETE FROM attendance      WHERE lesson_session_id IN (SELECT id FROM rc_sessions);
-DELETE FROM session_coaches WHERE lesson_session_id IN (SELECT id FROM rc_sessions);
-DELETE FROM lesson_sessions WHERE id IN (SELECT id FROM rc_sessions);
+DELETE FROM attendance             WHERE lesson_session_id IN (SELECT id FROM rc_sessions);
+DELETE FROM session_coach_absences WHERE lesson_session_id IN (SELECT id FROM rc_sessions);
+DELETE FROM session_coaches        WHERE lesson_session_id IN (SELECT id FROM rc_sessions);
+DELETE FROM lesson_sessions        WHERE id IN (SELECT id FROM rc_sessions);
+
+-- ⚠ CLASS-SCOPED, LIKE THE SESSIONS ABOVE AND FOR THE SAME REASON (§7.132).
+-- A shadow assignment is keyed to the CLASS, not to a lesson, so it survives
+-- every session delete above and the next run inherits it — the driver would
+-- then start with a shadow it never created and its first check would be
+-- measuring somebody else's fixture.
+DELETE FROM class_shadow_coaches
+ WHERE class_id IN ('c7000000-0000-0000-0000-00000000000a',
+                    'c7000000-0000-0000-0000-00000000000b');
 
 DELETE FROM trial_bookings  WHERE class_id IN ('c7000000-0000-0000-0000-00000000000a',
                                                'c7000000-0000-0000-0000-00000000000b');
@@ -96,6 +106,9 @@ SELECT
      JOIN lesson_sessions ls ON ls.id = sc.lesson_session_id
     WHERE ls.class_id IN ('c7000000-0000-0000-0000-00000000000a',
                           'c7000000-0000-0000-0000-00000000000b'))           AS roster_rows_left,
+  (SELECT count(*) FROM class_shadow_coaches
+    WHERE class_id IN ('c7000000-0000-0000-0000-00000000000a',
+                       'c7000000-0000-0000-0000-00000000000b'))              AS shadow_rows_left,
   (SELECT count(*) FROM students
     WHERE id::text LIKE 'c7000000-%')                                        AS students_left,
   (SELECT count(*) FROM coaches

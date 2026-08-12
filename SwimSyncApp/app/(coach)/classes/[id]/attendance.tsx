@@ -29,7 +29,6 @@ import {
   canMark,
   roleNotice,
   type LessonRole,
-  type RosterRole,
 } from "@/lib/coachRoster";
 import { fetchIsMainOnSession } from "@/lib/sessionMainCoach";
 import PrimaryButton from "@/components/PrimaryButton";
@@ -185,6 +184,12 @@ export default function MarkAttendanceScreen() {
   // else was rostered to cover, gets the roster READ-ONLY — `attendance_write`
   // is `coach_is_main_on_session()` since 20260811000200, so the alternative is
   // a screen that invites work the database will refuse.
+  /** The class's ACTIVE shadows for this lesson, and whether each was here.
+   *  Pre-ticked: the normal case is that the assigned trainee turned up, and a
+   *  forgotten tick must not silently cost them a lesson's pay. */
+  const [shadowsHere, setShadowsHere] = useState<
+    { coach_id: string; name: string; present: boolean }[]
+  >([]);
   const [role, setRole] = useState<LessonRole>("owner");
   // Which load() is the current one. Switching lessons quickly can leave an
   // earlier fetch in flight; without this it lands last and repopulates the
@@ -327,26 +332,72 @@ export default function MarkAttendanceScreen() {
     // offered, and the database refuses the write LOUDLY if it really is not
     // mine. The shadow branch and the gate below still narrow it.
     const ownsClass = !me?.id || cls.coach_id === me.id;
-    const [{ data: myRosterRow }, isMain] = await Promise.all([
-      sid
-        ? supabase
-            .from("session_coaches")
-            .select("role")
-            .eq("lesson_session_id", sid)
-            .maybeSingle()
-        : Promise.resolve({ data: null as { role: RosterRole } | null }),
-      // With no session row there is nothing to ask about.
-      sid ? fetchIsMainOnSession(sid) : Promise.resolve(ownsClass),
-    ]);
+    const [{ data: myRosterRow }, { data: amClassShadow }, isMain] =
+      await Promise.all([
+        sid
+          ? supabase
+              .from("session_coaches")
+              .select("coach_id")
+              .eq("lesson_session_id", sid)
+              .maybeSingle()
+          : Promise.resolve({ data: null as { coach_id: string } | null }),
+        // ⚠ AN RPC, NOT A FILTERED TABLE READ, AND `me` IS THE REASON.
+        // A client-side `coach_id = me.id` filter is null-unsafe here: `me` is
+        // resolved from a session that is NOT hydrated when this screen is
+        // deep-linked, so the filter matches nothing and the coach silently
+        // resolves to "covered" — measured, and it cost this screen a real
+        // failure (§7.141). coach_is_active_class_shadow() reads
+        // current_coach_id() server-side, which cannot be absent, and is also
+        // admin-proof in a way `select *` on the table is not.
+        supabase.rpc("coach_is_active_class_shadow", { p_class_id: id }),
+        // With no session row there is nothing to ask about.
+        sid ? fetchIsMainOnSession(sid) : Promise.resolve(ownsClass),
+      ]);
 
     if (token !== loadToken.current) return;
 
     const lessonIsMine = lessonRole({
       ownsClass,
-      assignment: myRosterRow?.role as RosterRole | undefined,
+      isSubstitute: Boolean(myRosterRow) && !ownsClass,
+      isClassShadow: amClassShadow === true,
       coveredOut: !isMain,
     });
     setRole(lessonIsMine);
+
+    // ── Who is shadowing this lesson, for the coach who marks it ───────────
+    // Only fetched for the coach who can actually record it. A shadow reading
+    // their own screen has no business ticking anybody, and `canMark` is the
+    // same predicate the write policy uses.
+    // ⚠ ONE RPC, AND IT RETURNS THE ABSENCES WITH THE NAMES. Reading
+    // class_shadow_coaches directly returns NOTHING for a substitute: the
+    // policy is `admin OR coach_id = current_coach_id()`, so the one person who
+    // must tick these boxes is the one person who cannot see them. The RPC is
+    // gated on coach_is_main_on_session — the SAME predicate as the write — so
+    // the list and the save can never disagree about who may act.
+    //
+    // Its date range is the LESSON's, not today's: a shadow assigned tomorrow
+    // must not appear on last week's lesson.
+    if (canMark(lessonIsMine)) {
+      // (class, date) — NOT the session id. The lesson_sessions row is created
+      // lazily by the very save this list feeds, so a session-keyed call returns
+      // nothing on the one visit that matters.
+      const { data: shadowRoster } = await supabase.rpc(
+        "session_shadow_coaches",
+        { p_class_id: id, p_session_date: date }
+      );
+
+      if (token !== loadToken.current) return;
+
+      setShadowsHere(
+        (shadowRoster ?? []).map((r: any) => ({
+          coach_id: r.coach_id,
+          name: r.full_name ?? "Unknown coach",
+          present: !r.absent,
+        }))
+      );
+    } else {
+      setShadowsHere([]);
+    }
 
     // ── Is this date markable at all? ──────────────────────────────────────
     // Checked AFTER the session lookup, because an existing session is itself
@@ -591,6 +642,55 @@ export default function MarkAttendanceScreen() {
       showToast("Failed to save attendance. Please try again.", "error");
       setSaving(false);
       return;
+    }
+
+    // ── Coaches present ───────────────────────────────────────────────────
+    // ⚠ AFTER THE ATTENDANCE UPSERT, AND ON finalSessionId. The lesson_sessions
+    // row is created LAZILY above, so an absence written before it has no lesson
+    // to reference.
+    //
+    // ⚠ A ROW MEANS ABSENT. No row means the shadow was here and is paid, which
+    // is why a FAILED write here is survivable: it leaves them PAID, the
+    // recoverable direction. Inverting this to a presence record would trade
+    // that for a silent underpayment (migration §2).
+    //
+    // Alert.alert is a no-op on RN-web, so the failure is a Toast.
+    if (shadowsHere.length > 0) {
+      const absent = shadowsHere.filter((sh) => !sh.present);
+      const present = shadowsHere.filter((sh) => sh.present);
+
+      const [delRes, insRes] = await Promise.all([
+        present.length > 0
+          ? supabase
+              .from("session_coach_absences")
+              .delete()
+              .eq("lesson_session_id", finalSessionId)
+              .in("coach_id", present.map((sh) => sh.coach_id))
+          : Promise.resolve({ error: null }),
+        absent.length > 0
+          ? supabase.from("session_coach_absences").upsert(
+              absent.map((sh) => ({
+                lesson_session_id: finalSessionId,
+                coach_id: sh.coach_id,
+                // Stamped by the trigger; the value sent is never trusted.
+                tenant_id: "00000000-0000-0000-0000-000000000000",
+                marked_by: session!.id,
+              })),
+              { onConflict: "lesson_session_id,coach_id" }
+            )
+          : Promise.resolve({ error: null }),
+      ]);
+
+      if (delRes.error || insRes.error) {
+        // Named, not swallowed: the month may be settled, in which case the
+        // seal refused this deliberately and the attendance above still saved.
+        showToast(
+          `Attendance saved, but the coaches-present list did not: ${
+            (delRes.error ?? insRes.error)?.message ?? "unknown error"
+          }`,
+          "error"
+        );
+      }
     }
 
     // Audit log
@@ -887,6 +987,68 @@ export default function MarkAttendanceScreen() {
               </View>
             );
           })
+        )}
+
+        {/* ── Coaches present ────────────────────────────────────────────
+            Renders NOTHING when the class has no shadows, so a business that
+            has never assigned one gains no new furniture on its screens.
+
+            Pre-ticked on purpose. The failure mode of a blank list is a coach
+            who forgets and silently costs a trainee their pay, which appears
+            nowhere; the failure mode of a pre-ticked one is an overpayment,
+            which appears as a line on the Wages page and can be seen. */}
+        {!readOnly && shadowsHere.length > 0 && (
+          <View className="mt-6 rounded-2xl border border-gray-200 bg-white p-4">
+            <Text className="text-sm font-semibold text-gray-900">
+              Coaches present
+            </Text>
+            <Text className="mt-0.5 text-xs text-gray-500">
+              Untick anyone who wasn&apos;t here — they won&apos;t be paid for
+              this lesson.
+            </Text>
+            {shadowsHere.map((sh) => (
+              <TouchableOpacity
+                key={sh.coach_id}
+                onPress={() =>
+                  setShadowsHere((prev) =>
+                    prev.map((x) =>
+                      x.coach_id === sh.coach_id
+                        ? { ...x, present: !x.present }
+                        : x
+                    )
+                  )
+                }
+                className="mt-3 flex-row items-center"
+              >
+                <View
+                  className={`h-5 w-5 items-center justify-center rounded border ${
+                    sh.present
+                      ? "bg-blue-500 border-blue-500"
+                      : "bg-white border-gray-300"
+                  }`}
+                >
+                  {sh.present && (
+                    <Text className="text-xs font-bold text-white">✓</Text>
+                  )}
+                </View>
+                {/* ⚠ THE NAME IS ITS OWN LEAF <Text>, DIRECTLY INSIDE THE
+                    TOUCHABLE. RN-web puts the press handler on the Pressable and
+                    a click on a nested Text child is swallowed silently — the
+                    same trap every marking driver in this repo works around. A
+                    name wrapped in an outer Text with a sibling span is not a
+                    leaf at all, so it cannot be pressed by text and the tick
+                    becomes untestable. */}
+                <Text
+                  className={`ml-2.5 text-sm ${
+                    sh.present ? "text-gray-900" : "text-gray-400"
+                  }`}
+                >
+                  {sh.name}
+                </Text>
+                <Text className="ml-1 text-xs text-gray-400">· shadowing</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
 
         {/* No save button at all when the lesson is not mine to mark. A

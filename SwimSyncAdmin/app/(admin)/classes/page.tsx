@@ -8,6 +8,7 @@ import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Tabl
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { Drawer } from "@/components/Drawer";
+import { assignableClassShadows } from "@/lib/sessionRoster";
 import { todayInSg, toSgDate, formatSgDate } from "@/lib/lessonDates";
 import { dayOfWeekOrder } from "@/lib/tableSort";
 import { formatTime } from "@/lib/utils";
@@ -45,7 +46,27 @@ type ClassRow = {
   deactivated_at: string | null;
 };
 
-type Coach = { id: string; full_name: string };
+type Coach = {
+  id: string;
+  full_name: string;
+  /** The EARLIEST date a shadow rate is in force from, or null for none.
+   *
+   *  ⚠ A DATE, NOT A BOOLEAN. Payroll refuses when no shadow rate is in force
+   *  ON THE LESSON'S DATE (`effective_from <= session_date`), so "they have one
+   *  somewhere" is the wrong question: a rate dated next month, or an
+   *  assignment backdated before the rate, silences the warning here and still
+   *  blocks the whole business's payroll later. */
+  shadowRateFrom: string | null;
+};
+
+/** A `class_shadow_coaches` row for the class in the drawer. */
+type ShadowAssignment = {
+  id: string;
+  coach_id: string;
+  coach_name: string;
+  effective_from: string;
+  effective_to: string | null;
+};
 
 const DAYS = [
   "monday","tuesday","wednesday","thursday","friday","saturday","sunday",
@@ -106,6 +127,11 @@ export default function ClassesPage() {
   const [bookings, setBookings] = useState<RosterBooking[]>([]);
   const [rosterError, setRosterError] = useState<string | null>(null);
   const [drawerClass, setDrawerClass] = useState<ClassRow | null>(null);
+  const [shadows, setShadows] = useState<ShadowAssignment[]>([]);
+  const [shadowPick, setShadowPick] = useState("");
+  const [shadowFrom, setShadowFrom] = useState("");
+  const [shadowBusy, setShadowBusy] = useState(false);
+  const [shadowError, setShadowError] = useState<string | null>(null);
   const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
     new Map()
   );
@@ -164,6 +190,19 @@ export default function ClassesPage() {
     loadCategories();
     loadRoster();
   }, []);
+
+  // The drawer's shadow list follows whichever class is open. Cleared on close
+  // so the next class cannot flash the previous one's assignments.
+  useEffect(() => {
+    if (drawerClass) loadShadows(drawerClass.id);
+    else {
+      setShadows([]);
+      setShadowPick("");
+      setShadowFrom("");
+      setShadowError(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerClass?.id, coaches.length]);
 
   /**
    * Who is in each class — the drawer's contents, and the "+1" on the badge.
@@ -285,15 +324,108 @@ export default function ClassesPage() {
   }
 
   async function loadCoaches() {
-    const { data } = await supabase
-      .from("coaches")
-      .select("id, profiles(full_name)");
+    const [{ data }, { data: shadowRates }] = await Promise.all([
+      supabase.from("coaches").select("id, profiles(full_name)"),
+      supabase
+        .from("coach_rates")
+        .select("coach_id, effective_from")
+        .eq("role", "shadow"),
+    ]);
+    const earliestShadowRate = new Map<string, string>();
+    for (const r of (shadowRates ?? []) as any[]) {
+      const seen = earliestShadowRate.get(r.coach_id);
+      if (!seen || r.effective_from < seen) {
+        earliestShadowRate.set(r.coach_id, r.effective_from);
+      }
+    }
     setCoaches(
       (data ?? []).map((c: any) => ({
         id: c.id,
         full_name: c.profiles?.full_name ?? "Unknown",
+        shadowRateFrom: earliestShadowRate.get(c.id) ?? null,
       }))
     );
+  }
+
+  /**
+   * Who shadows the class currently open in the drawer, and who used to.
+   *
+   * ⚠ ENDED ASSIGNMENTS ARE SHOWN, NOT HIDDEN. An ended one still explains
+   * money: pay asks "was this coach assigned on the LESSON's date", so a coach
+   * who stopped shadowing in August is still paid for August and an admin
+   * looking at that payout needs to see why. Hiding history here would make the
+   * Wages page unexplainable.
+   */
+  async function loadShadows(classId: string) {
+    setShadowError(null);
+    const { data, error } = await supabase
+      .from("class_shadow_coaches")
+      .select("id, coach_id, effective_from, effective_to")
+      .eq("class_id", classId)
+      .order("effective_from", { ascending: false });
+
+    if (error) {
+      // A failed load must NOT render as "nobody shadows this class" — that is
+      // the state an admin would then try to create, and the second assignment
+      // is refused by the unique index in a way that reads as a bug.
+      setShadowError(error.message);
+      setShadows([]);
+      return;
+    }
+    setShadows(
+      (data ?? []).map((r: any) => ({
+        id: r.id,
+        coach_id: r.coach_id,
+        coach_name:
+          coaches.find((c) => c.id === r.coach_id)?.full_name ?? "Unknown coach",
+        effective_from: r.effective_from,
+        effective_to: r.effective_to,
+      }))
+    );
+  }
+
+  async function handleAssignShadow() {
+    if (!drawerClass || !shadowPick) {
+      setShadowError("Choose a coach first.");
+      return;
+    }
+    setShadowBusy(true);
+    setShadowError(null);
+    const { error } = await supabase.rpc("assign_class_shadow", {
+      p_class_id: drawerClass.id,
+      p_coach_id: shadowPick,
+      p_effective_from: shadowFrom || null,
+    });
+    if (error) {
+      setShadowBusy(false);
+      setShadowError(error.message);
+      return;
+    }
+    setShadowPick("");
+    setShadowFrom("");
+    await loadShadows(drawerClass.id);
+    setShadowBusy(false);
+  }
+
+  async function handleEndShadow(coachId: string) {
+    if (!drawerClass) return;
+    setShadowBusy(true);
+    setShadowError(null);
+    // ⚠ END, never DELETE. The row is what says the coach was assigned on the
+    // dates it covers, and pay re-reads that for every already-paid lesson —
+    // deleting it would claw back money genuinely earned (migration §1).
+    const { error } = await supabase.rpc("end_class_shadow", {
+      p_class_id: drawerClass.id,
+      p_coach_id: coachId,
+      p_effective_to: null,
+    });
+    if (error) {
+      setShadowBusy(false);
+      setShadowError(error.message);
+      return;
+    }
+    await loadShadows(drawerClass.id);
+    setShadowBusy(false);
   }
 
   // The price/coach the edit form OPENED with. Comparing against these is
@@ -887,6 +1019,122 @@ export default function ClassesPage() {
           </p>
         ) : (
           <div className="space-y-8">
+            <section>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Shadow coaches
+              </h3>
+              <p className="mt-0.5 text-xs text-gray-500">
+                A shadow watches every lesson of this class and is paid their own
+                shadow rate for each one. It lasts until you end it — this is not
+                a per-lesson arrangement. To record a one-off cover instead, use{" "}
+                <span className="font-medium">Lesson Coaches</span>.
+              </p>
+
+              {shadowError && (
+                <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                  {shadowError}
+                </p>
+              )}
+
+              {shadows.length > 0 && (
+                <ul className="mt-3 space-y-1.5">
+                  {shadows.map((sh) => (
+                    <li
+                      key={sh.id}
+                      className="flex flex-wrap items-center gap-2 text-sm"
+                    >
+                      <span className="font-medium text-gray-900">
+                        {sh.coach_name}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {formatSgDate(sh.effective_from)} –{" "}
+                        {sh.effective_to
+                          ? formatSgDate(sh.effective_to)
+                          : "ongoing"}
+                      </span>
+                      {sh.effective_to === null ? (
+                        <button
+                          type="button"
+                          disabled={shadowBusy}
+                          onClick={() => handleEndShadow(sh.coach_id)}
+                          className="text-xs font-medium text-gray-500 underline disabled:opacity-50"
+                        >
+                          End
+                        </button>
+                      ) : (
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                          ended
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <select
+                  value={shadowPick}
+                  onChange={(e) => setShadowPick(e.target.value)}
+                  className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                >
+                  <option value="">Add a shadow…</option>
+                  {assignableClassShadows(
+                    drawerClass?.coach_id ?? "",
+                    shadows
+                      .filter((sh) => sh.effective_to === null)
+                      .map((sh) => sh.coach_id),
+                    coaches.map((c) => ({ id: c.id, name: c.full_name }))
+                  ).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  value={shadowFrom}
+                  onChange={(e) => setShadowFrom(e.target.value)}
+                  className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                  aria-label="Shadowing from"
+                />
+                <button
+                  type="button"
+                  disabled={shadowBusy || !shadowPick}
+                  onClick={handleAssignShadow}
+                  className="rounded-lg bg-sky-500 px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  Add
+                </button>
+                <span className="text-xs text-gray-400">
+                  from today if left blank
+                </span>
+              </div>
+
+              {/* Met HERE rather than at payroll, deliberately. A shadow with no
+                  shadow rate makes generate_coach_payouts refuse for the WHOLE
+                  business, months later, with the run blocked until somebody
+                  works out why. Here it costs one sentence. */}
+              {(() => {
+                if (!shadowPick) return null;
+                const from = coaches.find((c) => c.id === shadowPick)
+                  ?.shadowRateFrom;
+                // Compared against the date the ASSIGNMENT starts, because that
+                // is the earliest lesson payroll will price for them.
+                const startsOn = shadowFrom || todayInSg();
+                if (from && from <= startsOn) return null;
+                return (
+                  <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    {from
+                      ? `This coach's shadow rate only starts on ${formatSgDate(from)}, after this assignment does.`
+                      : "This coach has no shadow rate yet."}{" "}
+                    Set one on <span className="font-medium">Wages</span> before
+                    payroll — without a rate in force the whole business&apos;s
+                    payroll run will refuse rather than pay the wrong rate.
+                  </p>
+                );
+              })()}
+            </section>
+
             <section>
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Enrolled ({openRoster.enrolled.length})

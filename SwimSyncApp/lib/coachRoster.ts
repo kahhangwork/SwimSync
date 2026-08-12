@@ -18,16 +18,19 @@
 //
 // ⚠ NO CLOCK, NO FETCH. Callers pass everything in.
 
-/** A roster row's role. The database enum is `session_coach_role`. */
-export type RosterRole = "main" | "shadow";
-
-/** One of MY `session_coaches` rows, flattened with the lesson it names. */
+/** One of MY `session_coaches` rows, flattened with the lesson it names.
+ *
+ * ⚠ THERE IS NO ROLE. Since 20260812000200 `session_coaches` holds SUBSTITUTES
+ * only — at most one row per lesson. A shadow is a dated assignment to the whole
+ * CLASS (`class_shadow_coaches`), which is a different shape entirely: it has no
+ * session id, and it covers every lesson of the class rather than one. That is
+ * why `lessonRole()` below takes it as a SEPARATE input instead of another value
+ * of this one, and why this file did not get smaller. */
 export type RosterAssignment = {
   sessionId: string;
   classId: string;
   /** YYYY-MM-DD */
   date: string;
-  role: RosterRole;
 };
 
 /**
@@ -62,8 +65,6 @@ export function lessonKey(classId: string, date: string): string {
 export function parseAssignments(rows: readonly any[] | null): RosterAssignment[] {
   const out: RosterAssignment[] = [];
   for (const row of rows ?? []) {
-    const role = row?.role;
-    if (role !== "main" && role !== "shadow") continue;
     const embed = Array.isArray(row?.lesson_sessions)
       ? row.lesson_sessions[0]
       : row?.lesson_sessions;
@@ -72,7 +73,7 @@ export function parseAssignments(rows: readonly any[] | null): RosterAssignment[
     const sessionId = embed?.id ?? row?.lesson_session_id;
     if (typeof classId !== "string" || typeof date !== "string") continue;
     if (typeof sessionId !== "string") continue;
-    out.push({ sessionId, classId, date, role });
+    out.push({ sessionId, classId, date });
   }
   return out;
 }
@@ -121,13 +122,38 @@ export function rosteredDatesByClass(
  */
 export function lessonRole(opts: {
   ownsClass: boolean;
-  assignment?: RosterRole;
+  /** I hold this lesson's `session_coaches` row — I am its substitute. */
+  isSubstitute?: boolean;
+  /** I am an ACTIVE shadow of the class this lesson belongs to. */
+  isClassShadow?: boolean;
   coveredOut?: boolean;
 }): LessonRole {
-  const { ownsClass, assignment, coveredOut } = opts;
-  if (assignment === "shadow") return "shadow";
-  if (assignment === "main") return ownsClass ? "owner" : "cover";
-  // No row of my own on this lesson.
+  const { ownsClass, isSubstitute, isClassShadow, coveredOut } = opts;
+
+  // ⚠ SUBSTITUTE BEATS SHADOW, MIRRORING coach_attribution_kind() EXACTLY
+  // (20260812000200 §7). One coach can be both — they shadow the class all term
+  // and cover one lesson of it — and the database both PAYS them the substitute
+  // rate for that lesson and lets them MARK it. Checking shadow first would show
+  // them a read-only screen for a lesson they are required to mark, which is the
+  // unmarkable-and-un-nagged shape this whole wave removed.
+  if (isSubstitute) return ownsClass ? "owner" : "cover";
+
+  // ⚠ isClassShadow IS CHECKED BEFORE ownsClass, AND THE REASON IS THAT ONE OF
+  // THEM IS AUTHORITATIVE AND THE OTHER IS A GUESS THAT FAILS OPEN.
+  //
+  // `isClassShadow` comes from coach_is_active_class_shadow(), evaluated
+  // server-side against current_coach_id(). `ownsClass` is computed on the
+  // client as `!me?.id || cls.coach_id === me.id` — and `me` is NULL whenever
+  // the session has not hydrated, which a deep-linked screen does routinely
+  // (§7.141). So `ownsClass` is TRUE for a coach who owns nothing.
+  //
+  // Ordering ownsClass first was tried and REVERTED: it turned a shadow's
+  // read-only screen into a marking screen whose every save the database
+  // refuses — measured, verify-coach-roster check 18 went red immediately. The
+  // reverse hazard (an owner shown read-only) needs both flags true at once,
+  // which trg_class_shadow_guard makes unbuildable at the table, not merely
+  // discouraged. A measured failure beats an unbuildable one.
+  if (isClassShadow) return "shadow";
   if (!ownsClass) return "covered";
   return coveredOut ? "covered" : "owner";
 }
