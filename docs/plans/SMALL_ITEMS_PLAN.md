@@ -343,6 +343,40 @@ with a substitute and a shadow seeded, and over the Admins delete refusal.
 
 ---
 
+### B5. Phase B result — recorded 2026-08-13
+
+**Items 2 and 3 are SHIPPED AND LIVE. Item 1 is NOT STARTED** — it is the scope-moved one,
+and the decision was left with the user rather than taken silently.
+
+- **Item 2** (`378d4aa`) — both divergences closed: the off-pattern extra AND the retired
+  class. vitest **326** (+9), proven red three ways (6 of 9 against `main`; the future-session
+  guard against the unclamped variant; the count guard against the unfiltered count).
+- **Item 3's UI** (`ee15814`) — modal copy, driver re-pointed, and the new `adminhistory@`
+  persona. `verify-admins` **24/24** (was 21), proven red by the DOWN file: exactly the 3 new
+  checks fail. Fixture round-trip **24/24**, admins footprint `auth.users +5 / audit_log +1`.
+- **Deploy verified (§7.31/§7.51):** the served `app/(admin)/admins/page-*.js` chunk moved
+  from `0c143b4d…` to `c8dbdcdcb5…` and contains the new sentence. A 200 was not taken as
+  proof.
+
+> **⚠ RISK 3 GOT A STRUCTURAL FIX BEYOND WHAT THE PLAN ASKED FOR.** The plan's mitigation was
+> a pgTAP ordering change. That was necessary and not sufficient: `verify-admins.mjs` had the
+> *same* blind spot, deleting a fixture profile that is never an actor. A new persona whose
+> only distinguishing feature is an audit row naming them ACTOR now covers three things pgTAP
+> structurally cannot — that the refusal survives the trip through `delete-admin/route.ts`
+> into the modal **as a sentence rather than `audit_log.actor_id`** (RISK 11's wording, which
+> otherwise had no test at all), that the admin remains on the roster, and that the route's
+> compensating unban left the account **able to sign in**. That last one is the failure a
+> refusal could most easily introduce: the route bans *before* it calls the RPC.
+
+> **⚠ ITEM 1 REMAINS UNBUILT, AND ITS RISKS REMAIN LIVE.** If it is deferred rather than
+> built, RISK 1 is not a plan note but a live defect: the Attendance page still reads
+> `classes.coach_id`, so a class that has changed hands names the WRONG coach for every
+> lesson before the handover, on the page an admin opens because wages look odd. That must go
+> to `BACKLOG.md` with the `class_rate_on().paid_coach_id` finding attached — the existing
+> entry does not name the axis and is what let the first draft of this plan pick the wrong one.
+
+---
+
 ## Pre-commit gate
 
 Walk these before committing. **A box that cannot be ticked is a blocker, not a caveat.**
