@@ -292,3 +292,15 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     no orphans, but the Sidebar fires `rpc/unbilled_sealed_lessons` on **every** admin page
     — DevTools → Network → filter `unbilled`; a 200 with `[]` is the new build seen working
     (item 10's "a query the page must have made", §7.31).
+
+12. **Wave 5 chunk 1 deploy record (2026-08-13): owner transfer, the §11.9 order held.**
+    `20260813000100` (`dde26a3`) landed on `main` alone; `supabase db push` ran **from the
+    session this time** (item 11's "permission layer blocks it" did not recur — don't
+    assume either way, just run it and hand over if refused); the `pgdelta` certificate
+    stack trace printed for the **sixth** time (normal output); `migration list --linked`
+    remote column filled. Grant dump: `anon` EXECUTE still **18**, both new functions
+    `authenticated`-only. Only then did the app commit (`abc4956`) land. Rollback
+    `supabase/rollback/20260813_owner_transfer_DOWN.sql`, committed before the deploy and
+    rehearsed byte-identical. **The admin serve-check for interaction-only UI:** the
+    Change-owner modal fires `rpc/platform_tenant_admins` only when opened, so the check
+    is opening it live — the user did, and DevTools showed the 200 (item 10's method).
