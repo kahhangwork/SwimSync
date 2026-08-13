@@ -1,6 +1,13 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-11 — **Wave 2, *Multiple classes per child*, SHIPPED and was
+_Last updated: 2026-08-13 — **Wave 5 chunk 1, *Owner transfer*, SHIPPED and was removed**
+(`20260813000100`, PRD §4.4): platform-admin only by decision (WAVE_5_PLAN.md decision 2 —
+no self-service path exists), covering both the handover and the lost-owner case. Struck
+from the Build order and its own section deleted; the reasoning it carried lives in the
+PRD bullet and the migration header. Wave 5's remaining items (disable a coach, tenant
+suspension) stay queued — the risk-reviewed plan is `docs/plans/WAVE_5_PLAN.md`._
+
+_Previously, 2026-08-11 — **Wave 2, *Multiple classes per child*, SHIPPED and was
 removed** (`936e3bd`, live). Its Build-order entry is marked COMPLETE rather than deleted,
 because two later items were held behind it and both are now unblocked: *Convert a trial
 into an enrolled student* and *Book a make-up from the Attendance page*. One new item, the
@@ -303,8 +310,8 @@ header (`20260812000400`).
 
 #### Wave 5 — admin authority
 
-12. **Owner transfer** (S/M) — a live gap: a lost owner freezes a business today and SQL is
-    the only remedy.
+12. ~~**Owner transfer** (S/M)~~ — **SHIPPED 2026-08-13** (`20260813000100`, PRD §4.4):
+    platform-admin only, one path for handover and lost-owner alike.
 13. **Disable a COACH account** (M) — needs Wave 1 #6 and the coach RLS model settled in
     Wave 3.
 
@@ -1098,23 +1105,6 @@ as either more owner-style columns (cheap, coarse) or a `tenant_members`-style c
 table (the additive path the shipped design deliberately left open —
 `docs/ARCHITECTURE.md` §6). Don't add enum roles for this (same reasoning as the owner
 column: permanent, string-audited everywhere, can't express one-owner-per-tenant).
-
-### Owner transfer — **S/M**
-Hand a business's ownership to another of its admins (owner retires, business is sold,
-the founding admin leaves).
-
-**Why:** `tenants.owner_profile_id` has no transfer path — it is pinned against ALL
-client writes by a guard trigger (20260806000100), deliberately, because with co-admins
-any writable path is a takeover path. If an owner is lost today (account deleted at the
-auth layer, owner dies/leaves), their business's admin management is frozen until the
-platform admin intervenes in SQL.
-
-**Notes:** the mechanism wants to be a SECURITY DEFINER RPC gated on the CURRENT owner
-(self-service handover) plus a platform-admin recovery path for the lost-owner case. The
-guard trigger passes definer functions automatically (`current_user = 'postgres'` —
-§7.38's mechanism, documented in the migration). Remember `platform_tenant_overview()`
-and `resend-invite` both key on the owner column now — a transfer moves who the platform
-panel shows and who gets the onboarding resend, which is correct but worth asserting.
 
 ### The family-status search scans every membership client-side — **S**
 `handleFamilySearch` on the Platform page fetches **all** `parent_tenants` rows and filters

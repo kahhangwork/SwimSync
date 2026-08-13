@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
+import { Modal } from "@/components/Modal";
 import { formatSgDate, toSgDate } from "@/lib/lessonDates";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
 import { PackageChip } from "@/components/PackageChip";
@@ -59,6 +60,17 @@ type TenantRow = {
    *  invite was issued — 'none' means the business is live and joinable with
    *  nobody able to operate it, which is a fault, not a blank. */
   admin_status: "none" | "invited" | "active";
+};
+
+// One row of platform_tenant_admins() — the Change-owner dropdown feed.
+type TenantAdminOption = {
+  profile_id: string;
+  email: string;
+  full_name: string;
+  is_owner: boolean;
+  /** Rendered but not selectable — the RPC refuses a deactivated target too;
+   *  the disabled <option> just saves the round trip. */
+  is_disabled: boolean;
 };
 
 type StrandedParent = {
@@ -253,6 +265,81 @@ export default function PlatformPage() {
         ? `Invite resent to ${json.adminEmail}.`
         : `No email was sent (${json.emailReason}). Copy this link to them: ${json.inviteLink}`
     );
+  }
+
+  // ── Changing a business's owner ───────────────────────────────────────────
+  // Platform-admin only, by decision (WAVE_5_PLAN.md decision 2): the tenant
+  // owner has no transfer button anywhere. This one action covers both the
+  // handover and the lost-owner case — a tenant whose Admin cell reads
+  // "no admin" can still have live co-admins to promote, which is exactly the
+  // frozen state the RPC exists to fix.
+  const [ownerModal, setOwnerModal] = useState<{
+    tenantId: string;
+    tenantName: string;
+    currentEmail: string | null;
+  } | null>(null);
+  const [ownerAdmins, setOwnerAdmins] = useState<TenantAdminOption[]>([]);
+  const [ownerLoading, setOwnerLoading] = useState(false);
+  const [ownerChoice, setOwnerChoice] = useState("");
+  const [ownerSaving, setOwnerSaving] = useState(false);
+  const [ownerError, setOwnerError] = useState<string | null>(null);
+
+  // Which tenant the OPEN modal belongs to — read after the await below.
+  const ownerModalTenantRef = useRef<string | null>(null);
+
+  function closeOwnerModal() {
+    ownerModalTenantRef.current = null;
+    setOwnerModal(null);
+  }
+
+  async function openOwnerModal(t: TenantRow) {
+    ownerModalTenantRef.current = t.tenant_id;
+    setOwnerModal({
+      tenantId: t.tenant_id,
+      tenantName: t.display_name,
+      currentEmail: t.admin_email,
+    });
+    setOwnerAdmins([]);
+    setOwnerChoice("");
+    setOwnerError(null);
+    setOwnerLoading(true);
+    const { data, error } = await supabase.rpc("platform_tenant_admins", {
+      p_tenant_id: t.tenant_id,
+    });
+    // Guard against a stale response: close A, open B fast enough and A's
+    // list would land in B's modal. Submitting would be server-refused anyway
+    // ("must be an admin of that business") — this just prevents the baffling
+    // refusal from ever being reachable.
+    if (ownerModalTenantRef.current !== t.tenant_id) return;
+    setOwnerLoading(false);
+    if (error) {
+      setOwnerError(error.message);
+      return;
+    }
+    setOwnerAdmins((data ?? []) as TenantAdminOption[]);
+  }
+
+  async function reassignOwner() {
+    if (!ownerModal || !ownerChoice) return;
+    setOwnerSaving(true);
+    setOwnerError(null);
+    const { error } = await supabase.rpc("platform_reassign_owner", {
+      p_tenant_id: ownerModal.tenantId,
+      p_new_owner_profile_id: ownerChoice,
+    });
+    setOwnerSaving(false);
+    if (error) {
+      // The RPC's refusals (deactivated target, non-admin, …) surface verbatim
+      // — they are written for humans.
+      setOwnerError(error.message);
+      return;
+    }
+    const chosen = ownerAdmins.find((a) => a.profile_id === ownerChoice);
+    setMessage(
+      `${ownerModal.tenantName} is now owned by ${chosen?.email ?? "the selected admin"}.`
+    );
+    closeOwnerModal();
+    await loadTenants();
   }
 
   const [famSearch, setFamSearch] = useState("");
@@ -642,9 +729,20 @@ export default function PlatformPage() {
                       deleting the tenant when an invite fails — this cell is the
                       backstop for any orphan that escapes that. */}
                   {t.admin_status === "none" ? (
-                    <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-700">
-                      no admin
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-700">
+                        no admin
+                      </span>
+                      {/* The LOST-OWNER case: "no admin" means no OWNER — the
+                          business may still hold live co-admins to promote,
+                          and this button is the only remedy that isn't SQL. */}
+                      <button
+                        onClick={() => openOwnerModal(t)}
+                        className="text-xs font-medium text-sky-600 hover:text-sky-700"
+                      >
+                        Set owner
+                      </button>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-700">
@@ -668,6 +766,12 @@ export default function PlatformPage() {
                           active
                         </span>
                       )}
+                      <button
+                        onClick={() => openOwnerModal(t)}
+                        className="text-xs font-medium text-sky-600 hover:text-sky-700"
+                      >
+                        Change owner
+                      </button>
                     </div>
                   )}
                 </Td>
@@ -743,6 +847,75 @@ export default function PlatformPage() {
             ))}
           </Tbody>
         </Table>
+
+        <Modal
+          title={`Change owner — ${ownerModal?.tenantName ?? ""}`}
+          open={ownerModal !== null}
+          onClose={closeOwnerModal}
+        >
+          <p className="mb-3 text-sm text-gray-700">
+            The owner is the one account that can manage this business&apos;s
+            admins. Ownership moves immediately;{" "}
+            {ownerModal?.currentEmail ? (
+              <>
+                <span className="font-medium">{ownerModal.currentEmail}</span>{" "}
+                stays on as a co-admin.
+              </>
+            ) : (
+              <>this business currently has no owner at all.</>
+            )}
+          </p>
+          {ownerLoading ? (
+            <p className="mb-4 text-sm text-gray-400">Loading admins…</p>
+          ) : ownerAdmins.length === 0 && !ownerError ? (
+            <p className="text-sm text-gray-500">
+              No admin accounts to choose from — this business has no
+              co-admins. Invite one first.
+            </p>
+          ) : (
+            <select
+              value={ownerChoice}
+              onChange={(e) => setOwnerChoice(e.target.value)}
+              className="mb-4 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            >
+              <option value="">Choose the new owner…</option>
+              {ownerAdmins.map((a) => (
+                <option
+                  key={a.profile_id}
+                  value={a.profile_id}
+                  disabled={a.is_owner || a.is_disabled}
+                >
+                  {a.full_name || a.email}
+                  {a.is_owner ? " — current owner" : ""}
+                  {a.is_disabled ? " — deactivated" : ""}
+                </option>
+              ))}
+            </select>
+          )}
+          {ownerError && (
+            <p className="mb-3 text-sm font-medium text-red-600">{ownerError}</p>
+          )}
+          <div className="flex gap-3">
+            <button
+              onClick={reassignOwner}
+              disabled={!ownerChoice || ownerSaving}
+              className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-60"
+            >
+              {ownerSaving
+                ? "Transferring…"
+                : `Make ${
+                    ownerAdmins.find((a) => a.profile_id === ownerChoice)
+                      ?.full_name || "them"
+                  } the owner`}
+            </button>
+            <button
+              onClick={closeOwnerModal}
+              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </Modal>
       </div>
 
       {/* Registered, never entered a join code. They belong to no business, so

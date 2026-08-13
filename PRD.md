@@ -319,6 +319,16 @@ support rather than daily operation.
   nobody else can see them
 - **Move a student to another business** — the remedy when a parent joins with the
   wrong code
+- **Reassign a business's owner** *(implemented 2026-08-13)* — hand ownership to another
+  of its **live** admins (a deactivated or cross-tenant target is refused), from the
+  Businesses table. This is deliberately the **only** transfer path: the tenant owner has
+  no transfer button, because a transfer is rare enough that platform mediation is
+  acceptable and one path covers both the amicable handover and the **lost owner** (the
+  account deleted at the auth layer leaves `owner_profile_id` NULL and the business's
+  admin management frozen — this action is the remedy that isn't dashboard SQL). The old
+  owner stays on as a co-admin; everything keyed on the owner column — the overview's
+  Admin cell, the onboarding-invite resend — follows automatically. Audited as an
+  `owner_reassigned` row naming both parties.
 - Has **no** invoice-generation or payroll controls of their own: those run for one
   business at a time and are the tenant admin's
 
