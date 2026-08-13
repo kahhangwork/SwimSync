@@ -210,6 +210,16 @@ an off-pattern extra is not skipped whole.
 > `computeClassCoverage` output must be IDENTICAL.** If it passes, Position A is safe by
 > construction and the clamp ships. If it fails, Position A is wrong, ship Position B and
 > accept the current-month false alarm. **Record which way it went in this file.**
+>
+> **RESOLVED 2026-08-13 → POSITION A. The clamp ships.** The assertion holds by
+> construction: for an ended month `to = bounds.end`, so `.filter(d => d <= to)` removes
+> nothing a session query already bounded by the month could contain. Pinned from both
+> sides — *"clamping session dates is a no-op on an ended month"* (a session on 2026-07-31,
+> off-pattern, is still reported) and *"does not report a FUTURE session in the current
+> month"*. The second was **proven red by removing the clamp**, so Position B is what it
+> fails against; the first was proven red against `main`. The reviewer's concern — that a
+> clamp is how a pre-flight goes quiet on a lesson the engine blocks on — cannot occur,
+> because the engine only ever runs on an ended month, where the clamp is inert.
 
 > **⚠ RISK 5 MITIGATION (second half) — an assertion.** The union also inflates the
 > `{marked} of {expected}` line the dialog renders (`invoices/page.tsx:1196`): a session dated

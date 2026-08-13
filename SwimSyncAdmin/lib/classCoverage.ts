@@ -13,12 +13,25 @@ import {
   toSgDate,
   type DayOfWeek,
 } from "./lessonDates";
-import { type EnrolmentSpan, unmarkedDates } from "./attendanceCompleteness";
+import {
+  type EnrolmentSpan,
+  expectedStudentsOn,
+  unmarkedDates,
+} from "./attendanceCompleteness";
 
 export type CoverageClass = {
   id: string;
   title: string;
   day_of_week: string;
+  /**
+   * Both optional, and absent means ACTIVE — the engine bills every class
+   * regardless of status, so the pre-flight must see them all too. A caller
+   * that has not been updated to fetch these still behaves exactly as it did
+   * before the inactive-class fix.
+   */
+  is_active?: boolean;
+  /** DATE, not a boolean — see the clamp below and §7.109. */
+  deactivated_at?: string | null;
 };
 
 export type CoverageEnrolment = {
@@ -134,8 +147,67 @@ export function computeClassCoverage(
     // Clamp to today so future lessons in the current month aren't "missing".
     const to = today < bounds.end ? today : bounds.end;
 
-    const expected = expectedLessonDates(cls.day_of_week as DayOfWeek, from, to);
-    if (expected.length === 0) continue;
+    // ── Pattern dates, clamped at the day the class stopped being SCHEDULABLE ──
+    // Mirrors the engine's lastScheduledDate/expectedTo (core.ts §"...and
+    // clamped at the day the class stopped being SCHEDULABLE"), because this
+    // check now sees INACTIVE classes at all. Three cases, and the third is why
+    // `deactivated_at` is a DATE and a boolean cannot replace it (§7.109):
+    //   active                     → schedulable to the end of the window
+    //   deactivated on a date      → schedulable up to that date, not past it
+    //   inactive, no date recorded → predates deactivate_class(); nothing is
+    //                                known, so it expects nothing.
+    const lastScheduled: string | null =
+      cls.is_active !== false
+        ? to
+        : cls.deactivated_at
+        ? toSgDate(cls.deactivated_at)
+        : null;
+
+    const expectedTo =
+      lastScheduled === null || lastScheduled < from
+        ? null
+        : lastScheduled < to
+        ? lastScheduled
+        : to;
+
+    const patternDates =
+      expectedTo === null
+        ? []
+        : expectedLessonDates(cls.day_of_week as DayOfWeek, from, expectedTo);
+
+    // ── Lessons that ACTUALLY EXIST, whatever weekday they fell on ────────────
+    // The half this check was missing, and the reason it could report a month
+    // complete that the engine then refused to bill. `schedule_extra_lesson()`
+    // waives the weekday rule deliberately, so an off-pattern extra appears in
+    // NO weekly series and was invisible here while blocking the engine, which
+    // has always unioned `sessionByDate.keys()` (core.ts). §7.18 is the standing
+    // reason these two must not drift: hand-written copies of "who was expected
+    // here" caused a live underbill.
+    //
+    // ⚠ CLAMPED TO `to`, AND THE EQUIVALENCE IS WHAT MAKES THAT SAFE. For any
+    // ENDED month — the only kind the engine can bill — `to` IS `bounds.end`,
+    // so this filter removes nothing and the two agree exactly; the test
+    // "clamping session dates is a no-op on an ended month" pins it. What it
+    // does remove is a FUTURE session in the CURRENT month: `assign_session_coach()`
+    // creates a lesson_sessions row when an admin arranges cover in advance
+    // (sessionRoster.ts), and reporting that as a gap invites someone to mark
+    // attendance for a lesson that has not happened yet. The pattern half has
+    // clamped for that reason since it was written.
+    const sessionDates = sessions
+      .filter((s) => s.class_id === cls.id)
+      .map((s) => s.session_date)
+      // Re-bounded rather than trusted, so a caller whose query forgot its
+      // range cannot smear another month into this one.
+      .filter((d) => d >= bounds.start && d <= to);
+
+    // ⚠ THE UNION HAPPENS BEFORE THE EMPTY GUARD, not after. Guarding on the
+    // pattern dates alone skipped a class whose ONLY lesson that month was an
+    // off-pattern extra — the same bug one level up, and the more complete
+    // failure: not a missing date, an entire missing class.
+    const expectedDates = [
+      ...new Set([...patternDates, ...sessionDates, ...bookedByDate.keys()]),
+    ].sort();
+    if (expectedDates.length === 0) continue;
 
     // Marked students per lesson DATE — the shape the shared completeness rule
     // takes. A date absent from this map has no session at all, which the rule
@@ -157,24 +229,34 @@ export function computeClassCoverage(
         ])
     );
 
-    // Booking dates join the expected list: a trial on a date with no session
-    // yet would otherwise be invisible here while the engine blocks on it.
-    const expectedWithTrials = [
-      ...new Set([...expected, ...bookedByDate.keys()]),
-    ].sort();
-
     const missingDates = unmarkedDates(
-      expectedWithTrials,
+      expectedDates,
       markedByDate,
       enrolmentSpans,
       bookedByDate
     );
 
+    // ⚠ COUNTED SEPARATELY FROM WHAT IS CHECKED, and the difference is the
+    // point. `expectedDates` is deliberately wide — it holds every date that
+    // could possibly need a mark, so nothing escapes `unmarkedDates`. But some
+    // of those dates had NOBODY expected on them: a session that ran before the
+    // only enrolment opened, or a pattern date in a guest-only class. Those are
+    // filtered out of `missingDates` by the rule itself (expected.length > 0),
+    // so counting them would increment BOTH numbers and render "8 of 8" where
+    // the truth is "4 of 4". This dialog's whole job is to be believed, so the
+    // count is over the dates a mark was actually owed on.
+    //
+    // Order matters: missingDates ⊆ countedDates by construction, because
+    // unmarkedDates applies the same non-empty test. `marked` cannot go negative.
+    const countedDates = expectedDates.filter(
+      (d) => expectedStudentsOn(d, enrolmentSpans, bookedByDate).length > 0
+    );
+
     coverage.push({
       classId: cls.id,
       title: cls.title,
-      expected: expectedWithTrials.length,
-      marked: expectedWithTrials.length - missingDates.length,
+      expected: countedDates.length,
+      marked: countedDates.length - missingDates.length,
       missingDates,
     });
   }

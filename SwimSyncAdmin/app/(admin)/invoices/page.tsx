@@ -265,10 +265,19 @@ export default function InvoicesPage() {
       // Every query's error is checked: an unchecked failure would leave the
       // row set empty, which reads as "nothing missing" — the exact false
       // reassurance this dialog exists to prevent.
+      // ⚠ NO `is_active` FILTER, DELIBERATELY — and `deactivated_at` comes with
+      // it. The ENGINE bills every class, active or not, and keeps a retired
+      // class's recorded sessions in its completeness gate (core.ts). While
+      // this query filtered `is_active`, a retired class holding an unmarked
+      // lesson blocked generation and was invisible to this dialog: the admin
+      // read "all marked", pressed Generate, and got a refusal naming a class
+      // on no screen they could reach — §8.32's deadlock on a visibility axis.
+      // computeClassCoverage() clamps a retired class's WEEKLY expectation at
+      // `deactivated_at` (a DATE, §7.109) while still reporting sessions that
+      // genuinely ran, which is the engine's rule exactly. §7.18.
       const classesRes = await supabase
         .from("classes")
-        .select("id, title, day_of_week")
-        .eq("is_active", true)
+        .select("id, title, day_of_week, is_active, deactivated_at")
         .eq("tenant_id", tenantId!);
       if (classesRes.error) throw classesRes.error;
 
