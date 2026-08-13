@@ -382,8 +382,8 @@ by the suite's own dark matrix).
 new driver `verify-tenant-suspension` **12/12** across BOTH apps (the bulk ban/unban and
 ⚠ RISK 3 in a real browser) · fixture round-trip 24/24 · rollback rehearsed both
 directions (835 after DOWN, 923 after re-apply) · post-deploy grant dump clean (`anon`
-EXECUTE still 18, the overview's regrant landed) · CI green ×2 · the user's live
-serve-check is the one open item — §9.
+EXECUTE still 18, the overview's regrant landed) · CI green ×2 · live serve-check by
+the user (the Suspend buttons seen on the live Platform page).
 
 ---
 
@@ -487,10 +487,10 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 ### THE CURRENT BUILD — Wave 5 is COMPLETE; the build order is spent
 
 **All three chunks shipped 2026-08-13** (§8.49–8.51); Waves 1–5 are done and their plans
-are history, not queues. CI green ×2. **One loose end from chunk 3's ship: the live
-serve-check is the user's** — open `admin.swimsync.sg/platform` and see the Suspend
-action beside each business (§11.14; the correct production state is
-two dormant buttons). **`BACKLOG.md` → `## Build order`'s numbered list is exhausted —
+are history, not queues. CI green ×2, and the live serve-check is DONE — the user opened
+`admin.swimsync.sg/platform` and saw the Suspend buttons, 2026-08-13 (§11.14; the
+correct production state is two dormant buttons, and nothing should be suspended).
+**`BACKLOG.md` → `## Build order`'s numbered list is exhausted —
 what remains is the *Unordered* pool and the three small filed items below; the next
 build is a decision to make with the user**, and `/backlog-prioritisation` exists if the
 queue should be re-sequenced first.
