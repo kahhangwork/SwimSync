@@ -2575,3 +2575,39 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     residue as EXPECTED** ("still passes a `current_tenant_id()` read = TRUE — accepted,
     token-lifetime, ban enforces") so a future session finds a documented decision, not
     a leak. Don't "fix" it by editing the helper without auditing those call sites.
+
+152. **`classes.coach_id` IS THE WRONG ANSWER TO "WHO TAUGHT THIS LESSON" — IT IS THE
+    ACCESS AXIS, AND ANYTHING ABOUT MONEY MUST USE THE DATED ONE.** The column is
+    **mutable and undated**: it says who teaches the class *now*, not who taught it in
+    July. `20260812000200`'s header states the split (lines 23-24) and
+    `sessionRoster.ts:16-24` repeats it — ACCESS follows the roster + `classes.coach_id`;
+    MONEY follows `class_rate_on().paid_coach_id` + "was I a shadow ON THAT DATE?" — and
+    `20260719000800` exists because the two were once one query and handing a class over
+    **re-priced its entire unpaid history**. Both files say so, and a plan written with
+    both open still picked the access axis for the Attendance page's Coach column, whose
+    entire purpose is reconciling a payout. The failure is quiet and reversed: a class
+    handed from A to B on 1 August pays every July lesson to A, the screen names B, and
+    the admin "corrects" a correct payout. **Filed 2026-08-13 without shipping the fix**
+    (`BACKLOG.md` → *The Attendance page's Coach column…*, re-sized S → M), so the trap
+    is still live in `attendance/page.tsx`. The rule to carry: **a display-only change
+    reaches money the moment it names a person next to an amount.** The money-side twin
+    `lib/payoutItems.ts` reads `classes.coach_id` nowhere at all — copy that, not the
+    roster.
+
+153. **A SUITE CAN BE GREEN BECAUSE IT ONLY EVER TESTS THE ONE RECORD THE RULE CANNOT
+    REACH.** Before `20260813000400`, both suites covering admin deletion exercised a
+    profile that had **never acted**: pgTAP seeded an audit row purely to watch
+    `prepare_admin_delete()` purge it, and `verify-admins.mjs` deletes
+    `admindelete@swimsync.test`, seeded expressly as "pure, unreferenced" and never used
+    as an actor. Changing what "has recorded activity" means would have passed both,
+    unchanged, while proving nothing whatsoever about the product — the deletion path is
+    *only* reachable for a traceless profile, so a suite built around that profile is
+    structurally blind to every rule about history. The tell is a fixture described by
+    what it **lacks** ("unreferenced", "disposable", "never signs in"): that is the
+    happy path, and the rule under test almost always lives on the other side of it.
+    **The fix is a second persona differing in exactly the one attribute** — here
+    `adminhistory@` (a005), identical to a003 except that an audit row names it ACTOR —
+    not a cleverer assertion on the first. It also caught what pgTAP structurally cannot:
+    that the refusal reaches the modal as a *sentence* rather than
+    `audit_log.actor_id`, and that the route's compensating unban leaves the account able
+    to sign in, since it bans **before** it calls the RPC.

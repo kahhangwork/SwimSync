@@ -338,5 +338,34 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     re-apply → 923 green). **Serve-check:** the Platform page is interaction-only for
     everyone but the platform admin (item 12's shape) — the check is the user opening
     `admin.swimsync.sg/platform` and seeing the Suspend action beside each business.
+
+15. **Deploy record (2026-08-13): the admin audit trail survives deletion — and the
+    serve-check that a 200 could not have given.** `20260813000400` (`519eba8`) landed on
+    `main` alone. **The A1 gate ran first and it was NOT a formality:** the plan expected
+    one production admin and the query returned **three**, each in a different tenant —
+    but all three `is_owner`, and an owner was already undeletable (only a tenant's owner
+    may call the RPC, and it refuses `p_profile_id = auth.uid()`), so the change removed
+    nothing from anyone. Sandbox blocked `db push` again (items 13-14's situation), the
+    user ran it via `!`; the `pgdelta` stack trace printed for the **ninth** time
+    (normal); `migration list --linked` remote filled, 0 pending. **Grant dump:** `anon`
+    EXECUTE still **18**; `prepare_admin_delete` exactly `{postgres, authenticated}` and
+    `profile_reference_columns` exactly `{postgres, service_role}` — both **unchanged**,
+    which was the point: the migration issues no `GRANT`/`REVOKE` at all, since
+    `CREATE OR REPLACE` preserves the ACL and re-granting would be the blanket re-grant
+    §7.87 forbids. ⚠ **The review's claim that `profile_reference_columns` carried a
+    `GRANT … TO authenticated` was FALSE** (`co_admins.sql:333-334` are two REVOKEs); it
+    needs none, because its only caller is `SECURITY DEFINER`.
+    **The deployed BODY was verified, not just the version row** — `db dump --linked`
+    grepped: new refusal sentence present, `audit_log` exclusion gone (0 hits), and the
+    purge statement present **only as a comment** (0 non-comment occurrences). Then the
+    app commit (`ee15814`), and the §7.31/§7.51 serve-check on the built bundle: the
+    served `app/(admin)/admins/page-*.js` chunk hash moved `0c143b4d…` → `c8dbdcdcb5…`
+    and contains the new copy. Confirmed by scanning for the **old** string first, so the
+    method was proven able to see the component before the absence of the new string was
+    trusted. Rollback
+    `supabase/rollback/20260813_audit_survives_admin_delete_DOWN.sql` committed before the
+    deploy, bodies captured from `db dump --linked` of the live remote (§7.40) and
+    verified byte-identical to `20260806000100`; rehearsed both directions (DOWN → 4 of
+    40 red → re-apply → 925 green).
     No production tenant is suspended and none should be: the deploy's correct visible
     effect is two dormant buttons.

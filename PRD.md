@@ -258,9 +258,20 @@ keeps coaching when deactivated (their classes, attendance and coach app are unt
 they see an "access suspended" notice on the admin panel), and their "delete" is a
 demotion to coach — profile, history and coaches record all survive. A **pure** admin is
 additionally blocked from logging in when deactivated, and their delete is real: the
-account is removed along with their audit-log history (the confirmation requires typing
-DELETE and says so), and is **refused entirely if they have recorded any work** — those
-admins are deactivated instead, which preserves everything and is reversible.
+account is removed outright (the confirmation requires typing DELETE).
+
+*(implemented — corrected 2026-08-13)* **The audit trail now REFUSES the deletion instead
+of being destroyed by it.** Deleting an admin used to purge every audit-log entry they had
+written, because those rows point at the account and the deletion could not proceed while
+they existed. That erased exactly the evidence the trail exists for: the dispute it answers
+is "who changed this child's contact number, and when", and the person most likely to be at
+the centre of one is an admin who has since left. Deletion was already refused for an admin
+referenced anywhere else — a student they created, a payment they confirmed — and the audit
+log was the single exception; it no longer is. **In practice this means most admins cannot be
+deleted at all**, since every edit to a child's record is logged (§7.4), and **Deactivate is
+the route**: it revokes access immediately, keeps the record, and is reversible. The trade
+was chosen deliberately — the record outlives the person, and the cost is that their email
+address stays occupied permanently, so they cannot be re-invited later.
 
 *Known limitation, accepted:* deactivation cuts admin authority instantly at the database,
 but a deactivated pure admin's existing session can retain baseline staff-level reads
@@ -1174,6 +1185,20 @@ neither billed nor treated as a gap. On its own that only left the month open; a
 other class that billed, the month was **sealed** over the guest and their lesson could never
 be invoiced afterwards. It is now the same rule everywhere: a lesson someone was expected at
 must be marked before the month can be billed, and *expected* includes a guest.
+
+*(implemented — corrected 2026-08-13)* **The admin's pre-flight now sees the same two things
+the engine does: a lesson held OFF the weekly pattern, and a RETIRED class.** Both were
+divergences in the same direction — the dialog reported a month complete that the engine then
+refused to bill, which over-reports readiness but can never under-bill. An **extra lesson**
+(§7.5) sits off the class's weekday deliberately, so it appears in no weekly series and was
+invisible to the dialog while blocking the engine; the dialog is also where the missing dates
+are *named*, so the admin was refused with no list to act on. A **retired class** was worse:
+the dialog filtered it out entirely, so an unmarked lesson in one blocked generation while
+being visible on no screen an admin could reach. A retired class is now checked, but its
+weekly expectation stops at the day it was deactivated — lessons that genuinely ran are still
+reported, lessons that were never going to happen are not demanded. The counts (`N of M`)
+are taken over dates a mark was actually owed on, so a lesson from before the only child
+enrolled does not inflate both halves of the ratio.
 
 *(implemented — corrected 2026-07-18)* The **billing engine derives the expected lesson
 dates itself**, rather than inspecting only the lesson records that happen to exist. Until

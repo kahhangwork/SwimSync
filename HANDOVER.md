@@ -1,11 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-13 (3rd) — **Wave 5 chunk 3 SHIPPED, LIVE — the WAVE is COMPLETE**
+_Last updated: 2026-08-13 (4th) — **Two of the three small filed items SHIPPED, LIVE**
+(§8.52): the admin audit trail now survives deletion (`20260813000400`) and the invoice
+pre-flight sees extra lessons + retired classes. The third was re-sized S → M and deferred._
+
+_Previously, 2026-08-13 (3rd) — **Wave 5 chunk 3 SHIPPED, LIVE — the WAVE is COMPLETE**
 (§8.51): tenant suspension — `20260813000300` + engine v21 + the Platform-page
 Suspend/Unsuspend, deployed migrations → engine → apps (§7.60). §11.14._
-
-_Previously, 2026-08-13 (2nd) — **Wave 5 chunk 2 SHIPPED, LIVE** (§8.50): disable a
-coach — `20260813000200` + the Coaches-page dialog; atomic handover, pure-coach ban._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -130,7 +131,6 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | A month billed LATE can no longer be permanently unbillable (`markable_floor`) | pgTAP 18, LIVE | PRD §7.6 · §8.32 |
 | The coach's landing tab is a WEEK, not a day | jest 308 + 19-check driver, LIVE | PRD §14.2, §7.5 · §8.34 |
 | **A lesson recorded into an already-BILLED month is reported, and settled** | pgTAP 18 + vitest + 13-check driver, LIVE 2026-08-12 | PRD §7.17 · §8.48 |
-| The admin's tables sort; student counts mean ACTIVE | LIVE 2026-07-26 | PRD §14.3 · §8.19 |
 | Every audit row knows which business it is about | pgTAP, LIVE | `docs/ARCHITECTURE.md` §6 · §8.28 |
 | Every EDIT to a child is recorded (`SECURITY DEFINER` trigger) | pgTAP 11 + 4 drivers, LIVE 2026-08-09 | §7.104 · §8.38 |
 | `anon` holds EXECUTE on no callable function, and gets none for free | grant dump, LIVE | §7.82, §7.85 · §8.28 |
@@ -141,6 +141,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | An unmarked GUEST holds the month open; nothing new enters a retired class | pgTAP + Deno, LIVE 2026-08-10 | PRD §7.3 · §8.40 |
 | **A child can attend MORE THAN ONE class a week** | pgTAP + vitest + jest + 17-check driver, LIVE 2026-08-11 | PRD §7.4, §7.20 · §8.43 |
 | **A substitute is per-LESSON; a SHADOW is per-CLASS — dated, paid its own shadow rate** | pgTAP 49 + 9 + vitest + jest + **30-check driver**, LIVE 2026-08-12 | PRD §7.13, §7.6 · `docs/ARCHITECTURE.md` §6z · §8.46 |
+| **An admin's audit trail REFUSES their deletion — it is never destroyed to permit one; most admins are therefore undeletable and Deactivate is the route** | pgTAP 925 + driver 24/24, LIVE 2026-08-13 | PRD §4.3 · §7.153 · §8.52 |
 | **Wave 5, admin authority — owner REASSIGNED (platform-only) · coach DISABLED (atomic handover, pure-coach ban) · tenant SUSPENDED (staff+parents dark, staff banned, engine skips; already-sent invoice links deliberately keep working)** | pgTAP 27+55+88 + vitest + 3 drivers, LIVE 2026-08-13 | PRD §4.3, §4.4 · §8.49–8.51 |
 | Automated tests — pgTAP + Deno backend, vitest + jest-expo apps, all in CI on push | CI | `docs/TESTING.md` §5 |
 
@@ -180,7 +181,10 @@ is a guard whose first real firing is still ahead of you.
   refused by its own sole-owner guard (the only coach IS the owner, replacement dropdown
   correctly empty); tenant suspension has suspended nothing and **should stay that way**
   — its correct production state is two dormant buttons on the Platform page. Real the
-  day a co-admin or second coach exists.
+  day a co-admin or second coach exists. **The admin-delete refusal (§8.52) joins them for
+  the same reason:** all three tenant admins are their own tenant's OWNER, and an owner was
+  already undeletable — so the new refusal has never fired and cannot, until a business has a
+  second admin. Its correct production state is "no observable change".
 - **Multiple classes per child** — no production child holds two enrolments yet, so neither
   schedule guard has ever refused anything real and no admin has pressed *+ Add class*. The
   first real one is worth watching: it is also the first time `'mixed'` package coverage
@@ -360,6 +364,42 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.52 (2026-08-13, 4th) — TWO OF THE THREE SMALL FILED ITEMS, AND THE THIRD RE-SIZED
+
+**The three `BACKLOG.md` **S** items §9 had listed since Wave 5 finished. Two shipped and
+are LIVE; the third was planned, risk-reviewed, re-sized S → M and DEFERRED — its entry now
+names what made it M.**
+
+**Shipped.** `20260813000400` — deleting an admin no longer purges their audit trail; the
+delete is REFUSED instead (`audit_log.actor_id` was `profile_reference_columns()`'s one
+deliberate exclusion). Spec: **PRD §4.3**. Deploy record: **`docs/DEPLOYMENT.md` §11.15**.
+Then the app half: the modal copy, and `classCoverage.ts` — the invoice pre-flight now sees
+an off-pattern extra lesson **and** a retired class, closing the same §7.18 divergence on
+two axes at once. Spec: **PRD §7.7**. New gotchas: **§7.152–153**.
+
+**Deferred, and it is a LIVE defect rather than a plan note:** the Attendance page's Coach
+column. The review found the obvious fix is *also* wrong — `classes.coach_id` is the ACCESS
+axis, mutable and undated, on the page whose job is reconciling a payout (**§7.152**).
+`BACKLOG.md` carries the axis, the settled product choice, and the four other mitigations;
+`docs/plans/SMALL_ITEMS_PLAN.md` §B2 carries them as steps.
+
+**Two findings that changed how the work was done, both now graduated:**
+`/plan-review`'s independent agent found the wrong-axis bug in a plan written with both
+warning headers open (§7.152), and that **both** suites covering admin deletion tested only
+a profile that had never acted, so the change would have passed them while proving nothing
+(§7.153 — fixed structurally with a sixth driver persona, not with a sharper assertion).
+Two reviewer claims were checked and found **false**: a `GRANT` that does not exist, and a
+clamp said to re-create a divergence it provably cannot (`docs/plans/SMALL_ITEMS_PLAN.md`
+records both, and the clamp was settled by an assertion rather than by argument).
+
+**Verified:** pgTAP **925** (+2, proven red by the DOWN file — 4 of 40) · vitest **326**
+(+9, proven red three ways) · `verify-admins` **24/24** (+3, proven red) · fixture
+round-trip 24/24 · typecheck both apps · rollback rehearsed both directions · post-deploy
+grant dump clean (`anon` EXECUTE still 18, both ACLs unchanged) · the deployed **body**
+grepped from `db dump --linked`, and the served bundle's chunk hash confirmed changed.
+
+---
+
 ## 8.51 (2026-08-13, 3rd) — WAVE 5 CHUNK 3: THE PLATFORM KILL SWITCH — AND THE WAVE IS DONE
 
 **Shipped and LIVE through the full §7.60 order (migrations → engine → apps)** —
@@ -384,27 +424,6 @@ new driver `verify-tenant-suspension` **12/12** across BOTH apps (the bulk ban/u
 directions (835 after DOWN, 923 after re-apply) · post-deploy grant dump clean (`anon`
 EXECUTE still 18, the overview's regrant landed) · CI green ×2 · live serve-check by
 the user (the Suspend buttons seen on the live Platform page).
-
----
-
-## 8.50 (2026-08-13, 2nd) — WAVE 5 CHUNK 2: A LEAVING COACH IS ONE DIALOG, NOT A BAD AFTERNOON
-
-**Shipped and LIVE, migration-first (§11.9)** — `20260813000200` (`coaches.disabled_at`,
-the `current_coach_id()` cut, the load-bearing guard trigger, `disable_coach()` /
-`reactivate_coach()`, the audit `'Coach'` arm), then the Coaches-page dialog + API routes
-banning **pure** coaches only. The handover is atomic by decision 4: replacement required,
-one transaction, any refusal aborts. Spec: **PRD §4.3 → *Disabling a coach***. Deploy
-record: **`docs/DEPLOYMENT.md` §11.13**. Suites: `docs/TESTING.md` §5. New gotcha:
-**§7.147** (two ways a pgTAP gate probe under restricted claims tests the wrong refusal).
-
-**The review's one major find** — a join-shape check that could silently skip the ban —
-was fixed before commit and re-proven in the browser.
-
-**Verified:** pgTAP **835** (+55, proven red by 5 measured sabotages, messages pinned) ·
-vitest 311 (+7, proven red twice) · typecheck · new driver `verify-coach-disable`
-**13/13** across BOTH apps (the ban half in a real browser) · fixture round-trip 23/23 ·
-rollback rehearsed both directions · post-deploy grant dump clean (`anon` EXECUTE
-still 18) · CI green ×2 · live serve-check by the user (the Disable button seen rendering).
 
 ---
 
@@ -456,15 +475,17 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### The sweep — tonight is the first to see ALL THREE Wave 5 chunks
+### The sweep — tonight covers all three Wave 5 chunks AND a changed admins driver
 
-**Tonight's nightly is the first to sweep the whole wave**: the Change-owner UI, the
-Coaches-page Disable/Reactivate, the Platform-page Suspend/Unsuspend, and the FIRST runs
-of `verify-coach-disable` AND `verify-tenant-suspension` (auto-discovered by glob —
-nothing was wired). If `platform-admin-scope` or anything on the Platform page reddens,
-the suspect is `9c1279c`; the Coaches page, `f5d91aa` — but read the triage rules below
-first, and note the suspension driver's fixture REFUSES to apply over a still-suspended
-tenant and names its teardown.
+**Tonight's nightly is the first to sweep the whole wave** (the Change-owner UI, the
+Coaches-page Disable/Reactivate, the Platform-page Suspend/Unsuspend, and the first runs of
+`verify-coach-disable` and `verify-tenant-suspension`) **and the first to run the modified
+`verify-admins`** — 24 checks now, with a sixth fixture persona (`adminhistory@`) and one
+assertion re-pointed off the copy `20260813000400` made false (§8.52). If `verify-admins`
+reddens, the suspect is `ee15814`; if `platform-admin-scope` or the Platform page reddens,
+`9c1279c`; the Coaches page, `f5d91aa`. Read the triage rules below first, and note the
+suspension driver's fixture REFUSES to apply over a still-suspended tenant and names its
+teardown.
 
 > **Re-read the run, not this paragraph.** `gh run list --workflow=ui-drivers.yml` and the
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
@@ -484,24 +505,25 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE CURRENT BUILD — Wave 5 is COMPLETE; the build order is spent
+### THE CURRENT BUILD — the build order is spent, and so is the small-items list
 
-**All three chunks shipped 2026-08-13** (§8.49–8.51); Waves 1–5 are done and their plans
-are history, not queues. CI green ×2, and the live serve-check is DONE — the user opened
-`admin.swimsync.sg/platform` and saw the Suspend buttons, 2026-08-13 (§11.14; the
-correct production state is two dormant buttons, and nothing should be suspended).
-**`BACKLOG.md` → `## Build order`'s numbered list is exhausted —
-what remains is the *Unordered* pool and the three small filed items below; the next
-build is a decision to make with the user**, and `/backlog-prioritisation` exists if the
-queue should be re-sequenced first.
+**Wave 5 shipped 2026-08-13 (§8.49–8.51); the three small filed items were the follow-on,
+and two of them shipped the same day (§8.52).** `BACKLOG.md` → `## Build order`'s numbered
+list is **exhausted** — what remains is the *Unordered* pool, and the next build is a
+decision to make with the user. `/backlog-prioritisation` exists if the queue should be
+re-sequenced first.
 
-**Three small items remain filed rather than fixed**, all in `BACKLOG.md`:
-- *The Attendance page's Coach column can name someone who did not teach* (**S**) — the page an
-  admin checks when wages look odd. Left deliberately: the fix carries a product choice, and it
-  now has a third option (name the shadows too).
-- *The admin's invoice pre-flight misses an unmarked EXTRA lesson* (**S**) — over-reports
-  readiness; **never under-bills**, which is why it is S.
-- *Deleting an admin destroys the audit history* (**S**) — unchanged since 2026-08-09.
+**ONE item remains from the small three, and it is a LIVE DEFECT, not a tidy-up:**
+*The Attendance page's Coach column can name someone who did not teach* — now **M**, not S.
+It was planned, risk-reviewed and deliberately deferred, so pick it up from the finding
+rather than from the symptom: **`classes.coach_id` is the ACCESS axis — mutable and undated
+— and this is the page an admin opens because wages look odd** (§7.152). A class handed over
+on 1 August names the new coach on every July lesson, and the admin "corrects" a correct
+payout. The product choice is already **settled** (name who taught + cover chip + shadows).
+`BACKLOG.md` holds the axis and the four other mitigations; `docs/plans/SMALL_ITEMS_PLAN.md`
+§B2 holds them as steps, assertions and prohibitions. **Its blocking constraint: the module
+must not ship while `wages/page.tsx` still computes its own attribution** — that would be a
+third copy of the rule that decides who gets paid, which is §7.18's shape.
 
 **The `service_role` question is now ANSWERED, and the answer is "don't build the whitelist"**
 (`BACKLOG.md` carries the 11-call-site audit). `generate-invoices` alone touches 21 of 37 tables
@@ -510,8 +532,9 @@ failure mode of getting it wrong is `permission denied` **inside the invoice eng
 would not defend against the real worst case — a leaked key holding `auth.admin.deleteUser`,
 which no `GRANT` restrains. **What IS worth doing is the one-liner**: turn off the
 default-privilege grant to `service_role` the way `20260804000400` did for `anon` and `PUBLIC`.
-A sixth data point arrived on 2026-08-10 — the dump shows no `service_role` line on either
-function this session touched (`docs/DEPLOYMENT.md` §11.7).
+A seventh data point arrived on 2026-08-13 — `20260813000400`'s dump shows `prepare_admin_delete`
+with no `service_role` line, while `profile_reference_columns` still carries one from before
+that migration (`docs/DEPLOYMENT.md` §11.15).
 
 ### Triage rules, when the sweep does redden
 
@@ -534,8 +557,8 @@ function this session touched (`docs/DEPLOYMENT.md` §11.7).
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **The migration queue is EMPTY.** The latest applied is
-`20260813000300` (tenant suspension, §8.51); production confirmed caught up 2026-08-13,
-0 pending — and all three of the day's deploys followed the ordering gate below
+`20260813000400` (the admin audit trail, §8.52); production confirmed caught up 2026-08-13,
+0 pending — and all four of the day's deploys followed the ordering gate below
 deliberately: each migration merged and pushed to `main` ALONE,
 `migration list --linked` checked, and only then did the app commit land. **The rule chunk 1 bought is about ORDER, not
 content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must
