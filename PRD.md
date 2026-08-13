@@ -273,6 +273,39 @@ the panel itself, for any session that arrives another way) turns them away with
 "please use the SwimSync app", rather than the half-working read-only panel a hired
 coach's credentials used to reach.
 
+#### Disabling a coach *(implemented 2026-08-13)*
+
+**Any active admin of the business** — not just the owner — disables a coach from the
+**Coaches** page (staffing is the business's own; the admin half above is owner-only
+because it guards the owner). Disabling is the coach twin of admin deactivation:
+authority cut instantly at the database, plus a login ban for a **pure** coach. An
+**admin-who-coaches is never banned** — only their coach half goes dark; the admin
+panel stays theirs, and disabling the owner's own coach half is refused while they are
+the business's **only** active coach.
+
+**Disabling a coach with active classes is atomic.** The dialog requires a replacement
+coach; one step hands every active class over (effective-dated **today**, so wage
+history stays with whoever taught it) and disables the coach — or nothing happens at
+all. A refusal anywhere aborts the whole action, including the money guards (a sealed
+billing month at or after the current one, or an already-paid payout for it), whose own
+messages are shown as-is.
+
+**Disabling is forward-looking; nothing already taught changes.** Past lessons, pay and
+payout generation are untouched; a retired class keeps naming its old coach as history.
+Their shadow assignments are end-dated (never deleted — past shadow pay stands), and
+their **future** substitute bookings are cleared. A past or today's substitute booking is
+kept — that lesson becomes **the admin's to mark** (the replacement was never its coach),
+and the dialog lists exactly those lessons before the admin confirms, because an
+unmarked lesson blocks the month's billing with no override.
+
+**Reactivating takes no refusals** beyond being the business's admin — the exit door
+has no lock — and does **not** hand classes back; returning a class is a deliberate
+edit on the Classes page.
+
+*The same token-lifetime limitation as admin deactivation applies,* accepted for the
+same reason: a disabled coach's existing session keeps baseline membership reads for up
+to ~1 hour; the login ban is what ends it.
+
 #### Tenant Admin Permissions
 
 - Full visibility of **their own business**: its parents, students, classes, coaches

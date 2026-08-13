@@ -1,11 +1,12 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-13 — **Wave 5 chunk 1, *Owner transfer*, SHIPPED and was removed**
-(`20260813000100`, PRD §4.4): platform-admin only by decision (WAVE_5_PLAN.md decision 2 —
-no self-service path exists), covering both the handover and the lost-owner case. Struck
-from the Build order and its own section deleted; the reasoning it carried lives in the
-PRD bullet and the migration header. Wave 5's remaining items (disable a coach, tenant
-suspension) stay queued — the risk-reviewed plan is `docs/plans/WAVE_5_PLAN.md`._
+_Last updated: 2026-08-13 (2nd) — **Wave 5 chunk 2, *Disable a COACH account*, SHIPPED
+and was removed** (`20260813000200`, PRD §4.3 *Disabling a coach*): atomic class
+handover, pure-coach ban, admin-who-coaches keeps their admin half. Its section is
+deleted; the tenant-suspension half it carried is now its own item below (chunk 3 of
+`docs/plans/WAVE_5_PLAN.md`, next up). Earlier same day: chunk 1, *Owner transfer*,
+shipped (`20260813000100`, PRD §4.4) — platform-admin only by decision, covering
+handover and lost-owner alike._
 
 _Previously, 2026-08-11 — **Wave 2, *Multiple classes per child*, SHIPPED and was
 removed** (`936e3bd`, live). Its Build-order entry is marked COMPLETE rather than deleted,
@@ -312,8 +313,10 @@ header (`20260812000400`).
 
 12. ~~**Owner transfer** (S/M)~~ — **SHIPPED 2026-08-13** (`20260813000100`, PRD §4.4):
     platform-admin only, one path for handover and lost-owner alike.
-13. **Disable a COACH account** (M) — needs Wave 1 #6 and the coach RLS model settled in
-    Wave 3.
+13. ~~**Disable a COACH account** (M)~~ — **SHIPPED 2026-08-13** (`20260813000200`,
+    PRD §4.3 *Disabling a coach*): atomic handover to a replacement, pure-coach ban.
+14. **Tenant suspension** (M) — the wave's last chunk, fully specified as
+    `docs/plans/WAVE_5_PLAN.md` chunk 3 (its own item below).
 
 ### Unordered — no dependencies, pick by value
 
@@ -1147,55 +1150,26 @@ gives them its join code, and the child is added there as a new record. History 
 the business that taught it, which is the isolation working correctly. Don't conflate the
 two by making the rescue tool "move everything".
 
-### Disable a COACH account — **M** `[handover]`
-Revoke a coach's access without deleting them. **The ADMIN half of this item shipped
-2026-08-06** (PRD §4.3: the owner deactivates/deletes co-admins, with the auth-layer ban
-for pure admins) — what remains is the coach half, plus platform-level tenant suspension.
-Absorbs the older "delete-coach action" item, whose own note already concluded
-**deactivate is the right verb** — real deletion destroys billing history.
-
-**Why:** when a school's coach leaves, someone with access to that business's students
-and attendance keeps it indefinitely. The only remedy is SQL in the Supabase dashboard —
-fine for the owner, impossible for anyone else, and dashboard SQL against production is
-exactly where a bad afternoon comes from.
-
-**Notes — the control levels that remain:**
+### Tenant suspension — **M** `[handover]`
+Suspend a whole business: its staff and its parents lose the app view of that tenant's
+data, its staff logins are banned, and the invoice engine skips it. **Chunk 3 of
+`docs/plans/WAVE_5_PLAN.md`** — fully specified there, risk-reviewed, decisions settled
+(suspension blocks staff AND parents, per-tenant never account-level; already-sent
+invoice links keep working forever, by decision 8). The coach and admin halves of staff
+disabling both shipped (PRD §4.3); this is the last row of that item's control-levels
+table:
 
 | Disabling… | Who does it | Why there |
 |---|---|---|
-| A **school's coach** | That business's **tenant admin** | Their own staffing. The platform has no business being in the loop |
 | A whole **tenant** | **Platform admin** | Suspending a business; cascades to its accounts |
 
-The shipped admin half established the working pattern to reuse: authority cut by one
-clause in the identity helper (`admin_disabled_at IS NULL` inside `is_tenant_admin()` —
-the coach twin is `current_coach_id()` returning NULL for a disabled coach), an
-auth-layer ban for accounts with no other role, idempotent owner-gated RPCs, and the
-guard trigger pinning the column against client writes (20260806000100). ⚠️
-`current_coach_id()` feeds the coach half of the policy set — same blast-radius warning
-as ever: pgTAP before any UI. `profiles.is_active` still exists and is still enforced
-nowhere; the shipped work deliberately did NOT use it (it is whole-account, and an
-admin-who-coaches must keep coaching when their admin half is suspended — the coach
-version has the mirror-image concern).
-
-**Two traps, both already paid for elsewhere:**
-
-- **A private coach holds `tenant_admin` *and* a `coaches` row** (`docs/ARCHITECTURE.md` §6). "Disable
-  the coach" for them means locking the business owner out of their own business. Guard
-  it as *"cannot disable the sole coach who is also the owner"* — and check **which
-  extension rows exist**, never `role` (§7.19, and now §7.91's scoped exception).
-- **`classes.coach_id` is RESTRICT with no cascade.** A disabled coach's classes still
-  exist and still need attendance marked — and unmarked attendance **blocks invoice
-  generation outright, with no override** (PRD §7.7). So disabling a coach without
-  reassigning their classes doesn't just orphan a roster, it **stops the business
-  billing**. Disabling must force reassignment, the same shape as the open-enrolment
-  problem in "Remove from class" (PRD §7.4). Surface it plainly, never as a raw FK error.
-
-**Parent accounts are deliberately excluded**, considered and dropped 2026-07-19. Families
-leaving a business is handled by tenant-level active/inactive (`parent_tenants.is_active`),
-which is the actual common case. The only genuine platform-level trigger for a parent is a
-PDPA consent-withdrawal request — where "can't log in, records retained" is right, since
-IRAS requires ~5 years of financial records — and that has never happened. It rides along
-free once staff disabling exists, because the mechanism is identical.
+**Parent accounts are deliberately excluded from individual disabling**, considered and
+dropped 2026-07-19. Families leaving a business is handled by tenant-level
+active/inactive (`parent_tenants.is_active`), which is the actual common case. The only
+genuine platform-level trigger for a parent is a PDPA consent-withdrawal request — where
+"can't log in, records retained" is right, since IRAS requires ~5 years of financial
+records — and that has never happened. It rides along free once staff disabling exists,
+because the mechanism is identical.
 
 ### Export to Excel / CSV — **S** `[MVP-excluded]` `[Phase 3]`
 Export attendance, invoices, and credit notes from the admin panel.
