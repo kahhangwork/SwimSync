@@ -93,7 +93,8 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `admin_management.test.sql` (38) | co-admins (`20260806000100`): the **first** tenant_admin claims `tenants.owner_profile_id` (per tenant, a later one never steals it) and a plain empty-metadata parent signup still works — the control that matters, since `handle_new_user` fires on **every** signup; the escalation guards (`role` / `tenant_id` / `admin_disabled_at` / `owner_profile_id` unwritable by a client while `full_name` stays editable — without them assertion 6's self-promotion **lands**, and 13 assertions fall over downstream of the corruption); deactivation through the one `is_tenant_admin()` clause (writes 0 rows, `audit_log` dark) while a coach-admin's `current_coach_id()` survives, **plus the deliberate residue pinned as chosen**: membership reads via `current_tenant_id()` persist (the ban that ends them is auth-layer, covered by `verify-admins.mjs`); the four owner-gated RPCs (owner-immune, tenant-scoped, deactivate/reactivate **idempotent** because the API route's retry is the recovery for a half-failed ban pair); `prepare_admin_delete` refusing coach-admins and referenced admins via the **catalogue-derived** reference map (pinned to see `students.created_by` — a column the first hardcoded draft missed), purging the target's audit rows and writing an owner-attributed `admin_deleted` row whose `tenant_id` proves the `'Profile'` derivation arm; anon EXECUTE on none of the four; the overview reporting the **owner column**, not the oldest admin |
 | `owner_transfer.test.sql` (27) | owner transfer (`20260813000100`) — the platform-admin-only gate on **both** RPCs: every other role (owner included — no self-service, by decision) refused with the message **pinned**, and the dropdown feed returns them 0 rows; the transfer moves `owner_profile_id`, audited through the new `'Tenant'` arm (the INSERT reaching the table at all proves the arm — the ELSE RAISES, §7.37) with an idempotent re-run writing no second row; refused targets (cross-tenant, deactivated, non-admin, unknown tenant); the **lost-owner** NULL column recovering through the same RPC; `platform_tenant_overview()` following the column (the same keying `resend-invite` uses); anon EXECUTE on neither. Four measured sabotages recorded in the header; the gate probes for the remaining roles are APPENDED (25–27) so the sabotage records' assertion numbers stay true |
 | `unbilled_sealed_lessons.test.sql` (18) | the Wave 4 orphan-lesson report (`20260812000400`) — billable attendance inside a SEALED month that no `invoice_items` row covers and no live settlement clears. The fixture seals **last month**, deliberately inside §8.32's reopened marking window (the real trigger shape: July billed on 2 August, July still recordable). Every WHERE clause is pinned by an assertion a targeted sabotage turns red — **seven sabotages, each measured**: drop the billable-status filter, make the seal check tenant-blind or month-blind, match invoices per-student instead of per-(student, lesson), ignore invoices entirely, ignore settlements, demote the authorisation RAISE to a NOTICE. The per-(student, lesson) case is the one that matters most: a child billed for the month who gained ONE extra lesson afterwards reports that lesson alone. Settlement coverage in three acts — full clear, **partial** (`settled_through` mid-range leaves the later lesson reporting), and reversal restoring both. Grants: `authenticated` EXECUTE, `anon` none |
-**Total: 536 across 31 files** — verified by `supabase test db` 2026-08-06 (the previous
+| `coach_disable.test.sql` (55) | disable a coach (`20260813000200`, Wave 5 chunk 2) — the gate on both RPCs (coach, parent, CROSS-TENANT admin, disabled coach's self-rescue, all messages **pinned** — probe ids come from a `GRANT`ed temp table, §7.147); pre-write refusals naming only ACTIVE classes; the sole-owner-coach guard (extension-rows-decided, tenant B's owner is its only coach); THE DISABLE by a co-admin with the previous month sealed (⚠ RISK 7a — the normal arrears state): effective-dated `class_rates` handover, retired class untouched, shadow rows END-DATED by the actor, future substitute overrides deleted with past kept, audit through the new `'Coach'` arm, idempotent re-run rowless; authority dark (helper NULL, 0 classes/lessons, attendance refused) **with the `current_tenant_id()` residue pinned as EXPECTED** (⚠ RISK 5 — ban enforces); the guard's load-bearing case (a disabled coach's own `UPDATE` clearing `disabled_at`, proven red by dropping the trigger); ⚠ RISK 8 (replacement cannot mark the override lesson, admin can, month completes); July payroll still paying the disabled coach's taught lesson; admin-who-coaches keeping their admin half and reactivating their own coach half; reactivation taking no refusals and NOT handing classes back; ⚠ RISK 7b (a PAID current-month payout aborts ATOMICALLY — nothing moved, no audit row); the staff-shape invariant chunk 3's bulk ban leans on; anon EXECUTE none. **Five measured sabotages in the header** |
+**Total: 835 across 43 files** — verified by `supabase test db` 2026-08-13 (the previous
 "total" line here had been stale for several sessions while §3 was right; per §7.37,
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
@@ -171,7 +172,11 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 
 _Frontend tests:_
 `SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **22 files, 299
-tests** (2026-08-11; the runner is the fact, this number is a hint that drifts). Wave 4 added
+tests** (2026-08-11; the runner is the fact, this number is a hint that drifts). Wave 5
+chunk 2 added `lib/coachDisableImpact.test.ts` — the disable dialog's ⚠ RISK 8 list
+(unmarked override-carrying lessons up to TODAY, future ones excluded because the RPC
+deletes their overrides), reusing the shared completeness rule so guests count as expected
+(§7.18); proven red by removing the future clamp and by blinding it to bookings. Wave 4 added
 `lib/settlementPayload.test.ts` — the settlement INSERT payload, extracted so the unclaimed
 modal and the orphan-lesson report build it through ONE function; it pins the DB CHECK
 `settlement_amount_matches_kind` client-side (paid_outside carries the amount, written_off
@@ -512,6 +517,17 @@ the fixture admin via the JWT-claims GUC — the RPC refuses psql's superuser (n
 is correct and is pinned by pgTAP. ⚠ **Not re-runnable by hand** — settling is the driver's
 whole act and a live settlement is exactly what empties the report; the fixture guard names
 the leftover settlements and says to apply the teardown first;
+`verify-coach-disable.mjs` (+ `fixtures-coach-disable.sql` and its `-teardown.sql`) drives
+**Wave 5 chunk 2's disable/reactivate** — 13 checks across BOTH apps: the dialog demanding
+a replacement (confirm dead until chosen) and naming the ⚠ RISK 8 marking-backlog lesson;
+the disable moving the class to the replacement's row; then the part only a browser can
+prove (bans live in auth, not the database, the `verify-admins` precedent) — the disabled
+coach's **Expo login dying**, the replacement's week showing the inherited class, and after
+reactivation the login returning while the class deliberately does NOT. The two fixture
+coaches are non-admin for the §7.131 reason and the fixture refuses to apply if one has
+become an admin, or if a prior run left the target disabled. ⚠ **Not re-runnable by
+hand** — the class stays with the replacement; apply the teardown and fixture between runs.
+Personas: `dc-target@` / `dc-replace@swimsync.test`, `password123`, actor `coach@swimsync.test`;
 `verify-multi-class.mjs` (+ `fixtures-multi-class.sql` and its `-teardown.sql`) drives
 **a child in two classes** (Wave 2) across admin, database and parent app — 17 checks. The
 one that carries the weight is the **reveal guard**: it counts remove-buttons *inside
@@ -690,7 +706,9 @@ still scored 16/16, because RN's responder system does not propagate a press to 
 Touchables. Do not cite them as the nesting guard.
 
 **⚠ Hand-run caveats, collected (the sweep resets per driver, so these bite ONLY a
-hand-run).** Three drivers are **not re-runnable without their teardown**:
+hand-run).** Four drivers are **not re-runnable without their teardown**:
+`verify-coach-disable` (moves the class to the replacement and reactivation does not hand
+it back; its fixture refuses to apply over the leftovers and names the teardown),
 `verify-coach-roster` (marks the lesson; its shadow assignment is refused a second time by
 a unique index — it also **collides with `verify-schedule-week`**, same weekday last week,
 leaving that driver 20/21 if its fixture stays in place), `verify-multi-class` (removes a

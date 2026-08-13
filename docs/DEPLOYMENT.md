@@ -304,3 +304,18 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     rehearsed byte-identical. **The admin serve-check for interaction-only UI:** the
     Change-owner modal fires `rpc/platform_tenant_admins` only when opened, so the check
     is opening it live — the user did, and DevTools showed the 200 (item 10's method).
+
+13. **Wave 5 chunk 2 deploy record (2026-08-13): disable a coach, the §11.9 order held,
+    additive-only.** `20260813000200` (`953e085`) landed on `main` alone; the session's
+    own `supabase db push` was **blocked by the permission layer** (item 11's situation,
+    opposite verdict to item 12 — don't assume either way), so the user ran it via the
+    `!` prefix; the `pgdelta` certificate stack trace printed for the **seventh** time
+    (normal output); `migration list --linked` remote column filled. No dropped columns
+    and no signature changes, so neither the §7.145 window nor §7.123's class could
+    occur. Grant dump: `anon` EXECUTE still **18**, both new RPCs `authenticated`-only.
+    Then the app commit (`f5d91aa`) landed with the PRD/BACKLOG edits in the same push.
+    Rollback `supabase/rollback/20260813_disable_coach_DOWN.sql`, committed before the
+    deploy and rehearsed both directions (DOWN → 780 green → re-apply → 835 green).
+    **Serve-check:** the Coaches page renders the Disable button on load (not
+    interaction-only, unlike item 12), so the user opening the live page and seeing the
+    button IS the check — they did, 2026-08-13.

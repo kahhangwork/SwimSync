@@ -125,7 +125,7 @@ deploy, rehearsed (§7.93 — running it is the half that finds the bugs). DOWN 
 
 ---
 
-## Chunk 2 — Disable a coach (M — about one session)
+## Chunk 2 — Disable a coach (M — about one session) — ✅ SHIPPED 2026-08-13 (§8.50, `20260813000200`)
 
 **Migration `db/disable-coach`, one file:**
 

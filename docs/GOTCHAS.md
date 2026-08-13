@@ -2496,3 +2496,22 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     - The unit test that should have pinned this asserted `"shadow"` under a title that said
       `keeps the OWNER role`. A test whose name contradicts its assertion is worse than either
       answer; read the two together. (2026-08-12.)
+
+147. **A pgTAP GATE PROBE UNDER `SET LOCAL ROLE authenticated` CAN TEST THE WRONG REFUSAL
+    TWO WAYS, AND A MESSAGE-BLIND `throws_ok` CALLS BOTH A PASS.** Found writing
+    `coach_disable.test.sql` (2026-08-13); the same latent shape exists in older suites.
+    - **An inline subselect resolves under the CALLER's RLS.** `disable_coach((SELECT id
+      FROM coaches WHERE …))` run as a parent passes **NULL** — the parent cannot see the
+      row — so the RPC answers `no such coach` and the gate is never reached. Four gate
+      probes "passed" against the wrong refusal until the messages were pinned. Capture
+      probe ids in a TEMP TABLE **while still postgres** (`_foreign_coach` in
+      `class_shadow_coaches.test.sql` is the precedent) and add a non-NULL control.
+    - **A postgres-owned temp table is unreadable by `authenticated`** — the probe then
+      dies on `42501: permission denied for table _c`, which a `throws_ok(…, NULL, NULL,
+      …)` **also calls a PASS**. `GRANT SELECT ON <temp> TO authenticated` after creating
+      it. The `_foreign_coach` probe has this exact hole: its refusal is asserted
+      message-blind, so it has been green on `permission denied` since the day it was
+      written — the *refusal it names* is real (pgTAP pins it elsewhere), but that one
+      probe proves nothing.
+    - **The rule both bugs share: pin the refusal MESSAGE, not just `P0001`** (the
+      owner-transfer suite's post-review lesson, now with two more ways to be wrong).

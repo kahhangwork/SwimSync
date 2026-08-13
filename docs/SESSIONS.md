@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.48** | 2026-08-12 | **Wave 4** (`20260812000400`): sealed-month unbilled lessons reported + settled | PRD §7.17 · `docs/DEPLOYMENT.md` §11.11 · `docs/TESTING.md` §5 |
 | **8.47** | 2026-08-12 | **The shim drop** (`20260812000300`): 4-arg `assign_session_coach` + enum gone, on schedule | `docs/DEPLOYMENT.md` §11.10 · §8.46 |
 | **8.46** | 2026-08-12 | **Class-level shadow coaches** (`20260812000200`), LIVE; subs stay per-lesson | **§7.143–§7.146** · `docs/ARCHITECTURE.md` §6z · `CLASS_SHADOW_COACHES_PLAN.md` |
 | **8.45** | 2026-08-12 | **The owed-main guard** (`20260812000100`) + `verify-coach-roster.mjs`; guard deleted a day later by §8.46 | **§7.137–§7.141** · `WAVE_3_FOLLOWUP_PLAN.md` |
