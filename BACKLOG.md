@@ -1,12 +1,12 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-13 (2nd) — **Wave 5 chunk 2, *Disable a COACH account*, SHIPPED
-and was removed** (`20260813000200`, PRD §4.3 *Disabling a coach*): atomic class
-handover, pure-coach ban, admin-who-coaches keeps their admin half. Its section is
-deleted; the tenant-suspension half it carried is now its own item below (chunk 3 of
-`docs/plans/WAVE_5_PLAN.md`, next up). Earlier same day: chunk 1, *Owner transfer*,
-shipped (`20260813000100`, PRD §4.4) — platform-admin only by decision, covering
-handover and lost-owner alike._
+_Last updated: 2026-08-13 (3rd) — **Wave 5 chunk 3, *Tenant suspension*, SHIPPED and
+was removed** (`20260813000300`, PRD §4.4 *Suspending a business*): staff and parents
+dark, staff logins banned, engine skips the tenant; already-sent invoice links keep
+working by decision. **Wave 5 is COMPLETE.** The parent-account exclusion it carried
+moved to *Deliberately not doing*. Earlier same day: chunk 2, *Disable a COACH account*
+(`20260813000200`, PRD §4.3), and chunk 1, *Owner transfer* (`20260813000100`,
+PRD §4.4)._
 
 _Previously, 2026-08-11 — **Wave 2, *Multiple classes per child*, SHIPPED and was
 removed** (`936e3bd`, live). Its Build-order entry is marked COMPLETE rather than deleted,
@@ -315,8 +315,9 @@ header (`20260812000400`).
     platform-admin only, one path for handover and lost-owner alike.
 13. ~~**Disable a COACH account** (M)~~ — **SHIPPED 2026-08-13** (`20260813000200`,
     PRD §4.3 *Disabling a coach*): atomic handover to a replacement, pure-coach ban.
-14. **Tenant suspension** (M) — the wave's last chunk, fully specified as
-    `docs/plans/WAVE_5_PLAN.md` chunk 3 (its own item below).
+14. ~~**Tenant suspension** (M)~~ — **SHIPPED 2026-08-13** (`20260813000300`, PRD §4.4
+    *Suspending a business*): staff and parents dark, staff banned, engine skips the
+    tenant; already-sent invoice links deliberately keep working. **Wave 5 complete.**
 
 ### Unordered — no dependencies, pick by value
 
@@ -1150,27 +1151,6 @@ gives them its join code, and the child is added there as a new record. History 
 the business that taught it, which is the isolation working correctly. Don't conflate the
 two by making the rescue tool "move everything".
 
-### Tenant suspension — **M** `[handover]`
-Suspend a whole business: its staff and its parents lose the app view of that tenant's
-data, its staff logins are banned, and the invoice engine skips it. **Chunk 3 of
-`docs/plans/WAVE_5_PLAN.md`** — fully specified there, risk-reviewed, decisions settled
-(suspension blocks staff AND parents, per-tenant never account-level; already-sent
-invoice links keep working forever, by decision 8). The coach and admin halves of staff
-disabling both shipped (PRD §4.3); this is the last row of that item's control-levels
-table:
-
-| Disabling… | Who does it | Why there |
-|---|---|---|
-| A whole **tenant** | **Platform admin** | Suspending a business; cascades to its accounts |
-
-**Parent accounts are deliberately excluded from individual disabling**, considered and
-dropped 2026-07-19. Families leaving a business is handled by tenant-level
-active/inactive (`parent_tenants.is_active`), which is the actual common case. The only
-genuine platform-level trigger for a parent is a PDPA consent-withdrawal request — where
-"can't log in, records retained" is right, since IRAS requires ~5 years of financial
-records — and that has never happened. It rides along free once staff disabling exists,
-because the mechanism is identical.
-
 ### Export to Excel / CSV — **S** `[MVP-excluded]` `[Phase 3]`
 Export attendance, invoices, and credit notes from the admin panel.
 
@@ -1538,4 +1518,5 @@ Kept so the reasoning doesn't get re-litigated.
 | **Per-coach / per-tenant timezone (now)** | The invoice engine's billing timezone is a single configurable seam (`APP_TIMEZONE`, default `Asia/Singapore` — `generate-invoices/dates.ts`), and the frontend stays SG-hardcoded. Multi-timezone is a "don't-paint-into-a-corner" concern, **not near-term** (the user's explicit call). Don't build per-tenant TZ or generalize `lessonDates.ts` to multi-TZ before then — true multi-timezone folds into the **tenanted admin accounts** item when that lands. (HANDOVER §8a.) |
 | **Typing `<Thead>`'s children so a `<Tr>` inside it fails typecheck** | Considered 2026-07-26 while fixing the Levels table (`docs/GOTCHAS.md` §7.54) and declined by the user in favour of a call-site scan test. It would be the stronger guard in principle — the mistake becomes unrepresentable rather than merely detected — but React's `children` typing does not express "only these element types" cleanly, so it needs casts or a wrapper at call sites, and it would put a fiddly type on the component that backs **all 14 admin tables**. `components/Table.test.tsx` catches the same mistake in CI, names the file and the exact fix, and risks nothing at runtime. Note the earlier failure this replaces: the previous attempt at prevention was a **docblock asserting the broken form was "unrepresentable"**, which it was not — the lesson is that the guard must be executable, not that it must be a type. |
 | **Any invoice or payment count in the COACH app** | Settled with the user 2026-08-02 while removing the coach's Billing tab. The Today screen carried an "Outstanding" tile counting unpaid invoices across every parent the coach serves, and the obvious repair was to relabel it *Unpaid invoices* and make it tappable. The user rejected the whole category: **a coach does not need to know how many invoices are unpaid — that is an admin-app question.** Since fee-free payment collection shipped (PRD §7.21), everything that makes an invoice actionable — the `INV-YYYY-NNNN` reference, the dynamic QR, the WhatsApp queue, the "parent says paid" badge, the **Claimed** filter — lives on `admin.swimsync.sg`, so a number on the coach's phone can only ever prompt a decision the coach cannot act on well. It was also **not today-scoped and not lesson-shaped** while sitting between "Classes Today" and "Students Today", so it read as a fact about today's lessons. A private coach holds the tenant-admin role anyway and loses nothing. **Don't re-add a count, a badge or a filter here** (PRD §7.9; the prohibition is also a comment in `(coach)/schedule/index.tsx`). |
+| **Individually disabling a PARENT account** | Considered and dropped 2026-07-19, restated when tenant suspension shipped (2026-08-13, the last of the disabling controls). Families leaving a business is handled by tenant-level active/inactive (`parent_tenants.is_active`), which is the actual common case — and a whole business going dark is tenant suspension (PRD §4.4). The only genuine platform-level trigger for a parent is a PDPA consent-withdrawal request — where "can't log in, records retained" is right, since IRAS requires ~5 years of financial records — and that has never happened. If it ever does, the mechanism staff disabling uses (auth ban + read-back) applies unchanged; parents are otherwise **never** auth-banned, because a parent is multi-tenant and a ban is account-level (WAVE_5_PLAN.md decision 5). |
 | **A CI gate on documentation size** (`scripts/check-doc-budget.sh` — byte budget on `HANDOVER.md`, line cap on `CLAUDE.md`, wired into `repo-invariants`) | Built, proven to fail correctly on a one-byte growth, and **reverted the same day** at the user's call (`cb70808` holds it; `6013082` removed it). The case *for* is strong and is recorded in **§7.119**: instruction alone has now failed twice, taking `HANDOVER.md` to 290 KB and then to 91 KB, and the repo already uses exactly this pattern for a rule that kept being forgotten (`check-teardowns.sh`, whose own header says *"A note in a document does not catch that; a failing build does."*). The case *against* won on two counts, both fair: **failing a build on a documentation byte-count is disproportionate** when the same push carries a billing fix, and the ratchet as built was seeded at the file's *exact* current size, so the next session's first legitimate §9 addition would have reddened CI with no headroom at all. What replaced it: the same limits as **countable rules** in `/update-docs` — ledger row ≤200 chars, ≤1 `_Previously,_`, ≤45,000 bytes — measured at the **start** of Step 5 rather than asked as a Final-check question, which is the specific failure the old rule had (five consecutive sessions answered it and waived it). **If `HANDOVER.md` regrows a third time, restore the script from `cb70808` rather than re-wording the rule a fourth time** — that escalation is written into `/update-docs`'s Final check, so it does not depend on anyone remembering this row. |

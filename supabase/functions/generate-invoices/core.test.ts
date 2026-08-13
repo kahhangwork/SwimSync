@@ -171,6 +171,36 @@ Deno.test("auto mode honours the auto_invoice_enabled switch", async () => {
   }
 });
 
+Deno.test("a suspended tenant gets no invoicing — auto AND manual, even forced", async () => {
+  const s = await newScenario({ price: 30, billing: monthEnded("2026-05") });
+  try {
+    const j = await s.addSession("2026-04-03");
+    await s.mark(j, "present");
+    await s.completeMonth("2026-04");
+    // The service-role client passes the tenants guard (it refuses only
+    // current_user = 'authenticated') — same door /api/suspend-tenant's RPC
+    // uses, minus the audit row this test does not need.
+    await s.db
+      .from("tenants")
+      .update({ suspended_at: new Date().toISOString() })
+      .eq("id", s.tenantId);
+
+    for (const args of [
+      { mode: "auto" as const },
+      { mode: "manual" as const, force: true },
+    ]) {
+      const res = await generateInvoices(s.db, {
+        tenant_id: s.tenantId, billing_month: "2026-04", now: s.now, ...args });
+      assertEquals(res.status, "tenant_suspended");
+      assertEquals(res.invoices_created, undefined);
+    }
+    const inv = await getInvoice(s.db, s.parentId, "2026-04");
+    assertEquals(inv, null);
+  } finally {
+    await s.teardown();
+  }
+});
+
 Deno.test("credit note is applied FIFO to the next invoice; invariants hold", async () => {
   const s = await newScenario({ price: 30, billing: monthEnded("2026-06") });
   try {

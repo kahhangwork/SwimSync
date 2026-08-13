@@ -60,6 +60,10 @@ type TenantRow = {
    *  invite was issued — 'none' means the business is live and joinable with
    *  nobody able to operate it, which is a fault, not a blank. */
   admin_status: "none" | "invited" | "active";
+  /** NULL = operating. Set = the platform kill switch is on: staff and
+   *  parents dark, staff logins banned, engine skipping the tenant
+   *  (WAVE_5_PLAN.md chunk 3). */
+  suspended_at: string | null;
 };
 
 // One row of platform_tenant_admins() — the Change-owner dropdown feed.
@@ -339,6 +343,46 @@ export default function PlatformPage() {
       `${ownerModal.tenantName} is now owned by ${chosen?.email ?? "the selected admin"}.`
     );
     closeOwnerModal();
+    await loadTenants();
+  }
+
+  // ── Suspending / unsuspending a business ──────────────────────────────────
+  // Platform-admin only. The RPC is the boundary; the API route adds the
+  // staff auth-layer ban (parents are never banned — decision 5). The confirm
+  // dialog carries accepted consequence 1's exact shape: the app goes dark,
+  // already-sent invoice links keep working (decision 8).
+  const [suspendModal, setSuspendModal] = useState<{
+    tenantId: string;
+    tenantName: string;
+    suspended: boolean;
+  } | null>(null);
+  const [suspendBusy, setSuspendBusy] = useState(false);
+  const [suspendError, setSuspendError] = useState<string | null>(null);
+
+  async function toggleSuspend() {
+    if (!suspendModal) return;
+    setSuspendBusy(true);
+    setSuspendError(null);
+    const path = suspendModal.suspended
+      ? "/api/unsuspend-tenant"
+      : "/api/suspend-tenant";
+    const { res, json } = await postAs(path, {
+      tenantId: suspendModal.tenantId,
+    });
+    setSuspendBusy(false);
+    if (!res.ok) {
+      // A 500 here means the RPC half landed but a ban/unban miss remains —
+      // the message names the accounts and says to press again. Keep the
+      // modal open: the button IS the retry path.
+      setSuspendError(json.error ?? "Something went wrong — press again.");
+      return;
+    }
+    setMessage(
+      suspendModal.suspended
+        ? `${suspendModal.tenantName} is operating again — staff logins restored (individually disabled staff stay disabled).`
+        : `${suspendModal.tenantName} is suspended — its app is dark and staff logins are blocked.`
+    );
+    setSuspendModal(null);
     await loadTenants();
   }
 
@@ -721,7 +765,28 @@ export default function PlatformPage() {
             )}
             {visibleTenants.map((t) => (
               <Tr key={t.tenant_id}>
-                <Td>{t.display_name}</Td>
+                <Td>
+                  <div className="flex items-center gap-2">
+                    <span>{t.display_name}</span>
+                    {t.suspended_at && (
+                      <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-red-700">
+                        suspended
+                      </span>
+                    )}
+                    <button
+                      onClick={() =>
+                        setSuspendModal({
+                          tenantId: t.tenant_id,
+                          tenantName: t.display_name,
+                          suspended: t.suspended_at !== null,
+                        })
+                      }
+                      className="text-xs font-medium text-sky-600 hover:text-sky-700"
+                    >
+                      {t.suspended_at ? "Unsuspend" : "Suspend"}
+                    </button>
+                  </div>
+                </Td>
                 <Td>
                   {/* A business with NO admin is the bad intermediate state of
                       provisioning: its join code works, so parents can join it,
@@ -910,6 +975,69 @@ export default function PlatformPage() {
             </button>
             <button
               onClick={closeOwnerModal}
+              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </Modal>
+
+        <Modal
+          title={
+            suspendModal?.suspended
+              ? `Unsuspend ${suspendModal?.tenantName ?? ""}?`
+              : `Suspend ${suspendModal?.tenantName ?? ""}?`
+          }
+          open={suspendModal !== null}
+          onClose={() => setSuspendModal(null)}
+        >
+          {suspendModal?.suspended ? (
+            <p className="mb-4 text-sm text-gray-700">
+              Staff logins come back and the app lights up again for this
+              business&apos;s families. Staff who were individually disabled
+              before the suspension stay disabled.
+            </p>
+          ) : (
+            /* Accepted consequence 1's exact shape (WAVE_5_PLAN.md): the
+               outstanding-receivables position is the owner's problem BEFORE
+               suspension, and the dialog says so out loud. */
+            <p className="mb-4 text-sm text-gray-700">
+              The app goes dark for this business&apos;s staff and families:
+              staff logins are blocked, parents stop seeing this
+              business&apos;s data (a family with another business keeps that
+              one), and no new invoices are generated.{" "}
+              <span className="font-medium">
+                Already-sent invoice links keep working
+              </span>{" "}
+              — settling outstanding invoices before suspending is the
+              owner&apos;s responsibility.
+            </p>
+          )}
+          {suspendError && (
+            <p className="mb-3 text-sm font-medium text-red-600">
+              {suspendError}
+            </p>
+          )}
+          <div className="flex gap-3">
+            <button
+              onClick={toggleSuspend}
+              disabled={suspendBusy}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${
+                suspendModal?.suspended
+                  ? "bg-sky-500 hover:bg-sky-600"
+                  : "bg-red-600 hover:bg-red-700"
+              }`}
+            >
+              {suspendBusy
+                ? suspendModal?.suspended
+                  ? "Unsuspending…"
+                  : "Suspending…"
+                : suspendModal?.suspended
+                  ? "Unsuspend this business"
+                  : "Suspend this business"}
+            </button>
+            <button
+              onClick={() => setSuspendModal(null)}
               className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
             >
               Cancel

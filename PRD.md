@@ -362,6 +362,22 @@ support rather than daily operation.
   owner stays on as a co-admin; everything keyed on the owner column — the overview's
   Admin cell, the onboarding-invite resend — follows automatically. Audited as an
   `owner_reassigned` row naming both parties.
+- **Suspend a business** *(implemented 2026-08-13)* — the platform kill switch, from the
+  same Businesses table, with a confirm dialog and a red **suspended** badge. Suspension
+  is **per-tenant, never account-level**: the business's staff lose all authority
+  instantly (RLS-level) and their logins are banned; its **parents lose the app view of
+  that business's data** — children, classes, attendance, invoices, packages, claims —
+  while a family with children at another business keeps that one untouched, and
+  **parents are never banned**. The engine generates no new invoices for a suspended
+  tenant (auto and manual alike), its join code stops working — including for a
+  formerly-active family rejoining, refused with the same wording as an unknown code —
+  and the platform admin keeps full read access and the only unsuspend button.
+  **Already-sent invoice links keep working, indefinitely and deliberately**: the
+  invoice token is the access control and money can still come in on outstanding bills;
+  settling receivables before suspension is the owner's responsibility (the confirm
+  dialog says so). Unsuspending restores staff logins **except accounts individually
+  disabled beforehand** — a deactivated admin or disabled coach stays dead. Audited as
+  `tenant_suspended` / `tenant_unsuspended` rows.
 - Has **no** invoice-generation or payroll controls of their own: those run for one
   business at a time and are the tenant admin's
 

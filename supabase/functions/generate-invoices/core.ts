@@ -274,9 +274,23 @@ async function generateForTenant(
   // school changing its run day changed everyone's.
   const { data: tenantRow } = await supabase
     .from("tenants")
-    .select("auto_invoice_enabled, invoice_run_day")
+    .select("auto_invoice_enabled, invoice_run_day, suspended_at")
     .eq("id", tenantId)
     .maybeSingle();
+
+  // A suspended tenant gets no new invoicing at all — auto AND manual
+  // (WAVE_5_PLAN.md chunk 3, decision 6). Existing receivables were the
+  // owner's problem before suspension; already-sent public-invoice links
+  // keep working (decision 8).
+  if (tenantRow?.suspended_at) {
+    return {
+      tenant_id: tenantId,
+      billing_month: billingMonth,
+      status: "tenant_suspended",
+      message:
+        "This business is suspended. No invoices are generated while it is suspended.",
+    };
+  }
 
   if (mode === "auto") {
     const enabled = tenantRow?.auto_invoice_enabled !== false;
