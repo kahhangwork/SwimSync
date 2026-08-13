@@ -513,19 +513,17 @@ export default function AdminsPage() {
             <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-800">
               <p className="font-semibold mb-1">This cannot be undone.</p>
               <p className="mb-2">
-                The account is permanently deleted, and{" "}
-                <strong>
-                  every audit-log entry recorded by this admin is removed with
-                  it
-                </strong>
-                . If they have recorded any work (students added, invoices
-                confirmed, bookings made), deletion is refused — deactivate
-                them instead.
+                The account is permanently deleted. Deletion is{" "}
+                <strong>refused for an admin who has any history</strong> — a
+                student edited, work recorded, anything they did that was
+                written to the audit trail. The audit trail is never destroyed
+                to make a deletion possible.
               </p>
               <p>
-                If you only want to revoke their access, use{" "}
-                <strong>Deactivate</strong> — it keeps the history and can be
-                reversed.
+                In practice that means most admins cannot be deleted, and{" "}
+                <strong>Deactivate</strong> is the route: it revokes their
+                access immediately, keeps the record of what they did, and can
+                be reversed.
               </p>
             </div>
           )}

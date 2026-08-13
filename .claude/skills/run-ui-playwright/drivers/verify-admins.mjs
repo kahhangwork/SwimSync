@@ -16,6 +16,8 @@
 //   adminpure@swimsync.test    pure co-admin (deactivate must BAN)
 //   admincoach@swimsync.test   coach-admin (deactivate must NOT ban → suspension screen)
 //   admindelete@swimsync.test  pure, unreferenced — the typed-DELETE target
+//   adminhistory@swimsync.test pure, but an audit row names them ACTOR — the
+//                              REFUSED delete (20260813000400). Survives the run.
 //   gatecoach@swimsync.test    plain coach — the role gate's persona
 
 import os from "node:os";
@@ -149,8 +151,14 @@ const confirmBtn = page.getByText("Delete account", { exact: true });
 check("the delete button is dead until the word is typed",
   await confirmBtn.isDisabled());
 body = await page.evaluate(() => document.body.innerText);
-check("the modal warns about the audit-log purge",
-  body.includes("audit-log") && body.includes("cannot be undone"));
+// Re-pointed at the NEW guarantee by 20260813000400. This used to assert the
+// modal warned about the "audit-log" purge — that copy was correct until the
+// purge was removed, and the assertion would have failed the nightly on the
+// change that made it false. It is re-pointed rather than softened: an empty
+// or generic modal must still fail this driver.
+check("the modal says the audit trail refuses the delete, not that it is purged",
+  body.includes("refused") && body.includes("audit trail") &&
+  body.includes("cannot be undone"));
 
 await page.getByPlaceholder("DELETE").fill("DELETE");
 await confirmBtn.click();
@@ -162,6 +170,47 @@ await page.screenshot({ path: shot("06-deleted.png"), fullPage: true });
 
 check("the deleted admin's login is dead",
   !(await loginSticks("admindelete@swimsync.test")));
+
+// ── 8b. The OTHER half of delete: an admin with history is REFUSED ─────────
+// 20260813000400. Everything above this line exercises the profile that never
+// acted, which is the only profile the hard delete can still reach — so on its
+// own it says nothing about the change that made history load-bearing. This
+// block is the browser half of pgTAP checks 30-32, and it also covers the two
+// things pgTAP cannot see: that the refusal message travels intact through
+// delete-admin/route.ts into the modal, and that the compensating unban leaves
+// the account WORKING rather than stranded banned.
+await freshLogin("coach@swimsync.test");
+await page.goto(`${ADMIN}/admins`, { waitUntil: "networkidle" });
+await page.waitForTimeout(1500);
+await row("adminhistory@swimsync.test")
+  .getByRole("button", { name: "Delete", exact: true })
+  .click();
+await page.waitForTimeout(800);
+await page.getByPlaceholder("DELETE").fill("DELETE");
+await page.getByText("Delete account", { exact: true }).click();
+await page.waitForTimeout(3000);
+
+body = await page.evaluate(() => document.body.innerText);
+// The RISK 11 wording: a sentence, not "audit_log.actor_id". The owner reads
+// this, and after 20260813000400 it is the COMMON outcome, not a rare one.
+check("the refusal names history in words, not a table name",
+  body.includes("history recorded against their account") &&
+  !body.includes("audit_log.actor_id"),
+  body.slice(0, 300));
+
+await page.keyboard.press("Escape");
+await page.waitForTimeout(500);
+await page.goto(`${ADMIN}/admins`, { waitUntil: "networkidle" });
+await page.waitForTimeout(1500);
+body = await page.evaluate(() => document.body.innerText);
+check("the refused admin is STILL on the roster",
+  body.includes("adminhistory@swimsync.test"));
+
+// The compensation, which is the half a refusal could silently get wrong: the
+// route bans BEFORE calling the RPC, so a refused delete that forgot to unban
+// would leave a working admin locked out with no screen saying so.
+check("a refused delete leaves the account able to sign in",
+  await loginSticks("adminhistory@swimsync.test"));
 
 // ── 9. The role gate: a plain coach is refused at the DOOR ──────────────────
 // The login page signs a coach straight back out (and RequiresTenant repeats

@@ -53,5 +53,30 @@ INSERT INTO auth.users (
    crypt('password123', gen_salt('bf')), NOW(),
    '{"provider":"email","providers":["email"]}',
    '{"full_name":"Gate Coach","role":"coach","tenant_id":"70000000-0000-0000-0000-000000000001"}',
+   NOW(), NOW(), '', '', '', ''),
+  -- The one with HISTORY: pure admin, identical in every respect to a003
+  -- except that an audit row names them as ACTOR. Since 20260813000400 that
+  -- alone refuses the hard delete, and this persona exists because without it
+  -- BOTH suites covering admin deletion exercised only the profile that had
+  -- never acted — so the change that made the refusal real would have passed
+  -- them while proving nothing about the product.
+  ('00000000-0000-0000-0000-000000000000',
+   'ad100000-0000-0000-0000-00000000a005',
+   'authenticated', 'authenticated', 'adminhistory@swimsync.test',
+   crypt('password123', gen_salt('bf')), NOW(),
+   '{"provider":"email","providers":["email"]}',
+   '{"full_name":"Historic Admin","role":"tenant_admin","tenant_id":"70000000-0000-0000-0000-000000000001"}',
    NOW(), NOW(), '', '', '', '')
+ON CONFLICT (id) DO NOTHING;
+
+-- The history itself. entity_type 'Profile' so audit_log_tenant_of() can derive
+-- the tenant from the subject row (it must resolve, or the insert raises).
+-- A FIXED id, because this fixture must be idempotent while audit_log.id
+-- defaults to a fresh uuid — re-running would otherwise stack duplicates and
+-- the teardown's count assertion would stop meaning anything.
+INSERT INTO audit_log (id, actor_id, action, entity_type, entity_id)
+VALUES ('ad100000-0000-0000-0000-00000000ac01',
+        'ad100000-0000-0000-0000-00000000a005',
+        'driver_seed_history', 'Profile',
+        'ad100000-0000-0000-0000-00000000a005')
 ON CONFLICT (id) DO NOTHING;

@@ -25,7 +25,12 @@ SELECT unnest(ARRAY[
   'ad100000-0000-0000-0000-00000000a001',
   'ad100000-0000-0000-0000-00000000a002',
   'ad100000-0000-0000-0000-00000000a003',
-  'ad100000-0000-0000-0000-00000000a004'
+  'ad100000-0000-0000-0000-00000000a004',
+  -- a005 SURVIVES the driver by design: it is the persona whose delete is
+  -- REFUSED, so unlike a003 its profile is still here at teardown — and so is
+  -- the seeded audit row that caused the refusal, which the actor_id arm below
+  -- removes before auth.users goes.
+  'ad100000-0000-0000-0000-00000000a005'
 ]::uuid[]) AS id
 UNION
 SELECT id FROM profiles WHERE email = 'driver-invited@swimsync.test';
