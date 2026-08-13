@@ -2515,3 +2515,63 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       probe proves nothing.
     - **The rule both bugs share: pin the refusal MESSAGE, not just `P0001`** (the
       owner-transfer suite's post-review lesson, now with two more ways to be wrong).
+
+148. **THE PARENT SIDE HAS NO SINGLE CHOKE POINT, AND A TEXT GREP UNDER-COUNTS IT TWO
+    WAYS.** Found executing Wave 5 chunk 3 (2026-08-13): the plan's own risk review had
+    already raised the first draft's "4 parent paths" to "≥12"; the live enumeration
+    found **21 policy arms plus 2 RPC gates**, and then review found a whole fourth
+    family the grep could never see.
+    - **Enumerate from `pg_policies` on the LIVE database, never from migration files** —
+      policies are recreated over time and grep finds every historical copy plus zero
+      proof of which is current (`20260804000500` had silently *removed* one of the
+      paths the plan told chunk 3 to fix).
+    - **A grep for `current_parent_id` misses arms composed through OTHER helpers.**
+      `parent_in_tenant()` resolves `current_parent_id()` *internally*, so seven policy
+      arms and two RPC gates (`add_child_or_claim`, `find_student_candidates` — a
+      suspended tenant's parent could still CREATE a student) matched nothing. After the
+      policy enumeration, ask which *helpers* are parent-only by construction and audit
+      their callers (`pg_get_functiondef` over every function whose body names them).
+    - The full working method and the arm-by-arm matrix live in
+      `supabase/tests/tenant_suspension.test.sql` — the test list IS the enumeration; a
+      missed arm fails silent.
+
+149. **INSIDE A POLICY OR AN INVOKER-RIGHTS TRIGGER, EVERY SUBQUERY RUNS UNDER THE
+    CALLER'S OWN RLS — AND A ROW YOUR OWN CHANGE JUST HID READS AS NULL, WHICH CAN PASS
+    THE CHECK.** Two faces, both hit on 2026-08-13:
+    - `parent_students_select`'s first draft judged suspension via
+      `(SELECT s.tenant_id FROM students s WHERE s.id = student_id)`. Post-suspension
+      the caller's own `students_select` hides that row, the subselect returns NULL,
+      `tenant_suspended(NULL)` is deliberately FALSE (fail-open for legacy rows), and
+      **the arm PASSES — the policy defeated by the sibling policy it shipped with.**
+      Caught by the suite's own dark-matrix case; fixed by delegating the arm to a
+      `SECURITY DEFINER` helper (`parent_owns_student()`), which is the general fix:
+      **a policy arm that needs a fact from another RLS'd table must get it through a
+      DEFINER helper, never an inline subselect.**
+    - The same blindness moves REFUSALS to surprising places: `parent_packages`'
+      invoker-rights lifecycle trigger could no longer *see* the suspended tenant's
+      product, so the insert died on `Unknown package product` (23514) **before** the
+      WITH CHECK's 42501 was ever reached. Harmless here (both walls are
+      suspension-driven) but pin the error you actually get, and re-ask which wall fired
+      whenever an RLS cut lands near an invoker trigger.
+
+150. **A FUNCTION WHOSE RETURN TYPE MUST CHANGE CANNOT GO THROUGH `CREATE OR REPLACE` —
+    IT MUST BE DROPPED, AND THE DROP DESTROYS ITS GRANTS *AND ITS COMMENT*.** Hit by
+    `platform_tenant_overview()` gaining `suspended_at` (2026-08-13). Restate the full
+    grant triple **adjacent to the DROP in the same migration** — post-`20260804000400`
+    default privileges mean a forgotten regrant fails CLOSED (the page errors rather
+    than leaks), but a broken platform page is still broken, silently, for the one
+    admin who uses it. `COMMENT ON FUNCTION` needs restating too. The post-deploy grant
+    dump (§7.39) is the proof; chunk 3's came back exactly `REVOKE PUBLIC` + `GRANT
+    authenticated`.
+
+151. **CUTTING AN IDENTITY HELPER DOES NOT CUT THE MEMBERSHIP-SCOPED ARMS — the
+    `current_tenant_id()` residue is ACCEPTED, TWICE, and the auth-layer ban is the
+    enforcement.** A disabled coach (`20260813000200`) and a suspended tenant's staff
+    (`20260813000300`) both keep every `tenant_id = current_tenant_id()` read for the
+    lifetime of their current token: that helper reads `profiles.tenant_id`, which no
+    disable touches. Closing it for real is one clause in `current_tenant_id()`, but its
+    call sites include audit stamping (`20260804000300`) and were deliberately not
+    audited in Wave 5 — a future decision, not an oversight. **Both pgTAP suites pin the
+    residue as EXPECTED** ("still passes a `current_tenant_id()` read = TRUE — accepted,
+    token-lifetime, ban enforces") so a future session finds a documented decision, not
+    a leak. Don't "fix" it by editing the helper without auditing those call sites.

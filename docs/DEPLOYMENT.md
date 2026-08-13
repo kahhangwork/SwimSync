@@ -319,3 +319,24 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     **Serve-check:** the Coaches page renders the Disable button on load (not
     interaction-only, unlike item 12), so the user opening the live page and seeing the
     button IS the check — they did, 2026-08-13.
+
+14. **Wave 5 chunk 3 deploy record (2026-08-13): tenant suspension — the wave's widest
+    blast radius, and the full §7.60 order (migrations → engine → apps) for the first
+    time since Wave 4.** `20260813000300` (`9e5b82a`) landed on `main` alone; the
+    sandbox again blocked `db push` (item 13's situation), the user ran it via `!`; the
+    `pgdelta` stack trace printed for the **eighth** time (normal); `migration list
+    --linked` remote filled, 0 pending. **Grant dump — the load-bearing check of the
+    wave** (§7.150: the overview's return-type change forced a DROP+regrant): `anon`
+    EXECUTE still **18**; all four functions (`tenant_suspended`, `suspend_tenant`,
+    `unsuspend_tenant`, `platform_tenant_overview`) exactly `REVOKE PUBLIC` + `GRANT
+    authenticated`, no `service_role` line. Then `supabase functions deploy
+    generate-invoices` → **v21 ACTIVE** (confirmed by `functions list`, never assumed);
+    then the app commit (`9c1279c`, with PRD/BACKLOG in the same push) → `main`.
+    Rollback `supabase/rollback/20260813_tenant_suspension_DOWN.sql` — the widest of
+    the wave (15 policies, 7 function bodies, the overview WITH its grants and comment)
+    — committed before the deploy, rehearsed both directions (DOWN → 835 green →
+    re-apply → 923 green). **Serve-check:** the Platform page is interaction-only for
+    everyone but the platform admin (item 12's shape) — the check is the user opening
+    `admin.swimsync.sg/platform` and seeing the Suspend action beside each business.
+    No production tenant is suspended and none should be: the deploy's correct visible
+    effect is two dormant buttons.

@@ -221,7 +221,18 @@ the column.
 
 ---
 
-## Chunk 3 — Tenant suspension (M — up to two sessions; the widest blast radius in the wave)
+## Chunk 3 — Tenant suspension (M — up to two sessions; the widest blast radius in the wave) — ✅ SHIPPED 2026-08-13 (§8.51, `20260813000300`)
+
+> **Executed with four deviations, all recorded:** (1) ⚠ RISK 2 (review)'s
+> `parent_tenants_insert` edit was moot — `20260804000500` had already dropped the policy
+> and revoked INSERT; the suite pins the absence instead. (2) The live enumeration found
+> THREE more direct arms than step 4's list (`package_applications_select`,
+> `parent_packages_insert`, `parent_students_select`) plus the `students` `created_by`
+> arm — all cut. (3) Review found a FOURTH parent choke point the grep could not see:
+> `parent_in_tenant()`, gating `add_child_or_claim`/`find_student_candidates` and seven
+> more read arms (§7.148). (4) `parent_students_select`'s per-student check must go
+> through `parent_owns_student()`, not an inline subselect — the caller's own RLS blinds
+> it (§7.149).
 
 **Migration `db/tenant-suspension`, one file:**
 

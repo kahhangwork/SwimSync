@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.49** | 2026-08-13 | **Wave 5 chunk 1** (`20260813000100`): owner transfer, platform-admin only | PRD §4.4 · `docs/DEPLOYMENT.md` §11.12 · `docs/plans/WAVE_5_PLAN.md` |
 | **8.48** | 2026-08-12 | **Wave 4** (`20260812000400`): sealed-month unbilled lessons reported + settled | PRD §7.17 · `docs/DEPLOYMENT.md` §11.11 · `docs/TESTING.md` §5 |
 | **8.47** | 2026-08-12 | **The shim drop** (`20260812000300`): 4-arg `assign_session_coach` + enum gone, on schedule | `docs/DEPLOYMENT.md` §11.10 · §8.46 |
 | **8.46** | 2026-08-12 | **Class-level shadow coaches** (`20260812000200`), LIVE; subs stay per-lesson | **§7.143–§7.146** · `docs/ARCHITECTURE.md` §6z · `CLASS_SHADOW_COACHES_PLAN.md` |

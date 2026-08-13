@@ -1,11 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-13 (2nd) — **Wave 5 chunk 2 SHIPPED, LIVE** (§8.50): disable a
-coach — `20260813000200` + the Coaches-page dialog; atomic class handover, pure-coach
-ban. Chunk 3 (tenant suspension) is next, from `docs/plans/WAVE_5_PLAN.md`._
+_Last updated: 2026-08-13 (3rd) — **Wave 5 chunk 3 SHIPPED, LIVE — the WAVE is COMPLETE**
+(§8.51): tenant suspension — `20260813000300` + engine v21 + the Platform-page
+Suspend/Unsuspend, deployed migrations → engine → apps (§7.60). §11.14._
 
-_Previously, 2026-08-13 — **Wave 5 chunk 1 SHIPPED, LIVE** (§8.49): owner transfer,
-platform-admin only — `20260813000100` + the Platform-page Change-owner modal._
+_Previously, 2026-08-13 (2nd) — **Wave 5 chunk 2 SHIPPED, LIVE** (§8.50): disable a
+coach — `20260813000200` + the Coaches-page dialog; atomic handover, pure-coach ban._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -141,8 +141,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | An unmarked GUEST holds the month open; nothing new enters a retired class | pgTAP + Deno, LIVE 2026-08-10 | PRD §7.3 · §8.40 |
 | **A child can attend MORE THAN ONE class a week** | pgTAP + vitest + jest + 17-check driver, LIVE 2026-08-11 | PRD §7.4, §7.20 · §8.43 |
 | **A substitute is per-LESSON; a SHADOW is per-CLASS — dated, paid its own shadow rate** | pgTAP 49 + 9 + vitest + jest + **30-check driver**, LIVE 2026-08-12 | PRD §7.13, §7.6 · `docs/ARCHITECTURE.md` §6z · §8.46 |
-| **A business's owner can be REASSIGNED — platform admin only, no self-service** | pgTAP 27 + UI drive + live serve-check, LIVE 2026-08-13 | PRD §4.4 · §8.49 |
-| **A coach can be DISABLED — atomic class handover, pure-coach ban; reactivation hands nothing back** | pgTAP 55 + vitest + 13-check driver, LIVE 2026-08-13 | PRD §4.3 · §8.50 |
+| **Wave 5, admin authority — owner REASSIGNED (platform-only) · coach DISABLED (atomic handover, pure-coach ban) · tenant SUSPENDED (staff+parents dark, staff banned, engine skips; already-sent invoice links deliberately keep working)** | pgTAP 27+55+88 + vitest + 3 drivers, LIVE 2026-08-13 | PRD §4.3, §4.4 · §8.49–8.51 |
 | Automated tests — pgTAP + Deno backend, vitest + jest-expo apps, all in CI on push | CI | `docs/TESTING.md` §5 |
 
 **Counts are deliberately not written here.** The runner is the fact; a number in prose is
@@ -175,14 +174,13 @@ is a guard whose first real firing is still ahead of you.
   on real data (every July invoice is Paid; nothing has been recorded into July since it
   was billed). That is the expected state: its first real firing is a backdated
   enrolment, a backdated make-up/trial, or an absent→present edit after billing.
-- **Owner transfer** — production's one business has a single admin (the owner), so the
-  Change-owner dropdown correctly offers no selectable target and no transfer has ever run
-  on real data. Same shape as the empty shadow dropdown (§7.131) — **don't rediscover it
-  as a bug**. It becomes real the day a co-admin is invited.
-- **Coach disable** — production's sole coach IS the owner, so the headline path is
-  refused by its own sole-owner guard, and the dialog's replacement dropdown is correctly
-  empty ("no other active coach"). §7.131's shape again — **don't rediscover either as a
-  bug**. Real the day a second coach is hired; no disable has ever run on real data.
+- **The Wave 5 controls — none has ever run on real data, and each is dormant for its
+  own CORRECT reason** (§7.131's shape throughout — don't rediscover any as a bug):
+  owner transfer's dropdown offers no target (one admin, the owner); coach disable is
+  refused by its own sole-owner guard (the only coach IS the owner, replacement dropdown
+  correctly empty); tenant suspension has suspended nothing and **should stay that way**
+  — its correct production state is two dormant buttons on the Platform page. Real the
+  day a co-admin or second coach exists.
 - **Multiple classes per child** — no production child holds two enrolments yet, so neither
   schedule guard has ever refused anything real and no admin has pressed *+ Add class*. The
   first real one is worth watching: it is also the first time `'mixed'` package coverage
@@ -362,6 +360,33 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.51 (2026-08-13, 3rd) — WAVE 5 CHUNK 3: THE PLATFORM KILL SWITCH — AND THE WAVE IS DONE
+
+**Shipped and LIVE through the full §7.60 order (migrations → engine → apps)** —
+`20260813000300` (the `tenant_suspended()` predicate; staff cut at `is_tenant_admin()` +
+`current_coach_id()`; parents cut at **four** choke points + 15 direct policy arms; the
+rejoin and claim gates; platform-only suspend/unsuspend RPCs; the overview's
+DROP+regrant), then engine **v21** (suspended tenants get no invoicing, auto AND forced
+manual), then the Platform-page Suspend/Unsuspend with the staff ban/unban routes.
+Spec: **PRD §4.4 → *Suspend a business***. Deploy record: **`docs/DEPLOYMENT.md`
+§11.14**. Suites: `docs/TESTING.md` §5. New gotchas: **§7.148–151**. The plan executed
+with four recorded deviations — see the chunk 3 header in `docs/plans/WAVE_5_PLAN.md`.
+
+**The review's two major finds, both fixed before commit and sabotage-proven:**
+`parent_in_tenant()` uncut (a suspended tenant's parent could still CREATE a student —
+§7.148) and an RLS-blind inline subselect in `parent_students_select` (§7.149, found red
+by the suite's own dark matrix).
+
+**Verified:** pgTAP **923** (+88, proven red by TEN measured sabotages, header-recorded)
+· Deno 140 ×2 (+1, proven red) · vitest 317 (+6, proven red 3/6) · typecheck both apps ·
+new driver `verify-tenant-suspension` **12/12** across BOTH apps (the bulk ban/unban and
+⚠ RISK 3 in a real browser) · fixture round-trip 24/24 · rollback rehearsed both
+directions (835 after DOWN, 923 after re-apply) · post-deploy grant dump clean (`anon`
+EXECUTE still 18, the overview's regrant landed) · CI green ×2 · the user's live
+serve-check is the one open item — §9.
+
+---
+
 ## 8.50 (2026-08-13, 2nd) — WAVE 5 CHUNK 2: A LEAVING COACH IS ONE DIALOG, NOT A BAD AFTERNOON
 
 **Shipped and LIVE, migration-first (§11.9)** — `20260813000200` (`coaches.disabled_at`,
@@ -380,28 +405,6 @@ vitest 311 (+7, proven red twice) · typecheck · new driver `verify-coach-disab
 **13/13** across BOTH apps (the ban half in a real browser) · fixture round-trip 23/23 ·
 rollback rehearsed both directions · post-deploy grant dump clean (`anon` EXECUTE
 still 18) · CI green ×2 · live serve-check by the user (the Disable button seen rendering).
-
----
-
-## 8.49 (2026-08-13) — WAVE 5 CHUNK 1: A LOST OWNER IS NO LONGER A DATABASE-CONSOLE JOB
-
-**Shipped and LIVE, migration-first (§11.9)** — `20260813000100`
-(`platform_reassign_owner`, `platform_tenant_admins`, the audit `'Tenant'` arm), then the
-Platform-page Change-owner modal. **Platform-admin ONLY, by decision — no self-service
-path exists**; one path covers the handover and the lost-owner case alike. Spec:
-**PRD §4.4**. Deploy record — including the serve-check for interaction-only admin UI —
-**`docs/DEPLOYMENT.md` §11.12**. Suite coverage: `docs/TESTING.md` §5.
-
-**The session's other artifact is the Wave 5 plan itself** —
-`docs/plans/WAVE_5_PLAN.md`, risk-reviewed by an independent agent that proved the
-draft's parent-enforcement list FALSE (4 claimed paths; ≥12 real) among ten verified
-findings. The mitigations are inlined in the plan as ⚠ steps/assertions/prohibitions;
-chunks 2 (disable a coach) and 3 (tenant suspension) execute from there.
-
-**Verified:** pgTAP **780** (+27, proven red by 4 measured sabotages, refusal messages
-pinned) · vitest 304 · typecheck · 6-check UI drive · rollback rehearsed, restored body
-byte-identical · post-deploy grant dump clean (`anon` EXECUTE still 18) · CI green ×2 ·
-live serve-check by the user (the modal's RPC seen returning 200 on production).
 
 ---
 
@@ -453,14 +456,15 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### The sweep is green — tonight is the first to see BOTH chunk 1 and chunk 2
+### The sweep — tonight is the first to see ALL THREE Wave 5 chunks
 
-The 2026-08-12 nightly — the first to see Wave 4 and `verify-orphan-report` — **passed**
-(`31639739503`, success). **Tonight's is the first to see the Change-owner UI, the
-Coaches-page Disable/Reactivate buttons, AND the new `verify-coach-disable` driver's
-first sweep.** If `platform-admin-scope` reddens the suspect is `abc4956`; if anything
-asserting on the Coaches page (or the new driver itself) reddens, the suspect is
-`f5d91aa` — but read the triage rules below first.
+**Tonight's nightly is the first to sweep the whole wave**: the Change-owner UI, the
+Coaches-page Disable/Reactivate, the Platform-page Suspend/Unsuspend, and the FIRST runs
+of `verify-coach-disable` AND `verify-tenant-suspension` (auto-discovered by glob —
+nothing was wired). If `platform-admin-scope` or anything on the Platform page reddens,
+the suspect is `9c1279c`; the Coaches page, `f5d91aa` — but read the triage rules below
+first, and note the suspension driver's fixture REFUSES to apply over a still-suspended
+tenant and names its teardown.
 
 > **Re-read the run, not this paragraph.** `gh run list --workflow=ui-drivers.yml` and the
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
@@ -480,17 +484,16 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE CURRENT BUILD — Wave 5, chunks 1–2 of 3 done
+### THE CURRENT BUILD — Wave 5 is COMPLETE; the build order is spent
 
-**Chunk 1 (owner transfer, §8.49) and chunk 2 (disable a coach, §8.50) both shipped
-2026-08-13.** **Next: chunk 3 (tenant suspension)** — fully specified in
-**`docs/plans/WAVE_5_PLAN.md`**, risk-reviewed with mitigations inlined as ⚠ blocks:
-**read those as steps, not commentary** (the plan's own header says why). Chunk 3 is the
-wave's widest blast radius (≥12 parent policy arms — re-derive the list with the plan's
-grep, the test list IS the enumeration) and touches the ENGINE, so its deploy order is
-migrations → engine → apps (§7.60). The plan's pre-commit gate is the checklist to walk
-before `/commit-review`. Waves 1–4 are complete (§8.36–§8.48); their plans are history,
-not queues. **`BACKLOG.md` → `## Build order` governs what comes after Wave 5.**
+**All three chunks shipped 2026-08-13** (§8.49–8.51); Waves 1–5 are done and their plans
+are history, not queues. CI green ×2. **One loose end from chunk 3's ship: the live
+serve-check is the user's** — open `admin.swimsync.sg/platform` and see the Suspend
+action beside each business (§11.14; the correct production state is
+two dormant buttons). **`BACKLOG.md` → `## Build order`'s numbered list is exhausted —
+what remains is the *Unordered* pool and the three small filed items below; the next
+build is a decision to make with the user**, and `/backlog-prioritisation` exists if the
+queue should be re-sequenced first.
 
 **Three small items remain filed rather than fixed**, all in `BACKLOG.md`:
 - *The Attendance page's Coach column can name someone who did not teach* (**S**) — the page an
@@ -531,8 +534,8 @@ function this session touched (`docs/DEPLOYMENT.md` §11.7).
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **The migration queue is EMPTY.** The latest applied is
-`20260813000200` (disable a coach, §8.50); production confirmed caught up 2026-08-13,
-0 pending — and both of the day's deploys followed the ordering gate below
+`20260813000300` (tenant suspension, §8.51); production confirmed caught up 2026-08-13,
+0 pending — and all three of the day's deploys followed the ordering gate below
 deliberately: each migration merged and pushed to `main` ALONE,
 `migration list --linked` checked, and only then did the app commit land. **The rule chunk 1 bought is about ORDER, not
 content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must
