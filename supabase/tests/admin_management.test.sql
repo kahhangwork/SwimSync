@@ -27,8 +27,14 @@
 --      remove_admin_role demotes ONLY coach-admins; prepare_admin_delete
 --      refuses coach-admins and referenced admins via the CATALOGUE-DERIVED
 --      reference map (which must see students.created_by — the reference used
---      here), purges the target's audit rows, and writes an admin_deleted row
---      whose tenant_id proves the audit_log_tenant_of 'Profile' arm.
+--      here), and writes an admin_deleted row whose tenant_id proves the
+--      audit_log_tenant_of 'Profile' arm.
+--      SINCE 20260813000400 IT REFUSES RATHER THAN PURGES: audit_log.actor_id
+--      was the map's one deliberate exclusion, so an admin who had written any
+--      history was hard-deleted and their trail destroyed with them. Checks
+--      30-33 now pin the refusal WITH THE ROW PRESENT, that the row survives,
+--      that the map reports the column, and that a genuinely traceless admin
+--      can still be deleted.
 --   5. anon holds EXECUTE on none of the four RPCs.
 --   6. platform_tenant_overview reports the OWNER column, not the
 --      earliest-created admin.
@@ -53,7 +59,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(38);
+SELECT plan(40);
 
 -- ── Two businesses, an owner, two co-admins, a stranger admin, a parent ──────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -302,30 +308,68 @@ SELECT throws_ok(
   'P0001', NULL,
   'an admin with recorded activity (students.created_by) cannot be deleted');
 
--- 30. Clean, the delete proceeds. Seed one audit row AS the target first, so
---     the purge has something real to purge.
+-- 30. THE AUDIT TRAIL NOW REFUSES THE DELETE — 20260813000400.
+--     Clear the students.created_by reference so it cannot be what refuses,
+--     then seed one audit row AS the target and LEAVE IT THERE. Until this
+--     migration that row was purged; it is now a reference like any other.
+--
+--     ⚠ THE ROW MUST BE PRESENT FOR THIS CHECK. Both suites covering admin
+--     deletion used to exercise the one profile in the world with no history —
+--     pgTAP seeded a row only to watch it die, and verify-admins.mjs deletes a
+--     fixture that is never an actor. A change to what "has recorded activity"
+--     means passed both. Ordering the seed BEFORE the refusal is what makes
+--     this check about the product rather than about an empty table.
 RESET ROLE;
 DELETE FROM students WHERE id = 'ca000000-0000-0000-0000-00000000c001';
 INSERT INTO audit_log (actor_id, action, entity_type, entity_id)
-VALUES ('ca000000-0000-0000-0000-0000000000a2', 'seed_for_purge_test', 'Profile',
+VALUES ('ca000000-0000-0000-0000-0000000000a2', 'seed_for_refusal_test', 'Profile',
         'ca000000-0000-0000-0000-0000000000a3');
+
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" TO '{"sub":"ca000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
+
+--     THE MESSAGE IS PINNED, NOT JUST THE SQLSTATE. §7.147: a gate probe that
+--     throws for a different reason reads as a passing test, and this function
+--     has five other P0001 refusals above it — owner-only, not-an-admin,
+--     self-delete, coach-admin, and the generic recorded-activity arm. Pinning
+--     the audit sentence is what proves WHICH one fired.
+SELECT throws_ok(
+  $$ SELECT prepare_admin_delete('ca000000-0000-0000-0000-0000000000a2') $$,
+  'P0001',
+  'this admin has history recorded against their account and cannot be deleted — deactivate them instead. That revokes their access immediately, and keeps the record of what they did.',
+  'an admin with audit history cannot be deleted — the trail refuses it');
+
+RESET ROLE;
+
+-- 31. And the trail SURVIVED the refusal. The inverse of the check this
+--     replaced, which asserted the rows were gone.
+SELECT is(
+  (SELECT COUNT(*) FROM audit_log
+    WHERE actor_id = 'ca000000-0000-0000-0000-0000000000a2')::int,
+  1, 'the refused admin''s audit rows are still there');
+
+-- 32. The catalogue map reports audit_log.actor_id, which was its one
+--     deliberate exclusion until 20260813000400. Pinned because the map is
+--     derived from pg_constraint and this is the row that makes 30 possible.
+SELECT is(
+  (SELECT COUNT(*) FROM profile_reference_columns()
+    WHERE ref_table = 'public.audit_log'::regclass AND ref_column = 'actor_id')::int,
+  1, 'profile_reference_columns() now sees audit_log.actor_id');
+
+-- 33. A genuinely traceless admin can still be deleted. Remove the seeded row
+--     and the delete proceeds — which keeps the two checks below reachable.
+DELETE FROM audit_log WHERE actor_id = 'ca000000-0000-0000-0000-0000000000a2';
 
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
 
 SELECT lives_ok(
   $$ SELECT prepare_admin_delete('ca000000-0000-0000-0000-0000000000a2') $$,
-  'an unreferenced pure admin can be prepared for deletion');
+  'an admin with no history at all can still be prepared for deletion');
 
 RESET ROLE;
 
--- 31. The purge the UI warned about happened.
-SELECT is(
-  (SELECT COUNT(*) FROM audit_log
-    WHERE actor_id = 'ca000000-0000-0000-0000-0000000000a2')::int,
-  0, 'the deleted admin''s audit rows are purged');
-
--- 32. The deletion itself is on record, attributed to the OWNER, stamped with
+-- 34. The deletion itself is on record, attributed to the OWNER, stamped with
 --     the right business — which proves audit_log_tenant_of's 'Profile' arm.
 SELECT is(
   (SELECT COUNT(*) FROM audit_log
@@ -335,7 +379,7 @@ SELECT is(
       AND tenant_id = 'ca000000-0000-0000-0000-000000000001')::int,
   1, 'the admin_deleted audit row exists, owner-attributed, tenant-stamped');
 
--- 33. The profile itself survives the RPC — deleting the auth user (and the
+-- 35. The profile itself survives the RPC — deleting the auth user (and the
 --     cascade to profiles) is the API route's half, deliberately not done here.
 SELECT is(
   (SELECT COUNT(*) FROM profiles WHERE id = 'ca000000-0000-0000-0000-0000000000a2')::int,
@@ -346,7 +390,7 @@ SELECT is(
 -- ============================================================
 SET LOCAL ROLE anon;
 
--- 34–37.
+-- 36–39.
 SELECT throws_ok(
   $$ SELECT deactivate_admin('ca000000-0000-0000-0000-0000000000a2') $$,
   '42501', NULL, 'anon cannot execute deactivate_admin');
@@ -374,7 +418,7 @@ UPDATE tenants SET owner_profile_id = 'ca000000-0000-0000-0000-0000000000a3'
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"ca000000-0000-0000-0000-0000000000e1","role":"authenticated"}';
 
--- 38.
+-- 40.
 SELECT is(
   (SELECT admin_email FROM platform_tenant_overview()
     WHERE tenant_id = 'ca000000-0000-0000-0000-000000000001'),
