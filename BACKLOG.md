@@ -286,8 +286,11 @@ Wave-3-descended items sat unbuilt further down — the exact drift the ⚠ at t
 section warns about, found by `/session-start` on 2026-08-12. Struck in both places this time.)*
 
 **What is still open from Wave 3:** *The Attendance page's Coach column can name someone who
-did not teach* (**S**), below. It carries a product choice — show the roster main, or show both
-with the cover annotated as Coach Wages does — so it was left rather than guessed.
+did not teach* (**M**), below. The product choice was **settled** 2026-08-13 (name who taught,
+cover chip, shadows on a second line) and it was still deferred — the risk review found the
+fallback reads the wrong AXIS (`classes.coach_id` is mutable and undated; money follows
+`class_rate_on().paid_coach_id`), which re-sized it from S. `docs/plans/SMALL_ITEMS_PLAN.md`
+§B2 holds the mitigations.
 
 _(A third item once sat here — **the attendance screen trusts a `sessionId` in the URL** —
 and shipped 2026-08-10 instead, because the same change removed the caller that passed it.
@@ -333,8 +336,9 @@ copy/templates (S).
   well as attendance saves, every row is tenant-stamped, and the reader is buildable. Two
   things to know before building it: rows written by a backend path carry **no** actor by
   design, so the screen must render "system" rather than blank; and `prepare_admin_delete()`
-  purges a deleted admin's rows, so the history has holes with a known cause — see
-  *Deleting an admin destroys the audit history*.
+  **used to purge** a deleted admin's rows. **Fixed 2026-08-13 (`20260813000400`): the delete
+  is REFUSED instead**, so the trail no longer has holes from that cause — an admin with any
+  history can only be deactivated. Older holes predating that migration are permanent.
 - **Convert a trial into an enrolled student** (S) and **Book a make-up from the
   Attendance page** (S) — were held until Wave 2, which changed what an enrolment is.
   **Wave 2 shipped 2026-08-11, so both are unblocked.** Note for the make-up one: the
@@ -657,16 +661,53 @@ itself, and by `set_class_terms()` in the other direction. PRD §7.13, §7.6.
 that could create the state. Removing the state removed the guard too — `20260812000100`, one day
 old, was deleted whole along with its 16 pgTAP checks.
 
-### The Attendance page's Coach column can name someone who did not teach — **S** `[found 2026-08-11]`
+### The Attendance page's Coach column can name someone who did not teach — **M** `[found 2026-08-11]` `[re-sized 2026-08-13]`
 `SwimSyncAdmin/app/(admin)/attendance/page.tsx:162` reads the **class's** coach, so a covered
 lesson shows the wrong name.
 
 **Why:** it is the read-only audit page an admin opens when wages look odd — the one place the
 wrong name is most likely to be believed. Nothing downstream consumes it, so no money moves.
 
-**Notes:** deliberately not fixed in wt-admin: outside its declared scope, and the fix carries
-a product choice (show the roster main, or show both with the cover annotated, as Coach Wages
-now does). Wages is the model to copy.
+**⚠ IT IS TWO BUGS, AND THE SECOND ONE IS THE DANGEROUS ONE. `classes.coach_id` IS THE WRONG
+AXIS, not merely the un-covered one.** Planned and risk-reviewed 2026-08-13, then deferred —
+the review found that the obvious fix ("fall back to the class's coach when no substitute is
+named") is *also* wrong, and this entry did not say so, which is exactly why the first draft
+of the plan picked it. `20260812000200`'s header states the split at lines 23-24 and
+`sessionRoster.ts:16-24` repeats it:
+
+>   ACCESS — the roster + `classes.coach_id` + "am I a shadow TODAY?"
+>   MONEY  — `class_rate_on().paid_coach_id` + "was I a shadow ON THAT DATE?"
+
+`classes.coach_id` is **mutable and undated**. A class handed from A to B on 1 August pays
+every July lesson to A, and the access axis names **B** on all of them — so an admin
+reconciling a July payout reads "B taught it", sees Wages pay A, and "corrects" a correct
+payout. **That is how a display-only change reaches money**, and `20260719000800` exists
+because these two were once one query and handing a class over re-priced its entire unpaid
+history. The fix must resolve the ordinary case through `class_rate_on()`, i.e.
+`coach_attribution_kind()`'s `'terms'` arm verbatim. **The new module must not reference
+`classes.coach_id` at all** — its money-side twin `lib/payoutItems.ts` reads it nowhere.
+
+**Settled with the user 2026-08-13, so do not re-litigate:** the column names **who taught**
+(substitute if one is named, else the dated paid coach), with an amber `Cover` chip, **plus**
+a second line naming any active class shadow.
+
+**Why it is M and no longer S,** all from the same review — full detail, with each mitigation
+written as a step, an assertion or a prohibition, in **`docs/plans/SMALL_ITEMS_PLAN.md` §B2**:
+- **The rule already exists twice** — canonically in `coach_attribution_kind()`, and **inline
+  in `wages/page.tsx:316-388`**. A new module that leaves that loop standing makes **three**
+  disagreeing implementations of who gets paid, which is §7.18's shape and §7.18 cost a live
+  underbill. **Ship the module only if the wages page becomes a caller of it.**
+- **`supabase/config.toml:18` sets `max_rows = 1000`** and PostgREST truncates a bare
+  `.select()` there with no error, while this page's date range defaults to empty. Scope
+  `session_coach_absences` by `.in("coach_id", shadowCoachIds)` — a truncated absence set
+  names a shadow who was recorded absent and was **not paid**.
+- **A swallowed load error must not fall through to the class's coach** — that renders the
+  original bug via a network blip.
+- **The filter and sort are keyed by NAME** (`page.tsx:182`, option value `full_name`), so
+  two coaches sharing one collapse. Re-key to ids before adding a second identity per row.
+- **The invariant that protects production:** with zero `session_coaches` and zero
+  `class_shadow_coaches` rows — production's exact state (§3 DORMANT) — the rendered and
+  filtered rows must be **identical to today's**.
 
 ### ~~A set-returning gate for the coach's roster probes~~ — **SHIPPED 2026-08-12**
 `sessions_i_am_main_on(uuid[]) RETURNS SETOF uuid`, in the same migration as the guard above
@@ -888,7 +929,23 @@ graduated this way on 2026-08-10 (password reset, attendance marking, parent emp
 the pattern to copy. Do it in one pass rather than a bullet at a time, or the remainder reads
 as arbitrary.
 
-### The admin's invoice pre-flight misses an unmarked EXTRA lesson — **S**
+### ~~The admin's invoice pre-flight misses an unmarked EXTRA lesson~~ — **SHIPPED 2026-08-13**
+`378d4aa`. Fixed on BOTH axes, not just the filed one. The filed half — union the class's
+session dates so an off-pattern extra is seen — came with a second finding: the union had to
+move **above** the `expected.length === 0` guard, or a class whose ONLY lesson that month was
+an extra was dropped whole (a missing class, not a missing date). And the risk review found
+the divergence ran on a class-status axis too: the dialog filtered `is_active` while the
+engine does not, so a RETIRED class holding an unmarked lesson blocked generation and was
+invisible to the dialog *and* to every screen that could clear it — §8.32's deadlock on a
+visibility axis. The weekly expectation is now clamped at `deactivated_at` mirroring the
+engine, while sessions that genuinely ran are still reported. Session dates are clamped to
+`to`, which is **inert on any ENDED month** (the only kind the engine can bill) and suppresses
+a false gap for a FUTURE covered lesson — `assign_session_coach()` creates a session row when
+cover is arranged in advance. Counts are taken over dates a mark was actually owed on, so the
+"{marked} of {expected}" line cannot inflate. vitest 326 (+9), proven red three ways.
+`docs/plans/SMALL_ITEMS_PLAN.md` §B1.
+
+Original entry:
 `SwimSyncAdmin/lib/classCoverage.ts` and `generate-invoices/core.ts` are two copies of one
 rule, and on 2026-08-10 they were brought into line in ONE direction only. The engine unions
 `sessionByDate.keys()` into `datesToCheck` (`core.ts`); `classCoverage.ts` unions only
@@ -1254,7 +1311,30 @@ is a reasonable long-term answer for Singapore.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### Deleting an admin destroys the audit history — **S** `[found 2026-08-09, Wave 1 Chunk 3]`
+### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
+**Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the
+single deliberate exclusion in `profile_reference_columns()`; every other FK pointing at
+profiles already refused the delete by name. Removing the exclusion stops exempting one table
+from the mechanism that already existed, and the purge is gone — it had become unreachable.
+`actor_id` stays `NOT NULL`: the prohibition below held (§7.50).
+
+**The accepted consequence, chosen with the user:** an admin who has written any audit row can
+no longer be hard-deleted at all. Deactivation is the route, and their profile, auth user and
+**email address** are occupied permanently. The trade is that the record outlives the person.
+The `deleted_profiles` tombstone stays the upgrade path if hard delete is ever needed back.
+The production gate was checked before landing: all three tenant admins are their own tenant's
+OWNER, and an owner was already undeletable, so the change took nothing away from anyone.
+
+**The finding worth carrying, because it nearly shipped as a non-event:** both suites covering
+admin deletion exercised only a profile that had never acted — pgTAP seeded an audit row purely
+to watch it be purged, and `verify-admins.mjs` deletes a fixture that is never an actor. The
+change would have passed both while proving nothing about the product. A new `adminhistory@`
+persona now drives the refusal in a real browser, including the half pgTAP cannot see: that the
+route's compensating unban leaves the account **able to sign in**, since it bans *before* it
+calls the RPC. pgTAP 925, driver 24/24, both proven red. `docs/plans/SMALL_ITEMS_PLAN.md`
+Phase A.
+
+Original entry:
 `prepare_admin_delete()` **purges the target's `audit_log` rows** before the hard delete,
 because `audit_log.actor_id` is a `NOT NULL` FK with no cascade
 (`20260806000100_co_admins.sql:56`). So removing a departing admin erases every record of
