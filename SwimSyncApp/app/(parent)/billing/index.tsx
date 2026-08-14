@@ -15,7 +15,6 @@ import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import { invoiceLabel } from "@/lib/invoiceLabel";
 import { confirmAction } from "@/lib/confirm";
-import { packageExtensionState } from "@/lib/packageExtension";
 
 type Tab = "Invoices" | "Packages" | "Credit Notes";
 
@@ -56,8 +55,6 @@ type ParentPackage = {
    *  the RPC is the single derivation (PACKAGES_DESIGN.md ⚠ RISK 4). */
   live_lessons_remaining: number | null;
   live_value_remaining: number | null;
-  ph_extension_weeks: number;
-  ph_ack_weeks_parent: number;
 };
 
 type PackageProduct = {
@@ -67,7 +64,7 @@ type PackageProduct = {
   category_name: string | null;
   lesson_count: number;
   rate_per_lesson: number;
-  validity_weeks: number;
+  validity_months: number;
 };
 
 type CreditNote = {
@@ -109,7 +106,6 @@ export default function BillingScreen() {
   const [products, setProducts] = useState<PackageProduct[]>([]);
   const [parentId, setParentId] = useState<string | null>(null);
   const [requestingId, setRequestingId] = useState<string | null>(null);
-  const [acking, setAcking] = useState<string | null>(null);
   const [packageError, setPackageError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   /** PER-INVOICE, not a single boolean like the detail screen's `claiming` —
@@ -170,14 +166,6 @@ export default function BillingScreen() {
     }
     setParentId(parent.id);
 
-    // On-load recompute of holiday extensions for this parent's own packages
-    // (⚠ RISK 4 — idempotent; best-effort so a failure never blocks the page).
-    try {
-      await supabase.rpc("recompute_package_extensions", { p_parent: parent.id });
-    } catch {
-      /* ignore — the read below still shows the last computed state */
-    }
-
     const [invoicesRes, creditNotesRes, packagesRes, liveRes, productsRes] =
       await Promise.all([
         supabase
@@ -195,7 +183,7 @@ export default function BillingScreen() {
         // RLS scopes these to this parent's own packages.
         supabase
           .from("parent_packages")
-          .select("id, name, lesson_count, rate_per_lesson, total_value, status, expires_on, requested_at, ph_extension_weeks, ph_ack_weeks_parent, class_categories(name), tenants(display_name)")
+          .select("id, name, lesson_count, rate_per_lesson, total_value, status, expires_on, requested_at, class_categories(name), tenants(display_name)")
           .in("status", ["pending", "active"])
           .order("requested_at", { ascending: false }),
 
@@ -204,7 +192,7 @@ export default function BillingScreen() {
         // Products of every business this parent has joined (RLS).
         supabase
           .from("package_products")
-          .select("id, name, lesson_count, rate_per_lesson, validity_weeks, class_categories(name), tenants(display_name)")
+          .select("id, name, lesson_count, rate_per_lesson, validity_months, class_categories(name), tenants(display_name)")
           .eq("is_active", true)
           .order("name"),
       ]);
@@ -246,8 +234,6 @@ export default function BillingScreen() {
           expires_on: p.expires_on,
           live_lessons_remaining: live ? Number(live.live_lessons_remaining) : null,
           live_value_remaining: live ? Number(live.live_value_remaining) : null,
-          ph_extension_weeks: p.ph_extension_weeks ?? 0,
-          ph_ack_weeks_parent: p.ph_ack_weeks_parent ?? 0,
         };
       })
     );
@@ -265,7 +251,7 @@ export default function BillingScreen() {
           category_name: c?.name ?? null,
           lesson_count: p.lesson_count,
           rate_per_lesson: Number(p.rate_per_lesson),
-          validity_weeks: p.validity_weeks,
+          validity_months: p.validity_months,
         };
       })
     );
@@ -275,23 +261,6 @@ export default function BillingScreen() {
 
   /** Request a package: a PENDING row (the DB snapshots the product's terms
    *  and forces pending for parents), then straight to the PayNow screen. */
-  const acknowledgeExtension = useCallback(
-    async (packageId: string) => {
-      setAcking(packageId);
-      const { error } = await supabase.rpc("acknowledge_package_extension", {
-        p_package_id: packageId,
-        p_as: "parent",
-      });
-      setAcking(null);
-      if (error) {
-        setPackageError("Could not acknowledge that. Please try again.");
-        return;
-      }
-      loadData();
-    },
-    [loadData]
-  );
-
   const requestPackage = useCallback(
     async (product: PackageProduct) => {
       if (!parentId) return;
@@ -592,39 +561,6 @@ export default function BillingScreen() {
                           </Text>
                         </View>
                       )}
-                      {/* Loud while the holiday extension exceeds what this
-                          parent has acknowledged; a quiet note once acked. */}
-                      {(() => {
-                        const st = packageExtensionState(
-                          pkg.ph_extension_weeks,
-                          pkg.ph_ack_weeks_parent
-                        );
-                        return st === "loud" ? (
-                          <View className="mt-2 rounded-xl bg-amber-50 p-3">
-                            <Text className="text-xs font-semibold text-amber-800">
-                              Good news — your package was extended by{" "}
-                              {pkg.ph_extension_weeks} week
-                              {pkg.ph_extension_weeks === 1 ? "" : "s"} for public
-                              holidays.
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() => acknowledgeExtension(pkg.id)}
-                              disabled={acking !== null}
-                              className="mt-2 self-start rounded-lg bg-amber-500 px-3 py-1.5"
-                            >
-                              <Text className="text-xs font-bold text-white">
-                                {acking === pkg.id ? "…" : "Got it"}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        ) : st === "quiet" ? (
-                          <Text className="mt-1 text-xs text-gray-400">
-                            Includes +{pkg.ph_extension_weeks} week
-                            {pkg.ph_extension_weeks === 1 ? "" : "s"} for public
-                            holidays
-                          </Text>
-                        ) : null;
-                      })()}
                     </>
                   ) : (
                     <>
@@ -681,8 +617,7 @@ export default function BillingScreen() {
                         <Text className="font-bold text-gray-900">
                           S${(p.lesson_count * p.rate_per_lesson).toFixed(2)}
                         </Text>
-                        , valid {p.validity_weeks} week
-                        {p.validity_weeks === 1 ? "" : "s"} from its start date.
+                        , valid {p.validity_months} months from confirmation.
                       </Text>
                       <TouchableOpacity
                         onPress={() => requestPackage(p)}

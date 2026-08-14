@@ -26,7 +26,6 @@ import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { todayInSg } from "@/lib/lessonDates";
-import { packageExtensionState } from "@/lib/packageExtension";
 
 type Category = { id: string; name: string; class_count: number };
 
@@ -37,7 +36,7 @@ type Product = {
   category_name: string | null;
   lesson_count: number;
   rate_per_lesson: number;
-  validity_weeks: number;
+  validity_months: number;
   is_active: boolean;
   holder_count: number;
 };
@@ -55,13 +54,8 @@ type Purchase = {
   live_value_remaining: number | null;
   live_lessons_remaining: number | null;
   status: string;
-  product_id: string;
   requested_at: string;
-  start_date: string | null;
   expires_on: string | null;
-  ph_extension_weeks: number;
-  ph_ack_weeks_admin: number;
-  manual_extension_days: number;
   /** PKG-YYYY-NNNN (20260809000100). What an incoming PayNow line is matched
    *  back to — the parent's QR carries it as the bill reference. NOT NULL in
    *  the database; typed nullable only so a stale cached row cannot crash the
@@ -72,17 +66,6 @@ type Purchase = {
 type ParentOption = { id: string; name: string };
 
 const money = (n: number) => `S$${Number(n).toFixed(2)}`;
-
-async function myTenantId(): Promise<string | null> {
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) return null;
-  const { data } = await supabase
-    .from("profiles")
-    .select("tenant_id")
-    .eq("id", user.user.id)
-    .single();
-  return (data?.tenant_id as string | null) ?? null;
-}
 
 export default function PackagesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -101,24 +84,15 @@ export default function PackagesPage() {
   const [pCategory, setPCategory] = useState("");
   const [pLessons, setPLessons] = useState("");
   const [pRate, setPRate] = useState("");
-  const [pWeeks, setPWeeks] = useState("12");
+  const [pMonths, setPMonths] = useState("12");
   const [formError, setFormError] = useState<string | null>(null);
   // Record-sale form
   const [saleModal, setSaleModal] = useState(false);
   const [saleParent, setSaleParent] = useState("");
   const [saleProduct, setSaleProduct] = useState("");
-  // Start date — pre-filled from suggest_package_start, always editable, and
-  // failing open to today (⚠ RISK 7: the RPC must never block a sale).
-  const [saleStart, setSaleStart] = useState("");
-  const [confirmStart, setConfirmStart] = useState("");
   // Confirm/cancel/cancel-active confirmations
   const [confirming, setConfirming] = useState<Purchase | null>(null);
   const [cancelling, setCancelling] = useState<Purchase | null>(null);
-  // Manual extension
-  const [extending, setExtending] = useState<Purchase | null>(null);
-  const [extendWeeks, setExtendWeeks] = useState("1");
-  const [extendReason, setExtendReason] = useState("");
-  const [extendError, setExtendError] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -127,18 +101,6 @@ export default function PackagesPage() {
   async function load() {
     setLoading(true);
     setError(null);
-
-    // On-load recompute so holiday extensions reflect the current calendar and
-    // enrolments (⚠ RISK 4 — idempotent, so this is cheap and safe to call every
-    // load). Best-effort: a failure must not stop the page rendering.
-    const tenant = await myTenantId();
-    if (tenant) {
-      try {
-        await supabase.rpc("recompute_package_extensions", { p_tenant: tenant });
-      } catch {
-        /* best-effort: a failed recompute must not stop the page rendering */
-      }
-    }
 
     // RLS scopes every query here to the caller's own business.
     const [catRes, prodRes, purRes, liveRes, ptRes] = await Promise.all([
@@ -149,14 +111,14 @@ export default function PackagesPage() {
       supabase
         .from("package_products")
         .select(
-          "id, name, category_id, lesson_count, rate_per_lesson, validity_weeks, is_active, class_categories(name), parent_packages(id, status)"
+          "id, name, category_id, lesson_count, rate_per_lesson, validity_months, is_active, class_categories(name), parent_packages(id, status)"
         )
         .order("is_active", { ascending: false })
         .order("name"),
       supabase
         .from("parent_packages")
         .select(
-          "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, value_remaining, status, requested_at, start_date, expires_on, ph_extension_weeks, ph_ack_weeks_admin, manual_extension_days, reference_number, class_categories(name), parents(profiles(full_name, email))"
+          "id, parent_id, name, lesson_count, rate_per_lesson, total_value, value_remaining, status, requested_at, expires_on, reference_number, class_categories(name), parents(profiles(full_name, email))"
         )
         .order("status")
         .order("requested_at", { ascending: false }),
@@ -183,7 +145,7 @@ export default function PackagesPage() {
         category_name: p.class_categories?.name ?? null,
         lesson_count: p.lesson_count,
         rate_per_lesson: Number(p.rate_per_lesson),
-        validity_weeks: p.validity_weeks,
+        validity_months: p.validity_months,
         is_active: p.is_active,
         holder_count: (p.parent_packages ?? []).filter(
           (x: any) => x.status !== "cancelled"
@@ -217,13 +179,8 @@ export default function PackagesPage() {
           ? Number(liveById.get(p.id).live_lessons_remaining)
           : null,
         status: p.status,
-        product_id: p.product_id,
         requested_at: p.requested_at,
-        start_date: p.start_date,
         expires_on: p.expires_on,
-        ph_extension_weeks: p.ph_extension_weeks ?? 0,
-        ph_ack_weeks_admin: p.ph_ack_weeks_admin ?? 0,
-        manual_extension_days: p.manual_extension_days ?? 0,
         reference_number: p.reference_number ?? null,
       }))
     );
@@ -299,7 +256,7 @@ export default function PackagesPage() {
     setPCategory("");
     setPLessons("");
     setPRate("");
-    setPWeeks("12");
+    setPMonths("12");
     setFormError(null);
     setProductModal(true);
   }
@@ -314,8 +271,8 @@ export default function PackagesPage() {
       return setFormError("Lessons must be a whole number above zero.");
     if (pRate.trim() === "" || !Number.isFinite(Number(pRate)) || Number(pRate) <= 0)
       return setFormError("The rate per lesson must be above zero.");
-    if (pWeeks.trim() === "" || !Number.isInteger(Number(pWeeks)) || Number(pWeeks) <= 0)
-      return setFormError("Validity must be a whole number of weeks.");
+    if (pMonths.trim() === "" || !Number.isInteger(Number(pMonths)) || Number(pMonths) <= 0)
+      return setFormError("Validity must be a whole number of months.");
 
     setBusy(true);
     setFormError(null);
@@ -324,7 +281,7 @@ export default function PackagesPage() {
       category_id: pCategory || null,
       lesson_count: Number(pLessons),
       rate_per_lesson: Number(pRate),
-      validity_weeks: Number(pWeeks),
+      validity_months: Number(pMonths),
       tenant_id: (
         await supabase
           .from("profiles")
@@ -355,50 +312,15 @@ export default function PackagesPage() {
 
   // ── Purchases ──────────────────────────────────────────────────────────────
 
-  // Pre-fill a start date from the smart default. ⚠ RISK 7: this is only a
-  // suggestion — any failure falls back to today, never blocks the flow.
-  async function fetchSuggestedStart(parentId: string, productId: string) {
-    try {
-      const { data, error: err } = await supabase.rpc("suggest_package_start", {
-        p_parent_id: parentId,
-        p_product_id: productId,
-      });
-      if (err || !data) return todayInSg();
-      return String(data);
-    } catch {
-      return todayInSg();
-    }
-  }
-
-  // Sale form: when both parent and product are chosen, suggest a start date.
-  useEffect(() => {
-    if (saleModal && saleParent && saleProduct) {
-      fetchSuggestedStart(saleParent, saleProduct).then(setSaleStart);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saleModal, saleParent, saleProduct]);
-
-  // Confirm dialog: suggest a start date for the pending request being confirmed.
-  useEffect(() => {
-    if (confirming) {
-      fetchSuggestedStart(confirming.parent_id, confirming.product_id).then(
-        setConfirmStart
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [confirming]);
-
   async function recordSale() {
     if (!saleParent || !saleProduct) return;
     setBusy(true);
     // Directly active: the admin recording an offline sale IS the
-    // confirmation. The DB snapshots the product's terms and dates expiry from
-    // the start date (defaulting to today if the admin cleared the field).
+    // confirmation. The DB snapshots the product's terms and dates expiry.
     const { error: err } = await supabase.from("parent_packages").insert({
       parent_id: saleParent,
       product_id: saleProduct,
       status: "active",
-      start_date: saleStart || todayInSg(),
       tenant_id: (
         await supabase
           .from("profiles")
@@ -415,7 +337,6 @@ export default function PackagesPage() {
     setSaleModal(false);
     setSaleParent("");
     setSaleProduct("");
-    setSaleStart("");
     load();
   }
 
@@ -423,10 +344,9 @@ export default function PackagesPage() {
     setBusy(true);
     // WHERE status='pending' makes a double-click (or two admins) collapse to
     // one confirmation — the second update matches zero rows and is a no-op.
-    // The start date (editable, defaulted) anchors the validity period.
     const { error: err } = await supabase
       .from("parent_packages")
-      .update({ status: "active", start_date: confirmStart || todayInSg() })
+      .update({ status: "active" })
       .eq("id", p.id)
       .eq("status", "pending");
     setBusy(false);
@@ -442,65 +362,6 @@ export default function PackagesPage() {
         body: { type: "confirmed", package_id: p.id },
       })
       .catch(() => {});
-    load();
-  }
-
-  async function acknowledgeExtension(p: Purchase) {
-    setBusy(true);
-    const { error: err } = await supabase.rpc("acknowledge_package_extension", {
-      p_package_id: p.id,
-      p_as: "admin",
-    });
-    setBusy(false);
-    if (err) {
-      setError("Could not acknowledge that extension.");
-      return;
-    }
-    load();
-  }
-
-  async function submitExtend() {
-    if (!extending) return;
-    const weeks = Number(extendWeeks);
-    if (!Number.isInteger(weeks) || weeks <= 0) {
-      setExtendError("Enter a whole number of weeks above zero.");
-      return;
-    }
-    const days = weeks * 7;
-    if (days > 365) {
-      setExtendError("That is too long — 52 weeks is the most.");
-      return;
-    }
-    setBusy(true);
-    setExtendError(null);
-    const { error: err } = await supabase.rpc("extend_package", {
-      p_package_id: extending.id,
-      p_days: days,
-      p_reason: extendReason.trim(),
-    });
-    setBusy(false);
-    if (err) {
-      setExtendError("Could not extend that package.");
-      return;
-    }
-    setExtending(null);
-    setExtendWeeks("1");
-    setExtendReason("");
-    load();
-  }
-
-  async function acknowledgeAllExtensions() {
-    const tenant = await myTenantId();
-    if (!tenant) return;
-    setBusy(true);
-    const { error: err } = await supabase.rpc("acknowledge_all_extensions", {
-      p_tenant: tenant,
-    });
-    setBusy(false);
-    if (err) {
-      setError("Could not acknowledge the extensions.");
-      return;
-    }
     load();
   }
 
@@ -543,13 +404,6 @@ export default function PackagesPage() {
   });
   const visibleHeld = heldSort.apply(held);
   const activeProducts = products.filter((p) => p.is_active);
-  // A package is LOUD for the admin while its holiday extension exceeds what
-  // the admin has acknowledged.
-  const loudCount = held.filter(
-    (p) =>
-      packageExtensionState(p.ph_extension_weeks, p.ph_ack_weeks_admin) ===
-      "loud"
-  ).length;
 
   return (
     <div>
@@ -638,7 +492,7 @@ export default function PackagesPage() {
             <p className="font-medium text-gray-900">No packages defined</p>
             <p className="mt-1 text-sm text-gray-500">
               A package is N lessons at a locked rate — e.g. 10 lessons at
-              S$40, valid 12 weeks. Parents request one from the app and pay
+              S$40, valid 12 months. Parents request one from the app and pay
               by PayNow; families without one simply stay on monthly invoices.
             </p>
           </div>
@@ -650,7 +504,7 @@ export default function PackagesPage() {
               <Th sort={productSort} sortKey="lesson_count" firstDir="desc">Lessons</Th>
               <Th sort={productSort} sortKey="rate_per_lesson" firstDir="desc">Rate</Th>
               <Th sort={productSort} sortKey="price" firstDir="desc">Price</Th>
-              <Th sort={productSort} sortKey="validity_weeks" firstDir="desc">Validity</Th>
+              <Th sort={productSort} sortKey="validity_months" firstDir="desc">Validity</Th>
               <Th sort={productSort} sortKey="holder_count" firstDir="desc">Held by</Th>
               <Th>&nbsp;</Th>
             </Thead>
@@ -673,9 +527,7 @@ export default function PackagesPage() {
                   <Td className="text-gray-900">
                     {money(p.lesson_count * p.rate_per_lesson)}
                   </Td>
-                  <Td className="text-gray-500">
-                    {p.validity_weeks} week{p.validity_weeks === 1 ? "" : "s"}
-                  </Td>
+                  <Td className="text-gray-500">{p.validity_months} months</Td>
                   <Td className="text-gray-500">{p.holder_count}</Td>
                   <Td>
                     <Button
@@ -703,20 +555,9 @@ export default function PackagesPage() {
       <div className="mb-8">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-bold text-gray-900">Who holds one</h2>
-          <div className="flex gap-2">
-            {loudCount > 0 && (
-              <Button
-                variant="outline"
-                onClick={acknowledgeAllExtensions}
-                disabled={busy}
-              >
-                Acknowledge all ({loudCount})
-              </Button>
-            )}
-            <Button variant="outline" onClick={() => setSaleModal(true)}>
-              Record a sale
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => setSaleModal(true)}>
+            Record a sale
+          </Button>
         </div>
         {loading ? (
           <p className="text-sm text-gray-500">Loading…</p>
@@ -731,7 +572,6 @@ export default function PackagesPage() {
               <Th sort={heldSort} sortKey="name">Package</Th>
               <Th sort={heldSort} sortKey="reference_number">Reference</Th>
               <Th sort={heldSort} sortKey="remaining">Remaining</Th>
-              <Th sort={heldSort} sortKey="start_date">Starts</Th>
               <Th sort={heldSort} sortKey="expires_on">Expires</Th>
               <Th sort={heldSort} sortKey="status">Status</Th>
               <Th>&nbsp;</Th>
@@ -789,45 +629,12 @@ export default function PackagesPage() {
                         </span>
                       )}
                     </Td>
-                    <Td className="text-gray-500">{p.start_date ?? "—"}</Td>
                     <Td className="text-gray-500">
                       {p.expires_on ?? "—"}
                       {expired && (
                         <span className="ml-1 text-xs text-red-600">
                           expired
                         </span>
-                      )}
-                      {/* Loud while the extension exceeds the admin's ack; a
-                          quiet permanent note once acknowledged. */}
-                      {(() => {
-                        const st = packageExtensionState(
-                          p.ph_extension_weeks,
-                          p.ph_ack_weeks_admin
-                        );
-                        return st === "loud" ? (
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                              Extended +{p.ph_extension_weeks} wk
-                            </span>
-                            <button
-                              onClick={() => acknowledgeExtension(p)}
-                              disabled={busy}
-                              className="text-xs font-medium text-sky-600 hover:underline"
-                            >
-                              Acknowledge
-                            </button>
-                          </div>
-                        ) : st === "quiet" ? (
-                          <div className="mt-0.5 text-xs text-gray-400">
-                            +{p.ph_extension_weeks} wk · public holidays
-                          </div>
-                        ) : null;
-                      })()}
-                      {p.manual_extension_days > 0 && (
-                        <div className="mt-0.5 text-xs text-gray-400">
-                          +{p.manual_extension_days} day
-                          {p.manual_extension_days === 1 ? "" : "s"} · manual
-                        </div>
                       )}
                     </Td>
                     <Td>
@@ -839,28 +646,13 @@ export default function PackagesPage() {
                     </Td>
                     <Td>
                       {p.status === "active" && (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setExtendWeeks("1");
-                              setExtendReason("");
-                              setExtendError(null);
-                              setExtending(p);
-                            }}
-                            disabled={busy}
-                          >
-                            Extend
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => setCancelling(p)}
-                            disabled={busy}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={() => setCancelling(p)}
+                          disabled={busy}
+                        >
+                          Cancel
+                        </Button>
                       )}
                     </Td>
                   </Tr>
@@ -988,11 +780,11 @@ export default function PackagesPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                Weeks valid
+                Months valid
               </label>
               <input
-                value={pWeeks}
-                onChange={(e) => setPWeeks(e.target.value)}
+                value={pMonths}
+                onChange={(e) => setPMonths(e.target.value)}
                 inputMode="numeric"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               />
@@ -1065,21 +857,6 @@ export default function PackagesPage() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Start date
-            </label>
-            <input
-              type="date"
-              value={saleStart}
-              onChange={(e) => setSaleStart(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              Suggested from when this parent&rsquo;s current coverage ends —
-              adjust it freely.
-            </p>
-          </div>
           <div className="flex justify-end gap-2">
             <Button
               variant="outline"
@@ -1108,25 +885,12 @@ export default function PackagesPage() {
             <>
               <strong>{confirming.parent_name}</strong> — {confirming.name} for{" "}
               <strong>{money(confirming.total_value)}</strong>. Confirming
-              activates the package; its validity runs from the start date below.
+              activates the package and starts its{" "}
+              {/* validity from today, not from the request date */}
+              validity period from today.
             </>
           )}
         </p>
-        <div className="mt-4">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Start date
-          </label>
-          <input
-            type="date"
-            value={confirmStart}
-            onChange={(e) => setConfirmStart(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          />
-          <p className="mt-1 text-xs text-gray-400">
-            Suggested from when this parent&rsquo;s current coverage ends —
-            adjust it freely.
-          </p>
-        </div>
         <div className="mt-4 flex justify-end gap-2">
           <Button
             variant="outline"
@@ -1180,57 +944,6 @@ export default function PackagesPage() {
           >
             {busy ? "Working…" : cancelling?.status === "pending" ? "Decline" : "Cancel package"}
           </Button>
-        </div>
-      </Modal>
-
-      {/* Manual extension */}
-      <Modal
-        open={extending !== null}
-        onClose={() => setExtending(null)}
-        title={`Extend ${extending?.name ?? "package"}`}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            A discretionary extension for{" "}
-            <strong>{extending?.parent_name}</strong>, added on top of any
-            public-holiday extension. Currently expires{" "}
-            <strong>{extending?.expires_on ?? "—"}</strong>.
-          </p>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Extra weeks
-            </label>
-            <input
-              value={extendWeeks}
-              onChange={(e) => setExtendWeeks(e.target.value)}
-              inputMode="numeric"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Reason <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              value={extendReason}
-              onChange={(e) => setExtendReason(e.target.value)}
-              placeholder="Goodwill"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          </div>
-          {extendError && <p className="text-sm text-red-600">{extendError}</p>}
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setExtending(null)}
-              disabled={busy}
-            >
-              Cancel
-            </Button>
-            <Button onClick={submitExtend} disabled={busy}>
-              {busy ? "Extending…" : "Extend package"}
-            </Button>
-          </div>
         </div>
       </Modal>
     </div>
