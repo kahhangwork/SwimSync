@@ -405,3 +405,18 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `students/page-*.js` chunk hash moved `bc711a33…` (the rename deploy) → `4d4a0dc3…`, proving
     the new bundle shipped. Behaviour: the "possible duplicate" banner no longer flags a claimed
     child against an un-claimed look-alike (PRD §7.18).
+
+19. **Deploy record (2026-08-14): the Add-student duplicate warning — backend-first, §11.9 order
+    held, grant dump clean.** Two pushes. **Migration alone** (`920ead6`,
+    `20260814000200_find_roster_duplicates`) → `main`; then `supabase db push` (the `pgdelta` cert
+    stack trace printed again — normal, §7.49) → `migration list --linked` remote column filled, 0
+    pending → **grant dump** (`supabase db dump --linked`): `find_roster_duplicates` is
+    `REVOKE PUBLIC` + `GRANT authenticated` only (no `anon`/`service_role`), `anon` EXECUTE total
+    still **18**. Only then the **app** (`95c9304`) → `main`, so Vercel never built an app calling
+    an RPC production lacked. CI green on both. **§7.31 serve-check NOT completed:** the admin
+    Students page is auth-gated, so its `page-*.js` chunk hash is not exposed to an unauthenticated
+    fetch and the App-Router route→chunk manifest is not public; completing it would mean logging
+    into **production** (real data, no legitimate test account), so it was left. Standing in for it:
+    CI built the exact `main` commit, and byte-identical code passed the local browser pass 11/11.
+    Behaviour: Students → Add student warns on a possible roster duplicate before creating an
+    unregistered child (PRD §7.18).

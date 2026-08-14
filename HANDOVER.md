@@ -1,13 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-14 (3rd) — **Duplicate-banner false positive FIXED, LIVE** (§8.55): the
-"possible duplicate" banner no longer flags a CLAIMED child against an un-claimed look-alike
-(two different "Anya"s) — it compares only **same-parent-situation** rows (PRD §7.18). Follow-up
-(catch it at Add-student, by phone) filed in `BACKLOG.md`._
+_Last updated: 2026-08-14 (4th) — **Add-student duplicate WARNING shipped, LIVE** (§8.56):
+Students → Add student now checks the roster first and, if a possible duplicate is found
+(phone OR name, including claimed + inactive rows), shows it and offers **Add anyway** — the
+creation-time catch for the case §8.55's banner stopped netting. Backend-first;
+`find_roster_duplicates` RPC (PRD §7.18)._
 
-_Previously, 2026-08-14 (2nd) — **Student RENAME shipped, LIVE** (§8.54): a parent's provided
-name can replace the coach's placeholder (the "Anya (big)" bug) — `rename_student()` RPC +
-Students Rename + a claim-approval name picker. Backend-first deploy; gotchas **§7.154–155**._
+_Previously, 2026-08-14 (3rd) — **Duplicate-banner false positive fixed, LIVE** (§8.55): the
+"possible duplicate" banner no longer flags a CLAIMED child against an un-claimed look-alike
+(two different "Anya"s) — it compares only **same-parent-situation** rows (PRD §7.18)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -302,7 +303,7 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **Production was fully caught up as of 2026-08-12**, through `20260812000200`. THREE edge functions exist: `generate-invoices`,
+> **Production was fully caught up as of 2026-08-14**, through `20260814000200`. THREE edge functions exist: `generate-invoices`,
 > `package-emails` (verify_jwt ON) and **`public-invoice` (verify_jwt false, deliberately —
 > the invoice token is the access control)**. *(Version numbers used to be written here and
 > went stale twice. `supabase functions list` and `supabase migration list --linked` are the
@@ -369,6 +370,41 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.56 (2026-08-14, 4th) — WARN ON A POSSIBLE DUPLICATE AT ADD-STUDENT
+
+**A backlog item, built and shipped end to end, LIVE** (`920ead6` migration + `95c9304` app).
+Students → *Add student* now checks the roster before creating an unregistered child and, if a
+possible duplicate is found, shows it and flips the button to **Add anyway**. This closes the gap
+§8.55 opened: the merge dialog is only reachable from the "possible duplicate" banner, which no
+longer nets a claimed-vs-unclaimed pair — so a placeholder for an already-registered family had
+**no automatic catch once created**. Settled with the user through `/plan-with-confidence` +
+`/plan-review`.
+
+**Shipped, backend-first (§7.60):** migration `20260814000200` —
+`find_roster_duplicates(tenant, name, phone, dob)`, admin-only SECURITY DEFINER, tenant-scoped,
+returns **unmasked** names (own business). Signals (OR): entered phone matches a child's
+provisional number OR a **claiming parent's account**; or `names_match`. A known-different DOB
+disqualifies a name-only match; phone sorts before name; **includes INACTIVE + CLAIMED rows**; cap
+5. **Advisory — never blocks a write; a phone match never hard-blocks (siblings share a phone).**
+Then the app (`95c9304`): warn+confirm in `handleAddStudent`, **fail-open**, reset-on-edit,
+phone/name grouping (`lib/rosterDuplicates.ts`). Spec: **PRD §7.18**. Design + `/plan-review`
+mitigations (RISK 1–6): **`docs/plans/ADD_STUDENT_DUP_WARNING_PLAN.md`**. Deploy:
+**`docs/DEPLOYMENT.md` §11.19**.
+
+**One deviation from the filed item, decided with the user:** built as phone **OR** name, not
+phone-only — name-only is what catches the dad-signed-up / mum's-number-keyed case, which is a
+name-only match against a **claimed** child (what §8.55 turned off for the persistent banner —
+correct here as a one-shot dismissable prompt). `/plan-review` caught the plan's own error before
+any code: copying the banner's active-only rule would have missed a returning family (RISK 1).
+
+**Verified:** pgTAP **952** (+14; cross-tenant non-leak and inactive-included each proven red) ·
+vitest **356** (+6) · typecheck both apps · **live browser 11/11** (phone, name+inactive,
+Add-anyway proceeds, reset-on-edit) · CI green both commits · production **grant dump clean**
+(`find_roster_duplicates` `authenticated`-only, `anon` EXECUTE still **18**). Commit-review
+(subagent) found no blockers; three low fixes applied (stale-state reset on open/close, dead
+`class_title` dropped, explicit success reset). **§7.31 serve-check NOT completed** — the admin
+page is auth-gated; see `docs/DEPLOYMENT.md` §11.19 for why and what stood in.
+
 ## 8.55 (2026-08-14, 3rd) — THE DUPLICATE BANNER NO LONGER CRIES WOLF ON A CLAIMED CHILD
 
 **A production false positive, reported right after §8.54 and fixed the same session, LIVE
@@ -392,36 +428,6 @@ re-fixtured off the now-excluded "one parented, one not" shape · the inactive t
 `isActive` is its only skip reason · typecheck · CI green · deploy confirmed by the served
 `students/page-*.js` chunk hash changing (a pure-logic change adds no string to grep — §11.18).
 Review (subagent) found one doc mis-cite (§7.4→§7.18), fixed; no code blockers.
-
-## 8.54 (2026-08-14, 2nd) — SET A CLAIMED CHILD'S REAL NAME (THE "ANYA (big)" BUG)
-
-**A user-reported bug, verified and fixed end to end, LIVE.** When a parent claims an existing
-child and types the real name, `add_child_or_claim()` stores it as `student_claims.claimed_name`
-but `approve_student_claim()` never applied it (deliberately: "never overwrite what a coach
-recorded"), and the admin panel had **no way to rename a child at all** — so the roster kept the
-coach's placeholder. Fixed with a new primitive and two callers, settled with the user through
-`/plan-with-confidence` + `/plan-review`.
-
-**Shipped, backend-first (§7.60):** migration `20260814000100` — `rename_student(id, name)`,
-admin-only (tenant from the row, §7.42), refusing a name that would duplicate an **active**
-child's (name, DOB) including the **NULL-DOB** case the unique index cannot see (**§7.154**, the
-load-bearing find). Then the app (`c009945`): a Students-page **Rename** action (the retroactive
-fix — approval runs once, so Anya needs this), and a claim-approval **name picker** whose default
-is certainty-dependent (parent's name for `confirmed`, current for `unsure` — a blind approve
-must not overwrite a coach's name), applied after the link with "linked, name not applied"
-messaging on collision. Spec: **PRD §7.17**. Design + 7 risk mitigations:
-**`docs/plans/STUDENT_RENAME_PLAN.md`**. Deploy: **`docs/DEPLOYMENT.md` §11.17**.
-
-**`/plan-review` (independent agent) surfaced the two riskiest points before build:** the
-NULL-DOB collision hole (§7.154) and that an `unsure` claim must not auto-apply the parent's
-name. Both became steps/assertions. The commit-review agent found no blockers.
-
-**Verified:** pgTAP **938** (+13, the NULL-DOB probe proven red by removing it) · vitest **349**
-(+10, the certainty-default proven red) · typecheck both apps · a live browser pass (4/4) on the
-Rename flow + the friendly collision error · CI green on both commits · production grant dump
-clean (`rename_student` `authenticated`-only, `anon` EXECUTE still 18) · served bundles
-grepped for the new strings. **Second gotcha graduated:** the invoice **email** reads live
-`full_name`, so a future resend must read the snapshot (**§7.155**).
 
 ---
 
@@ -502,9 +508,10 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 
 ### THE CURRENT BUILD — the build order is spent, and so is the small-items list
 
-**Wave 5 shipped 2026-08-13 (§8.49–8.51); the three small filed items were the follow-on —
-two shipped 2026-08-13 (§8.52) and the LAST one shipped 2026-08-14 (§8.53, the Attendance
-money-axis column).** `BACKLOG.md` → `## Build order`'s numbered list is **exhausted** AND the
+**Wave 5 shipped 2026-08-13 (§8.49–8.51); the small filed items followed (§8.52–8.53); then
+2026-08-14 shipped, in order, the student **rename** (§8.54), the duplicate-**banner** fix
+(§8.55), and the Add-student duplicate **warning** (§8.56 — the compensating control §8.55
+filed, now built).** `BACKLOG.md` → `## Build order`'s numbered list is **exhausted** and the
 small-items list is **fully spent** — what remains is the *Unordered* pool, and the next build
 is a decision to make with the user. `/backlog-prioritisation` exists if the queue should be
 re-sequenced first. There is no queued, decided next build; picking one is the first task.
@@ -541,8 +548,8 @@ that migration (`docs/DEPLOYMENT.md` §11.15).
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **The migration queue is EMPTY.** The latest applied is
-`20260814000100` (`rename_student`, §8.54); production confirmed caught up 2026-08-14,
-0 pending. §8.54's deploy is the freshest worked example of the ordering gate below:
+`20260814000200` (`find_roster_duplicates`, §8.56); production confirmed caught up 2026-08-14,
+0 pending. §8.56's deploy is the freshest worked example of the ordering gate below:
 migration to `main` ALONE → `db push` → grant dump → **then** the app commit, so Vercel
 never built an app calling an RPC production lacked. **The rule chunk 1 bought is about ORDER, not
 content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must
