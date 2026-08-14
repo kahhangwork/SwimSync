@@ -102,11 +102,21 @@ still point at the local stack for dev.
    SELECT pg_get_userbyid(defaclrole), defaclnamespace::regnamespace, defaclobjtype, defaclacl
      FROM pg_default_acl
     WHERE pg_get_userbyid(defaclrole) = 'postgres'
-      AND (defaclacl::text LIKE '%anon=%' OR defaclacl::text LIKE '%authenticated=%');
+      AND (defaclacl::text LIKE '%anon=%' OR defaclacl::text LIKE '%authenticated=%'
+           OR defaclacl::text LIKE '%service_role=%');
    ```
-   The `supabase_admin`-owned rows still name both roles and are **deliberately left
+   The `supabase_admin`-owned rows still name all three roles and are **deliberately left
    alone** — nothing in this repo creates objects as `supabase_admin`, and on cloud
    `postgres` may not hold the membership to change them. Don't "fix" them.
+
+   **`service_role` joined the closed set on 2026-08-14 (`20260814000300`, §11.20)** — the
+   `postgres`-owned default no longer hands it a new function, table or sequence either, so
+   the grid query includes it above and must still return zero rows. It carries the same
+   apply-time probes as `20260804000400`. The **existing 37 tables keep their `service_role`
+   grants** — this closed the automatic leak for FUTURE objects only, so the consequence for
+   every later migration is: a table/function a NEW feature needs from an edge function or
+   admin route must `GRANT … TO service_role` explicitly, or the first call is a loud
+   `permission denied` in dev (that is the intended failure mode, not a regression).
 
    **Re-run 2026-08-11 after `20260811000100`** (Wave 2 — created two trigger functions and
    re-created two RPCs under new signatures): `anon` EXECUTE still **18**, unchanged from the
@@ -420,3 +430,20 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     CI built the exact `main` commit, and byte-identical code passed the local browser pass 11/11.
     Behaviour: Students → Add student warns on a possible roster duplicate before creating an
     unregistered child (PRD §7.18).
+
+20. **Deploy record (2026-08-14): turn off the `service_role` default-privilege grant —
+    backend-only, no app change.** `8263f73`, migration `20260814000300`, the sibling of
+    `20260804000400` (which did `anon` + `PUBLIC`). Order: migration → `main` (git push, no app
+    surface to sequence against) → `supabase db push`. **The apply-time probe RAN ON PRODUCTION
+    and passed** — `NOTICE: service_role default-privilege probes clean: functions, tables,
+    sequences` — which is the *only* place the FUNCTIONS half is meaningful (§7.39: local and
+    cloud `postgres` defaults disagree exactly there). `pgdelta` cert stack trace printed again
+    (normal, §7.49). `migration list --linked` remote column filled through `…000300`, 0 pending.
+    Grant check: the schema dump excludes `postgres`-owned default ACLs by construction, so the
+    behavioural probe on prod is the proof, not a dump grep; the §11.7 grid query now includes
+    `service_role` and must return zero rows. **Rollback rehearsed locally** — the committed DOWN
+    (`supabase/rollback/20260814_service_role_default_privileges_DOWN.sql`) restores the default
+    (a fresh object grants `service_role` again), then re-revoked to leave local matching `main`.
+    **The 37 existing tables were NOT swept** (deliberate — `generate-invoices` reads 21 of them
+    through `service_role`); this closes the automatic leak for FUTURE objects only. No behaviour
+    a user can see changed. See §11.7 for the standing consequence for later migrations.

@@ -1,14 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-14 (4th) — **Add-student duplicate WARNING shipped, LIVE** (§8.56):
-Students → Add student now checks the roster first and, if a possible duplicate is found
-(phone OR name, including claimed + inactive rows), shows it and offers **Add anyway** — the
-creation-time catch for the case §8.55's banner stopped netting. Backend-first;
-`find_roster_duplicates` RPC (PRD §7.18)._
+_Last updated: 2026-08-14 (5th) — **`service_role` default-privilege grant turned OFF, LIVE**
+(§8.57): migration `20260814000300` stops NEW objects being handed to `service_role`
+automatically (the `anon` sibling of `20260804000400`). The 37 existing tables keep their
+grants, so `generate-invoices` is untouched; the whitelist idea was rejected (`docs/DEPLOYMENT.md`
+§11.20). Backend-only — no behaviour a user sees changed._
 
-_Previously, 2026-08-14 (3rd) — **Duplicate-banner false positive fixed, LIVE** (§8.55): the
-"possible duplicate" banner no longer flags a CLAIMED child against an un-claimed look-alike
-(two different "Anya"s) — it compares only **same-parent-situation** rows (PRD §7.18)._
+_Previously, 2026-08-14 (4th) — **Add-student duplicate WARNING shipped, LIVE** (§8.56):
+Students → Add student checks the roster first and, on a possible duplicate (phone OR name,
+incl. claimed + inactive), offers **Add anyway** — `find_roster_duplicates` RPC (PRD §7.18)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -303,7 +303,7 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **Production was fully caught up as of 2026-08-14**, through `20260814000200`. THREE edge functions exist: `generate-invoices`,
+> **Production was fully caught up as of 2026-08-14**, through `20260814000300`. THREE edge functions exist: `generate-invoices`,
 > `package-emails` (verify_jwt ON) and **`public-invoice` (verify_jwt false, deliberately —
 > the invoice token is the access control)**. *(Version numbers used to be written here and
 > went stale twice. `supabase functions list` and `supabase migration list --linked` are the
@@ -370,6 +370,25 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.57 (2026-08-14, 5th) — TURN OFF THE `service_role` DEFAULT-PRIVILEGE GRANT
+
+**The last decided backend item, shipped end to end, LIVE** (`8263f73`, migration
+`20260814000300`). The sibling of `20260804000400` (which did `anon` + `PUBLIC`): the
+`pg_default_acl` rows owned by `postgres` no longer hand `service_role` a grant on every new
+function/table/sequence. **The 37 existing tables were deliberately NOT swept** —
+`generate-invoices` reads 21 of them through `service_role`, and revoking an existing grant
+risks `permission denied` inside the invoice engine — so this closes the *automatic* leak for
+FUTURE objects only. The whitelist question this answered was **rejected** (surface too big,
+exposure already bounded by the secret key, and it would not defend a leaked-key
+`auth.admin.deleteUser` anyway); reasoning kept as a `BACKLOG.md` *Deliberately not doing* row.
+
+**Verified:** applied local (pgTAP **952**) and to production, where the built-in probe RAN and
+passed — `probes clean: functions, tables, sequences` — the only place §7.39 makes the FUNCTIONS
+half meaningful. Fresh objects grant `service_role` nothing; engine tables unchanged; rollback
+DOWN rehearsed. Deploy record + the standing consequence for later migrations (a NEW feature's
+table must `GRANT … TO service_role` explicitly or fail loud in dev): **`docs/DEPLOYMENT.md`
+§11.20 and §11.7**.
+
 ## 8.56 (2026-08-14, 4th) — WARN ON A POSSIBLE DUPLICATE AT ADD-STUDENT
 
 **A backlog item, built and shipped end to end, LIVE** (`920ead6` migration + `95c9304` app).
@@ -404,30 +423,6 @@ Add-anyway proceeds, reset-on-edit) · CI green both commits · production **gra
 (subagent) found no blockers; three low fixes applied (stale-state reset on open/close, dead
 `class_title` dropped, explicit success reset). **§7.31 serve-check NOT completed** — the admin
 page is auth-gated; see `docs/DEPLOYMENT.md` §11.19 for why and what stood in.
-
-## 8.55 (2026-08-14, 3rd) — THE DUPLICATE BANNER NO LONGER CRIES WOLF ON A CLAIMED CHILD
-
-**A production false positive, reported right after §8.54 and fixed the same session, LIVE
-(`70b5e32`, app-only).** The Students-page "Two records may be the same child" banner flagged a
-CLAIMED child ("Anya Gundecha", parent Priya) against an un-claimed look-alike ("Anya (Small)")
-that shares only a first name. Cause: `findDuplicatePairs` (`lib/duplicateStudents.ts`) skipped a
-pair only when BOTH sides had a parent and they differed — a pair where one side had no parent
-slipped through. Narrowed to compare **only same-parent-situation rows** (both un-claimed, or
-both the same parent), so a claimed child is never matched against an un-claimed one. The two
-real cases stay flagged (two un-claimed look-alikes; a parent who added their own child twice).
-Spec: **PRD §7.18**. Deploy: **`docs/DEPLOYMENT.md` §11.18**.
-
-**The case it deliberately gives up** — a coach placeholder that is really a registered family's
-child — is already caught by the claim flow, which offers the un-claimed match to the parent at
-registration (`find_student_candidates`: phone → name+DOB → name-similar, NOT first-name-only).
-The compensating control (**catch it at the admin's Add-student step, keyed on the parent PHONE**
-— names collide too often in SG) is filed in **`BACKLOG.md`** with the settled reasoning.
-
-**Verified:** vitest **350** (+1; the Anya case proven red against the old rule) · four tests
-re-fixtured off the now-excluded "one parented, one not" shape · the inactive test re-isolated so
-`isActive` is its only skip reason · typecheck · CI green · deploy confirmed by the served
-`students/page-*.js` chunk hash changing (a pure-logic change adds no string to grep — §11.18).
-Review (subagent) found one doc mis-cite (§7.4→§7.18), fixed; no code blockers.
 
 ---
 
@@ -510,22 +505,18 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 
 **Wave 5 shipped 2026-08-13 (§8.49–8.51); the small filed items followed (§8.52–8.53); then
 2026-08-14 shipped, in order, the student **rename** (§8.54), the duplicate-**banner** fix
-(§8.55), and the Add-student duplicate **warning** (§8.56 — the compensating control §8.55
-filed, now built).** `BACKLOG.md` → `## Build order`'s numbered list is **exhausted** and the
-small-items list is **fully spent** — what remains is the *Unordered* pool, and the next build
-is a decision to make with the user. `/backlog-prioritisation` exists if the queue should be
-re-sequenced first. There is no queued, decided next build; picking one is the first task.
+(§8.55), the Add-student duplicate **warning** (§8.56), and the `service_role`
+default-privilege revoke (§8.57 — the last decided backend item).** `BACKLOG.md` →
+`## Build order`'s numbered list is **exhausted**, the small-items list is **fully spent**, and
+the one clean infra one-liner is **now done** — what remains is the *Unordered* pool, and the
+next build is a decision to make with the user. `/backlog-prioritisation` exists if the queue
+should be re-sequenced first. **There is no queued, decided next build; picking one is the first
+task.**
 
-**The `service_role` question is now ANSWERED, and the answer is "don't build the whitelist"**
-(`BACKLOG.md` carries the 11-call-site audit). `generate-invoices` alone touches 21 of 37 tables
-and writes 8; the excluded set is a dozen tables a future feature plausibly needs, and the
-failure mode of getting it wrong is `permission denied` **inside the invoice engine**. It also
-would not defend against the real worst case — a leaked key holding `auth.admin.deleteUser`,
-which no `GRANT` restrains. **What IS worth doing is the one-liner**: turn off the
-default-privilege grant to `service_role` the way `20260804000400` did for `anon` and `PUBLIC`.
-A seventh data point arrived on 2026-08-13 — `20260813000400`'s dump shows `prepare_admin_delete`
-with no `service_role` line, while `profile_reference_columns` still carries one from before
-that migration (`docs/DEPLOYMENT.md` §11.15).
+**The `service_role` question is CLOSED (§8.57).** The whitelist was rejected and the one-liner
+— turn off the default-privilege grant the way `20260804000400` did for `anon`/`PUBLIC` — shipped
+as `20260814000300`. Full reasoning: `BACKLOG.md` → *Deliberately not doing* (the 11-call-site
+audit) and `docs/DEPLOYMENT.md` §11.20/§11.7. Nothing left to decide here.
 
 ### Triage rules, when the sweep does redden
 
@@ -548,8 +539,9 @@ that migration (`docs/DEPLOYMENT.md` §11.15).
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **The migration queue is EMPTY.** The latest applied is
-`20260814000200` (`find_roster_duplicates`, §8.56); production confirmed caught up 2026-08-14,
-0 pending. §8.56's deploy is the freshest worked example of the ordering gate below:
+`20260814000300` (`service_role` default revoke, §8.57); production confirmed caught up
+2026-08-14, 0 pending through `…000300`. §8.57 was a backend-only change (no app branch to
+sequence against); §8.56 remains the freshest worked example of the full ordering gate below:
 migration to `main` ALONE → `db push` → grant dump → **then** the app commit, so Vercel
 never built an app calling an RPC production lacked. **The rule chunk 1 bought is about ORDER, not
 content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must

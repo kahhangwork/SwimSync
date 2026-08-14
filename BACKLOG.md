@@ -1,11 +1,15 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-14 (2nd) — **Catch a duplicate at the admin's Add-student step**
+_Last updated: 2026-08-14 (3rd) — **`service_role` whitelist question RESOLVED** — rejected
+(don't build it), and the one-liner that WAS worth doing shipped: `20260814000300` turns off
+the `service_role` default-privilege grant (`docs/DEPLOYMENT.md` §11.20). Item removed from the
+Unordered pool; reasoning kept as a *Deliberately not doing* row._
+
+_Previously, 2026-08-14 (2nd) — **Catch a duplicate at the admin's Add-student step**
 SHIPPED and removed (`find_roster_duplicates`, PRD §7.18). Built as phone **OR** name (not
 phone-only as filed): name-only is what catches the dad-signed-up / mum's-number-keyed case,
 and the merge banner no longer nets a claimed-vs-unclaimed pair, so creation-time is the only
-automatic catch. Prior: added that same item after the "possible duplicate" banner was
-narrowed to same-parent-situation-only._
+automatic catch._
 
 _Previously, 2026-08-11 — **Wave 2, *Multiple classes per child*, SHIPPED and was
 removed** (`936e3bd`, live). Its Build-order entry is marked COMPLETE rather than deleted,
@@ -363,8 +367,7 @@ In-app payment gateway (L), Native store builds (M — *deferred; not spending t
 → Push notifications (M — *blocked by it*), Check the logo for brand collisions (S —
 *before native builds, whenever those happen*), Bulk WhatsApp Cloud API (M — *only on a
 real tenant's request*), Multi-language (M — **decide or refuse it; it is accruing
-retrofit tax unranked**), Decide whether `service_role` deserves the whitelist treatment
-(M — *a question until the usage audit exists*), More polished dashboards (S — *delete
+retrofit tax unranked**), More polished dashboards (S — *delete
 unless a real question replaces it*).
 
 **Two items are deliberately LAST, and get cheaper by waiting:**
@@ -1358,81 +1361,6 @@ alignment and text assertion still passes, so width is a human-judgement signal,
 pass/fail one. Do not "fix" this by adding a width assertion to the driver; fix the two
 pages' column classes. The threshold in the driver is 80px and is arbitrary.
 
-### Decide whether `service_role` deserves the whitelist treatment — **M**
-`20260804000600` made `authenticated`'s table grants a declared whitelist derived from
-`pg_policies`, and `000700` shut the last default-privilege row. `service_role` was left
-untouched, deliberately and on the record — this item is the decision, not a plan to do it.
-
-**Why:** it is the one role where **grants are the entire gate**. `rolbypassrls = true`, so
-no policy in the repo restrains it, and it holds `arwdDxtm` on all 37 tables plus EXECUTE on
-everything. The mitigation is that it is reachable only with the secret key — held by the
-edge functions and the admin panel's server routes, never shipped to a browser. So the
-exposure is "anything that can read an env var", which is a real but different threat model
-from `anon` and `authenticated`.
-
-**Notes:**
-- **The `authenticated` argument does not transfer, and that is the point.** There, the
-  oracle was "no policy could ever permit this", which made 50 of 148 grants provably dead.
-  `service_role` has no policies by design, so that oracle returns *everything* and is
-  useless. A whitelist here would have to be derived from **actual usage** — which is a
-  genuine audit, not a query. **That audit now exists; see below.**
-- **Do not extend `table_grants.test.sql` to cover it.** That file asserts *no privilege
-  exists where no policy could permit it*, and `service_role` bypasses RLS entirely — the
-  file cannot express service-role scope at all (§7.87). A test that is red against a
-  correct database gets disabled, which costs the coverage it already has.
-
-#### THE USAGE AUDIT — done 2026-08-10, read from the code
-
-The prerequisite is answered. **Every caller was read; nothing was inherited from the
-earlier note in this item, which was wrong in both directions** — it said "`invite-parent`
-writes profiles" (it does not; it only reads them, and the write goes through
-`link_invited_parent()` on the CALLER's client) and it missed the six admin-management
-routes entirely. §8.38 made the same mistake with a different list: ask the code.
-
-**There are 11 call sites, not 10.** `createAdminClient()` is imported by five routes plus
-`lib/adminManagementGate.ts` — and the gate **returns its `adminClient` to its callers**, so
-the six admin-management routes use `service_role` too, through a key they do not hold
-themselves. Any narrowing that reads only the importer list will miss them.
-
-| Caller | Tables (R = read, W = write) | Also uses |
-|---|---|---|
-| `generate-invoices/core.ts` | **W:** `invoices`, `invoice_items`, `billing_periods`, `credit_notes`, `credit_applications`, `parent_packages`, `package_applications`, `parent_tenant_balances` · **R:** `app_settings`, `attendance`, `class_rates`, `classes`, `lesson_sessions`, `makeup_bookings`, `parent_students`, `student_class_enrolments`, `student_settlements`, `students`, `tenants`, `trial_bookings`, `trial_rates` | — |
-| `generate-invoices/email.ts` | **R:** `app_settings`, `parents`, `profiles`, `students`, `tenants` | Resend |
-| `public-invoice` | **W:** `invoices` (the "I've paid" claim stamp) · **R:** `invoices` | — |
-| `package-emails` | **R:** `parent_packages`, `profiles` | Resend |
-| `api/invite-parent` | **R:** `students`, `attendance`, `profiles` | `auth.admin` getUserById / generateLink / deleteUser |
-| `api/create-coach` | **R+W:** `profiles` | `auth.admin.createUser` |
-| `api/provision-tenant` | **R:** `profiles` · **W:** `tenants` (DELETE — the failed-provision unwind only) | `provision_tenant()`, `auth.admin.generateLink` |
-| `api/resend-invite` | **R:** `profiles`, `tenants` | `auth.admin` getUserById / generateLink |
-| `api/generate-invoices` | **R:** `profiles` | `fetch` → the edge function |
-| `lib/adminManagementGate` | **R:** `profiles`, `tenants`, `coaches` | — |
-| …and its six callers | `invite-admin` **R:** `profiles`, `tenants` · `list-admins` **R:** `profiles`, `coaches` · `resend-admin-invite` **R:** `profiles`, `tenants` · `deactivate-admin` / `reactivate-admin` / `delete-admin`: **no table access at all** — `deactivate_admin()`, `reactivate_admin()`, `prepare_admin_delete()` | `auth.admin` getUserById / updateUserById / deleteUser / generateLink |
-
-**RECOMMENDATION: do not build the whitelist. Close the default instead.**
-
-- **The surface is not small enough to be worth it.** `generate-invoices` alone touches 21 of
-  37 tables and writes 8. A whitelist would exclude roughly a dozen tables — `audit_log`,
-  `coach_payouts`, `coach_rates`, `class_categories`, `package_products`, `payment_records`,
-  `student_claims`, `tenant_levels`, `parent_tenants`, `trial_rates`' siblings — and every one
-  of them is a table a future feature plausibly reaches from the engine or an admin route.
-  The failure mode of getting it wrong is `permission denied` **inside the invoice engine**,
-  the one thing in this repo that must never fail silently.
-- **The exposure it would reduce is already bounded by the key.** `service_role` is reachable
-  only with the secret, which lives in Vercel and Supabase env vars and is never shipped to a
-  browser. A whitelist does not defend against a leaked key holding `auth.admin` —
-  `deleteUser` and `updateUserById` are not table grants and no `GRANT` can restrain them.
-  That is the actual worst case, and it is unaffected.
-- **What IS worth doing is the one-liner already identified** (`docs/DEPLOYMENT.md` §11.7):
-  whatever a migration does not explicitly revoke, cloud grants `service_role` — proven a
-  fifth time by `20260809000300`, which revoked its three functions and came back with no
-  `service_role` line at all. Turning off the default-privilege grant for `service_role`, the
-  way `20260804000400` did for `anon` and `PUBLIC`, stops new objects being handed to it
-  silently. That is a small, testable change with a loud failure mode, and it does not
-  require deciding anything about the 37 existing tables.
-- **If the whitelist is ever built anyway**, the table above is the input, and it must be
-  regenerated rather than trusted: it is a snapshot of 2026-08-10 and goes stale on the next
-  feature. Do not close it one migration at a time.
-
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`
 → `createClient<Database>(...)`) so query results are typed from the real schema instead
@@ -1534,6 +1462,7 @@ Kept so the reasoning doesn't get re-litigated.
 | Idea | Why not |
 |---|---|
 | **A blanket `anon` revoke via default privileges** | **Done 2026-08-04 (`20260804000400`) — this row is kept only so the two earlier refusals are not re-litigated as though nothing changed.** Declined 2026-07-21 and again earlier on 2026-08-04, both times on the grounds that it would lock a future function that legitimately needs `anon`. That objection had already expired on 2026-08-02, when `public-invoice` established the standing rule (`docs/ARCHITECTURE.md` §6) that anything public is served by an **edge function, never an anon RPC** — so the case being protected was one the architecture forbids. Doing it also revealed that the statement everyone had in mind (`… IN SCHEMA public REVOKE … FROM PUBLIC`) **succeeds and does nothing** (§7.85), meaning both refusals were declining something that would not have worked anyway. |
+| **A `service_role` usage whitelist** (the `authenticated` treatment, `20260804000600`-style) | **Rejected 2026-08-14 after the 11-call-site audit; the one-liner that WAS worth doing shipped the same day (`20260814000300`, `docs/DEPLOYMENT.md` §11.20).** The `authenticated` argument does not transfer: there the oracle was "no policy could ever permit this", proving 50/148 grants dead — but `service_role` has `rolbypassrls` and no policies, so that oracle returns *everything*. A whitelist would have to come from **actual usage**, and the surface is too big to be worth it: `generate-invoices` alone reads 21 of 37 tables and writes 8, and the ~dozen a whitelist would exclude are all tables a future feature plausibly reaches from the engine or an admin route — with `permission denied` **inside the invoice engine** as the failure mode. The exposure is already bounded by the **secret key** (Vercel/Supabase env only, never a browser), and a whitelist would not defend the real worst case: a leaked key holding `auth.admin.deleteUser`/`updateUserById`, which are not table grants and no `GRANT` restrains. So: don't build the whitelist; the audit table (a 2026-08-10 snapshot, regenerate don't trust) is the input if it is ever revisited anyway. **Do not extend `table_grants.test.sql` to cover `service_role`** — it asserts "no privilege where no policy could permit", which `bypassrls` makes inexpressible (§7.87). |
 | **Making the Students page's "All" tab mean active-only** | Considered 2026-07-26 so the header count would always equal the visible rows, and declined **with the user**: it would hide departed children from the default view and change behaviour people rely on. The header therefore deliberately describes a **subset** of the rows, and the `· N inactive` suffix is what explains the gap. **Do not "fix" the mismatch** — it is the honest reading. (`lib/studentCounts.ts`.) |
 | **An "In progress" state on a class card while its lesson is running** | Offered 2026-07-26 while building the attendance-status chips and declined. A class shows **Upcoming** until its **end** time, because a coach marks at the end of a lesson — so one still running is not yet overdue and a fourth word for it buys nothing. The `Now` badge already says a class is happening. `hasEndedInSg()` is keyed to the end time deliberately; if this is revisited, that is the single place it changes. |
 | **Pre-generating lesson sessions** (a scheduled session generator) | PRD §7.5 is knowingly unimplemented and should stay that way. Sessions are created lazily by the coach's attendance save; which lessons *should* have happened is derived at read time from `classes.day_of_week`. Pre-generation adds a job, a schedule, and a pile of edge cases when classes change — for no gain the read-time derivation doesn't already deliver. **Don't "fix" this** without a reason the derivation genuinely can't serve. (`docs/ARCHITECTURE.md` §6.) |
