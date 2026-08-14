@@ -25,7 +25,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(21);
+SELECT plan(22);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -308,6 +308,23 @@ SELECT is(
   'ad_hoc',
   'a date-expired package (status still active) does NOT cover — filtered in SQL, '
   'not left to each caller');
+
+-- ── 11b. ⚠ #3: a FUTURE-START active package does not cover YET ─────────────
+-- Give the same package a start date next month (and a healthy expiry, so the
+-- expiry filter is not what excludes it). The child falls back to ad_hoc until
+-- the package's start date arrives — the engine bills those lessons ad-hoc too.
+RESET ROLE;
+UPDATE parent_packages
+   SET start_date = (now() AT TIME ZONE 'Asia/Singapore')::date + 30,
+       expires_on = (now() AT TIME ZONE 'Asia/Singapore')::date + 120
+ WHERE id = 'b7000000-0000-0000-0000-000000000002';
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" TO '{"sub":"bd000000-0000-0000-0000-000000000001","role":"authenticated"}';
+SELECT is(
+  (SELECT c.coverage FROM student_package_coverage() c
+    WHERE c.student_id = 'b5000000-0000-0000-0000-000000000005'),
+  'ad_hoc',
+  'a future-start package does not cover until its start date arrives');
 
 -- ── 12-15. Sibling sharing, and RLS PARITY (the silent-mislabel catcher) ───
 SELECT is(

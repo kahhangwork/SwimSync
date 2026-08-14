@@ -54,8 +54,19 @@ async function setClassCategory(
 
 async function addProduct(
   s: Scenario,
-  opts: { lessons: number; rate: number; months?: number; categoryId?: string | null }
+  opts: {
+    lessons: number;
+    rate: number;
+    months?: number;
+    weeks?: number;
+    categoryId?: string | null;
+  }
 ): Promise<string> {
+  // Supply weeks OR months; the derive trigger fills the other column.
+  const validity =
+    opts.weeks !== undefined
+      ? { validity_weeks: opts.weeks }
+      : { validity_months: opts.months ?? 12 };
   const { data, error } = await s.db
     .from("package_products")
     .insert({
@@ -64,7 +75,7 @@ async function addProduct(
       category_id: opts.categoryId ?? null,
       lesson_count: opts.lessons,
       rate_per_lesson: opts.rate,
-      validity_months: opts.months ?? 12,
+      ...validity,
     })
     .select("id")
     .single();
@@ -73,11 +84,13 @@ async function addProduct(
 }
 
 /** Active package for the scenario's parent. confirmedAt is an ISO instant;
- *  coverage starts on its SGT date. */
+ *  coverage starts on startDate if given, else the SGT date of confirmation.
+ *  The end date is startDate + validity_weeks*7 (package_effective_end). */
 async function buyPackage(
   s: Scenario,
   productId: string,
-  confirmedAt: string
+  confirmedAt: string,
+  startDate?: string
 ): Promise<string> {
   const { data, error } = await s.db
     .from("parent_packages")
@@ -87,6 +100,7 @@ async function buyPackage(
       product_id: productId,
       status: "active",
       confirmed_at: confirmedAt,
+      ...(startDate ? { start_date: startDate } : {}),
     })
     .select("id")
     .single();
@@ -256,11 +270,14 @@ Deno.test("two packages: the one expiring FIRST draws first, whatever the purcha
 });
 
 Deno.test("expiry boundary: a lesson ON expires_on is covered; one after it bills ad-hoc despite remaining value", async () => {
-  // Confirmed 2026-07-10 + 12 months ⇒ expires_on 2027-07-10, a Saturday.
+  // Validity is WEEKS now: 12 months ⇒ 52 weeks = 364 days. Start 2026-07-11
+  // (a Saturday) ⇒ expires_on = start + 364 = 2027-07-10, the same Saturday
+  // the sessions fall on. The explicit start makes the boundary exact instead
+  // of relying on month arithmetic.
   const s = await newScenario({ price: 50, billing: monthEnded("2027-07") });
   try {
     const productId = await addProduct(s, { lessons: 2, rate: 40, months: 12 });
-    const pkgId = await buyPackage(s, productId, "2026-07-10T04:00:00Z");
+    const pkgId = await buyPackage(s, productId, "2026-07-10T04:00:00Z", "2026-07-11");
 
     const a = await s.addSession("2027-07-10"); await s.mark(a, "present"); // ON expiry
     const b = await s.addSession("2027-07-17"); await s.mark(b, "present"); // after
@@ -509,6 +526,136 @@ Deno.test("package_live_balances() predicts EXACTLY what the engine settles", as
       (r) => r.parent_package_id === pkgId
     );
     assertEquals(Number(after!.live_value_remaining), 320);
+  } finally {
+    await s.teardown();
+  }
+});
+
+// ── ⚠ RISK 2: the re-anchor to start_date (not SGT-of-confirmed_at) ──────────
+
+Deno.test("start_date AFTER confirmation: a lesson between confirm and start is NOT funded (engine and RPC agree)", async () => {
+  // Confirmed 2027-03-01, but the admin dated the package to start 2027-03-15.
+  // The 2027-03-13 Saturday lesson falls in that gap → ad-hoc; 2027-03-20 is
+  // inside the window → funded. Before the re-anchor the window opened at the
+  // SGT confirmation date and the gap lesson would have been (wrongly) covered.
+  const s = await newScenario({ price: 50, billing: monthEnded("2027-03") });
+  try {
+    const productId = await addProduct(s, { lessons: 10, rate: 40 });
+    const pkgId = await buyPackage(s, productId, "2027-03-01T04:00:00Z", "2027-03-15");
+
+    const gap = await s.addSession("2027-03-13"); await s.mark(gap, "present"); // before start
+    const inWin = await s.addSession("2027-03-20"); await s.mark(inWin, "present"); // inside
+    await s.completeMonth("2027-03");
+
+    // The RPC predicts a single funded lesson (only the in-window one).
+    const { data: liveRows } = await s.db.rpc("package_live_balances");
+    const mine = (liveRows as Record<string, unknown>[]).find(
+      (r) => r.parent_package_id === pkgId
+    );
+    assert(mine, "RPC returned no row for the package");
+    assertEquals(Number(mine!.live_value_remaining), 360); // 400 - one $40 draw
+
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true,
+      billing_month: "2027-03", now: s.now,
+    });
+
+    const inv = await getInvoice(s.db, s.parentId, "2027-03");
+    assertEquals(inv!.package_applied, 40); // only the in-window lesson drew
+    assertEquals(inv!.gross, 90);           // covered lesson at pkg rate 40 + ad-hoc at 50
+    assertEquals(inv!.net, 50);             // $90 - $40 package
+    assertEquals(await pkgRemaining(s, pkgId), 360); // engine settled to the RPC's number
+  } finally {
+    await s.teardown();
+  }
+});
+
+// ── ⚠ RISK 4: a lesson in the extension TAIL is funded because of the holiday ─
+
+Deno.test("a holiday extension funds a lesson in the tail that would otherwise bill ad-hoc", async () => {
+  // Start 2027-01-02 (Sat), 2 weeks ⇒ nominal end 2027-01-16 (Sat). A holiday
+  // on the class's Saturday inside the window pushes the end to 2027-01-23, so
+  // the 2027-01-23 lesson — which is AFTER the nominal end — is now funded.
+  const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
+  try {
+    const productId = await addProduct(s, { lessons: 10, rate: 30, weeks: 2 });
+    const pkgId = await buyPackage(s, productId, "2027-01-01T04:00:00Z", "2027-01-02");
+
+    // The holiday lands on a Saturday inside [2027-01-02, 2027-01-16); the
+    // enrolled Saturday class makes it an affected week ⇒ +1 week.
+    await s.db.from("tenant_public_holidays").insert({
+      tenant_id: s.tenantId, holiday_date: "2027-01-09", name: "Test PH",
+    });
+    const { data: changed } = await s.db.rpc("recompute_package_extensions", {
+      p_tenant: s.tenantId,
+    });
+    assertEquals(Number(changed), 1, "the extension applied");
+
+    // The tail lesson (2027-01-23 > nominal end 2027-01-16, ≤ extended 2027-01-23).
+    const tail = await s.addSession("2027-01-23"); await s.mark(tail, "present");
+    await s.completeMonth("2027-01");
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true,
+      billing_month: "2027-01", now: s.now,
+    });
+
+    const inv = await getInvoice(s.db, s.parentId, "2027-01");
+    assertEquals(inv!.package_applied, 30, "the tail lesson was funded by the extension");
+    assertEquals(inv!.net, 0, "billed at the package rate, fully covered");
+    assertEquals(await pkgRemaining(s, pkgId), 270);
+  } finally {
+    await s.teardown();
+  }
+});
+
+// ── ⚠ RISK 4: a holiday extension cannot touch an already-SEALED month ───────
+
+Deno.test("extending a package after a month is sealed changes no invoice and no balance", async () => {
+  const s = await newScenario({ price: 50, billing: monthEnded("2027-01") });
+  try {
+    // The scenario's class is Saturdays; the student is enrolled. A package
+    // whose window comfortably covers January.
+    const productId = await addProduct(s, { lessons: 10, rate: 30 });
+    const pkgId = await buyPackage(s, productId, "2027-01-01T04:00:00Z", "2027-01-01");
+
+    const jan = await s.addSession("2027-01-09"); await s.mark(jan, "present");
+    await s.completeMonth("2027-01");
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true,
+      billing_month: "2027-01", now: s.now,
+    });
+
+    const before = await getInvoice(s.db, s.parentId, "2027-01");
+    assertEquals(before!.package_applied, 30); // the January lesson drew
+    assertEquals(await pkgRemaining(s, pkgId), 270);
+
+    // Now a public holiday lands on a Saturday inside the window; recompute
+    // extends the package's expiry (proves the recompute fired)…
+    await s.db.from("tenant_public_holidays").insert({
+      tenant_id: s.tenantId, holiday_date: "2027-01-16", name: "Test PH",
+    });
+    const { data: changed } = await s.db.rpc("recompute_package_extensions", {
+      p_tenant: s.tenantId,
+    });
+    assertEquals(Number(changed), 1, "the package's extension moved");
+    const { data: pkg } = await s.db
+      .from("parent_packages")
+      .select("ph_extension_weeks, expires_on, value_remaining")
+      .eq("id", pkgId)
+      .single();
+    assertEquals(pkg!.ph_extension_weeks, 1, "extended by a week");
+
+    // …but the SEALED January invoice and the balance are untouched, and a
+    // re-run bills nothing new.
+    assertEquals(Number(pkg!.value_remaining), 270, "balance unchanged by the extension");
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true,
+      billing_month: "2027-01", now: s.now,
+    });
+    const after = await getInvoice(s.db, s.parentId, "2027-01");
+    assertEquals(after!.package_applied, before!.package_applied, "invoice unchanged");
+    assertEquals(after!.net, before!.net, "net unchanged");
+    assertEquals(await pkgRemaining(s, pkgId), 270, "no second draw");
   } finally {
     await s.teardown();
   }

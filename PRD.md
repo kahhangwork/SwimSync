@@ -1651,9 +1651,10 @@ removed on purpose, and a level is the coach's judgement.)*
 ### 7.16 Prepaid Lesson Packages *(implemented 2026-07-20)*
 
 Until this existed every family paid **after** the month's lessons (ad hoc). A business
-can now also sell **prepaid packages** — "10 Group lessons at S$40, valid 12 months" —
+can now also sell **prepaid packages** — "10 Group lessons at S$40, valid 12 weeks" —
 which is how many swim schools actually price, and which pays the business before the
-teaching instead of five weeks after it. Full design record: `PACKAGES_DESIGN.md`.
+teaching instead of five weeks after it. Full design record: `PACKAGES_DESIGN.md`; the
+weeks / start-date / holiday-extension work is `docs/plans/PACKAGE_WEEKS_HOLIDAYS_PLAN.md`.
 
 **A package is money, displayed as lessons.** The balance is stored in dollars and drawn
 down at the package's **locked rate**, so the counter a parent sees (`balance ÷ rate`) is
@@ -1707,10 +1708,40 @@ cash paid always equals value granted — nothing to reconcile.
   when no currently-enrolled class is covered. An unclaimed child shows no chip; they
   already carry "No parent account", and a family that doesn't exist has no payment
   method.
+- **Validity is measured in WEEKS, and a purchase carries an explicit start date**
+  *(implemented 2026-08-15)*. A product is "N lessons, valid **M weeks**"; a sale (or a
+  confirmed request) records a **start date**, and the package's effective end is
+  `start date + M weeks` (plus any extension below). The admin sets the start date at
+  the sale, **pre-filled** to the day the family's current coverage runs out — whichever
+  comes first, the previous package's lessons being used up (forecast from the covered
+  children's current enrolments) or its own expiry — so back-to-back packages line up
+  without hand arithmetic, including a family with two children who deplete a shared
+  package faster. The start date is the admin's decision, not the parent's, and is fixed
+  once the package is active (a wrong one is cancel-and-resell). A future-start package is
+  *not yet* coverage — the payment-method chip reads ad-hoc, and the engine bills those
+  lessons ad-hoc, until its start date arrives.
+- **Validity auto-extends for public holidays, loudly** *(implemented 2026-08-15)*. Each
+  business keeps its own **holiday calendar** (Admin → Holidays: add dates by hand or
+  **import a data.gov.sg CSV**, with a link to the source). When a scheduled lesson — for
+  any covered child's current class — would fall on one of those dates, the package's
+  validity extends by **one week per affected week** (two of a child's classes hit in the
+  same week is +1 week, not +2; the extension self-scales with more children/classes).
+  It **recomputes live** — over the current calendar and enrolments, at every relevant
+  change and page load and before every billing run — and is **loud**: a badge on the
+  parent app *and* the admin panel announces "+N weeks for public holidays" until that
+  side taps **Acknowledge** (the two acknowledge independently; the admin has
+  *Acknowledge all*), after which a quiet permanent note remains and it re-alerts only if
+  a later holiday extends it further. An extension can never touch an already-billed
+  month.
+- **The admin can also extend a package by hand** *(implemented 2026-08-15)* — a
+  discretionary number of weeks with an optional reason, stacked on top of any holiday
+  extension and recorded in an audit trail. Shortening is not an option (that is
+  cancel-and-resell).
 - **Purchase is PayNow + manual confirmation** (§7.9's model): the parent requests in
   the app, pays the business's QR, and the admin confirms receipt — which activates the
-  package and starts its validity clock. Admins can also record offline sales directly.
-  Both steps email the parent (business-branded, best-effort, isolated).
+  package and starts its validity clock from the start date above. Admins can also record
+  offline sales directly. Both steps email the parent (business-branded, best-effort,
+  isolated).
   *(implemented 2026-08-09)* **A package request is now identified like an invoice.** It
   carries **`PKG-YYYY-NNNN`**, numbered within the business — the year from the request's
   own timestamp in Singapore time, never the clock — and its PayNow screen builds the

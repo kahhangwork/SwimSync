@@ -1105,6 +1105,19 @@ async function generateForTenant(
     };
   }
 
+  // Refresh holiday extensions before reading expiries, so this run bills
+  // against the CURRENT calendar and enrolments rather than a stale expires_on
+  // (⚠ #1 — the recompute is idempotent, so this is cheap; service scope, all
+  // this tenant's active packages). Best-effort: a failure must not abort a
+  // billing run — the stored expiry is still a valid, if slightly stale, window.
+  {
+    const { error: recErr } = await supabase.rpc(
+      "recompute_package_extensions",
+      { p_tenant: tenantId },
+    );
+    if (recErr) log.push({ tenant_id: tenantId, recompute_warning: recErr.message });
+  }
+
   // ── Active prepaid packages for this tenant, in draw order ────────────────
   // FIFO by earliest expiry (tie: confirmed_at, then id) — the exact order
   // package_live_balances() simulates; a Deno test pins the two against each
@@ -1113,7 +1126,7 @@ async function generateForTenant(
   const { data: pkgRows, error: pkgErr } = await supabase
     .from("parent_packages")
     .select(
-      "id, parent_id, category_id, rate_per_lesson, value_remaining, confirmed_at, expires_on"
+      "id, parent_id, category_id, rate_per_lesson, value_remaining, start_date, expires_on"
     )
     .eq("tenant_id", tenantId)
     .eq("status", "active")
@@ -1139,11 +1152,15 @@ async function generateForTenant(
       category_id: (p.category_id as string | null) ?? null,
       rate: Number(p.rate_per_lesson),
       remaining: Number(p.value_remaining),
-      // Coverage is judged against the LESSON's own date: from the SGT date
-      // of confirmation through expiry. A package bought mid-month covers
-      // lessons from purchase onward, and a package that has expired by
-      // GENERATION time still pays for lessons taken while it was live.
-      startsOn: dateInTimeZone(new Date(p.confirmed_at as string), APP_TIMEZONE),
+      // Coverage is judged against the LESSON's own date: from the package's
+      // explicit start_date through its stored effective expiry. A package
+      // bought mid-month covers lessons from its start onward, and a package
+      // that has expired by GENERATION time still pays for lessons taken while
+      // it was live. expires_on is the ONE effective end (start + validity +
+      // holiday + manual extensions), written by package_effective_end in the
+      // DB — never re-derive it here, or it forks from package_live_balances
+      // and the §7.18 pin breaks silently (⚠ RISK 2 prohibition).
+      startsOn: String(p.start_date),
       endsOn: String(p.expires_on),
       drawn: 0,
     });

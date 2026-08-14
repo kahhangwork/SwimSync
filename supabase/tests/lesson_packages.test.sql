@@ -233,10 +233,13 @@ SELECT lives_ok($$
   WHERE id = 'ff000000-0000-0000-0000-000000000001'
 $$, 'the business''s admin confirms the request');
 
+-- Validity is now measured in WEEKS: the product's 12 months derived to 52
+-- weeks (round(12*52/12)), and with no explicit start supplied at confirmation
+-- the start defaults to the SGT confirmation date. So expiry = that date + 364d.
 SELECT is(
   (SELECT expires_on FROM parent_packages WHERE id = 'ff000000-0000-0000-0000-000000000001'),
-  ((now() AT TIME ZONE 'Asia/Singapore')::date + make_interval(months => 12))::date,
-  'expiry = SGT confirmation date + the product''s validity');
+  ((now() AT TIME ZONE 'Asia/Singapore')::date + 52 * 7),
+  'expiry = start date (SGT confirmation) + validity_weeks*7');
 
 SELECT throws_ok($$
   UPDATE parent_packages SET value_remaining = 999.00
