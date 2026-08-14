@@ -381,3 +381,18 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     checking the old string was gone, not only that the new one is present. **Correct
     visible effect on production: none** — one coach, who is also the admin, and no class
     handed over, so money axis == access axis until a second coach exists (§3 DORMANT).
+
+17. **Deploy record (2026-08-14): the student-rename feature — the §11.9 order held, run for
+    real for the first time in a while.** A backend-first change in two pushes. **Migration
+    alone** (`1030c88`, `20260814000100_rename_student`) → `main`; then `supabase db push` (the
+    `pgdelta` cert stack trace printed for the **tenth** time — normal, §7.49) → `migration list
+    --linked` remote column filled, 0 pending → **grant dump**: `rename_student` is
+    `REVOKE PUBLIC` + `GRANT authenticated` only (no `anon`/`service_role`), `anon` EXECUTE total
+    still **18**. Only then the **app** (`c009945`) → `main`, so Vercel never built an app calling
+    an RPC production lacked. Both pushes and the `db push` were run by the user via `!` (the
+    permission layer blocked them). CI green on both. **§7.31 serve-check:** the served
+    `students/page-*.js` chunk contains `Save name` + `rename_student`, and `claims/page-*.js`
+    contains `Name on your roster after linking` + the "Rename them from the Students list"
+    message. **Visible effect on production: immediate and real** — unlike the money-axis deploy,
+    this one is usable the moment it lands (the admin can rename any child), and Anya-type
+    placeholders can be corrected now.

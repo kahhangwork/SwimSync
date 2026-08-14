@@ -2611,3 +2611,30 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     that the refusal reaches the modal as a *sentence* rather than
     `audit_log.actor_id`, and that the route's compensating unban leaves the account able
     to sign in, since it bans **before** it calls the RPC.
+
+154. **`students_identity_uniq` DOES NOT FIRE ON A NULL DATE OF BIRTH — so the unique index
+    alone is NOT a duplicate guard for any code that writes `students.full_name`.** The index
+    is `(tenant_id, lower(trim(full_name)), date_of_birth)`, and Postgres treats NULLs as
+    distinct, so two active children of one business with the same name and **no DOB** coexist
+    happily — which is *exactly* why coach-added and parent-added rows become duplicates in the
+    first place (`20260719001400`'s own comment says so). `rename_student` (`20260814000100`)
+    would have recreated that duplicate silently on the index alone; it must **probe**
+    explicitly — `lower(btrim(full_name)) = v_name AND date_of_birth IS NOT DISTINCT FROM …
+    AND is_active AND id <> self` — the same `IS NOT DISTINCT FROM` shape `add_child_or_claim`
+    already uses, with the index kept only as the backstop for the non-NULL / inactive case.
+    **The rule to carry: any new write to `full_name` (or a new same-identity insert path) needs
+    its own NULL-safe probe; do not trust the index.** Proven by the pgTAP that goes red — the
+    duplicate slips through — the moment the probe is removed.
+
+155. **THE INVOICE EMAIL READS LIVE `students.full_name`, unlike every other invoice surface —
+    so a future RESEND would diverge from the issued document.** The snapshot boundary is
+    otherwise clean: `invoice_items.student_name` is captured at generation and the parent
+    invoice view reads it, so renaming a child (`rename_student`, 2026-08-14) never rewrites a
+    sent invoice/credit note (§7.7). But `supabase/functions/generate-invoices/email.ts`
+    (~L323-330) builds its itemised lines from a **live** `students.full_name` read. This is
+    harmless *today* only because the email is sent in the same engine run that issues the
+    invoice — live == snapshot at that instant — and there is **no resend path** (grep-confirmed).
+    **If an invoice-resend feature is ever built, it MUST read `invoice_items.student_name`, not
+    `students.full_name`**, or a renamed child's resent email will not match the document it
+    claims to reproduce. Named here because the trigger (resend) does not exist yet, so nothing
+    else will remind the person who builds it.

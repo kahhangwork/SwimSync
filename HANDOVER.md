@@ -1,13 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-14 — **The LAST of the three small filed items SHIPPED, LIVE**
-(§8.53): the Attendance audit page's Coach column now names who was **PAID** (money axis,
-`class_rate_on()`), not the class's current coach (§7.152). App-only deploy. **Wave 3 and the
-small-items list are both fully spent — the build queue is now the unordered pool.**_
+_Last updated: 2026-08-14 (2nd) — **Student RENAME shipped, LIVE** (§8.54): a parent's
+provided name can now replace the coach's placeholder (the "Anya (big)" bug) — new
+`rename_student()` RPC + a Students-page Rename action + a claim-approval name picker.
+Backend-first deploy (migration `20260814000100` → grant dump → app). Two new gotchas
+**§7.154–155**._
 
-_Previously, 2026-08-13 (4th) — **Two of the three small filed items SHIPPED, LIVE**
-(§8.52): the admin audit trail survives deletion (`20260813000400`), and the invoice
-pre-flight sees extra lessons + retired classes._
+_Previously, 2026-08-14 — **The Attendance Coach column speaks the money axis** (§8.53), not
+`classes.coach_id` (§7.152); the small-items list and Wave 3 are both fully spent, so the
+build queue is now the unordered pool._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -369,6 +370,36 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.54 (2026-08-14, 2nd) — SET A CLAIMED CHILD'S REAL NAME (THE "ANYA (big)" BUG)
+
+**A user-reported bug, verified and fixed end to end, LIVE.** When a parent claims an existing
+child and types the real name, `add_child_or_claim()` stores it as `student_claims.claimed_name`
+but `approve_student_claim()` never applied it (deliberately: "never overwrite what a coach
+recorded"), and the admin panel had **no way to rename a child at all** — so the roster kept the
+coach's placeholder. Fixed with a new primitive and two callers, settled with the user through
+`/plan-with-confidence` + `/plan-review`.
+
+**Shipped, backend-first (§7.60):** migration `20260814000100` — `rename_student(id, name)`,
+admin-only (tenant from the row, §7.42), refusing a name that would duplicate an **active**
+child's (name, DOB) including the **NULL-DOB** case the unique index cannot see (**§7.154**, the
+load-bearing find). Then the app (`c009945`): a Students-page **Rename** action (the retroactive
+fix — approval runs once, so Anya needs this), and a claim-approval **name picker** whose default
+is certainty-dependent (parent's name for `confirmed`, current for `unsure` — a blind approve
+must not overwrite a coach's name), applied after the link with "linked, name not applied"
+messaging on collision. Spec: **PRD §7.17**. Design + 7 risk mitigations:
+**`docs/plans/STUDENT_RENAME_PLAN.md`**. Deploy: **`docs/DEPLOYMENT.md` §11.17**.
+
+**`/plan-review` (independent agent) surfaced the two riskiest points before build:** the
+NULL-DOB collision hole (§7.154) and that an `unsure` claim must not auto-apply the parent's
+name. Both became steps/assertions. The commit-review agent found no blockers.
+
+**Verified:** pgTAP **938** (+13, the NULL-DOB probe proven red by removing it) · vitest **349**
+(+10, the certainty-default proven red) · typecheck both apps · a live browser pass (4/4) on the
+Rename flow + the friendly collision error · CI green on both commits · production grant dump
+clean (`rename_student` `authenticated`-only, `anon` EXECUTE still 18) · served bundles
+grepped for the new strings. **Second gotcha graduated:** the invoice **email** reads live
+`full_name`, so a future resend must read the snapshot (**§7.155**).
+
 ## 8.53 (2026-08-14) — THE LAST SMALL ITEM: THE ATTENDANCE COACH COLUMN, ON THE MONEY AXIS
 
 **The third of the three small filed items — deferred and re-sized S → M in §8.52 — SHIPPED,
@@ -397,40 +428,6 @@ ignore the substitute, skip the absence check) · typecheck both apps · CI gree
 it had to be seeded; teardown restored `classes.coach_id`) · served-chunk grep confirmed the new
 strings present and the old access-axis embed gone. **Production effect: none** — one coach who
 is also the admin, no handover, so money axis == access axis until a second coach exists (§3).
-
-## 8.52 (2026-08-13, 4th) — TWO OF THE THREE SMALL FILED ITEMS, AND THE THIRD RE-SIZED
-
-**The three `BACKLOG.md` **S** items §9 had listed since Wave 5 finished. Two shipped and
-are LIVE; the third was planned, risk-reviewed, re-sized S → M and DEFERRED — its entry now
-names what made it M.**
-
-**Shipped.** `20260813000400` — deleting an admin no longer purges their audit trail; the
-delete is REFUSED instead (`audit_log.actor_id` was `profile_reference_columns()`'s one
-deliberate exclusion). Spec: **PRD §4.3**. Deploy record: **`docs/DEPLOYMENT.md` §11.15**.
-Then the app half: the modal copy, and `classCoverage.ts` — the invoice pre-flight now sees
-an off-pattern extra lesson **and** a retired class, closing the same §7.18 divergence on
-two axes at once. Spec: **PRD §7.7**. New gotchas: **§7.152–153**.
-
-**Deferred, and it is a LIVE defect rather than a plan note:** the Attendance page's Coach
-column. The review found the obvious fix is *also* wrong — `classes.coach_id` is the ACCESS
-axis, mutable and undated, on the page whose job is reconciling a payout (**§7.152**).
-`BACKLOG.md` carries the axis, the settled product choice, and the four other mitigations;
-`docs/plans/SMALL_ITEMS_PLAN.md` §B2 carries them as steps.
-
-**Two findings that changed how the work was done, both now graduated:**
-`/plan-review`'s independent agent found the wrong-axis bug in a plan written with both
-warning headers open (§7.152), and that **both** suites covering admin deletion tested only
-a profile that had never acted, so the change would have passed them while proving nothing
-(§7.153 — fixed structurally with a sixth driver persona, not with a sharper assertion).
-Two reviewer claims were checked and found **false**: a `GRANT` that does not exist, and a
-clamp said to re-create a divergence it provably cannot (`docs/plans/SMALL_ITEMS_PLAN.md`
-records both, and the clamp was settled by an assertion rather than by argument).
-
-**Verified:** pgTAP **925** (+2, proven red by the DOWN file — 4 of 40) · vitest **326**
-(+9, proven red three ways) · `verify-admins` **24/24** (+3, proven red) · fixture
-round-trip 24/24 · typecheck both apps · rollback rehearsed both directions · post-deploy
-grant dump clean (`anon` EXECUTE still 18, both ACLs unchanged) · the deployed **body**
-grepped from `db dump --linked`, and the served bundle's chunk hash confirmed changed.
 
 ---
 
@@ -550,10 +547,10 @@ that migration (`docs/DEPLOYMENT.md` §11.15).
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **The migration queue is EMPTY.** The latest applied is
-`20260813000400` (the admin audit trail, §8.52); production confirmed caught up 2026-08-13,
-0 pending — and all four of the day's deploys followed the ordering gate below
-deliberately: each migration merged and pushed to `main` ALONE,
-`migration list --linked` checked, and only then did the app commit land. **The rule chunk 1 bought is about ORDER, not
+`20260814000100` (`rename_student`, §8.54); production confirmed caught up 2026-08-14,
+0 pending. §8.54's deploy is the freshest worked example of the ordering gate below:
+migration to `main` ALONE → `db push` → grant dump → **then** the app commit, so Vercel
+never built an app calling an RPC production lacked. **The rule chunk 1 bought is about ORDER, not
 content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must
 land BEFORE the first app branch does.** A worktree cannot author one, so no worktree can see
 that the deploy is incomplete — and both here pushed correct code onto a database that did not
