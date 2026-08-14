@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, QrCode, UserX, UserCheck } from "lucide-react";
+import { Plus, UserX, UserCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
@@ -20,7 +20,6 @@ type CoachRow = {
   full_name: string;
   email: string;
   phone: string | null;
-  paynow_qr_url: string | null;
   class_titles: string[];
   disabled_at: string | null;
 };
@@ -58,7 +57,6 @@ export default function CoachesPage() {
   const [coaches, setCoaches] = useState<CoachRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [qrModal, setQrModal] = useState<CoachRow | null>(null);
 
   // Disable / reactivate (Wave 5 chunk 2). The RPC is the boundary — these
   // dialogs are the UX affordance, and their job is to surface its refusals
@@ -88,11 +86,8 @@ export default function CoachesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("coaches")
-      // The PayNow QR is the BUSINESS's, not each coach's — a school has one
-      // bank account. Read through the coach's tenant so every coach in a
-      // school shows the same, correct payee.
       .select(
-        "id, profile_id, disabled_at, tenants(paynow_qr_url), profiles(full_name, email, phone), classes(title, is_active)"
+        "id, profile_id, disabled_at, profiles(full_name, email, phone), classes(title, is_active)"
       )
       .order("id");
 
@@ -103,8 +98,6 @@ export default function CoachesPage() {
         full_name: c.profiles?.full_name ?? "—",
         email: c.profiles?.email ?? "—",
         phone: c.profiles?.phone ?? null,
-        paynow_qr_url:
-          (Array.isArray(c.tenants) ? c.tenants[0] : c.tenants)?.paynow_qr_url ?? null,
         class_titles: (c.classes ?? [])
           .filter((cls: any) => cls.is_active)
           .map((cls: any) => cls.title),
@@ -309,9 +302,6 @@ export default function CoachesPage() {
     key: "full_name",
     accessors: {
       classes: (c) => c.class_titles.length,
-      // Missing QRs first when ascending: a business with no QR cannot be paid,
-      // which makes it the row worth surfacing, not the row worth hiding.
-      paynow_qr_url: (c) => Boolean(c.paynow_qr_url),
     },
   });
   const visible = sort.apply(coaches);
@@ -344,19 +334,18 @@ export default function CoachesPage() {
           <Th sort={sort} sortKey="email">Email</Th>
           <Th sort={sort} sortKey="phone">Phone</Th>
           <Th sort={sort} sortKey="classes">Classes</Th>
-          <Th sort={sort} sortKey="paynow_qr_url">PayNow QR</Th>
           <Th>Actions</Th>
         </Thead>
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={6}>
+              <Td className="text-center text-gray-400 py-8" colSpan={5}>
                 Loading…
               </Td>
             </Tr>
           ) : visible.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={6}>
+              <Td className="text-center text-gray-400 py-8" colSpan={5}>
                 No coaches yet.
               </Td>
             </Tr>
@@ -404,26 +393,7 @@ export default function CoachesPage() {
                   )}
                 </Td>
                 <Td>
-                  {coach.paynow_qr_url ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                      <QrCode className="h-3 w-3" /> Uploaded
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-600">
-                      Missing
-                    </span>
-                  )}
-                </Td>
-                <Td>
                   <div className="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setQrModal(coach)}
-                    >
-                      <QrCode className="h-3.5 w-3.5" />
-                      QR
-                    </Button>
                     {coach.disabled_at ? (
                       <Button
                         size="sm"
@@ -645,32 +615,6 @@ export default function CoachesPage() {
               {actionBusy ? "Reactivating…" : "Reactivate coach"}
             </Button>
           </div>
-        </div>
-      </Modal>
-
-      {/* PayNow QR Modal */}
-      <Modal
-        title={`${qrModal?.full_name ?? ""} — PayNow QR`}
-        open={!!qrModal}
-        onClose={() => setQrModal(null)}
-      >
-        <div className="flex flex-col items-center gap-4">
-          {qrModal?.paynow_qr_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={qrModal.paynow_qr_url}
-              alt="PayNow QR"
-              className="w-44 h-44 rounded-2xl object-contain"
-            />
-          ) : (
-            <div className="rounded-xl bg-yellow-50 p-4 text-sm text-yellow-700 w-full text-center">
-              No PayNow QR uploaded for this coach yet.
-            </div>
-          )}
-          <p className="text-xs text-gray-400 text-center">
-            To upload or replace a QR code, use the coach&apos;s Settings screen
-            in the mobile app.
-          </p>
         </div>
       </Modal>
     </div>
