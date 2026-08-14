@@ -172,8 +172,14 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
 _Frontend tests:_
-`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **22 files, 299
-tests** (2026-08-11; the runner is the fact, this number is a hint that drifts). Wave 5
+`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **26 files, 339
+tests** (2026-08-14; the runner is the fact, this number is a hint that drifts). The
+Attendance money-axis fix (2026-08-14) added `lib/lessonAttribution.test.ts` — who was PAID
+for a lesson (substitute → dated terms coach → shadow), pinning that a class handed over
+still pays the July coach, that substitute beats shadow (and the coach is not double-listed),
+and the production-shape invariant (zero roster + no handover renders identically to the old
+access-axis output). Proven red by three sabotages (drop the date bound, ignore the
+substitute, skip the absence check → 6 of 13 fail). Wave 5
 chunk 3 added `lib/suspensionUnbanSet.test.ts` — the ⚠ RISK 3 unban set, (staff) MINUS
 (individually disabled), extracted pure so the exclusion is testable away from the auth
 admin API; proven red by the naive mirror `return staff` (3/6 — the deactivated admin, the

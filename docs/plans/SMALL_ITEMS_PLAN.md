@@ -345,9 +345,8 @@ with a substitute and a shadow seeded, and over the Admins delete refusal.
 
 ### B5. Phase B result — recorded 2026-08-13
 
-**Items 2 and 3 are SHIPPED AND LIVE. Item 1 was BUILT AND LOCAL-VERIFIED on 2026-08-14**
-(next session, at the user's request) — see the item-1 result block below. Not yet
-committed/deployed at time of writing.
+**All three items are SHIPPED AND LIVE.** Item 1 shipped 2026-08-14 (`f2fd7bc`, next session at
+the user's request) — see the item-1 result block below.
 
 - **Item 2** (`378d4aa`) — both divergences closed: the off-pattern extra AND the retired
   class. vitest **326** (+9), proven red three ways (6 of 9 against `main`; the future-session
@@ -378,7 +377,7 @@ committed/deployed at time of writing.
 
 ---
 
-### B6. Item 1 result — recorded 2026-08-14 (built, local-verified, not yet deployed)
+### B6. Item 1 result — recorded 2026-08-14 (SHIPPED AND LIVE, `f2fd7bc`)
 
 **Item 1 is now BUILT.** The Attendance page's Coach column speaks the MONEY axis and reads
 `classes.coach_id` nowhere. Four files:
@@ -418,7 +417,8 @@ Cover chip", the ordinary Aug lessons as **"Coach Marcus"** (the money axis, NOT
 access-axis owner Bianca — the exact bug this fixes), and "+ Coach Chloe (shadow)" on both;
 filtering by Marcus (id-keyed) drops the Bianca-covered lesson. Seed torn down, `classes.coach_id`
 restored. **RISK 2's standing prohibition is now satisfied**: item 1 does not ship with
-`wages/page.tsx` computing its own attribution. **Not yet done:** commit.
+`wages/page.tsx` computing its own attribution. **Shipped `f2fd7bc`, CI green, deploy
+serve-checked (`docs/DEPLOYMENT.md` §11.16).**
 
 ---
 

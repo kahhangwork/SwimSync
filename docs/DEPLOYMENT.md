@@ -369,3 +369,15 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     40 red → re-apply → 925 green).
     No production tenant is suspended and none should be: the deploy's correct visible
     effect is two dormant buttons.
+
+16. **Deploy record (2026-08-14): the Attendance Coach column speaks the money axis —
+    APP-ONLY, so Vercel-from-`main` was the whole deploy.** `f2fd7bc` — no migration, no
+    edge function, no grant surface, so none of §11.9's ordering applied. Pushing to `main`
+    was blocked by the permission layer (items 13-15's situation); the user ran the
+    `git push … :main` via the `!` prefix. CI green (4m34s). **§7.31/§7.51 serve-check:**
+    the served `app/(admin)/attendance/page-ab051a173639470d.js` chunk contains `(shadow)`,
+    `Could not resolve who taught each lesson`, and `main_coach_id`, and the **old**
+    access-axis embed `coaches(id, profiles(full_name))` is **absent** (0 hits) — proven by
+    checking the old string was gone, not only that the new one is present. **Correct
+    visible effect on production: none** — one coach, who is also the admin, and no class
+    handed over, so money axis == access axis until a second coach exists (§3 DORMANT).

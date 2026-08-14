@@ -1,12 +1,13 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-13 (4th) — **Two of the three small filed items SHIPPED, LIVE**
-(§8.52): the admin audit trail now survives deletion (`20260813000400`) and the invoice
-pre-flight sees extra lessons + retired classes. The third was re-sized S → M and deferred._
+_Last updated: 2026-08-14 — **The LAST of the three small filed items SHIPPED, LIVE**
+(§8.53): the Attendance audit page's Coach column now names who was **PAID** (money axis,
+`class_rate_on()`), not the class's current coach (§7.152). App-only deploy. **Wave 3 and the
+small-items list are both fully spent — the build queue is now the unordered pool.**_
 
-_Previously, 2026-08-13 (3rd) — **Wave 5 chunk 3 SHIPPED, LIVE — the WAVE is COMPLETE**
-(§8.51): tenant suspension — `20260813000300` + engine v21 + the Platform-page
-Suspend/Unsuspend, deployed migrations → engine → apps (§7.60). §11.14._
+_Previously, 2026-08-13 (4th) — **Two of the three small filed items SHIPPED, LIVE**
+(§8.52): the admin audit trail survives deletion (`20260813000400`), and the invoice
+pre-flight sees extra lessons + retired classes._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -184,7 +185,11 @@ is a guard whose first real firing is still ahead of you.
   day a co-admin or second coach exists. **The admin-delete refusal (§8.52) joins them for
   the same reason:** all three tenant admins are their own tenant's OWNER, and an owner was
   already undeletable — so the new refusal has never fired and cannot, until a business has a
-  second admin. Its correct production state is "no observable change".
+  second admin. Its correct production state is "no observable change". **The Attendance
+  money-axis column (§8.53) joins them too:** with one coach and no class handed over, the
+  money axis equals the access axis, so the Coach column shows exactly the name it showed
+  before. It diverges the day a class changes hands — don't rediscover "same as before" as a
+  regression.
 - **Multiple classes per child** — no production child holds two enrolments yet, so neither
   schedule guard has ever refused anything real and no admin has pressed *+ Add class*. The
   first real one is worth watching: it is also the first time `'mixed'` package coverage
@@ -364,6 +369,35 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.53 (2026-08-14) — THE LAST SMALL ITEM: THE ATTENDANCE COACH COLUMN, ON THE MONEY AXIS
+
+**The third of the three small filed items — deferred and re-sized S → M in §8.52 — SHIPPED,
+LIVE (`f2fd7bc`).** The read-only Attendance audit page's Coach column read `classes.coach_id`,
+the ACCESS axis (mutable, undated), so a class handed to a new coach named that coach on every
+one of the outgoing coach's past lessons — on the exact page an admin opens to reconcile a
+payout (§7.152). It now resolves who was **PAID**: new pure module
+`SwimSyncAdmin/lib/lessonAttribution.ts` mirrors `coach_attribution_kind()` (substitute →
+`class_rate_on()` terms → shadow) and reads `classes.coach_id` nowhere. Its `resolveShadows()`
+is the **one** client home for the shadow arm — `wages/page.tsx`'s inline loop was deleted and
+now calls it, so there is no third copy of who-gets-paid (§7.18). The page renders the main
+name, an amber `Cover` chip on a substituted lesson, and `+ Name (shadow)` on a second line;
+filter/sort are re-keyed to coach ids. Spec: **PRD §7.13 oversight story**. Design & every risk
+mitigation: **`docs/plans/SMALL_ITEMS_PLAN.md` §B2/§B6**. File map: ARCH §10. Suite: TESTING §5.
+Deploy (app-only, Vercel-from-`main`): **`docs/DEPLOYMENT.md` §11.16**.
+
+**Review (subagent) found no blockers; two LOW.** Fixed: `resolveShadows` now dedupes
+`shadowsByLesson` at source (a future direct consumer could otherwise double-list a coach with
+two overlapping shadow rows). Left, with reasoning: the tenant-wide loads lean on RLS instead of
+an explicit `.eq("tenant_id")` like the wages page — unreachable, since a platform admin is
+unmounted from every tenant page, and the main `attendance` query shares that assumption.
+
+**Verified:** vitest **339** (+13, 6 proven red via three sabotages — drop the date bound,
+ignore the substitute, skip the absence check) · typecheck both apps · CI green · **browser pass
+8/8** with a seeded class handover + substitute + shadow (the DORMANT state cannot show this, so
+it had to be seeded; teardown restored `classes.coach_id`) · served-chunk grep confirmed the new
+strings present and the old access-axis embed gone. **Production effect: none** — one coach who
+is also the admin, no handover, so money axis == access axis until a second coach exists (§3).
+
 ## 8.52 (2026-08-13, 4th) — TWO OF THE THREE SMALL FILED ITEMS, AND THE THIRD RE-SIZED
 
 **The three `BACKLOG.md` **S** items §9 had listed since Wave 5 finished. Two shipped and
@@ -397,33 +431,6 @@ records both, and the clamp was settled by an assertion rather than by argument)
 round-trip 24/24 · typecheck both apps · rollback rehearsed both directions · post-deploy
 grant dump clean (`anon` EXECUTE still 18, both ACLs unchanged) · the deployed **body**
 grepped from `db dump --linked`, and the served bundle's chunk hash confirmed changed.
-
----
-
-## 8.51 (2026-08-13, 3rd) — WAVE 5 CHUNK 3: THE PLATFORM KILL SWITCH — AND THE WAVE IS DONE
-
-**Shipped and LIVE through the full §7.60 order (migrations → engine → apps)** —
-`20260813000300` (the `tenant_suspended()` predicate; staff cut at `is_tenant_admin()` +
-`current_coach_id()`; parents cut at **four** choke points + 15 direct policy arms; the
-rejoin and claim gates; platform-only suspend/unsuspend RPCs; the overview's
-DROP+regrant), then engine **v21** (suspended tenants get no invoicing, auto AND forced
-manual), then the Platform-page Suspend/Unsuspend with the staff ban/unban routes.
-Spec: **PRD §4.4 → *Suspend a business***. Deploy record: **`docs/DEPLOYMENT.md`
-§11.14**. Suites: `docs/TESTING.md` §5. New gotchas: **§7.148–151**. The plan executed
-with four recorded deviations — see the chunk 3 header in `docs/plans/WAVE_5_PLAN.md`.
-
-**The review's two major finds, both fixed before commit and sabotage-proven:**
-`parent_in_tenant()` uncut (a suspended tenant's parent could still CREATE a student —
-§7.148) and an RLS-blind inline subselect in `parent_students_select` (§7.149, found red
-by the suite's own dark matrix).
-
-**Verified:** pgTAP **923** (+88, proven red by TEN measured sabotages, header-recorded)
-· Deno 140 ×2 (+1, proven red) · vitest 317 (+6, proven red 3/6) · typecheck both apps ·
-new driver `verify-tenant-suspension` **12/12** across BOTH apps (the bulk ban/unban and
-⚠ RISK 3 in a real browser) · fixture round-trip 24/24 · rollback rehearsed both
-directions (835 after DOWN, 923 after re-apply) · post-deploy grant dump clean (`anon`
-EXECUTE still 18, the overview's regrant landed) · CI green ×2 · live serve-check by
-the user (the Suspend buttons seen on the live Platform page).
 
 ---
 
@@ -475,17 +482,14 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### The sweep — tonight covers all three Wave 5 chunks AND a changed admins driver
+### The nightly sweep — the Wave 5 first-sweep landed, and nothing new was added
 
-**Tonight's nightly is the first to sweep the whole wave** (the Change-owner UI, the
-Coaches-page Disable/Reactivate, the Platform-page Suspend/Unsuspend, and the first runs of
-`verify-coach-disable` and `verify-tenant-suspension`) **and the first to run the modified
-`verify-admins`** — 24 checks now, with a sixth fixture persona (`adminhistory@`) and one
-assertion re-pointed off the copy `20260813000400` made false (§8.52). If `verify-admins`
-reddens, the suspect is `ee15814`; if `platform-admin-scope` or the Platform page reddens,
-`9c1279c`; the Coaches page, `f5d91aa`. Read the triage rules below first, and note the
-suspension driver's fixture REFUSES to apply over a still-suspended tenant and names its
-teardown.
+The 2026-08-13 nightly (`ui-drivers.yml`) was the first to exercise all three Wave 5 chunks and
+the modified `verify-admins` (24 checks, the `adminhistory@` persona). Suspect→commit map if a
+Wave-5 area reddens later: `verify-admins`→`ee15814`; `platform-admin-scope`/Platform
+page→`9c1279c`; Coaches page→`f5d91aa`. **The Attendance money-axis change (§8.53) added NO
+registered driver** — its browser pass was a one-off (seeded, then torn down), so it is covered
+by vitest + that manual 8/8 run and nothing new enters the nightly.
 
 > **Re-read the run, not this paragraph.** `gh run list --workflow=ui-drivers.yml` and the
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
@@ -507,23 +511,12 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 
 ### THE CURRENT BUILD — the build order is spent, and so is the small-items list
 
-**Wave 5 shipped 2026-08-13 (§8.49–8.51); the three small filed items were the follow-on,
-and two of them shipped the same day (§8.52).** `BACKLOG.md` → `## Build order`'s numbered
-list is **exhausted** — what remains is the *Unordered* pool, and the next build is a
-decision to make with the user. `/backlog-prioritisation` exists if the queue should be
-re-sequenced first.
-
-**ONE item remains from the small three, and it is a LIVE DEFECT, not a tidy-up:**
-*The Attendance page's Coach column can name someone who did not teach* — now **M**, not S.
-It was planned, risk-reviewed and deliberately deferred, so pick it up from the finding
-rather than from the symptom: **`classes.coach_id` is the ACCESS axis — mutable and undated
-— and this is the page an admin opens because wages look odd** (§7.152). A class handed over
-on 1 August names the new coach on every July lesson, and the admin "corrects" a correct
-payout. The product choice is already **settled** (name who taught + cover chip + shadows).
-`BACKLOG.md` holds the axis and the four other mitigations; `docs/plans/SMALL_ITEMS_PLAN.md`
-§B2 holds them as steps, assertions and prohibitions. **Its blocking constraint: the module
-must not ship while `wages/page.tsx` still computes its own attribution** — that would be a
-third copy of the rule that decides who gets paid, which is §7.18's shape.
+**Wave 5 shipped 2026-08-13 (§8.49–8.51); the three small filed items were the follow-on —
+two shipped 2026-08-13 (§8.52) and the LAST one shipped 2026-08-14 (§8.53, the Attendance
+money-axis column).** `BACKLOG.md` → `## Build order`'s numbered list is **exhausted** AND the
+small-items list is **fully spent** — what remains is the *Unordered* pool, and the next build
+is a decision to make with the user. `/backlog-prioritisation` exists if the queue should be
+re-sequenced first. There is no queued, decided next build; picking one is the first task.
 
 **The `service_role` question is now ANSWERED, and the answer is "don't build the whitelist"**
 (`BACKLOG.md` carries the 11-call-site audit). `generate-invoices` alone touches 21 of 37 tables
