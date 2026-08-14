@@ -686,7 +686,7 @@ SwimSync served a single business and became wrong the moment it served two.
 
 #### Oversight
 
-- As a **tenant admin**, I want to view attendance, invoices, and credit notes across **my own** coaches so that I can run my business *(implemented: "across all coaches" was the pre-tenancy model — an admin now sees only their own business, §4.3)*
+- As a **tenant admin**, I want to view attendance, invoices, and credit notes across **my own** coaches so that I can run my business *(implemented: "across all coaches" was the pre-tenancy model — an admin now sees only their own business, §4.3)* *(implemented 2026-08-14: the read-only Attendance audit page attributes each lesson on the **money axis** — who was paid, i.e. the substitute if one was named, else the class's dated paid coach — never the class's current `coach_id`, so a class handed to another coach no longer mislabels the outgoing coach's lessons; an amber **Cover** chip marks a substituted lesson and any active class shadow appears on a second line. §7.13, §7.152.)*
 
 ---
 

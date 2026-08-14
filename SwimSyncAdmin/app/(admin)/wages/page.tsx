@@ -15,6 +15,7 @@ import {
   type PayoutSummary,
   type SessionRosterRow,
 } from "@/lib/payoutItems";
+import { resolveShadows } from "@/lib/lessonAttribution";
 
 /**
  * Coach wages — the other half of the billing loop.
@@ -315,12 +316,12 @@ export default function WagesPage() {
 
     // ── Which lessons was each coach an assigned CLASS SHADOW on? ───────────
     // A shadow holds no per-lesson row, so this cannot be read off the roster.
-    // Resolved here, once, into a (coach → lesson ids) map: the assignment is
-    // dated and class-scoped, so a lesson counts when its date falls inside the
-    // range AND no absence was recorded. Mirrors coach_attribution_kind()'s
-    // shadow arm exactly (20260812000200 §7) — including that a SUBSTITUTE row
-    // wins, which buildLessonLines() applies.
-    const shadowedByCoach = new Map<string, Set<string>>();
+    // The dated, absence-aware resolution — coach_attribution_kind()'s shadow
+    // arm (20260812000200 §7) — is NOT rebuilt here: it lives once in
+    // `lib/lessonAttribution.ts` (`resolveShadows`), which the Attendance page
+    // shares. That the SUBSTITUTE wins is applied downstream by
+    // buildLessonLines(), so resolveShadows deliberately does not filter it.
+    let shadowedByCoach = new Map<string, Set<string>>();
     if (sessionIds.size > 0) {
       const [
         { data: assigns, error: assignErr },
@@ -370,21 +371,15 @@ export default function WagesPage() {
           .join(" · ");
       }
 
-      const absent = new Set(
-        (absences ?? []).map((a: any) => `${a.lesson_session_id}:${a.coach_id}`)
-      );
-      for (const ls of lessonRows ?? []) {
-        for (const a of assigns ?? []) {
-          if (a.class_id !== (ls as any).class_id) continue;
-          const d = (ls as any).session_date as string;
-          if (d < a.effective_from) continue;
-          if (a.effective_to && d > a.effective_to) continue;
-          if (absent.has(`${(ls as any).id}:${a.coach_id}`)) continue;
-          const set = shadowedByCoach.get(a.coach_id) ?? new Set<string>();
-          set.add((ls as any).id);
-          shadowedByCoach.set(a.coach_id, set);
-        }
-      }
+      shadowedByCoach = resolveShadows({
+        lessons: (lessonRows ?? []).map((ls: any) => ({
+          lesson_session_id: ls.id,
+          class_id: ls.class_id,
+          session_date: ls.session_date,
+        })),
+        shadows: (assigns ?? []) as any[],
+        absences: (absences ?? []) as any[],
+      }).shadowedByCoach;
     }
 
     setLoadError(rosterError);

@@ -345,8 +345,9 @@ with a substitute and a shadow seeded, and over the Admins delete refusal.
 
 ### B5. Phase B result — recorded 2026-08-13
 
-**Items 2 and 3 are SHIPPED AND LIVE. Item 1 is NOT STARTED** — it is the scope-moved one,
-and the decision was left with the user rather than taken silently.
+**Items 2 and 3 are SHIPPED AND LIVE. Item 1 was BUILT AND LOCAL-VERIFIED on 2026-08-14**
+(next session, at the user's request) — see the item-1 result block below. Not yet
+committed/deployed at time of writing.
 
 - **Item 2** (`378d4aa`) — both divergences closed: the off-pattern extra AND the retired
   class. vitest **326** (+9), proven red three ways (6 of 9 against `main`; the future-session
@@ -377,16 +378,62 @@ and the decision was left with the user rather than taken silently.
 
 ---
 
+### B6. Item 1 result — recorded 2026-08-14 (built, local-verified, not yet deployed)
+
+**Item 1 is now BUILT.** The Attendance page's Coach column speaks the MONEY axis and reads
+`classes.coach_id` nowhere. Four files:
+
+- **`lib/lessonAttribution.ts`** (new, pure) — `attributeLessons()` resolves who taught each
+  lesson in `coach_attribution_kind()`'s order (substitute → terms via `class_rate_on()`'s
+  body verbatim → shadow), and `resolveShadows()` is the single home for the shadow arm. RISK
+  1 discharged: the whole module reads `paid_coach_id`, never `classes.coach_id`
+  (`grep` clean).
+- **`lib/lessonAttribution.test.ts`** (new) — **13 vitest cases**, 6 of them proven red across
+  three targeted sabotages (drop the date bound → the handover + no-rate cases fail; ignore
+  the substitute → the cover + RISK-2 cases fail; skip the absence check → both absence cases
+  fail). RISK 2's substitute-beats-shadow assertion passes with the substitute as main and
+  the coach NOT double-listed as their own shadow. RISK 9's zero-roster/no-handover case
+  renders identically to the old access-axis output (money == access before any handover).
+- **`wages/page.tsx`** (RISK 2) — the inline `shadowedByCoach` for-loop is deleted; the page
+  now calls `resolveShadows()`. There is no longer a second client copy of the shadow arm.
+- **`attendance/page.tsx`** — `lesson_sessions.id` added to the select, the `coaches`
+  (`classes.coach_id`) embed removed; four RLS-scoped loads feed `attributeLessons()`.
+  - **RISK 6** — every load checks its error AND `>= ROW_LIMIT` (silent PostgREST truncation);
+    absences keyed `.in("coach_id", shadowCoachIds)`, class_rates `.in("class_id", classIds)`,
+    substitutes/shadows tenant-wide. A null attribution degrades every Coach cell to "—".
+  - **RISK 7** — no bare `?? []` on any of the four results without a preceding error check;
+    a swallowed failure now shows "—" + an amber banner, never an ordinary-looking name.
+  - **RISK 9** — `AttendanceRow` carries `main_coach_id` + `shadow_coach_ids`; the filter
+    option value is the coach **id**, the predicate is `main === f || shadow.includes(f)`,
+    and the `coach_name` sort accessor returns the **main** coach's name only.
+  - Render: main name, amber **Cover** chip when a substitute is named, `+ Name (shadow)` on a
+    second line.
+
+**Verified:** admin vitest **339** (+13) · typecheck **both apps** clean · full admin suite
+green. Mobile untouched (git scope is 4 admin files), so jest-expo cannot regress and was not
+re-run. **Browser pass DONE (B4):** seeded a class handover (Marcus = Aug terms coach; Bianca
+= new `classes.coach_id` + substitute on one lesson; Chloe = class shadow), drove the admin
+Attendance page — 8/8 checks. The screenshot shows the covered lesson as "Coach Bianca +
+Cover chip", the ordinary Aug lessons as **"Coach Marcus"** (the money axis, NOT the
+access-axis owner Bianca — the exact bug this fixes), and "+ Coach Chloe (shadow)" on both;
+filtering by Marcus (id-keyed) drops the Bianca-covered lesson. Seed torn down, `classes.coach_id`
+restored. **RISK 2's standing prohibition is now satisfied**: item 1 does not ship with
+`wages/page.tsx` computing its own attribution. **Not yet done:** commit.
+
+---
+
 ## Pre-commit gate
 
 Walk these before committing. **A box that cannot be ticked is a blocker, not a caveat.**
 
 **The three that matter most:**
 
-- [ ] **RISK 1** — `grep -n "coach_id" SwimSyncAdmin/lib/lessonAttribution.ts` shows **no**
-      reference to `classes.coach_id`; the ordinary case resolves through `class_rates`.
-- [ ] **RISK 2** — `wages/page.tsx` no longer computes its own attribution, and the
-      substitute-beats-shadow assertion passes with `"substitute"`.
+- [x] **RISK 1** — `grep -n "coach_id" SwimSyncAdmin/lib/lessonAttribution.ts` shows **no**
+      reference to `classes.coach_id`; the ordinary case resolves through `class_rates`
+      (`termsCoachOn()` = `class_rate_on()`'s body verbatim). ✅ 2026-08-14.
+- [x] **RISK 2** — `wages/page.tsx` no longer computes its own attribution (inline loop
+      deleted, calls `resolveShadows()`), and the substitute-beats-shadow assertion passes
+      with the substitute as main. ✅ 2026-08-14.
 - [ ] **RISK 3** — pgTAP refuses the delete **with the audit row present**, the message is
       pinned, and the whole suite was proven red by reverting the migration.
 
@@ -396,11 +443,14 @@ Walk these before committing. **A box that cannot be ticked is a blocker, not a 
       the divergence is filed in `BACKLOG.md`.
 - [ ] **RISK 5** — the ended-month clamp-equivalence assertion ran, and **which way it went is
       recorded in this file**; the count line does not move on a pre-`from` session.
-- [ ] **RISK 6** — every new load asserts `< 1000` and degrades to "—".
-- [ ] **RISK 7** — no bare `?? []` on the three new results.
+- [x] **RISK 6** — every new load checks its error AND `>= ROW_LIMIT`, and a null
+      attribution degrades every Coach cell to "—". ✅ 2026-08-14.
+- [x] **RISK 7** — no bare `?? []` on any of the four new results without a preceding error
+      check. ✅ 2026-08-14.
 - [ ] **RISK 8** — `verify-admins.mjs` updated in the same commit and re-run green.
-- [ ] **RISK 9** — filter and sort keyed by **id**; the zero-roster fixture renders identically
-      to today.
+- [x] **RISK 9** — filter and sort keyed by **id** (option value = coach id, predicate main OR
+      shadow, sort accessor = main name); the zero-roster/no-handover vitest case renders
+      identically to the old access-axis output. ✅ 2026-08-14.
 - [ ] **RISK 10** — `CREATE OR REPLACE` only; DOWN bodies captured from `\sf` on the remote;
       `anon` EXECUTE still **18**.
 - [ ] **RISK 11** — the `audit_log` refusal reads as a sentence, not a table name.

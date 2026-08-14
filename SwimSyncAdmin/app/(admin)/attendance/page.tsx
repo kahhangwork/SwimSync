@@ -7,6 +7,15 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
 import { PackageChip } from "@/components/PackageChip";
+import {
+  attributeLessons,
+  type LessonRef,
+  type LessonAttribution,
+  type ClassRateRow,
+  type SubstituteRow,
+  type ClassShadowRow,
+  type AbsenceRow,
+} from "@/lib/lessonAttribution";
 
 type AttendanceRow = {
   id: string;
@@ -14,9 +23,16 @@ type AttendanceRow = {
   student_name: string;
   class_id: string;
   class_title: string;
-  coach_name: string;
   session_date: string;
   status: string;
+  // The MONEY axis (§7.152): who was PAID for this lesson, never
+  // classes.coach_id. Ids, not names — the filter and sort key on these so two
+  // coaches sharing a name cannot collapse (RISK 9). Null main = the cell shows
+  // "—", either because no rate resolved or because an attribution load failed
+  // (RISK 6/7 — never a name we could not stand behind).
+  main_coach_id: string | null;
+  is_cover: boolean;
+  shadow_coach_ids: string[];
 };
 
 const STATUS_FILTERS = [
@@ -51,6 +67,10 @@ export default function AttendancePage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Kept apart from loadError on purpose: an attribution failure leaves the
+  // audit trail COMPLETE — only the Coach column is unavailable — so it must not
+  // borrow the "records incomplete, do not trust this" framing (RISK 7).
+  const [attribError, setAttribError] = useState<string | null>(null);
   const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
     new Map()
   );
@@ -63,6 +83,11 @@ export default function AttendancePage() {
       .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
   }, []);
 
+  // Names are looked up at render from the coach list — the rows carry ids. A
+  // coach in the tenant is always in this list (the dropdown loads all of them),
+  // so a miss means a genuinely unknown id, not an unloaded name.
+  const coachNameById = new Map(coaches.map((c) => [c.id, c.full_name]));
+
   const sort = useTableSort<AttendanceRow>({
     key: "session_date",
     dir: "desc",
@@ -70,6 +95,10 @@ export default function AttendancePage() {
       // Sort the label, not the enum. `cancelled_rain` and "Cancelled (Rain)"
       // order differently, and A→Z has to mean the A→Z that is on screen.
       status: (r) => STATUS_LABELS[r.status] ?? r.status,
+      // Sort by the MAIN coach's name only — the same rule `status` states:
+      // A→Z must mean the A→Z that is on screen, and the shadow line is not it.
+      coach_name: (r) =>
+        r.main_coach_id ? coachNameById.get(r.main_coach_id) ?? "" : "",
     },
   });
 
@@ -122,10 +151,14 @@ export default function AttendancePage() {
     async function loadRows() {
       setLoading(true);
 
+      // No `coaches` embed any more: that is `classes.coach_id`, the ACCESS
+      // axis, and naming it beside a lesson mis-attributes money the moment a
+      // class changes hands (§7.152). `lesson_sessions.id` is added because the
+      // money-axis resolution is keyed by the lesson, not the class.
       let query = supabase
         .from("attendance")
         .select(
-          "id, status, students!inner(id, full_name), lesson_sessions!inner(session_date, classes!inner(id, title, coaches(id, profiles(full_name))))"
+          "id, status, students!inner(id, full_name), lesson_sessions!inner(id, session_date, classes!inner(id, title))"
         )
         // Ordering by the EMBEDDED date, not by `id`.
         //
@@ -150,23 +183,165 @@ export default function AttendancePage() {
       // reassuring possible rendering of a broken query. This page also has a
       // new way to fail: the ordering and the range filter are both expressed
       // against an EMBEDDED column, which PostgREST can reject outright.
-      setLoadError(error ? error.message : null);
+      if (error) {
+        setLoadError(error.message);
+        setAttribError(null);
+        setRows([]);
+        setLoading(false);
+        return;
+      }
+      setLoadError(null);
+
+      const rawRows = (data ?? []).map((a: any) => ({
+        id: a.id,
+        student_id: a.students?.id ?? "",
+        student_name: a.students?.full_name ?? "—",
+        class_id: a.lesson_sessions?.classes?.id ?? "",
+        class_title: a.lesson_sessions?.classes?.title ?? "—",
+        session_date: a.lesson_sessions?.session_date ?? "—",
+        status: a.status,
+        lesson_session_id: a.lesson_sessions?.id ?? "",
+      }));
+
+      // The distinct lessons behind these rows — one attribution per lesson,
+      // reused across every per-student row of it.
+      const lessonById = new Map<string, LessonRef>();
+      for (const r of rawRows) {
+        if (r.lesson_session_id && r.class_id && !lessonById.has(r.lesson_session_id)) {
+          lessonById.set(r.lesson_session_id, {
+            lesson_session_id: r.lesson_session_id,
+            class_id: r.class_id,
+            session_date: r.session_date,
+          });
+        }
+      }
+      const lessons = [...lessonById.values()];
+      const classIds = [...new Set(lessons.map((l) => l.class_id))];
+
+      const { attribution, attributionError } = await loadAttribution(
+        lessons,
+        classIds
+      );
+      if (cancelled) return;
+
+      setAttribError(attributionError);
 
       setRows(
-        (data ?? []).map((a: any) => ({
-          id: a.id,
-          student_id: a.students?.id ?? "",
-          student_name: a.students?.full_name ?? "—",
-          class_id: a.lesson_sessions?.classes?.id ?? "",
-          class_title: a.lesson_sessions?.classes?.title ?? "—",
-          coach_name:
-            a.lesson_sessions?.classes?.coaches?.profiles?.full_name ?? "—",
-          session_date: a.lesson_sessions?.session_date ?? "—",
-          status: a.status,
-        }))
+        rawRows.map((r) => {
+          // A null attribution (load failed) means EVERY row shows "—" in the
+          // Coach cell, never a name we could not stand behind (RISK 7).
+          const at = attribution?.get(r.lesson_session_id);
+          return {
+            id: r.id,
+            student_id: r.student_id,
+            student_name: r.student_name,
+            class_id: r.class_id,
+            class_title: r.class_title,
+            session_date: r.session_date,
+            status: r.status,
+            main_coach_id: at?.main_coach_id ?? null,
+            is_cover: at?.is_cover ?? false,
+            shadow_coach_ids: at?.shadow_coach_ids ?? [],
+          };
+        })
       );
 
       setLoading(false);
+    }
+
+    /**
+     * Resolve who was PAID for each lesson — substitute, else the class's terms
+     * coach on the date, plus any shadows. All loads are RLS-scoped to the
+     * admin's tenant, and each is checked two ways: a query error, and a result
+     * at the cap (`max_rows = 1000`, which PostgREST truncates SILENTLY —
+     * RISK 6). Either returns a null attribution, so the Coach column degrades
+     * to "—" rather than attributing from half the data.
+     */
+    async function loadAttribution(
+      lessons: LessonRef[],
+      classIds: string[]
+    ): Promise<{
+      attribution: Map<string, LessonAttribution> | null;
+      attributionError: string | null;
+    }> {
+      if (lessons.length === 0) {
+        return { attribution: new Map(), attributionError: null };
+      }
+
+      const [subsRes, ratesRes, shadowsRes] = await Promise.all([
+        // Substitutes are tenant-wide and near-empty by the absence rule; the
+        // whole set is a smaller, header-safe request than `.in(sessionIds)`.
+        supabase.from("session_coaches").select("lesson_session_id, coach_id"),
+        // The MONEY axis. Bounded to the visible classes — a handful of ids.
+        supabase
+          .from("class_rates")
+          .select("class_id, effective_from, paid_coach_id")
+          .in("class_id", classIds),
+        supabase
+          .from("class_shadow_coaches")
+          .select("class_id, coach_id, effective_from, effective_to"),
+      ]);
+
+      const firstErr = subsRes.error ?? ratesRes.error ?? shadowsRes.error;
+      if (firstErr) {
+        return {
+          attribution: null,
+          attributionError: `Could not resolve who taught each lesson: ${firstErr.message}`,
+        };
+      }
+
+      const subs = (subsRes.data ?? []) as SubstituteRow[];
+      const rates = (ratesRes.data ?? []) as ClassRateRow[];
+      const shadows = (shadowsRes.data ?? []) as ClassShadowRow[];
+
+      if (
+        subs.length >= ROW_LIMIT ||
+        rates.length >= ROW_LIMIT ||
+        shadows.length >= ROW_LIMIT
+      ) {
+        return {
+          attribution: null,
+          attributionError:
+            "Too many coaching records to resolve who taught each lesson reliably.",
+        };
+      }
+
+      // Absences only matter for coaches who actually shadow a class, so the
+      // query is keyed on that handful — never the lesson ids, which would put
+      // hundreds of them in the URL and 414 (RISK 6).
+      const shadowCoachIds = [...new Set(shadows.map((s) => s.coach_id))];
+      let absences: AbsenceRow[] = [];
+      if (shadowCoachIds.length > 0) {
+        const { data: absData, error: absErr } = await supabase
+          .from("session_coach_absences")
+          .select("lesson_session_id, coach_id")
+          .in("coach_id", shadowCoachIds);
+        if (absErr) {
+          return {
+            attribution: null,
+            attributionError: `Could not resolve shadow attendance: ${absErr.message}`,
+          };
+        }
+        if ((absData ?? []).length >= ROW_LIMIT) {
+          return {
+            attribution: null,
+            attributionError:
+              "Too many shadow-absence records to resolve reliably.",
+          };
+        }
+        absences = (absData ?? []) as AbsenceRow[];
+      }
+
+      return {
+        attribution: attributeLessons({
+          lessons,
+          substitutes: subs,
+          classRates: rates,
+          shadows,
+          absences,
+        }),
+        attributionError: null,
+      };
     }
 
     loadRows();
@@ -179,7 +354,12 @@ export default function AttendancePage() {
     const matchSearch = a.student_name
       .toLowerCase()
       .includes(search.toLowerCase());
-    const matchCoach = coachFilter === "All" || a.coach_name === coachFilter;
+    // Keyed by id, main OR shadow — the option values are ids now, so two
+    // coaches sharing a name no longer collapse into one filter (RISK 9).
+    const matchCoach =
+      coachFilter === "All" ||
+      a.main_coach_id === coachFilter ||
+      a.shadow_coach_ids.includes(coachFilter);
     const matchStatus = statusFilter === "All" || a.status === statusFilter;
     // By id, not by title: two classes can share a name, and the whole reason
     // to filter by class is to be sure you are looking at exactly one of them.
@@ -231,7 +411,7 @@ export default function AttendancePage() {
         >
           <option value="All">All Coaches</option>
           {coaches.map((c) => (
-            <option key={c.id} value={c.full_name}>
+            <option key={c.id} value={c.id}>
               {c.full_name}
             </option>
           ))}
@@ -299,6 +479,13 @@ export default function AttendancePage() {
         </div>
       )}
 
+      {attribError && !loadError && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {attribError} The records below are complete, but the Coach column is
+          shown as &ldquo;—&rdquo; rather than risk naming the wrong coach.
+        </div>
+      )}
+
       {!loading && !loadError && rows.length === ROW_LIMIT && (
         <p className="mb-3 text-sm text-amber-700">
           Showing the {ROW_LIMIT} most recent records. Narrow the date range to
@@ -341,7 +528,30 @@ export default function AttendancePage() {
                   </span>
                 </Td>
                 <Td className="text-gray-600">{a.class_title}</Td>
-                <Td className="text-gray-500">{a.coach_name}</Td>
+                <Td className="text-gray-500">
+                  {a.main_coach_id ? (
+                    <>
+                      {coachNameById.get(a.main_coach_id) ?? "Unknown coach"}
+                      {a.is_cover && (
+                        <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                          Cover
+                        </span>
+                      )}
+                      {a.shadow_coach_ids.length > 0 && (
+                        <div className="mt-0.5 text-xs text-gray-400">
+                          {a.shadow_coach_ids
+                            .map(
+                              (id) =>
+                                `+ ${coachNameById.get(id) ?? "Unknown coach"} (shadow)`
+                            )
+                            .join(", ")}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </Td>
                 <Td className="text-gray-500">{a.session_date}</Td>
                 <Td>
                   <StatusBadge status={STATUS_LABELS[a.status] ?? a.status} />

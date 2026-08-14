@@ -285,12 +285,11 @@ shipped in the same migration, survives and now has its own test file.)*
 Wave-3-descended items sat unbuilt further down — the exact drift the ⚠ at the top of this
 section warns about, found by `/session-start` on 2026-08-12. Struck in both places this time.)*
 
-**What is still open from Wave 3:** *The Attendance page's Coach column can name someone who
-did not teach* (**M**), below. The product choice was **settled** 2026-08-13 (name who taught,
-cover chip, shadows on a second line) and it was still deferred — the risk review found the
-fallback reads the wrong AXIS (`classes.coach_id` is mutable and undated; money follows
-`class_rate_on().paid_coach_id`), which re-sized it from S. `docs/plans/SMALL_ITEMS_PLAN.md`
-§B2 holds the mitigations.
+**Wave 3 is now fully shipped.** Its last open item — *The Attendance page's Coach column can
+name someone who did not teach* — SHIPPED 2026-08-14 (money-axis attribution via
+`lib/lessonAttribution.ts`, cover chip, shadow line; the struck entry below and §7.152 have the
+detail). The product choice settled 2026-08-13 (name who taught, cover chip, shadows on a second
+line) was built as specified.
 
 _(A third item once sat here — **the attendance screen trusts a `sessionId` in the URL** —
 and shipped 2026-08-10 instead, because the same change removed the caller that passed it.
@@ -661,53 +660,16 @@ itself, and by `set_class_terms()` in the other direction. PRD §7.13, §7.6.
 that could create the state. Removing the state removed the guard too — `20260812000100`, one day
 old, was deleted whole along with its 16 pgTAP checks.
 
-### The Attendance page's Coach column can name someone who did not teach — **M** `[found 2026-08-11]` `[re-sized 2026-08-13]`
-`SwimSyncAdmin/app/(admin)/attendance/page.tsx:162` reads the **class's** coach, so a covered
-lesson shows the wrong name.
-
-**Why:** it is the read-only audit page an admin opens when wages look odd — the one place the
-wrong name is most likely to be believed. Nothing downstream consumes it, so no money moves.
-
-**⚠ IT IS TWO BUGS, AND THE SECOND ONE IS THE DANGEROUS ONE. `classes.coach_id` IS THE WRONG
-AXIS, not merely the un-covered one.** Planned and risk-reviewed 2026-08-13, then deferred —
-the review found that the obvious fix ("fall back to the class's coach when no substitute is
-named") is *also* wrong, and this entry did not say so, which is exactly why the first draft
-of the plan picked it. `20260812000200`'s header states the split at lines 23-24 and
-`sessionRoster.ts:16-24` repeats it:
-
->   ACCESS — the roster + `classes.coach_id` + "am I a shadow TODAY?"
->   MONEY  — `class_rate_on().paid_coach_id` + "was I a shadow ON THAT DATE?"
-
-`classes.coach_id` is **mutable and undated**. A class handed from A to B on 1 August pays
-every July lesson to A, and the access axis names **B** on all of them — so an admin
-reconciling a July payout reads "B taught it", sees Wages pay A, and "corrects" a correct
-payout. **That is how a display-only change reaches money**, and `20260719000800` exists
-because these two were once one query and handing a class over re-priced its entire unpaid
-history. The fix must resolve the ordinary case through `class_rate_on()`, i.e.
-`coach_attribution_kind()`'s `'terms'` arm verbatim. **The new module must not reference
-`classes.coach_id` at all** — its money-side twin `lib/payoutItems.ts` reads it nowhere.
-
-**Settled with the user 2026-08-13, so do not re-litigate:** the column names **who taught**
-(substitute if one is named, else the dated paid coach), with an amber `Cover` chip, **plus**
-a second line naming any active class shadow.
-
-**Why it is M and no longer S,** all from the same review — full detail, with each mitigation
-written as a step, an assertion or a prohibition, in **`docs/plans/SMALL_ITEMS_PLAN.md` §B2**:
-- **The rule already exists twice** — canonically in `coach_attribution_kind()`, and **inline
-  in `wages/page.tsx:316-388`**. A new module that leaves that loop standing makes **three**
-  disagreeing implementations of who gets paid, which is §7.18's shape and §7.18 cost a live
-  underbill. **Ship the module only if the wages page becomes a caller of it.**
-- **`supabase/config.toml:18` sets `max_rows = 1000`** and PostgREST truncates a bare
-  `.select()` there with no error, while this page's date range defaults to empty. Scope
-  `session_coach_absences` by `.in("coach_id", shadowCoachIds)` — a truncated absence set
-  names a shadow who was recorded absent and was **not paid**.
-- **A swallowed load error must not fall through to the class's coach** — that renders the
-  original bug via a network blip.
-- **The filter and sort are keyed by NAME** (`page.tsx:182`, option value `full_name`), so
-  two coaches sharing one collapse. Re-key to ids before adding a second identity per row.
-- **The invariant that protects production:** with zero `session_coaches` and zero
-  `class_shadow_coaches` rows — production's exact state (§3 DORMANT) — the rendered and
-  filtered rows must be **identical to today's**.
+### ~~The Attendance page's Coach column can name someone who did not teach~~ — **SHIPPED 2026-08-14**
+The read-only Attendance audit page now attributes each lesson on the **MONEY axis** — who was
+paid, never `classes.coach_id` — so a class handed over no longer names the new coach on the
+outgoing coach's lessons. The resolution lives once in `SwimSyncAdmin/lib/lessonAttribution.ts`
+(`attributeLessons()` mirrors `coach_attribution_kind()`: substitute → `class_rate_on()` terms
+→ shadow), and `wages/page.tsx` now shares its `resolveShadows()` so there is no longer a second
+client copy of the shadow arm. The column names who taught, an amber `Cover` chip when a
+substitute is named, and `+ Name (shadow)` on a second line; the filter/sort are re-keyed to
+coach **ids**. The plan and every risk mitigation are in `docs/plans/SMALL_ITEMS_PLAN.md` §B2/§B6;
+the axis trap is **§7.152**. Browser-verified with a seeded handover + substitute + shadow (8/8).
 
 ### ~~A set-returning gate for the coach's roster probes~~ — **SHIPPED 2026-08-12**
 `sessions_i_am_main_on(uuid[]) RETURNS SETOF uuid`, in the same migration as the guard above
