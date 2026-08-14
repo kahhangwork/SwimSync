@@ -2034,9 +2034,30 @@ both un-claimed, or both linked to the **same** parent. A child a family has **c
 confirmed, distinct child and is never flagged against an un-claimed look-alike; that was a
 false positive on shared first names in Singapore, e.g. two different "Anya"s. The case this
 gives up — a coach placeholder that is really a registered family's child — is caught earlier
-by the **claim flow**, which offers the un-claimed match to the parent at registration. A
-compensating check on the admin's Add-student step, keyed on the parent phone, is in
-`BACKLOG.md`.)*
+by the **claim flow**, which offers the un-claimed match to the parent at registration, and
+now also at the moment of creation — see *Catching a duplicate before it is created* below.)*
+
+#### Catching a duplicate before it is created *(implemented 2026-08-14)*
+
+When the admin adds an unregistered child (Students → *Add student*), SwimSync checks the
+roster first and, if a possible duplicate is found, shows it and lets the admin decide —
+*Add anyway* proceeds, or they close the dialog and find the child already on the roster.
+The check is **advisory**: it never blocks the add (an existing exact name + date-of-birth
+collision is still refused separately), and it fails open if it cannot run.
+
+A child is surfaced when **either** the entered parent phone matches — the child's own
+contact number, or a **claiming parent's account** number — **or** the name matches the
+same rule the claim flow uses. Phone matches are shown first and separately from same-name
+matches, because a shared phone is the stronger signal; a name coincidence is the weaker.
+Both **active and inactive** children are checked — a family that left and returns is the
+commonest silent duplicate. Matches are shown with the child's **full name** and who has
+claimed them (the admin is looking at their own business, so nothing is masked).
+
+A phone match **never blocks** the add: siblings share a parent's phone, so this is a
+prompt, not a refusal. The warning exists because the *Duplicates that already exist* banner
+above deliberately stops comparing a claimed child against an un-claimed look-alike — so a
+placeholder created for a family that is already registered would otherwise have no
+automatic net once created.
 
 ### 7.19 The Parent's Contact Details *(implemented 2026-07-26)*
 
