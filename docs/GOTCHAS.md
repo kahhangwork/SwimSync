@@ -2638,3 +2638,33 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `students.full_name`**, or a renamed child's resent email will not match the document it
     claims to reproduce. Named here because the trigger (resend) does not exist yet, so nothing
     else will remind the person who builds it.
+
+156. **A SECURITY DEFINER function CANNOT tell a service/nightly caller from a client one
+    via `current_user` — inside a definer function it is ALWAYS the owner (`postgres`). The
+    seam is `auth.uid()`: NULL only when there is no JWT (service_role key / a direct
+    `psql`/cron call), the caller's uid otherwise.** `recompute_package_extensions`
+    (`20260815000200`) first shipped with `current_user IN ('postgres','service_role')` as its
+    "is this the trusted service path?" test — so *every* caller, including an authenticated
+    parent reaching it through PostgREST, took the full-access branch and the tenant/parent
+    authz below it never ran. A pgTAP case (a parent recomputing another tenant → expected
+    `42501`) caught it: "caught: no exception". Fixed to `v_is_service := auth.uid() IS NULL`.
+    **The rule to carry: in any DEFINER function, authorise with `auth.uid()` /
+    `can_admin_tenant()` / `current_parent_id()`, never `current_user`** — `current_user` only
+    works in a plain (invoker) trigger like `enforce_parent_package_lifecycle`, which is exactly
+    why the wrong instinct feels right. Proven by the pgTAP that goes green only after the seam
+    changes.
+
+157. **A new column on a table whose UPDATE policy is ROW-scoped is client-writable the moment
+    it exists — the policy authorises the ROW, the trigger must pin the COLUMN.**
+    `parent_packages_update` allows `parent_id = current_parent_id()`, so a parent can PostgREST
+    any column of their own row that no trigger clause holds still. Every money-adjacent column
+    added in `20260815*` (`start_date`, `validity_weeks`, `ph_extension_weeks`,
+    `manual_extension_days`, `ph_ack_weeks_*`) had to be named in
+    `enforce_parent_package_lifecycle`'s authenticated-DML branch or a parent could set
+    `manual_extension_days = 365` or pre-acknowledge an announcement nobody made. The subtle
+    one: `start_date` had to be pinned on a **pending** row too, not just once active — a parent
+    could otherwise park a start date on their own request that the admin's confirm step would
+    then adopt (the definer RPCs, arriving as `postgres`, still write these columns; same seam
+    as §7.156). **The rule: every new `parent_packages`-family column gets a pin clause in the
+    same migration that adds it, and a pgTAP that proves a parent's direct UPDATE of it fails
+    (shown red first).** The UPDATE *policy* is not column-scoped and will not save you.

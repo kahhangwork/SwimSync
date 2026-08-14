@@ -447,3 +447,26 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     **The 37 existing tables were NOT swept** (deliberate — `generate-invoices` reads 21 of them
     through `service_role`); this closes the automatic leak for FUTURE objects only. No behaviour
     a user can see changed. See §11.7 for the standing consequence for later migrations.
+
+21. **Deploy record (2026-08-15): weeks / start-date / holiday-extension packages —
+    migrations + engine + apps, LIVE.** Commits `a9c578a` (backend) + `c544f74` (apps),
+    migrations `20260814000400`…`20260815000400`. The full backend-first sequence, done
+    correctly **after getting it wrong first**: the apps commit was pushed to `main` (which
+    deploys Vercel) BEFORE the schema was on prod — the §7.60 trap, third time — and the live
+    Packages/Billing pages would have queried columns/RPCs prod lacked. **Recovery, now the
+    worked pattern for this mistake:** `git revert` the frontend commit (Vercel rebuilds the
+    apps at the safe pre-feature state; the backend commit stays on `main`, inert because a git
+    push applies neither migrations nor the engine), deploy the backend, then re-land the
+    frontend (`git cherry-pick`). Order actually followed: (1) `supabase db push` — 6 migrations,
+    `migration list --linked` remote filled, backfills touched **0 rows** (prod holds no
+    packages, so no expiry moved); (2) rollback DOWN rehearsed locally then committed
+    (`supabase/rollback/20260815_package_weeks_holidays_DOWN.sql`, `98cecbb`) — owed *before* the
+    push, done after; (3) `supabase functions deploy generate-invoices` (v22, downloaded bundle
+    grep-confirmed `recompute_package_extensions`); (4) **grant dump** (`supabase db dump
+    --linked`): all 6 new functions `REVOKE…PUBLIC` + `authenticated`/`service_role` only, zero
+    `anon`; `package_extension_events` SELECT-only, `tenant_public_holidays` all four verbs — the
+    whitelist; (5) re-land apps → Vercel. The engine now recomputes holiday extensions before
+    every billing run. **Dormant on prod:** no package is sold, so start-date, holiday extension,
+    acknowledge and manual-extend have never fired on real data — first firing is the first sale.
+    The one UI check the auth gate blocks (a served-bundle grep, §11.19's problem) stands: log in
+    and open Packages / Holidays.

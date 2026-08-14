@@ -1,14 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-14 (5th) — **`service_role` default-privilege grant turned OFF, LIVE**
-(§8.57): migration `20260814000300` stops NEW objects being handed to `service_role`
-automatically (the `anon` sibling of `20260804000400`). The 37 existing tables keep their
-grants, so `generate-invoices` is untouched; the whitelist idea was rejected (`docs/DEPLOYMENT.md`
-§11.20). Backend-only — no behaviour a user sees changed._
+_Last updated: 2026-08-15 — **weeks / start-date / holiday-extension PACKAGES shipped LIVE**
+(§8.59): products sold in WEEKS, a per-purchase START DATE (smart-defaulted to when coverage
+ends), holiday validity AUTO-EXTENSION with a loud per-role acknowledge, and admin
+manual-extend. Migrations `20260814000400`–`20260815000400`, engine, both apps — all on prod,
+grant dump clean. **DORMANT** (no package sold on prod). PRD §7.16 · `docs/DEPLOYMENT.md` §11.21._
 
-_Previously, 2026-08-14 (4th) — **Add-student duplicate WARNING shipped, LIVE** (§8.56):
-Students → Add student checks the roster first and, on a possible duplicate (phone OR name,
-incl. claimed + inactive), offers **Add anyway** — `find_roster_duplicates` RPC (PRD §7.18)._
+_Previously, 2026-08-15 — **stale per-coach PayNow QR column removed from the admin Coaches
+page** (§8.58): the QR is the BUSINESS's, managed on mobile — the column was a mislabeled
+read-only mirror. App-only, LIVE (`892e2cc`)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -119,7 +119,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | Coach wages — effective-dated rates, the pay-decision surface | UI + backend, LIVE | PRD §7.13 · §8.3 |
 | Active/inactive families and children, per business | UI + backend, LIVE | PRD §7.14 · §8.4 |
 | Effective-dated class terms — a lesson is priced by its OWN date | UI + backend, LIVE | PRD §7.3 · §8.3 |
-| Prepaid lesson packages | pgTAP + Deno + driver, LIVE | PRD §7.16 · §8.8 |
+| Prepaid lesson packages — sold in WEEKS, per-purchase start date, holiday auto-extension, admin extend | pgTAP + Deno + vitest + jest, LIVE 2026-08-15 | PRD §7.16 · §8.59 |
 | Package purchases numbered + QR-payable (`PKG-YYYY-NNNN`) | pgTAP 12 + 2 drivers, LIVE 2026-08-09 | PRD §7.16 · §8.37 |
 | Every child's name carries their payment method (per-child, category-aware) | pgTAP + vitest, LIVE | PRD §7.16 · §8.23 |
 | Fee-free payment collection — `INV-YYYY-NNNN`, dynamic QR, tokenized page, WhatsApp queue | pgTAP + Deno ×2 + vitest + jest + driver, LIVE | PRD §7.21 · §8.26 |
@@ -156,7 +156,10 @@ This is the half of "verified" that a PRD cannot tell you, so it is the part of 
 earns its place. **Shipped ≠ exercised**, and a guard that has never fired in production
 is a guard whose first real firing is still ahead of you.
 
-- **Packages** — no package has been sold on production.
+- **Packages** — no package has been sold on production, so the whole 2026-08-15 weeks/start-date
+  layer is dormant too: **no start date, holiday extension, acknowledge or manual-extend has ever
+  fired on real data.** First firing is the first sale. Its guards (the §7.156/§7.157 pins, the
+  no-cascade recompute, the sealed-month safety) are all verified locally only.
 - **Billing a month LATE** — no production month has been billed late, so `markable_floor`'s
   reopened window has never been used. That is the point: it is insurance, shipped ahead of
   the trigger its own backlog item named.
@@ -370,59 +373,43 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
-## 8.57 (2026-08-14, 5th) — TURN OFF THE `service_role` DEFAULT-PRIVILEGE GRANT
+## 8.59 (2026-08-15) — PACKAGES: WEEKS, START DATES, HOLIDAY AUTO-EXTENSION, MANUAL EXTEND
 
-**The last decided backend item, shipped end to end, LIVE** (`8263f73`, migration
-`20260814000300`). The sibling of `20260804000400` (which did `anon` + `PUBLIC`): the
-`pg_default_acl` rows owned by `postgres` no longer hand `service_role` a grant on every new
-function/table/sequence. **The 37 existing tables were deliberately NOT swept** —
-`generate-invoices` reads 21 of them through `service_role`, and revoking an existing grant
-risks `permission denied` inside the invoice engine — so this closes the *automatic* leak for
-FUTURE objects only. The whitelist question this answered was **rejected** (surface too big,
-exposure already bounded by the secret key, and it would not defend a leaked-key
-`auth.admin.deleteUser` anyway); reasoning kept as a `BACKLOG.md` *Deliberately not doing* row.
+**The whole weeks/holiday feature, built across four phases and SHIPPED LIVE** (backend
+`a9c578a` + apps `c544f74`; migrations `20260814000400`…`20260815000400`). Products are sold in
+**weeks**; a purchase carries an admin-set **start date**, smart-defaulted to when the family's
+current coverage ends (min of forecast-exhaustion and expiry); validity **auto-extends one week
+per holiday-affected week** (two classes hit in one week = +1, not +2), recomputed live and
+**loud** with a per-role acknowledge (parent + admin independent; admin *Acknowledge all*); and
+the admin can **manually extend**. Date-axis only — `value_remaining` untouched, and an extension
+can never touch a sealed month. Per-business holiday calendar with data.gov.sg **CSV import**.
+Settled via `/plan-with-confidence` + `/plan-review` (Fable); full design + risk mitigations:
+**`docs/plans/PACKAGE_WEEKS_HOLIDAYS_PLAN.md`**. Behaviour: **PRD §7.16**.
 
-**Verified:** applied local (pgTAP **952**) and to production, where the built-in probe RAN and
-passed — `probes clean: functions, tables, sequences` — the only place §7.39 makes the FUNCTIONS
-half meaningful. Fresh objects grant `service_role` nothing; engine tables unchanged; rollback
-DOWN rehearsed. Deploy record + the standing consequence for later migrations (a NEW feature's
-table must `GRANT … TO service_role` explicitly or fail loud in dev): **`docs/DEPLOYMENT.md`
-§11.20 and §11.7**.
+**Two bugs the tests caught mid-build, now gotchas:** a SECURITY DEFINER function can't tell
+service from client via `current_user` (§7.156), and a new `parent_packages` column is
+parent-writable until the trigger pins it (§7.157). **Hit §7.115 again** — I re-derived
+`package_live_balances` from the ORIGINAL migration and silently reverted its make-up-category
+body; read the LIVE body via `pg_get_functiondef`. Fable **commit-review** caught the recompute
+not being wired into holiday changes/the engine (would strand tail lessons ad-hoc) and a
+pending-`start_date` hole — both fixed before ship.
 
-## 8.56 (2026-08-14, 4th) — WARN ON A POSSIBLE DUPLICATE AT ADD-STUDENT
+**The §7.60 deploy order was got wrong a THIRD time** (apps pushed to `main` before the schema was
+on prod) and recovered by **revert-frontend → deploy backend → re-land** — that worked pattern
+and the full grant-dump/probe record are **`docs/DEPLOYMENT.md` §11.21**. Verified: pgTAP **1007**
+(only the pre-existing `coach_disable` date-flake red — fails on clean `main` too), Deno **143 ×2**,
+admin vitest **368**, app jest **363**; suites in `docs/TESTING.md` §5. **DORMANT on prod** — no
+package sold, so no guard here has fired on real data; first firing is the first sale.
 
-**A backlog item, built and shipped end to end, LIVE** (`920ead6` migration + `95c9304` app).
-Students → *Add student* now checks the roster before creating an unregistered child and, if a
-possible duplicate is found, shows it and flips the button to **Add anyway**. This closes the gap
-§8.55 opened: the merge dialog is only reachable from the "possible duplicate" banner, which no
-longer nets a claimed-vs-unclaimed pair — so a placeholder for an already-registered family had
-**no automatic catch once created**. Settled with the user through `/plan-with-confidence` +
-`/plan-review`.
+## 8.58 (2026-08-15) — REMOVE THE STALE PER-COACH PayNow QR COLUMN
 
-**Shipped, backend-first (§7.60):** migration `20260814000200` —
-`find_roster_duplicates(tenant, name, phone, dob)`, admin-only SECURITY DEFINER, tenant-scoped,
-returns **unmasked** names (own business). Signals (OR): entered phone matches a child's
-provisional number OR a **claiming parent's account**; or `names_match`. A known-different DOB
-disqualifies a name-only match; phone sorts before name; **includes INACTIVE + CLAIMED rows**; cap
-5. **Advisory — never blocks a write; a phone match never hard-blocks (siblings share a phone).**
-Then the app (`95c9304`): warn+confirm in `handleAddStudent`, **fail-open**, reset-on-edit,
-phone/name grouping (`lib/rosterDuplicates.ts`). Spec: **PRD §7.18**. Design + `/plan-review`
-mitigations (RISK 1–6): **`docs/plans/ADD_STUDENT_DUP_WARNING_PLAN.md`**. Deploy:
-**`docs/DEPLOYMENT.md` §11.19**.
-
-**One deviation from the filed item, decided with the user:** built as phone **OR** name, not
-phone-only — name-only is what catches the dad-signed-up / mum's-number-keyed case, which is a
-name-only match against a **claimed** child (what §8.55 turned off for the persistent banner —
-correct here as a one-shot dismissable prompt). `/plan-review` caught the plan's own error before
-any code: copying the banner's active-only rule would have missed a returning family (RISK 1).
-
-**Verified:** pgTAP **952** (+14; cross-tenant non-leak and inactive-included each proven red) ·
-vitest **356** (+6) · typecheck both apps · **live browser 11/11** (phone, name+inactive,
-Add-anyway proceeds, reset-on-edit) · CI green both commits · production **grant dump clean**
-(`find_roster_duplicates` `authenticated`-only, `anon` EXECUTE still **18**). Commit-review
-(subagent) found no blockers; three low fixes applied (stale-state reset on open/close, dead
-`class_title` dropped, explicit success reset). **§7.31 serve-check NOT completed** — the admin
-page is auth-gated; see `docs/DEPLOYMENT.md` §11.19 for why and what stood in.
+**App-only cleanup, LIVE** (`892e2cc`). The admin Coaches page carried a "PayNow QR" column +
+Uploaded/Missing badge + a QR action/modal — all a **mislabeled per-coach mirror** of the
+BUSINESS's QR (PRD §7.10), which is uploaded on the coach's mobile Settings screen, not the admin
+panel. Removed the column, badge, action, modal, the `qrModal` state, the `tenants(paynow_qr_url)`
+read, the sort accessor and the `QrCode` import; table 6→5 columns. No PRD/BACKLOG change — no doc
+line described the column and the QR itself is unchanged. Verified: typecheck + admin vitest 356;
+commit-reviewed. `verify-coach-roster` has no QR assertions, so nothing there broke.
 
 ---
 
@@ -501,22 +488,21 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE CURRENT BUILD — the build order is spent, and so is the small-items list
+### THE CURRENT BUILD — a big feature just shipped; no decided next build
 
-**Wave 5 shipped 2026-08-13 (§8.49–8.51); the small filed items followed (§8.52–8.53); then
-2026-08-14 shipped, in order, the student **rename** (§8.54), the duplicate-**banner** fix
-(§8.55), the Add-student duplicate **warning** (§8.56), and the `service_role`
-default-privilege revoke (§8.57 — the last decided backend item).** `BACKLOG.md` →
-`## Build order`'s numbered list is **exhausted**, the small-items list is **fully spent**, and
-the one clean infra one-liner is **now done** — what remains is the *Unordered* pool, and the
-next build is a decision to make with the user. `/backlog-prioritisation` exists if the queue
-should be re-sequenced first. **There is no queued, decided next build; picking one is the first
-task.**
+**2026-08-15 shipped the weeks/start-date/holiday-extension PACKAGES feature end to end and LIVE
+(§8.59)** — the largest single build in a while, and the first that came from an ad-hoc user
+request rather than the filed queue. Before it: Wave 5 (§8.49–8.51), the small items (§8.52–8.53),
+and 2026-08-14's rename/banner/warning/`service_role` chain (§8.54–8.57). `BACKLOG.md` →
+`## Build order` is still **exhausted** and the small-items list **spent**; what remains is the
+*Unordered* pool. **There is no queued, decided next build; picking one is the first task.**
+`/backlog-prioritisation` exists if the queue should be re-sequenced first.
 
-**The `service_role` question is CLOSED (§8.57).** The whitelist was rejected and the one-liner
-— turn off the default-privilege grant the way `20260804000400` did for `anon`/`PUBLIC` — shipped
-as `20260814000300`. Full reasoning: `BACKLOG.md` → *Deliberately not doing* (the 11-call-site
-audit) and `docs/DEPLOYMENT.md` §11.20/§11.7. Nothing left to decide here.
+**One thing to actually do first:** the packages deploy left a single **manual UI check** the auth
+gate blocks (§11.19's problem) — **log in to `admin.swimsync.sg`, open Packages (should read
+"Weeks valid" + a Start-date field) and the new Holidays page.** Everything backing them is
+verified live (migrations, engine bundle grep, grant dump). One follow-up is filed: a Playwright
+driver for the new package UI (`BACKLOG.md` → *Billing and payments*).
 
 ### Triage rules, when the sweep does redden
 
@@ -539,15 +525,14 @@ audit) and `docs/DEPLOYMENT.md` §11.20/§11.7. Nothing left to decide here.
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **The migration queue is EMPTY.** The latest applied is
-`20260814000300` (`service_role` default revoke, §8.57); production confirmed caught up
-2026-08-14, 0 pending through `…000300`. §8.57 was a backend-only change (no app branch to
-sequence against); §8.56 remains the freshest worked example of the full ordering gate below:
-migration to `main` ALONE → `db push` → grant dump → **then** the app commit, so Vercel
-never built an app calling an RPC production lacked. **The rule chunk 1 bought is about ORDER, not
-content (`docs/DEPLOYMENT.md` §11.9): if a wave is split across worktrees, its migration must
-land BEFORE the first app branch does.** A worktree cannot author one, so no worktree can see
-that the deploy is incomplete — and both here pushed correct code onto a database that did not
-have the schema yet. §7.123 still applies to signatures. Whatever comes next: still one at
+`20260815000400` (coverage-respects-start-date, §8.59); production confirmed caught up
+2026-08-15 via `supabase migration list --linked`, all six of the feature's migrations with the
+`remote` column filled. **§8.59 is the freshest — and a CAUTIONARY — worked example of the ordering
+gate:** its apps commit was pushed to `main` BEFORE the schema was on prod (the §7.60 trap, third
+time), which would have broken the live Packages/Billing pages. Recovered by **revert-frontend →
+`db push` + engine deploy + grant dump → re-land frontend** (`docs/DEPLOYMENT.md` §11.21). The rule
+stands: migrations to prod (and the engine) FIRST, apps to `main` LAST. §7.123 still applies to
+signatures. Whatever comes next: still one at
 a time (§7.55), a worktree never authors one, and budget the post-deploy grant check (§7.39,
 §7.89) **and** the rollback rehearsal (§7.93 — running the DOWN file is the half that finds the
 bugs). **Don't take `supabase db push`'s own output as proof it applied:** it printed a

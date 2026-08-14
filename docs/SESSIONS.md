@@ -29,6 +29,8 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.57** | 2026-08-14 | Turn OFF the `service_role` default-privilege grant (`20260814000300`), LIVE; whitelist rejected | `docs/DEPLOYMENT.md` §11.20 · BACKLOG *Deliberately not doing* |
+| **8.56** | 2026-08-14 | Warn on a possible duplicate at Add-student: `find_roster_duplicates` (`20260814000200`) + app, LIVE | PRD §7.18 · `docs/plans/ADD_STUDENT_DUP_WARNING_PLAN.md` |
 | **8.55** | 2026-08-14 | Duplicate banner (`70b5e32`, app-only) compares only same-parent-situation rows — no false flag on a claimed child | PRD §7.18 · `docs/DEPLOYMENT.md` §11.18 |
 | **8.54** | 2026-08-14 | Set a claimed child's real name: `rename_student` (`20260814000100`) + Students Rename + claim name picker | PRD §7.17 · `docs/DEPLOYMENT.md` §11.17 · §7.154–155 |
 | **8.53** | 2026-08-14 | Attendance Coach column speaks the money axis (`f2fd7bc`), not `classes.coach_id`; app-only | PRD §7.13 · `docs/DEPLOYMENT.md` §11.16 · §7.152 · `SMALL_ITEMS_PLAN.md` |

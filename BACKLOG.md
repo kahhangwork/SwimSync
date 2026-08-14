@@ -1,9 +1,8 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-14 (3rd) — **`service_role` whitelist question RESOLVED** — rejected
-(don't build it), and the one-liner that WAS worth doing shipped: `20260814000300` turns off
-the `service_role` default-privilege grant (`docs/DEPLOYMENT.md` §11.20). Item removed from the
-Unordered pool; reasoning kept as a *Deliberately not doing* row._
+_Last updated: 2026-08-15 — **weeks/start-date/holiday-extension packages shipped LIVE**
+(PRD §7.16, `docs/DEPLOYMENT.md` §11.21); one follow-up filed under *Billing and payments*:
+a Playwright driver for the new package UI (with the recompute perf-bound note folded in)._
 
 _Previously, 2026-08-14 (2nd) — **Catch a duplicate at the admin's Add-student step**
 SHIPPED and removed (`find_roster_duplicates`, PRD §7.18). Built as phone **OR** name (not
@@ -758,6 +757,22 @@ filter (per-tenant threshold) but the nudge still travels by hand. The building 
 exist: `package_live_balances()` is the number, and the `package-emails` function is
 the delivery path — this is a scheduled check away (needs cron, like the reminder
 chain).
+
+### A Playwright driver for the weeks/holiday package UI — **S** `[deferred 2026-08-15]`
+The loud/acknowledge badge (both apps), the Holidays page + CSV import, the Start-date
+field, and the Extend control shipped 2026-08-15 (PRD §7.16) with **no registered UI
+driver** — covered by pgTAP + Deno + vitest + jest, but not exercised in a browser in the
+nightly sweep.
+
+**Why:** the logic is DB-tested, but the loud→acknowledge→quiet transition and the CSV
+import are genuinely UI flows; the nightly sweep is where a rendering/wiring regression
+would surface. **Notes:** model on `verify-packages.mjs`; needs a fixture that seeds a
+holiday + an enrolment so recompute produces a real extension. While here, consider the
+deferred **recompute perf bound** (Fable review #9): `recompute_package_extensions` loops
+every `status='active'` package on each page load — status never flips at expiry, so this
+grows unboundedly over years. Bounding it (skip packages whose effective end is > N months
+past) is safe **only** if a late-added holiday inside an old nominal window can still
+resurrect an expired package — check that before adding the bound.
 
 ### In-app package refunds — **S**
 Record a refund against a cancelled package instead of settling fully offline.
