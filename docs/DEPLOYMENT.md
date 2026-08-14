@@ -396,3 +396,12 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     message. **Visible effect on production: immediate and real** — unlike the money-axis deploy,
     this one is usable the moment it lands (the admin can rename any child), and Anya-type
     placeholders can be corrected now.
+
+18. **Deploy record (2026-08-14): the duplicate-banner narrowing — app-only, and the
+    serve-check by CHUNK HASH not by string.** `70b5e32`, no migration/grant/edge surface, so
+    Vercel-from-`main` was the whole deploy (pushed via `!`). CI green (4m35s). **The §7.31 catch:
+    a pure LOGIC change adds no user-visible string to grep for** — the fix is a boolean in
+    `duplicateStudents.ts`. So the serve-check is §7.51's other half: the served
+    `students/page-*.js` chunk hash moved `bc711a33…` (the rename deploy) → `4d4a0dc3…`, proving
+    the new bundle shipped. Behaviour: the "possible duplicate" banner no longer flags a claimed
+    child against an un-claimed look-alike (PRD §7.18).

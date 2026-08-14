@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.53** | 2026-08-14 | Attendance Coach column speaks the money axis (`f2fd7bc`), not `classes.coach_id`; app-only | PRD §7.13 · `docs/DEPLOYMENT.md` §11.16 · §7.152 · `SMALL_ITEMS_PLAN.md` |
 | **8.52** | 2026-08-13 | Admin audit trail survives deletion (`20260813000400`); pre-flight sees extra + retired-class lessons | PRD §4.3, §7.7 · `docs/DEPLOYMENT.md` §11.15 · §7.152–153 |
 | **8.51** | 2026-08-13 | **Wave 5 chunk 3** (`20260813000300` + engine v21): tenant suspension; the wave is complete | PRD §4.4 · `docs/DEPLOYMENT.md` §11.14 · §7.148–151 |
 | **8.50** | 2026-08-13 | **Wave 5 chunk 2** (`20260813000200`): disable a coach, atomic handover | PRD §4.3 · `docs/DEPLOYMENT.md` §11.13 · §7.147 |

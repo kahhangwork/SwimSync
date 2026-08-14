@@ -173,7 +173,7 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
 _Frontend tests:_
-`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **27 files, 349
+`SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **27 files, 350
 tests** (2026-08-14; the runner is the fact, this number is a hint that drifts). The student
 rename (2026-08-14) added `lib/claimNaming.test.ts` — the claim-approval naming decisions,
 pure: the certainty-dependent picker default (parent's name for a confirmed claim, current for

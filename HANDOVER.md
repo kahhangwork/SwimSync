@@ -1,14 +1,13 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-14 (2nd) — **Student RENAME shipped, LIVE** (§8.54): a parent's
-provided name can now replace the coach's placeholder (the "Anya (big)" bug) — new
-`rename_student()` RPC + a Students-page Rename action + a claim-approval name picker.
-Backend-first deploy (migration `20260814000100` → grant dump → app). Two new gotchas
-**§7.154–155**._
+_Last updated: 2026-08-14 (3rd) — **Duplicate-banner false positive FIXED, LIVE** (§8.55): the
+"possible duplicate" banner no longer flags a CLAIMED child against an un-claimed look-alike
+(two different "Anya"s) — it compares only **same-parent-situation** rows (PRD §7.18). Follow-up
+(catch it at Add-student, by phone) filed in `BACKLOG.md`._
 
-_Previously, 2026-08-14 — **The Attendance Coach column speaks the money axis** (§8.53), not
-`classes.coach_id` (§7.152); the small-items list and Wave 3 are both fully spent, so the
-build queue is now the unordered pool._
+_Previously, 2026-08-14 (2nd) — **Student RENAME shipped, LIVE** (§8.54): a parent's provided
+name can replace the coach's placeholder (the "Anya (big)" bug) — `rename_student()` RPC +
+Students Rename + a claim-approval name picker. Backend-first deploy; gotchas **§7.154–155**._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -370,6 +369,30 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.55 (2026-08-14, 3rd) — THE DUPLICATE BANNER NO LONGER CRIES WOLF ON A CLAIMED CHILD
+
+**A production false positive, reported right after §8.54 and fixed the same session, LIVE
+(`70b5e32`, app-only).** The Students-page "Two records may be the same child" banner flagged a
+CLAIMED child ("Anya Gundecha", parent Priya) against an un-claimed look-alike ("Anya (Small)")
+that shares only a first name. Cause: `findDuplicatePairs` (`lib/duplicateStudents.ts`) skipped a
+pair only when BOTH sides had a parent and they differed — a pair where one side had no parent
+slipped through. Narrowed to compare **only same-parent-situation rows** (both un-claimed, or
+both the same parent), so a claimed child is never matched against an un-claimed one. The two
+real cases stay flagged (two un-claimed look-alikes; a parent who added their own child twice).
+Spec: **PRD §7.18**. Deploy: **`docs/DEPLOYMENT.md` §11.18**.
+
+**The case it deliberately gives up** — a coach placeholder that is really a registered family's
+child — is already caught by the claim flow, which offers the un-claimed match to the parent at
+registration (`find_student_candidates`: phone → name+DOB → name-similar, NOT first-name-only).
+The compensating control (**catch it at the admin's Add-student step, keyed on the parent PHONE**
+— names collide too often in SG) is filed in **`BACKLOG.md`** with the settled reasoning.
+
+**Verified:** vitest **350** (+1; the Anya case proven red against the old rule) · four tests
+re-fixtured off the now-excluded "one parented, one not" shape · the inactive test re-isolated so
+`isActive` is its only skip reason · typecheck · CI green · deploy confirmed by the served
+`students/page-*.js` chunk hash changing (a pure-logic change adds no string to grep — §11.18).
+Review (subagent) found one doc mis-cite (§7.4→§7.18), fixed; no code blockers.
+
 ## 8.54 (2026-08-14, 2nd) — SET A CLAIMED CHILD'S REAL NAME (THE "ANYA (big)" BUG)
 
 **A user-reported bug, verified and fixed end to end, LIVE.** When a parent claims an existing
@@ -399,35 +422,6 @@ Rename flow + the friendly collision error · CI green on both commits · produc
 clean (`rename_student` `authenticated`-only, `anon` EXECUTE still 18) · served bundles
 grepped for the new strings. **Second gotcha graduated:** the invoice **email** reads live
 `full_name`, so a future resend must read the snapshot (**§7.155**).
-
-## 8.53 (2026-08-14) — THE LAST SMALL ITEM: THE ATTENDANCE COACH COLUMN, ON THE MONEY AXIS
-
-**The third of the three small filed items — deferred and re-sized S → M in §8.52 — SHIPPED,
-LIVE (`f2fd7bc`).** The read-only Attendance audit page's Coach column read `classes.coach_id`,
-the ACCESS axis (mutable, undated), so a class handed to a new coach named that coach on every
-one of the outgoing coach's past lessons — on the exact page an admin opens to reconcile a
-payout (§7.152). It now resolves who was **PAID**: new pure module
-`SwimSyncAdmin/lib/lessonAttribution.ts` mirrors `coach_attribution_kind()` (substitute →
-`class_rate_on()` terms → shadow) and reads `classes.coach_id` nowhere. Its `resolveShadows()`
-is the **one** client home for the shadow arm — `wages/page.tsx`'s inline loop was deleted and
-now calls it, so there is no third copy of who-gets-paid (§7.18). The page renders the main
-name, an amber `Cover` chip on a substituted lesson, and `+ Name (shadow)` on a second line;
-filter/sort are re-keyed to coach ids. Spec: **PRD §7.13 oversight story**. Design & every risk
-mitigation: **`docs/plans/SMALL_ITEMS_PLAN.md` §B2/§B6**. File map: ARCH §10. Suite: TESTING §5.
-Deploy (app-only, Vercel-from-`main`): **`docs/DEPLOYMENT.md` §11.16**.
-
-**Review (subagent) found no blockers; two LOW.** Fixed: `resolveShadows` now dedupes
-`shadowsByLesson` at source (a future direct consumer could otherwise double-list a coach with
-two overlapping shadow rows). Left, with reasoning: the tenant-wide loads lean on RLS instead of
-an explicit `.eq("tenant_id")` like the wages page — unreachable, since a platform admin is
-unmounted from every tenant page, and the main `attendance` query shares that assumption.
-
-**Verified:** vitest **339** (+13, 6 proven red via three sabotages — drop the date bound,
-ignore the substitute, skip the absence check) · typecheck both apps · CI green · **browser pass
-8/8** with a seeded class handover + substitute + shadow (the DORMANT state cannot show this, so
-it had to be seeded; teardown restored `classes.coach_id`) · served-chunk grep confirmed the new
-strings present and the old access-axis embed gone. **Production effect: none** — one coach who
-is also the admin, no handover, so money axis == access axis until a second coach exists (§3).
 
 ---
 
