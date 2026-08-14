@@ -1,12 +1,10 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-13 (3rd) — **Wave 5 chunk 3, *Tenant suspension*, SHIPPED and
-was removed** (`20260813000300`, PRD §4.4 *Suspending a business*): staff and parents
-dark, staff logins banned, engine skips the tenant; already-sent invoice links keep
-working by decision. **Wave 5 is COMPLETE.** The parent-account exclusion it carried
-moved to *Deliberately not doing*. Earlier same day: chunk 2, *Disable a COACH account*
-(`20260813000200`, PRD §4.3), and chunk 1, *Owner transfer* (`20260813000100`,
-PRD §4.4)._
+_Last updated: 2026-08-14 — added **Catch a duplicate at the admin's Add-student step —
+by parent phone** (M, under *Admin and operations*), the compensating control after the
+"possible duplicate" banner was narrowed to same-parent-situation-only (PRD §7.18). Prior:
+2026-08-13 (3rd) — Wave 5 chunk 3, *Tenant suspension*, SHIPPED and removed
+(`20260813000300`); Wave 5 is COMPLETE._
 
 _Previously, 2026-08-11 — **Wave 2, *Multiple classes per child*, SHIPPED and was
 removed** (`936e3bd`, live). Its Build-order entry is marked COMPLETE rather than deleted,
@@ -1169,6 +1167,37 @@ different flow and needs no code: the old business marks the family inactive, th
 gives them its join code, and the child is added there as a new record. History stays with
 the business that taught it, which is the isolation working correctly. Don't conflate the
 two by making the rescue tool "move everything".
+
+### Catch a duplicate at the admin's Add-student step — by PARENT PHONE, not name — **M** `[found 2026-08-14]`
+When the admin adds an unregistered child (Students → Add student → `add_unclaimed_student`),
+warn if the **parent contact number** already belongs to a child on the roster, so a duplicate
+is prevented at creation instead of surfaced by the banner later.
+
+**Why:** the "possible duplicate" banner was narrowed on 2026-08-14 so a parented child is never
+matched against an un-parented one (it was throwing false positives on shared first names like
+"Anya" — PRD §7.18, `lib/duplicateStudents.ts`). That narrowing gives up one real case: an admin
+adds a placeholder that is actually a *registered* family's child. The right place to catch that
+is at creation. **Key it on the phone, NOT the name** — in Singapore many children share a name,
+so a name prompt would fire constantly and be ignored; the phone is a strong, near-unique signal,
+and adding a student already requires a parent contact number, so it is always available.
+
+**Notes:**
+- The Add-student path is `add_unclaimed_student()` (`20260725000200`) — **admin-only; coaches
+  cannot add students** (the coach app calls no write RPCs). Today it only hard-errors on an
+  **exact** name + DOB collision (`students_identity_uniq` → "…find them on the roster instead").
+  It does no similar-name / phone candidate check. Add a *soft* prompt before the insert.
+- Reuse `normalize_phone()` (last-8-digits, `20260726000200`) — do **not** write a second phone
+  comparison. The candidate query should match the entered contact number against existing
+  children's `provisional_contact_phone` (and the linked parent's phone) within the tenant.
+- **Investigate first — how the parent-CLAIM prompt matches (already scouted 2026-08-14):** it is
+  **not** first-name-only. `find_student_candidates()` (`20260726000200`) ranks an **unclaimed**
+  child by **phone** (strongest — `normalize_phone(provisional_contact_phone)` = the parent's
+  phone), then **name+DOB**, then **name-similar** (`names_match`: equal first token OR ≥2 shared
+  tokens). The claims page also renders an `email` reason — confirm whether email is actually a
+  candidate signal in SQL or vestigial UI before mirroring it. Decide whether the Add-student
+  prompt should reuse `find_student_candidates` wholesale or a phone-only subset.
+- Unlike the parent flow, the admin is adding into their OWN business, so this is a convenience
+  prompt, not a disclosure boundary — it can show the full matched name, like the merge banner.
 
 ### Export to Excel / CSV — **S** `[MVP-excluded]` `[Phase 3]`
 Export attendance, invoices, and credit notes from the admin panel.

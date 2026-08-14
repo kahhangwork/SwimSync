@@ -46,16 +46,31 @@ describe("namesMatch", () => {
 });
 
 describe("findDuplicatePairs", () => {
-  it("pairs a coach-added row with the parent-added one", () => {
+  it("pairs two un-parented look-alikes, survivor = the row with the history", () => {
     const pairs = findDuplicatePairs([
       kid({ id: "coach", full_name: "Ethan Tan", lessons: 3 }),
-      kid({ id: "parent", full_name: "Ethan Tan Wei Ming", date_of_birth: "2019-01-01", parentId: "p1" }),
+      kid({ id: "placeholder", full_name: "Ethan Tan Wei Ming", date_of_birth: "2019-01-01" }),
     ]);
     expect(pairs).toHaveLength(1);
     // The row with the history must survive — merge_students refuses the
     // other direction, so suggesting it would be suggesting a refusal.
     expect(pairs[0].survivor.id).toBe("coach");
-    expect(pairs[0].duplicate.id).toBe("parent");
+    expect(pairs[0].duplicate.id).toBe("placeholder");
+  });
+
+  // Reported from production 2026-08-14: a PARENTED child ("Anya Gundecha",
+  // parent p1) was flagged against an un-parented look-alike ("Anya (Small)")
+  // that shares only a first name. A claimed child is a confirmed, distinct
+  // child; the claim flow is what catches a placeholder that IS a registered
+  // family's child (it asks the parent at registration). Proven red against the
+  // old rule, which skipped only when BOTH sides had a (different) parent.
+  it("does NOT pair an un-parented row with a parented one", () => {
+    expect(
+      findDuplicatePairs([
+        kid({ id: "unparented", full_name: "Anya (Small)", lessons: 5 }),
+        kid({ id: "parented", full_name: "Anya Gundecha", date_of_birth: "2019-01-01", parentId: "p1", lessons: 5 }),
+      ])
+    ).toEqual([]);
   });
 
   it("ignores two children belonging to DIFFERENT families", () => {
@@ -93,7 +108,7 @@ describe("findDuplicatePairs", () => {
   it("still pairs when one side has no date of birth at all", () => {
     const pairs = findDuplicatePairs([
       kid({ id: "a", full_name: "Ethan Tan", date_of_birth: null, lessons: 2 }),
-      kid({ id: "b", full_name: "Ethan Tan", date_of_birth: "2019-01-01", parentId: "p1" }),
+      kid({ id: "b", full_name: "Ethan Tan", date_of_birth: "2019-01-01" }),
     ]);
     expect(pairs).toHaveLength(1);
     expect(pairs[0].survivor.id).toBe("a");
@@ -102,7 +117,7 @@ describe("findDuplicatePairs", () => {
   it("flags a pair that BOTH carry attendance as needing a human", () => {
     const pairs = findDuplicatePairs([
       kid({ id: "a", full_name: "Ethan Tan", lessons: 2 }),
-      kid({ id: "b", full_name: "Ethan Tan Wei Ming", lessons: 1, parentId: "p1" }),
+      kid({ id: "b", full_name: "Ethan Tan Wei Ming", lessons: 1 }),
     ]);
     expect(pairs[0].needsHuman).toBe(true);
   });
@@ -110,7 +125,7 @@ describe("findDuplicatePairs", () => {
   it("marks a pair with no attendance either side as direction-agnostic", () => {
     const pairs = findDuplicatePairs([
       kid({ id: "a", full_name: "Ethan Tan" }),
-      kid({ id: "b", full_name: "Ethan Tan Wei Ming", parentId: "p1" }),
+      kid({ id: "b", full_name: "Ethan Tan Wei Ming" }),
     ]);
     expect(pairs[0].eitherWay).toBe(true);
     expect(pairs[0].needsHuman).toBe(false);
@@ -121,10 +136,13 @@ describe("findDuplicatePairs", () => {
   // inactive — which is how you resolve a duplicate when there is no merge
   // tool. The banner has no dismiss, so that would have been permanent noise.
   it("never flags a record the business has marked INACTIVE", () => {
+    // Both under the SAME parent, so isActive is the ONLY reason this is
+    // skipped — otherwise the same-parent-situation rule would also skip it and
+    // the test would pass even if the inactive exclusion were removed.
     expect(
       findDuplicatePairs([
         kid({ id: "live", full_name: "TestParent", parentId: "p1" }),
-        kid({ id: "retired", full_name: "TestParent", isActive: false }),
+        kid({ id: "retired", full_name: "TestParent", parentId: "p1", isActive: false }),
       ])
     ).toEqual([]);
   });

@@ -27,13 +27,19 @@ export type DupStudent = {
   /**
    * The parent account attached to this row, or null if nobody has claimed it.
    *
-   * ⚠ THE IDENTITY MATTERS, NOT JUST THE PRESENCE. An earlier version stored a
-   * boolean `claimed` and skipped any pair where both sides had one — which
-   * silently hid the commonest duplicate of all: the SAME parent, having
-   * claimed the coach's record, then adding the child again by hand. Two rows
-   * belonging to one family is exactly a duplicate; two rows belonging to two
-   * families is two families. Found by the UI driver, which built that pair and
-   * then found nothing flagged.
+   * ⚠ ONLY A MATCHING PARENT SITUATION IS FLAGGED, AND THE IDENTITY MATTERS.
+   * A pair is compared only when both rows are un-parented, OR both belong to
+   * the SAME parent. Two things fall out of that:
+   *   • Two rows under one family (the parent claimed the coach's record, then
+   *     added the child again by hand) ARE flagged — the commonest duplicate,
+   *     which an earlier boolean-`claimed` version silently hid.
+   *   • A parented row is NEVER matched against an un-parented one. A child a
+   *     family has claimed is a confirmed, distinct child; pairing it with an
+   *     unclaimed look-alike (two different "Anya"s) was a false positive a real
+   *     business hit (2026-08-14). The claim flow is what catches a coach
+   *     placeholder that IS a registered family's child — it offers the unclaimed
+   *     match to the parent AT REGISTRATION (`find_student_candidates`), so this
+   *     banner re-flagging it was a redundant second net that only produced noise.
    */
   parentId: string | null;
   /** How many attendance rows — decides which row must survive a merge. */
@@ -53,8 +59,9 @@ export type DupStudent = {
    *   • The banner has no dismiss and no "seen" flag — by design, since the
    *     data is the state (§7.37) — so a pair the admin does not intend to
    *     merge is PERMANENT noise. That is what a real business hit on day one.
-   *   • The case this feature exists for is unaffected: a coach-added walk-in
-   *     and a parent-added duplicate are both ACTIVE.
+   *   • The cases this feature exists for are unaffected: two un-parented
+   *     look-alikes, and a parent who added their own claimed child twice, are
+   *     both ACTIVE.
    * `merge_students()` itself stays permissive — an admin who genuinely wants
    * to merge an inactive pair reactivates one and merges. The detector is a
    * suggestion; the function is the tool.
@@ -100,10 +107,14 @@ export function namesMatch(a: string, b: string): boolean {
 /**
  * Pairs worth showing the admin.
  *
- * Skipped only when the two rows belong to DIFFERENT families: two children
- * who each have their own parent account are two customers, and suggesting a
- * merge there is both wrong and alarming. Two rows under the SAME parent are
- * kept — that is the commonest duplicate there is.
+ * Compared ONLY when the two rows share the same parent situation — both
+ * un-parented, or both the same parent. A pair is skipped the moment the parent
+ * situations differ, which covers two distinct cases with one rule: two children
+ * who each have their OWN parent account are two customers, and an un-parented
+ * child against a parented one is a confirmed child against a look-alike (the
+ * "Anya" false positive). Two rows under the SAME parent are kept — that is the
+ * commonest duplicate there is. See `DupStudent.parentId` for why the redundant
+ * cross-family net is not missed: the claim flow already asks at registration.
  *
  * A conflicting date of birth is disqualifying. Two children genuinely called
  * "Ethan Tan" born on different days are siblings or namesakes, not a
@@ -120,7 +131,10 @@ export function findDuplicatePairs(students: DupStudent[]): DupPair[] {
 
       // A child who has left is not a duplicate to be tidied — see isActive.
       if (!a.isActive || !b.isActive) continue;
-      if (a.parentId && b.parentId && a.parentId !== b.parentId) continue;
+      // Only a MATCHING parent situation is compared: both null, or the same
+      // id. `null !== "p1"` skips an un-parented row vs a parented one; two
+      // different parents skip too. See DupStudent.parentId.
+      if ((a.parentId ?? null) !== (b.parentId ?? null)) continue;
       if (!namesMatch(a.full_name, b.full_name)) continue;
       if (a.date_of_birth && b.date_of_birth && a.date_of_birth !== b.date_of_birth) {
         continue;

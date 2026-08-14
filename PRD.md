@@ -2029,6 +2029,15 @@ contents written to the audit log first. Merging **refuses** when both records h
 lessons recorded, or when the duplicate already appears on an invoice — those need a
 person, not a button.
 
+*(Implemented 2026-08-14: the banner compares only rows in the **same parent situation** —
+both un-claimed, or both linked to the **same** parent. A child a family has **claimed** is a
+confirmed, distinct child and is never flagged against an un-claimed look-alike; that was a
+false positive on shared first names in Singapore, e.g. two different "Anya"s. The case this
+gives up — a coach placeholder that is really a registered family's child — is caught earlier
+by the **claim flow**, which offers the un-claimed match to the parent at registration. A
+compensating check on the admin's Add-student step, keyed on the parent phone, is in
+`BACKLOG.md`.)*
+
 ### 7.19 The Parent's Contact Details *(implemented 2026-07-26)*
 
 §7.18 makes a child's **contact number and email the two strongest signals** for matching
