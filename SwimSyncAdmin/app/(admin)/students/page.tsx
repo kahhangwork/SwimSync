@@ -132,6 +132,57 @@ export default function StudentsPage() {
     await load();
   }
 
+  // ── Rename a child ────────────────────────────────────────────────────────
+  // The admin's only sanctioned way to set a child's name. It goes through
+  // rename_student(), NEVER a raw `.update({ full_name })` (see
+  // handleSaveContact's three-key-payload note: a stray full_name rewrites a
+  // child's identity or trips students_identity_uniq). The RPC derives the
+  // tenant from the row, and refuses a name that would duplicate an active
+  // child's (name + DOB) — including the NULL-DOB case the unique index cannot
+  // see — surfacing a friendly message either way.
+  //
+  // ⚠ DELIBERATELY NOT FROZEN UNDER A PENDING CLAIM, unlike the contact modal.
+  // A contact edit is frozen because `student_claims.match_reason` was
+  // snapshotted against those details; a NAME change does not invalidate
+  // match_reason, so a pending claim has nothing to be made stale by. Two
+  // writers to full_name now exist (this and the parent's own app edit,
+  // PRD §7.4) — that is fine: both pass the uniqueness index and both are
+  // audited, so last-writer-wins is legible, not corrupting. Do not add a lock.
+  const [renameFor, setRenameFor] = useState<StudentRow | null>(null);
+  const [renameName, setRenameName] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+
+  function openRename(student: StudentRow) {
+    setRenameFor(student);
+    setRenameName(student.full_name);
+    setRenameError(null);
+  }
+
+  async function handleRename() {
+    if (!renameFor) return;
+    const name = renameName.trim();
+    if (name === "") {
+      setRenameError("Enter a name.");
+      return;
+    }
+    setRenameBusy(true);
+    setRenameError(null);
+    const { error } = await supabase.rpc("rename_student", {
+      p_student_id: renameFor.id,
+      p_new_name: name,
+    });
+    setRenameBusy(false);
+    if (error) {
+      // The RPC's messages are written for the admin (empty name, a name that
+      // is already registered) — surfaced verbatim, not reworded.
+      setRenameError(error.message);
+      return;
+    }
+    setRenameFor(null);
+    await load();
+  }
+
   // ── Add a class to a child who already has one ────────────────────────────
   // The Unassigned page still owns FIRST assignment; this is the second and
   // third. Both write the same row, and neither validates the schedule itself:
@@ -545,7 +596,8 @@ export default function StudentsPage() {
     // .update(): a stray full_name or date_of_birth silently rewrites a child's
     // identity or trips students_identity_uniq with an error the admin cannot
     // act on. (tenant_id would be caught by pin_student_tenant(); the others
-    // would not be.)
+    // would not be.) The SANCTIONED way to change full_name is rename_student()
+    // (the Rename action) — never add it to this payload.
     //
     // blankToNull mirrors the creation path's NULLIF(trim(...), '') so a
     // cleared field becomes NULL, not '' — see lib/sgPhone.ts.
@@ -1059,6 +1111,16 @@ export default function StudentsPage() {
                     >
                       Contact details
                     </button>
+                    {/* Set the child's real name — e.g. replacing a coach's
+                        placeholder once the parent has provided it. Offered for
+                        every child; the RPC is the only sanctioned writer. */}
+                    <button
+                      onClick={() => openRename(s)}
+                      disabled={busyId === s.id}
+                      className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      Rename
+                    </button>
                     {/* "Remove from class" USED TO LIVE HERE, one button per
                         child. It cannot: with several classes there is no "the"
                         class to remove them from. It is now the × on each chip
@@ -1362,6 +1424,42 @@ export default function StudentsPage() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* ── Rename a child ──────────────────────────────────────────────────
+          Not frozen under a pending claim — see openRename's note. */}
+      <Modal
+        title={`Rename ${renameFor?.full_name ?? ""}`}
+        open={renameFor !== null}
+        onClose={() => setRenameFor(null)}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Set this child&apos;s name — for example, replacing a coach&apos;s
+            placeholder with the full name their parent provided. This changes
+            the name shown across SwimSync. Invoices already issued keep the name
+            they were billed under.
+          </p>
+          <label className="block">
+            <span className="text-xs font-semibold text-gray-600">
+              Child&apos;s name
+            </span>
+            <input
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              placeholder="Anya Rahman"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </label>
+          {renameError && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {renameError}
+            </p>
+          )}
+          <Button className="w-full" disabled={renameBusy} onClick={handleRename}>
+            {renameBusy ? "Saving…" : "Save name"}
+          </Button>
+        </div>
       </Modal>
 
       {/* ── Invite the parent of an unclaimed child ─────────────────────────

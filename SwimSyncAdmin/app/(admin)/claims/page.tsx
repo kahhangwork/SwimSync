@@ -8,6 +8,11 @@ import { Modal } from "@/components/Modal";
 import { formatSgDate, todayInSg } from "@/lib/lessonDates";
 import { familyLessonsByParent, familyLabel } from "@/lib/packageCoverage";
 import { PackageChip } from "@/components/PackageChip";
+import {
+  defaultClaimName,
+  shouldApplyName,
+  approveNotes,
+} from "@/lib/claimNaming";
 
 /**
  * Parent Requests — a parent saying "I think that child on your roster is mine".
@@ -74,7 +79,27 @@ export default function ClaimsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<Claim | null>(null);
+  // The name the child will carry after linking. Applied via rename_student()
+  // AFTER a successful approve — see approve().
+  const [nameChoice, setNameChoice] = useState("");
   const [showDecided, setShowDecided] = useState(false);
+
+  // ⚠ RISK 1: the default is CERTAINTY-DEPENDENT. Pre-fill the parent's typed
+  // name only when they CONFIRMED the child is theirs. On an `unsure` claim,
+  // defaulting to the parent's string would let a blind Approve overwrite the
+  // coach's roster name with an unverified guess — exactly what
+  // approve_student_claim refuses to do with gender/notes. So `unsure` defaults
+  // to the current roster name; applying the parent's name takes an explicit act.
+  useEffect(() => {
+    if (!confirming) return;
+    setNameChoice(
+      defaultClaimName(
+        confirming.certainty,
+        confirming.claimed_name,
+        confirming.student_name
+      )
+    );
+  }, [confirming]);
   const [pkgByParent, setPkgByParent] = useState<Map<string, number>>(
     new Map()
   );
@@ -127,21 +152,39 @@ export default function ClaimsPage() {
     const { data, error } = await supabase.rpc("approve_student_claim", {
       p_claim_id: claim.id,
     });
-    setBusy(null);
-    setConfirming(null);
     if (error) {
+      setBusy(null);
+      setConfirming(null);
       setError(error.message);
       return;
     }
-    // Say what else happened. Approving silently closes any competing claim on
-    // the same child, and an admin who is not told will go looking for it.
-    const r = Array.isArray(data) ? data[0] : data;
-    if (r?.others_declined > 0) {
-      setError(
-        `${claim.student_name} is now linked to ${claim.parent_name}. ` +
-          `${r.others_declined} other request on this child was declined automatically.`
-      );
+
+    // ⚠ RISK 3: the LINK is now made — the irreversible half. Applying the
+    // chosen name is a SEPARATE, retryable step, and a failure here must NOT
+    // read as an approval failure: re-clicking Approve would throw "already
+    // decided" and look like a deeper bug. approve_student_claim also fills a
+    // missing DOB first, which can make this rename newly collide — so a clean
+    // "linked, but name not applied" message is the correct outcome, not a stall.
+    let renameError: string | null = null;
+    if (shouldApplyName(nameChoice, claim.student_name)) {
+      const { error: renameErr } = await supabase.rpc("rename_student", {
+        p_student_id: claim.student_id,
+        p_new_name: nameChoice.trim(),
+      });
+      if (renameErr) renameError = renameErr.message;
     }
+
+    setBusy(null);
+    setConfirming(null);
+
+    const r = Array.isArray(data) ? data[0] : data;
+    const notes = approveNotes({
+      studentName: claim.student_name,
+      parentName: claim.parent_name,
+      othersDeclined: r?.others_declined ?? 0,
+      renameError,
+    });
+    if (notes.length) setError(notes.join(" "));
     await loadAll();
   }
 
@@ -387,6 +430,46 @@ export default function ClaimsPage() {
               history, and future lessons will be invoiced to them. You can undo
               this from the decided list, until the child has been invoiced.
             </p>
+
+            {/* ⚠ RISK 1: the name picker. Default is parent-name for a
+                confirmed claim, current name for an unsure one (see nameChoice
+                useEffect). Applied via rename_student() after the link. */}
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-semibold text-gray-600">
+                Name on your roster after linking
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNameChoice(confirming.student_name)}
+                  className="rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  Keep &ldquo;{confirming.student_name}&rdquo;
+                </button>
+                {confirming.claimed_name.trim() !== "" &&
+                  confirming.claimed_name !== confirming.student_name && (
+                    <button
+                      type="button"
+                      onClick={() => setNameChoice(confirming.claimed_name)}
+                      className="rounded-full border border-sky-300 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100"
+                    >
+                      Use &ldquo;{confirming.claimed_name}&rdquo; (parent&apos;s)
+                    </button>
+                  )}
+              </div>
+              <input
+                value={nameChoice}
+                onChange={(e) => setNameChoice(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              {confirming.certainty === "unsure" && (
+                <p className="mt-1 text-[11px] text-amber-700">
+                  This parent said they weren&apos;t sure, so the current name is
+                  kept unless you change it.
+                </p>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <Button
                 onClick={() => approve(confirming)}

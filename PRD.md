@@ -1862,6 +1862,17 @@ finds their child already there, with everything the coach has recorded. If the 
 already has a SwimSync account (a second child at the same school, say) the child is
 simply added to it.
 
+*(Implemented 2026-08-14: the child's NAME is the one field the coach's record often does
+not hold correctly — a coach adds a placeholder ("Anya (big)") before the parent provides
+the real name, and approving a claim previously never applied the parent's name, so the
+roster kept the placeholder. Now at approval the admin sees the parent's typed name beside
+the roster name and applies it in one step: the parent's name is **pre-selected when they
+CONFIRMED** the child is theirs, and the **current name is kept when they were UNSURE** — a
+blind approve must not overwrite a coach's name with an unverified guess. The admin can also
+**rename any child at any time from the Students page**, the only sanctioned way to change a
+name. A rename is refused if it would duplicate another active child's name + date of birth,
+and it never rewrites a name on an invoice already issued (§7.7).)*
+
 *(Deliberately not built in this release: parents finding their own child by registering
 independently. That needs matching one family's details against another's, and a way to
 prove the child is theirs — see `BACKLOG.md`. Until then a parent who registers on their
