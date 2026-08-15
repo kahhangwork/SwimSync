@@ -330,7 +330,11 @@ header (`20260812000400`).
 offers + tokenised `/package` pay page + Generate-all preview + shared WhatsApp queue +
 per-category/all-classes default packages + Students Package/Left/Expires columns and an
 Actions drawer. **Also discharged** *A Playwright driver for the weeks/holiday package UI*
-(`verify-package-renewal`). **Build order is exhausted again** — pick from *Unordered*.
+(`verify-package-renewal`). ~~**Build order is exhausted again** — pick from *Unordered*.~~
+
+**NEXT — Parent referral codes (M)** — decided + planned 2026-08-15 via
+`/plan-with-confidence`, **`docs/plans/REFERRAL_PLAN.md`** (risk-reviewed, 16 mitigations inlined). Body under
+*Billing and payments* → *Parent referral codes*. Backend-first, one migration, four phases.
 
 ### Unordered — no dependencies, pick by value
 
@@ -757,6 +761,17 @@ a gateway takes a cut of a part-time coach's margin, and the current stack is
 deliberately $0. Probably only makes sense if SwimSync ever serves coaches other than
 its owner. Related: automatic PayNow detection above gets much of the benefit without
 the fee.
+
+### Parent referral codes — double-sided package discount — **M** `[planned 2026-08-15]`
+Every family membership gets a `REF-XXXXX` code that doubles as a join code. A family that
+joins with it gets a discount on their **first** package; the referrer gets one on a **later**
+package once that first package is *Payment received*. Discount = tenant default (% or $) with
+a per-product override (NULL = inherit; `0` = explicit opt-out); referrer rewards queue one per
+package with a tenant-wide expiry; admin Referrals page with grant/void; referrer emailed on
+earn. **Why:** the only growth route today is the tenant join code by word of mouth; every
+comparable swim school runs refer-a-friend. **Plan:** `docs/plans/REFERRAL_PLAN.md` — 15
+locked decisions, schema, 4 phases, ~4.5 days. First price modifier in the system: it changes
+what is *paid* (`amount_payable`), never what a package is *worth*.
 
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT
