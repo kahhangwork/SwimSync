@@ -67,8 +67,12 @@ sql(`UPDATE students SET provisional_contact_name  = 'Old Contact Name',
 const rowFor = (page, name) =>
   page.locator("tbody tr").filter({ hasText: name });
 
+// Contact details now lives in the per-row Actions drawer (Decision 10): open
+// the drawer for the row, then click its Contact details button.
 const openContact = async (page, name) => {
-  await rowFor(page, name).getByRole("button", { name: "Contact details" }).click();
+  await rowFor(page, name).getByRole("button", { name: /^Actions$/ }).click();
+  await page.waitForTimeout(400);
+  await page.getByRole("button", { name: "Contact details" }).click();
   await page.waitForTimeout(1200);
 };
 

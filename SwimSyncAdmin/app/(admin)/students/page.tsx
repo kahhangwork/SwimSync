@@ -25,11 +25,10 @@ import { checkSgPhone, checkEmail, blankToNull } from "@/lib/sgPhone";
 import { ContactHint } from "@/components/ContactHint";
 import {
   coverageByStudent,
-  isRunningLow,
   type StudentCoverage,
 } from "@/lib/packageCoverage";
-import { PackageChip } from "@/components/PackageChip";
 import { formatTime } from "@/lib/utils";
+import { Drawer } from "@/components/Drawer";
 
 type StudentRow = {
   id: string;
@@ -154,6 +153,9 @@ export default function StudentsPage() {
   // PRD §7.4) — that is fine: both pass the uniqueness index and both are
   // audited, so last-writer-wins is legible, not corrupting. Do not add a lock.
   const [renameFor, setRenameFor] = useState<StudentRow | null>(null);
+  // The per-row Actions drawer — one button holds Invite/Contact/Rename/Inactive
+  // so the row keeps only the inline glance-and-set controls (Decision 10).
+  const [drawerFor, setDrawerFor] = useState<StudentRow | null>(null);
   const [renameName, setRenameName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -325,6 +327,7 @@ export default function StudentsPage() {
   // double-sends, or worse, believes they have re-sent when they have not.
   const [inviteSent, setInviteSent] = useState(false);
   const [threshold, setThreshold] = useState("2");
+  const [expiryDays, setExpiryDays] = useState("14");
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
     new Map()
@@ -336,12 +339,17 @@ export default function StudentsPage() {
       .from("profiles")
       // !tenant_id disambiguates: tenants also references profiles via
       // owner_profile_id (20260806000100), so a bare embed is refused.
-      .select("tenant_id, tenants!tenant_id(low_package_lessons)")
+      .select(
+        "tenant_id, tenants!tenant_id(low_package_lessons, package_expiry_warning_days)"
+      )
       .eq("id", userRes.user?.id)
       .single();
     setTenantId((prof as any)?.tenant_id ?? null);
     const stored = (prof as any)?.tenants?.low_package_lessons;
     if (stored !== null && stored !== undefined) setThreshold(String(stored));
+    const storedDays = (prof as any)?.tenants?.package_expiry_warning_days;
+    if (storedDays !== null && storedDays !== undefined)
+      setExpiryDays(String(storedDays));
 
     // Per-child verdict, category- and expiry-aware, computed in SQL. The old
     // code summed package_live_balances() by parent here, which said "10 left"
@@ -360,6 +368,17 @@ export default function StudentsPage() {
     await supabase
       .from("tenants")
       .update({ low_package_lessons: Number(value) })
+      .eq("id", tenantId);
+  }
+
+  async function saveExpiryDays(value: string) {
+    setExpiryDays(value);
+    if (value.trim() === "" || !Number.isInteger(Number(value)) || Number(value) < 0)
+      return;
+    if (!tenantId) return;
+    await supabase
+      .from("tenants")
+      .update({ package_expiry_warning_days: Number(value) })
       .eq("id", tenantId);
   }
 
@@ -815,15 +834,10 @@ export default function StudentsPage() {
     return "Unassigned";
   };
 
-  const thresholdNum =
-    threshold.trim() === "" || !Number.isFinite(Number(threshold))
-      ? null
-      : Number(threshold);
-
-  // Coverage is per CHILD now — a family whose package cannot pay for this
-  // child's class is not flagged on this child's row. Logic lives in
-  // lib/packageCoverage so it is unit-tested.
-  const runningLow = (s: StudentRow) => isRunningLow(covMap.get(s.id), thresholdNum);
+  // ⚠ RISK 10 — "running low" is now the SQL `low` verdict (lessons OR expiry,
+  // minus families with an open row), so this filter AGREES with Generate-all's
+  // candidate list. No TS re-derivation.
+  const runningLow = (s: StudentRow) => covMap.get(s.id)?.low === true;
 
   const filtered = students.filter((s) => {
     const matchSearch =
@@ -967,7 +981,15 @@ export default function StudentsPage() {
                 className="w-12 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-xs"
                 aria-label="Low-package threshold in lessons"
               />
-              lessons or fewer
+              lessons or fewer, or expiring within
+              <input
+                value={expiryDays}
+                onChange={(e) => saveExpiryDays(e.target.value)}
+                inputMode="numeric"
+                className="w-12 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-xs"
+                aria-label="Expiry warning window in days"
+              />
+              days
             </label>
           )}
         </div>
@@ -1021,6 +1043,9 @@ export default function StudentsPage() {
           <Th sort={sort} sortKey="full_name">Student</Th>
           <Th sort={sort} sortKey="level_label">Level</Th>
           <Th sort={sort} sortKey="parent_name">Parent</Th>
+          <Th>Package</Th>
+          <Th>Left</Th>
+          <Th>Expires</Th>
           <Th sort={sort} sortKey="status">Status</Th>
           <Th sort={sort} sortKey="class_title">Class</Th>
           <Th sort={sort} sortKey="coach_name">Coach</Th>
@@ -1074,13 +1099,31 @@ export default function StudentsPage() {
                   ) : (
                     s.parent_name
                   )}
-                  <span className="ml-1.5">
-                    <PackageChip
-                      coverage={covMap.get(s.id)}
-                      lowThreshold={thresholdNum}
-                    />
-                  </span>
                 </Td>
+                {/* Package / Left / Expires — the coverage columns replace the
+                    old Parent-cell chip (one truth per row). Amber when the
+                    family is running low (SQL `low`); blank/"Ad-hoc" when the
+                    child's class is not package-covered. */}
+                {(() => {
+                  const cov = covMap.get(s.id);
+                  const adHoc = !cov || cov.coverage === "ad_hoc";
+                  const amber = cov?.low ? "text-amber-700 font-medium" : "text-gray-600";
+                  return (
+                    <>
+                      <Td className={adHoc ? "text-gray-400" : amber}>
+                        {adHoc ? "Ad-hoc" : cov?.packageName ?? "Package"}
+                      </Td>
+                      <Td className={adHoc ? "text-gray-400" : amber}>
+                        {adHoc || cov?.lessonsRemaining == null
+                          ? "—"
+                          : `${cov.lessonsRemaining} left`}
+                      </Td>
+                      <Td className="text-gray-500">
+                        {adHoc || !cov?.expiresOn ? "—" : cov.expiresOn}
+                      </Td>
+                    </>
+                  );
+                })()}
                 <Td>
                   <StatusBadge status={statusLabel(s)} />
                 </Td>
@@ -1137,67 +1180,99 @@ export default function StudentsPage() {
                     ", "
                   ) || "—"}
                 </Td>
+                {/* One Actions button opens the right-hand Drawer. The
+                    glance-and-set controls (Level dropdown, class chips + Add
+                    class) stay inline in their own columns — Decision 10. */}
                 <Td>
-                  <div className="flex gap-2">
-                    {s.is_active && isUnclaimed(s) && (
-                      // The BETTER remedy than settling: once the parent has an
-                      // account the lessons bill normally and no money is
-                      // written off.
-                      <button
-                        onClick={() => {
-                          setInviting(s);
-                          setInviteEmail("");
-                          setInviteResult(null);
-                        }}
-                        disabled={busyId === s.id}
-                        className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-50"
-                      >
-                        Invite parent
-                      </button>
-                    )}
-                    {/* Offered for EVERY child, claimed or not — the modal
-                        decides what it shows. For an unclaimed child it edits
-                        what the coach wrote down; for a claimed one it is the
-                        answer to "how do I reach this family?", which is
-                        otherwise only on the Parents page. */}
-                    <button
-                      onClick={() => openContact(s)}
-                      disabled={busyId === s.id}
-                      className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Contact details
-                    </button>
-                    {/* Set the child's real name — e.g. replacing a coach's
-                        placeholder once the parent has provided it. Offered for
-                        every child; the RPC is the only sanctioned writer. */}
-                    <button
-                      onClick={() => openRename(s)}
-                      disabled={busyId === s.id}
-                      className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Rename
-                    </button>
-                    {/* "Remove from class" USED TO LIVE HERE, one button per
-                        child. It cannot: with several classes there is no "the"
-                        class to remove them from. It is now the × on each chip
-                        in the Class column, which is also the only place that
-                        says which class is going. */}
-                    {s.is_active && (
-                      <button
-                        onClick={() => openInactive(s)}
-                        disabled={busyId === s.id}
-                        className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        Set inactive
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    onClick={() => setDrawerFor(s)}
+                    disabled={busyId === s.id}
+                    className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Actions
+                  </button>
                 </Td>
               </Tr>
             ))
           )}
         </Tbody>
       </Table>
+
+      {/* ── Per-row Actions drawer (Decision 10) ────────────────────────────
+          Each button opens the SAME modal the column opened before — no logic
+          moved, only the trigger. The drawer closes first so the modal is never
+          launched behind it (RISK 8 / §7.10, §7.58). */}
+      <Drawer
+        open={drawerFor !== null}
+        onClose={() => setDrawerFor(null)}
+        title={drawerFor?.full_name ?? "Actions"}
+        subtitle={drawerFor ? statusLabel(drawerFor) : undefined}
+      >
+        {drawerFor && (
+          <div className="space-y-6 px-6 py-5">
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Parent
+              </h3>
+              <div className="space-y-2">
+                {drawerFor.is_active && isUnclaimed(drawerFor) && (
+                  <button
+                    onClick={() => {
+                      const s = drawerFor;
+                      setDrawerFor(null);
+                      setInviting(s);
+                      setInviteEmail("");
+                      setInviteResult(null);
+                    }}
+                    className="w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-left text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                  >
+                    Invite parent
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    const s = drawerFor;
+                    setDrawerFor(null);
+                    openContact(s);
+                  }}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Contact details
+                </button>
+              </div>
+            </div>
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Student
+              </h3>
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    const s = drawerFor;
+                    setDrawerFor(null);
+                    openRename(s);
+                  }}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Rename
+                </button>
+                {drawerFor.is_active && (
+                  <button
+                    onClick={() => {
+                      const s = drawerFor;
+                      setDrawerFor(null);
+                      openInactive(s);
+                    }}
+                    className="w-full rounded-lg border border-red-200 px-3 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    Set inactive
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </Drawer>
 
       {/* ── Add a student whose parent hasn't registered ────────────────────
           For a child already attending weekly. A TRIAL is the coach's job —

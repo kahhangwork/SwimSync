@@ -3,8 +3,6 @@ import {
   coverageByStudent,
   familyLabel,
   familyLessonsByParent,
-  isRunningLow,
-  type StudentCoverage,
 } from "./packageCoverage";
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -13,23 +11,46 @@ const row = (over: Record<string, unknown> = {}) => ({
   tenant_id: "t1",
   coverage: "package",
   lessons_remaining: 8,
+  low: true,
+  package_id: "pkg1",
+  package_name: "8 Group",
+  expires_on: "2026-12-01",
   ...over,
 });
 
 describe("coverageByStudent", () => {
-  it("indexes rows by student_id", () => {
+  it("indexes rows by student_id, carrying the low + covering-package fields", () => {
     const map = coverageByStudent([
       row(),
-      row({ student_id: "s2", coverage: "ad_hoc", lessons_remaining: null }),
+      row({
+        student_id: "s2",
+        coverage: "ad_hoc",
+        lessons_remaining: null,
+        low: false,
+        package_id: null,
+        package_name: null,
+        expires_on: null,
+      }),
     ]);
     expect(map.get("s1")).toEqual({
       parentId: "p1",
       tenantId: "t1",
       coverage: "package",
       lessonsRemaining: 8,
+      low: true,
+      packageId: "pkg1",
+      packageName: "8 Group",
+      expiresOn: "2026-12-01",
     });
     expect(map.get("s2")?.coverage).toBe("ad_hoc");
+    expect(map.get("s2")?.low).toBe(false);
     expect(map.get("s2")?.lessonsRemaining).toBeNull();
+  });
+
+  it("low defaults to false when the field is absent or not boolean-true", () => {
+    const map = coverageByStudent([row({ low: undefined }), row({ student_id: "s3", low: "yes" })]);
+    expect(map.get("s1")?.low).toBe(false);
+    expect(map.get("s3")?.low).toBe(false);
   });
 
   // ⚠ FAIL-SAFE IS "NO CHIP", NEVER A CRASH. Every page passes the RPC's
@@ -59,37 +80,9 @@ describe("coverageByStudent", () => {
   });
 });
 
-describe("isRunningLow (the Students-page filter)", () => {
-  const cov = (
-    coverage: StudentCoverage["coverage"],
-    lessonsRemaining: number | null
-  ): StudentCoverage => ({
-    parentId: "p1",
-    tenantId: "t1",
-    coverage,
-    lessonsRemaining,
-  });
-
-  it("flags a covered child at or below the threshold", () => {
-    expect(isRunningLow(cov("package", 2), 2)).toBe(true);
-    expect(isRunningLow(cov("package", 3), 2)).toBe(false);
-  });
-
-  // The rule the old by-parent sum broke: a child whose class the package
-  // cannot pay for must never be flagged — no pool is not an empty pool.
-  it("never flags an ad_hoc child, whatever the threshold", () => {
-    expect(isRunningLow(cov("ad_hoc", null), 99)).toBe(false);
-  });
-
-  it("an EXHAUSTED package (0 left) is low — that family needs the reminder", () => {
-    expect(isRunningLow(cov("package", 0), 2)).toBe(true);
-  });
-
-  it("no coverage row, or no threshold, means not low", () => {
-    expect(isRunningLow(undefined, 2)).toBe(false);
-    expect(isRunningLow(cov("package", 1), null)).toBe(false);
-  });
-});
+// ⚠ RISK 10 — isRunningLow() was DELETED (one definition of "low", in SQL). Its
+// former tests are gone with it; the Students filter now reads coverage.low,
+// pinned by coverageByStudent above and by verify-packages.mjs end-to-end.
 
 describe("familyLessonsByParent (family-grain surfaces)", () => {
   const live = (over: Record<string, unknown> = {}) => ({

@@ -152,11 +152,14 @@ try {
   // read "14 left", which is the bug this pins shut.
   await tap(page.getByRole("button", { name: "Package running low" }), "filter off");
   await page.waitForTimeout(800);
-  const pabloRow = page.getByRole("row", { name: /Pablo Package/ });
-  check(/Package · 14 left/.test(await pabloRow.innerText()),
-    "students: PABLO's row carries 'Package · 14 left'",
+  // The PackageChip moved out of the Parent cell into dedicated Package/Left/
+  // Expires columns (Decision 10), so the "Package ·" prefix is gone — the Left
+  // column carries the family-sum count on its own.
+  const pabloRow = page.locator("tbody tr", { hasText: "Pablo" }).first();
+  check(/14 left/.test(await pabloRow.innerText()),
+    "students: PABLO's row shows '14 left' in the Left column",
     await pabloRow.innerText().catch(() => "row not found"));
-  const piaRow = page.getByRole("row", { name: /Pia Package/ });
+  const piaRow = page.locator("tbody tr", { hasText: "Pia" }).first();
   check(/Ad-hoc/.test(await piaRow.innerText()),
     "students: PIA's row says 'Ad-hoc' — same family, uncovered class",
     await piaRow.innerText().catch(() => "row not found"));

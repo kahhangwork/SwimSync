@@ -57,7 +57,11 @@ check("both children are in the Unassigned queue while active",
 // ── 3. Setting one child inactive OFFERS the sibling, and says what follows ─
 await page.goto("http://localhost:3000/students");
 await page.waitForTimeout(1500);
-await page.locator("tr", { hasText: "Ethan Tan" }).getByRole("button", { name: /Set inactive/i }).click();
+// Set inactive now lives in the per-row Actions drawer (Decision 10): open it,
+// then click the drawer's Set inactive, which opens the confirm modal.
+await page.locator("tr", { hasText: "Ethan Tan" }).getByRole("button", { name: /^Actions$/ }).click();
+await page.waitForTimeout(400);
+await page.getByRole("button", { name: /^Set inactive$/ }).click();
 await page.waitForTimeout(1200);
 body = await page.innerText("body");
 check("the sibling is named in the prompt", /Maya Tan is also in this family/.test(body));
@@ -98,7 +102,9 @@ check("their active sibling is still in it", /Maya Tan/.test(body));
 // ── 5. Deactivating the last child takes the family with it ─────────────────
 await page.goto("http://localhost:3000/students");
 await page.waitForTimeout(1500);
-await page.locator("tr", { hasText: "Maya Tan" }).getByRole("button", { name: /Set inactive/i }).click();
+await page.locator("tr", { hasText: "Maya Tan" }).getByRole("button", { name: /^Actions$/ }).click();
+await page.waitForTimeout(400);
+await page.getByRole("button", { name: /^Set inactive$/ }).click();
 await page.waitForTimeout(1200);
 body = await page.innerText("body");
 check("with no siblings left, the consequence is stated immediately",

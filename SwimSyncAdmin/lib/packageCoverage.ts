@@ -14,6 +14,15 @@ export type StudentCoverage = {
   coverage: CoverageVerdict;
   /** Family-shared live lessons remaining; null when ad_hoc. */
   lessonsRemaining: number | null;
+  /** ⚠ RISK 2/10 — the FAMILY "running low" verdict, computed in SQL (lessons
+   *  OR expiry, minus families that already have an open row). The Students
+   *  filter/amber read THIS; the old TS isRunningLow is gone so there is one
+   *  definition of "low", in SQL, everywhere. */
+  low: boolean;
+  /** The covering package to SHOW: earliest-expiring with live lessons left. */
+  packageId: string | null;
+  packageName: string | null;
+  expiresOn: string | null;
 };
 
 /** What the chip needs: family-grain callers synthesise this from
@@ -37,6 +46,10 @@ export function coverageByStudent(
       tenant_id?: unknown;
       coverage?: unknown;
       lessons_remaining?: unknown;
+      low?: unknown;
+      package_id?: unknown;
+      package_name?: unknown;
+      expires_on?: unknown;
     } | null;
     if (
       !r ||
@@ -53,6 +66,10 @@ export function coverageByStudent(
       coverage: r.coverage as CoverageVerdict,
       lessonsRemaining:
         typeof r.lessons_remaining === "number" ? r.lessons_remaining : null,
+      low: r.low === true,
+      packageId: typeof r.package_id === "string" ? r.package_id : null,
+      packageName: typeof r.package_name === "string" ? r.package_name : null,
+      expiresOn: typeof r.expires_on === "string" ? r.expires_on : null,
     });
   }
   return map;
@@ -94,22 +111,10 @@ export function familyLessonsByParent(
   return map;
 }
 
-/**
- * The Students page "running low" filter, per CHILD. ad_hoc children are
- * never "low" — no pool is not an empty pool — and an exhausted package
- * (0 left) IS low, because that family needs a top-up reminder.
- */
-export function isRunningLow(
-  c: StudentCoverage | undefined,
-  threshold: number | null
-): boolean {
-  return (
-    !!c &&
-    c.coverage !== "ad_hoc" &&
-    threshold !== null &&
-    (c.lessonsRemaining ?? 0) <= threshold
-  );
-}
+// ⚠ RISK 10 — isRunningLow() was DELETED. "Low" is now one definition, in SQL
+// (student_package_coverage().low: lessons OR expiry, minus open-row families),
+// so the Students filter/amber must read StudentCoverage.low. A second copy here
+// would drift from Generate-all's candidate list.
 
 /** Family-grain chip input: a family with any live package reads "Package ·
  *  N left"; one without reads "Ad-hoc". */
