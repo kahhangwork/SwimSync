@@ -156,6 +156,34 @@ export default function StudentsPage() {
   // The per-row Actions drawer — one button holds Invite/Contact/Rename/Inactive
   // so the row keeps only the inline glance-and-set controls (Decision 10).
   const [drawerFor, setDrawerFor] = useState<StudentRow | null>(null);
+  // Read-only referral summary for the drawer's parent (link to /referrals).
+  const [drawerReferral, setDrawerReferral] = useState<
+    { referred: boolean; brought: number } | null
+  >(null);
+  useEffect(() => {
+    const pid = drawerFor?.parent_id;
+    if (!pid) {
+      setDrawerReferral(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const [refereeRes, referrerRes] = await Promise.all([
+        supabase.from("referrals").select("id", { count: "exact", head: true })
+          .eq("referee_parent_id", pid),
+        supabase.from("referrals").select("id", { count: "exact", head: true })
+          .eq("referrer_parent_id", pid).eq("status", "converted"),
+      ]);
+      if (cancelled) return;
+      setDrawerReferral({
+        referred: (refereeRes.count ?? 0) > 0,
+        brought: referrerRes.count ?? 0,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [drawerFor?.parent_id]);
   const [renameName, setRenameName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -1214,6 +1242,19 @@ export default function StudentsPage() {
                 >
                   Contact details
                 </button>
+                {drawerReferral && (drawerReferral.referred || drawerReferral.brought > 0) && (
+                  <a
+                    href="/referrals"
+                    className="block rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600 hover:bg-gray-100"
+                  >
+                    {drawerReferral.referred ? "Referred by a friend" : ""}
+                    {drawerReferral.referred && drawerReferral.brought > 0 ? " · " : ""}
+                    {drawerReferral.brought > 0
+                      ? `Referred ${drawerReferral.brought} ${drawerReferral.brought === 1 ? "friend" : "friends"}`
+                      : ""}
+                    <span className="text-sky-600"> → Referrals</span>
+                  </a>
+                )}
               </div>
             </div>
             <div>

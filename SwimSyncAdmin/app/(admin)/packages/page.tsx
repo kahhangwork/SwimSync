@@ -30,6 +30,7 @@ import { packageExtensionState } from "@/lib/packageExtension";
 import { defaultConfirmStart, pickOfferProduct } from "@/lib/packageOffers";
 import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { WhatsAppQueue, type WaQueueRow } from "@/components/WhatsAppQueue";
+import { discountLabel } from "@/lib/referralDiscount";
 
 type Category = {
   id: string;
@@ -59,6 +60,10 @@ type Purchase = {
   lesson_count: number;
   rate_per_lesson: number;
   total_value: number;
+  /** What the family PAYS (referral discount applied). = total_value when
+   *  none. The confirm/QR number the admin ticks against the bank (RISK 7). */
+  amount_payable: number;
+  discount_amount: number;
   value_remaining: number;
   live_value_remaining: number | null;
   live_lessons_remaining: number | null;
@@ -105,6 +110,12 @@ type CandidateRow = {
   chosenProduct: string;
   chosenStart: string;
   include: boolean;
+  // RISK 7 — the discounted price the offer WILL carry, from
+  // preview_package_price (the one source of truth), so the preview equals the
+  // WhatsApp price and the pay-page headline. Null until fetched.
+  previewTotal: number | null;
+  previewDiscount: number | null;
+  previewPayable: number | null;
 };
 
 const money = (n: number) => `S$${Number(n).toFixed(2)}`;
@@ -140,6 +151,14 @@ export default function PackagesPage() {
   const [pLessons, setPLessons] = useState("");
   const [pRate, setPRate] = useState("");
   const [pWeeks, setPWeeks] = useState("12");
+  // Per-product referral override (D4): off = inherit the tenant default; on =
+  // this product's own type + value (a 0 is an explicit "no referral discount").
+  const [pRefOverride, setPRefOverride] = useState(false);
+  const [pRefType, setPRefType] = useState<"percent" | "amount">("percent");
+  const [pRefValue, setPRefValue] = useState("");
+  const [tenantReferral, setTenantReferral] = useState<{
+    enabled: boolean; type: "percent" | "amount" | null; value: number | null;
+  }>({ enabled: false, type: null, value: null });
   const [formError, setFormError] = useState<string | null>(null);
   // Record-sale form
   const [saleModal, setSaleModal] = useState(false);
@@ -148,6 +167,9 @@ export default function PackagesPage() {
   // Start date — pre-filled from suggest_package_start, always editable, and
   // failing open to today (⚠ RISK 7: the RPC must never block a sale).
   const [saleStart, setSaleStart] = useState("");
+  const [salePreview, setSalePreview] = useState<
+    { total: number; discount: number; payable: number } | null
+  >(null);
   const [confirmStart, setConfirmStart] = useState("");
   // Confirm/cancel/cancel-active confirmations
   const [confirming, setConfirming] = useState<Purchase | null>(null);
@@ -189,11 +211,16 @@ export default function PackagesPage() {
       }
       const { data: t } = await supabase
         .from("tenants")
-        .select("display_name, default_package_product_id")
+        .select("display_name, default_package_product_id, referral_enabled, referral_discount_type, referral_discount_value")
         .eq("id", tenant)
         .single();
       if (t?.display_name) setBusinessName(t.display_name);
       setTenantDefaultProduct(t?.default_package_product_id ?? null);
+      setTenantReferral({
+        enabled: !!t?.referral_enabled,
+        type: (t?.referral_discount_type as "percent" | "amount" | null) ?? null,
+        value: t?.referral_discount_value != null ? Number(t.referral_discount_value) : null,
+      });
     }
 
     // RLS scopes every query here to the caller's own business.
@@ -212,7 +239,7 @@ export default function PackagesPage() {
       supabase
         .from("parent_packages")
         .select(
-          "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, value_remaining, status, requested_at, start_date, expires_on, ph_extension_weeks, ph_ack_weeks_admin, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
+          "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, requested_at, start_date, expires_on, ph_extension_weeks, ph_ack_weeks_admin, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
         )
         .order("status")
         .order("requested_at", { ascending: false }),
@@ -280,6 +307,8 @@ export default function PackagesPage() {
         lesson_count: p.lesson_count,
         rate_per_lesson: Number(p.rate_per_lesson),
         total_value: Number(p.total_value),
+        amount_payable: Number(p.amount_payable),
+        discount_amount: Number(p.discount_amount),
         value_remaining: Number(p.value_remaining),
         live_value_remaining: liveById.has(p.id)
           ? Number(liveById.get(p.id).live_value_remaining)
@@ -411,6 +440,9 @@ export default function PackagesPage() {
     setPLessons("");
     setPRate("");
     setPWeeks("12");
+    setPRefOverride(false);
+    setPRefType("percent");
+    setPRefValue("");
     setFormError(null);
     setProductModal(true);
   }
@@ -427,6 +459,12 @@ export default function PackagesPage() {
       return setFormError("The rate per lesson must be above zero.");
     if (pWeeks.trim() === "" || !Number.isInteger(Number(pWeeks)) || Number(pWeeks) <= 0)
       return setFormError("Validity must be a whole number of weeks.");
+    if (pRefOverride) {
+      if (pRefValue.trim() === "" || !Number.isFinite(Number(pRefValue)) || Number(pRefValue) < 0)
+        return setFormError("The referral discount must be zero or more.");
+      if (pRefType === "percent" && Number(pRefValue) > 100)
+        return setFormError("A percentage discount cannot exceed 100.");
+    }
 
     setBusy(true);
     setFormError(null);
@@ -436,6 +474,9 @@ export default function PackagesPage() {
       lesson_count: Number(pLessons),
       rate_per_lesson: Number(pRate),
       validity_weeks: Number(pWeeks),
+      // Override present ⇒ its own type + value; absent ⇒ NULL/NULL = inherit.
+      referral_discount_type: pRefOverride ? pRefType : null,
+      referral_discount_value: pRefOverride ? Number(pRefValue) : null,
       tenant_id: (
         await supabase
           .from("profiles")
@@ -481,10 +522,34 @@ export default function PackagesPage() {
     }
   }
 
-  // Sale form: when both parent and product are chosen, suggest a start date.
+  // ⚠ RISK 7 — the ONE source of truth for any pre-insert price preview. Never
+  // lesson_count × rate: that ignores the family's referral reward.
+  async function fetchPreviewPrice(parentId: string, productId: string) {
+    try {
+      const { data, error: err } = await supabase.rpc("preview_package_price", {
+        p_parent_id: parentId,
+        p_product_id: productId,
+      });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (err || !row) return null;
+      return {
+        total: Number(row.total_value),
+        discount: Number(row.discount_amount),
+        payable: Number(row.amount_payable),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  // Sale form: when both parent and product are chosen, suggest a start date AND
+  // preview the discounted price (RISK 7).
   useEffect(() => {
     if (saleModal && saleParent && saleProduct) {
       fetchSuggestedStart(saleParent, saleProduct).then(setSaleStart);
+      fetchPreviewPrice(saleParent, saleProduct).then(setSalePreview);
+    } else {
+      setSalePreview(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saleModal, saleParent, saleProduct]);
@@ -556,6 +621,31 @@ export default function PackagesPage() {
         body: { type: "confirmed", package_id: p.id },
       })
       .catch(() => {});
+
+    // If activating this package converted a referral, tell the REFERRER they
+    // earned a reward. Best-effort, and independent of the confirmed email
+    // above: the conversion + referrer reward are minted by the DB trigger, so
+    // we look the reward up and hand its id to package-emails (RISK 3 path).
+    (async () => {
+      const { data: ref } = await supabase
+        .from("referrals")
+        .select("id")
+        .eq("converted_package_id", p.id)
+        .eq("status", "converted")
+        .maybeSingle();
+      if (!ref) return;
+      const { data: reward } = await supabase
+        .from("referral_rewards")
+        .select("id")
+        .eq("referral_id", ref.id)
+        .eq("kind", "referrer")
+        .maybeSingle();
+      if (!reward) return;
+      await supabase.functions
+        .invoke("package-emails", { body: { type: "referral_reward", reward_id: reward.id } })
+        .catch(() => {});
+    })().catch(() => {});
+
     load();
   }
 
@@ -658,7 +748,7 @@ export default function PackagesPage() {
     // Read back the minted token + terms for the email and the WhatsApp link.
     const { data: row } = await supabase
       .from("parent_packages")
-      .select("public_token, reference_number, name, lesson_count, total_value")
+      .select("public_token, reference_number, name, lesson_count, total_value, amount_payable, discount_amount")
       .eq("id", offerId as string)
       .single();
 
@@ -682,7 +772,9 @@ export default function PackagesPage() {
               childrenNames: c.children ? c.children.split(", ") : [],
               packageName: row.name as string,
               lessons: Number(row.lesson_count),
-              price: Number(row.total_value),
+              // RISK 7 — the WhatsApp price MUST equal the /package pay-page
+              // headline and the QR: amount_payable, not the undiscounted worth.
+              price: Number(row.amount_payable),
               reference: (row.reference_number as string) ?? "",
               link: payUrl,
             })
@@ -694,7 +786,7 @@ export default function PackagesPage() {
       parentName: c.parent_name,
       subtitle: c.children,
       meta: row
-        ? `${row.name} · ${money(Number(row.total_value))}`
+        ? `${row.name} · ${money(Number(row.amount_payable))}`
         : null,
       waNumber,
       rawPhone: c.parent_phone,
@@ -737,6 +829,9 @@ export default function PackagesPage() {
         const start = suggested
           ? await fetchSuggestedStart(r.parent_id, suggested)
           : todayInSg();
+        const preview = suggested
+          ? await fetchPreviewPrice(r.parent_id, suggested)
+          : null;
         return {
           parent_id: r.parent_id,
           parent_name: r.parent_name ?? "Unknown",
@@ -752,6 +847,9 @@ export default function PackagesPage() {
           chosenProduct: suggested,
           chosenStart: start,
           include: !!suggested && !r.has_open_offer,
+          previewTotal: preview?.total ?? null,
+          previewDiscount: preview?.discount ?? null,
+          previewPayable: preview?.payable ?? null,
         };
       })
     );
@@ -897,7 +995,14 @@ export default function PackagesPage() {
                   <Td className="font-mono text-xs text-gray-600">
                     {p.reference_number ?? "—"}
                   </Td>
-                  <Td className="text-gray-900">{money(p.total_value)}</Td>
+                  <Td className="text-gray-900">
+                    {money(p.amount_payable)}
+                    {p.discount_amount > 0 && (
+                      <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                        −{money(p.discount_amount)}
+                      </span>
+                    )}
+                  </Td>
                   <Td className="text-gray-500">
                     {new Date(p.requested_at).toLocaleDateString("en-SG")}
                   </Td>
@@ -1380,6 +1485,47 @@ export default function PackagesPage() {
               {pLessons} lessons at {money(Number(pRate))} each.
             </p>
           )}
+
+          {/* Referral discount override (D4). Off = inherit the tenant default. */}
+          <div className="rounded-lg border border-gray-200 p-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={pRefOverride}
+                onChange={(e) => setPRefOverride(e.target.checked)}
+              />
+              Override referral discount
+            </label>
+            {!pRefOverride ? (
+              <p className="mt-1 text-xs text-gray-500">
+                {tenantReferral.enabled && tenantReferral.type
+                  ? `Inherits the tenant default (${discountLabel(tenantReferral.type, tenantReferral.value ?? 0)}).`
+                  : "Referrals are off, or no tenant default is set — no discount applies."}
+              </p>
+            ) : (
+              <div className="mt-2 flex items-end gap-2">
+                <select
+                  value={pRefType}
+                  onChange={(e) => setPRefType(e.target.value as "percent" | "amount")}
+                  className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                >
+                  <option value="percent">Percent (%)</option>
+                  <option value="amount">Fixed (S$)</option>
+                </select>
+                <input
+                  value={pRefValue}
+                  onChange={(e) => setPRefValue(e.target.value)}
+                  inputMode="numeric"
+                  placeholder="0"
+                  className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                />
+                <span className="text-xs text-gray-500">
+                  0 = no referral discount on this product.
+                </span>
+              </div>
+            )}
+          </div>
+
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <div className="flex justify-end gap-2">
             <Button
@@ -1455,6 +1601,25 @@ export default function PackagesPage() {
               adjust it freely.
             </p>
           </div>
+          {/* ⚠ RISK 7 — the price the family pays, from preview_package_price,
+              so a referral discount is visible before recording the sale. */}
+          {salePreview && (
+            <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
+              {salePreview.discount > 0 ? (
+                <span className="text-gray-700">
+                  Pays <strong>{money(salePreview.payable)}</strong>{" "}
+                  <span className="text-emerald-700">
+                    (−{money(salePreview.discount)} referral discount off{" "}
+                    {money(salePreview.total)})
+                  </span>
+                </span>
+              ) : (
+                <span className="text-gray-700">
+                  Pays <strong>{money(salePreview.payable)}</strong>
+                </span>
+              )}
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button
               variant="outline"
@@ -1482,8 +1647,15 @@ export default function PackagesPage() {
           {confirming && (
             <>
               <strong>{confirming.parent_name}</strong> — {confirming.name} for{" "}
-              <strong>{money(confirming.total_value)}</strong>. Confirming
-              activates the package; its validity runs from the start date below.
+              <strong>{money(confirming.amount_payable)}</strong>
+              {confirming.discount_amount > 0 && (
+                <span className="text-emerald-700">
+                  {" "}(after a {money(confirming.discount_amount)} referral discount
+                  off {money(confirming.total_value)})
+                </span>
+              )}
+              . Confirming activates the package; its validity runs from the
+              start date below.
             </>
           )}
         </p>
@@ -1671,15 +1843,32 @@ export default function PackagesPage() {
                       <div className="mt-2 flex flex-wrap gap-2">
                         <select
                           value={c.chosenProduct}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const productId = e.target.value;
                             setCandidates((prev) =>
                               prev.map((r, j) =>
                                 j === i
-                                  ? { ...r, chosenProduct: e.target.value }
+                                  ? { ...r, chosenProduct: productId, previewPayable: null,
+                                      previewDiscount: null, previewTotal: null }
                                   : r
                               )
-                            )
-                          }
+                            );
+                            // RISK 7 — re-price via preview_package_price, never
+                            // lesson_count × rate, so a referral discount shows.
+                            if (productId) {
+                              fetchPreviewPrice(c.parent_id, productId).then((pv) =>
+                                setCandidates((prev) =>
+                                  prev.map((r, j) =>
+                                    j === i
+                                      ? { ...r, previewTotal: pv?.total ?? null,
+                                          previewDiscount: pv?.discount ?? null,
+                                          previewPayable: pv?.payable ?? null }
+                                      : r
+                                  )
+                                )
+                              );
+                            }
+                          }}
                           className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
                         >
                           <option value="">Choose package…</option>
@@ -1704,6 +1893,20 @@ export default function PackagesPage() {
                           className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
                         />
                       </div>
+                      {/* ⚠ RISK 7 — the discounted price this offer will carry
+                          (preview_package_price), matching the WhatsApp price
+                          and the pay-page headline. */}
+                      {c.previewPayable != null && (
+                        <div className="mt-1 text-xs text-gray-600">
+                          Pays <strong>{money(c.previewPayable)}</strong>
+                          {c.previewDiscount != null && c.previewDiscount > 0 && (
+                            <span className="text-emerald-700">
+                              {" "}(−{money(c.previewDiscount)} referral off{" "}
+                              {money(c.previewTotal ?? 0)})
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

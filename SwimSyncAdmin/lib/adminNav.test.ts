@@ -26,11 +26,12 @@ describe("navFor", () => {
     const hrefs = navFor(A_TENANT).map((n) => n.href);
     // 11 + Packages (2026-07-20) + Trials (2026-07-25) + Parent Requests
     // (2026-07-26) + Make-ups (2026-08-02) + Admins (2026-08-06) + Lesson
-    // Coaches (2026-08-11) + Holidays (2026-08-15). The count is asserted
+    // Coaches (2026-08-11) + Holidays (2026-08-15) + Referrals (2026-08-15).
+    // The count is asserted
     // deliberately: NAV also drives RequiresTenant's route gate, so a page added
     // here without being thought about is a page gated by accident rather than
     // on purpose.
-    expect(hrefs).toHaveLength(18);
+    expect(hrefs).toHaveLength(19);
     expect(hrefs).toContain("/dashboard");
     expect(hrefs).toContain("/wages");
     expect(hrefs).toContain("/packages");
