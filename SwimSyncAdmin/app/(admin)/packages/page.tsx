@@ -30,7 +30,12 @@ import { packageExtensionState } from "@/lib/packageExtension";
 import { defaultConfirmStart, pickOfferProduct } from "@/lib/packageOffers";
 import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 
-type Category = { id: string; name: string; class_count: number };
+type Category = {
+  id: string;
+  name: string;
+  class_count: number;
+  default_product_id: string | null;
+};
 
 type Product = {
   id: string;
@@ -120,6 +125,7 @@ export default function PackagesPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [parents, setParents] = useState<ParentOption[]>([]);
   const [businessName, setBusinessName] = useState("your swim school");
+  const [tenantDefaultProduct, setTenantDefaultProduct] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -181,17 +187,18 @@ export default function PackagesPage() {
       }
       const { data: t } = await supabase
         .from("tenants")
-        .select("display_name")
+        .select("display_name, default_package_product_id")
         .eq("id", tenant)
         .single();
       if (t?.display_name) setBusinessName(t.display_name);
+      setTenantDefaultProduct(t?.default_package_product_id ?? null);
     }
 
     // RLS scopes every query here to the caller's own business.
     const [catRes, prodRes, purRes, liveRes, ptRes, childRes] = await Promise.all([
       supabase
         .from("class_categories")
-        .select("id, name, classes(id)")
+        .select("id, name, default_product_id, classes(id)")
         .order("name"),
       supabase
         .from("package_products")
@@ -233,6 +240,7 @@ export default function PackagesPage() {
         id: c.id,
         name: c.name,
         class_count: (c.classes ?? []).length,
+        default_product_id: c.default_product_id ?? null,
       }))
     );
 
@@ -352,6 +360,41 @@ export default function PackagesPage() {
           ? `"${c.name}" has packages sold against it. Retire those products first.`
           : "Could not remove that category."
       );
+      return;
+    }
+    setError(null);
+    load();
+  }
+
+  /** Set (or clear, with "") a category's default renewal product. The DB
+   *  trigger refuses a product of the wrong category/tenant or a retired one. */
+  async function setCategoryDefault(categoryId: string, productId: string) {
+    setBusy(true);
+    const { error: err } = await supabase
+      .from("class_categories")
+      .update({ default_product_id: productId || null })
+      .eq("id", categoryId);
+    setBusy(false);
+    if (err) {
+      setError("Could not set that default.");
+      return;
+    }
+    setError(null);
+    load();
+  }
+
+  /** Set (or clear) the all-classes fallback default for the business. */
+  async function setAllClassesDefault(productId: string) {
+    const tenant = await myTenantId();
+    if (!tenant) return;
+    setBusy(true);
+    const { error: err } = await supabase
+      .from("tenants")
+      .update({ default_package_product_id: productId || null })
+      .eq("id", tenant);
+    setBusy(false);
+    if (err) {
+      setError("Could not set that default.");
       return;
     }
     setError(null);
@@ -1134,27 +1177,72 @@ export default function PackagesPage() {
         </div>
         {categories.length > 0 && (
           <ul className="space-y-1">
-            {categories.map((c) => (
-              <li
-                key={c.id}
-                className="flex w-96 items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-              >
-                <span className="font-medium text-gray-900">{c.name}</span>
-                <span className="text-xs text-gray-500">
-                  {c.class_count} class{c.class_count === 1 ? "" : "es"}
-                  <button
-                    onClick={() => removeCategory(c)}
-                    disabled={busy}
-                    className="ml-3 text-gray-400 hover:text-red-600"
-                    aria-label={`Remove ${c.name}`}
-                  >
-                    &times;
-                  </button>
-                </span>
-              </li>
-            ))}
+            {categories.map((c) => {
+              // Products that may default this category: its own, or all-classes.
+              const eligible = activeProducts.filter(
+                (p) => p.category_id === c.id || p.category_id === null
+              );
+              return (
+                <li
+                  key={c.id}
+                  className="flex w-[36rem] items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                >
+                  <span className="font-medium text-gray-900">{c.name}</span>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-400">Default:</label>
+                    <select
+                      value={c.default_product_id ?? ""}
+                      onChange={(e) => setCategoryDefault(c.id, e.target.value)}
+                      disabled={busy}
+                      className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                    >
+                      <option value="">None</option>
+                      {eligible.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-gray-500">
+                      {c.class_count} class{c.class_count === 1 ? "" : "es"}
+                    </span>
+                    <button
+                      onClick={() => removeCategory(c)}
+                      disabled={busy}
+                      className="text-gray-400 hover:text-red-600"
+                      aria-label={`Remove ${c.name}`}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
+
+        {/* The all-classes fallback: proposed when neither the family's original
+            nor a category default applies (Decision 5). */}
+        <div className="mt-3 flex w-[36rem] items-center gap-2 text-sm">
+          <label className="text-xs text-gray-500">
+            All-classes default (fallback):
+          </label>
+          <select
+            value={tenantDefaultProduct ?? ""}
+            onChange={(e) => setAllClassesDefault(e.target.value)}
+            disabled={busy}
+            className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+          >
+            <option value="">None</option>
+            {activeProducts
+              .filter((p) => p.category_id === null)
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+          </select>
+        </div>
       </div>
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}
