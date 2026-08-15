@@ -21,13 +21,18 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  authorizePackageEmail,
   buildConfirmedHtml,
   buildConfirmedSubject,
+  buildOfferedHtml,
+  buildOfferedSubject,
   buildRequestedHtml,
   buildRequestedSubject,
   sendPackageEmail,
   type PackageEmailData,
 } from "./email.ts";
+
+const APP_URL = Deno.env.get("APP_URL") ?? "https://swimsync.sg";
 
 Deno.serve(async (req) => {
   const respond = (body: unknown, status = 200) =>
@@ -39,7 +44,7 @@ Deno.serve(async (req) => {
   try {
     const { type, package_id } = await req.json().catch(() => ({}));
     if (
-      (type !== "requested" && type !== "confirmed") ||
+      (type !== "requested" && type !== "confirmed" && type !== "offered") ||
       typeof package_id !== "string"
     ) {
       return respond({ sent: false, reason: "bad request" }, 400);
@@ -65,7 +70,7 @@ Deno.serve(async (req) => {
     const { data: pkg } = await svc
       .from("parent_packages")
       .select(
-        "id, status, name, lesson_count, rate_per_lesson, total_value, expires_on, tenant_id, parents(profile_id, profiles(full_name, email)), tenants(display_name, logo_url)"
+        "id, status, name, lesson_count, rate_per_lesson, total_value, expires_on, start_date, validity_weeks, public_token, offered_by, tenant_id, parents(profile_id, profiles(full_name, email)), tenants(display_name, logo_url)"
       )
       .eq("id", package_id)
       .maybeSingle();
@@ -77,24 +82,38 @@ Deno.serve(async (req) => {
       ? parent?.profiles?.[0]
       : parent?.profiles;
 
-    if (type === "requested") {
-      if (parent?.profile_id !== caller.id || pkg.status !== "pending") {
-        return respond({ sent: false, reason: "not allowed" }, 403);
-      }
-    } else {
-      // Confirm email: only the business's own admin. Same tenant_id
-      // question the admin panel gates on — never the role enum (§7.19).
+    // Gather the authz inputs, then let the pure decider rule (RISK 6). Only
+    // the input each type needs is fetched: the can_admin_tenant RPC (as the
+    // CALLER, via their own JWT) for an offer; the caller's home tenant for a
+    // confirm.
+    let isAdminOfTenant = false;
+    let profileTenantId: string | null = null;
+    if (type === "offered") {
+      const { data: isAdmin } = await anon.rpc("can_admin_tenant", {
+        p_tenant_id: pkg.tenant_id,
+      });
+      isAdminOfTenant = isAdmin === true;
+    } else if (type === "confirmed") {
       const { data: callerProfile } = await svc
         .from("profiles")
         .select("tenant_id")
         .eq("id", caller.id)
         .maybeSingle();
-      if (
-        callerProfile?.tenant_id !== pkg.tenant_id ||
-        pkg.status !== "active"
-      ) {
-        return respond({ sent: false, reason: "not allowed" }, 403);
-      }
+      profileTenantId = callerProfile?.tenant_id ?? null;
+    }
+    if (
+      !authorizePackageEmail(
+        type,
+        {
+          status: pkg.status as string,
+          offeredBy: (pkg.offered_by as string | null) ?? null,
+          parentProfileId: parent?.profile_id ?? null,
+          tenantId: pkg.tenant_id as string,
+        },
+        { id: caller.id, isAdminOfTenant, profileTenantId },
+      )
+    ) {
+      return respond({ sent: false, reason: "not allowed" }, 403);
     }
 
     const data: PackageEmailData = {
@@ -106,19 +125,30 @@ Deno.serve(async (req) => {
       ratePerLesson: Number(pkg.rate_per_lesson),
       totalValue: Number(pkg.total_value),
       expiresOn: (pkg.expires_on as string | null) ?? null,
+      startDate: (pkg.start_date as string | null) ?? null,
+      payUrl: pkg.public_token
+        ? `${APP_URL}/package/${pkg.public_token}`
+        : null,
     };
+
+    const subject =
+      type === "requested"
+        ? buildRequestedSubject(data)
+        : type === "offered"
+        ? buildOfferedSubject(data)
+        : buildConfirmedSubject(data);
+    const html =
+      type === "requested"
+        ? buildRequestedHtml(data)
+        : type === "offered"
+        ? buildOfferedHtml(data)
+        : buildConfirmedHtml(data);
 
     const result = await sendPackageEmail({
       apiKey: Deno.env.get("RESEND_API_KEY"),
       to: parentProfile?.email as string | undefined,
-      subject:
-        type === "requested"
-          ? buildRequestedSubject(data)
-          : buildConfirmedSubject(data),
-      html:
-        type === "requested"
-          ? buildRequestedHtml(data)
-          : buildConfirmedHtml(data),
+      subject,
+      html,
       fromName: data.businessName,
     });
 

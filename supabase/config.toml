@@ -446,6 +446,14 @@ verify_jwt = false
 [functions.public-invoice]
 verify_jwt = false
 
+# public-package: the tokenized package-OFFER pay page's data source. No JWT on
+# purpose — the 128-bit public_token is the access control, and the caller is a
+# sessionless parent who clicked a WhatsApp link. Mirror of public-invoice; see
+# supabase/functions/public-package/core.ts for why an offer (unlike an invoice)
+# is refused for a SUSPENDED business (RISK 9).
+[functions.public-package]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

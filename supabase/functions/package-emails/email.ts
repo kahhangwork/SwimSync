@@ -17,9 +17,45 @@ export type PackageEmailData = {
   totalValue: number;
   /** confirmed only */
   expiresOn?: string | null;
+  /** offered only — the admin-set start date and the tokenised pay link */
+  startDate?: string | null;
+  payUrl?: string | null;
 };
 
 export type SendResult = { sent: boolean; reason?: string };
+
+export type EmailType = "requested" | "confirmed" | "offered";
+
+/** The authorization decision, pulled out of the HTTP handler so the RISK 6
+ *  matrix is unit-testable (the handler only gathers the inputs).
+ *   • requested — the caller must BE the package's parent, pending.
+ *   • confirmed — the caller's home tenant IS the package's, active.
+ *   • offered   — the caller must ADMIN the package's tenant (can_admin_tenant,
+ *     NOT mere membership: a coach shares the tenant_id), the row must be an
+ *     admin OFFER (offered_by set) and still pending. RISK 6. */
+export function authorizePackageEmail(
+  type: EmailType,
+  pkg: {
+    status: string;
+    offeredBy: string | null;
+    parentProfileId: string | null;
+    tenantId: string;
+  },
+  caller: {
+    id: string;
+    isAdminOfTenant: boolean;
+    profileTenantId: string | null;
+  },
+): boolean {
+  switch (type) {
+    case "requested":
+      return caller.id === pkg.parentProfileId && pkg.status === "pending";
+    case "offered":
+      return caller.isAdminOfTenant && !!pkg.offeredBy && pkg.status === "pending";
+    case "confirmed":
+      return caller.profileTenantId === pkg.tenantId && pkg.status === "active";
+  }
+}
 
 const DEFAULT_APP_URL = "https://swimsync.sg";
 
@@ -136,6 +172,39 @@ export function buildConfirmedHtml(d: PackageEmailData): string {
      <p style="margin:0;font-size:15px;line-height:1.6;color:#475569;">
        Lessons now come out of your package automatically. You can watch the
        balance any time in the app under Billing &rarr; Packages.
+     </p>`
+  );
+}
+
+export function buildOfferedSubject(d: PackageEmailData): string {
+  return `Your next ${d.businessName} swim package is ready to pay`;
+}
+
+export function buildOfferedHtml(d: PackageEmailData): string {
+  const payUrl = d.payUrl ?? DEFAULT_APP_URL;
+  return shell(
+    d.businessName,
+    d.logoUrl,
+    `<h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">Your next package is ready</h1>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+       Hi ${escapeHtml(d.parentName)}, ${escapeHtml(d.businessName)} has
+       prepared your next package — <strong>${escapeHtml(d.packageName)}</strong>,
+       ${d.lessonCount} lessons at ${escapeHtml(money(d.ratePerLesson))} each.
+     </p>
+     <p style="margin:0 0 16px;font-size:24px;font-weight:700;color:#0f172a;">${escapeHtml(money(d.totalValue))}</p>
+     ${
+       d.startDate
+         ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+       Starts <strong>${escapeHtml(formatDate(d.startDate))}</strong>.
+     </p>`
+         : ""
+     }
+     <p style="margin:0 0 20px;">
+       <a href="${escapeHtml(payUrl)}" style="display:inline-block;background:#0ea5e9;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:8px;">Pay by PayNow</a>
+     </p>
+     <p style="margin:0;font-size:13px;line-height:1.6;color:#94a3b8;">
+       The page shows a PayNow QR with the amount and reference filled in. Your
+       package activates once ${escapeHtml(d.businessName)} confirms the payment.
      </p>`
   );
 }

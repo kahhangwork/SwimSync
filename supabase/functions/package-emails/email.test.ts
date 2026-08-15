@@ -3,8 +3,11 @@
 
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
+  authorizePackageEmail,
   buildConfirmedHtml,
   buildConfirmedSubject,
+  buildOfferedHtml,
+  buildOfferedSubject,
   buildRequestedHtml,
   buildRequestedSubject,
   formatDate,
@@ -35,6 +38,65 @@ Deno.test("requested: subject and body carry the business, amount and next step"
   // Branded as the business; SwimSync only in the footer.
   assertStringIncludes(html, "Coastal Swim School");
   assertStringIncludes(html, "Sent via SwimSync");
+});
+
+Deno.test("offered: subject + body carry the terms, start date and pay link", () => {
+  const d: PackageEmailData = {
+    ...base,
+    startDate: "2026-09-01",
+    payUrl: "https://swimsync.sg/package/deadbeefdeadbeefdeadbeefdeadbeef",
+  };
+  assertEquals(
+    buildOfferedSubject(d),
+    "Your next Coastal Swim School swim package is ready to pay",
+  );
+  const html = buildOfferedHtml(d);
+  assertStringIncludes(html, "S$400.00");
+  assertStringIncludes(html, "1 Sep 2026");
+  assertStringIncludes(
+    html,
+    "https://swimsync.sg/package/deadbeefdeadbeefdeadbeefdeadbeef",
+  );
+  assertStringIncludes(html, "Pay by PayNow");
+});
+
+// ⚠ RISK 6 — the authorization matrix. A pay link must reach only families the
+// caller is entitled to send to.
+Deno.test("authz: an OFFER email needs a real admin + an actual offer row", () => {
+  const offer = {
+    status: "pending",
+    offeredBy: "admin-1",
+    parentProfileId: "parent-1",
+    tenantId: "t-1",
+  };
+  // admin + real offer → allowed
+  assert(authorizePackageEmail("offered", offer,
+    { id: "admin-1", isAdminOfTenant: true, profileTenantId: "t-1" }));
+  // parent (not admin) → refused, even though they own the row
+  assert(!authorizePackageEmail("offered", offer,
+    { id: "parent-1", isAdminOfTenant: false, profileTenantId: null }));
+  // coach of the tenant (member, not admin) → refused
+  assert(!authorizePackageEmail("offered", offer,
+    { id: "coach-1", isAdminOfTenant: false, profileTenantId: "t-1" }));
+  // admin, but a PARENT-created pending request (offered_by null) → refused
+  assert(!authorizePackageEmail("offered", { ...offer, offeredBy: null },
+    { id: "admin-1", isAdminOfTenant: true, profileTenantId: "t-1" }));
+  // admin + offer already active → refused (only pending is payable)
+  assert(!authorizePackageEmail("offered", { ...offer, status: "active" },
+    { id: "admin-1", isAdminOfTenant: true, profileTenantId: "t-1" }));
+});
+
+Deno.test("authz: requested is the parent's own pending row; confirmed is the tenant admin", () => {
+  const pkg = { status: "pending", offeredBy: null, parentProfileId: "parent-1", tenantId: "t-1" };
+  assert(authorizePackageEmail("requested", pkg,
+    { id: "parent-1", isAdminOfTenant: false, profileTenantId: null }));
+  assert(!authorizePackageEmail("requested", pkg,
+    { id: "someone-else", isAdminOfTenant: false, profileTenantId: null }));
+  const active = { ...pkg, status: "active" };
+  assert(authorizePackageEmail("confirmed", active,
+    { id: "admin-1", isAdminOfTenant: true, profileTenantId: "t-1" }));
+  assert(!authorizePackageEmail("confirmed", active,
+    { id: "admin-1", isAdminOfTenant: true, profileTenantId: "t-OTHER" }));
 });
 
 Deno.test("confirmed: body carries the lesson count, value and expiry date", () => {
