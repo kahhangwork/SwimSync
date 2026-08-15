@@ -36,27 +36,16 @@ describe("PackageChip", () => {
     expect(screen.queryByText("Mixed · 4 left")).not.toBeNull();
   });
 
-  it("tints amber at or below the low threshold", () => {
-    render(<PackageChip coverage={pkg(2)} lowThreshold={2} />);
-    expect(screen.getByText("Package · 2 left").className).toContain(
-      "bg-amber-100"
-    );
+  // ⚠ "Package · 0 left" — an exhausted package must read as an empty pool, NEVER
+  // as ad-hoc. It is still a package label.
+  it("renders an exhausted package as 0 left, not ad-hoc", () => {
+    render(<PackageChip coverage={pkg(0)} />);
+    expect(screen.queryByText("Package · 0 left")).not.toBeNull();
   });
 
-  // ⚠ "Package · 0 left" — an exhausted package must read as an empty pool
-  // needing a top-up, NEVER as ad-hoc, and 0 is always at or below any valid
-  // threshold (they are constrained >= 0).
-  it("renders an exhausted package as 0 left, tinted", () => {
-    render(<PackageChip coverage={pkg(0)} lowThreshold={0} />);
-    const chip = screen.getByText("Package · 0 left");
-    expect(chip.className).toContain("bg-amber-100");
-  });
-
-  it("stays emerald above the threshold, or when no threshold is set", () => {
-    render(<PackageChip coverage={pkg(3)} lowThreshold={2} />);
-    expect(screen.getByText("Package · 3 left").className).toContain(
-      "bg-emerald-100"
-    );
+  // ⚠ RISK 10 — the chip no longer has amber "low" styling (that verdict lives
+  // on the Students columns now). It is always emerald for a covered child.
+  it("is always emerald — no threshold styling remains", () => {
     render(<PackageChip coverage={pkg(1)} />);
     expect(screen.getByText("Package · 1 left").className).toContain(
       "bg-emerald-100"

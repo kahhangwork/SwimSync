@@ -10,13 +10,15 @@ import type { CoverageLabel } from "@/lib/packageCoverage";
 // pool — and the tooltip says so. 'mixed' is structurally unreachable while
 // one_active_enrolment_per_student stands; the branch is here so a lifted
 // constraint degrades to an honest label instead of a lie.
+// ⚠ RISK 10 — the amber "running low" styling was REMOVED: "low" is now a SQL
+// verdict shown only on the Students page's own columns, so a second threshold
+// here (the old `lowThreshold` prop) would be a duplicate definition. This chip
+// is a pure coverage label now.
 export function PackageChip({
   coverage,
-  lowThreshold = null,
   title,
 }: {
   coverage: CoverageLabel | undefined;
-  lowThreshold?: number | null;
   /** Override tooltip — family-grain surfaces word it per family. */
   title?: string;
 }) {
@@ -37,13 +39,10 @@ export function PackageChip({
   }
 
   const n = coverage.lessonsRemaining ?? 0;
-  const low = lowThreshold !== null && n <= lowThreshold;
   const label = coverage.coverage === "mixed" ? "Mixed" : "Package";
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-        low ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
-      }`}
+      className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700"
       title={
         title ??
         (coverage.coverage === "mixed"
