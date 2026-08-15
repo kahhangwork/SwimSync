@@ -599,6 +599,9 @@ the shape of the system changes:_
 | `supabase/functions/generate-invoices/core.ts` | Billing engine logic (exported, tested) |
 | `supabase/functions/generate-invoices/index.ts` | Thin HTTP handler (auth + client + call core) |
 | `supabase/functions/generate-invoices/email.ts` | Invoice-email builders + Resend sender + `emailCreatedInvoices()` orchestration (§8c) |
+| `supabase/functions/public-package/` | The tokenised renewal-offer pay page's data source (core.ts + index.ts), the package mirror of `public-invoice`; `verify_jwt=false`, the 128-bit `public_token` is the access control. Refuses a SUSPENDED business (an offer is prepayment, unlike an invoice) — §8.60 |
+| `SwimSyncAdmin/components/WhatsAppQueue.tsx` | The shared "open next chat" `wa.me` queue shell; `ReminderQueue` (invoices) and the packages renewal queue are both thin wrappers over it — §8.60 |
+| `SwimSyncAdmin/lib/packageOffers.ts` · `SwimSyncApp/app/package/[token].tsx` | Pure offer deciders (`defaultConfirmStart` RISK 3, `pickOfferProduct` Decision 5) · the parent public offer page — §8.60 |
 | `supabase/migrations/20260718000200_coach_close_enrolment.sql` | `close_student_enrolment()` RPC — remove-from-class / set-inactive for the tenant admin **and** the owning coach (§6, §8a) |
 | `supabase/migrations/20260718000100_…invoice_run_day` · `…000300_…invoice_block_notice` | `app_settings` seeds: automatic run day (default 7) + blocked-alert throttle state |
 | `SwimSyncAdmin/lib/studentStatus.ts` · `SwimSyncApp/lib/studentStatus.ts` | **Byte-identical twins** — `removeFromClass` / `setStudentInactive` over the RPC. Edit both (§6) |

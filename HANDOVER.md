@@ -1,14 +1,15 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-15 — **weeks / start-date / holiday-extension PACKAGES shipped LIVE**
-(§8.59): products sold in WEEKS, a per-purchase START DATE (smart-defaulted to when coverage
-ends), holiday validity AUTO-EXTENSION with a loud per-role acknowledge, and admin
-manual-extend. Migrations `20260814000400`–`20260815000400`, engine, both apps — all on prod,
-grant dump clean. **DORMANT** (no package sold on prod). PRD §7.16 · `docs/DEPLOYMENT.md` §11.21._
+_Last updated: 2026-08-15 — **Package RENEWAL AUTOMATION shipped LIVE** (§8.60): admin-created
+renewal OFFERS (pending row + tokenised `/package` pay page + "I've paid"), Generate-all
+preview, shared WhatsApp queue, per-category/all-classes DEFAULT packages, Students
+Package/Left/Expires columns + Actions drawer (class add/remove moved in, column view-only).
+Migrations A+B + 2 edge fns + apps, all on prod, grant dump clean. **DORMANT** (no offer sold).
+PRD §7.16 · `docs/DEPLOYMENT.md` §11.22._
 
-_Previously, 2026-08-15 — **stale per-coach PayNow QR column removed from the admin Coaches
-page** (§8.58): the QR is the BUSINESS's, managed on mobile — the column was a mislabeled
-read-only mirror. App-only, LIVE (`892e2cc`)._
+_Previously, 2026-08-15 — **weeks / start-date / holiday-extension PACKAGES** (§8.59): sold in
+WEEKS, per-purchase start date, holiday auto-extension + per-role acknowledge, admin extend.
+Migrations `20260814000400`–`20260815000400`, LIVE, DORMANT. PRD §7.16 · `docs/DEPLOYMENT.md` §11.21._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -119,7 +120,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | Coach wages — effective-dated rates, the pay-decision surface | UI + backend, LIVE | PRD §7.13 · §8.3 |
 | Active/inactive families and children, per business | UI + backend, LIVE | PRD §7.14 · §8.4 |
 | Effective-dated class terms — a lesson is priced by its OWN date | UI + backend, LIVE | PRD §7.3 · §8.3 |
-| Prepaid lesson packages — sold in WEEKS, per-purchase start date, holiday auto-extension, admin extend | pgTAP + Deno + vitest + jest, LIVE 2026-08-15 | PRD §7.16 · §8.59 |
+| Prepaid packages — weeks/start-date/holiday-extension, AND renewal OFFERS (tokenised `/package` pay page + WhatsApp queue + default packages + Students columns/drawer) | pgTAP + Deno + vitest + jest + driver, LIVE 2026-08-15 | PRD §7.16 · §8.59, §8.60 |
 | Package purchases numbered + QR-payable (`PKG-YYYY-NNNN`) | pgTAP 12 + 2 drivers, LIVE 2026-08-09 | PRD §7.16 · §8.37 |
 | Every child's name carries their payment method (per-child, category-aware) | pgTAP + vitest, LIVE | PRD §7.16 · §8.23 |
 | Fee-free payment collection — `INV-YYYY-NNNN`, dynamic QR, tokenized page, WhatsApp queue | pgTAP + Deno ×2 + vitest + jest + driver, LIVE | PRD §7.21 · §8.26 |
@@ -159,7 +160,10 @@ is a guard whose first real firing is still ahead of you.
 - **Packages** — no package has been sold on production, so the whole 2026-08-15 weeks/start-date
   layer is dormant too: **no start date, holiday extension, acknowledge or manual-extend has ever
   fired on real data.** First firing is the first sale. Its guards (the §7.156/§7.157 pins, the
-  no-cascade recompute, the sealed-month safety) are all verified locally only.
+  no-cascade recompute, the sealed-month safety) are all verified locally only. **Renewal offers
+  (§8.60) are dormant on the same premise** — no offer created on prod, so supersede, the public
+  `/package` page, and the RISK 1/2/4/12 guards (§7.158–§7.162) have never fired on real data;
+  first firing is the first offer.
 - **Billing a month LATE** — no production month has been billed late, so `markable_floor`'s
   reopened window has never been used. That is the point: it is insurance, shipped ahead of
   the trigger its own backlog item named.
@@ -373,6 +377,32 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.60 (2026-08-15) — PACKAGE RENEWAL AUTOMATION, SHIPPED LIVE
+
+**Packages got the collection loop invoices already had, built across Phases 1–4 + polish and
+DEPLOYED to prod** (`8173e8d`…`d2d5a2a`). An **offer** is an admin-created *pending*
+`parent_packages` row with a public token; the family pays on a tokenised `/package` page (same
+dynamic QR + `PKG-` reference + "I've paid" as an invoice — the new `public-package` edge fn),
+the admin works a shared **WhatsApp queue**, confirms *Payment received*, and it activates **with
+the offered start date**. *Generate all* previews every low family first. Per-category /
+all-classes **default packages** feed the product suggestion; the Students page gained
+**Package/Left/Expires** columns + an **Actions drawer** (Invite/Contact/Rename/Set-inactive AND
+class add/remove; the Class column is now view-only). Full design + 12 risk mitigations:
+**`docs/plans/PACKAGE_RENEWAL_AUTOMATION_PLAN.md`**. Behaviour: **PRD §7.16 *Renewal offers***.
+
+**Six gotchas graduated (§7.158–§7.163):** DEFINER trigger for a parent-initiated sibling UPDATE
++ explicit scoping; never auto-cancel a `paid_claimed_at` row; mint a secret only from a DEFINER
+trigger, unconditionally; `coverage.lessons_remaining` is a family sum ≠ "the covering package";
+parents link via `parent_tenants` not `profiles.tenant_id`; a driver must OWN its class id
+(seed regenerates UUIDs). Deploy (backend-first, clean this time): **`docs/DEPLOYMENT.md` §11.22**;
+rollback DOWN files committed + rehearsed (`6f43ee2`). Verified: pgTAP (package_offers 21,
+package_default_products 9, coverage + grants green — only the pre-existing `coach_disable`
+date-flake red), Deno 156×2, admin vitest 372, app jest 363, **served public-package fn**
+end-to-end, and 4 UI drivers (verify-package-renewal 7/7 new; active-inactive 17/17,
+contact-details 21/21, multi-class updated for the drawer). **DORMANT on prod** — no offer
+created, so supersede + the RISK 1/2/4/12 guards have not fired on real data; first firing is the
+first offer. Suites: `docs/TESTING.md` §5.
+
 ## 8.59 (2026-08-15) — PACKAGES: WEEKS, START DATES, HOLIDAY AUTO-EXTENSION, MANUAL EXTEND
 
 **The whole weeks/holiday feature, built across four phases and SHIPPED LIVE** (backend
@@ -400,16 +430,6 @@ and the full grant-dump/probe record are **`docs/DEPLOYMENT.md` §11.21**. Verif
 (only the pre-existing `coach_disable` date-flake red — fails on clean `main` too), Deno **143 ×2**,
 admin vitest **368**, app jest **363**; suites in `docs/TESTING.md` §5. **DORMANT on prod** — no
 package sold, so no guard here has fired on real data; first firing is the first sale.
-
-## 8.58 (2026-08-15) — REMOVE THE STALE PER-COACH PayNow QR COLUMN
-
-**App-only cleanup, LIVE** (`892e2cc`). The admin Coaches page carried a "PayNow QR" column +
-Uploaded/Missing badge + a QR action/modal — all a **mislabeled per-coach mirror** of the
-BUSINESS's QR (PRD §7.10), which is uploaded on the coach's mobile Settings screen, not the admin
-panel. Removed the column, badge, action, modal, the `qrModal` state, the `tenants(paynow_qr_url)`
-read, the sort accessor and the `QrCode` import; table 6→5 columns. No PRD/BACKLOG change — no doc
-line described the column and the QR itself is unchanged. Verified: typecheck + admin vitest 356;
-commit-reviewed. `verify-coach-roster` has no QR assertions, so nothing there broke.
 
 ---
 
@@ -488,25 +508,24 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE CURRENT BUILD — a big feature just shipped; no decided next build
+### THE CURRENT BUILD — Package renewal automation shipped; NO decided next build
 
-**2026-08-15 shipped the weeks/start-date/holiday-extension PACKAGES feature end to end and LIVE
-(§8.59)** — the largest single build in a while, and the first that came from an ad-hoc user
-request rather than the filed queue. Before it: Wave 5 (§8.49–8.51), the small items (§8.52–8.53),
-and 2026-08-14's rename/banner/warning/`service_role` chain (§8.54–8.57). `BACKLOG.md` →
-`## Build order` is still **exhausted** and the small-items list **spent**; what remains is the
-*Unordered* pool. **There is no queued, decided next build; picking one is the first task.**
-`/backlog-prioritisation` exists if the queue should be re-sequenced first.
+**2026-08-15 shipped *Package renewal automation* end to end and LIVE (§8.60)** — the filed NEXT
+item, Phases 1–4 + polish, migrations A+B + `public-package`/`package-emails` + both apps, deployed
+in the correct backend-first order (`docs/DEPLOYMENT.md` §11.22). It followed the weeks/holiday
+packages (§8.59) and 2026-08-14's rename/banner/`service_role` chain (§8.54–8.57). `BACKLOG.md` →
+`## Build order` is **exhausted again**; what remains is the *Unordered* pool + the *Later* big
+features. **There is no queued, decided next build; picking one is the first task.**
+`/backlog-prioritisation` re-sequences the queue if needed.
 
-> **Decided later on 2026-08-15: the next build is *Package renewal automation*** — planned via
-> `/plan-with-confidence` + `/plan-review` (12 risks, mitigations inlined), all decisions locked, in `docs/plans/PACKAGE_RENEWAL_AUTOMATION_PLAN.md`;
-> `BACKLOG.md` → *Build order* → **NEXT** points at it. Not started. Migration A lands first (§7.60).
+> **Two follow-ups the session filed** (both in `BACKLOG.md`): the **unprompted parent low-balance
+> nudge** (the admin-triggered offer email exists; the no-admin-action version is gated on cron)
+> and **bounding `recompute_package_extensions`** (a per-load full scan of active packages, fine
+> now, unbounded over years — verify the late-holiday-resurrection assumption before bounding).
 
-**One thing to actually do first:** the packages deploy left a single **manual UI check** the auth
-gate blocks (§11.19's problem) — **log in to `admin.swimsync.sg`, open Packages (should read
-"Weeks valid" + a Start-date field) and the new Holidays page.** Everything backing them is
-verified live (migrations, engine bundle grep, grant dump). One follow-up is filed: a Playwright
-driver for the new package UI (`BACKLOG.md` → *Billing and payments*).
+**Nothing to do first** — the renewal feature is verified live (served fn + parent bundle grep +
+4 drivers). It is **DORMANT** on prod: no offer has been created, so supersede and the
+RISK 1/2/4/12 guards have not fired on real data. First firing is the first offer.
 
 ### Triage rules, when the sweep does redden
 
@@ -528,15 +547,13 @@ driver for the new package UI (`BACKLOG.md` → *Billing and payments*).
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is
-`20260815000400` (coverage-respects-start-date, §8.59); production confirmed caught up
-2026-08-15 via `supabase migration list --linked`, all six of the feature's migrations with the
-`remote` column filled. **§8.59 is the freshest — and a CAUTIONARY — worked example of the ordering
-gate:** its apps commit was pushed to `main` BEFORE the schema was on prod (the §7.60 trap, third
-time), which would have broken the live Packages/Billing pages. Recovered by **revert-frontend →
-`db push` + engine deploy + grant dump → re-land frontend** (`docs/DEPLOYMENT.md` §11.21). The rule
-stands: migrations to prod (and the engine) FIRST, apps to `main` LAST. §7.123 still applies to
-signatures. Whatever comes next: still one at
+**The migration queue is EMPTY.** The latest applied is `20260815000600` (default packages,
+§8.60); production confirmed caught up 2026-08-15 via `supabase migration list --linked`,
+`remote` filled for both A (`…000500`) and B (`…000600`). **§8.60 is the freshest worked example
+of the ordering gate done RIGHT** (backend to prod first, apps last — no revert dance, unlike
+§8.59 which got it wrong; `docs/DEPLOYMENT.md` §11.21 vs §11.22). The rule stands: migrations to
+prod (and the engine, when `core.ts` changes — it did NOT this time) FIRST, apps to `main` LAST.
+§7.123 still applies to signatures. Whatever comes next: still one at
 a time (§7.55), a worktree never authors one, and budget the post-deploy grant check (§7.39,
 §7.89) **and** the rollback rehearsal (§7.93 — running the DOWN file is the half that finds the
 bugs). **Don't take `supabase db push`'s own output as proof it applied:** it printed a

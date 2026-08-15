@@ -2668,3 +2668,54 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     as §7.156). **The rule: every new `parent_packages`-family column gets a pin clause in the
     same migration that adds it, and a pgTAP that proves a parent's direct UPDATE of it fails
     (shown red first).** The UPDATE *policy* is not column-scoped and will not save you.
+
+158. **A trigger that must UPDATE a SIBLING row on behalf of a parent-initiated INSERT has to
+    be SECURITY DEFINER — and then it MUST carry explicit tenant/parent scoping, because
+    DEFINER bypasses RLS.** `supersede_open_package_offer` (AFTER INSERT on `parent_packages`)
+    cancels a family's open UNCLAIMED offer when a newer request arrives. As SECURITY INVOKER it
+    runs as `authenticated` on the parent's insert, and the §7.157 pin on `superseded_by` then
+    rejects the system's own UPDATE. Made DEFINER, it works — but DEFINER sees every tenant, so
+    the UPDATE is filtered `tenant_id = NEW.tenant_id AND parent_id = NEW.parent_id AND id <>
+    NEW.id AND status='pending' AND offered_by IS NOT NULL AND paid_claimed_at IS NULL`, never a
+    bare "same reference". Same DEFINER-hop-past-the-pins shape as the reference trigger (§7.156).
+
+159. **NEVER auto-cancel a row that carries a payment CLAIM (`paid_claimed_at`). Cancelled is
+    terminal, and the `PKG-`/`INV-` reference on the bank statement then points at a dead row.**
+    The supersede trigger (§7.158) deliberately excludes `paid_claimed_at IS NOT NULL`: a parent
+    who tapped "I've paid" on one offer and then requested a different package must keep the
+    claimed one live, or the admin has to hand-`recordSale` against a reference that no longer
+    resolves. The named prohibition: an offer with a payment claim is cancelled ONLY by the
+    admin's explicit Decline — no trigger, RPC or supersede touches it.
+
+160. **Minting a secret from `extensions.gen_random_bytes` inside a SECURITY INVOKER trigger
+    fails for the client role (`permission denied for gen_random_bytes`); mint it from a DEFINER
+    trigger, and mint UNCONDITIONALLY on any table a parent can INSERT into.** `public_token` on
+    `parent_packages` is minted in `assign_parent_package_reference` (already DEFINER, already
+    unconditional) — NOT in the invoker lifecycle trigger, and NOT with an `IS NULL` guard (a
+    when-NULL mint is parent-writable: the parent supplies the value and the guard skips). This
+    is exactly why invoice tokens work (`assign_invoice_public_fields` is DEFINER + unconditional)
+    and the instinct to "only mint when empty" is wrong on any parent-insertable table.
+
+161. **`student_package_coverage().lessons_remaining` is a per-student, category-scoped FAMILY
+    SUM — "the covering package" is a DIFFERENT question, and the FIFO skips exhausted ones.**
+    The Students "Left" column reads the sum (two Group packages 9+5 → Pablo shows 14); the
+    "Package"/"Expires" columns read ONE package — the earliest-expiring covering package with
+    `live_lessons_remaining > 0` (fallback earliest). Don't conflate them: the sum can be
+    non-zero while every individual package that could pay for THIS child's class is exhausted.
+    The coverage function must contain NO affordability comparison (`coverage.test.sql` greps
+    the source for it) — display is category+date only; the engine owns "can this package pay".
+
+162. **Parents link to a tenant via `parent_tenants` (many-to-many), NOT `profiles.tenant_id` —
+    that column is NULL for a parent (it names a STAFF member's home tenant).** A server-side
+    "is this family in my business?" check written as `profiles.tenant_id = <tenant>` refuses
+    every real parent (`create_package_offer` shipped this bug; the pgTAP fixture caught it with
+    "That family is not in this business."). Use `EXISTS (SELECT 1 FROM parent_tenants WHERE
+    parent_id = … AND tenant_id = …)`.
+
+163. **A Playwright driver that HARDCODES a seed row's id (a class, a coach) breaks the day the
+    DB is reset — `seed.sql` regenerates those UUIDs (`gen_random_uuid`) on every reset.** The
+    §7.73 family, fresh instance: `verify-package-renewal` borrowed a class id captured from a
+    live DB and passed once, then failed on the next reset with an enrolment-guard error. The
+    fix is §7.73's rule — a driver OWNS its fixtures: create the class (coach looked up by the
+    stable `coach@swimsync.test` email; the Default-category ids `7c000000…` ARE stable seed
+    constants) with a fixed id, and tear it down. Only borrow ids that are fixed in `seed.sql`.

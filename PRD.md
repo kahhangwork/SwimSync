@@ -1752,6 +1752,32 @@ cash paid always equals value granted — nothing to reconcile.
   parent made by scanning a static image and typing the amount by hand — the exact
   unattributable payment §7.21 exists to remove. The reference is assigned by a database
   trigger and is not client-writable, on insert or update.
+- **Renewal offers — packages get the invoice collection loop** *(implemented 2026-08-15)*.
+  When a family is **running low** — few lessons left **OR** its package expiring soon — the
+  admin can send them their next package as an **offer**: a *pending* package the admin
+  creates on the family's behalf, with a smart-defaulted start date and a product
+  pre-selected from the family's last package, or from a per-category / all-classes
+  **default** the admin sets on the Packages page. The parent gets a business-branded email
+  and a tokenised **`/package` pay page** — the same dynamic PayNow QR, locked amount +
+  `PKG-` reference, and "I've paid" claim an invoice has (§7.21) — and the admin works a
+  **WhatsApp queue** of `wa.me` links, the same shared queue the invoice reminders use. A
+  per-family **Generate invoice** button acts on one family; **Generate all** previews every
+  low family (product + start date editable per row) before anything is sent — nothing goes
+  out blind. A newer pending request **supersedes** (cancels) an open *unclaimed* offer, so a
+  family never holds two live pay links; a **claimed** offer is never auto-cancelled (the
+  bank reference must keep resolving). Confirming *Payment received* activates the package
+  **with the offered start date**. "Low" is one definition — lessons ≤ threshold or expiring
+  within N days (both admin-set), minus families that already have an open row — used
+  identically by *Generate all* and by the Students page's **Package / Left / Expires**
+  columns and its "running low" filter. Renewals are for package HOLDERS only; ad-hoc
+  families stay on monthly invoices. *(No cron: `wa.me` is worked by hand. The public page
+  refuses a suspended business — an offer is prepayment for lessons that may never run,
+  unlike an invoice for lessons delivered.)*
+- **The admin Students page** surfaces each child's coverage as **Package / Left / Expires**
+  columns (amber when running low; "Ad-hoc" when uncovered) and folds per-row actions —
+  Invite parent, Contact details, Rename, Set inactive, and **add / end a class** — into one
+  **Actions** drawer. The class chips themselves are **view-only** on the row; the Level
+  dropdown stays inline. *(implemented 2026-08-15.)*
 - **Multiple packages draw earliest-expiry-first.** Expiry is checked against the
   **lesson's own date** — a package that expires between the lesson and the invoice run
   still pays for lessons taken while it was live, and coverage starts at confirmation
@@ -1766,8 +1792,9 @@ cash paid always equals value granted — nothing to reconcile.
 
 *(Deliberately not built: in-app refunds — cancelling freezes the remaining value and
 the money settles offline, see `BACKLOG.md`; arbitrary-amount top-ups — buying another
-package is the top-up; and parent-facing low-balance notifications — the admin-facing
-filter shipped first, the parent nudge is backlogged behind cron.)*
+package is the top-up; and the UNPROMPTED parent low-balance nudge — the admin now sends a
+renewal offer with its own email (above), but an automatic parent-side reminder stays
+backlogged behind cron.)*
 
 ### 7.17 A Child Before Their Parent *(implemented 2026-07-25)*
 

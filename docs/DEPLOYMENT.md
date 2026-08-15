@@ -470,3 +470,27 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     acknowledge and manual-extend have never fired on real data — first firing is the first sale.
     The one UI check the auth gate blocks (a served-bundle grep, §11.19's problem) stands: log in
     and open Packages / Holidays.
+
+22. **Deploy record (2026-08-15): package RENEWAL AUTOMATION — migrations A+B + two edge
+    functions + apps, LIVE.** Commits `8173e8d`→`d2d5a2a` on `main`. This time the §7.60
+    order was followed cleanly (no revert dance): backend to prod FIRST, apps LAST.
+    Sequence: (1) `supabase db push` — migrations `20260815000500` (offers) + `20260815000600`
+    (default packages); `migration list --linked` remote filled for both; the token backfill
+    (`public_token` on existing `parent_packages`) minted for prod's real rows. The `pgdelta`
+    cert stack trace printed again alongside `Finished` — normal (§7.55), not an incident.
+    (2) `supabase functions deploy public-package` (NEW, v1, `verify_jwt: false` from
+    `config.toml`) + `package-emails` (v2, the `offered` type). **No `generate-invoices`
+    redeploy** — `core.ts` was untouched; only the SQL functions it reads changed. **No new
+    function secret** — the offer email's `APP_URL` defaults to `https://swimsync.sg`.
+    (3) RISK 11 assertion on prod: `curl "$FN/public-package?token=zz"` → `{"error":"not_found"}`
+    **404, not 401** — the anon path works. (4) **Grant dump** (`supabase db dump --linked`):
+    `anon` EXECUTE still **18** (none this wave's); the §11.7 default-privilege grid still
+    zero rows; the three new client RPCs (`create_package_offer`, `package_renewal_candidates`,
+    `student_package_coverage`) `authenticated`+`service_role` only. (5) Apps → `main` (Vercel):
+    the served parent bundle grep-confirmed new strings ("Prefer a different package", "has
+    prepared your next package"); a follow-up push (`d2d5a2a`) moved the Students class controls
+    into the Actions drawer. **Rollback cover:** committed DOWN files for A and B
+    (`supabase/rollback/20260815000500_…_DOWN.sql`, `…000600_…_DOWN.sql`, `6f43ee2`), rehearsed
+    locally (B-then-A → coverage test 22/22, triggers back to pre-A). **Dormant on prod:** no
+    renewal offer has been created, so supersede, the public `/package` page, and the RISK
+    1/2/4/12 guards have never fired on real data — first firing is the first offer.

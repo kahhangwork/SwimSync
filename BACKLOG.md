@@ -1,8 +1,10 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-15 — **weeks/start-date/holiday-extension packages shipped LIVE**
-(PRD §7.16, `docs/DEPLOYMENT.md` §11.21); one follow-up filed under *Billing and payments*:
-a Playwright driver for the new package UI (with the recompute perf-bound note folded in)._
+_Last updated: 2026-08-15 — **Package renewal automation shipped LIVE** (PRD §7.16 *Renewal
+offers*, `docs/DEPLOYMENT.md` §11.22): admin offers + `/package` pay page + Generate-all +
+WhatsApp queue + default packages + Students columns/drawer. Build order exhausted again.
+Two follow-ups filed: the UNPROMPTED parent nudge (behind cron) and bounding
+`recompute_package_extensions`._
 
 _Previously, 2026-08-14 (2nd) — **Catch a duplicate at the admin's Add-student step**
 SHIPPED and removed (`find_roster_duplicates`, PRD §7.18). Built as phone **OR** name (not
@@ -323,18 +325,12 @@ header (`20260812000400`).
     *Suspending a business*): staff and parents dark, staff banned, engine skips the
     tenant; already-sent invoice links deliberately keep working. **Wave 5 complete.**
 
-### NEXT — decided 2026-08-15, planned, unbuilt
-
-**Package renewal automation — M** — `docs/plans/PACKAGE_RENEWAL_AUTOMATION_PLAN.md`.
-Give packages the loop invoices already have: admin-created renewal **offers** (a pending
-`parent_packages` row + public tokenised pay page + *I've paid*), a per-family **Generate
-invoice** and a preview-then-confirm **Generate all** driven by the existing running-low
-threshold (+ a new expiry-days one), the same `wa.me` queue + `package-emails`, **per-category
-default packages**, the Packages page reordered (Categories → What you sell → Who holds one,
-with children named), and the Students page gaining Package/Left/Expires columns + a single
-**Actions** drawer. Settled via `/plan-with-confidence`, risk-reviewed via `/plan-review` (12 mitigations inlined); four phases, ~4 days;
-Migration A first (§7.60). Item body: *Billing and payments → Package renewal automation*.
-Also discharges *A Playwright driver for the weeks/holiday package UI* (Phase 4).
+~~**Package renewal automation — M** (decided + planned 2026-08-15)~~ — **SHIPPED LIVE
+2026-08-15** (PRD §7.16 *Renewal offers*, `docs/DEPLOYMENT.md` §11.22). Admin-created
+offers + tokenised `/package` pay page + Generate-all preview + shared WhatsApp queue +
+per-category/all-classes default packages + Students Package/Left/Expires columns and an
+Actions drawer. **Also discharged** *A Playwright driver for the weeks/holiday package UI*
+(`verify-package-renewal`). **Build order is exhausted again** — pick from *Unordered*.
 
 ### Unordered — no dependencies, pick by value
 
@@ -364,7 +360,7 @@ copy/templates (S).
 **Track invoice-email delivery + retry** (S) establishes the `sent_at` + `IS NULL`
 idempotency pattern in `email.ts` → **Credit-note email notifications** (M) inherits it
 rather than inventing a second one → *then* the cron decision (HANDOVER §9) gates
-**Parent-facing package notifications** (S) and **Automated reminder workflows** (M).
+**The UNPROMPTED parent low-balance nudge** (S) and **Automated reminder workflows** (M).
 
 ### Later — big features carrying their own dependencies
 
@@ -762,44 +758,23 @@ deliberately $0. Probably only makes sense if SwimSync ever serves coaches other
 its owner. Related: automatic PayNow detection above gets much of the benefit without
 the fee.
 
-### Package renewal automation — **M** `[planned 2026-08-15]`
-Admin-side "generate package invoice" for families whose package is running low (lessons ≤
-threshold OR expiry within N days), one-family and generate-all-with-preview, delivered by
-the invoice-style `wa.me` queue + email, paid on a public tokenised page with *I've paid*,
-confirmed by the existing **Payment received**. Per-category **default packages** with
-original-package precedence. Packages page reorder + children names; Students page gets
-Package · Left · Expires columns and a single **Actions** drawer (class chips + level stay
-inline). **Plan (all decisions locked with the user): `docs/plans/PACKAGE_RENEWAL_AUTOMATION_PLAN.md`.**
+### The UNPROMPTED parent low-balance nudge — **S**
+Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT
+the admin sending a renewal offer.
 
-**Why:** monthly invoicing is a rhythm (engine + WhatsApp queue); packages still renew by the
-parent noticing and the admin confirming. **Not** cron/auto-send — the queue is worked by
-hand, like invoices. Explicitly out of scope: offering packages to ad-hoc families, parent
-self-switching the offered product, scheduled sends.
+**Why:** the admin-triggered renewal offer now exists (PRD §7.16, its own email), but it is
+worked by hand. This is the parent-side, no-admin-action version. **Notes:** all the pieces
+exist — `package_renewal_candidates()` is the "who", `package-emails` the delivery — so it
+is a scheduled check away, gated on cron (same blocker as the invoice reminder chain).
 
-### Parent-facing package notifications — **S**
-Email/notify the parent when their package runs low or approaches expiry.
+### Bound `recompute_package_extensions` — **S** `[found 2026-08-15]`
+`recompute_package_extensions` loops every `status='active'` package on each Packages/Billing
+page load. Status never flips at expiry, so the set grows unboundedly over years.
 
-**Why:** today the parent must open the app to notice; the admin has a "running low"
-filter (per-tenant threshold) but the nudge still travels by hand. The building blocks
-exist: `package_live_balances()` is the number, and the `package-emails` function is
-the delivery path — this is a scheduled check away (needs cron, like the reminder
-chain).
-
-### A Playwright driver for the weeks/holiday package UI — **S** `[deferred 2026-08-15]`
-The loud/acknowledge badge (both apps), the Holidays page + CSV import, the Start-date
-field, and the Extend control shipped 2026-08-15 (PRD §7.16) with **no registered UI
-driver** — covered by pgTAP + Deno + vitest + jest, but not exercised in a browser in the
-nightly sweep.
-
-**Why:** the logic is DB-tested, but the loud→acknowledge→quiet transition and the CSV
-import are genuinely UI flows; the nightly sweep is where a rendering/wiring regression
-would surface. **Notes:** model on `verify-packages.mjs`; needs a fixture that seeds a
-holiday + an enrolment so recompute produces a real extension. While here, consider the
-deferred **recompute perf bound** (Fable review #9): `recompute_package_extensions` loops
-every `status='active'` package on each page load — status never flips at expiry, so this
-grows unboundedly over years. Bounding it (skip packages whose effective end is > N months
-past) is safe **only** if a late-added holiday inside an old nominal window can still
-resurrect an expired package — check that before adding the bound.
+**Why:** a per-load full scan is fine at a few dozen packages, a problem at thousands.
+**Notes:** bounding it (skip packages whose effective end is > N months past) is safe **only**
+if a late-added holiday inside an old nominal window can still resurrect an expired package —
+verify that assumption before adding the bound. (Fable review #9, deferred from the weeks work.)
 
 ### In-app package refunds — **S**
 Record a refund against a cancelled package instead of settling fully offline.

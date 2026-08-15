@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.58** | 2026-08-15 | Remove the stale per-coach PayNow QR column from admin Coaches (`892e2cc`, app-only) — a mislabeled mirror of the BUSINESS's QR, unchanged | PRD §7.10 |
 | **8.57** | 2026-08-14 | Turn OFF the `service_role` default-privilege grant (`20260814000300`), LIVE; whitelist rejected | `docs/DEPLOYMENT.md` §11.20 · BACKLOG *Deliberately not doing* |
 | **8.56** | 2026-08-14 | Warn on a possible duplicate at Add-student: `find_roster_duplicates` (`20260814000200`) + app, LIVE | PRD §7.18 · `docs/plans/ADD_STUDENT_DUP_WARNING_PLAN.md` |
 | **8.55** | 2026-08-14 | Duplicate banner (`70b5e32`, app-only) compares only same-parent-situation rows — no false flag on a claimed child | PRD §7.18 · `docs/DEPLOYMENT.md` §11.18 |

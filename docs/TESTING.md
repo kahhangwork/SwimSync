@@ -73,6 +73,8 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `tenant_public_holidays.test.sql` (8) | the per-business holiday calendar (`20260815000100`): RLS on, `authenticated` holds all four verbs, admin writes only their own tenant, a duplicate date is refused, a parent reads them, another tenant's admin sees/deletes none |
 | `package_holiday_extension.test.sql` (20) | live holiday extension (`20260815000200`): +1 week per affected week, **two classes hit in one week = +1 not +2**, no-cascade (a tail holiday adds nothing), idempotent (one audit event on re-run), shrink clamps the ack then a re-bump goes loud, a no-enrolment holiday is ignored; **⚠ RISK 5 authz** — a parent can't recompute/ack another's, `acknowledge_all_extensions` is admin-only + tenant-scoped (the `auth.uid() IS NULL` seam, §7.156) |
 | `package_manual_extend.test.sql` (9) | `extend_package` (`20260815000300`): admin adds days, moves expiry, audits, stacks; bounds 1..365 (0/negative/400 refused); a parent cannot extend |
+| `package_offers.test.sql` (21) | renewal OFFERS (`20260815000500`): **RISK 4** — `public_token` is DEFINER-minted, unconditional, non-spoofable (parent's supplied token discarded, `offered_by` forced null, five parent-UPDATE pins raise §7.160); **RISK 12** — `create_package_offer` is admin-only, one open offer per family, refuses a retired product / a foreign-tenant parent (parents link via `parent_tenants`, §7.162); **RISK 1** — supersede cancels ONLY an open UNCLAIMED offer (a paid one survives; a parent-role request cancels via the DEFINER hop §7.158; an admin active sale supersedes; a parent's own request is untouched §7.159); **RISK 2** — a family low by expiry is a candidate, one with an open row is not; anon holds EXECUTE on neither new RPC |
+| `package_default_products.test.sql` (9) | the category / all-classes DEFAULT slots (`20260815000600`): a category default accepts an all-classes or same-category product, rejects a different-category / other-tenant / retired one; the tenant default rejects another business's product; **retiring a product clears any default pointing at it** (the is_active half the FK's DELETE rule misses) |
 | `tenant_provisioning.test.sql` (21) | creating a business: parent, coach, **tenant admin** and anon all REFUSED (each in an explicit transaction, 7.16) and `tenants` does not grow after any of them; slug derivation incl. a **non-ASCII name** that would otherwise violate NOT NULL; join-code shape + uniqueness; a fresh tenant reports `admin_status = none`. The two ACL assertions are near-vacuous locally by construction (7.39) |
 | `package_corrections.test.sql` (12) | a correction on a package-funded line restores the package (even expired) and mints NO cash credit note; flip-flops refund at most once; ad-hoc lines keep the credit-note path byte-identical |
 | `session_coach_roster.test.sql` (40) | Wave 3's roster, in the order the risks were ranked. **Mechanics:** `assign_session_coach()` resolve-or-creates the lesson row and is idempotent (twice ⇒ one row), the partial unique index holds one main, `set_session_main_coach()` swaps without a raw 23505, an off-pattern date is refused, and a **cross-tenant coach is refused with a REAL foreign id** — resolved as superuser on purpose, because fetching it under RLS returns NULL and the refusal would then be a null check proving nothing. **The substitute walk** (any single missing policy fails it): class row, session, enrolments, child, **trial guest, make-up guest, both guest children**, then writes attendance. **The gates that must stay shut:** `coach_serves_student()` is FALSE for a substitute and `set_students_active()` refuses them (the door decision 2 does not guard); a shadow reads and cannot mark; the class's own coach loses write while covered. **Pay:** three deliberately unequal rates give three different amounts on one lesson (equal ones would let the coach argument be ignored), the replaced coach is owed **nothing**, the 1-arg form still exists and delegates to the roster main (§7.123), and a lesson with no roster row still pays the class's own coach. **The money assertion:** a cover recorded after the month was PAID claws the replaced coach back and pays the substitute in a period they had no payout in — **carried once** across three re-runs and a later period (`SUM` per coach per session is exactly `0.00` and `50.00`). **Proven red by running the DOWN file**: 0 of 40 pass, the gates do not exist |
@@ -106,9 +108,14 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 the command is the fact and this sentence is the hint). If you add a suite, add a row.
 
 _Deno tests (run by `generate-invoices/test.sh`, which also carries
-`../package-emails/email.test.ts` and `../public-invoice/core.test.ts` — the latter
-pins the public serializer's EXACT key set, first-names-only students, uniform
-null-for-every-failure, and claim idempotency against the local stack):_
+`../package-emails/email.test.ts`, `../public-invoice/core.test.ts` and (added 2026-08-15)
+`../public-package/core.test.ts` — the invoice one pins the public serializer's EXACT key
+set, first-names-only students, uniform null-for-every-failure, and claim idempotency; the
+**package** one mirrors it for renewal offers: the pinned key set (no parent/child/UUID
+leak), `valid_until_preview` math, claim only on a PENDING offer, and a SUSPENDED business
+→ not-found (RISK 5/9). `package-emails/email.test.ts` also pins the `offered`-email
+authorization matrix (`authorizePackageEmail` — a coach or parent is refused, only an admin
+of the offer's tenant with a real offer row passes — RISK 6):_
 **The clock is part of every fixture** — `monthEnded()` in `test-helpers.ts` supplies the
 billing month, an instant at which it is billable, and an early-enough enrolment as ONE fact,
 and `newScenario()` **throws** on a scenario expecting zero lessons (§7.33). The
@@ -354,6 +361,17 @@ second purchase, while Pia (Private-only, same family) wears "Ad-hoc" on both �
 the old by-parent sum labelled identically — plus the child profile's family-shared
 Balances line, and — since 2026-08-09 — that the package's PayNow screen carries its
 `PKG-YYYY-NNNN` reference (22 checks);
+`verify-package-renewal.mjs` (self-seeding into the seed tenant, own teardown; added
+2026-08-15) — the renewal-offer loop on the admin UI (7 checks): a low family surfaces in
+the *Generate all* preview → Confirm calls `create_package_offer` → a PENDING offer with
+`offered_by` + a minted `public_token` appears → *Payment received* shows the OFFERED start
+read-only (RISK 3) and activates the package **with that start date**. The public `/package`
+page half is proven separately against the served function (the Deno suite + the deploy
+curl). **It OWNS its class** (created here, coach looked up by email) — a hardcoded seed id
+would break on the next reset (§7.163). The Actions-drawer move (2026-08-15) also updated
+**`verify-active-inactive`, `verify-contact-details`, `verify-multi-class`**: each opens the
+per-row **Actions** button before Set-inactive / Contact-details / Add-class / Remove, since
+those controls left the row (the Class column is now view-only);
 `verify-class-deactivation.mjs` (+ `fixtures-class-deactivation.sql` and its
 `-teardown.sql`) — **21 checks, and check 7 is a DEPLOY GATE, not a regression test.**
 §7.109's whole mitigation is that the retire → reload → restore round trip completes
