@@ -499,7 +499,7 @@ and 2026-08-14's rename/banner/warning/`service_role` chain (§8.54–8.57). `BA
 `/backlog-prioritisation` exists if the queue should be re-sequenced first.
 
 > **Decided later on 2026-08-15: the next build is *Package renewal automation*** — planned via
-> `/plan-with-confidence`, all decisions locked, in `docs/plans/PACKAGE_RENEWAL_AUTOMATION_PLAN.md`;
+> `/plan-with-confidence` + `/plan-review` (12 risks, mitigations inlined), all decisions locked, in `docs/plans/PACKAGE_RENEWAL_AUTOMATION_PLAN.md`;
 > `BACKLOG.md` → *Build order* → **NEXT** points at it. Not started. Migration A lands first (§7.60).
 
 **One thing to actually do first:** the packages deploy left a single **manual UI check** the auth

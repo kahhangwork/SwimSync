@@ -332,7 +332,7 @@ invoice** and a preview-then-confirm **Generate all** driven by the existing run
 threshold (+ a new expiry-days one), the same `wa.me` queue + `package-emails`, **per-category
 default packages**, the Packages page reordered (Categories → What you sell → Who holds one,
 with children named), and the Students page gaining Package/Left/Expires columns + a single
-**Actions** drawer. Settled with the user via `/plan-with-confidence`; four phases, ~3.5 days;
+**Actions** drawer. Settled via `/plan-with-confidence`, risk-reviewed via `/plan-review` (12 mitigations inlined); four phases, ~4 days;
 Migration A first (§7.60). Item body: *Billing and payments → Package renewal automation*.
 Also discharges *A Playwright driver for the weeks/holiday package UI* (Phase 4).
 
