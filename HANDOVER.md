@@ -498,6 +498,10 @@ and 2026-08-14's rename/banner/warning/`service_role` chain (§8.54–8.57). `BA
 *Unordered* pool. **There is no queued, decided next build; picking one is the first task.**
 `/backlog-prioritisation` exists if the queue should be re-sequenced first.
 
+> **Decided later on 2026-08-15: the next build is *Package renewal automation*** — planned via
+> `/plan-with-confidence`, all decisions locked, in `docs/plans/PACKAGE_RENEWAL_AUTOMATION_PLAN.md`;
+> `BACKLOG.md` → *Build order* → **NEXT** points at it. Not started. Migration A lands first (§7.60).
+
 **One thing to actually do first:** the packages deploy left a single **manual UI check** the auth
 gate blocks (§11.19's problem) — **log in to `admin.swimsync.sg`, open Packages (should read
 "Weeks valid" + a Start-date field) and the new Holidays page.** Everything backing them is

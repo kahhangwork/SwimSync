@@ -323,6 +323,19 @@ header (`20260812000400`).
     *Suspending a business*): staff and parents dark, staff banned, engine skips the
     tenant; already-sent invoice links deliberately keep working. **Wave 5 complete.**
 
+### NEXT — decided 2026-08-15, planned, unbuilt
+
+**Package renewal automation — M** — `docs/plans/PACKAGE_RENEWAL_AUTOMATION_PLAN.md`.
+Give packages the loop invoices already have: admin-created renewal **offers** (a pending
+`parent_packages` row + public tokenised pay page + *I've paid*), a per-family **Generate
+invoice** and a preview-then-confirm **Generate all** driven by the existing running-low
+threshold (+ a new expiry-days one), the same `wa.me` queue + `package-emails`, **per-category
+default packages**, the Packages page reordered (Categories → What you sell → Who holds one,
+with children named), and the Students page gaining Package/Left/Expires columns + a single
+**Actions** drawer. Settled with the user via `/plan-with-confidence`; four phases, ~3.5 days;
+Migration A first (§7.60). Item body: *Billing and payments → Package renewal automation*.
+Also discharges *A Playwright driver for the weeks/holiday package UI* (Phase 4).
+
 ### Unordered — no dependencies, pick by value
 
 Upcoming-lessons view for parents (S), Maps deep link (S), Moving a student between
@@ -748,6 +761,20 @@ a gateway takes a cut of a part-time coach's margin, and the current stack is
 deliberately $0. Probably only makes sense if SwimSync ever serves coaches other than
 its owner. Related: automatic PayNow detection above gets much of the benefit without
 the fee.
+
+### Package renewal automation — **M** `[planned 2026-08-15]`
+Admin-side "generate package invoice" for families whose package is running low (lessons ≤
+threshold OR expiry within N days), one-family and generate-all-with-preview, delivered by
+the invoice-style `wa.me` queue + email, paid on a public tokenised page with *I've paid*,
+confirmed by the existing **Payment received**. Per-category **default packages** with
+original-package precedence. Packages page reorder + children names; Students page gets
+Package · Left · Expires columns and a single **Actions** drawer (class chips + level stay
+inline). **Plan (all decisions locked with the user): `docs/plans/PACKAGE_RENEWAL_AUTOMATION_PLAN.md`.**
+
+**Why:** monthly invoicing is a rhythm (engine + WhatsApp queue); packages still renew by the
+parent noticing and the admin confirming. **Not** cron/auto-send — the queue is worked by
+hand, like invoices. Explicitly out of scope: offering packages to ad-hoc families, parent
+self-switching the offered product, scheduled sends.
 
 ### Parent-facing package notifications — **S**
 Email/notify the parent when their package runs low or approaches expiry.
