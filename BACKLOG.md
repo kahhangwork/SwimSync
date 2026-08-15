@@ -332,9 +332,9 @@ per-category/all-classes default packages + Students Package/Left/Expires column
 Actions drawer. **Also discharged** *A Playwright driver for the weeks/holiday package UI*
 (`verify-package-renewal`). ~~**Build order is exhausted again** — pick from *Unordered*.~~
 
-~~**NEXT — Parent referral codes (M)**~~ — **SHIPPED 2026-08-15** (§8.61), all four phases:
-migration `20260815000700` + engine functions + pgTAP, parent app, admin Referrals page, and
-`verify-referrals` (13 checks). Built and verified locally; **NOT yet deployed** (HANDOVER §9).
+~~**NEXT — Parent referral codes (M)**~~ — **SHIPPED LIVE 2026-08-15** (§8.61, `docs/DEPLOYMENT.md`
+§11.23): migration `20260815000700` + `public-package` v2 + `package-emails` v3 + both apps, on prod,
+grant dump clean, RISK 12 checks 0/0. DORMANT (no business has enabled it).
 **Build order is exhausted again** — pick from *Unordered* or *Later*.
 
 ### Unordered — no dependencies, pick by value
@@ -768,8 +768,8 @@ Built exactly as planned (`docs/plans/REFERRAL_PLAN.md`): `REF-XXXXX` per member
 a join code, friend's first-package discount + referrer's later-package reward (FIFO queue,
 tenant-wide expiry on the referrer's), tenant %/$ default + per-product override (`0` = opt-out),
 admin Referrals page (grant/void/disable), same-household guard, referrer earn-email. First price
-modifier in the system — changes `amount_payable`, never `total_value`. **Verified locally; NOT
-deployed yet** (backend-first deploy still owed — HANDOVER §9). Two follow-ups filed below: the
+modifier in the system — changes `amount_payable`, never `total_value`. **LIVE on prod 2026-08-15**
+(`docs/DEPLOYMENT.md` §11.23), DORMANT until a business enables it. Two follow-ups filed below: the
 "your reward expires soon" nudge and any unprompted low-balance email (both cron-gated).
 
 ### The UNPROMPTED parent low-balance nudge — **S**

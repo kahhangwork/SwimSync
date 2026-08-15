@@ -1,10 +1,10 @@
 # Plan — parent referral codes (double-sided package discount)
 
-_Status: **BUILT (all 4 phases) and verified LOCALLY 2026-08-15, NOT yet deployed** — migration
-`20260815000700_referrals.sql` + engine fns + pgTAP `referrals.test.sql` (57), parent app, admin
-Referrals page, and `verify-referrals.mjs` (13), all on `main` locally. The backend-first prod
-deploy is the outstanding task (HANDOVER §9). Six gotchas graduated as §7.164–§7.169. Original
-plan below, unchanged._
+_Status: **SHIPPED LIVE 2026-08-15** (§8.61, `docs/DEPLOYMENT.md` §11.23) — migration
+`20260815000700_referrals.sql` + `public-package` v2 + `package-emails` v3 + both apps, deployed
+backend-first (grant dump clean, RISK 12 checks 0/0). pgTAP `referrals.test.sql` (57) +
+`verify-referrals.mjs` (13). DORMANT on prod (no business has `referral_enabled`). Six gotchas
+graduated as §7.164–§7.169. Original plan below, unchanged._
 
 _Settled with the user via `/plan-with-confidence` on 2026-08-15
 (two rounds of questions after an online-practice review; every decision below was answered

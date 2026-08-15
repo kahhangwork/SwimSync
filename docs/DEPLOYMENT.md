@@ -494,3 +494,31 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     locally (B-then-A → coverage test 22/22, triggers back to pre-A). **Dormant on prod:** no
     renewal offer has been created, so supersede, the public `/package` page, and the RISK
     1/2/4/12 guards have never fired on real data — first firing is the first offer.
+
+23. **Deploy record (2026-08-15): parent REFERRAL CODES — migration + two edge functions +
+    apps, LIVE.** Commits `71056d7`→`54dbd3e` on `main`. §7.60 order followed cleanly (backend
+    to prod FIRST, apps LAST, no revert dance). Sequence: (1) `supabase db push` — migration
+    `20260815000700_referrals.sql`; the `pgdelta` cert stack trace printed again alongside
+    `Finished` — normal (§7.55), not an incident; `migration list --linked` `remote` filled.
+    The migration's backfill (`amount_payable = total_value`) and the `assign_referral_code`
+    trigger minted `REF-` codes for prod's real `parent_tenants` rows — expected, harmless.
+    (2) `supabase functions deploy public-package` (**v2** — `amount` is now `amount_payable`
+    plus `discount_amount`/`total_value`, `verify_jwt: false`) + `package-emails` (**v3** — the
+    `referral_reward` type, RISK 3 recipient path). **No `generate-invoices` redeploy** —
+    `core.ts` untouched. **No new secret.** (3) **Grant dump** (`supabase db dump --linked`):
+    `anon` EXECUTE still **18** — all trigger functions (the excluded kind), **none this wave's**;
+    the DROP+recreated `join_tenant_by_code` came back `REVOKE PUBLIC`+`GRANT authenticated`,
+    **no `anon`** (the §7.168/RISK 8 failure mode did NOT occur); all 7 referral RPCs
+    `authenticated` only; `referrals`+`referral_rewards` SELECT-to-`authenticated` /
+    ALL-to-`service_role`, no `anon` — the declared whitelist. (4) Apps → `main` (Vercel): the
+    served parent bundle (`entry-784f93eb…js`, hash changed from the pre-push build) grep-confirmed
+    "Your referral code", "Join or referral code", "REF-ABCDE", "first package is discounted";
+    admin `GET /referrals` → **200** (a route that 404'd before this deploy — §11.19's honest
+    signal for an authed page). (5) **RISK 12 invisibility checks on prod:** `SELECT count(*)
+    FROM parent_packages WHERE amount_payable IS DISTINCT FROM total_value` = **0** and
+    `… WHERE referral_enabled` = **0**. **Rollback cover:** committed DOWN
+    (`supabase/rollback/20260815000700_referrals_DOWN.sql`), **rehearsed** locally (UP→DOWN
+    restores `join_tenant_by_code`/`handle_new_user`/`enforce_parent_package_lifecycle`
+    byte-identical). **Dormant on prod:** no business has `referral_enabled`, so no code, reward,
+    conversion or same-household guard has fired on real data — first firing is the first business
+    that turns it on. Six gotchas: §7.164–§7.169.

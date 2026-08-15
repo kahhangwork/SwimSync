@@ -1,12 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-15 — **Parent REFERRAL CODES built (all 4 phases), NOT yet deployed** (§8.61):
-`REF-` code per membership doubling as a join code, double-sided package discount (friend's first
-package + referrer's later one, FIFO queue, tenant %/$ + per-product override, same-household guard),
-admin Referrals page (grant/void/disable), referrer earn-email. First PRICE modifier — moves
-`amount_payable`, never `total_value`. Migration `20260815000700` + engine fns + both apps + driver,
-**on `main` locally, verified, but NOT pushed / NOT on prod** — deploy is the next task (§9).
-PRD §7.16 · `docs/plans/REFERRAL_PLAN.md`._
+_Last updated: 2026-08-15 — **Parent REFERRAL CODES shipped LIVE** (§8.61): `REF-` code per
+membership doubling as a join code, double-sided package discount (friend's first package +
+referrer's later one, FIFO queue, tenant %/$ + per-product override, same-household guard), admin
+Referrals page (grant/void/disable), referrer earn-email. First PRICE modifier — moves
+`amount_payable`, never `total_value`. Migration `20260815000700` + `public-package` v2 +
+`package-emails` v3 + both apps, all on prod; grant dump clean; RISK 12 checks 0/0. **DORMANT**
+(no business has enabled it). PRD §7.16 · `docs/DEPLOYMENT.md` §11.23._
 
 _Previously, 2026-08-15 — **Package RENEWAL AUTOMATION shipped LIVE** (§8.60): admin-created renewal
 OFFERS + tokenised `/package` pay page + Generate-all preview + WhatsApp queue + default packages +
@@ -122,7 +122,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | Active/inactive families and children, per business | UI + backend, LIVE | PRD §7.14 · §8.4 |
 | Effective-dated class terms — a lesson is priced by its OWN date | UI + backend, LIVE | PRD §7.3 · §8.3 |
 | Prepaid packages — weeks/start-date/holiday-extension, AND renewal OFFERS (tokenised `/package` pay page + WhatsApp queue + default packages + Students columns/drawer) | pgTAP + Deno + vitest + jest + driver, LIVE 2026-08-15 | PRD §7.16 · §8.59, §8.60 |
-| **Parent referral codes — double-sided package discount** (`REF-` join code, friend's-first + referrer's-later reward, FIFO, tenant %/$ + per-product override, same-household guard, admin Referrals page) — moves `amount_payable`, never `total_value` | pgTAP 57 + Deno + vitest + jest + `verify-referrals` 13, **verified LOCAL — NOT deployed** | PRD §7.16 · §8.61 |
+| **Parent referral codes — double-sided package discount** (`REF-` join code, friend's-first + referrer's-later reward, FIFO, tenant %/$ + per-product override, same-household guard, admin Referrals page) — moves `amount_payable`, never `total_value` | pgTAP 57 + Deno + vitest + jest + `verify-referrals` 13, **LIVE 2026-08-15** | PRD §7.16 · §8.61 |
 | Package purchases numbered + QR-payable (`PKG-YYYY-NNNN`) | pgTAP 12 + 2 drivers, LIVE 2026-08-09 | PRD §7.16 · §8.37 |
 | Every child's name carries their payment method (per-child, category-aware) | pgTAP + vitest, LIVE | PRD §7.16 · §8.23 |
 | Fee-free payment collection — `INV-YYYY-NNNN`, dynamic QR, tokenized page, WhatsApp queue | pgTAP + Deno ×2 + vitest + jest + driver, LIVE | PRD §7.21 · §8.26 |
@@ -402,11 +402,13 @@ a value concept (two client price surfaces — the in-app QR AND the pay page); 
 triggers run alphabetically (`trg_zz_*` sorts last); a `RETURNS TABLE` change is a security event
 (DROP eats the ACL, cloud re-grants anon); RLS hides other families' codes from a role-scoped probe
 (capture into a non-RLS temp table first). Rollback DOWN committed + **rehearsed** (UP→DOWN restores
-the three replaced functions byte-identical). Verified LOCAL: pgTAP **referrals 57**, full suite
-green bar the pre-existing `coach_disable` date-flake; Deno **160 ×2**; admin vitest **381**; app jest
-**367**; `verify-referrals` **13/13** (incl. the RISK 7 three-way price identity). **NOT DEPLOYED** —
-migration/engine/apps are on `main` locally but not pushed and not on prod; the backend-first deploy
-(§7.60, §11) is the outstanding task. Suites: `docs/TESTING.md` §5.
+the three replaced functions byte-identical). Verified: pgTAP **referrals 57**, full suite green bar
+the pre-existing `coach_disable` date-flake; Deno **160 ×2**; admin vitest **381**; app jest **367**;
+`verify-referrals` **13/13** (incl. the RISK 7 three-way price identity). **SHIPPED LIVE 2026-08-15**
+— backend-first, no revert dance: migration `…000700` → `public-package` v2 + `package-emails` v3 →
+grant dump clean (RISK 8 held through the `join_tenant_by_code` DROP+recreate) → apps to `main`
+(bundle grep confirmed) → RISK 12 checks **0/0**. Full deploy record: **`docs/DEPLOYMENT.md` §11.23**.
+**DORMANT** — no business has `referral_enabled`, so nothing has fired on real data. Suites: `docs/TESTING.md` §5.
 
 ## 8.60 (2026-08-15) — PACKAGE RENEWAL AUTOMATION, SHIPPED LIVE
 
@@ -514,28 +516,25 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE CURRENT BUILD — Referral codes BUILT locally; DEPLOYING them is the first task
+### THE CURRENT BUILD — Referral codes SHIPPED LIVE; NO decided next build
 
-**2026-08-15 built *Parent referral codes* end to end (§8.61)** — the filed NEXT item, all four
-phases: migration `20260815000700` + engine fns + pgTAP, parent app, admin **Referrals** page, and
-`verify-referrals` (13/13). **It is committed on `main` LOCALLY, verified, but NOT pushed and NOT on
-prod.** So unlike §8.60, the **first task is to DEPLOY it** — backend-first (§7.60): `supabase db
-push` → `migration list --linked` shows `remote` filled → `functions deploy public-package` +
-`package-emails` → `functions list` → **remote grant dump**, and confirm the `join_tenant_by_code`
-row shows **REVOKE PUBLIC + GRANT authenticated, no `anon`** (§7.168/RISK 8) — THEN push `main` so
-Vercel ships both apps. `core.ts` did NOT change (no engine deploy). Rollback DOWN is committed +
-rehearsed. Post-deploy invisibility checks (RISK 12): `SELECT count(*) FROM parent_packages WHERE
-amount_payable IS DISTINCT FROM total_value` = 0 and `… WHERE referral_enabled` = 0.
+**2026-08-15 shipped *Parent referral codes* end to end and LIVE (§8.61, `docs/DEPLOYMENT.md`
+§11.23)** — the filed NEXT item, all four phases: migration `20260815000700` + `public-package` v2
++ `package-emails` v3 + both apps, deployed backend-first in the correct order (no revert dance).
+Grant dump clean, RISK 12 invisibility checks **0/0**. It followed the renewal automation (§8.60)
+and weeks/holiday packages (§8.59). `BACKLOG.md → ## Build order` is **exhausted again**; what
+remains is the *Unordered* pool + the *Later* big features. **There is no queued, decided next
+build; picking one is the first task.** `/backlog-prioritisation` re-sequences if needed.
 
 > **Two follow-ups the referral session filed** (both in `BACKLOG.md`): the "**your reward expires
 > soon**" nudge and any **unprompted parent low-balance email** — both cron-gated, filed beside the
 > earlier low-balance nudge. (The earlier package follow-up — bounding `recompute_package_extensions`
 > — still stands.)
 
-**After deploy it is DORMANT** by construction — no business has `referral_enabled`, so no code,
-reward, conversion or same-household guard has fired on real data. First firing is the first family
-that enables it. `BACKLOG.md → ## Build order` is otherwise **exhausted**; the next *new* build is a
-pick from *Unordered* / *Later* (`/backlog-prioritisation` re-sequences).
+**Nothing to do first** — the feature is verified live (grant dump + parent bundle grep + admin
+`/referrals` 200 + RISK 12 0/0). It is **DORMANT**: no business has `referral_enabled`, so no code,
+reward, conversion or same-household guard has fired on real data. First firing is the first business
+that turns it on.
 
 ### Triage rules, when the sweep does redden
 
@@ -557,10 +556,9 @@ pick from *Unordered* / *Later* (`/backlog-prioritisation` re-sequences).
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**One migration is queued but UNDEPLOYED: `20260815000700_referrals.sql`** — applied LOCALLY (on
-`main`, `supabase db reset` green) but its `remote` column is EMPTY. Prod is caught up only through
-`20260815000600` (§8.60). Deploying `…000700` (backend-first, per THE CURRENT BUILD above) is the
-outstanding task. **§8.60 is the freshest worked example of the ordering gate done RIGHT** (backend
+**The migration queue is EMPTY.** The latest applied is `20260815000700` (referrals, §8.61);
+production confirmed caught up 2026-08-15 via `supabase migration list --linked`, `remote` filled.
+**§8.61 is the freshest worked example of the ordering gate done RIGHT** (backend
 to prod first, apps last — no revert dance, unlike §8.59 which got it wrong; `docs/DEPLOYMENT.md`
 §11.21 vs §11.22). The rule stands: migrations to prod (engine too when `core.ts` changes — it did
 NOT for referrals) FIRST, apps to `main` LAST.
