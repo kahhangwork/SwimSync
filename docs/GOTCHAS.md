@@ -2719,3 +2719,59 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     fix is §7.73's rule — a driver OWNS its fixtures: create the class (coach looked up by the
     stable `coach@swimsync.test` email; the Default-category ids `7c000000…` ARE stable seed
     constants) with a fixed id, and tear it down. Only borrow ids that are fixed in `seed.sql`.
+
+164. **An FK written from inside a BEFORE INSERT trigger points at a row that does not exist
+    yet — the RI check fires at the end of the INNER statement, not the outer INSERT.** Make it
+    `DEFERRABLE INITIALLY DEFERRED` or don't write it there. `apply_referral_reward` (BEFORE
+    INSERT on `parent_packages`) does `UPDATE referral_rewards SET reserved_package_id = NEW.id`
+    — but `NEW`'s row is not in `parent_packages` until the outer INSERT completes, so a
+    non-deferrable `reserved_package_id → parent_packages(id)` FK raises at the end of that inner
+    UPDATE and **every package purchase in the product dies**. `referral_rewards.reserved_package_id`
+    and `used_package_id` are therefore `DEFERRABLE INITIALLY DEFERRED`; the pgTAP pins that a
+    bare parent INSERT with a reward available inserts one row and reserves the reward with no FK
+    error. (REFERRAL_PLAN.md RISK 2 · §8.61)
+
+165. **A resource reserved by a BEFORE INSERT trigger is invisible to the AFTER INSERT trigger
+    that would free it — the same-statement handoff must resolve inside the BEFORE trigger's own
+    predicate.** When a parent requests a package over an open admin OFFER, `apply_referral_reward`
+    (BEFORE) must re-use the reward the offer already reserved, because `create_package_offer`
+    REFUSES on an open offer (it never supersedes) and `supersede_open_package_offer` (AFTER)
+    fires too late to release it in time. The fix: apply's candidate set is `available` rewards
+    OR rewards `reserved` by a to-be-superseded offer of the same family; it re-points
+    `reserved_package_id` to the new row. `settle_referral_reward`'s release arm is then guarded
+    `AND reserved_package_id = OLD.id`, so the supersede-cancel of the old offer does NOT release
+    a reward the new row now holds. (RISK 4 · §8.61)
+
+166. **A discount is a PRICE concept, not a VALUE concept** — `total_value` / `value_remaining` /
+    invoice `package_applied` never move; only `amount_payable` (= `total_value − discount_amount`)
+    does. Grep every `total_value` render and classify it PRICE vs VALUE: the in-app PayNow QR
+    (`SwimSyncApp/app/(parent)/billing/paynow.tsx`) is a **second** price surface distinct from the
+    tokenised `/package/[token]` pay page, and both must lock `amount_payable`; the "N lessons ·
+    S$r each" line is VALUE and no longer sums to the headline, so an explicit "− discount" line
+    is mandatory beside it. Never re-price a row that carries `paid_claimed_at` — the family
+    already used that amount and reference (the §7.159 family, on the amount axis). (RISK 3/6/11 · §8.61)
+
+167. **Two BEFORE INSERT triggers on one table run in ALPHABETICAL order by trigger name — a
+    trigger that reads another's `NEW.*` must sort after it, and a pgTAP assertion should pin
+    that.** `apply_referral_reward` reads `NEW.total_value` (set by `enforce_parent_package_lifecycle`),
+    so its trigger is named `trg_zz_apply_referral_reward` to sort after `trg_parent_package_lifecycle`.
+    Same rule already inline at `20260815000500` for the reference trigger (§6, ARCHITECTURE);
+    graduated here as the general one. (§8.61)
+
+168. **Changing a function's `RETURNS TABLE` shape is a SECURITY event, not a refactor** — a
+    fold into §7.150. Postgres cannot `CREATE OR REPLACE` a result-type change, so it forces
+    `DROP FUNCTION` + recreate, which **destroys the ACL and the COMMENT**; on Supabase cloud the
+    project-level default privileges then re-grant EXECUTE to `anon`, so "it still works locally"
+    is exactly the failure mode. Adding `referred` to `join_tenant_by_code`'s result forced the
+    DROP; the migration re-`REVOKE`s from PUBLIC/anon/service_role, re-`GRANT`s to authenticated
+    and restores the COMMENT ADJACENT to the DROP, and the post-deploy remote grant dump must
+    show no `anon` row for it. (RISK 8 · §8.61)
+
+169. **RLS on `parents`/`parent_tenants` hides OTHER families' rows from a role-scoped pgTAP
+    probe, so a driver/test that resolves another family's code under `SET LOCAL ROLE
+    authenticated` reads NULL and the RPC then reports the wrong error.** In `referrals.test.sql`
+    the join-failure probes needed each referrer's random `REF-` code, but a fresh joiner cannot
+    SELECT another parent's `parent_tenants` row — the lookup returned NULL and
+    `join_tenant_by_code(NULL)` raised "enter a join code" instead of the anti-probing "not
+    recognised". The fix: capture the needed codes into a NON-RLS temp table as `postgres` BEFORE
+    switching roles, and `GRANT SELECT` the temp helpers to `authenticated`. (§8.61)

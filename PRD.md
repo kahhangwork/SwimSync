@@ -1773,6 +1773,37 @@ cash paid always equals value granted — nothing to reconcile.
   families stay on monthly invoices. *(No cron: `wa.me` is worked by hand. The public page
   refuses a suspended business — an offer is prepayment for lessons that may never run,
   unlike an invoice for lessons delivered.)*
+- **Referral discounts — a double-sided, package-only refer-a-friend** *(implemented 2026-08-15)*.
+  The business's own marketing, and SwimSync's **first price modifier**: it changes only what
+  a family **pays** for a package (`amount_payable`), never what the package is **worth**
+  (`total_value` / `value_remaining` / invoice netting are untouched). Every member of a
+  business has a **referral code** — a second kind of join code, `REF-XXXXX`, shown on their
+  parent **Billing** tab (one card **per business**), with Copy and Share-on-WhatsApp. A
+  friend enters it at registration or on the Join screen (the field accepts `SWIM-` join codes
+  **or** `REF-` referral codes); entering a `REF-` code joins the referrer's business **and**
+  records the referral. This does not weaken the join-code argument (there is still no public
+  directory): a referral code is minted per real member of a real business, so possessing one
+  is still proof of a genuine relationship. The scheme is **double-sided**: the **friend** gets
+  a discount on their **first** package, and the **referrer** gets one on a **later** package,
+  released only when the friend's first package goes **active** (Payment received, or a direct
+  active sale) — never at registration or "I've paid", and **once per referred family, ever**.
+  Rewards **queue** (FIFO, oldest first — three referrals is three discounted packages) and are
+  applied automatically to the next package. The discount is a tenant-wide **percent or fixed
+  $** (capped so the price never goes below $0), with an optional **per-product override** (its
+  own type + value; a `0` is an explicit "no referral discount on this product"). The
+  **referrer's** reward can **expire** (tenant-set days from earn date, or never); the friend's
+  first-package discount does not. Configured on a dedicated **Referrals** admin page
+  (enable/type/value/expiry, the referrals + rewards lists, and actions to **Grant** a goodwill
+  reward, **Void** an unused one — refused once the family has paid — and **Disable** a leaked
+  code); the discount shows on the Packages page, the offer/pay page and the confirmation the
+  admin ticks against the bank, all from **one** price source so the preview, the WhatsApp
+  price and the pay-page headline always agree. A referral whose friend shares a **student,
+  phone or postal code** with the referrer is **not** rewarded (same-household guard; the manual
+  *Grant* is the override for a legitimate case). The referrer is emailed when they earn a
+  reward — that email carries only the discount and the business name, never the friend's
+  package. *(No cron: the "your reward expires soon" nudge and any unprompted low-balance email
+  are out of scope, filed in `BACKLOG.md`. Referrals are package-only by design — monthly-billed
+  families are not in scope. Full design + 16 risk mitigations: `docs/plans/REFERRAL_PLAN.md`.)*
 - **The admin Students page** surfaces each child's coverage as **Package / Left / Expires**
   columns (amber when running low; "Ad-hoc" when uncovered) and folds per-row actions —
   Invite parent, Contact details, Rename, Set inactive, and **add / end a class** — into one

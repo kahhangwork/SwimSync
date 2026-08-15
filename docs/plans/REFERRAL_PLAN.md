@@ -1,6 +1,12 @@
 # Plan — parent referral codes (double-sided package discount)
 
-_Status: PLANNED, not built. Settled with the user via `/plan-with-confidence` on 2026-08-15
+_Status: **BUILT (all 4 phases) and verified LOCALLY 2026-08-15, NOT yet deployed** — migration
+`20260815000700_referrals.sql` + engine fns + pgTAP `referrals.test.sql` (57), parent app, admin
+Referrals page, and `verify-referrals.mjs` (13), all on `main` locally. The backend-first prod
+deploy is the outstanding task (HANDOVER §9). Six gotchas graduated as §7.164–§7.169. Original
+plan below, unchanged._
+
+_Settled with the user via `/plan-with-confidence` on 2026-08-15
 (two rounds of questions after an online-practice review; every decision below was answered
 explicitly, none is inferred). **Risk-reviewed via `/plan-review` on 2026-08-15 by an
 independent reviewer agent** that verified 24 factual claims against the code (6 were wrong and
