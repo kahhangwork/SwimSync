@@ -1127,13 +1127,9 @@ export default function StudentsPage() {
                 <Td>
                   <StatusBadge status={statusLabel(s)} />
                 </Td>
-                {/* ONE CHIP PER CLASS, each with its own ×. This cell is the
-                    only place in the product that shows a child is in more than
-                    one class, and the only place one of them can be ended.
-                    "Add class" is offered for any ACTIVE child, including an
-                    unassigned one — the Unassigned page still handles first
-                    assignment, but an admin already looking at this row should
-                    not have to go and find it. */}
+                {/* VIEW-ONLY chips — one per class, showing that a child is in
+                    more than one class. Adding a class and ending one both live
+                    in the Actions drawer now. */}
                 <Td className="text-gray-500">
                   {s.classes.length === 0 ? (
                     "—"
@@ -1143,34 +1139,13 @@ export default function StudentsPage() {
                         <span
                           key={c.id}
                           title={`${c.title}${c.coach_name ? ` · ${c.coach_name}` : ""}`}
-                          className="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-2 pr-1 text-xs text-gray-700"
+                          className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700"
                         >
                           {c.day ? capitalizeDay(c.day) : c.title}
                           {c.start ? ` ${c.start}` : ""}
-                          {s.is_active && (
-                            <button
-                              onClick={() =>
-                                setPending({ student: s, mode: "remove", cls: c })
-                              }
-                              disabled={busyId === s.id}
-                              aria-label={`Remove ${s.full_name} from ${c.title}`}
-                              className="rounded-full px-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700 disabled:opacity-50"
-                            >
-                              ×
-                            </button>
-                          )}
                         </span>
                       ))}
                     </div>
-                  )}
-                  {s.is_active && (
-                    <button
-                      onClick={() => openAddClass(s)}
-                      disabled={busyId === s.id}
-                      className="mt-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-50"
-                    >
-                      + Add class
-                    </button>
                   )}
                 </Td>
                 <Td className="text-gray-500">
@@ -1270,6 +1245,57 @@ export default function StudentsPage() {
                 )}
               </div>
             </div>
+            {/* Classes — the add / end-enrolment controls moved here from the
+                table; the Class column is now view-only. Active students only,
+                as the inline controls were. */}
+            {drawerFor.is_active && (
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Classes
+                </h3>
+                <div className="space-y-2">
+                  {drawerFor.classes.length === 0 ? (
+                    <p className="text-sm text-gray-400">Not in any class yet.</p>
+                  ) : (
+                    drawerFor.classes.map((c) => (
+                      <div
+                        key={c.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2"
+                      >
+                        <span className="text-sm text-gray-700">
+                          {c.day ? capitalizeDay(c.day) : c.title}
+                          {c.start ? ` ${c.start}` : ""}
+                          {c.coach_name ? (
+                            <span className="text-gray-400"> · {c.coach_name}</span>
+                          ) : null}
+                        </span>
+                        <button
+                          onClick={() => {
+                            const s = drawerFor;
+                            setDrawerFor(null);
+                            setPending({ student: s, mode: "remove", cls: c });
+                          }}
+                          aria-label={`Remove ${drawerFor.full_name} from ${c.title}`}
+                          className="rounded-lg border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))
+                  )}
+                  <button
+                    onClick={() => {
+                      const s = drawerFor;
+                      setDrawerFor(null);
+                      openAddClass(s);
+                    }}
+                    className="w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-left text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                  >
+                    + Add class
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Drawer>

@@ -168,18 +168,27 @@ function sqlAsExpectError(profileId, q) {
       ameliaRowText.slice(0, 200)
     );
 
-    // 3. THE REVEAL GUARD. Counts remove-buttons inside Amelia's row: one per
-    // chip. Two means her row genuinely holds two classes, rather than the page
-    // happening to contain both strings somewhere.
-    const ameliaChips = await ameliaRow
+    // 3. THE REVEAL GUARD. The per-class Remove controls moved into the Actions
+    // drawer (the Class column is view-only), so count them THERE: one per class.
+    // Two means Amelia genuinely holds two classes, not that the page happens to
+    // contain both strings somewhere.
+    const benRow = page.locator("tr", { hasText: "MultiCls Ben" }).first();
+    await ameliaRow.getByRole("button", { name: /^Actions$/ }).click();
+    await page.waitForTimeout(400);
+    const ameliaChips = await page
       .locator('button[aria-label^="Remove MultiCls Amelia from"]')
       .count();
-    const benRow = page.locator("tr", { hasText: "MultiCls Ben" }).first();
-    const benChips = await benRow
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    await benRow.getByRole("button", { name: /^Actions$/ }).click();
+    await page.waitForTimeout(400);
+    const benChips = await page
       .locator('button[aria-label^="Remove MultiCls Ben from"]')
       .count();
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
     check(
-      "chip count is per-row: Amelia 2, Ben 1",
+      "class count is per-child (via the drawer): Amelia 2, Ben 1",
       ameliaChips === 2 && benChips === 1,
       `Amelia ${ameliaChips} -> 2, Ben ${benChips} -> 1`
     );
@@ -193,11 +202,16 @@ function sqlAsExpectError(profileId, q) {
       benRowText.slice(0, 160)
     );
 
-    // 5. Add class is offered on the row.
+    // 5. Add class is offered — it now lives in the per-row Actions drawer
+    // (the Class column is view-only). Open the drawer, assert, then close it.
+    await ameliaRow.getByRole("button", { name: /^Actions$/ }).click();
+    await page.waitForTimeout(400);
     check(
-      "an Add class control is on Amelia's row",
-      (await ameliaRow.getByRole("button", { name: /Add class/i }).count()) > 0
+      "an Add class control is offered in the Actions drawer",
+      (await page.getByRole("button", { name: /Add class/i }).count()) > 0
     );
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
 
     // 6. The Coach column does not print one coach twice. Both of Amelia's
     // classes belong to the seed coach, so a naive join prints the name twice.
@@ -342,7 +356,11 @@ function sqlAsExpectError(profileId, q) {
 
     const row2 = page.locator("tr", { hasText: "MultiCls Amelia" }).first();
     await row2.waitFor({ timeout: 10_000 });
-    await row2
+    // Ending an enrolment now lives in the Actions drawer: open it, click the
+    // per-class Remove, then confirm in the modal it opens.
+    await row2.getByRole("button", { name: /^Actions$/ }).click();
+    await page.waitForTimeout(400);
+    await page
       .locator('button[aria-label="Remove MultiCls Amelia from MultiCls Wednesday"]')
       .click();
     await page.waitForTimeout(400);
