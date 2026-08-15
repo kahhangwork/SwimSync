@@ -30,7 +30,11 @@ export interface PublicPackage {
   paynow_uen: string | null;
   paynow_mobile: string | null;
   reference: string;
+  // What the family PAYS (RISK 3 / D14): total_value is the package's WORTH,
+  // amount is the discounted price on the QR, discount_amount the gap between.
   amount: number;
+  total_value: number;
+  discount_amount: number;
   package_name: string;
   lesson_count: number;
   rate: number;
@@ -59,6 +63,8 @@ export function validUntilPreview(
 export function serializePublicPackage(row: {
   reference_number: string;
   total_value: number;
+  amount_payable: number;
+  discount_amount: number;
   name: string;
   lesson_count: number;
   rate_per_lesson: number;
@@ -81,7 +87,9 @@ export function serializePublicPackage(row: {
     paynow_uen: tenant.paynow_uen ?? null,
     paynow_mobile: tenant.paynow_mobile ?? null,
     reference: row.reference_number,
-    amount: row.total_value,
+    amount: row.amount_payable,
+    total_value: row.total_value,
+    discount_amount: row.discount_amount,
     package_name: row.name,
     lesson_count: row.lesson_count,
     rate: row.rate_per_lesson,
@@ -103,8 +111,9 @@ export async function lookupPackage(
   const { data, error } = await db
     .from("parent_packages")
     .select(
-      "reference_number, total_value, name, lesson_count, rate_per_lesson, " +
-        "start_date, validity_weeks, status, paid_claimed_at, " +
+      "reference_number, total_value, amount_payable, discount_amount, name, " +
+        "lesson_count, rate_per_lesson, start_date, validity_weeks, status, " +
+        "paid_claimed_at, " +
         "tenants(display_name, paynow_uen, paynow_mobile, suspended_at)",
     )
     .eq("public_token", token)
