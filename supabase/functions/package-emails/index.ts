@@ -26,8 +26,11 @@ import {
   buildConfirmedSubject,
   buildOfferedHtml,
   buildOfferedSubject,
+  buildReferralRewardHtml,
+  buildReferralRewardSubject,
   buildRequestedHtml,
   buildRequestedSubject,
+  type ReferralRewardEmailData,
   sendPackageEmail,
   type PackageEmailData,
 } from "./email.ts";
@@ -42,10 +45,14 @@ Deno.serve(async (req) => {
     });
 
   try {
-    const { type, package_id } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    const { type, package_id, reward_id } = body;
     if (
-      (type !== "requested" && type !== "confirmed" && type !== "offered") ||
-      typeof package_id !== "string"
+      (type !== "requested" && type !== "confirmed" && type !== "offered" &&
+        type !== "referral_reward") ||
+      (type === "referral_reward"
+        ? typeof reward_id !== "string"
+        : typeof package_id !== "string")
     ) {
       return respond({ sent: false, reason: "bad request" }, 400);
     }
@@ -67,10 +74,68 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // ── referral_reward — its OWN recipient path (RISK 3). The recipient is the
+    // REFERRER (the reward's own parent), never a package's parent; the data
+    // carries no field from the referee's package. Caller must admin the
+    // reward's tenant.
+    if (type === "referral_reward") {
+      const { data: reward } = await svc
+        .from("referral_rewards")
+        .select(
+          "id, tenant_id, parent_id, expires_at, " +
+            "parents(profiles(full_name, email)), " +
+            "tenants(display_name, logo_url, referral_discount_type, referral_discount_value)"
+        )
+        .eq("id", reward_id)
+        .maybeSingle();
+      if (!reward) return respond({ sent: false, reason: "not found" }, 404);
+
+      const { data: isAdmin } = await anon.rpc("can_admin_tenant", {
+        p_tenant_id: reward.tenant_id,
+      });
+      if (
+        !authorizePackageEmail(
+          "referral_reward",
+          { status: "", offeredBy: null, parentProfileId: null,
+            tenantId: reward.tenant_id as string },
+          { id: caller.id, isAdminOfTenant: isAdmin === true, profileTenantId: null },
+        )
+      ) {
+        return respond({ sent: false, reason: "not allowed" }, 403);
+      }
+
+      const rParent: any = Array.isArray(reward.parents)
+        ? reward.parents[0] : reward.parents;
+      const rProfile: any = Array.isArray(rParent?.profiles)
+        ? rParent?.profiles?.[0] : rParent?.profiles;
+      const rTenant: any = Array.isArray(reward.tenants)
+        ? reward.tenants[0] : reward.tenants;
+
+      const rData: ReferralRewardEmailData = {
+        businessName: rTenant?.display_name ?? "Your coach",
+        logoUrl: rTenant?.logo_url ?? null,
+        discountType: (rTenant?.referral_discount_type as
+          "percent" | "amount" | null) ?? null,
+        discountValue: rTenant?.referral_discount_value != null
+          ? Number(rTenant.referral_discount_value) : null,
+        expiresOn: reward.expires_at
+          ? String(reward.expires_at).slice(0, 10) : null,
+      };
+      const result = await sendPackageEmail({
+        apiKey: Deno.env.get("RESEND_API_KEY"),
+        to: rProfile?.email as string | undefined,
+        subject: buildReferralRewardSubject(rData),
+        html: buildReferralRewardHtml(rData),
+        fromName: rData.businessName,
+      });
+      if (!result.sent) console.log(`referral reward email not sent: ${result.reason}`);
+      return respond(result);
+    }
+
     const { data: pkg } = await svc
       .from("parent_packages")
       .select(
-        "id, status, name, lesson_count, rate_per_lesson, total_value, expires_on, start_date, validity_weeks, public_token, offered_by, tenant_id, parents(profile_id, profiles(full_name, email)), tenants(display_name, logo_url)"
+        "id, status, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, expires_on, start_date, validity_weeks, public_token, offered_by, tenant_id, parents(profile_id, profiles(full_name, email)), tenants(display_name, logo_url)"
       )
       .eq("id", package_id)
       .maybeSingle();
@@ -124,6 +189,8 @@ Deno.serve(async (req) => {
       lessonCount: Number(pkg.lesson_count),
       ratePerLesson: Number(pkg.rate_per_lesson),
       totalValue: Number(pkg.total_value),
+      amountPayable: pkg.amount_payable != null ? Number(pkg.amount_payable) : undefined,
+      discountAmount: pkg.discount_amount != null ? Number(pkg.discount_amount) : undefined,
       expiresOn: (pkg.expires_on as string | null) ?? null,
       startDate: (pkg.start_date as string | null) ?? null,
       payUrl: pkg.public_token

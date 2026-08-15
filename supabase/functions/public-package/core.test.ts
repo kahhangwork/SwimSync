@@ -26,6 +26,8 @@ import {
 const ROW = {
   reference_number: "PKG-2026-0001",
   total_value: 320,
+  amount_payable: 288,
+  discount_amount: 32,
   name: "8 Group Lessons",
   lesson_count: 8,
   rate_per_lesson: 40,
@@ -40,6 +42,7 @@ Deno.test("serializer: the public key set is EXACT — a new key is a failure", 
   assertEquals(Object.keys(serializePublicPackage(ROW)).sort(), [
     "amount",
     "business_name",
+    "discount_amount",
     "lesson_count",
     "package_name",
     "paid_claimed_at",
@@ -49,14 +52,17 @@ Deno.test("serializer: the public key set is EXACT — a new key is a failure", 
     "reference",
     "start_date",
     "status",
+    "total_value",
     "valid_until_preview",
   ]);
 });
 
-Deno.test("serializer: no parent/child/UUID fields leak; preview rides along", () => {
+Deno.test("serializer: amount is what's PAYABLE, not the package's worth (D14)", () => {
   const p = serializePublicPackage(ROW);
   assertEquals(p.valid_until_preview, "2026-09-29"); // 2026-09-01 + 4 weeks
-  assertEquals(p.amount, 320);
+  assertEquals(p.amount, 288); // amount_payable — the discounted QR amount
+  assertEquals(p.total_value, 320); // the package's worth, unchanged
+  assertEquals(p.discount_amount, 32);
   assertEquals(p.package_name, "8 Group Lessons");
 });
 

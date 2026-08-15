@@ -8,9 +8,12 @@ import {
   buildConfirmedSubject,
   buildOfferedHtml,
   buildOfferedSubject,
+  buildReferralRewardHtml,
+  buildReferralRewardSubject,
   buildRequestedHtml,
   buildRequestedSubject,
   formatDate,
+  type ReferralRewardEmailData,
   sendPackageEmail,
   type PackageEmailData,
 } from "./email.ts";
@@ -124,6 +127,64 @@ Deno.test("HTML is escaped — a hostile business or package name cannot inject 
   assert(!html.includes("<script>"));
   assertStringIncludes(html, "&lt;script&gt;");
   assert(!html.includes("<b>bold</b>"));
+});
+
+// ⚠ RISK 3 — the referral-reward email goes to the REFERRER and must carry NONE
+// of the referee's package fields.
+Deno.test("referral_reward: carries the discount + business, NONE of the referee's package", () => {
+  const d: ReferralRewardEmailData = {
+    businessName: "Coastal Swim School",
+    logoUrl: null,
+    discountType: "percent",
+    discountValue: 10,
+    expiresOn: "2026-11-14",
+  };
+  assertEquals(
+    buildReferralRewardSubject(d),
+    "You've earned 10% off your next Coastal Swim School package",
+  );
+  const html = buildReferralRewardHtml(d);
+  assertStringIncludes(html, "10% off");
+  assertStringIncludes(html, "14 Nov 2026");
+  assertStringIncludes(html, "Coastal Swim School");
+  // None of B's package fields (the referee's package) may appear.
+  assert(!html.includes("10 Group Lessons"));
+  assert(!html.includes("S$400.00"));
+  assert(!html.includes("Pay by PayNow"));
+  assert(!html.includes("/package/"));
+});
+
+Deno.test("referral_reward: a fixed-$ reward and a settings-less tenant both render", () => {
+  const amt = buildReferralRewardHtml({
+    businessName: "B", logoUrl: null, discountType: "amount", discountValue: 25, expiresOn: null,
+  });
+  assertStringIncludes(amt, "S$25.00 off");
+  const none = buildReferralRewardSubject({
+    businessName: "B", logoUrl: null, discountType: null, discountValue: null, expiresOn: null,
+  });
+  assertStringIncludes(none, "a discount off your next B package");
+});
+
+Deno.test("referral_reward authz: only an admin of the reward's tenant", () => {
+  const r = { status: "", offeredBy: null, parentProfileId: null, tenantId: "t-1" };
+  assert(authorizePackageEmail("referral_reward", r,
+    { id: "admin-1", isAdminOfTenant: true, profileTenantId: "t-1" }));
+  assert(!authorizePackageEmail("referral_reward", r,
+    { id: "parent-1", isAdminOfTenant: false, profileTenantId: null }));
+});
+
+Deno.test("discounted offer/confirm show amount_payable + a discount line", () => {
+  const d: PackageEmailData = {
+    ...base, amountPayable: 360, discountAmount: 40,
+    startDate: "2026-09-01",
+    payUrl: "https://swimsync.sg/package/deadbeefdeadbeefdeadbeefdeadbeef",
+  };
+  const offered = buildOfferedHtml(d);
+  assertStringIncludes(offered, "S$360.00"); // pays the discounted amount
+  assertStringIncludes(offered, "Referral discount applied");
+  const confirmed = buildConfirmedHtml(d);
+  assertStringIncludes(confirmed, "You paid");
+  assertStringIncludes(confirmed, "S$360.00");
 });
 
 Deno.test("formatDate never shifts across a timezone (string in, string out)", () => {

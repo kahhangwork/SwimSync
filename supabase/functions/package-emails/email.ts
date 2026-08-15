@@ -15,6 +15,10 @@ export type PackageEmailData = {
   lessonCount: number;
   ratePerLesson: number;
   totalValue: number;
+  /** The discounted price to PAY (referral). Falls back to totalValue when the
+   *  package carries no discount, so a non-referral email is unchanged. */
+  amountPayable?: number;
+  discountAmount?: number;
   /** confirmed only */
   expiresOn?: string | null;
   /** offered only — the admin-set start date and the tokenised pay link */
@@ -22,9 +26,33 @@ export type PackageEmailData = {
   payUrl?: string | null;
 };
 
+/** What the family pays — the discounted price, or the full value if none. */
+export function payable(d: PackageEmailData): number {
+  return d.amountPayable ?? d.totalValue;
+}
+
+/** A "was S$X · Y off" line, or empty when there is no discount. */
+function discountLine(d: PackageEmailData): string {
+  if (!d.discountAmount || d.discountAmount <= 0) return "";
+  return `<p style="margin:0 0 16px;font-size:13px;color:#16a34a;">
+       Referral discount applied: ${escapeHtml(money(d.discountAmount))} off ${escapeHtml(money(d.totalValue))}.
+     </p>`;
+}
+
 export type SendResult = { sent: boolean; reason?: string };
 
-export type EmailType = "requested" | "confirmed" | "offered";
+// ⚠ RISK 3 — the referral-reward email goes to the REFERRER and must carry NONE
+// of the referee's package: no packageName / lessonCount / ratePerLesson /
+// totalValue / payUrl. It describes only the discount the referrer has earned.
+export type ReferralRewardEmailData = {
+  businessName: string;
+  logoUrl?: string | null;
+  discountType: "percent" | "amount" | null;
+  discountValue: number | null;
+  expiresOn?: string | null;
+};
+
+export type EmailType = "requested" | "confirmed" | "offered" | "referral_reward";
 
 /** The authorization decision, pulled out of the HTTP handler so the RISK 6
  *  matrix is unit-testable (the handler only gathers the inputs).
@@ -54,6 +82,10 @@ export function authorizePackageEmail(
       return caller.isAdminOfTenant && !!pkg.offeredBy && pkg.status === "pending";
     case "confirmed":
       return caller.profileTenantId === pkg.tenantId && pkg.status === "active";
+    case "referral_reward":
+      // The caller must ADMIN the reward's tenant. No package status to check —
+      // the reward is the subject, not a package (RISK 3).
+      return caller.isAdminOfTenant;
   }
 }
 
@@ -113,7 +145,7 @@ function shell(businessName: string, logoUrl: string | null | undefined, body: s
 }
 
 export function buildRequestedSubject(d: PackageEmailData): string {
-  return `Your ${d.businessName} package request — pay ${money(d.totalValue)} by PayNow`;
+  return `Your ${d.businessName} package request — pay ${money(payable(d))} by PayNow`;
 }
 
 export function buildRequestedHtml(d: PackageEmailData): string {
@@ -127,7 +159,8 @@ export function buildRequestedHtml(d: PackageEmailData): string {
        ${escapeHtml(d.businessName)} — ${d.lessonCount} lessons at
        ${escapeHtml(money(d.ratePerLesson))} each.
      </p>
-     <p style="margin:0 0 16px;font-size:24px;font-weight:700;color:#0f172a;">${escapeHtml(money(d.totalValue))}</p>
+     <p style="margin:0 0 16px;font-size:24px;font-weight:700;color:#0f172a;">${escapeHtml(money(payable(d)))}</p>
+     ${discountLine(d)}
      <p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#475569;">
        Transfer the amount using the PayNow QR code shown in the SwimSync app
        (Billing &rarr; Packages). Your package activates once
@@ -161,6 +194,18 @@ export function buildConfirmedHtml(d: PackageEmailData): string {
          <td style="padding:6px 0;font-size:13px;color:#0f172a;text-align:right;">${escapeHtml(money(d.totalValue))}</td>
        </tr>
        ${
+         d.discountAmount && d.discountAmount > 0
+           ? `<tr>
+         <td style="padding:6px 0;font-size:13px;color:#16a34a;">Referral discount</td>
+         <td style="padding:6px 0;font-size:13px;color:#16a34a;text-align:right;">− ${escapeHtml(money(d.discountAmount))}</td>
+       </tr>
+       <tr>
+         <td style="padding:6px 0;font-size:13px;color:#475569;font-weight:600;">You paid</td>
+         <td style="padding:6px 0;font-size:13px;color:#0f172a;text-align:right;font-weight:600;">${escapeHtml(money(payable(d)))}</td>
+       </tr>`
+           : ""
+       }
+       ${
          d.expiresOn
            ? `<tr>
          <td style="padding:6px 0;font-size:13px;color:#475569;">Valid until</td>
@@ -191,7 +236,8 @@ export function buildOfferedHtml(d: PackageEmailData): string {
        prepared your next package — <strong>${escapeHtml(d.packageName)}</strong>,
        ${d.lessonCount} lessons at ${escapeHtml(money(d.ratePerLesson))} each.
      </p>
-     <p style="margin:0 0 16px;font-size:24px;font-weight:700;color:#0f172a;">${escapeHtml(money(d.totalValue))}</p>
+     <p style="margin:0 0 16px;font-size:24px;font-weight:700;color:#0f172a;">${escapeHtml(money(payable(d)))}</p>
+     ${discountLine(d)}
      ${
        d.startDate
          ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
@@ -205,6 +251,46 @@ export function buildOfferedHtml(d: PackageEmailData): string {
      <p style="margin:0;font-size:13px;line-height:1.6;color:#94a3b8;">
        The page shows a PayNow QR with the amount and reference filled in. Your
        package activates once ${escapeHtml(d.businessName)} confirms the payment.
+     </p>`
+  );
+}
+
+/** "10% off" / "S$25.00 off" / a generic phrase when the tenant leans on
+ *  per-product overrides and has no headline default. */
+export function discountPhrase(
+  type: "percent" | "amount" | null,
+  value: number | null,
+): string {
+  if (type === "percent" && value != null) return `${value}% off`;
+  if (type === "amount" && value != null) return `${money(value)} off`;
+  return "a discount off";
+}
+
+export function buildReferralRewardSubject(d: ReferralRewardEmailData): string {
+  return `You've earned ${discountPhrase(d.discountType, d.discountValue)} your next ${d.businessName} package`;
+}
+
+export function buildReferralRewardHtml(d: ReferralRewardEmailData): string {
+  const phrase = discountPhrase(d.discountType, d.discountValue);
+  return shell(
+    d.businessName,
+    d.logoUrl,
+    `<h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">Thanks for the referral 🎉</h1>
+     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+       Good news — a family you referred to ${escapeHtml(d.businessName)} has
+       started their first package. As a thank-you, you've earned
+       <strong>${escapeHtml(phrase)}</strong> your next package.
+     </p>
+     ${
+       d.expiresOn
+         ? `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#475569;">
+       Use it by <strong>${escapeHtml(formatDate(d.expiresOn))}</strong>.
+     </p>`
+         : ""
+     }
+     <p style="margin:0;font-size:15px;line-height:1.6;color:#475569;">
+       The discount is applied automatically to your next package —
+       ${escapeHtml(d.businessName)} will sort it out when you renew.
      </p>`
   );
 }
