@@ -28,9 +28,14 @@ const sql = (q) =>
     .toString()
     .trim();
 
-// Fixed ids so teardown is exact.
+// Fixed ids so teardown is exact. Everything the driver depends on it OWNS
+// (§7.73): the class is created here rather than borrowed by a hardcoded id
+// (seed.sql regenerates class UUIDs on every reset). The seed tenant and its
+// Default Group category are the only borrowed ids, and both are stable seed
+// constants; the coach is looked up by email.
 const T = "70000000-0000-0000-0000-000000000001"; // the seed tenant
-const CLASS = "a440fb6c-718a-4f9a-8f6e-617d311500ec"; // existing Group class
+const GROUP_CAT = "7c000000-0000-0000-0000-000000000002"; // stable seed id
+const CLASS = "f9c00000-0000-0000-0000-000000000001"; // OWNED
 const PROD = "f9e00000-0000-0000-0000-000000000001";
 const AUTHU = "f9b00000-0000-0000-0000-000000000001";
 const STU = "f9500000-0000-0000-0000-000000000001";
@@ -39,20 +44,28 @@ const PKG = "f9700000-0000-0000-0000-000000000001";
 function teardown() {
   sql(`DELETE FROM parent_packages WHERE product_id='${PROD}'
        OR parent_id IN (SELECT id FROM parents WHERE profile_id='${AUTHU}')`);
-  sql(`DELETE FROM student_class_enrolments WHERE student_id='${STU}'`);
+  sql(`DELETE FROM student_class_enrolments WHERE student_id='${STU}' OR class_id='${CLASS}'`);
   sql(`DELETE FROM parent_students WHERE student_id='${STU}'`);
   sql(`DELETE FROM students WHERE id='${STU}'`);
   sql(`DELETE FROM parent_tenants WHERE parent_id IN (SELECT id FROM parents WHERE profile_id='${AUTHU}')`);
   sql(`DELETE FROM package_products WHERE id='${PROD}'`);
+  sql(`DELETE FROM classes WHERE id='${CLASS}'`);
   sql(`DELETE FROM auth.users WHERE id='${AUTHU}'`); // cascades parents/profiles
 }
 
 function seed() {
   teardown();
+  // An OWNED Group class (coach looked up by email — its id regenerates).
+  sql(`INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
+        location_name, price_per_lesson, tenant_id, category_id)
+       SELECT '${CLASS}', co.id, 'Renewal Sat', 'saturday', '09:00', '10:00',
+              'Test Pool', 40, '${T}', '${GROUP_CAT}'
+       FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
+       WHERE pr.email = 'coach@swimsync.test'`);
   // A Group product, 4-week validity.
   sql(`INSERT INTO package_products (id, tenant_id, name, category_id, lesson_count,
         rate_per_lesson, validity_months, validity_weeks, is_active)
-       VALUES ('${PROD}','${T}','Renewal 8 Group','7c000000-0000-0000-0000-000000000002',
+       VALUES ('${PROD}','${T}','Renewal 8 Group','${GROUP_CAT}',
                8, 40, 12, 4, true)`);
   // Parent (never logs in) + student + enrolment in the existing Group class.
   sql(`INSERT INTO auth.users (instance_id,id,aud,role,email,encrypted_password,

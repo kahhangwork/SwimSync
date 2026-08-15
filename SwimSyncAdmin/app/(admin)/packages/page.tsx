@@ -29,6 +29,7 @@ import { todayInSg } from "@/lib/lessonDates";
 import { packageExtensionState } from "@/lib/packageExtension";
 import { defaultConfirmStart, pickOfferProduct } from "@/lib/packageOffers";
 import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
+import { WhatsAppQueue, type WaQueueRow } from "@/components/WhatsAppQueue";
 
 type Category = {
   id: string;
@@ -161,11 +162,12 @@ export default function PackagesPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [genBusy, setGenBusy] = useState(false);
   const [genProgress, setGenProgress] = useState<string | null>(null);
-  // Rows to work through in the WhatsApp queue after offers are created.
-  const [queue, setQueue] = useState<
-    { id: string; parentName: string; waLink: string | null }[]
-  >([]);
-  const [queueDone, setQueueDone] = useState<Set<string>>(new Set());
+  // Rows to work through in the WhatsApp queue after offers are created. Each
+  // carries its pre-built wa.me link (opened by onOpenChat) plus the fields the
+  // shared WhatsAppQueue renders.
+  const [queue, setQueue] = useState<(WaQueueRow & { link: string | null })[]>([]);
+  // Reveal superseded offers in the Awaiting panel (RISK 1 tracing aid).
+  const [showSuperseded, setShowSuperseded] = useState(false);
 
   useEffect(() => {
     load();
@@ -638,11 +640,9 @@ export default function PackagesPage() {
    *  and return the row for the WhatsApp queue. Throws on RPC failure so the
    *  caller can mark that family and continue (RISK 12: the RPC itself refuses a
    *  second open offer). */
-  async function createOneOffer(c: CandidateRow): Promise<{
-    id: string;
-    parentName: string;
-    waLink: string | null;
-  }> {
+  async function createOneOffer(
+    c: CandidateRow
+  ): Promise<WaQueueRow & { link: string | null }> {
     const { data: offerId, error: err } = await supabase.rpc(
       "create_package_offer",
       {
@@ -670,7 +670,7 @@ export default function PackagesPage() {
       .catch(() => {});
 
     const waNumber = toWaNumber(c.parent_phone);
-    const link = row?.public_token
+    const payUrl = row?.public_token
       ? `${window.location.origin.replace("admin.", "")}/package/${row.public_token}`
       : "";
     const waLink =
@@ -684,12 +684,23 @@ export default function PackagesPage() {
               lessons: Number(row.lesson_count),
               price: Number(row.total_value),
               reference: (row.reference_number as string) ?? "",
-              link,
+              link: payUrl,
             })
           )
         : null;
 
-    return { id: offerId as string, parentName: c.parent_name, waLink };
+    return {
+      id: offerId as string,
+      parentName: c.parent_name,
+      subtitle: c.children,
+      meta: row
+        ? `${row.name} · ${money(Number(row.total_value))}`
+        : null,
+      waNumber,
+      rawPhone: c.parent_phone,
+      openedStamp: null, // an offer is superseded, not re-chased (no reminded_at)
+      link: waLink,
+    };
   }
 
   /** Open the Generate-all preview: pull the candidate families and seed each
@@ -752,8 +763,7 @@ export default function PackagesPage() {
    *  that row and continues — RISK 12), then open the WhatsApp queue. */
   async function confirmGenerateAll() {
     setGenBusy(true);
-    const created: { id: string; parentName: string; waLink: string | null }[] =
-      [];
+    const created: (WaQueueRow & { link: string | null })[] = [];
     const chosen = candidates.filter((c) => c.include && c.chosenProduct);
     for (let i = 0; i < chosen.length; i++) {
       setGenProgress(`Creating offer ${i + 1} of ${chosen.length}…`);
@@ -767,12 +777,20 @@ export default function PackagesPage() {
     setGenBusy(false);
     setGenModal(false);
     setQueue(created);
-    setQueueDone(new Set());
     load();
   }
 
   const pending = purchases.filter((p) => p.status === "pending");
-  const held = purchases.filter((p) => p.status !== "pending");
+  // ⚠ RISK 1 — a SUPERSEDED offer (cancelled by a newer request) so a stray
+  // bank transfer against the old PKG- reference can still be traced.
+  const superseded = purchases.filter(
+    (p) => p.status === "cancelled" && p.superseded_by
+  );
+  // "held" is unchanged EXCEPT that a superseded offer is pulled out (it now
+  // lives in the Awaiting panel's Superseded list, not "Who holds one").
+  const held = purchases.filter(
+    (p) => p.status !== "pending" && !(p.status === "cancelled" && p.superseded_by)
+  );
 
   // Oldest request first: this queue is work waiting on the admin, and the
   // parent who has been waiting longest is the one to serve next.
@@ -822,11 +840,21 @@ export default function PackagesPage() {
       )}
 
       {/* ── Pending requests — the action queue, so it comes first ────────── */}
-      {pending.length > 0 && (
+      {(pending.length > 0 || superseded.length > 0) && (
         <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <h2 className="mb-1 text-sm font-bold text-amber-900">
-            Awaiting confirmation ({pending.length})
-          </h2>
+          <div className="mb-1 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-amber-900">
+              Awaiting confirmation ({pending.length})
+            </h2>
+            {superseded.length > 0 && (
+              <button
+                onClick={() => setShowSuperseded((v) => !v)}
+                className="text-xs font-semibold text-amber-700 underline"
+              >
+                {showSuperseded ? "Hide" : "Show"} superseded ({superseded.length})
+              </button>
+            )}
+          </div>
           <p className="mb-3 text-xs text-amber-800">
             Confirm once the parent&rsquo;s PayNow transfer has landed in your
             account. Confirming starts the validity period.
@@ -889,10 +917,133 @@ export default function PackagesPage() {
                   </Td>
                 </Tr>
               ))}
+              {showSuperseded &&
+                superseded.map((p) => (
+                  <Tr key={p.id} className="opacity-60">
+                    <Td className="font-medium text-gray-500">
+                      {p.parent_name}
+                      <span className="ml-2 rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">
+                        Superseded
+                      </span>
+                    </Td>
+                    <Td className="text-gray-500">
+                      {p.name}
+                      <span className="text-gray-400">
+                        {" "}
+                        · {p.lesson_count} × {money(p.rate_per_lesson)}
+                      </span>
+                    </Td>
+                    <Td className="font-mono text-xs text-gray-500">
+                      {p.reference_number ?? "—"}
+                    </Td>
+                    <Td className="text-gray-500">{money(p.total_value)}</Td>
+                    <Td className="text-gray-400">
+                      {new Date(p.requested_at).toLocaleDateString("en-SG")}
+                    </Td>
+                    <Td className="text-xs text-gray-400">
+                      cancelled — a newer request replaced it
+                    </Td>
+                  </Tr>
+                ))}
             </Tbody>
           </Table>
         </div>
       )}
+
+      {/* ── Class categories ──────────────────────────────────────────────── */}
+      <div className="mb-8">
+        <h2 className="mb-1 text-sm font-bold text-gray-900">
+          Class categories
+        </h2>
+        <p className="mb-3 text-xs text-gray-500">
+          Your own grouping of classes — &ldquo;Group&rdquo;,
+          &ldquo;Private&rdquo;, whatever you price together. A package sold
+          against a category is spendable at every class in it, including ones
+          you add later. Assign a class its category on the Classes page.
+        </p>
+        <div className="mb-3 flex gap-2">
+          <input
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addCategory();
+            }}
+            placeholder="Group"
+            className="w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+          />
+          <Button onClick={addCategory} disabled={busy || !newCategory.trim()}>
+            Add category
+          </Button>
+        </div>
+        {categories.length > 0 && (
+          <ul className="space-y-1">
+            {categories.map((c) => {
+              // Products that may default this category: its own, or all-classes.
+              const eligible = activeProducts.filter(
+                (p) => p.category_id === c.id || p.category_id === null
+              );
+              return (
+                <li
+                  key={c.id}
+                  className="flex w-[36rem] items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                >
+                  <span className="font-medium text-gray-900">{c.name}</span>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-400">Default:</label>
+                    <select
+                      value={c.default_product_id ?? ""}
+                      onChange={(e) => setCategoryDefault(c.id, e.target.value)}
+                      disabled={busy}
+                      className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                    >
+                      <option value="">None</option>
+                      {eligible.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-gray-500">
+                      {c.class_count} class{c.class_count === 1 ? "" : "es"}
+                    </span>
+                    <button
+                      onClick={() => removeCategory(c)}
+                      disabled={busy}
+                      className="text-gray-400 hover:text-red-600"
+                      aria-label={`Remove ${c.name}`}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {/* The all-classes fallback: proposed when neither the family's original
+            nor a category default applies (Decision 5). */}
+        <div className="mt-3 flex w-[36rem] items-center gap-2 text-sm">
+          <label className="text-xs text-gray-500">
+            All-classes default (fallback):
+          </label>
+          <select
+            value={tenantDefaultProduct ?? ""}
+            onChange={(e) => setAllClassesDefault(e.target.value)}
+            disabled={busy}
+            className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+          >
+            <option value="">None</option>
+            {activeProducts
+              .filter((p) => p.category_id === null)
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+          </select>
+        </div>
+      </div>
 
       {/* ── Products ──────────────────────────────────────────────────────── */}
       <div className="mb-8">
@@ -1148,101 +1299,6 @@ export default function PackagesPage() {
           are already subtracted. The money itself moves when the month is
           billed.
         </p>
-      </div>
-
-      {/* ── Class categories ──────────────────────────────────────────────── */}
-      <div className="mb-8">
-        <h2 className="mb-1 text-sm font-bold text-gray-900">
-          Class categories
-        </h2>
-        <p className="mb-3 text-xs text-gray-500">
-          Your own grouping of classes — &ldquo;Group&rdquo;,
-          &ldquo;Private&rdquo;, whatever you price together. A package sold
-          against a category is spendable at every class in it, including ones
-          you add later. Assign a class its category on the Classes page.
-        </p>
-        <div className="mb-3 flex gap-2">
-          <input
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addCategory();
-            }}
-            placeholder="Group"
-            className="w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-          />
-          <Button onClick={addCategory} disabled={busy || !newCategory.trim()}>
-            Add category
-          </Button>
-        </div>
-        {categories.length > 0 && (
-          <ul className="space-y-1">
-            {categories.map((c) => {
-              // Products that may default this category: its own, or all-classes.
-              const eligible = activeProducts.filter(
-                (p) => p.category_id === c.id || p.category_id === null
-              );
-              return (
-                <li
-                  key={c.id}
-                  className="flex w-[36rem] items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                >
-                  <span className="font-medium text-gray-900">{c.name}</span>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-gray-400">Default:</label>
-                    <select
-                      value={c.default_product_id ?? ""}
-                      onChange={(e) => setCategoryDefault(c.id, e.target.value)}
-                      disabled={busy}
-                      className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
-                    >
-                      <option value="">None</option>
-                      {eligible.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-xs text-gray-500">
-                      {c.class_count} class{c.class_count === 1 ? "" : "es"}
-                    </span>
-                    <button
-                      onClick={() => removeCategory(c)}
-                      disabled={busy}
-                      className="text-gray-400 hover:text-red-600"
-                      aria-label={`Remove ${c.name}`}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {/* The all-classes fallback: proposed when neither the family's original
-            nor a category default applies (Decision 5). */}
-        <div className="mt-3 flex w-[36rem] items-center gap-2 text-sm">
-          <label className="text-xs text-gray-500">
-            All-classes default (fallback):
-          </label>
-          <select
-            value={tenantDefaultProduct ?? ""}
-            onChange={(e) => setAllClassesDefault(e.target.value)}
-            disabled={busy}
-            className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
-          >
-            <option value="">None</option>
-            {activeProducts
-              .filter((p) => p.category_id === null)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
-        </div>
       </div>
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}
@@ -1681,53 +1737,24 @@ export default function PackagesPage() {
         )}
       </Modal>
 
-      {/* ── WhatsApp queue — send each created offer's link ────────────────── */}
-      <Modal
+      {/* ── WhatsApp queue — the shared shell, fed the created offers ───────── */}
+      <WhatsAppQueue
         open={queue.length > 0}
         onClose={() => setQueue([])}
         title="Send the renewal links"
-      >
-        <p className="mb-3 text-xs text-gray-500">
-          {queue.length} offer{queue.length === 1 ? "" : "s"} created and emailed.
-          Open each WhatsApp chat and press Send — that press is WhatsApp&rsquo;s
-          own anti-spam boundary.
-        </p>
-        <div className="max-h-[420px] space-y-2 overflow-y-auto">
-          {queue.map((q) => (
-            <div
-              key={q.id}
-              className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2"
-            >
-              <span className="text-sm text-gray-900">
-                {q.parentName}
-                {queueDone.has(q.id) && (
-                  <span className="ml-2 text-xs text-emerald-600">opened</span>
-                )}
-              </span>
-              {q.waLink ? (
-                <a
-                  href={q.waLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() =>
-                    setQueueDone((prev) => new Set(prev).add(q.id))
-                  }
-                  className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white"
-                >
-                  Open WhatsApp
-                </a>
-              ) : (
-                <span className="text-xs text-gray-400">no number — email only</span>
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 flex justify-end">
-          <Button variant="outline" onClick={() => setQueue([])}>
-            Done
-          </Button>
-        </div>
-      </Modal>
+        intro={
+          <>
+            {queue.length} offer{queue.length === 1 ? "" : "s"} created and
+            emailed. Each click opens a pre-filled WhatsApp chat in a new tab —{" "}
+            <b>you still press Send there</b>.
+          </>
+        }
+        rows={queue}
+        onOpenChat={(id) => {
+          const row = queue.find((q) => q.id === id);
+          if (row?.link) window.open(row.link, "_blank", "noopener,noreferrer");
+        }}
+      />
     </div>
   );
 }
