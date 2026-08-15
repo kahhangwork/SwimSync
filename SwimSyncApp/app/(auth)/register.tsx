@@ -21,6 +21,7 @@ export default function RegisterScreen() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [postal, setPostal] = useState("");
+  const [joinCode, setJoinCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,6 +63,11 @@ export default function RegisterScreen() {
         data: {
           full_name: name.trim(),
           role: "parent",
+          // The code MUST travel in user_metadata: when email confirmation is
+          // on there is no session, so the post-signup updates below silently
+          // fail. handle_new_user copies it to parents.signup_join_code; the
+          // parent home applies it once on first sign-in.
+          join_code: joinCode.trim() || undefined,
         },
       },
     });
@@ -225,6 +231,25 @@ export default function RegisterScreen() {
               className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50"
               placeholderTextColor="#9ca3af"
             />
+          </View>
+
+          <View>
+            <Text className="text-sm font-medium text-gray-700 mb-1.5">
+              Join or referral code <Text className="text-gray-400">(optional)</Text>
+            </Text>
+            <TextInput
+              value={joinCode}
+              onChangeText={setJoinCode}
+              placeholder="SWIM-1234 or REF-ABCDE"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              className="border border-gray-200 rounded-xl px-4 py-3 text-gray-900 bg-gray-50 tracking-widest"
+              placeholderTextColor="#9ca3af"
+            />
+            <Text className="mt-1.5 text-xs text-gray-500">
+              Have a code from your coach or a friend? Add it and we&rsquo;ll
+              connect you when you sign in.
+            </Text>
           </View>
 
           <View>

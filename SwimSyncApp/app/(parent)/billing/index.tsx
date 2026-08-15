@@ -16,6 +16,7 @@ import Card from "@/components/Card";
 import { invoiceLabel } from "@/lib/invoiceLabel";
 import { confirmAction } from "@/lib/confirm";
 import { packageExtensionState } from "@/lib/packageExtension";
+import ReferralSection from "@/components/ReferralSection";
 
 type Tab = "Invoices" | "Packages" | "Credit Notes";
 
@@ -49,6 +50,10 @@ type ParentPackage = {
   lesson_count: number;
   rate_per_lesson: number;
   total_value: number;
+  /** What the family PAYS: total_value − discount_amount (referral). Distinct
+   *  from total_value / value_remaining, which never move (D14). */
+  amount_payable: number;
+  discount_amount: number;
   status: "pending" | "active" | "cancelled";
   /** Set ⇒ the business prepared this as a renewal OFFER, not a parent request. */
   offered_by: string | null;
@@ -197,7 +202,7 @@ export default function BillingScreen() {
         // RLS scopes these to this parent's own packages.
         supabase
           .from("parent_packages")
-          .select("id, name, lesson_count, rate_per_lesson, total_value, status, offered_by, expires_on, requested_at, ph_extension_weeks, ph_ack_weeks_parent, class_categories(name), tenants(display_name)")
+          .select("id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, status, offered_by, expires_on, requested_at, ph_extension_weeks, ph_ack_weeks_parent, class_categories(name), tenants(display_name)")
           .in("status", ["pending", "active"])
           .order("requested_at", { ascending: false }),
 
@@ -244,6 +249,8 @@ export default function BillingScreen() {
           lesson_count: p.lesson_count,
           rate_per_lesson: Number(p.rate_per_lesson),
           total_value: Number(p.total_value),
+          amount_payable: Number(p.amount_payable),
+          discount_amount: Number(p.discount_amount),
           status: p.status,
           offered_by: p.offered_by ?? null,
           expires_on: p.expires_on,
@@ -635,15 +642,20 @@ export default function BillingScreen() {
                         <Text className="text-sm text-gray-600 mb-3">
                           {pkg.business_name} has prepared your next package —{" "}
                           {pkg.lesson_count} lessons ·{" "}
-                          S${(pkg.lesson_count * pkg.rate_per_lesson).toFixed(2)}.
-                          Pay via PayNow to activate it.
+                          S${pkg.amount_payable.toFixed(2)}. Pay via PayNow to
+                          activate it.
                         </Text>
                       ) : (
                         <Text className="text-sm text-gray-600 mb-3">
                           {pkg.lesson_count} lessons ·{" "}
-                          S${(pkg.lesson_count * pkg.rate_per_lesson).toFixed(2)}.
-                          Waiting for {pkg.business_name} to confirm your PayNow
-                          payment.
+                          S${pkg.amount_payable.toFixed(2)}. Waiting for{" "}
+                          {pkg.business_name} to confirm your PayNow payment.
+                        </Text>
+                      )}
+                      {pkg.discount_amount > 0 && (
+                        <Text className="text-xs font-medium text-emerald-600 -mt-2 mb-3">
+                          Referral discount: −S${pkg.discount_amount.toFixed(2)}{" "}
+                          off S${pkg.total_value.toFixed(2)}
                         </Text>
                       )}
                       <View className="flex-row gap-2">
@@ -716,6 +728,8 @@ export default function BillingScreen() {
                   </Text>
                 </>
               )}
+
+              <ReferralSection />
             </>
           ) : creditNotes.length === 0 ? (
             <View className="items-center py-16">

@@ -88,11 +88,13 @@ export default function PayNowScreen() {
           .from("parent_packages")
           // Kept on ONE line on purpose: `"a" + "b"` widens to `string`, and
           // the typed client can only parse a select it sees as a literal.
-          .select("name, total_value, reference_number, tenants(display_name, paynow_qr_url, paynow_uen, paynow_mobile)")
+          .select("name, amount_payable, reference_number, tenants(display_name, paynow_qr_url, paynow_uen, paynow_mobile)")
           .eq("id", packageId)
           .single();
         if (pkg) {
-          amount = Number(pkg.total_value);
+          // PRICE surface: the QR must lock the DISCOUNTED amount the family
+          // owes (amount_payable), never the package's full worth (total_value).
+          amount = Number(pkg.amount_payable);
           ref = pkg.reference_number ?? null;
           setPackageName(pkg.name);
           tenant = embeddedTenant(pkg);

@@ -52,7 +52,15 @@ export default function JoinTenantScreen() {
     }
 
     const joined = Array.isArray(data) ? data[0] : data;
-    showToast(`You've joined ${joined?.display_name ?? "your coach"}.`, "success");
+    const name = joined?.display_name ?? "your coach";
+    // A REF- code both joins AND records a referral — say so, so the family
+    // knows their first package will be discounted.
+    showToast(
+      joined?.referred
+        ? `You've joined ${name}. Your first package is discounted!`
+        : `You've joined ${name}.`,
+      "success",
+    );
     router.back();
   }
 
@@ -82,14 +90,15 @@ export default function JoinTenantScreen() {
           <TextInput
             value={code}
             onChangeText={setCode}
-            placeholder="SWIM-1234"
+            placeholder="SWIM-1234 or REF-ABCDE"
             placeholderTextColor="#94a3b8"
             autoCapitalize="characters"
             autoCorrect={false}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-lg tracking-widest text-slate-900"
           />
           <Text className="mt-2 text-xs text-slate-500">
-            Codes look like SWIM-1234. Capitals and spaces don&rsquo;t matter.
+            A join code (SWIM-1234) or a friend&rsquo;s referral code (REF-ABCDE).
+            Capitals and spaces don&rsquo;t matter.
           </Text>
         </View>
 

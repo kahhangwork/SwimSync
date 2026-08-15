@@ -24,7 +24,10 @@ interface PublicPackage {
   paynow_uen: string | null;
   paynow_mobile: string | null;
   reference: string;
+  // amount is what's PAYABLE (discounted); total_value is the package's worth.
   amount: number;
+  total_value: number;
+  discount_amount: number;
   package_name: string;
   lesson_count: number;
   rate: number;
@@ -193,6 +196,11 @@ export default function PublicPackagePage() {
         <Text selectable className="text-4xl font-bold text-gray-900 mt-1 mb-2">
           ${pkg.amount.toFixed(2)}
         </Text>
+        {pkg.discount_amount > 0 ? (
+          <Text className="text-sm text-emerald-600 mb-1">
+            ${pkg.total_value.toFixed(2)} − ${pkg.discount_amount.toFixed(2)} referral discount
+          </Text>
+        ) : null}
         <Text className="text-sm text-gray-500">
           {pkg.lesson_count} lessons · ${pkg.rate.toFixed(2)} each
         </Text>

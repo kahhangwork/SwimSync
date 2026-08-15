@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -89,6 +89,7 @@ function capitalize(str: string | null): string {
 
 export default function ParentHomeScreen() {
   const session = useAppStore((s) => s.session);
+  const showToast = useAppStore((s) => s.showToast);
   const [children, setChildren] = useState<Child[]>([]);
   const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
     new Map()
@@ -279,6 +280,40 @@ export default function ParentHomeScreen() {
   }, [session]);
 
   // Reload every time the screen comes into focus (e.g. after adding a child)
+  // Apply a join/referral code entered at registration, ONCE. Email
+  // confirmation defers any session, so it could not be applied at signup;
+  // handle_new_user parked it on parents.signup_join_code. We clear it whatever
+  // the outcome, so a bad code never retries forever.
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    (async () => {
+      const { data: p } = await supabase
+        .from("parents")
+        .select("id, signup_join_code")
+        .eq("profile_id", session.id)
+        .single();
+      if (cancelled || !p?.signup_join_code) return;
+      const { data, error } = await supabase.rpc("join_tenant_by_code", {
+        p_code: p.signup_join_code,
+      });
+      await supabase.from("parents").update({ signup_join_code: null }).eq("id", p.id);
+      if (cancelled || error) return;
+      const joined = Array.isArray(data) ? data[0] : data;
+      const name = joined?.display_name ?? "your coach";
+      showToast(
+        joined?.referred
+          ? `Joined ${name}. Your first package is discounted!`
+          : `Joined ${name}.`,
+        "success",
+      );
+      loadData();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session, showToast, loadData]);
+
   useFocusEffect(
     useCallback(() => {
       loadData();
