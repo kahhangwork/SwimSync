@@ -58,6 +58,32 @@ export function buildReminderMessage(opts: ReminderMessageOpts): string {
   );
 }
 
+export interface PackageOfferMessageOpts {
+  businessName: string;
+  childrenNames: string[];
+  packageName: string;
+  lessons: number;
+  price: number;
+  reference: string;
+  /** The tokenized public /package page URL (carries the QR). */
+  link: string;
+}
+
+/** The renewal-offer message — the package sibling of buildReminderMessage.
+ *  Same fixed-template doctrine (per-tenant templates stay a non-feature until
+ *  asked). */
+export function buildPackageOfferMessage(opts: PackageOfferMessageOpts): string {
+  const children =
+    opts.childrenNames.length > 0 ? opts.childrenNames.join(", ") : "your child";
+  return (
+    `Hi! ${opts.businessName} has prepared your next swim package.\n\n` +
+    `${opts.packageName} for ${children} — ${opts.lessons} lessons, ` +
+    `$${opts.price.toFixed(2)} (ref ${opts.reference}).\n\n` +
+    `Pay by PayNow here:\n${opts.link}\n\n` +
+    `Thank you!`
+  );
+}
+
 /** https://wa.me/<number>?text=<encoded>. Caller guarantees number came from
  *  toWaNumber — this never builds a link to an unvetted number. */
 export function buildWaLink(waNumber: string, message: string): string {

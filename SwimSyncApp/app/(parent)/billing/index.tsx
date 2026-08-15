@@ -50,6 +50,8 @@ type ParentPackage = {
   rate_per_lesson: number;
   total_value: number;
   status: "pending" | "active" | "cancelled";
+  /** Set ⇒ the business prepared this as a renewal OFFER, not a parent request. */
+  offered_by: string | null;
   expires_on: string | null;
   /** LIVE numbers from package_live_balances() — the stored balance minus
    *  lessons already attended but not yet invoiced. Never recomputed here:
@@ -195,7 +197,7 @@ export default function BillingScreen() {
         // RLS scopes these to this parent's own packages.
         supabase
           .from("parent_packages")
-          .select("id, name, lesson_count, rate_per_lesson, total_value, status, expires_on, requested_at, ph_extension_weeks, ph_ack_weeks_parent, class_categories(name), tenants(display_name)")
+          .select("id, name, lesson_count, rate_per_lesson, total_value, status, offered_by, expires_on, requested_at, ph_extension_weeks, ph_ack_weeks_parent, class_categories(name), tenants(display_name)")
           .in("status", ["pending", "active"])
           .order("requested_at", { ascending: false }),
 
@@ -243,6 +245,7 @@ export default function BillingScreen() {
           rate_per_lesson: Number(p.rate_per_lesson),
           total_value: Number(p.total_value),
           status: p.status,
+          offered_by: p.offered_by ?? null,
           expires_on: p.expires_on,
           live_lessons_remaining: live ? Number(live.live_lessons_remaining) : null,
           live_value_remaining: live ? Number(live.live_value_remaining) : null,
@@ -628,12 +631,21 @@ export default function BillingScreen() {
                     </>
                   ) : (
                     <>
-                      <Text className="text-sm text-gray-600 mb-3">
-                        {pkg.lesson_count} lessons ·{" "}
-                        S${(pkg.lesson_count * pkg.rate_per_lesson).toFixed(2)}.
-                        Waiting for {pkg.business_name} to confirm your PayNow
-                        payment.
-                      </Text>
+                      {pkg.offered_by ? (
+                        <Text className="text-sm text-gray-600 mb-3">
+                          {pkg.business_name} has prepared your next package —{" "}
+                          {pkg.lesson_count} lessons ·{" "}
+                          S${(pkg.lesson_count * pkg.rate_per_lesson).toFixed(2)}.
+                          Pay via PayNow to activate it.
+                        </Text>
+                      ) : (
+                        <Text className="text-sm text-gray-600 mb-3">
+                          {pkg.lesson_count} lessons ·{" "}
+                          S${(pkg.lesson_count * pkg.rate_per_lesson).toFixed(2)}.
+                          Waiting for {pkg.business_name} to confirm your PayNow
+                          payment.
+                        </Text>
+                      )}
                       <View className="flex-row gap-2">
                         <TouchableOpacity
                           onPress={() =>

@@ -27,6 +27,8 @@ import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { todayInSg } from "@/lib/lessonDates";
 import { packageExtensionState } from "@/lib/packageExtension";
+import { defaultConfirmStart, pickOfferProduct } from "@/lib/packageOffers";
+import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 
 type Category = { id: string; name: string; class_count: number };
 
@@ -67,9 +69,37 @@ type Purchase = {
    *  the database; typed nullable only so a stale cached row cannot crash the
    *  page. */
   reference_number: string | null;
+  /** Renewal-offer fields (Migration A). offered_by set ⇒ an admin OFFER, not a
+   *  parent request. paid_claimed_at ⇒ the family tapped "I've paid".
+   *  superseded_by ⇒ a newer row cancelled this open offer. */
+  offered_by: string | null;
+  paid_claimed_at: string | null;
+  superseded_by: string | null;
+  public_token: string | null;
+  children: string | null;
 };
 
 type ParentOption = { id: string; name: string };
+
+/** A row of the Generate-all preview (from package_renewal_candidates), plus the
+ *  admin's editable product/start choices and whether it is ticked. */
+type CandidateRow = {
+  parent_id: string;
+  parent_name: string;
+  parent_phone: string | null;
+  children: string | null;
+  package_name: string | null;
+  lessons_left: number | null;
+  expires_on: string | null;
+  expired_days_ago: number | null;
+  original_product_id: string | null;
+  suggested_product_id: string | null;
+  has_open_offer: boolean;
+  // admin-editable
+  chosenProduct: string;
+  chosenStart: string;
+  include: boolean;
+};
 
 const money = (n: number) => `S$${Number(n).toFixed(2)}`;
 
@@ -89,6 +119,7 @@ export default function PackagesPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [parents, setParents] = useState<ParentOption[]>([]);
+  const [businessName, setBusinessName] = useState("your swim school");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -119,6 +150,16 @@ export default function PackagesPage() {
   const [extendWeeks, setExtendWeeks] = useState("1");
   const [extendReason, setExtendReason] = useState("");
   const [extendError, setExtendError] = useState<string | null>(null);
+  // Renewal offers — Generate all preview + the resulting WhatsApp queue.
+  const [genModal, setGenModal] = useState(false);
+  const [candidates, setCandidates] = useState<CandidateRow[]>([]);
+  const [genBusy, setGenBusy] = useState(false);
+  const [genProgress, setGenProgress] = useState<string | null>(null);
+  // Rows to work through in the WhatsApp queue after offers are created.
+  const [queue, setQueue] = useState<
+    { id: string; parentName: string; waLink: string | null }[]
+  >([]);
+  const [queueDone, setQueueDone] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     load();
@@ -138,10 +179,16 @@ export default function PackagesPage() {
       } catch {
         /* best-effort: a failed recompute must not stop the page rendering */
       }
+      const { data: t } = await supabase
+        .from("tenants")
+        .select("display_name")
+        .eq("id", tenant)
+        .single();
+      if (t?.display_name) setBusinessName(t.display_name);
     }
 
     // RLS scopes every query here to the caller's own business.
-    const [catRes, prodRes, purRes, liveRes, ptRes] = await Promise.all([
+    const [catRes, prodRes, purRes, liveRes, ptRes, childRes] = await Promise.all([
       supabase
         .from("class_categories")
         .select("id, name, classes(id)")
@@ -156,7 +203,7 @@ export default function PackagesPage() {
       supabase
         .from("parent_packages")
         .select(
-          "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, value_remaining, status, requested_at, start_date, expires_on, ph_extension_weeks, ph_ack_weeks_admin, manual_extension_days, reference_number, class_categories(name), parents(profiles(full_name, email))"
+          "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, value_remaining, status, requested_at, start_date, expires_on, ph_extension_weeks, ph_ack_weeks_admin, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
         )
         .order("status")
         .order("requested_at", { ascending: false }),
@@ -165,7 +212,21 @@ export default function PackagesPage() {
         .from("parent_tenants")
         .select("parents(id, profiles(full_name, email))")
         .order("joined_at"),
+      // Children names per family, for the "Who holds one" rows (Decision 9).
+      supabase
+        .from("parent_students")
+        .select("parent_id, students(full_name, is_active)"),
     ]);
+
+    // parent_id → "Ali, Bo" (active children only).
+    const childrenByParent = new Map<string, string[]>();
+    for (const r of (childRes.data as any[]) ?? []) {
+      const s = Array.isArray(r.students) ? r.students[0] : r.students;
+      if (!s?.is_active || !s?.full_name) continue;
+      const arr = childrenByParent.get(r.parent_id) ?? [];
+      arr.push(s.full_name);
+      childrenByParent.set(r.parent_id, arr);
+    }
 
     setCategories(
       (catRes.data ?? []).map((c: any) => ({
@@ -225,6 +286,11 @@ export default function PackagesPage() {
         ph_ack_weeks_admin: p.ph_ack_weeks_admin ?? 0,
         manual_extension_days: p.manual_extension_days ?? 0,
         reference_number: p.reference_number ?? null,
+        offered_by: p.offered_by ?? null,
+        paid_claimed_at: p.paid_claimed_at ?? null,
+        superseded_by: p.superseded_by ?? null,
+        public_token: p.public_token ?? null,
+        children: (childrenByParent.get(p.parent_id) ?? []).join(", ") || null,
       }))
     );
 
@@ -378,11 +444,14 @@ export default function PackagesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saleModal, saleParent, saleProduct]);
 
-  // Confirm dialog: suggest a start date for the pending request being confirmed.
+  // Confirm dialog: pre-fill the start date. ⚠ RISK 3 — an OFFER carries the
+  // start_date the parent paid against, so adopt THAT; only a parent-created
+  // request (no start_date) falls back to the freshly-suggested one.
   useEffect(() => {
     if (confirming) {
       fetchSuggestedStart(confirming.parent_id, confirming.product_id).then(
-        setConfirmStart
+        (suggested) =>
+          setConfirmStart(defaultConfirmStart(confirming.start_date, suggested))
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -520,6 +589,145 @@ export default function PackagesPage() {
     load();
   }
 
+  // ── Renewal offers ─────────────────────────────────────────────────────────
+
+  /** Create ONE offer (create_package_offer), fire the best-effort offer email,
+   *  and return the row for the WhatsApp queue. Throws on RPC failure so the
+   *  caller can mark that family and continue (RISK 12: the RPC itself refuses a
+   *  second open offer). */
+  async function createOneOffer(c: CandidateRow): Promise<{
+    id: string;
+    parentName: string;
+    waLink: string | null;
+  }> {
+    const { data: offerId, error: err } = await supabase.rpc(
+      "create_package_offer",
+      {
+        p_parent_id: c.parent_id,
+        p_product_id: c.chosenProduct,
+        p_start_date: c.chosenStart || todayInSg(),
+      }
+    );
+    if (err || !offerId) {
+      throw new Error(err?.message ?? "offer failed");
+    }
+
+    // Read back the minted token + terms for the email and the WhatsApp link.
+    const { data: row } = await supabase
+      .from("parent_packages")
+      .select("public_token, reference_number, name, lesson_count, total_value")
+      .eq("id", offerId as string)
+      .single();
+
+    // Best-effort email (never blocks the offer).
+    supabase.functions
+      .invoke("package-emails", {
+        body: { type: "offered", package_id: offerId },
+      })
+      .catch(() => {});
+
+    const waNumber = toWaNumber(c.parent_phone);
+    const link = row?.public_token
+      ? `${window.location.origin.replace("admin.", "")}/package/${row.public_token}`
+      : "";
+    const waLink =
+      waNumber && row
+        ? buildWaLink(
+            waNumber,
+            buildPackageOfferMessage({
+              businessName,
+              childrenNames: c.children ? c.children.split(", ") : [],
+              packageName: row.name as string,
+              lessons: Number(row.lesson_count),
+              price: Number(row.total_value),
+              reference: (row.reference_number as string) ?? "",
+              link,
+            })
+          )
+        : null;
+
+    return { id: offerId as string, parentName: c.parent_name, waLink };
+  }
+
+  /** Open the Generate-all preview: pull the candidate families and seed each
+   *  row with its suggested product + start date, editable, ticked when a
+   *  product could be pre-selected (Decision 6). */
+  async function openGenerateAll() {
+    setGenBusy(true);
+    setError(null);
+    const { data, error: err } = await supabase.rpc(
+      "package_renewal_candidates"
+    );
+    setGenBusy(false);
+    if (err) {
+      setError("Could not load renewal candidates.");
+      return;
+    }
+    const rows: CandidateRow[] = await Promise.all(
+      ((data as any[]) ?? []).map(async (r) => {
+        const suggested =
+          r.suggested_product_id ??
+          pickOfferProduct(
+            r.original_product_id
+              ? {
+                  productId: r.original_product_id,
+                  isActive: activeProducts.some(
+                    (p) => p.id === r.original_product_id
+                  ),
+                }
+              : null,
+            null,
+            null
+          ) ??
+          "";
+        const start = suggested
+          ? await fetchSuggestedStart(r.parent_id, suggested)
+          : todayInSg();
+        return {
+          parent_id: r.parent_id,
+          parent_name: r.parent_name ?? "Unknown",
+          parent_phone: r.parent_phone ?? null,
+          children: r.children ?? null,
+          package_name: r.package_name ?? null,
+          lessons_left: r.lessons_left ?? null,
+          expires_on: r.expires_on ?? null,
+          expired_days_ago: r.expired_days_ago ?? null,
+          original_product_id: r.original_product_id ?? null,
+          suggested_product_id: suggested || null,
+          has_open_offer: !!r.has_open_offer,
+          chosenProduct: suggested,
+          chosenStart: start,
+          include: !!suggested && !r.has_open_offer,
+        };
+      })
+    );
+    setCandidates(rows);
+    setGenModal(true);
+  }
+
+  /** Confirm the preview: create each ticked offer sequentially (a failure marks
+   *  that row and continues — RISK 12), then open the WhatsApp queue. */
+  async function confirmGenerateAll() {
+    setGenBusy(true);
+    const created: { id: string; parentName: string; waLink: string | null }[] =
+      [];
+    const chosen = candidates.filter((c) => c.include && c.chosenProduct);
+    for (let i = 0; i < chosen.length; i++) {
+      setGenProgress(`Creating offer ${i + 1} of ${chosen.length}…`);
+      try {
+        created.push(await createOneOffer(chosen[i]));
+      } catch {
+        /* skip this family; the rest continue */
+      }
+    }
+    setGenProgress(null);
+    setGenBusy(false);
+    setGenModal(false);
+    setQueue(created);
+    setQueueDone(new Set());
+    load();
+  }
+
   const pending = purchases.filter((p) => p.status === "pending");
   const held = purchases.filter((p) => p.status !== "pending");
 
@@ -558,6 +766,12 @@ export default function PackagesPage() {
         subtitle="Prepaid lesson packages — what you sell, and who holds one"
       />
 
+      <div className="mb-6 flex justify-end">
+        <Button onClick={openGenerateAll} disabled={genBusy || loading}>
+          {genBusy ? "Loading…" : "Generate renewal offers"}
+        </Button>
+      </div>
+
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -586,7 +800,19 @@ export default function PackagesPage() {
             <Tbody>
               {visiblePending.map((p) => (
                 <Tr key={p.id}>
-                  <Td className="font-medium text-gray-900">{p.parent_name}</Td>
+                  <Td className="font-medium text-gray-900">
+                    {p.parent_name}
+                    {p.offered_by && (
+                      <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                        Offer
+                      </span>
+                    )}
+                    {p.paid_claimed_at && (
+                      <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                        Claimed
+                      </span>
+                    )}
+                  </Td>
                   <Td className="text-gray-600">
                     {p.name}
                     <span className="text-gray-400">
@@ -748,6 +974,11 @@ export default function PackagesPage() {
                   <Tr key={p.id}>
                     <Td className="font-medium text-gray-900">
                       {p.parent_name}
+                      {p.children && (
+                        <span className="block text-xs font-normal text-gray-400">
+                          {p.children}
+                        </span>
+                      )}
                     </Td>
                     <Td className="text-gray-600">
                       {p.name}
@@ -1116,6 +1347,13 @@ export default function PackagesPage() {
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Start date
           </label>
+          {/* ⚠ RISK 3 — for an OFFER the parent already paid against this date;
+              show it so the admin does not silently move the validity window. */}
+          {confirming?.offered_by && confirming?.start_date && (
+            <p className="mb-1 text-xs font-medium text-sky-700">
+              Offered start: {confirming.start_date}
+            </p>
+          )}
           <input
             type="date"
             value={confirmStart}
@@ -1123,8 +1361,9 @@ export default function PackagesPage() {
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
           <p className="mt-1 text-xs text-gray-400">
-            Suggested from when this parent&rsquo;s current coverage ends —
-            adjust it freely.
+            {confirming?.offered_by
+              ? "Defaults to the offered start above — change only if needed."
+              : "Suggested from when this parent’s current coverage ends — adjust it freely."}
           </p>
         </div>
         <div className="mt-4 flex justify-end gap-2">
@@ -1231,6 +1470,174 @@ export default function PackagesPage() {
               {busy ? "Extending…" : "Extend package"}
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* ── Generate-all preview (Decision 6) — never a blind send ─────────── */}
+      <Modal
+        open={genModal}
+        onClose={() => !genBusy && setGenModal(false)}
+        title="Generate renewal offers"
+      >
+        {candidates.length === 0 ? (
+          <p className="text-sm text-gray-600">
+            No families are due for renewal right now — everyone covered is above
+            the low-balance and expiry thresholds, or already has an open offer.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">
+              Each family below is running low or has recently expired. Tick the
+              ones to offer, adjust the package or start date, then confirm. An
+              email goes out and a WhatsApp queue opens for the rest.
+            </p>
+            <div className="max-h-[420px] space-y-2 overflow-y-auto">
+              {candidates.map((c, i) => (
+                <div
+                  key={c.parent_id}
+                  className="rounded-lg border border-gray-200 p-3"
+                >
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={c.include}
+                      onChange={(e) =>
+                        setCandidates((prev) =>
+                          prev.map((r, j) =>
+                            j === i ? { ...r, include: e.target.checked } : r
+                          )
+                        )
+                      }
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900">
+                        {c.parent_name}
+                        {c.children ? (
+                          <span className="text-gray-400"> · {c.children}</span>
+                        ) : null}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {c.expired_days_ago != null
+                          ? `Expired ${c.expired_days_ago} day${c.expired_days_ago === 1 ? "" : "s"} ago`
+                          : `${c.lessons_left ?? 0} left${c.expires_on ? ` · expires ${c.expires_on}` : ""}`}
+                        {c.has_open_offer ? " · already has an open offer" : ""}
+                        {!toWaNumber(c.parent_phone) ? " · no WhatsApp number" : ""}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <select
+                          value={c.chosenProduct}
+                          onChange={(e) =>
+                            setCandidates((prev) =>
+                              prev.map((r, j) =>
+                                j === i
+                                  ? { ...r, chosenProduct: e.target.value }
+                                  : r
+                              )
+                            )
+                          }
+                          className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                        >
+                          <option value="">Choose package…</option>
+                          {activeProducts.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} — {money(p.lesson_count * p.rate_per_lesson)}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="date"
+                          value={c.chosenStart}
+                          onChange={(e) =>
+                            setCandidates((prev) =>
+                              prev.map((r, j) =>
+                                j === i
+                                  ? { ...r, chosenStart: e.target.value }
+                                  : r
+                              )
+                            )
+                          }
+                          className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {genProgress && (
+              <p className="text-xs text-sky-700">{genProgress}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setGenModal(false)}
+                disabled={genBusy}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmGenerateAll}
+                disabled={
+                  genBusy ||
+                  candidates.filter((c) => c.include && c.chosenProduct)
+                    .length === 0
+                }
+              >
+                {genBusy
+                  ? "Creating…"
+                  : `Create ${candidates.filter((c) => c.include && c.chosenProduct).length} offer(s)`}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── WhatsApp queue — send each created offer's link ────────────────── */}
+      <Modal
+        open={queue.length > 0}
+        onClose={() => setQueue([])}
+        title="Send the renewal links"
+      >
+        <p className="mb-3 text-xs text-gray-500">
+          {queue.length} offer{queue.length === 1 ? "" : "s"} created and emailed.
+          Open each WhatsApp chat and press Send — that press is WhatsApp&rsquo;s
+          own anti-spam boundary.
+        </p>
+        <div className="max-h-[420px] space-y-2 overflow-y-auto">
+          {queue.map((q) => (
+            <div
+              key={q.id}
+              className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2"
+            >
+              <span className="text-sm text-gray-900">
+                {q.parentName}
+                {queueDone.has(q.id) && (
+                  <span className="ml-2 text-xs text-emerald-600">opened</span>
+                )}
+              </span>
+              {q.waLink ? (
+                <a
+                  href={q.waLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    setQueueDone((prev) => new Set(prev).add(q.id))
+                  }
+                  className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  Open WhatsApp
+                </a>
+              ) : (
+                <span className="text-xs text-gray-400">no number — email only</span>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Button variant="outline" onClick={() => setQueue([])}>
+            Done
+          </Button>
         </div>
       </Modal>
     </div>

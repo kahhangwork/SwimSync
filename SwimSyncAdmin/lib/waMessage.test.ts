@@ -1,10 +1,37 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildPackageOfferMessage,
   buildReminderMessage,
   buildWaLink,
   monthLabel,
   toWaNumber,
 } from "./waMessage";
+
+describe("buildPackageOfferMessage", () => {
+  const base = {
+    businessName: "Coastal Swim",
+    childrenNames: ["Ali", "Bo"],
+    packageName: "8 Group Lessons",
+    lessons: 8,
+    price: 320,
+    reference: "PKG-2026-0001",
+    link: "https://swimsync.sg/package/deadbeef",
+  };
+  it("names the business, package, children, price, ref and link", () => {
+    const m = buildPackageOfferMessage(base);
+    expect(m).toContain("Coastal Swim");
+    expect(m).toContain("8 Group Lessons");
+    expect(m).toContain("Ali, Bo");
+    expect(m).toContain("$320.00");
+    expect(m).toContain("PKG-2026-0001");
+    expect(m).toContain("https://swimsync.sg/package/deadbeef");
+  });
+  it("falls back to 'your child' with no names", () => {
+    expect(buildPackageOfferMessage({ ...base, childrenNames: [] })).toContain(
+      "your child"
+    );
+  });
+});
 
 describe("toWaNumber", () => {
   it("prefixes 65 onto a bare 8-digit number", () => {
