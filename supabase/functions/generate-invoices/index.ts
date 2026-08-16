@@ -15,7 +15,12 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateInvoices, type GenerateOptions } from "./core.ts";
-import { emailCreatedInvoices, notifyGenerationBlocked } from "./email.ts";
+import {
+  emailCreatedInvoices,
+  notifyGenerationBlocked,
+  retryUnsentInvoiceEmails,
+  shouldRetryTenantEmails,
+} from "./email.ts";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -87,12 +92,45 @@ Deno.serve(async (req: Request) => {
     // Email each newly-created invoice (best-effort, after generation has
     // committed — see emailCreatedInvoices). Never throws; logged no-op when
     // RESEND_API_KEY is unset (local dev / tests).
-    const { emailsSent } = await emailCreatedInvoices(supabase, result.created ?? [], {
+    const emailEnv = {
       apiKey: Deno.env.get("RESEND_API_KEY"),
       appUrl: Deno.env.get("APP_URL"),
-    });
+    };
+    const { emailsSent } = await emailCreatedInvoices(
+      supabase,
+      result.created ?? [],
+      emailEnv
+    );
 
-    return json({ ...result, emails_sent: emailsSent, blocked_alerts_sent: blockedAlerts });
+    // Self-heal pass: re-send any invoice email that never went out for the
+    // month(s) just processed. Runs even when generation short-circuited
+    // (already_complete) — that is the whole point (INVOICE_EMAIL_RETRY_PLAN.md).
+    // Best-effort; retryUnsentInvoiceEmails never throws.
+    //
+    // ⚠ RISK 3: never email on behalf of a SUSPENDED tenant, nor an AUTO-DISABLED
+    // tenant on an automatic run (a manual run for it is an explicit instruction).
+    const isManual = opts.mode === "manual";
+    let emailsRetried = 0;
+    for (const run of result.per_tenant ?? [result]) {
+      if (!run.tenant_id) continue;
+      if (!shouldRetryTenantEmails(run.status, isManual)) continue;
+      // ⚠ RISK 5: hold this run's freshly-created invoices out of the retry claim.
+      const excludeIds = (run.created ?? []).map((c) => c.invoice_id);
+      const { emailsRetried: n } = await retryUnsentInvoiceEmails(
+        supabase,
+        run.tenant_id,
+        run.billing_month,
+        { ...emailEnv, excludeIds }
+      );
+      emailsRetried += n;
+    }
+
+    return json({
+      ...result,
+      emails_sent: emailsSent,
+      emails_retried: emailsRetried,
+      blocked_alerts_sent: blockedAlerts,
+    });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
   }

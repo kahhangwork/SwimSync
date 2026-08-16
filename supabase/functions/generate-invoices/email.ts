@@ -1,7 +1,9 @@
 // Transactional invoice email for generate-invoices.
 //
 // Kept OUT of core.ts (the billing engine, which stays pure + unit-tested):
-// index.ts calls sendInvoiceEmail() for each invoice core.ts reports creating.
+// index.ts sends via emailCreatedInvoices() for each invoice core.ts reports
+// creating, then runs retryUnsentInvoiceEmails() to re-send any earlier miss
+// (both go through the private emailInvoices() helper + sendInvoiceEmail()).
 // There is no other transactional-email path in the project today — password
 // reset uses Supabase Auth's built-in SMTP, which only fires on auth events.
 // This talks to the Resend HTTP API directly with the same key that backs the
@@ -16,7 +18,7 @@
 //    Date (no UTC drift — the same discipline the apps use for SG-local dates).
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import type { CreatedInvoice } from "./core.ts";
+import type { CreatedInvoice, CreatedInvoiceItem } from "./core.ts";
 
 const MONTHS_LONG = [
   "January", "February", "March", "April", "May", "June",
@@ -273,24 +275,34 @@ export async function sendInvoiceEmail(
   }
 }
 
-// Orchestrate emails for a batch of just-created invoices. Called by index.ts
-// AFTER generation has committed, so nothing here can affect billing. Resolves
-// each parent's email/name and student names, then sends one email per invoice.
-// NEVER throws — any failure is logged and swallowed; returns how many sent.
-// A no-op (returns 0) when there are no invoices or no apiKey.
-export async function emailCreatedInvoices(
+// Per-invoice send outcome, so the caller can stamp (happy path) or reset
+// (retry path) invoice_email_sent_at accordingly.
+export type InvoiceSendResult = { invoiceId: string; sent: boolean };
+
+// Send one email per invoice in the batch. PURE SEND — resolves recipients and
+// branding, sends, and reports which invoices went out. Does NOT touch
+// invoice_email_sent_at; stamping/claiming is the caller's concern (the happy
+// path stamps on success, the retry path claims up-front and resets misses).
+// NEVER throws — any failure is logged and swallowed. A no-op (0 sent, empty
+// results) when there are no invoices; a no-op send when no apiKey.
+//
+// Student NAMES are resolved LIVE from students.full_name — NOT from the
+// invoice_items.student_name snapshot — so first-send and retried emails render
+// identically (⚠ RISK 7, INVOICE_EMAIL_RETRY_PLAN.md).
+async function emailInvoices(
   supabase: SupabaseClient,
-  created: CreatedInvoice[],
+  invoices: CreatedInvoice[],
   opts: { apiKey?: string; appUrl?: string } = {}
-): Promise<{ emailsSent: number }> {
-  if (!created.length) return { emailsSent: 0 };
+): Promise<{ emailsSent: number; results: InvoiceSendResult[] }> {
+  if (!invoices.length) return { emailsSent: 0, results: [] };
   const appUrl = opts.appUrl ?? DEFAULT_APP_URL;
   let emailsSent = 0;
+  const results: InvoiceSendResult[] = [];
 
   try {
-    const parentIds = [...new Set(created.map((c) => c.parent_id))];
+    const parentIds = [...new Set(invoices.map((c) => c.parent_id))];
     const studentIds = [
-      ...new Set(created.flatMap((c) => c.items.map((i) => i.student_id))),
+      ...new Set(invoices.flatMap((c) => c.items.map((i) => i.student_id))),
     ];
 
     // parent_id → { email, name } (profiles is a to-one embed)
@@ -308,7 +320,7 @@ export async function emailCreatedInvoices(
     }
 
     // tenant_id → branding. One query for the whole run, not one per invoice.
-    const tenantIds = [...new Set(created.map((c) => c.tenant_id).filter(Boolean))];
+    const tenantIds = [...new Set(invoices.map((c) => c.tenant_id).filter(Boolean))];
     const { data: tenantRows } = tenantIds.length
       ? await supabase
           .from("tenants")
@@ -330,7 +342,7 @@ export async function emailCreatedInvoices(
       studentName[row.id] = row.full_name ?? "";
     }
 
-    for (const inv of created) {
+    for (const inv of invoices) {
       const info = parentInfo[inv.parent_id];
       const brand = tenantInfo[inv.tenant_id];
       const r = await sendInvoiceEmail({
@@ -352,6 +364,7 @@ export async function emailCreatedInvoices(
           amount: i.amount,
         })),
       });
+      results.push({ invoiceId: inv.invoice_id, sent: r.sent });
       if (r.sent) emailsSent++;
       else console.log(`invoice email not sent (${inv.invoice_id}): ${r.reason}`);
     }
@@ -360,7 +373,192 @@ export async function emailCreatedInvoices(
     console.log(`invoice email step error: ${(e as Error).message}`);
   }
 
+  return { emailsSent, results };
+}
+
+// Orchestrate emails for a batch of just-created invoices. Called by index.ts
+// AFTER generation has committed, so nothing here can affect billing. Sends one
+// email per invoice, then STAMPS invoice_email_sent_at on each success so a
+// dropped send can be retried later without re-emailing the ones that worked.
+// NEVER throws — any failure is logged and swallowed; returns how many sent.
+export async function emailCreatedInvoices(
+  supabase: SupabaseClient,
+  created: CreatedInvoice[],
+  opts: { apiKey?: string; appUrl?: string } = {}
+): Promise<{ emailsSent: number }> {
+  if (!created.length) return { emailsSent: 0 };
+  const { emailsSent, results } = await emailInvoices(supabase, created, opts);
+
+  const sentAt = new Date().toISOString();
+  for (const r of results) {
+    if (!r.sent) continue;
+    // ⚠ RISK 4: a stamp failure must NOT drop the rest of the batch. Each stamp
+    // is isolated — the sends already happened, so a stamp miss only means that
+    // one invoice may be re-sent by a later retry (harmless), never a lost send.
+    try {
+      const { error } = await supabase
+        .from("invoices")
+        .update({ invoice_email_sent_at: sentAt })
+        .eq("id", r.invoiceId);
+      if (error) console.log(`invoice email stamp failed (${r.invoiceId}): ${error.message}`);
+    } catch (e) {
+      console.log(`invoice email stamp threw (${r.invoiceId}): ${(e as Error).message}`);
+    }
+  }
+
   return { emailsSent };
+}
+
+// Whether the retry pass should run for a per-tenant generation result.
+// ⚠ RISK 3 (INVOICE_EMAIL_RETRY_PLAN.md): never email on behalf of a SUSPENDED
+// tenant, and skip an AUTO-DISABLED tenant on an AUTOMATIC run (a manual run for
+// that tenant is an explicit instruction and may proceed). Pure so it is unit-
+// tested directly, away from the Deno.serve handler.
+export function shouldRetryTenantEmails(
+  status: string | undefined,
+  isManual: boolean
+): boolean {
+  if (status === "tenant_suspended") return false;
+  if (status === "auto_disabled" && !isManual) return false;
+  return true;
+}
+
+// Retry unsent invoice emails for ONE (tenant, month) — the self-heal path.
+// Runs on every generate-invoices invocation, INCLUDING a sealed-month
+// short-circuit, so a send Resend rejected on an earlier run is re-sent on the
+// next run with no duplicate to parents who already got theirs.
+//
+// ⚠ RISK 1 — CLAIM ONE INVOICE AT A TIME, then send it, then reset it on
+// failure. Each claim is an atomic conditional UPDATE (`WHERE id = ? AND
+// invoice_email_sent_at IS NULL RETURNING id`): a concurrent run (double-clicked
+// button, or cron overlapping a manual run) racing for the same row gets zero
+// rows back and skips it, so no duplicate is ever sent. Claiming per-invoice
+// rather than the whole batch up-front BOUNDS a mid-run crash/timeout to a
+// SINGLE in-flight invoice — a batch claim would strand the entire unsent tail
+// stamped-as-sent (a silent, permanent drop). The residual one-invoice window
+// is the cost of a boolean claim column; eliminating it entirely needs a
+// separate claimed_at column or an advisory lock (BACKLOG).
+//
+// ⚠ RISK 2/#2 — the itemised lines are rebuilt from invoice_items. If that fetch
+// errors we send NOTHING (a line-item-less email would still stamp sent and
+// never retry); an invoice that resolves zero items is a partial fetch and is
+// left unclaimed for a later run.
+//
+// ⚠ RISK 5 — excludeIds (this run's freshly-created invoice ids) are held out of
+// the candidate set, so a happy-path send whose stamp failed is not re-sent in
+// the SAME invocation.
+export async function retryUnsentInvoiceEmails(
+  supabase: SupabaseClient,
+  tenantId: string,
+  billingMonth: string,
+  opts: { apiKey?: string; appUrl?: string; excludeIds?: string[] } = {}
+): Promise<{ emailsRetried: number }> {
+  try {
+    // 1. Discover unsent candidates — a READ, not a claim; the claim is per-row
+    //    below so a crash cannot strand a batch.
+    let discover = supabase
+      .from("invoices")
+      .select("id, parent_id, tenant_id, billing_month, gross_amount, package_applied, credit_applied, net_amount")
+      .eq("tenant_id", tenantId)
+      .eq("billing_month", billingMonth)
+      .is("invoice_email_sent_at", null);
+    if (opts.excludeIds && opts.excludeIds.length) {
+      discover = discover.not("id", "in", `(${opts.excludeIds.join(",")})`);
+    }
+    const { data: candidates, error: discoverErr } = await discover;
+    if (discoverErr) {
+      console.log(`invoice email retry discovery failed (${tenantId}/${billingMonth}): ${discoverErr.message}`);
+      return { emailsRetried: 0 };
+    }
+    const rows = (candidates ?? []) as any[];
+    if (!rows.length) return { emailsRetried: 0 };
+
+    // 2. Rebuild itemised lines. On a fetch error, send nothing (⚠ #2).
+    const invoiceIds = rows.map((r) => r.id as string);
+    const { data: itemRows, error: itemErr } = await supabase
+      .from("invoice_items")
+      .select("invoice_id, student_id, session_date, class_title, amount")
+      .in("invoice_id", invoiceIds);
+    if (itemErr) {
+      console.log(`invoice email retry items fetch failed (${tenantId}/${billingMonth}): ${itemErr.message}`);
+      return { emailsRetried: 0 };
+    }
+    const itemsByInvoice: Record<string, CreatedInvoiceItem[]> = {};
+    for (const it of (itemRows ?? []) as any[]) {
+      (itemsByInvoice[it.invoice_id] ??= []).push({
+        student_id: it.student_id,
+        session_date: it.session_date,
+        class_title: it.class_title,
+        amount: Number(it.amount),
+      });
+    }
+
+    // 3. Per-invoice: claim → send → reset on failure.
+    const claimedAt = new Date().toISOString();
+    let emailsRetried = 0;
+    for (const r of rows) {
+      const items = itemsByInvoice[r.id] ?? [];
+      if (!items.length) {
+        // A generated invoice always has >=1 item; none means the item fetch was
+        // partial. Leave it unclaimed (NULL) so a later run rebuilds it (⚠ #2).
+        console.log(`invoice email retry skipped (${r.id}): no items resolved`);
+        continue;
+      }
+
+      // Atomic claim of THIS row only. A concurrent run gets 0 rows back here.
+      let claimed: { id: string }[] | null = null;
+      try {
+        const { data, error } = await supabase
+          .from("invoices")
+          .update({ invoice_email_sent_at: claimedAt })
+          .eq("id", r.id)
+          .is("invoice_email_sent_at", null)
+          .select("id");
+        if (error) {
+          console.log(`invoice email retry claim failed (${r.id}): ${error.message}`);
+          continue;
+        }
+        claimed = data as { id: string }[];
+      } catch (e) {
+        console.log(`invoice email retry claim threw (${r.id}): ${(e as Error).message}`);
+        continue;
+      }
+      if (!claimed || !claimed.length) continue; // another run already claimed it
+
+      const invoice: CreatedInvoice = {
+        invoice_id: r.id,
+        parent_id: r.parent_id,
+        tenant_id: r.tenant_id,
+        billing_month: r.billing_month,
+        gross: Number(r.gross_amount),
+        package: Number(r.package_applied),
+        credit: Number(r.credit_applied),
+        net: Number(r.net_amount),
+        items,
+      };
+      const { results } = await emailInvoices(supabase, [invoice], opts);
+      if (results[0]?.sent) {
+        emailsRetried++;
+        continue;
+      }
+      // Send did not go out — reset so a later run retries it.
+      try {
+        const { error } = await supabase
+          .from("invoices")
+          .update({ invoice_email_sent_at: null })
+          .eq("id", r.id);
+        if (error) console.log(`invoice email retry reset failed (${r.id}): ${error.message}`);
+      } catch (e) {
+        console.log(`invoice email retry reset threw (${r.id}): ${(e as Error).message}`);
+      }
+    }
+
+    return { emailsRetried };
+  } catch (e) {
+    // Best-effort, same contract as emailCreatedInvoices — never disturb billing.
+    console.log(`invoice email retry error (${tenantId}/${billingMonth}): ${(e as Error).message}`);
+    return { emailsRetried: 0 };
+  }
 }
 
 // ── Blocked-generation alert ───────────────────────────────────────────────

@@ -13,6 +13,7 @@ import {
   type InvoiceEmailData,
   buildBlockedEmailHtml,
   notifyGenerationBlocked,
+  shouldRetryTenantEmails,
 } from "./email.ts";
 
 const sample: InvoiceEmailData = {
@@ -250,4 +251,25 @@ Deno.test("a business logo renders as an image, and its URL is escaped", () => {
   assertStringIncludes(html, "<img src=");
   assert(!html.includes('?a="b'), "logo URL must be escaped, not raw");
   assert(!html.includes('Evil "Swim"'), "business name must be escaped");
+});
+
+// ── Retry-eligibility predicate (⚠ RISK 3) ─────────────────────────────────
+// The retry pass must never email on behalf of a suspended tenant, and must
+// skip an auto-disabled tenant on an automatic run. Pure, so tested here.
+
+Deno.test("shouldRetryTenantEmails: suspended tenant never gets a retry", () => {
+  assertEquals(shouldRetryTenantEmails("tenant_suspended", true), false);
+  assertEquals(shouldRetryTenantEmails("tenant_suspended", false), false);
+});
+
+Deno.test("shouldRetryTenantEmails: auto-disabled skipped on auto, allowed on manual", () => {
+  assertEquals(shouldRetryTenantEmails("auto_disabled", false), false); // auto run
+  assertEquals(shouldRetryTenantEmails("auto_disabled", true), true); // manual run
+});
+
+Deno.test("shouldRetryTenantEmails: normal statuses always retry", () => {
+  for (const st of ["complete", "already_complete", "incomplete_attendance", undefined]) {
+    assertEquals(shouldRetryTenantEmails(st, false), true);
+    assertEquals(shouldRetryTenantEmails(st, true), true);
+  }
 });
