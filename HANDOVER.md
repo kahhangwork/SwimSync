@@ -1,16 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-15 — **Parent REFERRAL CODES shipped LIVE** (§8.61): `REF-` code per
-membership doubling as a join code, double-sided package discount (friend's first package +
-referrer's later one, FIFO queue, tenant %/$ + per-product override, same-household guard), admin
-Referrals page (grant/void/disable), referrer earn-email. First PRICE modifier — moves
-`amount_payable`, never `total_value`. Migration `20260815000700` + `public-package` v2 +
-`package-emails` v3 + both apps, all on prod; grant dump clean; RISK 12 checks 0/0. **DORMANT**
-(no business has enabled it). PRD §7.16 · `docs/DEPLOYMENT.md` §11.23._
+_Last updated: 2026-08-16 — **Backlog RE-RANKED** after the referral queue drained (§8.62, docs only).
+No rework-critical sequence left; the queue is now decisions + a flat value pool. Three settled with
+the user: revenue **ACCRUAL**, reminders **MANUAL for now**, **multi-language REFUSED** (+ dashboards
+retired) — all in `BACKLOG.md`. Live product state UNCHANGED. Next: pick a Wave C item (§9)._
 
-_Previously, 2026-08-15 — **Package RENEWAL AUTOMATION shipped LIVE** (§8.60): admin-created renewal
-OFFERS + tokenised `/package` pay page + Generate-all preview + WhatsApp queue + default packages +
-Students columns/drawer. Migrations A+B + 2 edge fns + apps on prod. DORMANT. `docs/DEPLOYMENT.md` §11.22._
+_Previously, 2026-08-15 — **Parent REFERRAL CODES shipped LIVE** (§8.61): `REF-` join code, double-
+sided package discount (friend's first + referrer's later, FIFO, tenant %/$ + per-product override,
+same-household guard), admin Referrals page, earn-email. First PRICE modifier — moves `amount_payable`,
+never `total_value`. On prod, grant dump clean, RISK 12 0/0. **DORMANT**. PRD §7.16 · `docs/DEPLOYMENT.md` §11.23._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -379,7 +377,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
-## 8.61 (2026-08-15) — PARENT REFERRAL CODES, BUILT (all 4 phases), NOT YET DEPLOYED
+## 8.62 (2026-08-16) — BACKLOG RE-RANKED after the referral queue drained (docs only, no code)
+
+`/backlog-prioritisation` after §8.61 exhausted `## Build order`. Finding: **no rework-critical
+sequence remains** — the queue is now three decisions plus a flat value pool, not a topological sort.
+**Three decisions settled with the user, all recorded in `BACKLOG.md`:** revenue is **ACCRUAL**
+(invoices issued that month; unblocks the owner-only accounting page, whose trainee-coach payroll
+dependency is also discharged — shadows already ship two payout rows); reminders **stay MANUAL for
+now** (parks the cron-gated tail: low-balance nudge, automated reminders, referral reward-expiry
+nudge); **multi-language REFUSED** and *More polished dashboards* retired, both to *Deliberately not
+doing* with revisit triggers. Build order reshaped: **Wave B** (email chain, head not cron-gated) →
+**Wave C** (value-ranked independents) → **Wave D** (latent traps) → *Later*. Also fixed §8.61's
+title drift (read "NOT YET DEPLOYED"; it shipped). No migration, no PRD change. Full ranking +
+reasoning: `BACKLOG.md → ## Build order`; next steps in §9.
+
+## 8.61 (2026-08-15) — PARENT REFERRAL CODES, SHIPPED LIVE (all 4 phases)
 
 **The first PRICE modifier in SwimSync, built end to end across Phases 1–4** (`71056d7`…`652aa35`,
 all on `main` **locally**). A **referral code** is a second kind of join code (`REF-XXXXX`) minted
@@ -410,34 +422,8 @@ grant dump clean (RISK 8 held through the `join_tenant_by_code` DROP+recreate) �
 (bundle grep confirmed) → RISK 12 checks **0/0**. Full deploy record: **`docs/DEPLOYMENT.md` §11.23**.
 **DORMANT** — no business has `referral_enabled`, so nothing has fired on real data. Suites: `docs/TESTING.md` §5.
 
-## 8.60 (2026-08-15) — PACKAGE RENEWAL AUTOMATION, SHIPPED LIVE
-
-**Packages got the collection loop invoices already had, built across Phases 1–4 + polish and
-DEPLOYED to prod** (`8173e8d`…`d2d5a2a`). An **offer** is an admin-created *pending*
-`parent_packages` row with a public token; the family pays on a tokenised `/package` page (same
-dynamic QR + `PKG-` reference + "I've paid" as an invoice — the new `public-package` edge fn),
-the admin works a shared **WhatsApp queue**, confirms *Payment received*, and it activates **with
-the offered start date**. *Generate all* previews every low family first. Per-category /
-all-classes **default packages** feed the product suggestion; the Students page gained
-**Package/Left/Expires** columns + an **Actions drawer** (Invite/Contact/Rename/Set-inactive AND
-class add/remove; the Class column is now view-only). Full design + 12 risk mitigations:
-**`docs/plans/PACKAGE_RENEWAL_AUTOMATION_PLAN.md`**. Behaviour: **PRD §7.16 *Renewal offers***.
-
-**Six gotchas graduated (§7.158–§7.163):** DEFINER trigger for a parent-initiated sibling UPDATE
-+ explicit scoping; never auto-cancel a `paid_claimed_at` row; mint a secret only from a DEFINER
-trigger, unconditionally; `coverage.lessons_remaining` is a family sum ≠ "the covering package";
-parents link via `parent_tenants` not `profiles.tenant_id`; a driver must OWN its class id
-(seed regenerates UUIDs). Deploy (backend-first, clean this time): **`docs/DEPLOYMENT.md` §11.22**;
-rollback DOWN files committed + rehearsed (`6f43ee2`). Verified: pgTAP (package_offers 21,
-package_default_products 9, coverage + grants green — only the pre-existing `coach_disable`
-date-flake red), Deno 156×2, admin vitest 372, app jest 363, **served public-package fn**
-end-to-end, and 4 UI drivers (verify-package-renewal 7/7 new; active-inactive 17/17,
-contact-details 21/21, multi-class updated for the drawer). **DORMANT on prod** — no offer
-created, so supersede + the RISK 1/2/4/12 guards have not fired on real data; first firing is the
-first offer. Suites: `docs/TESTING.md` §5.
-
-*(§8.59 — weeks/start-date/holiday-extension packages, SHIPPED LIVE — moved to the ledger,
-`docs/SESSIONS.md`, when §8.61 landed.)*
+*(§8.60 — package RENEWAL AUTOMATION, SHIPPED LIVE — and §8.59, weeks/holiday-extension packages —
+both moved to the ledger, `docs/SESSIONS.md`, when §8.62 landed.)*
 
 ---
 
@@ -516,15 +502,19 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE CURRENT BUILD — Referral codes SHIPPED LIVE; NO decided next build
+### THE CURRENT BUILD — queue re-ranked 2026-08-16; NO decided next build
 
-**2026-08-15 shipped *Parent referral codes* end to end and LIVE (§8.61, `docs/DEPLOYMENT.md`
-§11.23)** — the filed NEXT item, all four phases: migration `20260815000700` + `public-package` v2
-+ `package-emails` v3 + both apps, deployed backend-first in the correct order (no revert dance).
-Grant dump clean, RISK 12 invisibility checks **0/0**. It followed the renewal automation (§8.60)
-and weeks/holiday packages (§8.59). `BACKLOG.md → ## Build order` is **exhausted again**; what
-remains is the *Unordered* pool + the *Later* big features. **There is no queued, decided next
-build; picking one is the first task.** `/backlog-prioritisation` re-sequences if needed.
+Referral codes shipped LIVE (§8.61), draining `BACKLOG.md → ## Build order`. `/backlog-prioritisation`
+re-ranked what remains: **no rework-critical sequence left**, so it is decisions + a flat value pool.
+**Three decisions settled with the user** (recorded in the BACKLOG decisions table): revenue
+**ACCRUAL** (unblocks the owner-only accounting page, trainee-coach dependency discharged); reminders
+**MANUAL for now** (parks the cron-gated nudge tail); **multi-language REFUSED** + *More polished
+dashboards* retired (→ *Deliberately not doing*).
+
+**No queued, decided next build — picking one is the first task.** The shape: **Wave B** (email
+chain: invoice-retry → credit-note email, head not cron-gated) → **Wave C** (value-ranked
+independents: convert-trial, upcoming-lessons, book-makeup-from-attendance, edit-history, CSV) →
+**Wave D** (latent traps) → *Later*. Full ranking + reasoning: `BACKLOG.md`.
 
 > **Two follow-ups the referral session filed** (both in `BACKLOG.md`): the "**your reward expires
 > soon**" nudge and any **unprompted parent low-balance email** — both cron-gated, filed beside the
@@ -604,10 +594,13 @@ a fourth time.**
 
 ### Worth deciding, not urgent
 
-**Whether to enable cron.** Both original blockers are long gone (timezone-correct billing
-month, configurable run day) and the engine is per-tenant. Before switching it on: a blocked
-month becomes a *silent stall* rather than a button that refuses, and the block-notification
-email **has still never fired in production**.
+**Whether to enable cron. Revisited 2026-08-16 → STAY MANUAL for now** (the user's call). Both
+original blockers are long gone (timezone-correct billing month, configurable run day) and the
+engine is per-tenant, but manual billing + the WhatsApp click-through queue are working, so cron
+stays off. This is a "not yet", not a refusal — it parks the three scheduled-reminder items
+(unprompted low-balance nudge, automated reminders, referral reward-expiry nudge). Before switching
+it on later: a blocked month becomes a *silent stall* rather than a button that refuses, and the
+block-notification email **has still never fired in production**.
 
 **Dormant but live, so don't rediscover them as bugs:** prepaid packages (Admin → Packages),
 business provisioning (Platform → New business — creating one is immediate and its join code

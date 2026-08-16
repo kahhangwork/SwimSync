@@ -1,6 +1,13 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-15 — **Package renewal automation shipped LIVE** (PRD §7.16 *Renewal
+_Last updated: 2026-08-16 — **Build order re-ranked** after referrals shipped (§8.61 exhausted the
+queue). No rework-critical sequence remains, so this is now decisions + a flat value pool. **Three
+decisions settled with the user:** revenue is **ACCRUAL** (unblocks the owner-only accounting page),
+reminders stay **MANUAL** for now (parks the cron-gated nudge tail), **multi-language REFUSED**
+(→ Deliberately not doing). *More polished dashboards* retired to the same place. New shape: Wave B
+(email chain) → Wave C (value-ranked independents) → Wave D (latent traps) → Later._
+
+_Previously, 2026-08-15 — **Package renewal automation shipped LIVE** (PRD §7.16 *Renewal
 offers*, `docs/DEPLOYMENT.md` §11.22): admin offers + `/package` pay page + Generate-all +
 WhatsApp queue + default packages + Students columns/drawer. Build order exhausted again.
 Two follow-ups filed: the UNPROMPTED parent nudge (behind cron) and bounding
@@ -227,6 +234,14 @@ below, because an unrecorded decision is re-litigated.)_
 | Multiple classes per child? | **Yes, and soon** | **SHIPPED 2026-08-11** as Wave 2 (PRD §7.4). The ranking was right: it dropped `one_active_enrolment_per_student`, and three pieces of code turned out to be correct only because that index held. Everything enrolment-shaped built after this inherits the new model |
 | Native store builds ($99/yr)? | **Not yet — stay web-only** | *Push notifications* stays blocked. **Settled by what shipped 2026-08-09:** the static PayNow QR upload was neither deleted nor hidden — it is **collapsed behind a disclosure and always present**, which keeps the native fallback path alive *and* survives a stored-but-unencodable PayNow ID. Any future native decision inherits that, not a conditional |
 
+#### Three more settled 2026-08-16 (the re-rank after referrals shipped)
+
+| Decision | Answer | Consequence |
+|---|---|---|
+| Revenue: accrual or cash? | **Accrual** — revenue = invoices *issued* in the month | Settles *An owner-only accounting page*'s decide-first question. Sum `invoices` issued that month **plus** `student_settlements.amount where kind='paid_outside'`; do **not** ship a partial figure |
+| Enable cron, or stay manual? | **Manual, for now** | Parks the whole scheduled-reminder tail: *unprompted low-balance nudge*, *automated reminder workflows*, the referral *reward-expiry* nudge. The WhatsApp click-through queue stays the chasing tool. The invoice/credit-note email chain is NOT cron-gated and stays buildable |
+| Multi-language? | **Refused** | Low value for the target base; English-only is enough. Moved to *Deliberately not doing* with a Mandarin-for-pickup revisit trigger. Stops it accruing retrofit tax unranked |
+
 #### Wave 1 — cheap, independent, and inherited by everything after (**COMPLETE**)
 
 **All four chunks are DONE.** Chunk 4 shipped 2026-08-09: `classes.is_active` means
@@ -335,43 +350,63 @@ Actions drawer. **Also discharged** *A Playwright driver for the weeks/holiday p
 ~~**NEXT — Parent referral codes (M)**~~ — **SHIPPED LIVE 2026-08-15** (§8.61, `docs/DEPLOYMENT.md`
 §11.23): migration `20260815000700` + `public-package` v2 + `package-emails` v3 + both apps, on prod,
 grant dump clean, RISK 12 checks 0/0. DORMANT (no business has enabled it).
-**Build order is exhausted again** — pick from *Unordered* or *Later*.
 
-### Unordered — no dependencies, pick by value
+**Build order re-ranked 2026-08-16 after referrals shipped.** No rework-critical sequence remains —
+the queue is now a decision-gated tail plus a flat value pool. Three decisions settled (table above):
+accrual, manual reminders, multi-language refused. The order below: **Wave B** the one real internal
+chain → **Wave C** value-ranked independents → **Wave D** latent traps → **Later** big features →
+deliberately-last. Sections restructured below.
 
-Upcoming-lessons view for parents (S), Maps deep link (S), Moving a student between
-businesses (S), The family-status search client-side scan (S), Better filtering/search (S),
-Export to CSV (S), Tick off swimming skills per child (M), Email-confirmation
-copy/templates (S).
-
-**Three sit here but carry one edge each:**
-
-- **Attendance edit history view** (S) — **its blocker cleared 2026-08-09**: the writers
-  shipped (Wave 1 Chunk 3, `20260809000200`), so `audit_log` now records student edits as
-  well as attendance saves, every row is tenant-stamped, and the reader is buildable. Two
-  things to know before building it: rows written by a backend path carry **no** actor by
-  design, so the screen must render "system" rather than blank; and `prepare_admin_delete()`
-  **used to purge** a deleted admin's rows. **Fixed 2026-08-13 (`20260813000400`): the delete
-  is REFUSED instead**, so the trail no longer has holes from that cause — an admin with any
-  history can only be deactivated. Older holes predating that migration are permanent.
-- **Convert a trial into an enrolled student** (S) and **Book a make-up from the
-  Attendance page** (S) — were held until Wave 2, which changed what an enrolment is.
-  **Wave 2 shipped 2026-08-11, so both are unblocked.** Note for the make-up one: the
-  Attendance page now has to ask WHICH class the make-up replaces when the child has more
-  than one, exactly as the Make-ups page does (PRD §7.20).
-
-### The email / scheduler chain — strict internal order, start any time
+### Wave B — the one genuine internal chain (start any time; head is NOT cron-gated)
 
 **Track invoice-email delivery + retry** (S) establishes the `sent_at` + `IS NULL`
 idempotency pattern in `email.ts` → **Credit-note email notifications** (M) inherits it
-rather than inventing a second one → *then* the cron decision (HANDOVER §9) gates
-**The UNPROMPTED parent low-balance nudge** (S) and **Automated reminder workflows** (M).
+rather than inventing a second.
+
+**The tail is PARKED — manual chosen 2026-08-16.** The cron decision gated *The UNPROMPTED
+parent low-balance nudge* (S) and *Automated reminder workflows* (M) (plus the referral
+reward-expiry nudge); all stay unbuilt while reminders remain manual. Revisit if the WhatsApp
+click-through queue stops scaling.
+
+### Wave C — independent, pick by value (no edges between them)
+
+Ranked by value; build any, in roughly this order:
+
+1. **Convert a trial into an enrolled student** (S) — conversion has no home today; Wave 2
+   (2026-08-11) unblocked it. Reuse the guarded insert Unassigned Children performs.
+2. **Upcoming lessons view for parents** (S) — the most-asked question the app can't answer;
+   point `lib/lessonDates.ts` at the future, don't pre-generate sessions.
+3. **Book a make-up from the Attendance page** (S) — entry point at the natural moment; must
+   ask WHICH class the make-up replaces when the child has >1 (PRD §7.20). Wave 2 unblocked it.
+4. **Attendance edit history view** (S) — dispute resolution; blocker cleared 2026-08-09
+   (`20260809000200`), the delete-purge hole closed 2026-08-13 (`20260813000400`, delete now
+   REFUSED). Render backend-written rows as "system", diff the `to_jsonb` snapshots.
+5. **Export to CSV** (S) — accountant escape hatch; start with invoices.
+
+Lower-value S pool, no order: Maps deep link, Better filtering/search, Moving a student
+between businesses (two silent loose ends), the family-status client-side scan,
+Email-confirmation copy, Tick off swimming skills (M).
+
+### Wave D — latent traps: cheap now, silently worse later
+
+- **A PayNow ID that can't build a QR** (S) — a mistyped UEN/mobile saves clean and the
+  business collects nothing; dry-run `buildPayNowPayload()` at save, advisory only.
+- **`fixtures-trial-onboarding-teardown` deletes invoices it doesn't own** (S) — the next
+  fixture touching invoices trips `credit_notes_invoice_item_id_fkey`.
+- **Sealing a LATER month strands an earlier unsealed one** (S) — moves `markable_floor()`
+  for every business; measure prod first, property-test the matrix.
+- **Bound `recompute_package_extensions`** (S) — scale, not today; verify the resurrection
+  assumption before adding the bound.
+- **`/makeups` and `/trials` 79px date column** (S) — cosmetic; fix the column classes.
+- **`HANDOVER.md` §3 needs graduating** (S) — docs tax; keep the prohibitions +
+  verified-vs-specified, point the rest at the PRD.
 
 ### Later — big features carrying their own dependencies
 
-**An owner-only accounting page (M — *absorbs Revenue reporting*; decide accrual-vs-cash
-first; not a priority per the user 2026-08-08)** — build after the trainee-coach item, or
-its payroll half is written twice. Needs no capability model.
+**An owner-only accounting page (M — *absorbs Revenue reporting*)** — **accrual chosen
+2026-08-16** (revenue = invoices issued that month; sum issued invoices + `paid_outside`
+settlements, no partial figure), and the trainee-coach payroll dependency is **discharged**
+(shipped 2026-08-12). So this now waits on nothing but priority. Needs no capability model.
 **Split co-admin permissions (M)** — *yes eventually*; the accounting page does not wait
 on it. Parent self-enrolment (M — *needs class capacity, which does not exist*),
 Coach-assisted assignment (M), Household split billing (M — *needs a credit-splitting
@@ -379,9 +414,8 @@ rule*), Auto PayNow detection (L — *the CSV-import M is the 10% worth doing fi
 In-app payment gateway (L), Native store builds (M — *deferred; not spending the $99 yet*)
 → Push notifications (M — *blocked by it*), Check the logo for brand collisions (S —
 *before native builds, whenever those happen*), Bulk WhatsApp Cloud API (M — *only on a
-real tenant's request*), Multi-language (M — **decide or refuse it; it is accruing
-retrofit tax unranked**), More polished dashboards (S — *delete
-unless a real question replaces it*).
+real tenant's request*). *(Multi-language and More polished dashboards moved to
+Deliberately not doing 2026-08-16.)*
 
 **Two items are deliberately LAST, and get cheaper by waiting:**
 
@@ -1136,14 +1170,14 @@ is the first concrete thing a co-admin should *not* see, and the reason the answ
   be built whenever it becomes a priority, and it does **not** wait on
   *Split co-admin permissions*. Recording that explicitly, because the two look coupled and
   are not.
-- **This absorbs _Revenue reporting_** as its main content, and inherits that item's
-  decide-first question: **accrual (invoices issued this month) or cash (payments received
-  this month)?** Everything else follows from the answer. It also inherits *do not ship a
-  partial figure* — two sources must be summed, `invoices` **plus**
-  `student_settlements.amount` where `kind = 'paid_outside'`.
-- Wages paid out come from `coach_payouts`, which is already draft→frozen per period.
-  Note the trainee-coach item makes a lesson pay **more than one** coach — build this
-  after it, or the payroll half is written twice.
+- **This absorbs _Revenue reporting_** as its main content. Its decide-first question is
+  **settled: ACCRUAL** (revenue = invoices *issued* that month), chosen with the user
+  2026-08-16. It still inherits *do not ship a partial figure* — two sources must be summed,
+  `invoices` issued that month **plus** `student_settlements.amount` where
+  `kind = 'paid_outside'`.
+- Wages paid out come from `coach_payouts`, which is already draft→frozen per period. The
+  trainee-coach dependency is **discharged** — shadows ship two payout rows already
+  (`20260812000200`), so the payroll half exists and this reads it rather than reinventing it.
 
 ### Split co-admin permissions — **M**
 Restrict what individual co-admins can do — e.g. an assistant who can mark attendance and
@@ -1239,13 +1273,11 @@ numeric-aware, and that columns sort by what is **on screen** rather than what t
 stores. Attendance's filter deliberately keys on class **id, not title**, because two
 classes can share a name.
 
-### More polished dashboards — **S** `[Phase 2]`
-Richer metrics on the admin dashboard.
-
-**Why:** the vaguest item here, and honestly the weakest — it has no specific pain
-behind it. Kept only because the PRD names it. **Delete this item if a real question
-ever replaces it** ("how much am I owed?" would be a better item than "polish the
-dashboard").
+### ~~More polished dashboards~~ — **RETIRED 2026-08-16** `[Phase 2]`
+Richer metrics on the admin dashboard. **Retired with the user 2026-08-16** — the item's own
+standing instruction was "delete if a real question ever replaces it", and none has. No
+specific pain behind it. Moved to *Deliberately not doing*; the concrete money question
+("how much am I owed / did I earn?") is served by *An owner-only accounting page* instead.
 
 ---
 
@@ -1290,14 +1322,11 @@ the user on 2026-08-08, is that **both** real needs are session-level: a tempora
 substitute, and trainees shadowing. A class-level join table would have expressed neither
 and would have been rebuilt.
 
-### Multi-language support — **M** `[MVP-excluded]`
-Beyond English.
-
-**Why:** recorded for completeness. English-only was an explicit MVP decision (§8.1) and
-is a reasonable long-term answer for Singapore.
-
-**Notes:** the honest reason to do this would be Mandarin for grandparents doing pickup
-— which would be a real reason, but nobody has asked.
+### ~~Multi-language support~~ — **REFUSED 2026-08-16** `[MVP-excluded]`
+Beyond English. **Refused with the user 2026-08-16:** low value for the customer base being
+sought, English-only is enough, and it was accruing retrofit tax unranked. Moved to
+*Deliberately not doing*. **Revisit trigger:** Mandarin for grandparents doing pickup, if a
+real tenant asks — that is the one honest reason, and nobody has.
 
 ---
 
@@ -1492,6 +1521,8 @@ Kept so the reasoning doesn't get re-litigated.
 
 | Idea | Why not |
 |---|---|
+| **Multi-language support** | Refused 2026-08-16 with the user: low value for the customer base being sought, English-only is enough, and it was accruing retrofit tax while sitting unranked. English-only was already an explicit MVP call (§8.1) and is a reasonable long-term answer for Singapore. **Revisit only if** a real tenant asks for Mandarin (grandparents doing pickup is the one honest trigger) — a "not yet", not a "never". |
+| **More polished dashboards** | Retired 2026-08-16. Vaguest item in the backlog, no specific pain behind it, kept only because the PRD named it. Its own standing note was "delete if a real question replaces it", and none did. The concrete money question it gestured at is served by *An owner-only accounting page*. Revisit only if a specific metric someone actually asks for replaces "polish the dashboard". |
 | **A blanket `anon` revoke via default privileges** | **Done 2026-08-04 (`20260804000400`) — this row is kept only so the two earlier refusals are not re-litigated as though nothing changed.** Declined 2026-07-21 and again earlier on 2026-08-04, both times on the grounds that it would lock a future function that legitimately needs `anon`. That objection had already expired on 2026-08-02, when `public-invoice` established the standing rule (`docs/ARCHITECTURE.md` §6) that anything public is served by an **edge function, never an anon RPC** — so the case being protected was one the architecture forbids. Doing it also revealed that the statement everyone had in mind (`… IN SCHEMA public REVOKE … FROM PUBLIC`) **succeeds and does nothing** (§7.85), meaning both refusals were declining something that would not have worked anyway. |
 | **A `service_role` usage whitelist** (the `authenticated` treatment, `20260804000600`-style) | **Rejected 2026-08-14 after the 11-call-site audit; the one-liner that WAS worth doing shipped the same day (`20260814000300`, `docs/DEPLOYMENT.md` §11.20).** The `authenticated` argument does not transfer: there the oracle was "no policy could ever permit this", proving 50/148 grants dead — but `service_role` has `rolbypassrls` and no policies, so that oracle returns *everything*. A whitelist would have to come from **actual usage**, and the surface is too big to be worth it: `generate-invoices` alone reads 21 of 37 tables and writes 8, and the ~dozen a whitelist would exclude are all tables a future feature plausibly reaches from the engine or an admin route — with `permission denied` **inside the invoice engine** as the failure mode. The exposure is already bounded by the **secret key** (Vercel/Supabase env only, never a browser), and a whitelist would not defend the real worst case: a leaked key holding `auth.admin.deleteUser`/`updateUserById`, which are not table grants and no `GRANT` restrains. So: don't build the whitelist; the audit table (a 2026-08-10 snapshot, regenerate don't trust) is the input if it is ever revisited anyway. **Do not extend `table_grants.test.sql` to cover `service_role`** — it asserts "no privilege where no policy could permit", which `bypassrls` makes inexpressible (§7.87). |
 | **Making the Students page's "All" tab mean active-only** | Considered 2026-07-26 so the header count would always equal the visible rows, and declined **with the user**: it would hide departed children from the default view and change behaviour people rely on. The header therefore deliberately describes a **subset** of the rows, and the `· N inactive` suffix is what explains the gap. **Do not "fix" the mismatch** — it is the honest reading. (`lib/studentCounts.ts`.) |
