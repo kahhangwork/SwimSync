@@ -1,14 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-16 — **Backlog RE-RANKED** after the referral queue drained (§8.62, docs only).
-No rework-critical sequence left; the queue is now decisions + a flat value pool. Three settled with
-the user: revenue **ACCRUAL**, reminders **MANUAL for now**, **multi-language REFUSED** (+ dashboards
-retired) — all in `BACKLOG.md`. Live product state UNCHANGED. Next: pick a Wave C item (§9)._
+_Last updated: 2026-08-16 — **Invoice-email delivery tracking + retry SHIPPED LIVE** (§8.63).
+Re-running generate-invoices re-sends only invoice emails that never went out — even on a sealed
+month, no duplicate, via a per-invoice atomic claim; suspended/auto-disabled tenants skipped. Prod
+migration `20260816000100` + `generate-invoices` v23; backfill 0-unsent, grant dump clean.
+**DORMANT** (0 unsent on prod). PRD §7.7 · `docs/DEPLOYMENT.md` §11.24. Next: a Wave B/C item (§9)._
 
-_Previously, 2026-08-15 — **Parent REFERRAL CODES shipped LIVE** (§8.61): `REF-` join code, double-
-sided package discount (friend's first + referrer's later, FIFO, tenant %/$ + per-product override,
-same-household guard), admin Referrals page, earn-email. First PRICE modifier — moves `amount_payable`,
-never `total_value`. On prod, grant dump clean, RISK 12 0/0. **DORMANT**. PRD §7.16 · `docs/DEPLOYMENT.md` §11.23._
+_Previously, 2026-08-16 — **Backlog RE-RANKED** after the referral queue drained (§8.62, docs only):
+revenue **ACCRUAL**, reminders **MANUAL for now**, **multi-language REFUSED** (+ dashboards retired);
+Wave B → C → D → Later. Live product state unchanged. `BACKLOG.md`._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -310,9 +310,9 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **Production was fully caught up as of 2026-08-14**, through `20260814000300`. THREE edge functions exist: `generate-invoices`,
-> `package-emails` (verify_jwt ON) and **`public-invoice` (verify_jwt false, deliberately —
-> the invoice token is the access control)**. *(Version numbers used to be written here and
+> **Production was fully caught up as of 2026-08-16**, through `20260816000100`. FOUR edge functions exist: `generate-invoices`,
+> `package-emails` (verify_jwt ON), **`public-invoice`** and **`public-package`** (both verify_jwt false,
+> deliberately — the token is the access control). *(Version numbers used to be written here and
 > went stale twice. `supabase functions list` and `supabase migration list --linked` are the
 > honest answers; this sentence is a hint.)*
 
@@ -377,6 +377,26 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.63 (2026-08-16) — INVOICE-EMAIL DELIVERY TRACKING + RETRY, SHIPPED LIVE
+
+**Wave B head; backend-only, no `core.ts` and no app change** (`a0b502c`). A dropped invoice email
+now self-heals: re-running generate-invoices for a (tenant, month) re-sends only the invoices whose
+email never went out — **even on a sealed month** (`already_complete` path) — with no duplicate. New
+nullable `invoices.invoice_email_sent_at`; the happy path stamps on success; `retryUnsentInvoiceEmails`
+claims each unsent invoice ONE at a time (atomic conditional UPDATE — concurrency-safe, and per-invoice
+so a mid-run crash strands at most one), rebuilds the email from `invoices`+`invoice_items`, sends,
+resets on failure; the handler skips suspended/auto-disabled tenants (`shouldRetryTenantEmails`).
+
+Built `/plan-with-confidence` → `/plan-review` (a 2nd agent ranked 10 product risks, folded into the
+plan) → `/commit-review` (a 2nd agent's two findings — batch-claim tail-drop, swallowed items-fetch —
+fixed before commit). Verified Deno **169 ×2**, `deno check`, `supabase test db` green bar the
+pre-existing `coach_disable` date-flake; prove-red done. **SHIPPED LIVE 2026-08-16**, backend-first:
+RISK 2 prod count (7 invoices, all July, all paid → blanket backfill) → migration `20260816000100` →
+`generate-invoices` **v23** → grant dump clean. **DORMANT** — 0 unsent on prod, so retry has re-sent
+nothing; first firing is the August run (early Sept). Two gotchas **§7.170–§7.171**. Plan
+`docs/plans/INVOICE_EMAIL_RETRY_PLAN.md` · PRD §7.7 · `docs/DEPLOYMENT.md` §11.24 · `docs/TESTING.md`
+§5. Crash-safe-claim follow-up in `BACKLOG.md`.
+
 ## 8.62 (2026-08-16) — BACKLOG RE-RANKED after the referral queue drained (docs only, no code)
 
 `/backlog-prioritisation` after §8.61 exhausted `## Build order`. Finding: **no rework-critical
@@ -391,39 +411,8 @@ doing* with revisit triggers. Build order reshaped: **Wave B** (email chain, hea
 title drift (read "NOT YET DEPLOYED"; it shipped). No migration, no PRD change. Full ranking +
 reasoning: `BACKLOG.md → ## Build order`; next steps in §9.
 
-## 8.61 (2026-08-15) — PARENT REFERRAL CODES, SHIPPED LIVE (all 4 phases)
-
-**The first PRICE modifier in SwimSync, built end to end across Phases 1–4** (`71056d7`…`652aa35`,
-all on `main` **locally**). A **referral code** is a second kind of join code (`REF-XXXXX`) minted
-per `parent_tenants` membership; entering it at join records a **referral** and mints the friend's
-first-package discount, and the **referrer** earns a discount on a LATER package when the friend's
-first package goes active — **double-sided, FIFO-queued, once per referred family**. The discount is
-a tenant **%/$** default + optional **per-product override** (`0` = explicit opt-out), applied by ONE
-source (`preview_package_price`/`apply_referral_reward`) so the Generate-all preview, the WhatsApp
-price and the `/package` headline are byte-identical. It moves `amount_payable` only — `total_value`
-/ `value_remaining` / invoice netting never change (D14). Admin **Referrals** page (settings +
-referrals/rewards lists + Grant/Void/Disable); parent **Billing** shows the code (per business) +
-share + rewards + referred friends (first names). **Same-household guard** (shared student/phone/
-postal ⇒ no reward). Full design + 16 mitigations: **`docs/plans/REFERRAL_PLAN.md`**. Behaviour:
-**PRD §7.16 *Referral discounts***.
-
-**Six gotchas graduated (§7.164–§7.169):** an FK from a BEFORE INSERT trigger must be DEFERRABLE;
-a BEFORE-reserved resource is invisible to the AFTER trigger (resolve the handoff in the BEFORE
-predicate + guard the release on `reserved_package_id = OLD.id`); a discount is a price concept, not
-a value concept (two client price surfaces — the in-app QR AND the pay page); two BEFORE INSERT
-triggers run alphabetically (`trg_zz_*` sorts last); a `RETURNS TABLE` change is a security event
-(DROP eats the ACL, cloud re-grants anon); RLS hides other families' codes from a role-scoped probe
-(capture into a non-RLS temp table first). Rollback DOWN committed + **rehearsed** (UP→DOWN restores
-the three replaced functions byte-identical). Verified: pgTAP **referrals 57**, full suite green bar
-the pre-existing `coach_disable` date-flake; Deno **160 ×2**; admin vitest **381**; app jest **367**;
-`verify-referrals` **13/13** (incl. the RISK 7 three-way price identity). **SHIPPED LIVE 2026-08-15**
-— backend-first, no revert dance: migration `…000700` → `public-package` v2 + `package-emails` v3 →
-grant dump clean (RISK 8 held through the `join_tenant_by_code` DROP+recreate) → apps to `main`
-(bundle grep confirmed) → RISK 12 checks **0/0**. Full deploy record: **`docs/DEPLOYMENT.md` §11.23**.
-**DORMANT** — no business has `referral_enabled`, so nothing has fired on real data. Suites: `docs/TESTING.md` §5.
-
-*(§8.60 — package RENEWAL AUTOMATION, SHIPPED LIVE — and §8.59, weeks/holiday-extension packages —
-both moved to the ledger, `docs/SESSIONS.md`, when §8.62 landed.)*
+*(§8.61 — parent REFERRAL CODES, SHIPPED LIVE — moved to the ledger, `docs/SESSIONS.md`, when §8.63
+landed; along with §8.60 package renewal automation and §8.59 weeks/holiday packages before it.)*
 
 ---
 
@@ -502,29 +491,22 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE CURRENT BUILD — queue re-ranked 2026-08-16; NO decided next build
+### THE CURRENT BUILD — invoice-email retry SHIPPED LIVE 2026-08-16 (§8.63)
 
-Referral codes shipped LIVE (§8.61), draining `BACKLOG.md → ## Build order`. `/backlog-prioritisation`
-re-ranked what remains: **no rework-critical sequence left**, so it is decisions + a flat value pool.
-**Three decisions settled with the user** (recorded in the BACKLOG decisions table): revenue
-**ACCRUAL** (unblocks the owner-only accounting page, trainee-coach dependency discharged); reminders
-**MANUAL for now** (parks the cron-gated nudge tail); **multi-language REFUSED** + *More polished
-dashboards* retired (→ *Deliberately not doing*).
+This session built + deployed the Wave B head — **invoice-email delivery tracking + retry** (§8.63,
+`docs/DEPLOYMENT.md` §11.24). **DORMANT**: 0 unsent invoices on prod, so retry has re-sent nothing;
+first firing is the August billing run (early Sept).
 
-**No queued, decided next build — picking one is the first task.** The shape: **Wave B** (email
-chain: invoice-retry → credit-note email, head not cron-gated) → **Wave C** (value-ranked
-independents: convert-trial, upcoming-lessons, book-makeup-from-attendance, edit-history, CSV) →
-**Wave D** (latent traps) → *Later*. Full ranking + reasoning: `BACKLOG.md`.
+**Pick the next build** — the queue was re-ranked 2026-08-16 with **no rework-critical sequence left**:
+**Wave B remaining head = Credit-note email notifications** (M; inherits the retry idempotency pattern)
+→ **Wave C** (value-ranked independents: convert-trial, upcoming-lessons, book-makeup-from-attendance,
+edit-history, CSV) → **Wave D** (latent traps) → *Later*. Full ranking + the three settled decisions
+(revenue **ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**): `BACKLOG.md`.
 
-> **Two follow-ups the referral session filed** (both in `BACKLOG.md`): the "**your reward expires
-> soon**" nudge and any **unprompted parent low-balance email** — both cron-gated, filed beside the
-> earlier low-balance nudge. (The earlier package follow-up — bounding `recompute_package_extensions`
-> — still stands.)
-
-**Nothing to do first** — the feature is verified live (grant dump + parent bundle grep + admin
-`/referrals` 200 + RISK 12 0/0). It is **DORMANT**: no business has `referral_enabled`, so no code,
-reward, conversion or same-household guard has fired on real data. First firing is the first business
-that turns it on.
+> **Cron-gated follow-ups parked in `BACKLOG.md`** (reminders stay manual): reward-expiry nudge,
+> unprompted low-balance email, automated reminders. Plus the new **crash-safe invoice-email retry**
+> item (eliminate the one-invoice claim window — §8.63) and the earlier `recompute_package_extensions`
+> bound.
 
 ### Triage rules, when the sweep does redden
 
@@ -546,12 +528,11 @@ that turns it on.
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260815000700` (referrals, §8.61);
-production confirmed caught up 2026-08-15 via `supabase migration list --linked`, `remote` filled.
-**§8.61 is the freshest worked example of the ordering gate done RIGHT** (backend
-to prod first, apps last — no revert dance, unlike §8.59 which got it wrong; `docs/DEPLOYMENT.md`
-§11.21 vs §11.22). The rule stands: migrations to prod (engine too when `core.ts` changes — it did
-NOT for referrals) FIRST, apps to `main` LAST.
+**The migration queue is EMPTY.** The latest applied is `20260816000100` (invoice-email retry, §8.63);
+production confirmed caught up 2026-08-16 via `supabase migration list --linked`, `remote` filled.
+**§8.63 is the freshest worked example of a backend-only deploy done RIGHT** (RISK-2 prod count →
+migration → edge fn v23 → grant dump, no app change; `docs/DEPLOYMENT.md` §11.24). The rule stands:
+migrations to prod (engine too when `core.ts` changes — it did NOT for retry) FIRST, apps to `main` LAST.
 §7.123 still applies to signatures. Whatever comes next: still one at
 a time (§7.55), a worktree never authors one, and budget the post-deploy grant check (§7.39,
 §7.89) **and** the rollback rehearsal (§7.93 — running the DOWN file is the half that finds the

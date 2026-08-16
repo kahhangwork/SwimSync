@@ -127,8 +127,14 @@ auto/manual completeness gate, the `auto_invoice_enabled` switch, FIFO credit ap
 **11.1** leap-year last-day / month-boundary billing, **11.7** credit-exceeds-invoice
 carry-forward (+ ledger invariants via `checkInvariants`), plus `result.created` shape and
 two **stack-backed invoice-email orchestration** tests (recipients resolved from the DB;
-no-op without a key). **Email** (`email.test.ts`): pure HTML builder + `sendInvoiceEmail`
-(no-op without key, mocked-fetch success/failure, HTML escaping). **Dates**
+no-op without a key), and (added 2026-08-16 §8.63) **invoice-email retry** — a successful send
+stamps `invoice_email_sent_at`; a dropped send self-heals on a sealed-month re-run exactly once
+(no duplicate); a failed retry resets to unsent (retryable); a pre-stamped/backfilled row is
+never re-emailed; two concurrent retries send each invoice at most once (atomic claim);
+`excludeIds` holds this run's fresh invoices out. **Email** (`email.test.ts`): pure HTML builder
++ `sendInvoiceEmail` (no-op without key, mocked-fetch success/failure, HTML escaping), plus
+`shouldRetryTenantEmails` (suspended never retried; auto-disabled skipped on auto, allowed on
+manual). **Dates**
 (`dates.test.ts`, 5): `previousBillingMonth`/`dateInTimeZone` — the SGT day-boundary
 regression (1 Aug 00:30 SGT bills July, **fails on the old UTC path**), year rollover, and
 the `APP_TIMEZONE` seam (UTC vs SGT diverge at the boundary).

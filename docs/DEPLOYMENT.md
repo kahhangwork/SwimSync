@@ -522,3 +522,19 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     byte-identical). **Dormant on prod:** no business has `referral_enabled`, so no code, reward,
     conversion or same-household guard has fired on real data — first firing is the first business
     that turns it on. Six gotchas: §7.164–§7.169.
+
+24. **Deploy record (2026-08-16): invoice-email delivery tracking + retry** (§8.63). Backend-only,
+    no `core.ts` change, no app change. Order followed: (1) **RISK 2 read-only count on prod** —
+    `invoices` held exactly 7 rows, all `2026-07`, all `paid` → blanket backfill confirmed
+    correct (re-emailing a settled invoice is noise). (2) **Migration** `20260816000100`
+    (`supabase db push`) — nullable `invoices.invoice_email_sent_at` + blanket back-stamp to
+    `generated_at`; the pgdelta cert stack trace printed alongside `Finished` again (§7.55, normal).
+    `migration list --linked` shows `remote` filled; `invoice_email_sent_at IS NULL` = **0**;
+    all 7 stamped `= generated_at`. (3) **Grant dump (RISK 8) clean** — `invoices` grants
+    unchanged (`authenticated` SELECT,UPDATE · `service_role` full · no `anon`); no grant added.
+    (4) **Edge function** `supabase functions deploy generate-invoices` → **version 23 ACTIVE**
+    (verify_jwt false). **Rollback cover:** committed DOWN
+    (`supabase/rollback/20260816000100_invoice_email_sent_at_DOWN.sql`), rehearsed UP→DOWN→UP
+    locally. **Dormant on prod:** 0 unsent invoices, so retry has re-sent nothing — first firing
+    is the first real dropped send (next: the August run, early September). Two gotchas:
+    §7.170–§7.171. Plan: `docs/plans/INVOICE_EMAIL_RETRY_PLAN.md`.

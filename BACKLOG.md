@@ -359,12 +359,10 @@ deliberately-last. Sections restructured below.
 
 ### Wave B — the one genuine internal chain (start any time; head is NOT cron-gated)
 
-**Track invoice-email delivery + retry** (S) — **BUILT, code on `main`, pending edge-fn deploy**
-(2026-08-16; migration `20260816000100` + `retryUnsentInvoiceEmails`, plan
-`docs/plans/INVOICE_EMAIL_RETRY_PLAN.md`). It established the `invoice_email_sent_at` +
-per-invoice atomic-claim retry pattern, which **Credit-note email notifications** (M) now
-inherits rather than inventing a second. **Credit-note emails is the remaining head of the
-chain.**
+*Invoice-email delivery + retry SHIPPED LIVE 2026-08-16 (PRD §7.7, `docs/DEPLOYMENT.md` §11.24),
+establishing the `invoice_email_sent_at` + per-invoice atomic-claim pattern.* **The remaining
+head is now Credit-note email notifications** (M) — it inherits that idempotency pattern rather
+than inventing a second.
 
 **The tail is PARKED — manual chosen 2026-08-16.** The cron decision gated *The UNPROMPTED
 parent low-balance nudge* (S) and *Automated reminder workflows* (M) (plus the referral
@@ -1100,26 +1098,19 @@ firing from the trigger, or a Supabase DB webhook → a small endpoint that send
 **Reuse `email.ts`** (builders + `sendInvoiceEmail`, HANDOVER §8c) once building. Guard
 idempotency — the trigger can fire per edit.
 
-### Track invoice-email delivery + retry — **S** — BUILT (pending edge-fn deploy)
-**Shipped to `main` 2026-08-16** (migration `20260816000100` + `retryUnsentInvoiceEmails` in
-`email.ts`). Re-running generate-invoices for a (tenant, month) re-sends only the unsent
-invoice emails — **even on a sealed month** — with no duplicate, via a per-invoice ATOMIC
-CLAIM. (Not the original `IS NULL`-filter-on-`created` sketch below, which does nothing on a
-sealed month because generation creates no rows to filter.) Suspended/auto-disabled tenants
-are skipped. Full design + risk mitigations: `docs/plans/INVOICE_EMAIL_RETRY_PLAN.md`.
-**Not yet deployed** — the edge function ships separately from a git push; the RISK 2 backfill
-decision is made against the prod invoice count at `db push` time, and PRD §7.7 updates when it
-goes live (the current PRD line "only newly-created invoices are emailed" becomes false then).
+### Crash-safe invoice-email retry (eliminate the one-invoice claim window) — **S**
+The shipped retry (SHIPPED LIVE 2026-08-16 — PRD §7.7) uses the boolean `invoice_email_sent_at`
+as BOTH the claim and the sent-marker: it claims one invoice, sends it, resets on failure. A
+crash/timeout in the ~one-invoice window between claim and send silently drops that single
+invoice's email.
 
-**Why it was built:** the invoice email is **best-effort** — a Resend hiccup silently drops a
-parent's notification and the coach chases a bill they never heard about.
+**Why:** invoice email is best-effort, but a silent drop still means a parent never hears about
+a bill. Today bounded to one in-flight invoice and low-volume, so low-priority.
 
-**Follow-up (unbuilt, low-priority):** the retry uses the boolean `invoice_email_sent_at` as
-BOTH the claim and the sent-marker, so a crash/timeout in the ~one-invoice window between claim
-and send can silently drop that single invoice's email. Eliminating the residual window needs a
-separate `claimed_at` column or a per-scope advisory lock (so a crash-safe send-then-stamp
-ordering is safe under concurrency). Bounded to one invoice and best-effort by design, so cheap
-to leave.
+**Notes:** eliminating the residual window needs a separate `claimed_at` column (or a per-scope
+advisory lock) so a crash-safe send-then-stamp ordering is safe under concurrency — a boolean
+column cannot be both claim and sent-marker. Design + why the per-invoice claim was chosen:
+`docs/plans/INVOICE_EMAIL_RETRY_PLAN.md` (⚠ RISK 1).
 
 ### One-click bulk WhatsApp sends (Cloud API) — **M** `[Phase 3]`
 Send the payment reminder to every unpaid parent with ONE click, server-side, instead

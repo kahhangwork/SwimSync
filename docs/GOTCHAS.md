@@ -2775,3 +2775,21 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `join_tenant_by_code(NULL)` raised "enter a join code" instead of the anti-probing "not
     recognised". The fix: capture the needed codes into a NON-RLS temp table as `postgres` BEFORE
     switching roles, and `GRANT SELECT` the temp helpers to `authenticated`. (§8.61)
+
+170. **A re-run of `generate-invoices` on a SEALED month is no longer a no-op — it RE-SENDS any
+    invoice email that never went out.** Since 2026-08-16 the handler runs
+    `retryUnsentInvoiceEmails` per (tenant, month) AFTER generation, on the `already_complete`
+    path too. Anyone reasoning "sealed month ⇒ nothing happens" or "re-running generate is inert"
+    is now wrong for email: a parent whose earlier send failed WILL be emailed on the next run.
+    It never double-sends (per-invoice atomic claim then stamp), resets a failed send back to
+    unsent, and skips suspended/auto-disabled tenants. Plan:
+    `docs/plans/INVOICE_EMAIL_RETRY_PLAN.md`. (§8.63)
+
+171. **A completeness backfill on a best-effort DELIVERY column can permanently seal genuine
+    misses — scope it against real data, never blanket by reflex.** Back-stamping every existing
+    invoice as "email sent" when adding `invoice_email_sent_at` would mark as done any invoice
+    whose best-effort send had silently failed since the email path shipped (2026-07-16) — the
+    exact misses the retry exists to heal. Blanket was correct HERE only because the prod count
+    showed all 7 existing invoices PAID (a paid invoice needs no re-email). The rule generalizes
+    to any future delivery-tracking column: run the count, decide the WHERE clause against it.
+    Plan ⚠ RISK 2. (§8.63)

@@ -1289,10 +1289,15 @@ no clue which one is asking. SwimSync appears only in the footer, as the sending
 platform. The message is (line items + gross/credit/net; a fully
 credit-covered invoice gets a "nothing to pay" variant). Delivery is **best-effort and
 isolated from billing** — it runs after the invoice is committed, via the Resend HTTP API,
-and a send failure never affects invoice generation. Only newly-created invoices are
-emailed, so re-running generation never double-sends. *Credit-note* emails are not yet sent
-(a separate path — see §7.8). **Live in production since 2026-07-16** (Edge Function deployed
-+ `RESEND_API_KEY` secret set); the first real send is the 1 Aug generation.
+and a send failure never affects invoice generation. Every successful send is stamped, and
+**re-running generation for a month re-sends only the invoices whose email never went out —
+even on a sealed month — with no duplicate** to anyone who already received theirs
+*(implemented 2026-08-16: a Resend hiccup previously dropped a parent's notification silently
+with no record; the retry self-heals on the next run via a per-invoice atomic claim, and
+skips suspended/auto-disabled tenants — see §7.7 and `docs/DEPLOYMENT.md` §11.24)*.
+*Credit-note* emails are not yet sent (a separate path — see §7.8). **Live in production
+since 2026-07-16** (Edge Function deployed + `RESEND_API_KEY` secret set); the first real
+send is the 1 Aug generation, and delivery-tracking/retry went live 2026-08-16.
 
 ### 7.8 Credit Note Management
 
