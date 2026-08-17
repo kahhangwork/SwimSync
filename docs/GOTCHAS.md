@@ -2869,9 +2869,12 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     nor the admin's product catalogue mentions those columns, and both stopped working
     anyway: with two relationships available PostgREST refuses to choose and answers
     **PGRST201 on the WHOLE query**, not on the one ambiguous embed. Both call sites did
-    `?? []`, so for two days no parent could buy a package and no admin could see their own
-    catalogue, with no error anywhere. **Adding a column can break a query that does not
-    name it.** After any migration that adds an FK, run the ambiguity check —
+    `?? []`, so for two days the parent's "Buy a package" list and the admin's catalogue
+    rendered empty, with no error anywhere. **Adding a column can break a query that does not
+    name it.** *(It cost nothing in the end — prod held 0 `package_products`, so both lists
+    were correctly empty regardless. Note what that means for detection: **the blast radius
+    of this class of bug is invisible until the data exists**, so the dormant feature you
+    are not watching is exactly where it hides until first use.)* After any migration that adds an FK, run the ambiguity check —
     `pg_constraint` grouped by table pair, `HAVING count(*) > 1` — and qualify every embed
     on a pair it returns as `table!fkey_name(cols)`. **Fix them ALL at once:** PostgREST
     reports only the first, so `class_categories` was qualified, the query re-run, and it

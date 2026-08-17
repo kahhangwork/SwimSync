@@ -2,10 +2,10 @@
 
 _Last updated: 2026-08-17 (second session) — **CI and the nightly were BOTH red and nobody had
 looked** (§8.65). CI failed **every push for 20 commits** on one expired fixture date; the nightly
-had 3 of 45 drivers red for 3 nights, and underneath the noise sat a **LIVE regression: no parent
-could buy a package and no admin could see their catalogue** since 2026-08-15 (PGRST201 embed
-ambiguity from the default-packages FKs). Both fixed and pushed — `2c16be9`, `2c83573`. **No
-migration, no deploy needed beyond Vercel.** §7.176–178. Next: **Wave C** (§9)._
+had 3 of 45 drivers red for 3 nights, and underneath the noise sat a **LIVE regression** since
+2026-08-15 — PGRST201 embed ambiguity emptied the package catalogue in BOTH apps. **Latent, not
+costly: prod has 0 `package_products`**, so nothing was for sale to lose. Fixed and deploy-verified
+— `2c16be9`, `2c83573`. **No migration.** §7.176–178. Next: **Wave C** (§9)._
 
 _Previously, 2026-08-17 — **Credit-note email notifications SHIPPED LIVE** (§8.64), which
 **exhausts Wave B**. A post-invoice correction now emails the parent; the admin resends a miss from
@@ -398,9 +398,11 @@ from `today_sg()` — §7.177 has the boundary trap that makes the obvious spell
 **The nightly: 3 of 45 red for 3 nights, and the noisy one hid the real one.** A deliberate
 page-count pin nobody bumped (§7.178) sat on top of **`PGRST201`**:
 `20260815000600_default_packages` added FKs back to `package_products`, making two embeds
-ambiguous, and PostgREST refuses the *whole* query — so since 2026-08-15 **no parent could buy a
-package and no admin could see their own catalogue**, silently, because both sites did `?? []`
-(§7.176). Fixing it exposed 3 more stale assertions the dead driver had hidden, all from
+ambiguous, and PostgREST refuses the *whole* query — so since 2026-08-15 the parent's "Buy a
+package" list and the admin's catalogue both rendered EMPTY, silently, because both sites did
+`?? []` (§7.176). **Latent, not costly** — a signed-in check on 2026-08-17 showed prod holds **0
+`package_products`**, so both lists were correctly empty anyway and no sale was lost; it also
+confirmed the fix (HTTP 200, was 300). Fixing it exposed 3 more stale assertions, all from
 start-date sequencing (⚠ RISK 2: a family that already topped up is deliberately not "low").
 Third was `parent-claim` — c009945 renames a confirmed claim to the parent's own words.
 
