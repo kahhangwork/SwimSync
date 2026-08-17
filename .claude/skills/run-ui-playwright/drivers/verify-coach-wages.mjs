@@ -47,7 +47,7 @@ INSERT INTO attendance (lesson_session_id, student_id, status, marked_by) VALUES
     await page.waitForTimeout(2000);
     let body = await page.evaluate(() => document.body.innerText);
 
-    check("wages page renders", body.includes("Coach Wages"), "");
+    check("wages page renders", body.includes("Wages"), "");
     check(
       "a coach with no rate is shown as not on payroll",
       body.includes("Not on payroll"),

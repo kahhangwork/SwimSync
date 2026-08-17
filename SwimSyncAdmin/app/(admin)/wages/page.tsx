@@ -530,7 +530,7 @@ export default function WagesPage() {
   if (!tenantId) {
     return (
       <div>
-        <PageHeader title="Coach Wages" subtitle="Pay your coaches from attendance" />
+        <PageHeader title="Wages" subtitle="Pay your coaches from attendance" />
         <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600">
           Wages are run per business, and your account is not attached to one.
         </div>
@@ -541,7 +541,7 @@ export default function WagesPage() {
   return (
     <div>
       <PageHeader
-        title="Coach Wages"
+        title="Wages"
         subtitle="Calculated from the lessons your coaches actually taught"
       />
 
@@ -582,7 +582,7 @@ export default function WagesPage() {
           A lesson pays when at least one student attended. Everyone absent
           doesn&rsquo;t pay; a lesson the coach cancelled never does. Rain
           follows the setting above, and any single session can be overridden.
-          Where a lesson was covered or shadowed (see Lesson Coaches), each
+          Where a lesson was covered or shadowed (see Substitutes), each
           coach is paid their own rate and the coach they replaced is paid
           nothing for it — expand a payout below to see which lessons those are.
         </p>

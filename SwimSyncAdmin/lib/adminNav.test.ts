@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { NAV, navFor, hasTenant, landingRoute, scopeForPath } from "./adminNav";
+import {
+  NAV,
+  navFor,
+  hasTenant,
+  landingRoute,
+  scopeForPath,
+  groupedNavFor,
+  groupIdForPath,
+  NAV_GROUPS,
+  TOP_LEVEL_HREFS,
+} from "./adminNav";
 
 // The seeded production shape: the real coach holds tenant_admin AND a coaches
 // row (a tenant of one). These tests exist mostly to pin that they are treated
@@ -39,7 +49,7 @@ describe("navFor", () => {
     expect(hrefs).toContain("/holidays");
     expect(hrefs).toContain("/claims");
     expect(hrefs).toContain("/admins");
-    expect(hrefs).toContain("/lesson-coaches");
+    expect(hrefs).toContain("/substitutes");
     expect(hrefs).not.toContain("/platform");
   });
 
@@ -134,5 +144,91 @@ describe("Make-ups", () => {
 
   it("is NOT offered to the platform admin", () => {
     expect(navFor(null).map((i) => i.href)).not.toContain("/makeups");
+  });
+});
+
+describe("sidebar grouping (presentation layer over NAV)", () => {
+  const groupHrefs = NAV_GROUPS.flatMap((g) => g.hrefs);
+  const navHrefs = new Set(NAV.map((n) => n.href));
+
+  it("every group href is a real NAV entry (no dangling href drops a page)", () => {
+    for (const href of groupHrefs) expect(navHrefs.has(href)).toBe(true);
+  });
+
+  it("no href is claimed by two groups, or by a group AND the top level", () => {
+    const all = [...groupHrefs, ...TOP_LEVEL_HREFS];
+    expect(new Set(all).size).toBe(all.length);
+  });
+
+  it("partitions the tenant nav with nothing lost or duplicated", () => {
+    // The grouped twin of navFor's "none is orphaned" test: topLevel + every
+    // group item together must equal navFor(A_TENANT) exactly.
+    const g = groupedNavFor(A_TENANT);
+    const seen = [
+      ...g.topLevel.map((n) => n.href),
+      ...g.groups.flatMap((x) => x.items.map((n) => n.href)),
+    ];
+    expect(seen.length).toBe(navFor(A_TENANT).length);
+    expect(new Set(seen)).toEqual(new Set(navFor(A_TENANT).map((n) => n.href)));
+  });
+
+  it("EVERY tenant page has a deliberate home — top-level or a group", () => {
+    // The fail-safe pin: adding page #21 without deciding its home leaves it in
+    // topLevel, which is fine to SHIP but must be a conscious choice. This test
+    // (like navFor's count-of-20) makes an accidental addition visible.
+    const homed = new Set([...groupHrefs, ...TOP_LEVEL_HREFS]);
+    const orphans = navFor(A_TENANT)
+      .map((n) => n.href)
+      .filter((href) => !homed.has(href));
+    expect(orphans).toEqual([]);
+  });
+
+  it("leads the top level with the four daily pages, in order", () => {
+    const g = groupedNavFor(A_TENANT);
+    expect(g.topLevel.slice(0, 4).map((n) => n.href)).toEqual([
+      "/dashboard",
+      "/students",
+      "/classes",
+      "/attendance",
+    ]);
+  });
+
+  it("gives a platform admin one top-level Platform link and no groups", () => {
+    const g = groupedNavFor(null);
+    expect(g.topLevel.map((n) => n.href)).toEqual(["/platform"]);
+    expect(g.groups).toEqual([]);
+  });
+
+  it("renders nothing while the tenant is still unresolved", () => {
+    // Mirrors the Sidebar guard: undefined means "not looked up yet", and
+    // navFor(undefined) would otherwise return the platform link and flash it.
+    // groupedNavFor is not called with undefined by the component, but confirm
+    // the group set is empty so an accidental call cannot show a stray header.
+    const g = groupedNavFor(undefined);
+    expect(g.groups).toEqual([]);
+  });
+});
+
+describe("groupIdForPath (auto-expand the active group)", () => {
+  it("maps a page to its group", () => {
+    expect(groupIdForPath("/invoices")).toBe("billing");
+    expect(groupIdForPath("/claims")).toBe("families");
+    expect(groupIdForPath("/holidays")).toBe("scheduling");
+    expect(groupIdForPath("/history")).toBe("settings");
+  });
+
+  it("opens the group for a detail route", () => {
+    expect(groupIdForPath("/invoices/abc-123")).toBe("billing");
+  });
+
+  it("returns null for a top-level page or the platform link", () => {
+    expect(groupIdForPath("/dashboard")).toBeNull();
+    expect(groupIdForPath("/students")).toBeNull();
+    expect(groupIdForPath("/platform")).toBeNull();
+  });
+
+  it("does not let a prefix collision open the wrong group", () => {
+    // "/invoicesish" must not match "/invoices".
+    expect(groupIdForPath("/invoicesish")).toBeNull();
   });
 });

@@ -61,14 +61,14 @@ export type NavItem = {
 // not exist on the type and nothing complained.
 export const NAV: readonly NavItem[] = [
   { href: "/dashboard",    label: "Dashboard",            icon: LayoutDashboard, scope: "tenant"   },
-  { href: "/unassigned",   label: "Unassigned Children",  icon: UserX,           scope: "tenant"   },
+  { href: "/unassigned",   label: "Unassigned",           icon: UserX,           scope: "tenant"   },
   { href: "/classes",      label: "Classes",              icon: Layers,          scope: "tenant"   },
   { href: "/students",     label: "Students",             icon: Users,           scope: "tenant"   },
   { href: "/claims",       label: "Parent Requests",      icon: UserCheck,       scope: "tenant"   },
-  { href: "/levels",       label: "Swimming Levels",      icon: Waves,           scope: "tenant"   },
+  { href: "/levels",       label: "Levels",               icon: Waves,           scope: "tenant"   },
   { href: "/parents",      label: "Parents",              icon: UsersRound,      scope: "tenant"   },
   { href: "/attendance",   label: "Attendance",           icon: CalendarCheck,   scope: "tenant"   },
-  { href: "/lesson-coaches", label: "Lesson Coaches",     icon: ArrowLeftRight,  scope: "tenant"   },
+  { href: "/substitutes",  label: "Substitutes",          icon: ArrowLeftRight,  scope: "tenant"   },
   { href: "/trials",       label: "Trials",               icon: Sparkles,        scope: "tenant"   },
   { href: "/makeups",      label: "Make-ups",             icon: RefreshCcw,      scope: "tenant"   },
   { href: "/invoices",     label: "Invoices",             icon: Receipt,         scope: "tenant"   },
@@ -78,7 +78,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/credit-notes", label: "Credit Notes",         icon: FileText,        scope: "tenant"   },
   { href: "/coaches",      label: "Coaches",              icon: UserCog,         scope: "tenant"   },
   { href: "/admins",       label: "Admins",               icon: ShieldCheck,     scope: "tenant"   },
-  { href: "/wages",        label: "Coach Wages",          icon: Wallet,          scope: "tenant"   },
+  { href: "/wages",        label: "Wages",                icon: Wallet,          scope: "tenant"   },
   { href: "/history",      label: "Change History",       icon: History,         scope: "tenant"   },
   { href: "/platform",     label: "Platform",             icon: Globe,           scope: "platform" },
 ];
@@ -135,4 +135,85 @@ export function scopeForPath(pathname: string): NavScope {
  */
 export function landingRoute(tenantId: string | null | undefined): string {
   return hasTenant(tenantId) ? "/dashboard" : "/platform";
+}
+
+// ── Sidebar grouping — a PRESENTATION layer over NAV, never a replacement ─────
+//
+// NAV above stays the flat single source of truth that `scopeForPath()` gates
+// every route from. The grouping below only references hrefs, so collapsing the
+// sidebar into groups can NEVER move a route's security scope — the tempting
+// "refactor NAV into nested groups" is exactly what would. Any tenant page not
+// claimed by a group and not in TOP_LEVEL_HREFS renders top-level, ungrouped:
+// a new page can never silently vanish from the sidebar (a unit test pins this).
+
+export type NavGroup = {
+  id: string;
+  label: string;
+  /** hrefs, in the order they display inside the group. */
+  hrefs: readonly string[];
+};
+
+/** The daily loop — kept one click away, ungrouped. Order is display order. */
+export const TOP_LEVEL_HREFS: readonly string[] = [
+  "/dashboard",
+  "/students",
+  "/classes",
+  "/attendance",
+];
+
+/** Task-based groups. See HANDOVER §3 for why the dormant pages sit here. */
+export const NAV_GROUPS: readonly NavGroup[] = [
+  { id: "families",   label: "Families",   hrefs: ["/trials", "/unassigned", "/claims", "/parents"] },
+  { id: "billing",    label: "Billing",    hrefs: ["/invoices", "/credit-notes", "/packages", "/referrals", "/wages"] },
+  { id: "scheduling", label: "Scheduling", hrefs: ["/makeups", "/substitutes", "/holidays"] },
+  { id: "settings",   label: "Settings",   hrefs: ["/levels", "/coaches", "/admins", "/history"] },
+];
+
+export type GroupedNav = {
+  topLevel: NavItem[];
+  groups: { group: NavGroup; items: NavItem[] }[];
+};
+
+/**
+ * The tenant sidebar, grouped. Calls `navFor()` FIRST so scope filtering lives
+ * in exactly one place, then partitions its result: hrefs a group names go under
+ * it (in the group's declared order); TOP_LEVEL_HREFS lead the top level; every
+ * remaining unclaimed item — a future page, or the platform admin's lone
+ * Platform link — follows, ungrouped. Empty groups are dropped, so a platform
+ * admin renders no headers.
+ */
+export function groupedNavFor(tenantId: string | null | undefined): GroupedNav {
+  const items = navFor(tenantId);
+  const byHref = new Map(items.map((n) => [n.href, n]));
+  const claimed = new Set<string>();
+
+  const groups = NAV_GROUPS.map((group) => {
+    const groupItems = group.hrefs
+      .map((href) => byHref.get(href))
+      .filter((n): n is NavItem => n !== undefined);
+    groupItems.forEach((n) => claimed.add(n.href));
+    return { group, items: groupItems };
+  }).filter((g) => g.items.length > 0);
+
+  const preferred = TOP_LEVEL_HREFS
+    .map((href) => byHref.get(href))
+    .filter((n): n is NavItem => n !== undefined);
+  preferred.forEach((n) => claimed.add(n.href));
+
+  const rest = items.filter((n) => !claimed.has(n.href));
+  return { topLevel: [...preferred, ...rest], groups };
+}
+
+/**
+ * Which group (if any) a URL lives in — for auto-expanding the group that holds
+ * the active page. Same prefix rule as the sidebar's active state, so
+ * `/invoices/<id>` opens Billing.
+ */
+export function groupIdForPath(pathname: string): string | null {
+  for (const group of NAV_GROUPS) {
+    if (group.hrefs.some((h) => pathname === h || pathname.startsWith(h + "/"))) {
+      return group.id;
+    }
+  }
+  return null;
 }

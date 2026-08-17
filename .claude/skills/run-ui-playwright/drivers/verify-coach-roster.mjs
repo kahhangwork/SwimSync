@@ -230,7 +230,7 @@ const LESSON_LABEL = sql(
   const admin = await ctx.browser().newContext({ viewport: { width: 1280, height: 900 } });
   const ap = await admin.newPage();
   await loginAdmin(ap, SEED_EMAIL);
-  await ap.goto(`${ADMIN}/lesson-coaches`, { waitUntil: "domcontentloaded" });
+  await ap.goto(`${ADMIN}/substitutes`, { waitUntil: "domcontentloaded" });
   await ap.waitForTimeout(2500);
 
   async function openRoster(p = ap) {
@@ -359,7 +359,7 @@ const LESSON_LABEL = sql(
     `${assigned} active assignment(s)`
   );
 
-  await ap.goto(`${ADMIN}/lesson-coaches`, { waitUntil: "domcontentloaded" });
+  await ap.goto(`${ADMIN}/substitutes`, { waitUntil: "domcontentloaded" });
   await ap.waitForTimeout(2500);
   await openRoster();
   await row(LESSON_LABEL).getByRole("button", { name: "Clear" }).first().click();

@@ -103,16 +103,28 @@ function sqlAs(uid, q) {
     await loginAdmin(page, ADMIN_EMAIL);
 
     // ── The badge, from a page that is NOT /invoices.
-    const badge = page.locator('a[href="/invoices"] span');
+    // Since 2026-08-17 Invoices lives inside the collapsed "Billing" group, so
+    // from the dashboard its count BUBBLES to the group header pill — the whole
+    // point of §3's requirement that a collapsed group never hides a stuck-family
+    // signal. The badge must be readable without expanding anything.
+    const badge = page.locator('[data-testid="navgroup-billing-badge"]');
     await badge.waitFor({ timeout: 10000 }).catch(() => {});
     check(
-      "sidebar badge shows 2 from the dashboard",
+      "Billing group header shows the badge (2) from the dashboard, collapsed",
       (await badge.count()) === 1 && (await badge.innerText()) === "2",
       `count=${await badge.count()}`
     );
 
-    // ── The standing section.
+    // ── The standing section. Navigating to /invoices auto-expands Billing, so
+    // the child link's own badge is now visible — assert that too.
     await page.goto(`${ADMIN}/invoices`, { waitUntil: "networkidle" });
+    const childBadge = page.locator('a[href="/invoices"] span');
+    await childBadge.waitFor({ timeout: 10000 }).catch(() => {});
+    check(
+      "expanded, the Invoices child link carries its own badge (2)",
+      (await childBadge.count()) === 1 && (await childBadge.innerText()) === "2",
+      `count=${await childBadge.count()}`
+    );
     const report = page.locator('[data-testid="orphan-report"]');
     await report.waitFor({ timeout: 10000 });
     check("report section renders on /invoices", true);
@@ -179,7 +191,10 @@ function sqlAs(uid, q) {
     await page.waitForTimeout(2000);
     check(
       "sidebar badge is gone once everything is settled",
-      (await page.locator('a[href="/invoices"] span').count()) === 0
+      // Robust to Billing being either expanded (no child span) or collapsed
+      // (no header pill) — the count is 0 either way once settled.
+      (await page.locator('a[href="/invoices"] span').count()) === 0 &&
+        (await page.locator('[data-testid="navgroup-billing-badge"]').count()) === 0
     );
   } finally {
     await page.screenshot({ path: "/tmp/orphan-report-final.png" }).catch(() => {});

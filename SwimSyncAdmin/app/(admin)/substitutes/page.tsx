@@ -337,7 +337,7 @@ export default function LessonCoachesPage() {
   return (
     <div>
       <PageHeader
-        title="Lesson Coaches"
+        title="Substitutes"
         subtitle="Who is teaching each lesson — assign a substitute when the class's coach is away"
       />
 

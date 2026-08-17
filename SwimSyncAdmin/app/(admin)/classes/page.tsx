@@ -1027,7 +1027,7 @@ export default function ClassesPage() {
                 A shadow watches every lesson of this class and is paid their own
                 shadow rate for each one. It lasts until you end it — this is not
                 a per-lesson arrangement. To record a one-off cover instead, use{" "}
-                <span className="font-medium">Lesson Coaches</span>.
+                <span className="font-medium">Substitutes</span>.
               </p>
 
               {shadowError && (

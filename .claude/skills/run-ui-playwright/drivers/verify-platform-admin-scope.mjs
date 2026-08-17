@@ -119,9 +119,26 @@ try {
   // 08-15 and 08-16 ones saw 19, and all three were left red. Designed-to-redden
   // only pays if someone bumps it the next morning.
   // `SwimSyncAdmin/lib/adminNav.ts` is the fact — count its scope:"tenant" rows.
-  check("sidebar shows the 20 business pages", tnav.navLinks.length === 20,
-    `${tnav.navLinks.length}: ${JSON.stringify(tnav.navLinks)}`);
-  check("sidebar does NOT show Platform", !tnav.navLinks.includes("/platform"));
+  // Since 2026-08-17 the sidebar GROUPS 16 of the 20 into 4 collapsible drawers
+  // (Families/Billing/Scheduling/Settings), so a collapsed group hides its child
+  // <a>s from the DOM. Expand every group first, then the full inventory is back
+  // and the exact-count guard still means what it always did.
+  await page.evaluate(() => {
+    document
+      .querySelectorAll('aside button[data-testid^="navgroup-"]')
+      .forEach((b) => {
+        if (b.getAttribute("aria-expanded") === "false") b.click();
+      });
+  });
+  await page.waitForTimeout(400);
+  const tenantLinks = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("aside a")).map((a) =>
+      a.getAttribute("href")
+    )
+  );
+  check("sidebar shows the 20 business pages", tenantLinks.length === 20,
+    `${tenantLinks.length}: ${JSON.stringify(tenantLinks)}`);
+  check("sidebar does NOT show Platform", !tenantLinks.includes("/platform"));
 
   // The regression that matters most: every page must still WORK for them.
   // Asserting "no refusal" is not enough — a blank page would pass that.
