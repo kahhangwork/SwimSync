@@ -2937,3 +2937,29 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     deliberately STAYS on the needs-marking list — converting is not marking. Rule: before
     dropping a guard you inherited, read its predicate; "it can't apply here" is a claim about
     code you may not have read. (`lib/trialConvert.ts`, §8.66)
+
+181. **A `*/` inside a CSS comment closes it — Tailwind class patterns are booby-trapped.**
+    A block comment in `globals.css` documenting the responsive scaling wrote the class pair
+    as `h-*/w-*`; the `*/` ended the comment mid-sentence and the rest parsed as broken CSS.
+    `tsc` and the dev server both passed — PostCSS only runs at build — so only `npm run
+    build` caught it, with a webpack error pointing INTO the comment text. Never write `*/`
+    (nor a bare `*` before `/`) inside a CSS comment: say "height/width", not `h-*/w-*`.
+    Build, not typecheck, is the check that finds it. (§8.67)
+
+182. **`next build` while `next dev` is running corrupts the shared `.next` — the dev server
+    then serves 200 with an empty page.** Verifying the production build while the dev server
+    stayed up for Playwright screenshots left the running server returning 200 on `/login`
+    with NO form in the HTML, so a driver timed out on the email input and looked like a
+    login regression. It is neither — both processes write the same `.next/`. Fix:
+    `pkill -f 'next dev'; rm -rf .next; npm run dev`, then re-poll for the actual form
+    (`curl … | grep 'type="email"'`), not merely the 200. Don't run `build` and `dev` against
+    one checkout at once. (§8.67)
+
+183. **The admin sidebar's grouping is PRESENTATIONAL — never nest `NAV` to build it.**
+    `scopeForPath()` (route-level tenant/platform gating in RequiresTenant) prefix-matches the
+    FLAT `NAV` array in `lib/adminNav.ts`. The 2026-08-17 collapsible groups add a SECOND
+    declaration (`NAV_GROUPS` + `groupedNavFor`) that only references hrefs; `NAV` is
+    untouched, so grouping cannot move a route's security scope. A "cleanup" that refactors
+    `NAV` into nested groups — tempting, and `/simplify` might propose it — would break the
+    gate silently. That the `navFor`/`scopeForPath` unit tests still pass unchanged is the
+    proof it didn't move; keep them that way. (§8.67)

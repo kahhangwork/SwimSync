@@ -593,3 +593,17 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     the whole plan — no DOWN file. **Dormant/low-exposure on prod:** the make-up and convert
     actions need data states prod's single private-coach account rarely has; Change History shows
     the real trail immediately (verified live — actor resolves to a name, diffs render).
+
+27. **Deploy record (2026-08-17): admin UI polish — two APP-ONLY pushes** (§8.67). (1)
+    `43bef0c` responsive auto-scaling (root font-size media queries), (2) `88d88a5` collapsible
+    grouped sidebar + label/route renames. No migration, no edge function — Vercel builds both
+    sites from `main`. **A GitHub OUTAGE hit mid-session:** the push landed on GitHub's `main`
+    (confirmed via `git ls-remote origin main`) but Vercel's auto-deploy webhook never fired —
+    the Deployments page showed a **"GitHub Outage"** banner and the newest build was the prior
+    commit. Fix that worked: Vercel dashboard → **Create Deployment** → branch `main` →
+    Production (deploys the pushed commit without waiting on the webhook). **Deploy proof:** grep
+    the served admin CSS bundle for the new `@media … font-size` rules (public, un-gated), and
+    hit `admin.swimsync.sg/lesson-coaches` — a **308 redirect to `/substitutes`** only exists in
+    the new build. **Rollback:** app-only — Vercel "promote previous deployment", no DOWN file.
+    **Reference:** the responsive `*/`-in-CSS-comment build break is §7.181; the
+    build-vs-dev `.next` corruption is §7.182; the flat-`NAV`-as-security invariant is §7.183.

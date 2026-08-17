@@ -1457,7 +1457,7 @@ nobody has touched, and there was no backfill.
   shadows, **pre-ticked**, and unticking one drops that single lesson from their pay. Nothing
   appears for a class with no shadows. Pre-ticked because forgetting an opt-in silently
   underpays somebody and shows nowhere, while forgetting an opt-out overpays and shows as a
-  line on Coach Wages.
+  line on Wages.
 - **Ending an assignment never changes pay for the lessons inside it.** The record is dated,
   so a shadow who stops in November keeps every August lesson they were assigned for. What
   ending it *does* change is visibility — see §7.6.
@@ -1482,8 +1482,10 @@ pay is kept either way.
 **Admins assign; coaches do not.** Substitutes and shadows are managed on **different pages**,
 because they are different shapes:
 
-- **Lesson Coaches** picks a class and a month and shows who is teaching each lesson, with
-  assign / change / clear for the substitute. It no longer mentions shadows at all.
+- **Substitutes** *(labelled "Lesson Coaches" until 2026-08-17; route `/substitutes`, old
+  `/lesson-coaches` permanently redirects)* picks a class and a month and shows who is teaching
+  each lesson, with assign / change / clear for the substitute. It no longer mentions shadows
+  at all.
 - **Classes → a class → Shadow coaches** adds a shadow with a start date, ends an active one,
   and lists past assignments with their date ranges. Ended ones stay visible because they
   still explain money. The class's own coach is not offered.
@@ -1493,7 +1495,7 @@ lesson rows that already exist, so an extra or rescheduled lesson is assignable 
 *Extra*. Assigning a cover to a date with no lesson row **creates** it — the admin never
 handles a lesson id — and a date the class does not run on is refused.
 
-**Coach Wages** expands each payout into a per-lesson breakdown: it sums the **set** of items
+**Wages** *(labelled "Coach Wages" until 2026-08-17)* expands each payout into a per-lesson breakdown: it sums the **set** of items
 per lesson, counts **distinct** lessons (a clawback-only line is not a lesson taught), and
 labels every line — *Assigned to cover*, *Shadowing*, *Reassigned to another coach*,
 *Correction to a settled month* — with a ±S$ chip naming the month it corrects. It also now
@@ -3035,7 +3037,12 @@ The following section provides a screen-by-screen reference for each SwimSync us
 
 #### Superadmin Panel (Web)
 
-- Sidebar navigation with sections: Dashboard, Unassigned, Classes, Students, Attendance, Invoices, Credit Notes, Coaches
+- Sidebar navigation *(implemented 2026-08-17)*: four top-level items (Dashboard, Students,
+  Classes, Attendance) plus four **collapsible task groups** — Families, Billing, Scheduling,
+  Settings — that remember their open/closed state and auto-expand the active page's group; a
+  collapsed group's header carries the amber count badge of any page inside it. The whole panel
+  also **auto-scales down on narrower screens** (root font-size media queries) so it fits a
+  smaller laptop without manual browser zoom.
 - Persistent search bar and filter controls on all table views
 - Bulk action support where relevant (e.g. batch assign, batch mark paid)
 - **Every column is sortable and every cell hugs its content** *(implemented)* — one

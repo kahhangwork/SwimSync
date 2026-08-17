@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.65** | 2026-08-17 | CI red 20 commits on a typed "future" fixture date; a page-count pin hid a latent PGRST201 that emptied the package catalogue (prod 0 rows, no loss) | §7.176–178 |
 | **8.64** | 2026-08-17 | Credit-note email notifications, LIVE DORMANT (0 notes) — one email per note w/ two amounts, admin Resend for a miss | PRD §7.8 · §11.25 · §7.172–175 |
 | **8.63** | 2026-08-16 | Invoice-email delivery tracking + RETRY, LIVE DORMANT — a re-run re-sends only the misses, even on a sealed month, no duplicate | PRD §7.7 · §11.24 · §7.170–171 |
 | **8.62** | 2026-08-16 | Backlog RE-RANKED after the referral queue drained (docs only) — revenue ACCRUAL, reminders MANUAL, multi-language REFUSED | `BACKLOG.md` → Build order |

@@ -1,14 +1,13 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-17 (Wave C) — **All FIVE Wave C items SHIPPED LIVE in one app-only push**
-(§8.66): CSV export, convert-a-trial, parent upcoming-lessons, book-a-make-up-from-Attendance, and
-the **Change History** page. No migration, no edge function — `c4d78f5..4891744` on `main`, Vercel
-builds both sites. Built `/plan-with-confidence` → `/plan-review` (Fable) → per-item
-`/commit-review`; six risk mitigations, each proven red. §7.179–180 · `§11.26`. **Wave C is EMPTY.**_
+_Last updated: 2026-08-17 (third session) — **ADMIN UI POLISH** (§8.67), two app-only pushes: the
+admin panel now auto-scales to narrow screens, and the 20-tab sidebar became 4 top-level items + 4
+collapsible groups (Families/Billing/Scheduling/Settings, badge-bubbling); labels renamed (Lesson
+Coaches→**Substitutes**, `/lesson-coaches`→`/substitutes` 308 redirect; Coach Wages→**Wages**).
+§7.181–183 · §11.27. A GitHub outage forced a manual Vercel "Create Deployment"._
 
-_Previously, 2026-08-17 — CI and the nightly were BOTH red and nobody had looked (§8.65): CI red
-every push for 20 commits on an expired fixture date, and under the nightly noise a LATENT PGRST201
-regression emptied the package catalogue (prod has 0 `package_products`, so no loss). §7.176–178._
+_Previously, 2026-08-17 (Wave C, §8.66) — all five Wave C items shipped live in one app-only push:
+CSV export, convert-a-trial, parent upcoming-lessons, make-up-from-Attendance, Change History._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -387,6 +386,25 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.67 (2026-08-17, third session) — ADMIN UI: RESPONSIVE SCALING + COLLAPSIBLE GROUPED SIDEBAR
+
+**Two APP-ONLY pushes, no migration/function** (`43bef0c`, `88d88a5`). (1) The admin panel now
+**auto-scales down on narrower screens** — root font-size media queries in `globals.css`, so the
+whole rem-based UI shrinks like a zoom-out and fits a small laptop without manual zoom. (2) The
+tenant sidebar went from **20 flat tabs to 4 top-level + 4 collapsible groups** (Families /
+Billing / Scheduling / Settings): multi-open, localStorage-remembered, auto-expands the active
+page's group, and a collapsed group's header carries the amber "stuck family" badge of any child.
+Labels clarified — **Lesson Coaches → Substitutes** (route `/lesson-coaches` → `/substitutes`, 308
+redirect), **Coach Wages → Wages**, sidebar-only Unassigned/Levels. The flat `NAV` stays the
+security source of truth (`scopeForPath`); grouping is a presentational overlay (`NAV_GROUPS` /
+`groupedNavFor`) — **§7.183, don't nest NAV.** Verified admin vitest **438** (+11 nav-grouping),
+both typechecks, production build, real-browser collapse/expand + label render + the 308.
+
+**A GitHub outage** blocked Vercel's auto-deploy mid-session; shipped via the dashboard's **Create
+Deployment** button (§11.27). Two build traps graduated: **§7.181** (a `*/` inside a CSS comment
+closes it — broke `next build`) and **§7.182** (`next build` beside a live `next dev` corrupts
+`.next` → 200 with an empty page). PRD §7.13/§7.16 + Superadmin Panel · `docs/DEPLOYMENT.md` §11.27.
+
 ## 8.66 (2026-08-17, Wave C) — ALL FIVE WAVE C ITEMS SHIPPED LIVE, ONE APP-ONLY PUSH
 
 **Wave C is now EMPTY.** Five features, **no migration and no edge function**, deployed by a single
@@ -411,36 +429,6 @@ page stays the full-featured home); `lesson_session`-level cancellations in upco
 were the free 90% — the join is a `BACKLOG.md` follow-up). Nav gained `/history`, so
 `verify-platform-admin-scope.mjs`'s page-count pin was bumped **19→20 in the same push** (§7.178
 applied). PRD §7.5/§7.17/§7.20/§14 · `docs/DEPLOYMENT.md` §11.26 · plan `docs/plans/WAVE_C_PLAN.md`.
-
-## 8.65 (2026-08-17, second session) — BOTH CI AND THE NIGHTLY WERE RED, AND ONE HID A LIVE BUG
-
-**Nothing was built. Two red pipelines were read, and one hid a production regression**
-(`2c16be9`, `2c83573`). No migration, no function deploy — the app fix rides Vercel off `main`.
-
-**CI: red on EVERY push for 20 commits** (2026-08-14 → 08-17), same two tests, and the Deno suite
-never ran once in three days because pgTAP gates it. One fixture date in `coach_disable.test.sql`
-called a lesson "FUTURE" and typed `'2026-08-15'`; product code correct throughout. Now derived
-from `today_sg()` — §7.177 has the boundary trap that makes the obvious spelling wrong 1 day in 7.
-
-**The nightly: 3 of 45 red for 3 nights, and the noisy one hid the real one.** A deliberate
-page-count pin nobody bumped (§7.178) sat on top of **`PGRST201`**:
-`20260815000600_default_packages` added FKs back to `package_products`, making two embeds
-ambiguous, and PostgREST refuses the *whole* query — so since 2026-08-15 the parent's "Buy a
-package" list and the admin's catalogue both rendered EMPTY, silently, because both sites did
-`?? []` (§7.176). **Latent, not costly** — a signed-in check on 2026-08-17 showed prod holds **0
-`package_products`**, so both lists were correctly empty anyway and no sale was lost; it also
-confirmed the fix (HTTP 200, was 300). Fixing it exposed 3 more stale assertions, all from
-start-date sequencing (⚠ RISK 2: a family that already topped up is deliberately not "low").
-Third was `parent-claim` — c009945 renames a confirmed claim to the parent's own words.
-
-**Coverage went UP.** `student_package_coverage.test.sql` **+2**: nothing anywhere asserted `low`
-could be TRUE. Verified pgTAP **1097** on a clean reset, vitest 395, jest 384, both typechecks,
-packages 21/21, parent-claim 21/21, 4 neighbour drivers green; every fix proven red first.
-
-*(§8.64 — credit-note email notifications, SHIPPED LIVE, Wave B exhausted — moved to the ledger,
-`docs/SESSIONS.md`, when §8.66 landed; along with §8.63 invoice-email retry, §8.62 the backlog
-re-rank, §8.61 referral codes and §8.60 package renewal automation before it. Its four gotchas
-§7.172–175 and deploy record §11.25 carry the reasoning.)*
 
 ---
 
