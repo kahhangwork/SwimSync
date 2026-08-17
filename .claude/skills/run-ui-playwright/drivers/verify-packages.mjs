@@ -130,12 +130,25 @@ try {
   await page.waitForTimeout(800);
 
   const threshold = page.getByLabel("Low-package threshold in lessons");
-  // Family live total = 9 + 5 = 14 lessons. At 20 they are "low"…
+  // ⚠ THE TOP-UP JUST BOUGHT DOES NOT COUNT YET, AND THAT IS RISK 2 WORKING.
+  // Since 20260814…/20260815000600 a package carries a START DATE, and
+  // suggest_package_start sequences a second one to begin when the first runs
+  // out — here 2026-10-27, ten weeks out. student_package_coverage() therefore
+  // (a) leaves it out of the live count, which stays 9 rather than 9+5, and
+  // (b) declares the family NOT low, because a family holding a pending or
+  //     future-start package has already topped up; flagging them would nag
+  //     forever. Both rules are stated at the head of that function.
+  //
+  // This block asserted 14 and "flagged at 20" until 2026-08-17, written before
+  // start dates existed. It went red on the 2026-08-15 nightly and was invisible
+  // underneath the PGRST201 embed break, which killed the driver 15 checks
+  // earlier — fixing that one is what exposed these.
   await threshold.fill("20");
   await page.waitForTimeout(1200);
   text = await page.evaluate(() => document.body.innerText);
-  check(/Pablo Package/.test(text), "at threshold 20 the family is flagged");
-  check(/14 left/.test(text), "…with the family's combined live count");
+  check(!/Pablo Package/.test(text),
+    "⚠ RISK 2: at threshold 20 the family is NOT flagged — a future-start top-up already answers the nag",
+    text.slice(0, 300));
 
   // …and at 2 they are not (and no package-less family ever appears).
   await threshold.fill("2");
@@ -145,19 +158,20 @@ try {
     "at threshold 2 nobody is flagged");
 
   // ── Admin students: the chip is PER CHILD, BY NAME (§7.75) ────────────────
-  // Filter off, so both children are visible. The family now holds 9 + 5 = 14
-  // live Group lessons — Pablo's row must carry that count, and Pia's row must
-  // say Ad-hoc even though it is the SAME family: the Group-scoped packages
-  // cannot pay for her Private class. Under the old by-parent sum both rows
-  // read "14 left", which is the bug this pins shut.
+  // Filter off, so both children are visible. The family holds 9 LIVE Group
+  // lessons — the 5 bought above start 2026-10-27 and are deliberately not
+  // counted (see RISK 2 above). Pablo's row must carry that count, and Pia's
+  // row must say Ad-hoc even though it is the SAME family: the Group-scoped
+  // packages cannot pay for her Private class. Under the old by-parent sum
+  // both rows read the same number, which is the bug this pins shut.
   await tap(page.getByRole("button", { name: "Package running low" }), "filter off");
   await page.waitForTimeout(800);
   // The PackageChip moved out of the Parent cell into dedicated Package/Left/
   // Expires columns (Decision 10), so the "Package ·" prefix is gone — the Left
   // column carries the family-sum count on its own.
   const pabloRow = page.locator("tbody tr", { hasText: "Pablo" }).first();
-  check(/14 left/.test(await pabloRow.innerText()),
-    "students: PABLO's row shows '14 left' in the Left column",
+  check(/9 left/.test(await pabloRow.innerText()),
+    "students: PABLO's row shows '9 left' in the Left column — the LIVE count, not the future top-up",
     await pabloRow.innerText().catch(() => "row not found"));
   const piaRow = page.locator("tbody tr", { hasText: "Pia" }).first();
   check(/Ad-hoc/.test(await piaRow.innerText()),

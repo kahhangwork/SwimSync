@@ -209,9 +209,23 @@ export default function BillingScreen() {
         supabase.rpc("package_live_balances"),
 
         // Products of every business this parent has joined (RLS).
+        //
+        // ⚠ BOTH FKs ARE NAMED ON PURPOSE. Bare `class_categories(name)` and
+        // bare `tenants(display_name)` are each AMBIGUOUS from
+        // package_products, and PostgREST answers PGRST201 — refusing the WHOLE
+        // query, not the one embed. 20260815000600_default_packages added a
+        // reverse FK on each side (class_categories.default_product_id and
+        // tenants.default_package_product_id, both → package_products.id) next
+        // to the forward ones used here. The bare form worked until that
+        // migration and then silently returned NOTHING, so every parent's
+        // "Buy a package" list was empty from 2026-08-15.
+        //
+        // Fixing only the first one still fails on the second — check the whole
+        // query, not the first error. `pg_constraint` is the fact; four pairs
+        // involving these two tables are ambiguous today (§7.176).
         supabase
           .from("package_products")
-          .select("id, name, lesson_count, rate_per_lesson, validity_weeks, class_categories(name), tenants(display_name)")
+          .select("id, name, lesson_count, rate_per_lesson, validity_weeks, class_categories!package_products_category_id_fkey(name), tenants!package_products_tenant_id_fkey(display_name)")
           .eq("is_active", true)
           .order("name"),
       ]);
@@ -262,6 +276,14 @@ export default function BillingScreen() {
       })
     );
 
+    // A FAILED products fetch and "this business sells nothing" render
+    // IDENTICALLY — `?? []` collapses both to an empty Buy-a-package list with
+    // no signal at all. That is how the PGRST201 break above survived three
+    // nightlies. Say something instead of degrading quietly.
+    if (productsRes.error) {
+      console.error("package_products fetch failed", productsRes.error);
+      showToast("Couldn't load the packages for sale — please try again.", "error");
+    }
     setProducts(
       (productsRes.data ?? []).map((p: any) => {
         const t = Array.isArray(p.tenants) ? p.tenants[0] : p.tenants;

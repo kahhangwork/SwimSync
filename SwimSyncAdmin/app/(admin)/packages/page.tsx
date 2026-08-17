@@ -229,10 +229,16 @@ export default function PackagesPage() {
         .from("class_categories")
         .select("id, name, default_product_id, classes(id)")
         .order("name"),
+      // ⚠ THE FK IS NAMED ON PURPOSE. `class_categories(name)` is AMBIGUOUS
+      // from package_products — category_id → class_categories.id (this one)
+      // and class_categories.default_product_id → package_products.id, which
+      // 20260815000600_default_packages added. Bare, PostgREST refuses the
+      // whole query with PGRST201 and this catalogue renders EMPTY. Same trap
+      // on the parent app's products query. Never drop the `!fkey` qualifier.
       supabase
         .from("package_products")
         .select(
-          "id, name, category_id, lesson_count, rate_per_lesson, validity_weeks, is_active, class_categories(name), parent_packages(id, status)"
+          "id, name, category_id, lesson_count, rate_per_lesson, validity_weeks, is_active, class_categories!package_products_category_id_fkey(name), parent_packages(id, status)"
         )
         .order("is_active", { ascending: false })
         .order("name"),
@@ -253,6 +259,15 @@ export default function PackagesPage() {
         .from("parent_students")
         .select("parent_id, students(full_name, is_active)"),
     ]);
+
+    // A failed catalogue fetch and "this business sells nothing" render
+    // IDENTICALLY without this — an empty products table and no signal. That is
+    // how the PGRST201 embed break above went unnoticed from 2026-08-15; say so
+    // instead of degrading quietly. Same guard as the parent app's Billing tab.
+    if (prodRes.error) {
+      console.error("package_products fetch failed", prodRes.error);
+      setError("Couldn't load the package catalogue — please reload the page.");
+    }
 
     // parent_id → "Ali, Bo" (active children only).
     const childrenByParent = new Map<string, string[]>();

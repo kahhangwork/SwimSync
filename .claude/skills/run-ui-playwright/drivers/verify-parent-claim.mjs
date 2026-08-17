@@ -196,10 +196,23 @@ check(
 await page.goto(`${EXPO}/home`, { waitUntil: "domcontentloaded" });
 await page.waitForTimeout(7000);
 text = await page.evaluate(() => document.body.innerText);
+// ⚠ THE NAME CHANGES HERE, AND THAT IS THE PRODUCT WORKING. Since c009945 the
+// admin's approval also applies a name, and defaultClaimName() makes the
+// default certainty-dependent: a CONFIRMED claim (which is what this driver
+// files — it picks the candidate and confirms) pre-fills the PARENT's typed
+// name, so 'Ethan Tan Wei Ming' becomes 'Ethan'. An `unsure` claim would keep
+// the roster name instead, so a blind Approve cannot overwrite a coach's name
+// with a guess.
+//
+// This assertion read /Ethan Tan Wei Ming/ until 2026-08-17 and went red on the
+// 2026-08-14 nightly, three nights before anyone looked. Do NOT weaken it back
+// to a bare /Ethan/ — that is a SUBSTRING of the old roster name, so it would
+// pass under both behaviours and prove nothing. The `!/Wei Ming/` half is what
+// pins the rename, and it is the same idiom the masking check above uses.
 check(
-  "the claimed child now appears in the parent's app",
-  /Ethan Tan Wei Ming/.test(text),
-  "same student_id throughout — nothing was transferred"
+  "the claimed child now appears in the parent's app, under the name the PARENT typed",
+  /Ethan/.test(text) && !/Wei Ming/.test(text),
+  "same student_id throughout — nothing was transferred, the row was renamed in place"
 );
 check(
   "and the waiting card is gone",

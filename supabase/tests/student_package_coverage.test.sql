@@ -25,7 +25,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(22);
+SELECT plan(24);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -200,6 +200,33 @@ SELECT is(
     WHERE c.student_id = 'b5000000-0000-0000-0000-000000000002'),
   'package:10',
   'the Private-class child is covered, 10 lessons left');
+
+-- ── The `low` flag, BOTH directions ────────────────────────────────────────
+-- Added 2026-08-17 because nothing anywhere asserted this flag could be TRUE.
+-- verify-packages.mjs was its only cover and only in the negative direction
+-- after 2026-08-15, when start dates made its family hold a future-start
+-- top-up (⚠ RISK 2 — a family that has already topped up is deliberately NOT
+-- low). The UI half stays in that driver; the predicate belongs here.
+-- tenants.low_package_lessons defaults to 2, and this child has 10 left.
+SELECT ok(
+  NOT (SELECT c.low FROM student_package_coverage() c
+        WHERE c.student_id = 'b5000000-0000-0000-0000-000000000002'),
+  '10 lessons left is NOT low at the default threshold of 2');
+
+UPDATE tenants SET low_package_lessons = 20
+ WHERE id = 'ba000000-0000-0000-0000-000000000001';
+SELECT ok(
+  (SELECT c.low FROM student_package_coverage() c
+    WHERE c.student_id = 'b5000000-0000-0000-0000-000000000002'),
+  '…and IS low once the business raises its own threshold to 20 — the flag is '
+  'per-tenant, not a constant SwimSync picks');
+
+-- Restore it: every assertion below this point predates the low flag and must
+-- see the fixture exactly as it was. DEFAULT, not a typed 2 — a literal here
+-- would be a second copy of the column default and would silently corrupt every
+-- assertion below on the day someone changes it.
+UPDATE tenants SET low_package_lessons = DEFAULT
+ WHERE id = 'ba000000-0000-0000-0000-000000000001';
 
 SELECT is(
   (SELECT c.coverage FROM student_package_coverage() c
