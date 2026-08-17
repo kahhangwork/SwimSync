@@ -98,6 +98,17 @@ the shape of the system changes:_
   - **`package-emails`** is a separate Edge Function (verify_jwt ON, caller re-checked
     in-body), sharing the project-wide `RESEND_API_KEY`. Deployed separately, like
     everything under `supabase/functions/`.
+  - **`credit-note-emails` follows that same shape, and the send point is a DECISION** (2026-08-17).
+    A credit note is issued by the `handle_attendance_update` **trigger**, so there is no natural
+    server-side send point. Both alternatives were considered and **refused**: `pg_net` from inside
+    the trigger puts network latency and failure in the attendance write's own transaction — on the
+    billing path — and is **cloud-only**, so the send path would ship having never run locally; a
+    Supabase **DB webhook** is dashboard config rather than a migration, invisible to the repo and
+    untestable, with replay semantics that would become load-bearing unobserved. So the **coach app
+    calls the function after a successful save**, and the admin panel calls the same function to
+    resend. **Do not "simplify" this into a trigger-side send later** — that is the option that was
+    rejected, twice over (untestable and on the billing path). Plan:
+    `docs/plans/CREDIT_NOTE_EMAIL_PLAN.md`.
 - **ANYTHING PUBLIC (SESSIONLESS) IS SERVED BY AN EDGE FUNCTION, NEVER AN ANON RPC**
   (2026-08-02, `public-invoice`). The tempting alternative — `GRANT USAGE ON SCHEMA
   public TO anon` + one RPC — is a standing foot-gun: Supabase cloud's project-level
@@ -600,6 +611,11 @@ the shape of the system changes:_
 | `supabase/functions/generate-invoices/index.ts` | Thin HTTP handler (auth + client + call core) |
 | `supabase/functions/generate-invoices/email.ts` | Invoice-email builders + Resend sender + `emailCreatedInvoices()` orchestration (§8c) |
 | `supabase/functions/public-package/` | The tokenised renewal-offer pay page's data source (core.ts + index.ts), the package mirror of `public-invoice`; `verify_jwt=false`, the 128-bit `public_token` is the access control. Refuses a SUSPENDED business (an offer is prepayment, unlike an invoice) — §8.60 |
+| `supabase/functions/credit-note-emails/email.ts` | Credit-note email builders + the PURE deciders (`authorizeCreditNoteEmail`, `isSendableNote`, `canEmailForTenant`, `shouldResetClaim`) + Resend sender. Scalars only — a builder cannot be handed a `students` row, so a live name is unreachable (§7.155) |
+| `supabase/functions/credit-note-emails/core.ts` | The DB-facing pipeline: candidate discovery (tenant-filtered), spent/sibling checks, `fetchTenantSuspended` (a COLUMN read, not the RPC — §7.172), the atomic claim, and the per-note claim→send→release loop. Split out of the handler **so a test can call it** |
+| `supabase/functions/credit-note-emails/index.ts` | Thin handler: parse, authorize as the caller, delegate. `verify_jwt` ON; the NOTE path uses `is_tenant_admin`, NOT `can_admin_tenant` (§7.173) |
+| `SwimSyncApp/lib/creditNoteEmail.ts` | The coach app's bounded, awaited call after an attendance save, plus `mayHaveIssuedCreditNote` — the guard that skips it unless a lesson left `present`/`trial_paid` |
+| `SwimSyncAdmin/lib/creditNoteEmailState.ts` | The Credit Notes page's Resend gate; mirrors `is_tenant_admin()` term for term |
 | `SwimSyncAdmin/components/WhatsAppQueue.tsx` | The shared "open next chat" `wa.me` queue shell; `ReminderQueue` (invoices) and the packages renewal queue are both thin wrappers over it — §8.60 |
 | `SwimSyncAdmin/lib/packageOffers.ts` · `SwimSyncApp/app/package/[token].tsx` | Pure offer deciders (`defaultConfirmStart` RISK 3, `pickOfferProduct` Decision 5) · the parent public offer page — §8.60 |
 | `supabase/migrations/20260718000200_coach_close_enrolment.sql` | `close_student_enrolment()` RPC — remove-from-class / set-inactive for the tenant admin **and** the owning coach (§6, §8a) |

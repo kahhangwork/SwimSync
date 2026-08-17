@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.62** | 2026-08-16 | Backlog RE-RANKED after the referral queue drained (docs only) — revenue ACCRUAL, reminders MANUAL, multi-language REFUSED | `BACKLOG.md` → Build order |
 | **8.61** | 2026-08-15 | Parent REFERRAL CODES, LIVE DORMANT — `REF-` code, double-sided FIFO discount, same-household guard, admin Referrals page | PRD §7.16 · §11.23 · §7.164–169 |
 | **8.60** | 2026-08-15 | Package RENEWAL AUTOMATION — admin offers + tokenised `/package` pay page + WhatsApp queue, LIVE DORMANT | PRD §7.16 · `docs/DEPLOYMENT.md` §11.22 · §7.158–163 |
 | **8.59** | 2026-08-15 | Weeks/holiday-extension packages (`…000400` + apps), LIVE DORMANT — per-purchase start, holiday auto-extend + ack, admin extend | PRD §7.16 · `PACKAGE_WEEKS_HOLIDAYS_PLAN.md` |

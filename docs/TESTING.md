@@ -117,6 +117,25 @@ leak), `valid_until_preview` math, claim only on a PENDING offer, and a SUSPENDE
 → not-found (RISK 5/9). `package-emails/email.test.ts` also pins the `offered`-email
 authorization matrix (`authorizePackageEmail` — a coach or parent is refused, only an admin
 of the offer's tenant with a real offer row passes — RISK 6):_
+
+_**Added 2026-08-17 — the credit-note email pair** (`../credit-note-emails/email.test.ts` and
+`../credit-note-emails/core.test.ts`, both carried by the same `test.sh`):_ the **email** file is
+pure — builders, the authorization matrix (`authorizeCreditNoteEmail`: the NOTE path refuses
+session authority, because `can_admin_tenant` includes `is_platform_admin()` — §7.173),
+`isSendableNote` (a **partly** drawn-down note is refused though its `status` is still
+`'available'`), `canEmailForTenant`, and `shouldResetClaim` over **every** `SendOutcome` (a thrown
+`fetch` or a 5xx KEEPS the claim — releasing it is how a parent gets a duplicate). The **core**
+file is integration and answers what only Postgres can: the tenant filter on the session-path
+select, the atomic claim (two racing claims → exactly **one** winner), release/re-discovery, the
+one-email-per-invoice-line dedupe, and the `try/finally` release — a **throwing send leaves
+`email_sent_at` NULL**, which is the assertion whose absence let §7.172 ship.
+**⚠ Every credit note in `core.test.ts` is created by driving the `handle_attendance_update`
+TRIGGER** (mark an invoiced lesson absent), never by INSERTing one — a hand-inserted fixture skips
+the package-application early return, the reference-number generation and the balance update at
+once, and `credit_notes` is EMPTY locally so it would prove nothing. `requireNote()` raises a
+named "vacuous fixture" error rather than passing on an empty set, and
+`scenarioWithCreditNote()` tears its own scenario down before rethrowing (**§7.174** — the
+version that did not cost 9 leaked tenants and a mystery `tenant_isolation` red)._
 **The clock is part of every fixture** — `monthEnded()` in `test-helpers.ts` supplies the
 billing month, an instant at which it is billable, and an early-enough enrolment as ONE fact,
 and `newScenario()` **throws** on a scenario expecting zero lessons (§7.33). The
@@ -197,7 +216,13 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 
 _Frontend tests:_
 `SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **27 files, 350
-tests** (2026-08-14; the runner is the fact, this number is a hint that drifts). The student
+tests** (2026-08-14; the runner is the fact, this number is a hint that drifts). **2026-08-17
+added `lib/creditNoteEmailState.test.ts`** — the Credit Notes page's Resend gate, pure: it mirrors
+`is_tenant_admin()` **term for term** (role `tenant_admin`, `admin_disabled_at IS NULL`, tenant
+match), so a platform admin, a coach whose `tenant_id` happens to match, and a disabled admin all
+get **no button** rather than a 403 rendered as "Edge Function returned a non-2xx status code"
+(§7.173); plus the `hasApplications` term, which is the only thing that sees a **partly** spent
+note. The student
 rename (2026-08-14) added `lib/claimNaming.test.ts` — the claim-approval naming decisions,
 pure: the certainty-dependent picker default (parent's name for a confirmed claim, current for
 `unsure`, proven red by defaulting to the parent's always) and that a post-approve rename
@@ -237,7 +262,15 @@ the bug it prevents — *"NEVER says nobody when only inactive children hold the
 (§7.69). `Table.test.tsx` gained sortable-header render tests (click, reverse, `firstDir`,
 `aria-sort`, non-sortable columns) plus width assertions, and keeps its `<Thead>`-owns-its-
 `<tr>` call-site scan.
-`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **19 files, 348 tests** (2026-08-11).
+`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **19 files, 348 tests** (2026-08-11). **2026-08-17
+added `lib/creditNoteEmail.test.ts`** — two things. (a) The **ordering** pin: the credit-note email
+request is `await`ed (bounded 3s) BEFORE `leaveScreen()`, because that is a `router.replace` which
+unmounts the screen — an unawaited fetch is issued milliseconds before its own destruction, and a
+coach locking their phone kills it. The test asserts the promise does **not** settle before the
+invoke does; a fire-and-forget implementation turns it red while the neighbouring
+"resolves once settled" test passes **vacuously**, which is why both exist. (b)
+`mayHaveIssuedCreditNote` — the guard that keeps the COMMON save free: only a lesson **leaving**
+`present`/`trial_paid` can issue a note, so every other save skips the round trip entirely.
 Wave 3 added `lib/coachRoster.test.ts` (+23, pure role resolution: main / shadow / covered /
 mine) and `lib/payoutBreakdown.test.ts` (+17, lessons vs corrections — a clawback-only line is
 not a lesson taught). Historically **14 files, 188 tests**, scoped to

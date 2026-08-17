@@ -538,3 +538,40 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     locally. **Dormant on prod:** 0 unsent invoices, so retry has re-sent nothing — first firing
     is the first real dropped send (next: the August run, early September). Two gotchas:
     §7.170–§7.171. Plan: `docs/plans/INVOICE_EMAIL_RETRY_PLAN.md`.
+
+25. **Deploy record (2026-08-17): credit-note email notifications** (§8.64). The first deploy
+    in this project whose **apps** had to wait on a **new edge function** — the coach app and
+    the admin panel both call `credit-note-emails`, so pushing `main` first would have shipped
+    two callers of a function that did not exist. Order followed, backend-first (§7.60):
+    (1) **RISK 1 read-only count on prod** — `credit_notes` held **0 rows** (via
+    `supabase db dump --linked --data-only`; the same dump showed `invoices` = 7, matching
+    §11.24, which is what makes the read trustworthy). That is the whole risk answered: a bare
+    `ADD COLUMN` would have flagged the entire credit-note history "Not emailed" beside a live
+    Resend button, and there **is** no history, so the in-file backfill was a no-op on prod.
+    (2) **Migration** `20260817000100` — nullable `credit_notes.email_sent_at` + backfill in the
+    same file; pgdelta cert stack trace alongside `Finished` **again** (normal, ~7th time);
+    `migration list --linked` **0 pending**; post-push `email_sent_at IS NULL` = **0**
+    (vacuously — the table is empty; it proves the backfill left nothing behind, not that it
+    stamped anything). (3) **Grant dump clean** — `credit_notes` unchanged
+    (`authenticated` **SELECT only** · `service_role` ALL · no column-level ACL), `anon` EXECUTE
+    still **18**. It also **confirmed §7.172 on production**: `tenant_suspended` is granted to
+    `authenticated` only, no `service_role` — the absence is the correct state, and had the
+    fail-open bug been "fixed" with a GRANT this dump would show the drift. (4) **Edge function**
+    `supabase functions deploy credit-note-emails` → **version 1 ACTIVE, `verify_jwt: true`**
+    (no `config.toml` entry needed — it defaults ON, same as `package-emails`). **FIVE functions
+    now exist.** (5) **Apps LAST** — `git push origin feat/credit-note-emails:main`
+    (`69111df..4288e4c`).
+    **Deploy proof (§7.31 — a 200 proves nothing):** the first bundle fetch after the push served
+    the **old** build; polling until the Expo hash changed (`784f93eb` → `f9a05efc`) and the new
+    bundle contained `credit-note-emails` is what confirmed it. The admin's Credit Notes chunk is
+    **code-split behind auth**, so a bundle grep cannot reach it without logging in — that half
+    was confirmed by the user opening Admin → Credit Notes and seeing the new **Parent notified**
+    column render. Record that limitation: for auth-gated admin pages, the bundle-grep proof is
+    unavailable and a human check is the substitute.
+    **Rollback cover:** committed DOWN
+    (`supabase/rollback/20260817000100_credit_note_email_sent_at_DOWN.sql`), rehearsed
+    UP→DOWN→DOWN(idempotent)→UP locally; its header carries the ordering constraint (revert the
+    apps and the function BEFORE dropping the column). **Dormant on prod, both halves:** 0 credit
+    notes exist, so nothing has been emailed and the Resend button has no row to act on. First
+    firing is the first post-billing attendance edit that leaves `present`/`trial_paid`.
+    Four gotchas: **§7.172–§7.175**. Plan: `docs/plans/CREDIT_NOTE_EMAIL_PLAN.md`.

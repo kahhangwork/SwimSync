@@ -1,14 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-16 — **Invoice-email delivery tracking + retry SHIPPED LIVE** (§8.63).
-Re-running generate-invoices re-sends only invoice emails that never went out — even on a sealed
-month, no duplicate, via a per-invoice atomic claim; suspended/auto-disabled tenants skipped. Prod
-migration `20260816000100` + `generate-invoices` v23; backfill 0-unsent, grant dump clean.
-**DORMANT** (0 unsent on prod). PRD §7.7 · `docs/DEPLOYMENT.md` §11.24. Next: a Wave B/C item (§9)._
+_Last updated: 2026-08-17 — **Credit-note email notifications SHIPPED LIVE** (§8.64), which
+**exhausts Wave B**. A post-invoice correction now emails the parent; the admin resends a miss from
+Credit Notes. Prod migration `20260817000100` + new `credit-note-emails` v1 (5 functions now).
+**DORMANT** — 0 credit notes on prod. PRD §7.8 · `docs/DEPLOYMENT.md` §11.25 · §7.172–175.
+Next: pick from **Wave C** (§9)._
 
-_Previously, 2026-08-16 — **Backlog RE-RANKED** after the referral queue drained (§8.62, docs only):
-revenue **ACCRUAL**, reminders **MANUAL for now**, **multi-language REFUSED** (+ dashboards retired);
-Wave B → C → D → Later. Live product state unchanged. `BACKLOG.md`._
+_Previously, 2026-08-16 — **Invoice-email delivery tracking + retry SHIPPED LIVE** (§8.63):
+re-running generate-invoices re-sends only the misses, even on a sealed month, no duplicate.
+**DORMANT** (0 unsent). PRD §7.7 · `docs/DEPLOYMENT.md` §11.24._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -146,6 +146,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | **A substitute is per-LESSON; a SHADOW is per-CLASS — dated, paid its own shadow rate** | pgTAP 49 + 9 + vitest + jest + **30-check driver**, LIVE 2026-08-12 | PRD §7.13, §7.6 · `docs/ARCHITECTURE.md` §6z · §8.46 |
 | **An admin's audit trail REFUSES their deletion — it is never destroyed to permit one; most admins are therefore undeletable and Deactivate is the route** | pgTAP 925 + driver 24/24, LIVE 2026-08-13 | PRD §4.3 · §7.153 · §8.52 |
 | **Wave 5, admin authority — owner REASSIGNED (platform-only) · coach DISABLED (atomic handover, pure-coach ban) · tenant SUSPENDED (staff+parents dark, staff banned, engine skips; already-sent invoice links deliberately keep working)** | pgTAP 27+55+88 + vitest + 3 drivers, LIVE 2026-08-13 | PRD §4.3, §4.4 · §8.49–8.51 |
+| **A parent is emailed when a credit note is issued** — one per note, lesson details from the invoice's snapshot, two labelled amounts; an applied note is refused; admin **Resend** for a miss | Deno + vitest + jest, LIVE 2026-08-17 **DORMANT** | PRD §7.8 · §8.64 |
 | Automated tests — pgTAP + Deno backend, vitest + jest-expo apps, all in CI on push | CI | `docs/TESTING.md` §5 |
 
 **Counts are deliberately not written here.** The runner is the fact; a number in prose is
@@ -180,6 +181,10 @@ is a guard whose first real firing is still ahead of you.
   coach is hired; `generate_coach_payouts` also skips a coach with no rate, so **no payout has
   ever been generated on production.** The whole model is verified locally against non-admin
   coaches in a browser (`verify-coach-roster`, 30 checks) — that is the only place it can be.
+- **Credit-note emails (§8.64)** — production holds **0 credit notes**, so nothing has been
+  emailed and the admin's Resend button has no row to act on. Dormant on BOTH halves, and the
+  0-rows fact is also what made the migration's backfill a no-op. First firing is the first
+  post-billing attendance edit that leaves `present`/`trial_paid`.
 - **The orphan-lesson report** — production shows zero lines and the badge has never lit
   on real data (every July invoice is Paid; nothing has been recorded into July since it
   was billed). That is the expected state: its first real firing is a backdated
@@ -310,11 +315,12 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
 > three. **After any backend change, run `supabase migration list` and check nothing has an
 > empty `remote` column.** `git log origin/main` is the honest answer to
 > "what's in production"; don't trust a SHA written into prose here, including this one.
-> **Production was fully caught up as of 2026-08-16**, through `20260816000100`. FOUR edge functions exist: `generate-invoices`,
-> `package-emails` (verify_jwt ON), **`public-invoice`** and **`public-package`** (both verify_jwt false,
-> deliberately — the token is the access control). *(Version numbers used to be written here and
-> went stale twice. `supabase functions list` and `supabase migration list --linked` are the
-> honest answers; this sentence is a hint.)*
+> **Production was fully caught up as of 2026-08-17**, through `20260817000100`. **FIVE** edge functions
+> exist: `generate-invoices`, `package-emails` and **`credit-note-emails`** (verify_jwt ON), plus
+> **`public-invoice`** and **`public-package`** (both verify_jwt false, deliberately — the token is
+> the access control). *(Version numbers used to be written here and went stale twice, and this
+> COUNT went stale once — it read FOUR the day a fifth was deployed. `supabase functions list` and
+> `supabase migration list --linked` are the honest answers; this sentence is a hint.)*
 
 > **Rollback cover is uneven, so know which kind you are shipping.** Backups were taken
 > before each production migration through 2026-08-01 (scratchpad, uncommitted — so not
@@ -377,6 +383,37 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.64 (2026-08-17) — CREDIT-NOTE EMAIL NOTIFICATIONS, SHIPPED LIVE — Wave B is now EXHAUSTED
+
+**A post-invoice correction now tells the parent** (`4288e4c`, migration `383c52f`). New
+`credit-note-emails` edge function: the coach app calls it after a successful save, the admin
+Credit Notes page shows any miss as **Not emailed** with **Resend**. One email per note, naming
+the credited lesson from the invoice's own snapshot, with **two labelled amounts** (this note, and
+the total with that business). **Neither mechanism the backlog proposed was used** — `pg_net` and
+a DB webhook were both refused; reasoning graduated to `docs/ARCHITECTURE.md` §6, where the
+"don't turn this into a trigger-side send later" prohibition now lives.
+
+Built `/plan-with-confidence` → `/plan-review` → `/commit-review`, **each with a second agent**.
+The review agents earned their keep: the plan reviewer's 12 risks reshaped the design before a line
+was written (3 of its findings were wrong on verification, including a proposal to read the
+vestigial `tenants.suspend`), and the commit reviewer's 15 findings caught a **critical live bug
+the whole test suite was blind to** — the suspension gate was calling an RPC `service_role` cannot
+execute and reading the resulting null as "not suspended". §7.172 carries it, along with the
+structural reason no test saw it (it lived in the `Deno.serve` closure), which is why the per-note
+loop was extracted to `core.ts`. Three more gotchas: §7.173–§7.175.
+
+Also this session, unrelated to the feature: **9 orphaned fixture tenants** were traced to this
+session's own prove-red run and deleted (they had been breaking `tenant_isolation` test 18);
+cause fixed at source, §7.174. And **`coach_disable` tests 22/39 were diagnosed** — a fixture
+date that expired on 2026-08-16, product code correct, fix specified but deliberately not applied
+(`BACKLOG.md` → Wave D).
+
+Verified Deno **211 ×2**, pgTAP 1095 (bar `coach_disable` 22/39), vitest 395, jest 384, both
+typechecks, `deno check`; every mitigation proven red. **SHIPPED LIVE 2026-08-17** backend-first —
+prod count (0 credit notes) → migration → function v1 → grant dump → apps last; deploy proof
+needed a bundle-hash poll, and the admin half needed a human check (`docs/DEPLOYMENT.md` §11.25).
+Plan `docs/plans/CREDIT_NOTE_EMAIL_PLAN.md` · PRD §7.8 · `docs/TESTING.md` §5.
+
 ## 8.63 (2026-08-16) — INVOICE-EMAIL DELIVERY TRACKING + RETRY, SHIPPED LIVE
 
 **Wave B head; backend-only, no `core.ts` and no app change** (`a0b502c`). A dropped invoice email
@@ -397,22 +434,9 @@ nothing; first firing is the August run (early Sept). Two gotchas **§7.170–§
 `docs/plans/INVOICE_EMAIL_RETRY_PLAN.md` · PRD §7.7 · `docs/DEPLOYMENT.md` §11.24 · `docs/TESTING.md`
 §5. Crash-safe-claim follow-up in `BACKLOG.md`.
 
-## 8.62 (2026-08-16) — BACKLOG RE-RANKED after the referral queue drained (docs only, no code)
-
-`/backlog-prioritisation` after §8.61 exhausted `## Build order`. Finding: **no rework-critical
-sequence remains** — the queue is now three decisions plus a flat value pool, not a topological sort.
-**Three decisions settled with the user, all recorded in `BACKLOG.md`:** revenue is **ACCRUAL**
-(invoices issued that month; unblocks the owner-only accounting page, whose trainee-coach payroll
-dependency is also discharged — shadows already ship two payout rows); reminders **stay MANUAL for
-now** (parks the cron-gated tail: low-balance nudge, automated reminders, referral reward-expiry
-nudge); **multi-language REFUSED** and *More polished dashboards* retired, both to *Deliberately not
-doing* with revisit triggers. Build order reshaped: **Wave B** (email chain, head not cron-gated) →
-**Wave C** (value-ranked independents) → **Wave D** (latent traps) → *Later*. Also fixed §8.61's
-title drift (read "NOT YET DEPLOYED"; it shipped). No migration, no PRD change. Full ranking +
-reasoning: `BACKLOG.md → ## Build order`; next steps in §9.
-
-*(§8.61 — parent REFERRAL CODES, SHIPPED LIVE — moved to the ledger, `docs/SESSIONS.md`, when §8.63
-landed; along with §8.60 package renewal automation and §8.59 weeks/holiday packages before it.)*
+*(§8.62 — the backlog re-rank — moved to the ledger, `docs/SESSIONS.md`, when §8.64 landed; along
+with §8.61 referral codes, §8.60 package renewal automation and §8.59 weeks/holiday packages
+before it.)*
 
 ---
 
@@ -491,22 +515,31 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE CURRENT BUILD — invoice-email retry SHIPPED LIVE 2026-08-16 (§8.63)
+### THE CURRENT BUILD — credit-note emails SHIPPED LIVE 2026-08-17 (§8.64). **Wave B is empty.**
 
-This session built + deployed the Wave B head — **invoice-email delivery tracking + retry** (§8.63,
-`docs/DEPLOYMENT.md` §11.24). **DORMANT**: 0 unsent invoices on prod, so retry has re-sent nothing;
-first firing is the August billing run (early Sept).
+Both halves are **DORMANT**: production holds **0 credit notes**, so nothing has been emailed and
+Resend has no row to act on. First firing is the first post-billing attendance edit that leaves
+`present`/`trial_paid` — realistically after August is billed in early September.
 
-**Pick the next build** — the queue was re-ranked 2026-08-16 with **no rework-critical sequence left**:
-**Wave B remaining head = Credit-note email notifications** (M; inherits the retry idempotency pattern)
-→ **Wave C** (value-ranked independents: convert-trial, upcoming-lessons, book-makeup-from-attendance,
-edit-history, CSV) → **Wave D** (latent traps) → *Later*. Full ranking + the three settled decisions
-(revenue **ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**): `BACKLOG.md`.
+**Pick from Wave C** — value-ranked, no edges between them, so pick by appetite:
+convert-a-trial (S) · upcoming-lessons-for-parents (S) · book-a-make-up-from-Attendance (S) ·
+attendance-edit-history (S) · CSV export (S). Then **Wave D** (latent traps) → *Later*.
+Full ranking and the settled decisions (revenue **ACCRUAL** · reminders **MANUAL** ·
+multi-language **REFUSED**): `BACKLOG.md`.
 
-> **Cron-gated follow-ups parked in `BACKLOG.md`** (reminders stay manual): reward-expiry nudge,
-> unprompted low-balance email, automated reminders. Plus the new **crash-safe invoice-email retry**
-> item (eliminate the one-invoice claim window — §8.63) and the earlier `recompute_package_extensions`
-> bound.
+> **Two items worth doing together as a small Wave D batch**, because they share one migration:
+> the **duplicate credit note on a re-toggled correction** (no unique index on
+> `credit_notes(invoice_item_id)` — a re-correction really does double the credit, proven by test
+> 2026-08-17) and the **partial unique index** that would make "one credit-note email per invoice
+> line" airtight rather than best-effort. Add `credit_notes(lesson_session_id)` in the same file.
+> Also parked there: `tenants.suspend` is vestigial and should be dropped, and
+> **`coach_disable.test.sql`'s expired fixture date** (2 tests red since 2026-08-16 — diagnosis and
+> fix both written down, product code is fine).
+
+> **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
+> low-balance email, automated reminders. Plus the **crash-safe email claim** item, which now covers
+> `credit_notes.email_sent_at` as well as the invoice column — and is *sharper* for credit notes,
+> since they have no automatic retry pass.
 
 ### Triage rules, when the sweep does redden
 
@@ -528,11 +561,14 @@ edit-history, CSV) → **Wave D** (latent traps) → *Later*. Full ranking + the
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260816000100` (invoice-email retry, §8.63);
-production confirmed caught up 2026-08-16 via `supabase migration list --linked`, `remote` filled.
-**§8.63 is the freshest worked example of a backend-only deploy done RIGHT** (RISK-2 prod count →
-migration → edge fn v23 → grant dump, no app change; `docs/DEPLOYMENT.md` §11.24). The rule stands:
-migrations to prod (engine too when `core.ts` changes — it did NOT for retry) FIRST, apps to `main` LAST.
+**The migration queue is EMPTY.** The latest applied is `20260817000100` (credit-note email
+tracking, §8.64); production confirmed caught up 2026-08-17 via `supabase migration list --linked`,
+**0 pending**. **§8.64 is the freshest worked example, and the first where the APPS had to wait on a
+NEW edge function** — pushing `main` first would have shipped two callers of a function that did not
+exist (prod count → migration → gate → function v1 → grant dump → apps last;
+`docs/DEPLOYMENT.md` §11.25). The rule stands:
+migrations to prod (engine too when `core.ts` changes — it did NOT for either email feature) FIRST,
+apps to `main` LAST.
 §7.123 still applies to signatures. Whatever comes next: still one at
 a time (§7.55), a worktree never authors one, and budget the post-deploy grant check (§7.39,
 §7.89) **and** the rollback rehearsal (§7.93 — running the DOWN file is the half that finds the
@@ -553,14 +589,11 @@ file, and grep finds the oldest first. That cost a wrong risk rating on 2026-08-
 
 ### The documents are on a THIRD attempt at discipline-by-instruction — watch it
 
-`HANDOVER.md` is **40 KB against a 45,000-byte budget**. §8.43 spent 3.8 KB of the 7.4 KB
-that was left after 2026-08-10's cut (§8.41) — half the headroom in one session. §8.44 cost
-**nothing net**: it graduated everything first, then demoted §8.42 to a ledger row and paid
-for its §3 row by deleting one. **That is the mechanism working — a session can add a wave
-and leave the file smaller.** The
-two previous attempts to hold a limit by writing it down both failed, reaching 290 KB and
-then 91 KB — **§7.119** is why, and it is worth reading before the next `/update-docs`, not
-after. Three commands are the whole of the discipline and take ten seconds:
+**Measure BEFORE writing, not after** — that is the whole of it, and §7.119 is why (two
+previous attempts to hold a limit by writing it down reached 290 KB and then 91 KB). The
+mechanism that works: graduate everything to `docs/` first, demote the third-newest §8 entry
+to a ledger row, and pay for a new §3 row by deleting one. A session can add a feature and
+leave the file smaller. Three commands, ten seconds:
 
 ```bash
 wc -c HANDOVER.md                                              # budget 45000

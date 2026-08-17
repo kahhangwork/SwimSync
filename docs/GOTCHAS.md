@@ -2793,3 +2793,71 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     showed all 7 existing invoices PAID (a paid invoice needs no re-email). The rule generalizes
     to any future delivery-tracking column: run the count, decide the WHERE clause against it.
     Plan ⚠ RISK 2. (§8.63)
+
+172. **`service_role` holds EXECUTE on almost every RPC — but NOT all of them, and a
+    `svc.rpc()` whose `error` you discard FAILS OPEN.** This shipped a live bug on
+    2026-08-17, caught in review and not by any test. `credit-note-emails` gated on
+    `tenant_suspended()` via `const { data: suspended } = await svc.rpc(...)`. `proacl` for
+    that function is `{postgres=X,authenticated=X}` — **no `service_role`** — so every call
+    raised `permission denied`, `data` came back `null`, `null === true` evaluated `false`,
+    and the gate concluded "not suspended" on **every invocation**. A suspended business
+    would have emailed parents about credits its own RLS hides from them. The predicate was
+    never at fault; its input always said false.
+    **Two rules.** (a) **Prefer reading the COLUMN** with the service client —
+    `tenants.suspended_at`, as `generate-invoices/core.ts:275-285` already did — and **fail
+    CLOSED** on an unreadable row. **Do NOT fix it by granting EXECUTE to `service_role`**
+    (§7.87): a plain column read needs no new privilege, and the post-deploy grant dump on
+    2026-08-17 confirmed the absence is the *correct* production state. (b) **Never
+    destructure only `data` off an RPC that gates a decision.** `const { data }` silently
+    converts "permission denied" into "the answer is null", and for any boolean gate written
+    as `data === true`, null means *allow*. Check `error`, or don't use an RPC.
+    **Why no test caught it: the gate lived inside the `Deno.serve` closure.** A handler
+    closure is unreachable from a test, so every assertion targeted `core.ts`/`email.ts`
+    while the mitigation sat where only a reviewer could read it. The per-note loop was
+    extracted to `core.ts` for exactly this reason. **A mitigation only a reviewer can read
+    is not a mitigation** — if a guard matters, it has to live somewhere a test can call it.
+    Plan ⚠ RISK 10. (§8.64)
+
+173. **`can_admin_tenant()` includes `is_platform_admin()`, so it is the WRONG check for
+    anything that acts, or sends mail, in a single tenant's name.** It is literally
+    `SELECT is_platform_admin() OR is_tenant_admin(p_tenant_id)`. Admin pages routinely
+    `select` unfiltered and lean on RLS, which hands a platform admin **every** tenant's
+    rows — so gating a per-tenant action on `can_admin_tenant` lets the operator on
+    `admin.swimsync.sg` act as any business (for credit-note emails: send
+    `From: <someone else's business>` to that business's parents). Use
+    **`is_tenant_admin()`** when the action belongs to one business, and note it *also*
+    requires `role = 'tenant_admin'`, `admin_disabled_at IS NULL` and a non-suspended
+    tenant — so a UI check that only compares `tenant_id` is looser than the server and
+    renders a button that 403s. `can_admin_tenant` is correct where a POLICY already uses
+    it (`attendance_write`), because then you are inheriting an existing authority, not
+    inventing one. **Do not widen a per-tenant check to make a platform admin's 403 go
+    away — that 403 is the feature.** Plan ⚠ RISK 4. (§8.64)
+
+174. **A test fixture that creates shared-database state and then throws BEFORE returning
+    leaks it, and the damage surfaces as an unrelated pgTAP failure.** Cost real time on
+    2026-08-17. A Deno helper built a scenario (tenant + coach + parent + invoices), then
+    threw on its own vacuous-fixture guard; the caller's `try/finally { teardown() }` only
+    starts protecting once the helper **returns**, so all 9 tests leaked a tenant holding a
+    2026-05 invoice. That broke `supabase/tests/tenant_isolation.test.sql` **test 18**,
+    which asserts `SELECT COUNT(*) FROM invoices` = 2 **globally** — a pgTAP red with no
+    visible connection to the Deno suite that caused it, and nearly undebuggable from the
+    pgTAP end. **Rule: everything after the fixture is created goes inside a `try` that
+    tears down before rethrowing**, and fold a teardown failure into the original error
+    rather than letting it replace it. Same reason `Promise.allSettled` beats sequential
+    `await`s when tearing down two scenarios: `teardown()` throws if anything still
+    references its tenant, and the first throw would skip the second. **If pgTAP reddens on
+    a global COUNT assertion, suspect Deno-suite debris before suspecting the product** —
+    `SELECT count(*) FROM tenants WHERE display_name LIKE 'Test Tenant%'` is the check.
+    (§8.64)
+
+175. **`psql` renders `timestamptz` in the SESSION timezone, which is UTC here — reading it
+    as SGT is 8 hours of wrong diagnosis.** On 2026-08-17 a `to_char(created_at,'... HH24:MI')`
+    read `10:10`, which was concluded to be "hours before this session started" and therefore
+    somebody else's debris. It was **18:10 SGT — seventeen minutes earlier**, inside the
+    session, and the debris was this session's own (§7.174). `SHOW TimeZone` on the local
+    container returns `UTC`. This is §7.7 wearing different clothes: the same UTC-vs-SGT
+    confusion that shipped a double-billing bug, now on the *diagnostic* side, where it
+    produces a confident wrong answer instead of a wrong invoice. **When a timestamp decides
+    a conclusion, render it explicitly in both zones** —
+    `to_char(x AT TIME ZONE 'UTC', ...)` and `to_char(x AT TIME ZONE 'Asia/Singapore', ...)`
+    — and sanity-check against `now()` in the same query. (§8.64)
