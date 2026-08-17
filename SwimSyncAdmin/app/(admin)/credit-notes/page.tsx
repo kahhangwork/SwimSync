@@ -7,6 +7,10 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
 import { PackageChip } from "@/components/PackageChip";
+import {
+  creditNoteEmailView,
+  resendBlockedLabel,
+} from "@/lib/creditNoteEmailState";
 
 type CreditNoteRow = {
   id: string;
@@ -19,6 +23,12 @@ type CreditNoteRow = {
   linked_invoice_id: string | null;
   created_at: string;
   status: string; // "applied" | "available"
+  // ── Email delivery (docs/plans/CREDIT_NOTE_EMAIL_PLAN.md) ──────────────────
+  email_sent_at: string | null;
+  tenant_id: string;
+  applied_to_invoice_id: string | null;
+  /** ⚠ RISK 2 — status stays 'available' while a note is PARTLY drawn down. */
+  has_applications: boolean;
 };
 
 const STATUS_FILTERS = ["All", "Applied", "Available"];
@@ -31,6 +41,20 @@ export default function CreditNotesPage() {
   const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
     new Map()
   );
+  // ⚠ RISK 4 — the viewer's OWN role and tenant, never a value off a row. The
+  // select below is unfiltered and leans on RLS, which hands a platform admin every
+  // business's notes; only a TENANT admin of a note's own business may email it.
+  const [viewer, setViewer] = useState<{
+    role: string | null;
+    tenantId: string | null;
+    adminDisabled: boolean;
+  }>({ role: null, tenantId: null, adminDisabled: true }); // deny-by-default until loaded
+  // A SET, not one slot: with a single `resendingId`, pressing Resend on B while A is
+  // in flight re-enabled A's button, and A's completion then cleared B's marker —
+  // producing spurious red errors on notes that had in fact just been emailed.
+  const [resending, setResending] = useState<Set<string>>(new Set());
+  const [resendError, setResendError] = useState<Record<string, string>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     // Payment-method chips: fire-and-forget, a failed RPC only means no chips.
@@ -38,12 +62,40 @@ export default function CreditNotesPage() {
       .rpc("student_package_coverage")
       .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
     async function load() {
-      const { data } = await supabase
+      const { data: auth } = await supabase.auth.getUser();
+      if (auth?.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, tenant_id, admin_disabled_at")
+          .eq("id", auth.user.id)
+          .maybeSingle();
+        setViewer({
+          role: profile?.role ?? null,
+          tenantId: profile?.tenant_id ?? null,
+          adminDisabled: profile?.admin_disabled_at != null,
+        });
+      }
+
+      // ⚠ RISK 2 — credit_applications comes back as an EMBED, not a second query.
+      // It was `supabase.from("credit_applications").select("credit_note_id")` with no
+      // filter, no limit and no error check: an error or a db-max-rows truncation made
+      // `has_applications` false on every row, so Resend rendered for part-spent notes
+      // — silently turning off the guard whose whole purpose is the case `status`
+      // cannot see. As an embed it is scoped to the notes actually loaded, costs no
+      // extra round trip, and shares this query's error handling.
+      const { data, error } = await supabase
         .from("credit_notes")
         .select(
-          "id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, students(id, full_name), parents(profiles(full_name))"
+          "id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, email_sent_at, tenant_id, credit_applications(credit_note_id), students(id, full_name), parents(profiles(full_name))"
         )
         .order("issued_at", { ascending: false });
+
+      if (error) {
+        // Surfaced, not defaulted to "nothing is applied" — see ⚠ RISK 2 above.
+        setLoadError(`Could not load credit notes: ${error.message}`);
+        setLoading(false);
+        return;
+      }
 
       setNotes(
         (data ?? []).map((cn: any) => ({
@@ -57,6 +109,10 @@ export default function CreditNotesPage() {
           linked_invoice_id: cn.applied_to_invoice_id,
           created_at: cn.issued_at?.split("T")[0] ?? "—",
           status: cn.status,
+          email_sent_at: cn.email_sent_at ?? null,
+          tenant_id: cn.tenant_id,
+          applied_to_invoice_id: cn.applied_to_invoice_id ?? null,
+          has_applications: (cn.credit_applications ?? []).length > 0,
         }))
       );
       setLoading(false);
@@ -64,6 +120,77 @@ export default function CreditNotesPage() {
 
     load();
   }, []);
+
+  // Resend one note's notification. The edge function re-checks authority and
+  // refuses an applied note on its own; this only stops a doomed press.
+  /** Human copy for the reasons the function can return. */
+  function resendReasonLabel(reason: string): string {
+    switch (reason) {
+      case "already-applied":
+        return "That credit has already been used on an invoice.";
+      case "invoice-line-already-emailed":
+        return "This lesson's credit was already emailed.";
+      case "no-snapshot":
+        return "That credit note is missing its invoice details.";
+      case "tenant suspended":
+        return "This business is suspended, so no email was sent.";
+      case "not allowed":
+        return "You do not administer this business.";
+      default:
+        return reason;
+    }
+  }
+
+  const markEmailed = (noteId: string) =>
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.id === noteId ? { ...n, email_sent_at: new Date().toISOString() } : n
+      )
+    );
+
+  async function resend(noteId: string) {
+    setResending((prev) => new Set(prev).add(noteId));
+    setResendError((prev) => {
+      const { [noteId]: _drop, ...rest } = prev;
+      return rest;
+    });
+
+    const { data, error } = await supabase.functions.invoke(
+      "credit-note-emails",
+      { body: { credit_note_id: noteId } }
+    );
+
+    setResending((prev) => {
+      const next = new Set(prev);
+      next.delete(noteId);
+      return next;
+    });
+
+    const sent = (data as { sent?: number } | null)?.sent ?? 0;
+    const reason = (data as { reason?: string } | null)?.reason;
+
+    // "nothing to send" means it is ALREADY emailed — the coach's save may have
+    // beaten this press by a second. Showing a red error there is wrong twice over:
+    // it reads as a failure, and it left the row saying "Not emailed" with a live
+    // button, because the optimistic update only ran on success.
+    if (reason === "nothing to send") {
+      markEmailed(noteId);
+      return;
+    }
+
+    if (error || sent < 1) {
+      // Inline, never an Alert — this is a web page (and Alert.alert is a no-op on
+      // RN-web anyway, which is why the coach app has the same rule).
+      setResendError((prev) => ({
+        ...prev,
+        [noteId]: reason
+          ? resendReasonLabel(reason)
+          : error?.message ?? "Not sent.",
+      }));
+      return;
+    }
+    markEmailed(noteId);
+  }
 
   const filtered = notes.filter((cn) => {
     const matchSearch =
@@ -89,8 +216,14 @@ export default function CreditNotesPage() {
     <div>
       <PageHeader
         title="Credit Notes"
-        subtitle="Read-only — auto-issued when attendance is corrected post-invoice"
+        subtitle="Auto-issued when attendance is corrected post-invoice — amounts are immutable; the parent's notification can be resent"
       />
+
+      {loadError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3 mb-4">
         <input
@@ -127,17 +260,18 @@ export default function CreditNotesPage() {
           <Th sort={sort} sortKey="linked_invoice_id">Linked Invoice</Th>
           <Th sort={sort} sortKey="created_at" firstDir="desc">Date</Th>
           <Th sort={sort} sortKey="status">Status</Th>
+          <Th>Parent notified</Th>
         </Thead>
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={8}>
+              <Td className="text-center text-gray-400 py-8" colSpan={9}>
                 Loading…
               </Td>
             </Tr>
           ) : visible.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={8}>
+              <Td className="text-center text-gray-400 py-8" colSpan={9}>
                 No credit notes found.
               </Td>
             </Tr>
@@ -170,6 +304,48 @@ export default function CreditNotesPage() {
                   <StatusBadge
                     status={cn.status === "applied" ? "Applied" : "Available"}
                   />
+                </Td>
+                <Td>
+                  {(() => {
+                    const view = creditNoteEmailView(
+                      {
+                        emailSentAt: cn.email_sent_at,
+                        status: cn.status,
+                        appliedToInvoiceId: cn.applied_to_invoice_id,
+                        hasApplications: cn.has_applications,
+                        tenantId: cn.tenant_id,
+                      },
+                      viewer
+                    );
+                    if (!view.showNotEmailed) {
+                      return <span className="text-xs text-gray-400">Emailed</span>;
+                    }
+                    return (
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex w-fit items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                          Not emailed
+                        </span>
+                        {view.canResend ? (
+                          <button
+                            onClick={() => resend(cn.id)}
+                            disabled={resending.has(cn.id)}
+                            className="w-fit rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            {resending.has(cn.id) ? "Sending…" : "Resend"}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400">
+                            {resendBlockedLabel(view.blockedReason!)}
+                          </span>
+                        )}
+                        {resendError[cn.id] && (
+                          <span className="text-xs text-red-600">
+                            {resendError[cn.id]}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </Td>
               </Tr>
             ))

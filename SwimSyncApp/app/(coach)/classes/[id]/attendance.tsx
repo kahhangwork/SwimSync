@@ -31,6 +31,10 @@ import {
   type LessonRole,
 } from "@/lib/coachRoster";
 import { fetchIsMainOnSession } from "@/lib/sessionMainCoach";
+import {
+  mayHaveIssuedCreditNote,
+  notifyCreditNoteEmails,
+} from "@/lib/creditNoteEmail";
 import PrimaryButton from "@/components/PrimaryButton";
 
 type TopStatus = "unmarked" | "present" | "absent" | "cancelled" | "trial";
@@ -168,6 +172,9 @@ export default function MarkAttendanceScreen() {
   const [classTitle, setClassTitle] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [attendance, setAttendance] = useState<Record<string, AttState>>({});
+  // Statuses as the roster loaded them, keyed by student. A ref, not state: nothing
+  // renders from it, and it must not trigger a re-render when the roster reloads.
+  const loadedStatuses = useRef<Record<string, DBStatus | null>>({});
   // A session id is never held on its own — always with the date it belongs
   // to. See lib/attendanceSession.ts for what that prevents.
   const [resolved, setResolved] = useState<ResolvedSession | null>(null);
@@ -497,6 +504,12 @@ export default function MarkAttendanceScreen() {
     }
 
     setAttendance(initAtt);
+    // The statuses AS LOADED, for the credit-note-email check in handleSave. A note
+    // can only be issued when a lesson LEAVES a billable status, so this is what lets
+    // the common save skip the edge-function round trip entirely.
+    loadedStatuses.current = Object.fromEntries(
+      Object.entries(initAtt).map(([id, st]) => [id, toDBStatus(st.top, st.sub)])
+    );
     setLoading(false);
   }
 
@@ -705,6 +718,31 @@ export default function MarkAttendanceScreen() {
         student_count: students.length,
       },
     });
+
+    // ⚠ RISK 9 (CREDIT_NOTE_EMAIL_PLAN.md) — BEFORE setSaving(false), and before
+    // leaveScreen(). If this attendance edit flipped an already-invoiced lesson from
+    // billable to non-billable, the handle_attendance_update trigger has just issued
+    // a credit note, and the parent has no idea until they open the app.
+    //
+    // AWAITED ON PURPOSE, bounded to 3s. leaveScreen() below is a router.replace
+    // that unmounts this screen, so an unawaited request is issued milliseconds
+    // before its own destruction — and a coach who locks the phone kills it. Held
+    // here, the existing save spinner covers the wait; the attendance rows are
+    // already committed above, so this can only delay the toast, never the save.
+    // Silent on failure by decision: the admin's Credit Notes page has the Resend
+    // button, and a failed email is not something the coach can act on (§8.27).
+    //
+    // GUARDED so the COMMON save pays nothing. A credit note can only arise when a
+    // lesson LEAVES 'present'/'trial_paid'; every other save — the normal one — would
+    // otherwise wait on an edge-function cold start plus five queries to be told there
+    // was nothing to do. The server stays authoritative; this only skips the call when
+    // a note is impossible.
+    const savedStatuses = Object.fromEntries(
+      rows.map((r) => [r.student_id, r.status as string | null])
+    );
+    if (mayHaveIssuedCreditNote(loadedStatuses.current, savedStatuses)) {
+      await notifyCreditNoteEmails(supabase, finalSessionId);
+    }
 
     setSaving(false);
     showToast("Attendance saved.", "success");

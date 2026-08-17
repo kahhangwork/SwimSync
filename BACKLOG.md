@@ -357,12 +357,13 @@ accrual, manual reminders, multi-language refused. The order below: **Wave B** t
 chain → **Wave C** value-ranked independents → **Wave D** latent traps → **Later** big features →
 deliberately-last. Sections restructured below.
 
-### Wave B — the one genuine internal chain (start any time; head is NOT cron-gated)
+### Wave B — the one genuine internal chain — **EXHAUSTED bar the cron-gated tail**
 
 *Invoice-email delivery + retry SHIPPED LIVE 2026-08-16 (PRD §7.7, `docs/DEPLOYMENT.md` §11.24),
-establishing the `invoice_email_sent_at` + per-invoice atomic-claim pattern.* **The remaining
-head is now Credit-note email notifications** (M) — it inherits that idempotency pattern rather
-than inventing a second.
+establishing the `invoice_email_sent_at` + per-invoice atomic-claim pattern.*
+***Credit-note email notifications SHIPPED 2026-08-17** (PRD §7.8) — it did inherit that
+pattern, as its own `credit_notes.email_sent_at` claim column.* **Nothing buildable is left in
+Wave B**; the next build comes from **Wave C** below.
 
 **The tail is PARKED — manual chosen 2026-08-16.** The cron decision gated *The UNPROMPTED
 parent low-balance nudge* (S) and *Automated reminder workflows* (M) (plus the referral
@@ -398,6 +399,32 @@ Email-confirmation copy, Tick off swimming skills (M).
   for every business; measure prod first, property-test the matrix.
 - **Bound `recompute_package_extensions`** (S) — scale, not today; verify the resurrection
   assumption before adding the bound.
+- **A re-toggled attendance correction issues a SECOND credit note and DOUBLES the credit**
+  (S) — found 2026-08-17 while building credit-note emails. `present→absent` issues note #1
+  and adds `+amount` to `parent_tenant_balances`; `absent→present` reverses **nothing**;
+  `present→absent` again re-enters the same trigger branch and inserts note #2 with a fresh
+  reference, adding `+amount` again. Verified against the live catalogue: `credit_notes` has
+  **no unique constraint or index on `invoice_item_id`** — only PK, FKs, a status CHECK, and
+  `(tenant_id, reference_number)`. So one $30 lesson can carry $60 of credit, silently.
+  Needs a unique index on `credit_notes(invoice_item_id)` **plus a decision on what the
+  trigger should do on re-correction** (refuse? reverse note #1? reuse it?) — which is why it
+  is not a one-liner. **Add a partial unique index on
+  `credit_notes(invoice_item_id) WHERE email_sent_at IS NOT NULL` in the same migration**:
+  it is what finally makes "one email per invoice line" airtight rather than
+  best-effort (the email path can only narrow the two-concurrent-claims window, not close
+  it), and it costs nothing extra once the table is being altered. Add
+  `credit_notes(lesson_session_id)` there too — `credit-note-emails` filters on it on every
+  attendance save and there is no index today (harmless at current row counts). Deliberately NOT fixed alongside the email: it is a billing-path change
+  with its own blast radius, and one schema change at a time (§7.55). **The email feature
+  cannot make it worse** — `credit-note-emails` sends at most one email per
+  `invoice_item_id`, ever, so a duplicate note is never announced twice.
+- **`tenants.suspend` is a vestigial column and should be dropped** (S) — found 2026-08-17.
+  `boolean`, default `false`, and **nothing in the repo writes it**: `suspend_tenant()` sets
+  only `suspended_at`, and `tenant_suspended()` reads only `suspended_at`. It survives as a
+  column that *looks* authoritative next to the one that is — a plan review for the
+  credit-note email proposed reading both, which would have given the dead column real
+  authority. Drop it, after confirming production holds no `suspend = true` row (a
+  belt-and-braces check: if one exists, something undocumented wrote it).
 - **`/makeups` and `/trials` 79px date column** (S) — cosmetic; fix the column classes.
 - **`HANDOVER.md` §3 needs graduating** (S) — docs tax; keep the prohibitions +
   verified-vs-specified, point the rest at the PRD.
@@ -1082,30 +1109,33 @@ pool. `classes.location_address` is already captured and currently just renders 
 
 ## Notifications and reminders
 
-### Credit-note email notifications — **M** `[Phase 2]`
-Email the parent when a credit note is auto-issued (attendance edited billable→non-billable
-on an already-invoiced lesson). _(Invoice-generation emails **shipped 2026-07-16** — PRD
-§7.7, HANDOVER §8c; this is the other half.)_
+### ~~Credit-note email notifications~~ — **SHIPPED 2026-08-17**
+Built as the `credit-note-emails` edge function; see **PRD §7.8** for the behaviour and
+`docs/plans/CREDIT_NOTE_EMAIL_PLAN.md` for the design.
 
-**Why:** the parent has no idea an adjustment happened until they open the app, so the coach
-fields "why is my bill different?" by hand — the same silent-notification gap the invoice
-email closes, for the other side of the ledger.
+**Neither mechanism this item proposed was used.** It named `pg_net` from the trigger or a
+Supabase DB webhook; both were rejected. `pg_net` puts a network call inside a
+`SECURITY DEFINER` trigger running in the attendance write's transaction — on the billing
+path — and is cloud-only, so the whole send path would have shipped never having run
+locally. A webhook is dashboard config rather than a migration: invisible to the repo and
+untestable. The coach app calls a `verify_jwt`-ON function instead, re-checking the caller
+against `attendance_write`'s own expression — the `package-emails` pattern that already
+existed here and that this item never considered.
 
-**Notes:** deliberately split from the invoice email because it's a **harder path** — credit
-notes are issued by the `handle_attendance_update` **Postgres trigger** (`20260309000500`),
-not the Edge Function, so there's no server-side send point. Needs `pg_net` (cloud-only)
-firing from the trigger, or a Supabase DB webhook → a small endpoint that sends via Resend.
-**Reuse `email.ts`** (builders + `sendInvoiceEmail`, HANDOVER §8c) once building. Guard
-idempotency — the trigger can fire per edit.
+### Crash-safe email claim (eliminate the one-row claim window) — **S**
+The shipped invoice retry (SHIPPED LIVE 2026-08-16 — PRD §7.7) uses the boolean
+`invoice_email_sent_at` as BOTH the claim and the sent-marker: it claims one invoice, sends it,
+resets on failure. A crash/timeout in the ~one-row window between claim and send silently drops
+that single invoice's email.
 
-### Crash-safe invoice-email retry (eliminate the one-invoice claim window) — **S**
-The shipped retry (SHIPPED LIVE 2026-08-16 — PRD §7.7) uses the boolean `invoice_email_sent_at`
-as BOTH the claim and the sent-marker: it claims one invoice, sends it, resets on failure. A
-crash/timeout in the ~one-invoice window between claim and send silently drops that single
-invoice's email.
+**Credit notes now share the exposure** (`credit_notes.email_sent_at`, 2026-08-17) and it is
+*sharper* there: the invoice path has an automatic retry pass on every generate-invoices run,
+whereas the credit-note path has **only the admin Resend button** by decision — and a claimed
+row renders as *emailed*, so Resend cannot reach it. A `try/finally` covers a thrown send; a
+process kill does not. Fix both columns together; the design is one column, not two.
 
-**Why:** invoice email is best-effort, but a silent drop still means a parent never hears about
-a bill. Today bounded to one in-flight invoice and low-volume, so low-priority.
+**Why:** email is best-effort, but a silent drop still means a parent never hears about a bill
+or an adjustment. Today bounded to one in-flight row and low-volume, so low-priority.
 
 **Notes:** eliminating the residual window needs a separate `claimed_at` column (or a per-scope
 advisory lock) so a crash-safe send-then-stamp ordering is safe under concurrency — a boolean

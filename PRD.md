@@ -1295,7 +1295,7 @@ even on a sealed month — with no duplicate** to anyone who already received th
 *(implemented 2026-08-16: a Resend hiccup previously dropped a parent's notification silently
 with no record; the retry self-heals on the next run via a per-invoice atomic claim, and
 skips suspended/auto-disabled tenants — see §7.7 and `docs/DEPLOYMENT.md` §11.24)*.
-*Credit-note* emails are not yet sent (a separate path — see §7.8). **Live in production
+*Credit-note* emails are now sent too, by their own path — see §7.8. **Live in production
 since 2026-07-16** (Edge Function deployed + `RESEND_API_KEY` secret set); the first real
 send is the 1 Aug generation, and delivery-tracking/retry went live 2026-08-16.
 
@@ -1310,6 +1310,39 @@ SwimSync shall support credit notes for post-invoice attendance corrections.
 - Parents can view credit note history in SwimSync's billing section
 - Coaches and superadmin can view credit notes in their respective views
 - Credit notes carry unique sequential reference numbers (e.g. CN-2026-0001)
+
+#### The parent is emailed when a credit note is issued *(implemented 2026-08-17)*
+
+Until this shipped, a parent learned about an adjustment only by opening the app, so the
+coach fielded "why is my bill different?" by hand — the same silent-notification gap the
+invoice email closes, on the other side of the ledger.
+
+When a correction issues a credit note, SwimSync emails that parent a message **branded as
+the business** (§7.7's rule) naming the credited lesson — child, class and date, taken from
+the invoice's own snapshot so a later rename or class hand-over cannot make the email
+contradict the invoice the parent is holding — the credit note's reference number, the
+coach's stated reason where they gave one, **and two separately labelled amounts: this
+credit note, and the parent's total credit with that business**. The total is named
+alongside the business because credit never crosses businesses (§5.6), and the email says
+the credit is applied automatically to the next invoice, so no payment is needed for the
+credited lesson.
+
+- **One email per credit note.** A rained-off lesson credits every affected child, so a
+  parent with two children in that class receives two — each with its own reference number.
+- **A credit that has already been used is never emailed.** Once the engine has drawn a
+  note down, in whole or in part, the "applied to your next invoice" promise would be
+  false, so the notification is refused rather than sent late.
+- **A suspended business sends nothing**, because a suspended business's credit notes are
+  hidden from the parent in the app.
+- **Delivery is best-effort and isolated**, like the invoice email: a failure never affects
+  the attendance save or the credit note itself. Every successful send is stamped, and the
+  tenant admin sees any note that was never emailed on the admin panel's Credit Notes page,
+  marked **Not emailed**, with a **Resend** button. Resending is deliberately a **tenant
+  admin** action — the platform admin can see every business's notes and must not send mail
+  in a business's name.
+
+Package-funded corrections are **not** emailed, because they issue no credit note — the
+lesson's value returns to the package instead (§7.16).
 
 ### 7.9 Payment Tracking
 

@@ -292,8 +292,17 @@ Resend path). Anything else → 400.
 > - **PROHIBITION:** do NOT fix the trigger in this plan. It is a billing-path change with
 >   its own blast radius and belongs in its own migration, one at a time (§7.55).
 > - **ASSERTION:** two notes on one `invoice_item_id` → exactly **1** send.
-> - **STRUCTURAL: yes** for the email (a query condition); **no** for the double credit,
->   which is why it gets a backlog item.
+>
+> **⚠ "EVER" WAS OVER-CLAIMED. Corrected 2026-08-17 after review.** The guarantee is
+> *one email per line per run*, plus a best-effort cross-run check. A condition evaluated
+> **before** the claim is not a claim: two notes on one line, with a coach save and an
+> admin Resend firing together, both read the set as empty and then claim **different
+> rows** — so both claims succeed and two emails go out. Mitigated by re-reading the line's
+> stamps *after* our own claim and backing out if another note also holds one, which
+> narrows the window to the interval between the two claims but cannot close it.
+> - **STRUCTURAL: partly.** Closing it fully needs a partial unique index on
+>   `credit_notes(invoice_item_id) WHERE email_sent_at IS NOT NULL`, filed with the
+>   duplicate-note item in `BACKLOG.md`. The double credit itself is deferred there too.
 
 > ### ⚠ RISK 10 MITIGATION — gate on `tenant_suspended()`, and do NOT read `tenants.suspend`
 >
@@ -306,9 +315,24 @@ Resend path). Anything else → 400.
 > default `false`, and `suspend_tenant()` writes only `suspended_at`. Nothing in the repo
 > sets it. Encoding a dead column into new code would give it false authority.
 >
-> - **STEP:** call the existing `tenant_suspended(tenant_id)` helper — the single source
->   of truth — and refuse when true. `canEmailForTenant` consumes its boolean result, with
->   **no default-allow branch**.
+> **⚠ THIS STEP AS ORIGINALLY WRITTEN SHIPPED A BUG. Corrected 2026-08-17 after review.**
+> It said "call the existing `tenant_suspended(tenant_id)` helper", and that was done —
+> from the SERVICE client, which holds **no EXECUTE on it**:
+> `proacl = {postgres=X,authenticated=X}`, and `SET ROLE service_role; SELECT
+> tenant_suspended(...)` → `permission denied`. The code discarded the RPC's `error`, so
+> `data` was null, `null === true` was false, and the gate concluded "not suspended" on
+> **every invocation**. The mitigation was dead code; `canEmailForTenant` was never at
+> fault — its input always said false. No test could see it, because the gate lived in the
+> `Deno.serve` closure (see RISK 3's note in Step 6).
+>
+> - **STEP:** read the **column** with the service client — `fetchTenantSuspended` in
+>   `core.ts`, mirroring `generate-invoices/core.ts:275-285` — and **fail closed**: an
+>   unreadable tenant row returns null, which must not send.
+> - **PROHIBITION:** do NOT fix this by granting EXECUTE to `service_role` (§7.87). A
+>   plain column read needs no new privilege; `service_role` already holds SELECT on
+>   `tenants`.
+> - **ASSERTION:** three integration tests — live → false, `suspended_at` set → true,
+>   unknown tenant → null. Proven red against the RPC form (2 of 3 fail).
 > - **PROHIBITION:** do NOT read `tenants.suspend` in this feature.
 > - **STEP:** file a `BACKLOG.md` note that `tenants.suspend` is vestigial and should be
 >   dropped, so the next person does not read it either.
