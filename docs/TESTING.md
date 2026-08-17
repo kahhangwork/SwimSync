@@ -217,7 +217,13 @@ _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 _Frontend tests:_
 `SwimSyncAdmin` uses **vitest** + Testing Library (`vitest.config.ts`) — **27 files, 350
 tests** (2026-08-14; the runner is the fact, this number is a hint that drifts). **2026-08-17
-added `lib/creditNoteEmailState.test.ts`** — the Credit Notes page's Resend gate, pure: it mirrors
+(Wave C)** added four pure libs, each with its risk-mitigation proven red first:
+`lib/csv.test.ts` (serialisation + the §7.179 formula-injection and source-count truncation
+guards), `lib/trialConvert.test.ts` (the §7.180 two-press guard), `lib/makeupFromAttendance.test.ts`
+(the own-enrolled-class gate + the "exclude EVERY own class" host-choice filter) and
+`lib/auditDiff.test.ts` (the snapshot diff + the "an unresolved actor is *unknown user*, never
+*system*" label). `lib/adminNav.test.ts`'s page-count assertion moved 19 → 20 for `/history`.
+**2026-08-17 added `lib/creditNoteEmailState.test.ts`** — the Credit Notes page's Resend gate, pure: it mirrors
 `is_tenant_admin()` **term for term** (role `tenant_admin`, `admin_disabled_at IS NULL`, tenant
 match), so a platform admin, a coach whose `tenant_id` happens to match, and a disabled admin all
 get **no button** rather than a 403 rendered as "Edge Function returned a non-2xx status code"
@@ -262,7 +268,11 @@ the bug it prevents — *"NEVER says nobody when only inactive children hold the
 (§7.69). `Table.test.tsx` gained sortable-header render tests (click, reverse, `firstDir`,
 `aria-sort`, non-sortable columns) plus width assertions, and keeps its `<Thead>`-owns-its-
 `<tr>` call-site scan.
-`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **19 files, 348 tests** (2026-08-11). **2026-08-17
+`SwimSyncApp` uses **jest-expo** (`jest.config.js`) — **19 files, 348 tests** (2026-08-11).
+**2026-08-17 (Wave C)** added `lib/upcomingLessons.test.ts` — the parent upcoming-lessons
+projection (weekday walk over ~4 weeks, per-`(class,date)` dedup), with the **public-holiday
+exclusion proven red** (§7.179-era Wave C): a date on `tenant_public_holidays` is dropped, so
+the app never lists a lesson on a day the pool is closed. **2026-08-17
 added `lib/creditNoteEmail.test.ts`** — two things. (a) The **ordering** pin: the credit-note email
 request is `await`ed (bounded 3s) BEFORE `leaveScreen()`, because that is a `router.replace` which
 unmounts the screen — an unawaited fetch is issued milliseconds before its own destruction, and a

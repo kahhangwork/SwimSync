@@ -575,3 +575,21 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     notes exist, so nothing has been emailed and the Resend button has no row to act on. First
     firing is the first post-billing attendance edit that leaves `present`/`trial_paid`.
     Four gotchas: **§7.172–§7.175**. Plan: `docs/plans/CREDIT_NOTE_EMAIL_PLAN.md`.
+
+26. **Deploy record (2026-08-17): Wave C — five APP-ONLY features, one push** (§8.66). CSV
+    export, convert-a-trial, parent upcoming-lessons, book-a-make-up-from-Attendance, and the
+    Change History page. **No migration, no edge function** — so the order inverts §11.9: there
+    was nothing to land first, and a single `git push origin main` (`c4d78f5..4891744`) is the
+    whole deploy, Vercel rebuilding both sites. CI green before relying on it.
+    **Deploy proof, and a NEW technique that fixes §11.25's gap:** the parent app half is a
+    public SPA bundle, confirmed the normal way (poll `swimsync.sg`'s `/_expo/.../entry-*.js`
+    until it carries the new subtitle string — the old build served for **~15 min**; Vercel was
+    slow, not stuck). The admin half added a **new route** `/history`, and an auth-gated page's
+    bundle can't be grepped anonymously (§11.25's limitation) — **but a route that did not exist
+    in the prior build returns 404, and 200 once deployed**, with no login needed. Existing
+    routes (`/invoices`) return 200 throughout, a nonexistent path (`/zzz`) stays 404, so
+    `admin.swimsync.sg/history` flipping 404→200 is a clean per-deploy admin signal whenever a
+    release adds a route. **Rollback:** app-only, so Vercel's "promote previous deployment" is
+    the whole plan — no DOWN file. **Dormant/low-exposure on prod:** the make-up and convert
+    actions need data states prod's single private-coach account rarely has; Change History shows
+    the real trail immediately (verified live — actor resolves to a name, diffs render).

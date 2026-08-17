@@ -1,16 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-17 (second session) — **CI and the nightly were BOTH red and nobody had
-looked** (§8.65). CI failed **every push for 20 commits** on one expired fixture date; the nightly
-had 3 of 45 drivers red for 3 nights, and underneath the noise sat a **LIVE regression** since
-2026-08-15 — PGRST201 embed ambiguity emptied the package catalogue in BOTH apps. **Latent, not
-costly: prod has 0 `package_products`**, so nothing was for sale to lose. Fixed and deploy-verified
-— `2c16be9`, `2c83573`. **No migration.** §7.176–178. Next: **Wave C** (§9)._
+_Last updated: 2026-08-17 (Wave C) — **All FIVE Wave C items SHIPPED LIVE in one app-only push**
+(§8.66): CSV export, convert-a-trial, parent upcoming-lessons, book-a-make-up-from-Attendance, and
+the **Change History** page. No migration, no edge function — `c4d78f5..4891744` on `main`, Vercel
+builds both sites. Built `/plan-with-confidence` → `/plan-review` (Fable) → per-item
+`/commit-review`; six risk mitigations, each proven red. §7.179–180 · `§11.26`. **Wave C is EMPTY.**_
 
-_Previously, 2026-08-17 — **Credit-note email notifications SHIPPED LIVE** (§8.64), which
-**exhausts Wave B**. A post-invoice correction now emails the parent; the admin resends a miss from
-Credit Notes. Prod migration `20260817000100` + new `credit-note-emails` v1 (5 functions now).
-**DORMANT** — 0 credit notes on prod. PRD §7.8 · `docs/DEPLOYMENT.md` §11.25 · §7.172–175._
+_Previously, 2026-08-17 — CI and the nightly were BOTH red and nobody had looked (§8.65): CI red
+every push for 20 commits on an expired fixture date, and under the nightly noise a LATENT PGRST201
+regression emptied the package catalogue (prod has 0 `package_products`, so no loss). §7.176–178._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -210,6 +208,10 @@ is a guard whose first real firing is still ahead of you.
   first real one is worth watching: it is also the first time `'mixed'` package coverage
   becomes reachable on real data (PRD §7.16), a code path that was unreachable-by-construction
   for its whole life until 2026-08-11.
+- **Wave C (§8.66)** — four of the five are dormant for a data reason, not a bug: convert-a-trial and
+  make-up-from-Attendance need data states the single private-coach account rarely produces; CSV export
+  and parent upcoming-lessons do nothing until there is data. **Change History is the exception — LIVE,
+  showing the real `audit_log` trail immediately.** Don't rediscover the four quiet ones as bugs.
 
 *(Corrected 2026-08-10: this list also carried "production has 0 attendance rows", which
 had been false since 2026-07-26 and directly contradicted the REAL BILLING note below.
@@ -385,6 +387,31 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.66 (2026-08-17, Wave C) — ALL FIVE WAVE C ITEMS SHIPPED LIVE, ONE APP-ONLY PUSH
+
+**Wave C is now EMPTY.** Five features, **no migration and no edge function**, deployed by a single
+push to `main` (`3a72947`, `85b880b`, `02c75e8`, `7a3ff8e`, `4891744` → `c4d78f5..4891744`):
+- **CSV export** (Invoices/Credit Notes/Attendance) — `lib/csv.ts`, §7.179.
+- **Convert a trial → enrolled** from the Trials past-needs-marking list — §7.180.
+- **Upcoming lessons** on the parent Attendance screen — `lib/upcomingLessons.ts`, holidays subtracted.
+- **Book a make-up from Attendance** — an absent/cancelled row seeds `book_makeup()`.
+- **Change History** page (`/history`) — an `audit_log` viewer, diffs the `to_jsonb` snapshots.
+
+Built `/plan-with-confidence` → `/plan-review` (**Fable agent**; all 6 risks verified in code, two
+contradicting the draft) → per-item `/commit-review`. **Every risk mitigation proven red first**; the
+durable ones graduated to **§7.179** (CSV export safety — injection + source-count truncation) and
+**§7.180** (the convert guard queries *future* trials, so skipping it re-opens the blocked-month hole).
+Verified admin vitest **427**, app jest **389**, both typechecks; the `/history` PostgREST embed
+checked against the live DB per §7.176; the parent upcoming section **eyeballed live** (holiday
+exclusion confirmed — the first apparent failure was an incomplete manual seed missing
+`parent_tenants`, not the code).
+
+**Deliberately not done:** off-schedule extra dates in the make-up-from-Attendance modal (the Makeups
+page stays the full-featured home); `lesson_session`-level cancellations in upcoming lessons (holidays
+were the free 90% — the join is a `BACKLOG.md` follow-up). Nav gained `/history`, so
+`verify-platform-admin-scope.mjs`'s page-count pin was bumped **19→20 in the same push** (§7.178
+applied). PRD §7.5/§7.17/§7.20/§14 · `docs/DEPLOYMENT.md` §11.26 · plan `docs/plans/WAVE_C_PLAN.md`.
+
 ## 8.65 (2026-08-17, second session) — BOTH CI AND THE NIGHTLY WERE RED, AND ONE HID A LIVE BUG
 
 **Nothing was built. Two red pipelines were read, and one hid a production regression**
@@ -410,40 +437,10 @@ Third was `parent-claim` — c009945 renames a confirmed claim to the parent's o
 could be TRUE. Verified pgTAP **1097** on a clean reset, vitest 395, jest 384, both typechecks,
 packages 21/21, parent-claim 21/21, 4 neighbour drivers green; every fix proven red first.
 
-## 8.64 (2026-08-17) — CREDIT-NOTE EMAIL NOTIFICATIONS, SHIPPED LIVE — Wave B is now EXHAUSTED
-
-**A post-invoice correction now tells the parent** (`4288e4c`, migration `383c52f`). New
-`credit-note-emails` edge function: the coach app calls it after a successful save, the admin
-Credit Notes page shows any miss as **Not emailed** with **Resend**. One email per note, naming
-the credited lesson from the invoice's own snapshot, with **two labelled amounts** (this note, and
-the total with that business). **Neither mechanism the backlog proposed was used** — `pg_net` and
-a DB webhook were both refused; reasoning graduated to `docs/ARCHITECTURE.md` §6, where the
-"don't turn this into a trigger-side send later" prohibition now lives.
-
-Built `/plan-with-confidence` → `/plan-review` → `/commit-review`, **each with a second agent**.
-The review agents earned their keep: the plan reviewer's 12 risks reshaped the design before a line
-was written (3 of its findings were wrong on verification, including a proposal to read the
-vestigial `tenants.suspend`), and the commit reviewer's 15 findings caught a **critical live bug
-the whole test suite was blind to** — the suspension gate was calling an RPC `service_role` cannot
-execute and reading the resulting null as "not suspended". §7.172 carries it, along with the
-structural reason no test saw it (it lived in the `Deno.serve` closure), which is why the per-note
-loop was extracted to `core.ts`. Three more gotchas: §7.173–§7.175.
-
-Also this session, unrelated to the feature: **9 orphaned fixture tenants** were traced to this
-session's own prove-red run and deleted (they had been breaking `tenant_isolation` test 18);
-cause fixed at source, §7.174. And **`coach_disable` tests 22/39 were diagnosed** — a fixture
-date that expired on 2026-08-16, product code correct, fix specified but deliberately not applied
-(`BACKLOG.md` → Wave D).
-
-Verified Deno **211 ×2**, pgTAP 1095 (bar `coach_disable` 22/39), vitest 395, jest 384, both
-typechecks, `deno check`; every mitigation proven red. **SHIPPED LIVE 2026-08-17** backend-first —
-prod count (0 credit notes) → migration → function v1 → grant dump → apps last; deploy proof
-needed a bundle-hash poll, and the admin half needed a human check (`docs/DEPLOYMENT.md` §11.25).
-Plan `docs/plans/CREDIT_NOTE_EMAIL_PLAN.md` · PRD §7.8 · `docs/TESTING.md` §5.
-
-*(§8.63 — invoice-email retry — moved to the ledger, `docs/SESSIONS.md`, when §8.65 landed;
-along with §8.62 the backlog re-rank, §8.61 referral codes and §8.60 package renewal
-automation before it.)*
+*(§8.64 — credit-note email notifications, SHIPPED LIVE, Wave B exhausted — moved to the ledger,
+`docs/SESSIONS.md`, when §8.66 landed; along with §8.63 invoice-email retry, §8.62 the backlog
+re-rank, §8.61 referral codes and §8.60 package renewal automation before it. Its four gotchas
+§7.172–175 and deploy record §11.25 carry the reasoning.)*
 
 ---
 
@@ -529,17 +526,17 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE CURRENT BUILD — credit-note emails SHIPPED LIVE 2026-08-17 (§8.64). **Wave B is empty.**
+### THE NEXT BUILD — Wave C SHIPPED LIVE 2026-08-17 (§8.66). **Both Wave B and Wave C are empty.**
 
-Both halves are **DORMANT**: production holds **0 credit notes**, so nothing has been emailed and
-Resend has no row to act on. First firing is the first post-billing attendance edit that leaves
-`present`/`trial_paid` — realistically after August is billed in early September.
+All five Wave C items are live (app-only, `c4d78f5..4891744`). Their prod exposure is small and
+each is dormant for its own reason: the make-up and convert actions need data states the single
+private-coach account rarely produces; **Change History shows the real trail immediately** (the one
+Wave C feature that is NOT dormant — verified live). CSV export and upcoming-lessons work the moment
+there is data.
 
-**Pick from Wave C** — value-ranked, no edges between them, so pick by appetite:
-convert-a-trial (S) · upcoming-lessons-for-parents (S) · book-a-make-up-from-Attendance (S) ·
-attendance-edit-history (S) · CSV export (S). Then **Wave D** (latent traps) → *Later*.
-Full ranking and the settled decisions (revenue **ACCRUAL** · reminders **MANUAL** ·
-multi-language **REFUSED**): `BACKLOG.md`.
+**Next is Wave D** (latent traps — the batch below), then *Later* (the owner-only accounting page
+absorbs Revenue reporting; accrual chosen). Full ranking and the settled decisions (revenue
+**ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**): `BACKLOG.md`.
 
 > **Two items worth doing together as a small Wave D batch**, because they share one migration:
 > the **duplicate credit note on a re-toggled correction** (no unique index on

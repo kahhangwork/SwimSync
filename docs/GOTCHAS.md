@@ -2909,3 +2909,31 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     the whole time. **When the nightly reddens, triage it that day even if you are certain
     which check it is** — the certainty is about one driver, and the sweep reports several.
     (§8.65)
+
+179. **A CSV export of user-entered text has TWO ways to lie, and quoting fixes neither.**
+    Wave C added `lib/csv.ts` for the admin tables. (a) **Formula injection**: a
+    parent-entered name like `=HYPERLINK(...)` or `+cmd|...` EXECUTES when the admin opens
+    the file in Excel, and RFC-4180 quoting does **not** stop it — Excel evaluates quoted
+    formulas. A leading `'` does; `toCsv` prefixes any STRING field whose first char is
+    `= + - @ TAB CR`. **Numbers are passed through untouched** — a JS number cannot
+    stringify to a formula, and guarding one would turn a real `-5` credit into text and
+    break the accountant's SUM. (b) **Silent truncation**: the admin pages cap their fetch
+    (~1000 rows), so exporting a capped array yields a file that SUMS WRONG with no on-file
+    warning. `exportCsv` refuses to emit when the source was capped — keyed on the
+    **unfiltered fetch count (`sourceCount`), NOT the filtered `visible` length**: a client
+    filter that shrinks 1000 capped rows to 50 does not make the export complete, it just
+    hides that the fetch already dropped the rest. A blocked download is recoverable; a
+    wrong revenue figure is not. UTF-8 BOM so Excel opens unicode names. (§8.66)
+
+180. **"Skip the guard, it can't apply here" — CHECK what the guard actually queries first.**
+    Convert-a-trial (Wave C) reuses the Unassigned Children enrolment insert, which carries
+    a two-press guard. The first plan skipped it: "the trial is the reason to convert." That
+    premise was WRONG about the guard — it queries only *future* trials
+    (`.gte("session_date", today).is("cancelled_at", null)`), so it never fires on the past
+    trial being converted anyway. What it catches is the real hazard: a child who rebooked a
+    *second, upcoming* trial. Enrolling then stacks a permanent enrolment on a live unmarked
+    booking, and an unmarked trial blocks the whole tenant's billing month with **no
+    override** (§7.15). The guard was ported into the convert handler, and the past trial row
+    deliberately STAYS on the needs-marking list — converting is not marking. Rule: before
+    dropping a guard you inherited, read its predicate; "it can't apply here" is a claim about
+    code you may not have read. (`lib/trialConvert.ts`, §8.66)
