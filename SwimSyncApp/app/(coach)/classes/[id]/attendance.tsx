@@ -16,6 +16,7 @@ import { confirmAction } from "@/lib/confirm";
 import { applyBulkStatus, SET_ALL_OPTIONS, BulkOption } from "@/lib/attendanceBulk";
 import { mergeRoster } from "@/lib/attendanceRoster";
 import { buildAttendanceRows } from "@/lib/attendancePayload";
+import { attendanceSaveErrorMessage } from "@/lib/attendanceSaveError";
 import { checkMarkableDate, type MarkableCheck } from "@/lib/attendanceWindow";
 import { fetchMarkableFloor } from "@/lib/markableFloor";
 import {
@@ -652,7 +653,13 @@ export default function MarkAttendanceScreen() {
       .upsert(rows, { onConflict: "lesson_session_id,student_id" });
 
     if (upsertError) {
-      showToast("Failed to save attendance. Please try again.", "error");
+      // ⚠ CN001 — the credit-note trigger REFUSED to un-correct a lesson whose
+      // credit is already applied (20260818000100). One row in a batch upsert, so
+      // the whole roster rolled back — attendanceSaveErrorMessage says so.
+      showToast(
+        attendanceSaveErrorMessage((upsertError as { code?: string }).code),
+        "error"
+      );
       setSaving(false);
       return;
     }

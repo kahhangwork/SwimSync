@@ -236,30 +236,31 @@ Deno.test("⚠ RISK 5: an emailed invoice line is reported, so a sibling note is
   }
 });
 
-// The double-credit bug itself (BACKLOG.md): re-correcting the SAME lesson issues a
-// second note on the same invoice line. This pins that the EMAIL never announces it
-// twice, which is the guarantee the plan actually makes.
-Deno.test("⚠ RISK 5: a re-toggled correction makes TWO notes on one line; only one may email", async () => {
+// The double-credit bug (BACKLOG.md Wave D) is FIXED by 20260818000100: a re-toggled
+// correction now REUSES one credit_notes row per invoice line (absent->present voids it,
+// present->absent re-activates the SAME row) instead of minting a second note. So the
+// email side trivially announces the one line once.
+Deno.test("⚠ RISK 5: a re-toggled correction reuses ONE note on the line; one email", async () => {
   const { s, sessionId, note } = await scenarioWithCreditNote();
   try {
-    // absent -> present reverses nothing, then present -> absent issues note #2.
+    // absent -> present VOIDS the note; present -> absent re-activates the SAME row.
     await s.mark(sessionId, "present");
     await s.mark(sessionId, "absent");
 
-    const both = await findUnsentBySession(s.db, sessionId, s.tenantId);
-    assert(both.ok);
-    assertEquals(both.notes.length, 2, "the trigger really does issue a second note");
+    const found = await findUnsentBySession(s.db, sessionId, s.tenantId);
+    assert(found.ok);
+    assertEquals(found.notes.length, 1, "the fix reuses one note per invoice line");
     assertEquals(
-      both.notes[0].invoice_item_id,
-      both.notes[1].invoice_item_id,
-      "and both sit on the SAME invoice line — the double-credit bug",
+      found.notes[0].invoice_item_id,
+      note.invoice_item_id,
+      "the reused note sits on the same invoice line",
     );
 
-    // Now walk them the way index.ts does: claim, record the line, then re-decide.
+    // Walk it the way index.ts does: claim, record the line, then re-decide.
     const emailedItems = new Set<string>();
     const spent = new Set<string>();
     let would = 0;
-    for (const n of both.notes) {
+    for (const n of found.notes) {
       if (skipReasonFor(n, { spent, emailedItems })) continue;
       const claim = await claimNote(s.db, n.id);
       if (!(claim.ok && claim.claimed)) continue;
@@ -267,7 +268,6 @@ Deno.test("⚠ RISK 5: a re-toggled correction makes TWO notes on one line; only
       would++;
     }
     assertEquals(would, 1, "one invoice line, one email — ever");
-    void note;
   } finally {
     await s.teardown();
   }
@@ -530,27 +530,37 @@ Deno.test("a successful send STAMPS the note and reports it", async () => {
   }
 });
 
-Deno.test("⚠ RISK 5: two notes on ONE invoice line produce exactly ONE send", async () => {
+Deno.test("⚠ RISK 5: the reused note sends once; the dedup still guards a same-line pair", async () => {
   const { s, sessionId } = await scenarioWithCreditNote();
   try {
-    // Re-toggle the SAME lesson: a second note on the same invoice line.
+    // The fix leaves ONE note on the line after a re-toggle.
     await s.mark(sessionId, "present");
     await s.mark(sessionId, "absent");
-    const both = await findUnsentBySession(s.db, sessionId, s.tenantId);
-    assert(both.ok);
-    assertEquals(both.notes.length, 2);
-    assertEquals(both.notes[0].invoice_item_id, both.notes[1].invoice_item_id);
+    const found = await findUnsentBySession(s.db, sessionId, s.tenantId);
+    assert(found.ok);
+    assertEquals(found.notes.length, 1, "one note per line (double-credit fixed)");
 
     const stub = stubSender(() => ({ sent: true, outcome: "ok" }));
     const res = await sendNotes(
       s.db,
-      both.notes,
+      found.notes,
       { spent: new Set(), emailedItems: new Set() },
       { send: stub.send as never, balances: new Map() },
     );
     assertEquals(res.sent, 1, "one invoice line, one email");
     assertEquals(stub.calls.length, 1, "the sender was invoked exactly once");
-    assertEquals(res.firstSkip, "invoice-line-already-emailed");
+    assertEquals(res.firstSkip, null, "nothing to skip — there is only one note");
+
+    // Defense in depth: UNIQUE(invoice_item_id) now forbids two unsent notes on one
+    // line, but skipReasonFor must still refuse a second were one ever constructed.
+    const twin = { ...found.notes[0], id: crypto.randomUUID() };
+    assertEquals(
+      skipReasonFor(twin, {
+        spent: new Set(),
+        emailedItems: new Set([found.notes[0].invoice_item_id]),
+      }),
+      "invoice-line-already-emailed",
+    );
   } finally {
     await s.teardown();
   }

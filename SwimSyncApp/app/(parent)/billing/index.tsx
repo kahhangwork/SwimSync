@@ -196,7 +196,12 @@ export default function BillingScreen() {
         supabase
           .from("credit_notes")
           .select("id, reference_number, amount, issued_at, original_status, corrected_status, reason, applied_to_invoice_id")
+          // A 'reversed' note was voided (the lesson was un-corrected back to
+          // billable, 20260818000100). It is no longer real credit, so it must
+          // never render as "Available" here — filter it out (the badge below
+          // then only ever sees available/applied).
           .eq("parent_id", parent.id)
+          .neq("status", "reversed")
           .order("issued_at", { ascending: false }),
 
         // RLS scopes these to this parent's own packages.

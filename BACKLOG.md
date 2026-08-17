@@ -391,41 +391,36 @@ Email-confirmation copy, Tick off swimming skills (M).
 
 ### Wave D — latent traps: cheap now, silently worse later
 
-- **A PayNow ID that can't build a QR** (S) — a mistyped UEN/mobile saves clean and the
-  business collects nothing; dry-run `buildPayNowPayload()` at save, advisory only.
+- ~~**A PayNow ID that can't build a QR**~~ — **DONE 2026-08-18** (§8.68). Advisory warning at
+  the admin save (`SwimSyncAdmin/lib/paynow.ts`, mirrors `buildPayNowPayload`'s mobile check);
+  a UEN has no checksum so only the mobile shape is verifiable, which is all the real builder checks.
 - **`fixtures-trial-onboarding-teardown` deletes invoices it doesn't own** (S) — the next
   fixture touching invoices trips `credit_notes_invoice_item_id_fkey`.
 - **Sealing a LATER month strands an earlier unsealed one** (S) — moves `markable_floor()`
   for every business; measure prod first, property-test the matrix.
 - **Bound `recompute_package_extensions`** (S) — scale, not today; verify the resurrection
   assumption before adding the bound.
-- **A re-toggled attendance correction issues a SECOND credit note and DOUBLES the credit**
-  (S) — found 2026-08-17 while building credit-note emails. `present→absent` issues note #1
-  and adds `+amount` to `parent_tenant_balances`; `absent→present` reverses **nothing**;
-  `present→absent` again re-enters the same trigger branch and inserts note #2 with a fresh
-  reference, adding `+amount` again. Verified against the live catalogue: `credit_notes` has
-  **no unique constraint or index on `invoice_item_id`** — only PK, FKs, a status CHECK, and
-  `(tenant_id, reference_number)`. So one $30 lesson can carry $60 of credit, silently.
-  Needs a unique index on `credit_notes(invoice_item_id)` **plus a decision on what the
-  trigger should do on re-correction** (refuse? reverse note #1? reuse it?) — which is why it
-  is not a one-liner. **Add a partial unique index on
-  `credit_notes(invoice_item_id) WHERE email_sent_at IS NOT NULL` in the same migration**:
-  it is what finally makes "one email per invoice line" airtight rather than
-  best-effort (the email path can only narrow the two-concurrent-claims window, not close
-  it), and it costs nothing extra once the table is being altered. Add
-  `credit_notes(lesson_session_id)` there too — `credit-note-emails` filters on it on every
-  attendance save and there is no index today (harmless at current row counts). Deliberately NOT fixed alongside the email: it is a billing-path change
-  with its own blast radius, and one schema change at a time (§7.55). **The email feature
-  cannot make it worse** — `credit-note-emails` sends at most one email per
-  `invoice_item_id`, ever, so a duplicate note is never announced twice.
-- **`tenants.suspend` is VESTIGIAL and should be dropped** (S) — the column is a
-  `boolean`, default `false`, and **nothing in the repo writes it**: `suspend_tenant()` sets
-  only `suspended_at`, and `tenant_suspended()` reads only `suspended_at`. It survives as a
-  column that *looks* authoritative next to the one that is — a plan review for the
-  credit-note email proposed reading both, which would have given the dead column real
-  authority. Drop it, after confirming production holds no `suspend = true` row (a
-  belt-and-braces check: if one exists, something undocumented wrote it).
-- **`/makeups` and `/trials` 79px date column** (S) — cosmetic; fix the column classes.
+- ~~**A re-toggled attendance correction issues a SECOND credit note and DOUBLES the credit**~~
+  — **DONE 2026-08-18** (§8.68, migration `20260818000100`). Symmetric ledger: one `credit_notes`
+  row reused per `invoice_item_id` (`UNIQUE(invoice_item_id)` + `lesson_session_id` index);
+  `absent→present` voids an undrawn note (−balance), and un-correcting an already-DRAWN credit is
+  **refused** (`CN001`). The partial email index was found **redundant** — full `UNIQUE(invoice_item_id)`
+  + reuse-row makes "one email per line" structural — so it was deliberately NOT added.
+- ~~**`tenants.suspend` is VESTIGIAL and should be dropped**~~ — **DONE 2026-08-18** (§8.68).
+  `DROP COLUMN IF EXISTS` — the column was schema DRIFT (present in the DB, created by no
+  migration), which is why `IF EXISTS` was required for a clean `db reset`.
+- ~~**`/makeups` and `/trials` 79px date column**~~ — **DONE 2026-08-18** (§8.68). `whitespace-nowrap`
+  on the Date `<Th>`/`<Td>` in both pages.
+- **Engine-side credit-note lock — the COMPLETE fix for the un-correction/drawdown race** (S)
+  `[found 2026-08-18]` — the trigger's un-correction branch now takes `FOR UPDATE` on the note
+  (§8.68), closing the trigger-vs-trigger window. But `generate-invoices` (`core.ts:~1404`) still
+  selects `status='available'` notes without a row lock and inserts the application before flipping
+  status, so a billing run racing an un-correction is not fully serialised. Dormant (0 notes on prod,
+  billing is monthly/manual) — do it when cron is enabled or a second coach exists.
+- **Admin action to void/reverse a credit note** (S) `[found 2026-08-18]` — a DRAWN credit that
+  needs un-correcting is now refused (`CN001`) with "reverse it manually / contact support", but the
+  admin UI has no void button, so the only route is DB-level. Give the tenant admin a guarded reverse
+  action (audited) so the coach's refusal has a real destination.
 - **`HANDOVER.md` §3 needs graduating** (S) — docs tax; keep the prohibitions +
   verified-vs-specified, point the rest at the PRD.
 
@@ -798,7 +793,11 @@ migration** and the bounded loop is correct as it stands. Do it in the same migr
 
 ## Billing and payments
 
-### A PayNow ID can be saved that no QR can be built from — **S** `[found 2026-08-09]`
+### ~~A PayNow ID can be saved that no QR can be built from~~ — **S** — **DONE 2026-08-18** (§8.68)
+_Advisory warning at the admin save for the mobile-shape case (`SwimSyncAdmin/lib/paynow.ts`,
+mirroring `buildPayNowPayload`). The UEN "wrong-yet-valid" half remains uncatchable by design
+(no checksum), as the notes below predicted; the dry-run reduces to the mobile check because
+that is the only thing the real builder validates on a stored proxy. Advisory only, no DB CHECK._
 Tell the admin, at save time, that the PayNow UEN or mobile they just entered cannot be
 encoded — instead of letting them find out from a parent who could not pay.
 
@@ -1478,7 +1477,9 @@ already knows both). Do **not** widen `check-fixture-roundtrip.sh` to tolerate i
 the fix is cheap: run the full round-trip, then move that fixture's billing month back to
 last month and confirm the unwind still passes.
 
-### `/makeups` and `/trials` render a 79px DATE column — **S**
+### ~~`/makeups` and `/trials` render a 79px DATE column~~ — **S** — **DONE 2026-08-18** (§8.68)
+_Fixed the column classes as the note below directs: `whitespace-nowrap` on the Date `<Th>`/`<Td>`
+in both pages. No width assertion added to the driver (per §7.71)._
 Both pages squeeze their date column to 79px at a 1280px viewport, reported by
 `verify-admin-table-geometry.mjs`'s width probe.
 

@@ -17,6 +17,7 @@ import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Tabl
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { blankToNull, checkSgPhone, normalizeSgPhone } from "@/lib/sgPhone";
+import { payNowProxyWarning } from "@/lib/paynow";
 import { settlementPayload } from "@/lib/settlementPayload";
 import { buildReminderMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { ReminderQueue } from "./ReminderQueue";
@@ -222,7 +223,16 @@ export default function InvoicesPage() {
       .from("tenants")
       .update({ [field]: value, updated_at: new Date().toISOString() })
       .eq("id", tenantId);
-    setPaynowSaved(error ? `Error: ${error.message}` : "PayNow details saved.");
+    // Advisory only: the value still saved. A mistyped mobile can't build a QR,
+    // and the parent's screen would silently show none — warn here instead.
+    const warning = error ? null : payNowProxyWarning(field, value);
+    setPaynowSaved(
+      error
+        ? `Error: ${error.message}`
+        : warning
+          ? `Saved — ⚠ ${warning}`
+          : "PayNow details saved."
+    );
     if (!error && field === "paynow_mobile") setPaynowMobile(value ?? "");
     if (!error && field === "paynow_uen") setPaynowUen(value ?? "");
   }

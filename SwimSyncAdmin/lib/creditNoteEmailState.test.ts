@@ -138,6 +138,21 @@ describe("creditNoteEmailView", () => {
     expect(view.blockedReason).toBe("already-applied");
   });
 
+  it("a reversed (voided) note reports 'reversed', never the 'already used' copy", () => {
+    const view = creditNoteEmailView({ ...virgin, status: "reversed" }, adminOfA);
+    expect(view.canResend).toBe(false);
+    expect(view.showNotEmailed).toBe(false);
+    expect(view.blockedReason).toBe("reversed");
+  });
+
+  it("a reversed note reads as voided even if it was emailed before the void", () => {
+    const view = creditNoteEmailView(
+      { ...virgin, status: "reversed", emailSentAt: "2026-08-18T00:00:00Z" },
+      adminOfA,
+    );
+    expect(view.blockedReason).toBe("reversed");
+  });
+
   // Authority is decided BEFORE note state, so a platform admin never learns
   // whether someone else's note happens to be resendable.
   it("permission outranks note state in the reported reason", () => {
@@ -166,5 +181,6 @@ describe("resendBlockedLabel", () => {
     expect(resendBlockedLabel("already-emailed")).toBe("Emailed");
     expect(resendBlockedLabel("not-your-business")).toBe("Another business");
     expect(resendBlockedLabel("already-applied")).toBe("Credit already used");
+    expect(resendBlockedLabel("reversed")).toBe("Credit voided");
   });
 });

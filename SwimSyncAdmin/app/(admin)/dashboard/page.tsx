@@ -138,7 +138,9 @@ export default function DashboardPage() {
           .eq("status", "outstanding"),
         supabase
           .from("credit_notes")
-          .select("id", { count: "exact", head: true }),
+          // A 'reversed' note was voided (20260818000100) — not live credit.
+          .select("id", { count: "exact", head: true })
+          .neq("status", "reversed"),
         supabase.from("coaches").select("id", { count: "exact", head: true }),
         supabase
           .from("classes")

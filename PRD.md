@@ -580,6 +580,22 @@ A credit note is **automatically triggered** when a coach changes a student's at
 
 No credit note is generated for changes within the same billing category (e.g. Present to Paid Trial).
 
+#### When a Credit Note Is Reversed *(implemented, 2026-08-18)*
+
+The credit is **symmetric**. If the same lesson is later corrected back to a billable
+status (the coach un-does the correction), the credit note is **reversed** — its status
+becomes `reversed` and the credit is removed from the parent's balance, so re-toggling a
+lesson can never accumulate more than one lesson's credit. Reversal reuses the one credit
+note per corrected lesson rather than issuing new records (so the note count stays honest),
+and a reversed note is hidden from the parent and labelled *Reversed* in the admin views.
+
+**One exception, by design:** if the credit has already been drawn down against another
+invoice, the correction back to billable is **refused** — un-marking the lesson would
+silently reopen a past (possibly paid) invoice. The coach is told the credit must be
+reversed manually; there is no automatic clawback. *(Before 2026-08-18 an un-correction
+reversed nothing and a re-correction issued a second note, doubling the credit — see
+`HANDOVER.md` §8 / GOTCHAS.)*
+
 #### Credit Note Details
 
 - Each credit note is linked to the original invoice and the specific attendance correction

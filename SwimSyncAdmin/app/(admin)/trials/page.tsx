@@ -476,7 +476,7 @@ export default function TrialsPage() {
         <Thead>
           <Th sort={trialSort} sortKey="student_name">Child</Th>
           <Th sort={trialSort} sortKey="class_title">Class</Th>
-          <Th sort={trialSort} sortKey="session_date">Date</Th>
+          <Th sort={trialSort} sortKey="session_date" className="whitespace-nowrap">Date</Th>
           <Th sort={trialSort} sortKey="marked">Status</Th>
           <Th>Actions</Th>
         </Thead>
@@ -496,7 +496,7 @@ export default function TrialsPage() {
                   </span>
                 </Td>
                 <Td className="text-gray-500">{b.class_title}</Td>
-                <Td className="text-gray-500">{formatSgDate(b.session_date)}</Td>
+                <Td className="text-gray-500 whitespace-nowrap">{formatSgDate(b.session_date)}</Td>
                 <Td className="text-gray-500">
                   {b.marked ? "Marked" : "Awaiting the lesson"}
                 </Td>

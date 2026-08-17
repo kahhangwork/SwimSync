@@ -26,7 +26,7 @@ type CreditNoteRow = {
   reason: string | null;
   linked_invoice_id: string | null;
   created_at: string;
-  status: string; // "applied" | "available"
+  status: string; // "applied" | "available" | "reversed"
   // ── Email delivery (docs/plans/CREDIT_NOTE_EMAIL_PLAN.md) ──────────────────
   email_sent_at: string | null;
   tenant_id: string;
@@ -35,7 +35,16 @@ type CreditNoteRow = {
   has_applications: boolean;
 };
 
-const STATUS_FILTERS = ["All", "Applied", "Available"];
+const STATUS_FILTERS = ["All", "Applied", "Available", "Reversed"];
+
+// A note voided by an un-correction (status 'reversed', 20260818000100) must NOT
+// read as "Available" — it is no longer live credit. One helper so the label, the
+// filter, the sort and the CSV all agree.
+function creditNoteStatusLabel(status: string): string {
+  if (status === "applied") return "Applied";
+  if (status === "reversed") return "Reversed";
+  return "Available";
+}
 
 // CSV export — what's on screen (post-filter/sort). Amounts raw for summing;
 // the linked invoice is exported as the full id (the table truncates it), date
@@ -48,7 +57,7 @@ const CREDIT_NOTE_CSV_COLUMNS: CsvColumn<CreditNoteRow>[] = [
   { header: "Reason", value: (r) => r.reason },
   { header: "Linked Invoice", value: (r) => r.linked_invoice_id },
   { header: "Date", value: (r) => r.created_at },
-  { header: "Status", value: (r) => (r.status === "applied" ? "Applied" : "Available") },
+  { header: "Status", value: (r) => creditNoteStatusLabel(r.status) },
   { header: "Emailed", value: (r) => (r.email_sent_at ? "yes" : "no") },
 ];
 
@@ -217,8 +226,7 @@ export default function CreditNotesPage() {
       cn.student_name.toLowerCase().includes(search.toLowerCase()) ||
       cn.parent_name.toLowerCase().includes(search.toLowerCase()) ||
       cn.reference_number.toLowerCase().includes(search.toLowerCase());
-    const label =
-      cn.status === "applied" ? "Applied" : "Available";
+    const label = creditNoteStatusLabel(cn.status);
     const matchStatus = statusFilter === "All" || label === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -227,7 +235,7 @@ export default function CreditNotesPage() {
     key: "created_at",
     dir: "desc",
     accessors: {
-      status: (cn) => (cn.status === "applied" ? "Applied" : "Available"),
+      status: (cn) => creditNoteStatusLabel(cn.status),
     },
   });
   const visible = sort.apply(filtered);
@@ -352,7 +360,7 @@ export default function CreditNotesPage() {
                 <Td className="text-gray-500">{cn.created_at}</Td>
                 <Td>
                   <StatusBadge
-                    status={cn.status === "applied" ? "Applied" : "Available"}
+                    status={creditNoteStatusLabel(cn.status)}
                   />
                 </Td>
                 <Td>

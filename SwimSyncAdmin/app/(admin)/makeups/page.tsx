@@ -393,7 +393,7 @@ export default function MakeupsPage() {
         <Thead>
           <Th sort={makeupSort} sortKey="student_name">Child</Th>
           <Th sort={makeupSort} sortKey="class_title">Joining</Th>
-          <Th sort={makeupSort} sortKey="session_date">Date</Th>
+          <Th sort={makeupSort} sortKey="session_date" className="whitespace-nowrap">Date</Th>
           <Th sort={makeupSort} sortKey="marked">Status</Th>
           <Th>Actions</Th>
         </Thead>
@@ -408,7 +408,7 @@ export default function MakeupsPage() {
               <Tr key={b.id}>
                 <Td className="font-medium text-gray-800">{b.student_name}</Td>
                 <Td className="text-gray-500">{b.class_title}</Td>
-                <Td className="text-gray-500">{formatSgDate(b.session_date)}</Td>
+                <Td className="text-gray-500 whitespace-nowrap">{formatSgDate(b.session_date)}</Td>
                 <Td className="text-gray-500">
                   {b.marked ? "Marked" : "Awaiting the lesson"}
                 </Td>

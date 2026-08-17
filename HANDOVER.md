@@ -480,21 +480,7 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
-### The nightly sweep — cleared 2026-08-17 after THREE red nights nobody read
-
-**A sweep left red stops being an alarm.** A deliberate page-count pin nobody bumped (§7.178) sat
-on top of a LIVE regression (§7.176) in the same rot issue, unread, while CI was also red on every
-push. **Triage the day it reddens even when you are sure which check it is** — you are sure about
-one driver; it reports several. §8.65.
-
-### The nightly sweep — the Wave 5 first-sweep landed, and nothing new was added
-
-The 2026-08-13 nightly (`ui-drivers.yml`) was the first to exercise all three Wave 5 chunks and
-the modified `verify-admins` (24 checks, the `adminhistory@` persona). Suspect→commit map if a
-Wave-5 area reddens later: `verify-admins`→`ee15814`; `platform-admin-scope`/Platform
-page→`9c1279c`; Coaches page→`f5d91aa`. **The Attendance money-axis change (§8.53) added NO
-registered driver** — its browser pass was a one-off (seeded, then torn down), so it is covered
-by vitest + that manual 8/8 run and nothing new enters the nightly.
+### The nightly sweep
 
 > **Re-read the run, not this paragraph.** `gh run list --workflow=ui-drivers.yml` and the
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
@@ -543,8 +529,15 @@ absorbs Revenue reporting; accrual chosen). Full ranking and the settled decisio
 
 ### Triage rules, when the sweep does redden
 
-**Three triage rules worth keeping, all bought with real time:**
+**Four triage rules worth keeping, all bought with real time:**
 
+- **A sweep left red stops being an alarm.** A deliberate page-count pin nobody bumped (§7.178)
+  once sat on top of a LIVE regression (§7.176) in the same rot issue, unread, while CI was red on
+  every push. **Triage the day it reddens even when you are sure which check it is** — you are sure
+  about one driver; it reports several. §8.65. *(Wave-5 suspect→commit map if one of those areas
+  reddens: `verify-admins`→`ee15814`; `platform-admin-scope`/Platform page→`9c1279c`; Coaches
+  page→`f5d91aa`. The Attendance money-axis change, §8.53, registered NO driver — vitest + a one-off
+  8/8 browser run cover it.)*
 - **A job that dies before checkout is not your code.** Three CI runs on 2026-08-06 failed
   in *"Set up job"* during a GitHub Actions major outage. Check `githubstatus.com` before
   reading a diff.

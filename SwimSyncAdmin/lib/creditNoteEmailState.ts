@@ -28,7 +28,11 @@ export type ResendBlockedReason =
    * engine leaves status 'available' while a note is PARTLY drawn down
    * (core.ts:1437-1445), which is why hasApplications is a separate input.
    */
-  | "already-applied";
+  | "already-applied"
+  /** The note was VOIDED by an un-correction (status 'reversed', 20260818000100).
+   *  It is not spent credit — it is no credit at all — so "already used" would
+   *  mislead on a money page. Never sendable. */
+  | "reversed";
 
 export type CreditNoteEmailView = {
   /** Show a "Not emailed" pill? False once it has been sent. */
@@ -57,6 +61,12 @@ export function creditNoteEmailView(
     adminDisabled: boolean;
   },
 ): CreditNoteEmailView {
+  // A voided note is not live credit — decide this before anything else so the
+  // hint reads "Credit voided", never "already used" or a stale "Not emailed".
+  if (note.status === "reversed") {
+    return { showNotEmailed: false, canResend: false, blockedReason: "reversed" };
+  }
+
   if (note.emailSentAt !== null) {
     return { showNotEmailed: false, canResend: false, blockedReason: "already-emailed" };
   }
@@ -103,5 +113,7 @@ export function resendBlockedLabel(reason: ResendBlockedReason): string {
       return "Another business";
     case "already-applied":
       return "Credit already used";
+    case "reversed":
+      return "Credit voided";
   }
 }
