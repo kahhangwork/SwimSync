@@ -4,7 +4,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(6);
+SELECT plan(7);
 
 -- Multi-tenancy scaffolding: coaches and students now require a tenant. This
 -- fixture creates its own so the test stays independent of the seed. The rule
@@ -149,6 +149,22 @@ SELECT throws_ok($$
   UPDATE credit_notes SET reason='tampered'
     WHERE id='0c000000-0000-0000-0000-000000000001'
 $$, '42501', NULL, 'an authenticated user cannot modify a credit note');
+
+-- The same refusal, aimed at email_sent_at specifically (20260817000100).
+-- WHY A SECOND ASSERTION ON THE SAME TABLE. Grants are not column-scoped, so the
+-- one above already covers this column — but that is exactly the reasoning the
+-- credit-note email feature RELIES on, and a claim relied upon should be pinned
+-- where it can go red rather than inferred. The column doubles as the send CLAIM:
+-- if a client could ever null it, a tenant member could force a re-email to a
+-- parent; if they could set it, they could suppress one. Neither is reachable
+-- while credit_notes grants `authenticated` SELECT and nothing else, and this is
+-- the line that fails the day someone "fixes" a permission error with a re-grant.
+-- (§7.87 · docs/plans/CREDIT_NOTE_EMAIL_PLAN.md)
+SELECT throws_ok($$
+  UPDATE credit_notes SET email_sent_at=NULL
+    WHERE id='0c000000-0000-0000-0000-000000000001'
+$$, '42501', NULL,
+   'an authenticated user cannot clear a credit note''s email_sent_at claim');
 
 SELECT * FROM finish();
 ROLLBACK;
