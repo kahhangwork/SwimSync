@@ -110,8 +110,14 @@ try {
   // 2026-08-05, after claims/parents/trials/makeups/packages landed; 15 → 16
   // on 2026-08-06 for Admins; 16 → 17 on 2026-08-12 for Lesson Coaches —
   // Wave 3 shipped it 2026-08-11 and the first sweep to reach this driver
-  // afterwards went red here, exactly as designed).
-  check("sidebar shows the 17 business pages", tnav.navLinks.length === 17,
+  // afterwards went red here, exactly as designed; 17 → 18 for Holidays
+  // (c544f74 — NOT its reverted first attempt b3933d1) and 18 → 19 for
+  // Referrals (e59af21), bumped together on 2026-08-17).
+  // That last bump was three nights late: the 08-14 nightly saw 18, the 08-15
+  // and 08-16 ones saw 19, and all three were left red. Designed-to-redden only
+  // pays if someone bumps it the next morning.
+  // `SwimSyncAdmin/lib/adminNav.ts` is the fact — count its scope:"tenant" rows.
+  check("sidebar shows the 19 business pages", tnav.navLinks.length === 19,
     `${tnav.navLinks.length}: ${JSON.stringify(tnav.navLinks)}`);
   check("sidebar does NOT show Platform", !tnav.navLinks.includes("/platform"));
 

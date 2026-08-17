@@ -141,11 +141,41 @@ SELECT c.id, 25.00, 60, '2026-01-01', 'main'   FROM coaches c WHERE c.profile_id
 -- Lessons. X: one JULY lesson (the payout month) and one August, both marked
 -- by the target. Y: a PAST August lesson (unmarked — the ⚠ RISK 8 subject)
 -- and a FUTURE one, each carrying a substitute override naming the target.
+--
+-- ⚠ …0034 IS RELATIVE, AND THE OTHER THREE ARE NOT. That asymmetry is the fix
+-- for a real 3-day CI outage, so don't "tidy" it into four of a kind.
+--   …0034 is the only date whose assertion is about ITS RELATION TO TODAY:
+--   test 22 wants disable_coach() to delete its override, and that deletion is
+--   `session_date > today_sg()`. Written as a literal it is a FUTURE date for
+--   one week and a past one for ever after. It was '2026-08-15' and expired on
+--   2026-08-15 SGT, reddening every push for 20 commits (2026-08-14 → 08-17)
+--   until it was found.
+--
+--   The expression yields the first Saturday STRICTLY AFTER today. Saturday
+--   because all three classes here are Saturday classes; strictly after because
+--   the offset `((12 - dow) % 7) + 1` is in 1..7 and can never be 0 — the naive
+--   `6 - dow` returns 0 when today IS Saturday, which re-creates this exact bug
+--   on one day in seven. `12 - dow` (dow is 0..6) is kept positive on purpose so
+--   `%` never sees a negative operand.
+--
+--   The other three are pinned on purpose and do NOT rot:
+--     …0031 (Jul 4) — tests 40/41 aggregate generate_coach_payouts(…,'2026-07'),
+--                     a month that stays in the past. One lesson = one 30.00 payout.
+--     …0032 (Aug 1) — must be marked and NOT in July, or test 41's payout doubles.
+--     …0033 (Aug 8) — test 38 marks it as the ADMIN, through the window guard.
+--                     Safe for ever because of the '2026-07' billing_periods seal
+--                     this fixture writes below: markable_floor() is
+--                     LEAST(1st of last month, month after the latest seal), and
+--                     that second term is pinned at 2026-08-01, so the floor can
+--                     never rise past 2026-08-01 and never shuts …0033 out.
+--   The fixture's own INSERTs run as postgres, and both guards return early on
+--   `current_user <> 'authenticated'` — so only test 38's mark is guard-checked.
 INSERT INTO lesson_sessions (id, class_id, session_date, status) VALUES
   ('d15a0000-0000-0000-0000-000000000031','d15a0000-0000-0000-0000-000000000011','2026-07-04','completed'),
   ('d15a0000-0000-0000-0000-000000000032','d15a0000-0000-0000-0000-000000000011','2026-08-01','completed'),
   ('d15a0000-0000-0000-0000-000000000033','d15a0000-0000-0000-0000-000000000012','2026-08-08','completed'),
-  ('d15a0000-0000-0000-0000-000000000034','d15a0000-0000-0000-0000-000000000012','2026-08-15','scheduled');
+  ('d15a0000-0000-0000-0000-000000000034','d15a0000-0000-0000-0000-000000000012',
+   today_sg() + (((12 - EXTRACT(DOW FROM today_sg())::int) % 7) + 1),'scheduled');
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
 SELECT ls.id,'d15a0000-0000-0000-0000-000000000021','present','d15a0000-0000-0000-0000-0000000000c1'
   FROM lesson_sessions ls WHERE ls.id IN
