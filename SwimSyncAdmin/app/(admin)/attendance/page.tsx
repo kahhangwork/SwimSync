@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { exportCsv, type CsvColumn } from "@/lib/csv";
+import { todayInSg } from "@/lib/lessonDates";
 import { PageHeader } from "@/components/PageHeader";
+import { Button } from "@/components/Button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
@@ -67,6 +71,7 @@ export default function AttendancePage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   // Kept apart from loadError on purpose: an attribution failure leaves the
   // audit trail COMPLETE — only the Coach column is unavailable — so it must not
   // borrow the "records incomplete, do not trust this" framing (RISK 7).
@@ -389,6 +394,37 @@ export default function AttendancePage() {
   const inputClass =
     "rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400";
 
+  function handleExportCsv() {
+    // Coach text mirrors the on-screen cell: main coach, "(cover)" when a
+    // substitute stood in, and each shadow appended. Blank when no coach
+    // resolved (the same "—" the cell shows — empty is cleaner in a spreadsheet).
+    const coachText = (a: AttendanceRow): string => {
+      if (!a.main_coach_id) return "";
+      let s = coachNameById.get(a.main_coach_id) ?? "Unknown coach";
+      if (a.is_cover) s += " (cover)";
+      for (const id of a.shadow_coach_ids) {
+        s += `; +${coachNameById.get(id) ?? "Unknown coach"} (shadow)`;
+      }
+      return s;
+    };
+    const columns: CsvColumn<AttendanceRow>[] = [
+      { header: "Student", value: (a) => a.student_name },
+      { header: "Class", value: (a) => a.class_title },
+      { header: "Coach", value: coachText },
+      { header: "Date", value: (a) => a.session_date },
+      { header: "Status", value: (a) => STATUS_LABELS[a.status] ?? a.status },
+    ];
+    const res = exportCsv(`attendance-${todayInSg()}.csv`, visible, columns, {
+      sourceCount: rows.length,
+    });
+    setExportNotice(
+      res.ok
+        ? null
+        : `Too many records to export at once (capped at ${res.cap} most recent). ` +
+            `Narrow the date range or filters, then export again.`,
+    );
+  }
+
   return (
     <div>
       <PageHeader
@@ -470,7 +506,24 @@ export default function AttendancePage() {
             Clear filters
           </button>
         )}
+
+        <div className="ml-auto">
+          <Button
+            variant="outline"
+            disabled={visible.length === 0}
+            onClick={handleExportCsv}
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
+
+      {exportNotice && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {exportNotice}
+        </div>
+      )}
 
       {loadError && (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

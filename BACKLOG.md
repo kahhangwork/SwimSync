@@ -383,7 +383,7 @@ Ranked by value; build any, in roughly this order:
 4. **Attendance edit history view** (S) — dispute resolution; blocker cleared 2026-08-09
    (`20260809000200`), the delete-purge hole closed 2026-08-13 (`20260813000400`, delete now
    REFUSED). Render backend-written rows as "system", diff the `to_jsonb` snapshots.
-5. **Export to CSV** (S) — accountant escape hatch; start with invoices.
+5. ~~**Export to CSV**~~ — **DONE 2026-08-17** (all three tables; see below).
 
 Lower-value S pool, no order: Maps deep link, Better filtering/search, Moving a student
 between businesses (two silent loose ends), the family-status client-side scan,
@@ -1268,15 +1268,17 @@ gives them its join code, and the child is added there as a new record. History 
 the business that taught it, which is the isolation working correctly. Don't conflate the
 two by making the rescue tool "move everything".
 
-### Export to Excel / CSV — **S** `[MVP-excluded]` `[Phase 3]`
-Export attendance, invoices, and credit notes from the admin panel.
-
-**Why:** it's how the data gets to an accountant at tax time, and it's the escape hatch
-that makes the whole system less scary to commit to — if you can always get your data
-out, you're not trapped.
-
-**Notes:** admin tables already query exactly this data; the work is serialisation and a
-download. Start with invoices, which is the one with an actual deadline behind it.
+### ~~Export to Excel / CSV~~ — **S** — **DONE 2026-08-17**
+Shipped all three at once (invoices, credit notes, attendance), not invoices-only as the
+item proposed — the serialisation was shared, so the incremental cost of the other two was
+near zero. Each admin table has an **Export CSV** button (`lib/csv.ts` + per-page columns);
+PRD §14 *(Superadmin Panel)* describes the behaviour. Two safeguards hardened by
+`/plan-review` are the durable part: a **formula-injection guard** (a parent-entered name
+like `=HYPERLINK(...)` is neutralised with a leading apostrophe — quoting alone does NOT stop
+Excel evaluating it), and a **cap-block** that refuses to emit when the source fetch was
+truncated (keyed on the unfiltered fetch count, not the filtered view — a client filter that
+shrinks a capped 1000 rows to 50 does not make the export complete). Excel unit is dollars,
+exported raw for summing; UTF-8 BOM for unicode names. Both safeguards graduate to §7.
 
 ### Coach-assisted assignment workflow — **M** `[Phase 3]`
 Let a coach assign students to their own classes, not just the superadmin.

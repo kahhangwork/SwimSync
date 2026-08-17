@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { exportCsv, type CsvColumn } from "@/lib/csv";
+import { todayInSg } from "@/lib/lessonDates";
 import { PageHeader } from "@/components/PageHeader";
+import { Button } from "@/components/Button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
@@ -33,6 +37,21 @@ type CreditNoteRow = {
 
 const STATUS_FILTERS = ["All", "Applied", "Available"];
 
+// CSV export — what's on screen (post-filter/sort). Amounts raw for summing;
+// the linked invoice is exported as the full id (the table truncates it), date
+// is the raw YYYY-MM-DD, and "Emailed" reflects whether the parent was notified.
+const CREDIT_NOTE_CSV_COLUMNS: CsvColumn<CreditNoteRow>[] = [
+  { header: "Reference", value: (r) => r.reference_number },
+  { header: "Student", value: (r) => r.student_name },
+  { header: "Parent", value: (r) => r.parent_name },
+  { header: "Amount", value: (r) => r.amount },
+  { header: "Reason", value: (r) => r.reason },
+  { header: "Linked Invoice", value: (r) => r.linked_invoice_id },
+  { header: "Date", value: (r) => r.created_at },
+  { header: "Status", value: (r) => (r.status === "applied" ? "Applied" : "Available") },
+  { header: "Emailed", value: (r) => (r.email_sent_at ? "yes" : "no") },
+];
+
 export default function CreditNotesPage() {
   const [notes, setNotes] = useState<CreditNoteRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +74,7 @@ export default function CreditNotesPage() {
   const [resending, setResending] = useState<Set<string>>(new Set());
   const [resendError, setResendError] = useState<Record<string, string>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
 
   useEffect(() => {
     // Payment-method chips: fire-and-forget, a failed RPC only means no chips.
@@ -212,6 +232,21 @@ export default function CreditNotesPage() {
   });
   const visible = sort.apply(filtered);
 
+  function handleExportCsv() {
+    const res = exportCsv(
+      `credit-notes-${todayInSg()}.csv`,
+      visible,
+      CREDIT_NOTE_CSV_COLUMNS,
+      { sourceCount: notes.length },
+    );
+    setExportNotice(
+      res.ok
+        ? null
+        : `Too many credit notes to export at once (the list is capped at ${res.cap}). ` +
+            `Narrow it with the status filter or search, then export again.`,
+    );
+  }
+
   return (
     <div>
       <PageHeader
@@ -248,7 +283,22 @@ export default function CreditNotesPage() {
             </button>
           ))}
         </div>
+        <div className="ml-auto">
+          <Button
+            variant="outline"
+            disabled={visible.length === 0}
+            onClick={handleExportCsv}
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
+      {exportNotice && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+          {exportNotice}
+        </div>
+      )}
 
       <Table>
         <Thead>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle, Link as LinkIcon, MessageCircle, RefreshCw } from "lucide-react";
+import { CheckCircle, Download, Link as LinkIcon, MessageCircle, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { exportCsv, type CsvColumn } from "@/lib/csv";
 import {
   todayInSg,
   monthBounds,
@@ -61,6 +62,22 @@ type UnclaimedStudent = {
  *  never see them — this standing report is the only thing that can. */
 type OrphanLine = UnclaimedStudent & { billing_month: string };
 
+// CSV export — what's on screen (post-filter/sort `visible`), raw values so an
+// accountant can sum the money columns. Month stays the raw YYYY-MM (sortable in
+// Excel); status is the badge label, not the lowercased enum.
+const INVOICE_CSV_COLUMNS: CsvColumn<InvoiceRow>[] = [
+  { header: "Parent", value: (r) => r.parent_name },
+  { header: "Students", value: (r) => r.student_names },
+  { header: "Month", value: (r) => r.billing_month },
+  { header: "Gross", value: (r) => r.gross_amount },
+  { header: "Package", value: (r) => r.package_applied },
+  { header: "Credit", value: (r) => r.credit_applied },
+  { header: "Net", value: (r) => r.net_amount },
+  { header: "Status", value: (r) => (r.status === "paid" ? "Paid" : "Outstanding") },
+  { header: "Parent says paid", value: (r) => (r.paid_claimed_at ? "yes" : "") },
+  { header: "Reference", value: (r) => r.reference_number },
+];
+
 // "Claimed" = outstanding AND the parent has said "I've paid" — the rows an
 // admin should check against the bank first.
 const STATUS_FILTERS = ["All", "Outstanding", "Claimed", "Paid"];
@@ -78,6 +95,7 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
   // Invoice generation controls.
@@ -706,6 +724,21 @@ export default function InvoicesPage() {
   });
   const visible = sort.apply(filtered);
 
+  function handleExportCsv() {
+    const res = exportCsv(
+      `invoices-${todayInSg()}.csv`,
+      visible,
+      INVOICE_CSV_COLUMNS,
+      { sourceCount: invoices.length },
+    );
+    setExportNotice(
+      res.ok
+        ? null
+        : `Too many invoices to export at once (the list is capped at ${res.cap}). ` +
+            `Narrow it with the status filter, search, or a month, then export again.`,
+    );
+  }
+
   const totalOutstanding = invoices
     .filter((i) => i.status === "outstanding")
     .reduce((sum, i) => sum + i.net_amount, 0);
@@ -1280,7 +1313,15 @@ export default function InvoicesPage() {
             </button>
           ))}
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <Button
+            variant="outline"
+            disabled={visible.length === 0}
+            onClick={handleExportCsv}
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
           <Button
             variant="outline"
             disabled={invoices.every((i) => i.status !== "outstanding")}
@@ -1291,6 +1332,11 @@ export default function InvoicesPage() {
           </Button>
         </div>
       </div>
+      {exportNotice && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+          {exportNotice}
+        </div>
+      )}
 
       <ReminderQueue
         open={queueOpen}

@@ -3019,6 +3019,15 @@ The following section provides a screen-by-screen reference for each SwimSync us
   weekdays sort in week order rather than alphabetically, and it is stable, so a second
   key keeps the first one's grouping. Columns sort by **what is on screen** — a status by
   its label, an amount by its number — not by what the row stores underneath.
+- **Export to CSV** *(implemented)* — the Invoices, Credit Notes, and Attendance tables each
+  carry an **Export CSV** button that downloads exactly what is on screen (post-search,
+  filter, and sort), for handing to an accountant. Money is exported as raw numbers so the
+  columns sum in Excel; the file carries a UTF-8 BOM so unicode names open correctly. Two
+  safeguards are deliberate: a field beginning with `=`, `+`, `-`, `@`, tab, or return is
+  prefixed with an apostrophe so a parent-entered name can never execute as an Excel formula;
+  and when the underlying list was capped (the tables fetch at most ~1000 rows) the export is
+  **refused** with a "narrow the range" message rather than silently writing an incomplete
+  financial file.
 
 ---
 
