@@ -529,7 +529,15 @@ out of a text blob. What makes it an M rather than an S:
 - Watch the read cost: a roster of six children each with six skills is 36 rows, so fetch
   it per class rather than per student.
 
-### Convert a trial into an enrolled student — **S**
+### ~~Convert a trial into an enrolled student~~ — **S** — **DONE 2026-08-17**
+Shipped: the *past — needs marking* list on the Trials page carries a **Convert to enrolled**
+action that enrols the child into the class they tried, reusing the Unassigned Children insert.
+The RISK 1 two-press guard (a rebooked *upcoming* trial would otherwise block billing) is in
+`lib/trialConvert.ts` and unit-tested; PRD §7.17 describes the behaviour. The past trial row
+deliberately stays on the needs-marking list — converting is not marking.
+
+<details><summary>Original item (kept for the reasoning)</summary>
+
 After a trial is marked, give the Trials page a **"Convert to enrolled"** action instead
 of sending the admin to Unassigned Children to do it.
 
@@ -545,6 +553,8 @@ a relabelling of an existing guarded action, not a new capability: reuse the sam
 Unassigned Children performs, and keep the "this makes them expected every week" wording.
 The natural trigger is the Trials page's *past — needs marking* list, once the lesson has
 been marked.
+
+</details>
 
 ### ~~Editing a student's PARENT contact details~~ — **S** — **DONE 2026-07-26**
 Shipped and deployed (`3832670`): every child on the admin Students page has a **Contact

@@ -16,6 +16,7 @@ import {
   expectedLessonDates,
   type DayOfWeek,
 } from "@/lib/lessonDates";
+import { needsConvertConfirmation } from "@/lib/trialConvert";
 
 /**
  * Trials — booking a child into ONE lesson, and what a trial costs.
@@ -35,6 +36,7 @@ type Booking = {
   session_date: string;
   student_id: string;
   student_name: string;
+  class_id: string;
   class_title: string;
   marked: boolean;
 };
@@ -108,7 +110,7 @@ export default function TrialsPage() {
         supabase
           .from("trial_bookings")
           .select(
-            "id, session_date, student_id, students(full_name), classes(title)"
+            "id, session_date, student_id, class_id, students(full_name), classes(title)"
           )
           .is("cancelled_at", null)
           .order("session_date"),
@@ -154,6 +156,7 @@ export default function TrialsPage() {
       session_date: b.session_date,
       student_id: b.student_id ?? "",
       student_name: b.students?.full_name ?? "—",
+      class_id: b.class_id ?? "",
       class_title: b.classes?.title ?? "—",
       marked: markedKeys.has(`${b.student_id}:${b.session_date}`),
     }));
@@ -260,6 +263,100 @@ export default function TrialsPage() {
     if (!error) await loadAll();
   }
 
+  // ── Convert a trial to an enrolment ─────────────────────────────────────────
+  // The child tried this class; converting enrols them into THAT class, reusing
+  // the exact insert Unassigned Children performs. See lib/trialConvert.ts for
+  // the RISK 1 reasoning behind the two-press guard.
+  const [convertTarget, setConvertTarget] = useState<Booking | null>(null);
+  const [convertBusy, setConvertBusy] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
+  const [convertConfirmed, setConvertConfirmed] = useState(false);
+
+  function openConvert(b: Booking) {
+    setConvertTarget(b);
+    setConvertError(null);
+    setConvertConfirmed(false);
+  }
+
+  async function handleConvert() {
+    if (!convertTarget) return;
+    const kid = convertTarget.student_id;
+    const classId = convertTarget.class_id;
+    if (!classId) {
+      setConvertError(
+        "This trial has no class on record, so there is nothing to enrol into. " +
+          "Enrol the child from Unassigned Children instead.",
+      );
+      return;
+    }
+    setConvertBusy(true);
+    setConvertError(null);
+
+    // ⚠ RISK 1 — a FUTURE live trial means enrolling stacks a permanent
+    // enrolment on a still-unmarked booking, which blocks the billing month.
+    // The past trial being converted is in the past, so this query never
+    // returns it. Same query Unassigned Children runs (unassigned/page.tsx).
+    const todaySg = todayInSg();
+    const { data: liveTrial } = await supabase
+      .from("trial_bookings")
+      .select("session_date")
+      .eq("student_id", kid)
+      .is("cancelled_at", null)
+      .gte("session_date", todaySg)
+      .order("session_date")
+      .limit(1);
+
+    if (
+      needsConvertConfirmation({
+        hasFutureTrial: (liveTrial ?? []).length > 0,
+        alreadyConfirmed: convertConfirmed,
+      })
+    ) {
+      setConvertError(
+        `${convertTarget.student_name} still has a trial booked for ` +
+          `${formatSgDate(liveTrial![0].session_date)}. Enrolling makes them ` +
+          `expected EVERY week, and that unmarked trial will block invoicing. ` +
+          `Press Convert again if you really mean to enrol them now.`,
+      );
+      setConvertConfirmed(true);
+      setConvertBusy(false);
+      return;
+    }
+
+    const { error: enrolError } = await supabase
+      .from("student_class_enrolments")
+      .insert({ student_id: kid, class_id: classId, is_active: true });
+    if (enrolError) {
+      // The enrolment-overlap trigger (§8.43) and any other refusal come back
+      // as a plain message — show it as-is rather than assume success.
+      setConvertError(enrolError.message);
+      setConvertBusy(false);
+      return;
+    }
+
+    const { error: statusError } = await supabase
+      .from("students")
+      .update({ assignment_status: "assigned" })
+      .eq("id", kid);
+    setConvertBusy(false);
+    if (statusError) {
+      // Enrolment DID succeed — say so rather than swallow it (the Unassigned
+      // page ignores this error; we do not). Reload so the new enrolment shows.
+      setConvertError(
+        `Enrolled, but their status could not be updated (${statusError.message}). ` +
+          `They may still appear under Unassigned Children.`,
+      );
+      await loadAll();
+      return;
+    }
+
+    setConvertTarget(null);
+    setConvertConfirmed(false);
+    // The past trial row deliberately STAYS on the needs-marking list — the
+    // trial lesson itself is still unmarked and still holds the month open.
+    await loadAll();
+  }
+
   async function handleSaveRate(categoryId: string) {
     const raw = rateDraft[categoryId];
     const value = Number(raw);
@@ -354,12 +451,20 @@ export default function TrialsPage() {
                 <span className="text-gray-500">
                   {b.class_title} · {formatSgDate(b.session_date)}
                 </span>
-                <button
-                  onClick={() => handleCancel(b.id)}
-                  className="ml-auto rounded-lg border border-gray-300 px-2 py-0.5 font-semibold text-gray-600 hover:bg-white"
-                >
-                  Cancel
-                </button>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={() => openConvert(b)}
+                    className="rounded-lg border border-sky-300 bg-white px-2 py-0.5 font-semibold text-sky-700 hover:bg-sky-50"
+                  >
+                    Convert to enrolled
+                  </button>
+                  <button
+                    onClick={() => handleCancel(b.id)}
+                    className="rounded-lg border border-gray-300 px-2 py-0.5 font-semibold text-gray-600 hover:bg-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -590,6 +695,46 @@ export default function TrialsPage() {
             {bookBusy ? "Booking…" : "Book the trial"}
           </Button>
         </div>
+      </Modal>
+
+      {/* ── Convert a trial to an enrolment ─────────────────────────────────── */}
+      <Modal
+        title="Convert to enrolled"
+        open={convertTarget !== null}
+        onClose={() => setConvertTarget(null)}
+      >
+        {convertTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              Enrol <strong>{convertTarget.student_name}</strong> into{" "}
+              <strong>{convertTarget.class_title}</strong>?
+            </p>
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              This makes them <strong>expected every week</strong> from now on. An
+              unmarked lesson then blocks that class&apos;s billing month — so only
+              convert a child who is really joining. The trial lesson above still
+              needs marking either way.
+            </p>
+
+            {convertError && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {convertError}
+              </p>
+            )}
+
+            <Button
+              className="w-full"
+              disabled={convertBusy}
+              onClick={handleConvert}
+            >
+              {convertBusy
+                ? "Converting…"
+                : convertConfirmed
+                  ? "Convert anyway"
+                  : "Convert to enrolled"}
+            </Button>
+          </div>
+        )}
       </Modal>
     </div>
   );

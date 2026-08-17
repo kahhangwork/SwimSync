@@ -1931,6 +1931,15 @@ admin one was actively dangerous:
   trial has **passed** remain, because that is the real decision point — did they convert?
   Assigning a child who still has a live booking now explains the consequence and requires
   a second press.
+- **Converting a trial now has a home on the Trials page itself** *(implemented 2026-08-17)*.
+  Each row in the *past — needs marking* list carries a **Convert to enrolled** action beside
+  Cancel, so the admin no longer has to leave for Unassigned Children to place a child who
+  just tried the class. It enrols them into **the class they tried**, reusing the same guarded
+  insert Unassigned Children performs, and it carries the same two safeguards: the modal warns
+  that enrolling makes the child **expected every week**, and if the child *also* has a still
+  upcoming trial booked, the action explains that the unmarked booking will block invoicing and
+  requires a second press. The converted trial lesson **stays on the needs-marking list** — it
+  is still unmarked and still holds the month open; converting is not marking.
 
 ##### A trial is a booking, not attendance *(corrected 2026-07-25)*
 
