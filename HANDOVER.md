@@ -1,14 +1,16 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-17 — **Credit-note email notifications SHIPPED LIVE** (§8.64), which
+_Last updated: 2026-08-17 (second session) — **CI and the nightly were BOTH red and nobody had
+looked** (§8.65). CI failed **every push for 20 commits** on one expired fixture date; the nightly
+had 3 of 45 drivers red for 3 nights, and underneath the noise sat a **LIVE regression: no parent
+could buy a package and no admin could see their catalogue** since 2026-08-15 (PGRST201 embed
+ambiguity from the default-packages FKs). Both fixed and pushed — `2c16be9`, `2c83573`. **No
+migration, no deploy needed beyond Vercel.** §7.176–178. Next: **Wave C** (§9)._
+
+_Previously, 2026-08-17 — **Credit-note email notifications SHIPPED LIVE** (§8.64), which
 **exhausts Wave B**. A post-invoice correction now emails the parent; the admin resends a miss from
 Credit Notes. Prod migration `20260817000100` + new `credit-note-emails` v1 (5 functions now).
-**DORMANT** — 0 credit notes on prod. PRD §7.8 · `docs/DEPLOYMENT.md` §11.25 · §7.172–175.
-Next: pick from **Wave C** (§9)._
-
-_Previously, 2026-08-16 — **Invoice-email delivery tracking + retry SHIPPED LIVE** (§8.63):
-re-running generate-invoices re-sends only the misses, even on a sealed month, no duplicate.
-**DORMANT** (0 unsent). PRD §7.7 · `docs/DEPLOYMENT.md` §11.24._
+**DORMANT** — 0 credit notes on prod. PRD §7.8 · `docs/DEPLOYMENT.md` §11.25 · §7.172–175._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -31,7 +33,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.146** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.178** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -383,6 +385,29 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.65 (2026-08-17, second session) — BOTH CI AND THE NIGHTLY WERE RED, AND ONE HID A LIVE BUG
+
+**Nothing was built. Two red pipelines were read, and one hid a production regression**
+(`2c16be9`, `2c83573`). No migration, no function deploy — the app fix rides Vercel off `main`.
+
+**CI: red on EVERY push for 20 commits** (2026-08-14 → 08-17), same two tests, and the Deno suite
+never ran once in three days because pgTAP gates it. One fixture date in `coach_disable.test.sql`
+called a lesson "FUTURE" and typed `'2026-08-15'`; product code correct throughout. Now derived
+from `today_sg()` — §7.177 has the boundary trap that makes the obvious spelling wrong 1 day in 7.
+
+**The nightly: 3 of 45 red for 3 nights, and the noisy one hid the real one.** A deliberate
+page-count pin nobody bumped (§7.178) sat on top of **`PGRST201`**:
+`20260815000600_default_packages` added FKs back to `package_products`, making two embeds
+ambiguous, and PostgREST refuses the *whole* query — so since 2026-08-15 **no parent could buy a
+package and no admin could see their own catalogue**, silently, because both sites did `?? []`
+(§7.176). Fixing it exposed 3 more stale assertions the dead driver had hidden, all from
+start-date sequencing (⚠ RISK 2: a family that already topped up is deliberately not "low").
+Third was `parent-claim` — c009945 renames a confirmed claim to the parent's own words.
+
+**Coverage went UP.** `student_package_coverage.test.sql` **+2**: nothing anywhere asserted `low`
+could be TRUE. Verified pgTAP **1097** on a clean reset, vitest 395, jest 384, both typechecks,
+packages 21/21, parent-claim 21/21, 4 neighbour drivers green; every fix proven red first.
+
 ## 8.64 (2026-08-17) — CREDIT-NOTE EMAIL NOTIFICATIONS, SHIPPED LIVE — Wave B is now EXHAUSTED
 
 **A post-invoice correction now tells the parent** (`4288e4c`, migration `383c52f`). New
@@ -414,29 +439,9 @@ prod count (0 credit notes) → migration → function v1 → grant dump → app
 needed a bundle-hash poll, and the admin half needed a human check (`docs/DEPLOYMENT.md` §11.25).
 Plan `docs/plans/CREDIT_NOTE_EMAIL_PLAN.md` · PRD §7.8 · `docs/TESTING.md` §5.
 
-## 8.63 (2026-08-16) — INVOICE-EMAIL DELIVERY TRACKING + RETRY, SHIPPED LIVE
-
-**Wave B head; backend-only, no `core.ts` and no app change** (`a0b502c`). A dropped invoice email
-now self-heals: re-running generate-invoices for a (tenant, month) re-sends only the invoices whose
-email never went out — **even on a sealed month** (`already_complete` path) — with no duplicate. New
-nullable `invoices.invoice_email_sent_at`; the happy path stamps on success; `retryUnsentInvoiceEmails`
-claims each unsent invoice ONE at a time (atomic conditional UPDATE — concurrency-safe, and per-invoice
-so a mid-run crash strands at most one), rebuilds the email from `invoices`+`invoice_items`, sends,
-resets on failure; the handler skips suspended/auto-disabled tenants (`shouldRetryTenantEmails`).
-
-Built `/plan-with-confidence` → `/plan-review` (a 2nd agent ranked 10 product risks, folded into the
-plan) → `/commit-review` (a 2nd agent's two findings — batch-claim tail-drop, swallowed items-fetch —
-fixed before commit). Verified Deno **169 ×2**, `deno check`, `supabase test db` green bar the
-pre-existing `coach_disable` date-flake; prove-red done. **SHIPPED LIVE 2026-08-16**, backend-first:
-RISK 2 prod count (7 invoices, all July, all paid → blanket backfill) → migration `20260816000100` →
-`generate-invoices` **v23** → grant dump clean. **DORMANT** — 0 unsent on prod, so retry has re-sent
-nothing; first firing is the August run (early Sept). Two gotchas **§7.170–§7.171**. Plan
-`docs/plans/INVOICE_EMAIL_RETRY_PLAN.md` · PRD §7.7 · `docs/DEPLOYMENT.md` §11.24 · `docs/TESTING.md`
-§5. Crash-safe-claim follow-up in `BACKLOG.md`.
-
-*(§8.62 — the backlog re-rank — moved to the ledger, `docs/SESSIONS.md`, when §8.64 landed; along
-with §8.61 referral codes, §8.60 package renewal automation and §8.59 weeks/holiday packages
-before it.)*
+*(§8.63 — invoice-email retry — moved to the ledger, `docs/SESSIONS.md`, when §8.65 landed;
+along with §8.62 the backlog re-rank, §8.61 referral codes and §8.60 package renewal
+automation before it.)*
 
 ---
 
@@ -488,6 +493,13 @@ Everything below is the monthly loop from here on:
 The join code is **`SWIM-RVM9`** — the only route in for a new family, and the re-entry route
 for one marked inactive.
 
+### The nightly sweep — cleared 2026-08-17 after THREE red nights nobody read
+
+**A sweep left red stops being an alarm.** A deliberate page-count pin nobody bumped (§7.178) sat
+on top of a LIVE regression (§7.176) in the same rot issue, unread, while CI was also red on every
+push. **Triage the day it reddens even when you are sure which check it is** — you are sure about
+one driver; it reports several. §8.65.
+
 ### The nightly sweep — the Wave 5 first-sweep landed, and nothing new was added
 
 The 2026-08-13 nightly (`ui-drivers.yml`) was the first to exercise all three Wave 5 chunks and
@@ -532,9 +544,10 @@ multi-language **REFUSED**): `BACKLOG.md`.
 > `credit_notes(invoice_item_id)` — a re-correction really does double the credit, proven by test
 > 2026-08-17) and the **partial unique index** that would make "one credit-note email per invoice
 > line" airtight rather than best-effort. Add `credit_notes(lesson_session_id)` in the same file.
-> Also parked there: `tenants.suspend` is vestigial and should be dropped, and
-> **`coach_disable.test.sql`'s expired fixture date** (2 tests red since 2026-08-16 — diagnosis and
-> fix both written down, product code is fine).
+> Also parked there: `tenants.suspend` is vestigial and should be dropped.
+> *(**`coach_disable.test.sql`'s expired fixture date is DONE** — fixed 2026-08-17, §8.65/§7.177.
+> It was red from 2026-08-15 SGT, not the 16th as the backlog had it, and it was blocking **every**
+> push rather than being a standalone flake.)*
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders. Plus the **crash-safe email claim** item, which now covers

@@ -418,28 +418,7 @@ Email-confirmation copy, Tick off swimming skills (M).
   with its own blast radius, and one schema change at a time (§7.55). **The email feature
   cannot make it worse** — `credit-note-emails` sends at most one email per
   `invoice_item_id`, ever, so a duplicate note is never announced twice.
-- **`coach_disable.test.sql` has a hardcoded "future" date that EXPIRED — 2 tests red since
-  2026-08-16** (S) — diagnosed in full 2026-08-17; the fix is known and deliberately not
-  applied in the credit-note-email session (unrelated change, one at a time §7.55).
-  **The product code is correct — both assertions test real behaviour.** The fixture calls
-  session `…0034` "a FUTURE one" and dates it **`2026-08-15`**, which stopped being future on
-  the 16th. Two failures, one cause:
-  - **test 22** ("the future substitute override is deleted") — `disable_coach()` deletes
-    overrides via `AND ls.session_date > today_sg()`, so the override is now **correctly kept
-    as wage history**. Expects 0, gets 1.
-  - **test 39** (⚠ RISK 8, no unmarked August pair) — its query scans
-    `ls.session_date BETWEEN '2026-08-01' AND today_sg()`, so the still-unmarked `…0034` has
-    slid *into* the window. Expects 0, gets 1.
-
-  **Proven, not inferred:** changing that one date to `2026-08-22` makes all **55** pass.
-  **Why it is not a one-liner.** The two Y-class dates must stay **Saturdays** (test 38 marks
-  through the attendance-window guard, which enforces the class's own weekday) *and* stay
-  inside **August** (test 39's month window), while tests 40+ hardcode **July** for payroll.
-  So the fix is relative-date arithmetic — "the most recent Saturday" and "the next
-  Saturday" off `today_sg()` — not a find-and-replace, and it needs a re-read of the July
-  assertions to confirm they do not drift with it. **Grep the file for every hardcoded
-  `2026-0` date before changing any of them.** Same class of trap as §7.122: a fixture that
-  encodes "future" as a literal expires silently, and the failure looks like a product bug.
+- **`tenants.suspend` is VESTIGIAL and should be dropped** (S) — the column is a
   `boolean`, default `false`, and **nothing in the repo writes it**: `suspend_tenant()` sets
   only `suspended_at`, and `tenant_suspended()` reads only `suspended_at`. It survives as a
   column that *looks* authoritative next to the one that is — a plan review for the

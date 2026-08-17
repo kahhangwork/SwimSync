@@ -2861,3 +2861,48 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     a conclusion, render it explicitly in both zones** —
     `to_char(x AT TIME ZONE 'UTC', ...)` and `to_char(x AT TIME ZONE 'Asia/Singapore', ...)`
     — and sanity-check against `now()` in the same query. (§8.64)
+
+176. **A second FK between two tables silently breaks EVERY PostgREST embed between them —
+    and the failure renders as "there is nothing here".** `20260815000600_default_packages`
+    added `class_categories.default_product_id` and `tenants.default_package_product_id`,
+    both pointing back at `package_products`. Neither the parent app's "Buy a package" list
+    nor the admin's product catalogue mentions those columns, and both stopped working
+    anyway: with two relationships available PostgREST refuses to choose and answers
+    **PGRST201 on the WHOLE query**, not on the one ambiguous embed. Both call sites did
+    `?? []`, so for two days no parent could buy a package and no admin could see their own
+    catalogue, with no error anywhere. **Adding a column can break a query that does not
+    name it.** After any migration that adds an FK, run the ambiguity check —
+    `pg_constraint` grouped by table pair, `HAVING count(*) > 1` — and qualify every embed
+    on a pair it returns as `table!fkey_name(cols)`. **Fix them ALL at once:** PostgREST
+    reports only the first, so `class_categories` was qualified, the query re-run, and it
+    failed again on `tenants`. Four pairs are ambiguous around `package_products` /
+    `parent_packages` today. **And the deeper rule: a `?? []` on a fetch makes a broken
+    query indistinguishable from an empty result.** Check `.error` wherever emptiness is a
+    plausible real state — that silence is what turned a two-line fix into a two-day live
+    outage. (§8.65)
+
+177. **A fixture date that means "in the future" must be COMPUTED, never typed.**
+    `coach_disable.test.sql` called a lesson "a FUTURE one" and dated it `'2026-08-15'`.
+    `disable_coach()` deletes overrides with `session_date > today_sg()`, so the assertion
+    was true for one week and false for ever after — it expired on 2026-08-15 SGT and
+    reddened **every push for 20 commits** (2026-08-14 → 08-17), gating the Deno suite
+    behind it the whole time. The product code was correct throughout. Rule: if an
+    assertion is about a date's RELATION to today, derive it from `today_sg()`; only pin a
+    literal when the assertion is about a fixed month that stays in the past (that file's
+    July payout dates are correctly literal, and the comment now says why for each).
+    ⚠ **Watch the boundary when deriving**: the obvious "next Saturday" spelling `6 - dow`
+    returns 0 when today IS Saturday, re-creating the bug on one day in seven. Use an
+    offset that cannot be zero and sweep all seven weekdays before believing it.
+    **Related but distinct from §7.122** — that one is about which weekday a CI run
+    happened to see; this is about a date that stops meaning what its name says. (§8.65)
+
+178. **"Designed to redden" only pays if someone bumps it the next morning.**
+    `verify-platform-admin-scope.mjs` pins the admin sidebar at an exact page count
+    precisely so a dropped entry cannot pass — and it reddens by design when a page is
+    legitimately added. Holidays took it 17 → 18 and Referrals 18 → 19, and the nightly was
+    left red for **three consecutive sweeps** instead. A counter nobody bumps is not an
+    alarm, it is noise that hides the two real failures underneath it — which is exactly
+    what happened: the `packages` regression (§7.176) sat in the same rot issue, unread,
+    the whole time. **When the nightly reddens, triage it that day even if you are certain
+    which check it is** — the certainty is about one driver, and the sweep reports several.
+    (§8.65)
