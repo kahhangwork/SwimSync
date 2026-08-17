@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Auto-scale the whole panel down on narrower screens.
+ *
+ * Every admin utility (text, padding, gap, icon height/width, w-64 sidebar) is
+ * rem-based, so shrinking the root font-size scales the entire UI together —
+ * the same effect as a browser zoom-out, but automatic. This is why a smaller
+ * laptop no longer needs manual zoom to fit the toolbar/table on one screen.
+ *
+ * We only ever scale DOWN, never up: a large monitor stays at the 16px design
+ * size. Keyed on width (not height) because the pain is horizontal crowding of
+ * the filter row / action buttons; density follows for free.
+ */
+html { font-size: 16px; }
+@media (max-width: 1536px) { html { font-size: 15px; } }
+@media (max-width: 1280px) { html { font-size: 14px; } }
+@media (max-width: 1152px) { html { font-size: 13px; } }
+
 body {
   @apply bg-gray-50 text-gray-900;
 }
