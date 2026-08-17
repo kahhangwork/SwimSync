@@ -980,7 +980,15 @@ has an attendance record on it — the same rule the invoice engine applies.
 > from the span each enrolment actually covers, in the coach's app, the admin's gap
 > report and the billing engine alike.
 
-**Not provided:** parents see no "upcoming lessons" list (only marked history).
+**Upcoming lessons** *(implemented 2026-08-17)*: the parent Attendance screen now shows an
+**Upcoming** section above the marked history, listing the lessons scheduled for the selected
+child over roughly the next four weeks. The dates are **derived at read time** from each active
+enrolment's weekday (the same `expectedLessonDates` logic the coach's unmarked-lessons view
+uses) — **no sessions are pre-generated**. A date that falls on one of the business's
+**public holidays** (`tenant_public_holidays`) is removed, so the app never sends a family to a
+closed pool. It is a forward projection of the schedule, not a promise about individual
+lessons: an **ad-hoc cancellation or reschedule** recorded against a specific `lesson_session`
+is not yet reflected (a noted follow-up). The status filter applies only to the history below.
 
 ### 7.6 Attendance Management
 

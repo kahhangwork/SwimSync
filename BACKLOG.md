@@ -1034,7 +1034,14 @@ already fetches. Do it the next time anything opens that file, and add the case 
 these two must not drift: hand-written copies of "who was expected here" caused a live
 underbill.
 
-### Upcoming lessons view for parents — **S** `[PRD §7.5]`
+### ~~Upcoming lessons view for parents~~ — **S** — **DONE 2026-08-17**
+Shipped: an **Upcoming** section on the parent Attendance screen, derived from each active
+enrolment's weekday over ~4 weeks (`lib/upcomingLessons.ts`), holidays subtracted. No sessions
+pre-generated. PRD §7.5 describes it. Ad-hoc `lesson_session` cancellations are a named
+follow-up (see below); the RISK 4 holiday exclusion is unit-tested.
+
+<details><summary>Original item (kept for the reasoning)</summary>
+
 Show parents the lessons that are scheduled next, not just the history of marked ones.
 
 **Why:** parents currently see only what already happened. "When is my next lesson?" is
@@ -1046,6 +1053,14 @@ already exists — expected lesson dates are derived at read time from
 `classes.day_of_week` via `lib/lessonDates.ts`, which is exactly what the coach's
 unmarked-lessons backlog uses. Point it at the future instead of the past. **This does
 not require pre-generating sessions** — resist that; see `docs/ARCHITECTURE.md` §6.
+
+</details>
+
+**Follow-up (Wave D-ish):** the upcoming list reflects the schedule, not individual
+`lesson_session` cancellations/reschedules — a lesson cancelled ahead of time still shows.
+Higher fidelity means unioning `lesson_sessions` + bookings (`scheduleWeek.ts`'s
+`lessonDatesInRange`) and cross-referencing status, as the coach forward-view does. Deferred:
+holidays were the free 90%; ad-hoc cancellations are rarer and cost a join.
 
 ### ~~Pay and claim straight from the parent's invoice LIST~~ — **SHIPPED 2026-08-08** (PRD §7.21)
 Both controls now sit on each outstanding card in `(parent)/billing`, matching the public

@@ -17,6 +17,10 @@ import {
   expectedLessonDates,
   type DayOfWeek,
 } from "@/lib/lessonDates";
+import {
+  computeUpcomingLessons,
+  type UpcomingLesson,
+} from "@/lib/upcomingLessons";
 import Card from "@/components/Card";
 
 type DbStatus =
@@ -83,6 +87,23 @@ function formatDate(dateStr: string): string {
   });
 }
 
+// 24h "17:00:00" → "5:00 PM". Same shape the parent home screen uses.
+function formatTime(time: string | null): string | null {
+  if (!time) return null;
+  const [h, m] = time.split(":");
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${m} ${ampm}`;
+}
+
+function timeLabel(start: string | null, end: string | null): string {
+  const s = formatTime(start);
+  const e = formatTime(end);
+  if (s && e) return `${s} – ${e}`;
+  return s ?? "";
+}
+
 export default function AttendanceScreen() {
   const session = useAppStore((s) => s.session);
   const [children, setChildren] = useState<Child[]>([]);
@@ -95,6 +116,8 @@ export default function AttendanceScreen() {
   // tell "no lessons have taken place yet" (child just joined) apart from
   // "lessons happened but the coach hasn't marked them" (waiting on the coach).
   const [hasExpectedLesson, setHasExpectedLesson] = useState(false);
+  // Lessons scheduled in the next ~4 weeks (derived, not stored). Holidays removed.
+  const [upcoming, setUpcoming] = useState<UpcomingLesson[]>([]);
 
   // Load the parent's children once on focus
   const loadChildren = useCallback(async () => {
@@ -180,21 +203,53 @@ export default function AttendanceScreen() {
     // enough, which is what the question actually means.
     const { data: enrolments } = await supabase
       .from("student_class_enrolments")
-      .select("enrolled_at, classes(day_of_week)")
+      .select("enrolled_at, classes(id, day_of_week, title, start_time, end_time)")
       .eq("student_id", selectedChildId)
       .eq("is_active", true);
 
+    const today = todayInSg();
+    const activeClasses = (enrolments ?? []).map((enr: any) => ({
+      enr,
+      cls: Array.isArray(enr.classes) ? enr.classes[0] : enr.classes,
+    }));
+
     setHasExpectedLesson(
-      (enrolments ?? []).some((enr: any) => {
-        const cls = Array.isArray(enr.classes) ? enr.classes[0] : enr.classes;
+      activeClasses.some(({ enr, cls }) => {
         const day = cls?.day_of_week as DayOfWeek | undefined;
         return (
           !!day &&
           !!enr.enrolled_at &&
-          expectedLessonDates(day, toSgDate(enr.enrolled_at), todayInSg()).length > 0
+          expectedLessonDates(day, toSgDate(enr.enrolled_at), today).length > 0
         );
       })
     );
+
+    // Upcoming lessons: derived from each class's weekday over the next ~4 weeks,
+    // minus this tenant's public holidays (RLS returns only the parent's tenant).
+    const horizonRows = activeClasses.filter(({ cls }) => cls?.day_of_week && cls?.title);
+    if (horizonRows.length > 0) {
+      const { data: holidayRows } = await supabase
+        .from("tenant_public_holidays")
+        .select("holiday_date")
+        .gte("holiday_date", today);
+      const holidays = new Set(
+        (holidayRows ?? []).map((h: any) => h.holiday_date as string)
+      );
+      setUpcoming(
+        computeUpcomingLessons(
+          horizonRows.map(({ cls }, i) => ({
+            class_id: (cls.id as string) ?? `enr-${i}`,
+            day_of_week: cls.day_of_week as DayOfWeek,
+            class_title: cls.title as string,
+            time_label: timeLabel(cls.start_time ?? null, cls.end_time ?? null),
+          })),
+          today,
+          holidays
+        )
+      );
+    } else {
+      setUpcoming([]);
+    }
 
     setLoadingRecords(false);
   }, [selectedChildId]);
@@ -214,7 +269,7 @@ export default function AttendanceScreen() {
       <View className="px-5 pt-5 pb-3">
         <Text className="text-2xl font-bold text-gray-900">Attendance</Text>
         <Text className="text-sm text-gray-500 mt-0.5">
-          Lesson history for your children
+          Upcoming lessons and history for your children
         </Text>
       </View>
 
@@ -290,6 +345,37 @@ export default function AttendanceScreen() {
         contentContainerClassName="px-5 pb-10 gap-2"
         showsVerticalScrollIndicator={false}
       >
+        {/* Upcoming lessons — derived, shown above the marked history and outside
+            the status filter (it applies only to what has already happened). */}
+        {!loadingRecords &&
+          selectedChild?.assignment_status === "assigned" &&
+          upcoming.length > 0 && (
+            <View className="mb-1">
+              <Text className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">
+                Upcoming
+              </Text>
+              {upcoming.map((u) => (
+                <Card key={u.key} className="flex-row items-center gap-3 mb-2">
+                  <Ionicons name="calendar-outline" size={24} color="#0ea5e9" />
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-gray-800">
+                      {u.class_title}
+                    </Text>
+                    <Text className="text-xs text-gray-500">
+                      {formatDate(u.session_date)}
+                      {u.time_label ? ` · ${u.time_label}` : ""}
+                    </Text>
+                  </View>
+                </Card>
+              ))}
+              {records.length > 0 && (
+                <Text className="text-xs font-bold uppercase tracking-wide text-gray-400 mt-3 mb-2">
+                  History
+                </Text>
+              )}
+            </View>
+          )}
+
         {loadingRecords ? (
           <View className="items-center py-16">
             <ActivityIndicator size="large" color="#0ea5e9" />
