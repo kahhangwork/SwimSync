@@ -4,9 +4,19 @@ import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { exportCsv, type CsvColumn } from "@/lib/csv";
-import { todayInSg } from "@/lib/lessonDates";
+import {
+  canBookMakeupFromRow,
+  makeupHostChoices,
+} from "@/lib/makeupFromAttendance";
+import {
+  todayInSg,
+  formatSgDate,
+  expectedLessonDates,
+  type DayOfWeek,
+} from "@/lib/lessonDates";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
+import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
@@ -59,10 +69,35 @@ const STATUS_LABELS: Record<string, string> = {
  */
 const ROW_LIMIT = 1000;
 
+// Make-up booking, from an absent/cancelled row. The missed lesson's class is
+// the HOME class; the admin picks a same-category HOST class + date to guest into.
+type MakeupClass = {
+  id: string;
+  title: string;
+  day_of_week: DayOfWeek;
+  category_id: string;
+  is_active: boolean;
+};
+
 export default function AttendancePage() {
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [coaches, setCoaches] = useState<{ id: string; full_name: string }[]>([]);
   const [classes, setClasses] = useState<{ id: string; label: string }[]>([]);
+  // For booking a make-up: the full class list (incl. inactive, so a retired
+  // home class still resolves its category) and every active enrolment as a
+  // "student:class" set.
+  const [makeupClasses, setMakeupClasses] = useState<MakeupClass[]>([]);
+  const [enrolmentSet, setEnrolmentSet] = useState<Set<string>>(new Set());
+  const [ownClassesByStudent, setOwnClassesByStudent] = useState<
+    Map<string, Set<string>>
+  >(new Map());
+  // The row a make-up is being booked from, plus the host class/date chosen.
+  const [makeupRow, setMakeupRow] = useState<AttendanceRow | null>(null);
+  const [mkHost, setMkHost] = useState("");
+  const [mkDate, setMkDate] = useState("");
+  const [mkBusy, setMkBusy] = useState(false);
+  const [mkError, setMkError] = useState<string | null>(null);
+  const [mkSuccess, setMkSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [coachFilter, setCoachFilter] = useState("All");
@@ -142,7 +177,36 @@ export default function AttendancePage() {
     }
 
     loadFilters();
+    loadMakeupData();
   }, []);
+
+  // Data the make-up entry point needs: every class (incl. inactive, so a
+  // retired home class still resolves a category) and every active enrolment.
+  async function loadMakeupData() {
+    const [{ data: cls }, { data: enrol }] = await Promise.all([
+      supabase
+        .from("classes")
+        .select("id, title, day_of_week, category_id, is_active")
+        .order("title"),
+      supabase
+        .from("student_class_enrolments")
+        .select("student_id, class_id")
+        .eq("is_active", true),
+    ]);
+    setMakeupClasses((cls ?? []) as MakeupClass[]);
+    const set = new Set<string>();
+    const byStudent = new Map<string, Set<string>>();
+    for (const e of enrol ?? []) {
+      const sid = e.student_id as string;
+      const cid = e.class_id as string;
+      set.add(`${sid}:${cid}`);
+      const own = byStudent.get(sid) ?? new Set<string>();
+      own.add(cid);
+      byStudent.set(sid, own);
+    }
+    setEnrolmentSet(set);
+    setOwnClassesByStudent(byStudent);
+  }
 
   // Re-queries when the range moves, because the range is applied in the
   // DATABASE. Filtering client-side would only narrow whatever arbitrary slice
@@ -425,6 +489,77 @@ export default function AttendancePage() {
     );
   }
 
+  // ── Book a make-up from a missed lesson ──────────────────────────────────────
+  // ⚠ RISK 6 — only a row that is the child's OWN enrolled class can seed a
+  // make-up: its class becomes p_home_class_id. A guest row (a trial, or another
+  // child's make-up) has class_id = the HOST class, which is not an enrolment, so
+  // book_makeup() would refuse it with a baffling message. Gate the button here.
+  function canBookMakeup(a: AttendanceRow): boolean {
+    return canBookMakeupFromRow(
+      a.status,
+      enrolmentSet.has(`${a.student_id}:${a.class_id}`),
+    );
+  }
+
+  // Same-category classes minus EVERY class the child is in (see the helper — the
+  // "all their classes" exclusion is load-bearing).
+  const makeupHosts: MakeupClass[] = makeupRow
+    ? makeupHostChoices(
+        makeupClasses,
+        makeupRow.class_id,
+        ownClassesByStudent.get(makeupRow.student_id) ?? new Set<string>(),
+      )
+    : [];
+
+  /** Real lesson dates for the host class: its weekday pattern, a short look back
+   *  and a couple of months ahead. An affordance — book_makeup() is the guard. */
+  function makeupDatesFor(classId: string): string[] {
+    const c = makeupClasses.find((x) => x.id === classId);
+    if (!c) return [];
+    const today = todayInSg();
+    const shift = (days: number): string => {
+      const [y, m, d] = today.split("-").map(Number);
+      const t = new Date(Date.UTC(y, m - 1, d + days));
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
+    };
+    return expectedLessonDates(c.day_of_week, shift(-21), shift(70));
+  }
+
+  function openMakeup(a: AttendanceRow) {
+    setMakeupRow(a);
+    setMkHost("");
+    setMkDate("");
+    setMkError(null);
+    setMkSuccess(null);
+  }
+
+  async function handleBookMakeup() {
+    if (!makeupRow || !mkHost || !mkDate) return;
+    setMkBusy(true);
+    setMkError(null);
+    // book_makeup() holds every refusal — wrong category, own class, wrong
+    // weekday, an already-billed month — in plain sentences. Show them as-is.
+    // The missed lesson's class IS the home class this make-up replaces.
+    const { error } = await supabase.rpc("book_makeup", {
+      p_class_id: mkHost,
+      p_session_date: mkDate,
+      p_student_id: makeupRow.student_id,
+      p_home_class_id: makeupRow.class_id,
+    });
+    setMkBusy(false);
+    if (error) {
+      setMkError(error.message);
+      return;
+    }
+    const name = makeupRow.student_name;
+    setMakeupRow(null);
+    setMkSuccess(
+      `Make-up booked for ${name}. It now appears on the Makeups page, where it ` +
+        `stays until the coach marks it.`,
+    );
+  }
+
   return (
     <div>
       <PageHeader
@@ -525,6 +660,18 @@ export default function AttendancePage() {
         </div>
       )}
 
+      {mkSuccess && (
+        <div className="mb-3 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          <span className="flex-1">{mkSuccess}</span>
+          <button
+            onClick={() => setMkSuccess(null)}
+            className="font-semibold text-green-700 hover:underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {loadError && (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           Could not load the attendance records: {loadError}. The table below is
@@ -553,17 +700,18 @@ export default function AttendancePage() {
           <Th sort={sort} sortKey="coach_name">Coach</Th>
           <Th sort={sort} sortKey="session_date" firstDir="desc">Date</Th>
           <Th sort={sort} sortKey="status">Status</Th>
+          <Th>Actions</Th>
         </Thead>
         <Tbody>
           {loading ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={5}>
+              <Td className="text-center text-gray-400 py-8" colSpan={6}>
                 Loading…
               </Td>
             </Tr>
           ) : visible.length === 0 ? (
             <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={5}>
+              <Td className="text-center text-gray-400 py-8" colSpan={6}>
                 {loadError
                   ? "Could not load the records — see the error above."
                   : anyFilter
@@ -609,11 +757,100 @@ export default function AttendancePage() {
                 <Td>
                   <StatusBadge status={STATUS_LABELS[a.status] ?? a.status} />
                 </Td>
+                <Td>
+                  {canBookMakeup(a) && (
+                    <button
+                      onClick={() => openMakeup(a)}
+                      className="rounded-lg border border-sky-300 bg-white px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50"
+                    >
+                      Book make-up
+                    </button>
+                  )}
+                </Td>
               </Tr>
             ))
           )}
         </Tbody>
       </Table>
+
+      {/* ── Book a make-up ──────────────────────────────────────────────────── */}
+      <Modal
+        title="Book a make-up"
+        open={makeupRow !== null}
+        onClose={() => setMakeupRow(null)}
+      >
+        {makeupRow && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              Make up <strong>{makeupRow.student_name}</strong>&apos;s missed{" "}
+              <strong>{makeupRow.class_title}</strong> lesson on{" "}
+              {formatSgDate(makeupRow.session_date)} by guesting them into another
+              class of the same kind.
+            </p>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-gray-600">Host class</span>
+              <select
+                value={mkHost}
+                onChange={(e) => {
+                  setMkHost(e.target.value);
+                  setMkDate("");
+                }}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="">Choose a class…</option>
+                {makeupHosts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+              {makeupHosts.length === 0 && (
+                <span className="mt-1 block text-[11px] text-amber-600">
+                  No other class of this kind to host the make-up. Create one, or
+                  book it from the Makeups page.
+                </span>
+              )}
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-gray-600">Lesson</span>
+              <select
+                value={mkDate}
+                onChange={(e) => setMkDate(e.target.value)}
+                disabled={!mkHost}
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+              >
+                <option value="">
+                  {mkHost ? "Choose a date…" : "Choose a class first"}
+                </option>
+                {makeupDatesFor(mkHost).map((d) => (
+                  <option key={d} value={d}>
+                    {formatSgDate(d)}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[11px] text-gray-400">
+                Only the days the host class actually runs.
+              </span>
+            </label>
+
+            {mkError && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {mkError}
+              </p>
+            )}
+
+            <Button
+              className="w-full"
+              disabled={mkBusy || !mkHost || !mkDate}
+              onClick={handleBookMakeup}
+            >
+              {mkBusy ? "Booking…" : "Book the make-up"}
+            </Button>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

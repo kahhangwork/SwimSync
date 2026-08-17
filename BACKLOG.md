@@ -490,11 +490,13 @@ the guest-pass shape already in `makeup_bookings` but with the child's own class
 it is pinned by `multi_class.test.sql`. Only bites a business whose category has few
 classes and a keen swimmer in all of them, which is why it is filed rather than built.
 
-### Book a make-up from the Attendance page — **S**
-The admin Attendance page can filter to `absent` / `cancelled_*` rows but has no action
-column — the most natural moment to offer "book a make-up" is while looking at the miss.
-The Make-ups page stays primary (a booking you cannot see is forgotten and holds the
-month open); this is an entry point, not a second home.
+### ~~Book a make-up from the Attendance page~~ — **S** — **DONE 2026-08-17**
+Shipped: absent/cancelled rows carry a **Book make-up** action; the row's class is the home
+the make-up replaces, so the modal asks only host class + date and calls `book_makeup()`. The
+Make-ups page stays primary. ⚠ RISK 6 gate (`lib/makeupFromAttendance.ts`, unit-tested): the
+button shows only on the child's OWN enrolled class — a guest row carries the host class, not
+an enrolment, and would be refused. PRD §7.20 describes it. (Off-schedule extra dates are not
+offered here — the Make-ups page remains the full-featured home.)
 
 ### A different-coach PRIVATE make-up — **M**
 A private-category make-up today is an **Extra lesson of the child's own class** — same

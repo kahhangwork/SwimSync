@@ -2273,6 +2273,15 @@ marking screen for that date with a *Make-up* chip, and an **unmarked make-up ho
 billing month open** exactly as a trial does. The trial refusals invert: a trial child
 must not be enrolled; a make-up child must be (active, actively enrolled).
 
+**Also bookable from the Attendance page** *(implemented 2026-08-17)*: an absent or
+cancelled row carries a **Book make-up** action, so the natural moment — looking at the miss
+— is an entry point. The row already knows the child and the class they missed, so that class
+is the home the make-up replaces (no home-class question), and the modal asks only for the
+host class and date; the booking still lands on `makeup_bookings` and shows on the Make-ups
+page, which stays the primary home (a booking you cannot see is forgotten). The action shows
+**only on the child's own enrolled class** — a guest row (a trial, or another child's make-up)
+carries the *host* class, not an enrolment, so seeding a make-up from it would be refused.
+
 **Booked by the admin, from the Make-ups page** (the Trials mirror, including its
 "Past — needs marking" list). The form is child-first — one search box finds the child
 by **their name or their class's name** (a dropdown stops working at a few dozen
