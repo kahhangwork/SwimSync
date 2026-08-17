@@ -3045,6 +3045,16 @@ The following section provides a screen-by-screen reference for each SwimSync us
   weekdays sort in week order rather than alphabetically, and it is stable, so a second
   key keeps the first one's grouping. Columns sort by **what is on screen** — a status by
   its label, an amount by its number — not by what the row stores underneath.
+- **Change History** *(implemented 2026-08-17)* — a read-only `/history` page surfacing the
+  `audit_log` trail so a disputed charge can be answered without SQL: who changed what, and
+  when. One global list filtered by entity type and a date range (both applied in the database
+  so the 1000-row cap bites after filtering). Each row **diffs** the `to_jsonb` before/after
+  snapshots — a change shows only the fields that moved, with the old value struck through — so
+  the answer to "what was the number before" is on screen. It is deliberately **"Change
+  History", not "Audit log"**: the trail has holes by design (a removed admin's rows are purged;
+  a no-JWT system write records nothing), and the page says so. An action by someone the admin
+  cannot see renders as *"unknown user"*, never as *"system"* — an audit view must not relabel a
+  real person.
 - **Export to CSV** *(implemented)* — the Invoices, Credit Notes, and Attendance tables each
   carry an **Export CSV** button that downloads exactly what is on screen (post-search,
   filter, and sort), for handing to an accountant. Money is exported as raw numbers so the

@@ -615,7 +615,17 @@ removed for — plus it feeds the matcher for a child who can no longer be a can
 
 </details>
 
-### Attendance edit history view — **S** `[Phase 2]`
+### ~~Attendance edit history view~~ — **S** — **DONE 2026-08-17**
+Shipped as the **Change History** page (`/history`) — both settled shape decisions honoured:
+labelled "Change History" not "Audit log" (the trail has holes by design), and one global
+filtered list, not per-entity. Reads `audit_log` directly (grant + RLS already existed),
+entity-type + date-range filters applied in the DB, diffs the `to_jsonb` snapshots
+(`lib/auditDiff.ts`, unit-tested). ⚠ RISK 5: an unresolvable actor renders "unknown user",
+never "system" — actor_id is always non-null (no-JWT writes insert no row), so "system" is a
+defensive-only fallback. PRD §14 describes it.
+
+<details><summary>Original item (kept for the reasoning)</summary>
+
 Surface the existing audit trail in the UI.
 
 **Why:** every attendance edit is already logged to `audit_log`, but nobody can see it
@@ -654,6 +664,8 @@ where it used to be.
    filters, exactly as `attendance/page.tsx` already does it. A per-entity page would need an
    entry point from all five entity screens and answers a narrower question than *"what
    changed here recently"*, which is the one a disputed charge actually asks.
+
+</details>
 
 ### ~~A coach week view~~ — **SHIPPED 2026-08-08 as the Schedule tab** (PRD §14.2)
 It went further than this item asked. Rather than turning the *Classes* tab into a week

@@ -43,6 +43,7 @@ import {
   ArrowLeftRight,
   CalendarX,
   Gift,
+  History,
 } from "lucide-react";
 
 /** A page's audience. `tenant` = shows ONE business. `platform` = cross-tenant. */
@@ -78,6 +79,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/coaches",      label: "Coaches",              icon: UserCog,         scope: "tenant"   },
   { href: "/admins",       label: "Admins",               icon: ShieldCheck,     scope: "tenant"   },
   { href: "/wages",        label: "Coach Wages",          icon: Wallet,          scope: "tenant"   },
+  { href: "/history",      label: "Change History",       icon: History,         scope: "tenant"   },
   { href: "/platform",     label: "Platform",             icon: Globe,           scope: "platform" },
 ];
 
