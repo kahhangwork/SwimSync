@@ -1,6 +1,8 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-16 — **Build order re-ranked** after referrals shipped (§8.61 exhausted the
+_Last updated: 2026-08-18 — **Wave D closed** (§8.69): the markable_floor stranding, the engine-side
+credit-note lock, and the admin void all SHIPPED — removed from the queue; added the partial-payment
+reopen edge. **Build order re-ranked** after referrals shipped (§8.61 exhausted the
 queue). No rework-critical sequence remains, so this is now decisions + a flat value pool. **Three
 decisions settled with the user:** revenue is **ACCRUAL** (unblocks the owner-only accounting page),
 reminders stay **MANUAL** for now (parks the cron-gated nudge tail), **multi-language REFUSED**
@@ -396,8 +398,6 @@ Email-confirmation copy, Tick off swimming skills (M).
   a UEN has no checksum so only the mobile shape is verifiable, which is all the real builder checks.
 - **`fixtures-trial-onboarding-teardown` deletes invoices it doesn't own** (S) — the next
   fixture touching invoices trips `credit_notes_invoice_item_id_fkey`.
-- **Sealing a LATER month strands an earlier unsealed one** (S) — moves `markable_floor()`
-  for every business; measure prod first, property-test the matrix.
 - **Bound `recompute_package_extensions`** (S) — scale, not today; verify the resurrection
   assumption before adding the bound.
 - ~~**A re-toggled attendance correction issues a SECOND credit note and DOUBLES the credit**~~
@@ -411,16 +411,14 @@ Email-confirmation copy, Tick off swimming skills (M).
   migration), which is why `IF EXISTS` was required for a clean `db reset`.
 - ~~**`/makeups` and `/trials` 79px date column**~~ — **DONE 2026-08-18** (§8.68). `whitespace-nowrap`
   on the Date `<Th>`/`<Td>` in both pages.
-- **Engine-side credit-note lock — the COMPLETE fix for the un-correction/drawdown race** (S)
-  `[found 2026-08-18]` — the trigger's un-correction branch now takes `FOR UPDATE` on the note
-  (§8.68), closing the trigger-vs-trigger window. But `generate-invoices` (`core.ts:~1404`) still
-  selects `status='available'` notes without a row lock and inserts the application before flipping
-  status, so a billing run racing an un-correction is not fully serialised. Dormant (0 notes on prod,
-  billing is monthly/manual) — do it when cron is enabled or a second coach exists.
-- **Admin action to void/reverse a credit note** (S) `[found 2026-08-18]` — a DRAWN credit that
-  needs un-correcting is now refused (`CN001`) with "reverse it manually / contact support", but the
-  admin UI has no void button, so the only route is DB-level. Give the tenant admin a guarded reverse
-  action (audited) so the coach's refusal has a real destination.
+- **Partial-payment accounting for a voided-credit reopen** (S/M) `[found 2026-08-18]` — the admin
+  void (§8.69, PRD §5.6) reopens a drawn invoice to `outstanding` with `net += amount`. If that
+  invoice had already been **cash-paid**, it reopens at the higher net while its `payment_records`
+  still show the old lower payment, so the amount-owed reads too high and the admin reconciles by
+  hand. **Why:** correct-to-the-cent parent-facing balances once voids run on real paid invoices.
+  **Notes:** needs a partial-payment / amount-owed model (`net_amount − SUM(payment_records)`), which
+  SwimSync's binary paid/outstanding invoice status does not have today. Dormant (0 credit notes on
+  prod, so no void has ever reopened a paid invoice). Void itself is race-safe (§8.69's drawdown lock).
 - **`HANDOVER.md` §3 needs graduating** (S) — docs tax; keep the prohibitions +
   verified-vs-specified, point the rest at the PRD.
 
@@ -939,56 +937,6 @@ settlements — or vice versa — is worse than no number, because it reads as a
 That is precisely the mistake PRD §4.4 records about the platform pages, which showed
 several businesses' figures added together and labelled as one; the fix there was to show
 nothing rather than something wrong.
-
-### Sealing a LATER month strands an earlier unsealed one — **S**
-`markable_floor()` takes `LEAST(session_window_start(), month after MAX(billing_month))`.
-**`MAX` is the latest sealed month, not the latest CONTIGUOUS one**, so sealing a month while
-an earlier one is still unsealed pushes the floor past the earlier month, and its lessons
-become unmarkable for ever. The month can then never be billed — the completeness gate names
-a lesson nobody may record, and it has no override by design.
-
-**Worked example**, September, a business that has sealed nothing since June:
-- July blocked (an unmarked lesson), August complete. Floor today =
-  `LEAST(1 Aug, 1 Jul)` = **1 Jul** — July is still markable, which is correct and is what
-  §8.32 built.
-- Bill and seal **August**. `MAX` becomes `2026-08`, so the seal term becomes 1 Sep and the
-  floor becomes `LEAST(1 Aug, 1 Sep)` = **1 Aug**. July's dates are now below the floor.
-  Nobody can mark them, so July can never be billed.
-
-**Why:** it is §8.32's own failure mode — *"a month billed LATE is permanently unbillable"* —
-reached through the door §8.32 did not close. Nothing forces the admin to bill in order; the
-picker caps at the last completed month but happily offers August while July is outstanding.
-That is a plausible sequence: July is blocked on one forgotten lesson, September arrives, and
-billing August is the obvious thing to do.
-
-**Notes:**
-- ⚠ **The obvious fix was already tried and is WRONG.** "Floor at the earliest UNSEALED
-  month" leaves no floor at all, because a month with **nothing recorded is never sealed**
-  (§8a.1) — so every business that ever had a quiet month floors at the beginning of time.
-  §8.32 recorded this; do not re-derive it.
-- The shape that probably works is *the month after the latest **contiguous** run of sealed
-  months*, which needs a gap scan over `billing_periods`, not a `MAX`. Cheap in SQL, but it
-  changes what `markable_floor()` returns for every business, so it wants the same treatment
-  §8.32 got: a property assertion over a matrix of tenant states, plus the production
-  read-out before and after.
-- **Measure production before touching it** — a non-zero result changes this from insurance
-  into an incident:
-  ```sql
-  SELECT bp.tenant_id, MAX(bp.billing_month) AS latest_sealed,
-         count(*) AS sealed_months
-    FROM billing_periods bp GROUP BY 1
-   HAVING count(*) <> (
-     EXTRACT(YEAR  FROM age(to_date(MAX(bp.billing_month),'YYYY-MM'),
-                            to_date(MIN(bp.billing_month),'YYYY-MM'))) * 12
-   + EXTRACT(MONTH FROM age(to_date(MAX(bp.billing_month),'YYYY-MM'),
-                            to_date(MIN(bp.billing_month),'YYYY-MM'))) + 1);
-  -- rows = businesses with a GAP in their sealed months. Expect none today:
-  -- production has sealed exactly one month (July 2026) and recorded no
-  -- attendance before 2026-07-26, so there is no earlier month to strand.
-  ```
-- Found 2026-08-10 while writing `20260810000100`; noted in
-  `docs/plans/UNMARKED_BOOKING_PLAN.md` as explicitly out of that change's scope, and filed
-  here rather than fixed because it moves `markable_floor()` for every business.
 
 ### `HANDOVER.md` §3 needs graduating — **S** `[docs]`
 `HANDOVER.md` is **~1000 lines against its own ~700 target**, and §3 ("what works") is about

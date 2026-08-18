@@ -590,11 +590,25 @@ note per corrected lesson rather than issuing new records (so the note count sta
 and a reversed note is hidden from the parent and labelled *Reversed* in the admin views.
 
 **One exception, by design:** if the credit has already been drawn down against another
-invoice, the correction back to billable is **refused** — un-marking the lesson would
-silently reopen a past (possibly paid) invoice. The coach is told the credit must be
-reversed manually; there is no automatic clawback. *(Before 2026-08-18 an un-correction
-reversed nothing and a re-correction issued a second note, doubling the credit — see
-`HANDOVER.md` §8 / GOTCHAS.)*
+invoice, the correction back to billable is **refused** (`CN001`) — un-marking the lesson
+would silently reopen a past (possibly paid) invoice. The coach is told to ask their admin
+to **void** the credit note first (below), then mark again; there is no automatic clawback.
+*(Before 2026-08-18 an un-correction reversed nothing and a re-correction issued a second
+note, doubling the credit — see `HANDOVER.md` §8 / GOTCHAS.)*
+
+#### Voiding a Credit Note *(implemented, 2026-08-18)*
+
+A **tenant admin** (their own business only — not the platform admin) can **void** a credit
+note from the admin Credit Notes page, with a required reason. Voiding is the destination
+for the `CN001` refusal above and for any credit issued in error. It reverses every live
+draw the note has made — each affected invoice is **reopened to `outstanding`** with the
+drawn amount added back to its balance and its settlement stamps cleared — removes the
+note's undrawn remainder from the parent's balance, and marks the note `reversed`. Payment
+records are left untouched as immutable history. **No email is sent to the parent in v1** —
+the admin communicates the reopened balance. If a reopened invoice had already been
+cash-paid, it returns to `outstanding` at the higher net while its recorded payment stands,
+so the admin reconciles the difference by hand (see `BACKLOG.md`). Rationale, guards and the
+drawdown-lock that makes voiding race-safe: `docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md`.
 
 #### Credit Note Details
 
@@ -1153,6 +1167,19 @@ There is **no override**, for the same reason as the attendance block: no legiti
 served by billing an unfinished month, so an override could only ever cause the loss above. The
 picker is capped as well, but the refusal is enforced in the billing engine — a limit that only
 the admin screen applies is not a limit.
+
+#### Months must be billed IN ORDER *(implemented 2026-08-18)*
+
+Generation **refuses** to bill a month for a business while an **earlier** month still has
+unbilled lessons, naming the earliest one ("bill 2026-07 first"). Sealing a later month pushes
+the marking floor past the skipped one and permanently strands its unmarked lessons — the same
+override-less underbill as above, arrived at from a different direction. The guard prevents it at
+the source rather than lowering the floor (which would re-expose already-sealed months to
+editing). Like the two guards above it takes **no `force` bypass**. A month with **nothing left
+to bill** — empty, or fully marked absent — does not block, so a quiet month never deadlocks the
+next one. The check is **fail-open**: any uncertainty resolves to "does not block", because a
+missed block is a recoverable late mark (§7.17) while a wrongful block would halt a real
+business's billing. Reasoning and the deploy record: `docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md`.
 
 #### A lesson is priced by its own date *(implemented — corrected 2026-07-19)*
 

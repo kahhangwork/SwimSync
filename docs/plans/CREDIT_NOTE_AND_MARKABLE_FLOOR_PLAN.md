@@ -619,8 +619,9 @@ gate the deploy even if everything else is green.
   next in order → no block) passes.
 - [x] P1/P4 RED-proven (guard neutralised → exactly the 7 block-assertions fail); below-floor
   seal-term RED-proven (drop seal term → 3 fail); Deno suite green **twice** (§7.15).
-- [ ] **Deploy step (owed):** `supabase functions deploy generate-invoices` + confirm via
-  `supabase functions list` + grep the served bundle for `earlier_month_unbilled` (§7.31/§7.51).
+- [x] **DEPLOYED 2026-08-18:** `generate-invoices` v24 live; RISK 7 prod dry-run clean (only tenant
+  73c243a8 has lessons — 2026-07 sealed, 2026-08 unsealed but not yet billable → guard is a no-op);
+  served bundle byte-matches source (download + clean git status), `earlier_month_unbilled` present.
 
 **Item 2 (before deploying the RPC + engine):** — branch `feature/item2-credit-lock` (`2291691`,
 off Item 1). Migration `20260818000200`. Deno **228 ×2**, pgTAP **1141 PASS** (credit_drawdown 29).
@@ -633,7 +634,8 @@ Signature simplified to `(p_invoice_id)` — invoice is the single source of sco
 - [x] `function_grants.test.sql` rows added (service_role EXECUTE only). **Owed at deploy:** remote grant dump.
 - [x] Race rehearsal run (session B blocked on the note's FOR UPDATE, drew $0 after reverse committed);
   estimate-vs-truth test RED against current engine (`credit_applied=30` with $20 notes).
-- [ ] **Deploy step (owed):** `supabase db push` (migration) → `supabase functions deploy generate-invoices` → grant dump.
+- [x] **DEPLOYED 2026-08-18:** migration `20260818000200` applied to prod (remote filled); engine v24
+  live; grant dump confirmed on prod — `apply_credit_to_invoice` = service_role EXECUTE only.
 
 **Item 3 (before deploying migration → functions → apps):** — branch `feature/item3-admin-void`
 (`b18375f`, off Item 2). Migration `20260818000300`. pgTAP **1171** (void 28), Deno **229 ×2**,
@@ -653,7 +655,10 @@ admin vitest **452** + typecheck, app jest **391** + typecheck.
 - [x] Re-toggle-after-void test RED against the 20260818000100 trigger (RED-proofing caught a weak first
   assertion; the true re-toggle fails 2 tests without edit A); DOWN caveat written into the header.
   Also: `audit_log_tenant_of()` gained a `credit_note` arm (§8.28 requires every entity type registered).
-- [ ] **Deploy step (owed):** migration → `credit-note-emails` deploy → apps to `main` LAST; grant dump.
+- [x] **DEPLOYED 2026-08-18:** migration `20260818000300` applied (remote filled); `credit-note-emails`
+  v2 live (reversed filter in served bundle); grant dump confirmed — `void_credit_note` = authenticated
+  EXECUTE only; apps pushed to `main` LAST (`572dbaf..8766682`). **App build: confirm Vercel went green
+  (§11.27) — void UI + CN001 copy are auth-gated, not greppable from outside.**
 
 **Graduate the durable ones:** at `/update-docs`, RISK 2 (RPC-commits-then-retry double-draw)
 and RISK 6 (grep every `credit_applications` consumer for `reversed_at`) outlive this task —

@@ -1,12 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-18 — **CREDIT-NOTE DOUBLE-CREDIT FIX (Wave D, §8.68), LIVE.** A re-toggled
-attendance correction used to double a parent's credit ($30 lesson → $60); the trigger is now
-symmetric — one note per invoice line, un-correction voids the credit, an already-spent credit
-refuses (`CN001`). Migration `20260818000100` applied to prod; apps deployed first. §7.184–186 · PRD §5.6._
+_Last updated: 2026-08-18 — **WAVE D COMPLETE (§8.69), LIVE.** Three shipped + deployed: an engine
+**ordering-guard** (billing refuses a later month while an earlier one is unbilled — stranding fixed
+at the source), the **engine-side credit lock** (`apply_credit_to_invoice`, one locked idempotent
+transaction), and the **admin void** for a credit note (CN001's destination). Migrations
+`20260818000200/000300`, engine v24, emails v2; apps last. §7.187 · PRD §5.6/§7.7 · plan
+`docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md`._
 
-_Previously, 2026-08-17 (§8.67) — admin UI polish: responsive auto-scaling + a collapsible grouped
-sidebar (4 top-level + 4 groups); Lesson Coaches→Substitutes, Coach Wages→Wages. §7.181–183._
+_Previously, 2026-08-18 (§8.68) — symmetric credit notes: a re-toggled correction no longer doubles a
+parent's credit; one note per line, `CN001` refuses a spent un-correction. Migration `20260818000100`. §7.184–186._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -179,11 +181,15 @@ is a guard whose first real firing is still ahead of you.
   coach is hired; `generate_coach_payouts` also skips a coach with no rate, so **no payout has
   ever been generated on production.** The whole model is verified locally against non-admin
   coaches in a browser (`verify-coach-roster`, 30 checks) — that is the only place it can be.
-- **Credit-note emails (§8.64) AND the symmetric double-credit fix (§8.68)** — production holds
-  **0 credit notes**, so nothing has been emailed, the admin's Resend button has no row, and the
-  §8.68 guards (un-correction void, the `CN001` spent-credit refusal, the dedup backfill) have
-  **never fired** — the 0-rows fact is what made both migrations' backfills no-ops. First firing of
-  either is the first post-billing attendance edit that leaves `present`/`trial_paid`.
+- **Credit-note emails (§8.64), the symmetric double-credit fix (§8.68), AND all of Wave D's credit
+  work (§8.69)** — production holds **0 credit notes**, so nothing has been emailed, the admin's
+  Resend/Void buttons have no row, and none of the guards has **ever fired**: the `CN001` refusal, the
+  engine credit lock (`apply_credit_to_invoice`, drawn only when an invoice applies credit), the admin
+  void, and the `reversed_at` filter are all dormant, and the 0-rows fact is what made every migration's
+  backfill a no-op. First firing of the credit paths is the first post-billing attendance edit leaving
+  `present`/`trial_paid`; of the credit lock, the first billing run that draws a note down.
+  **The ordering-guard (§8.69) is dormant too but for a stronger reason:** prod bills in order (only
+  2026-07 sealed), so the guard is provably a no-op — it fires only on an out-of-order billing attempt.
 - **The orphan-lesson report** — production shows zero lines and the badge has never lit
   on real data (every July invoice is Paid; nothing has been recorded into July since it
   was billed). That is the expected state: its first real firing is a backdated
@@ -386,6 +392,33 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.69 (2026-08-18, second session) — WAVE D: ORDERING-GUARD + CREDIT LOCK + ADMIN VOID, LIVE
+
+**Three latent Wave-D items shipped and deployed to prod in one sequenced wave.** (1) **Ordering-guard**
+(Item 1, engine-only, `generate-invoices` v24): billing refuses to seal a month while an EARLIER unsealed
+month has unbilled lessons, naming the earliest; no `force` bypass; empty/all-absent months skippable;
+fail-open. **`markable_floor` UNCHANGED** — the "lower the floor" contiguity fix was REJECTED in review,
+because lowering the floor re-exposes already-sealed months to the coach. (2) **Engine-side credit lock**
+(Item 2, migration `20260818000200`): the credit drawdown moved into one locked DB transaction
+(`apply_credit_to_invoice`), idempotent per invoice + folds the invoice truth-up in (also fixed a latent
+estimate-vs-truth bug). (3) **Admin void** (Item 3, migration `20260818000300`): `void_credit_note`
+(tenant-admin only) reopens drawn invoices to outstanding + clears settlement stamps, leaves
+`payment_records`; `credit_applications.reversed_at` + trigger v9; the admin **Void button**, and **CN001**
+now points there.
+
+Built via `/plan-with-confidence` → `/plan-review` (8 product risks, mitigations folded INTO the plan) →
+three forks (one per item), each diff-reviewed + re-verified by me. Deploy order: RISK-7 prod dry-run
+(clean) → migrations → engine v24 → emails v2 → grant dump → apps LAST. Verified pgTAP **1171**, Deno
+**229 ×2**, admin vitest **452**, app jest **391**, both typechecks. **All reasoning, the 8 RISK gates,
+and the deploy record live in `docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md`** — behaviour → PRD
+§5.6/§7.7; trap → §7.187; deploy → DEPLOYMENT §11.28; one follow-up → BACKLOG. `1a17d33`→`8766682`.
+
+**Deliberately not done:** partial-payment accounting for a voided-credit reopen — an already-cash-paid
+invoice reopens at the higher net while its `payment_records` stand, so the admin reconciles by hand
+(BACKLOG, dormant on 0 notes). The `paid_at`-clearing on reopen departs from the plan's original "leave
+paid_at" (an `outstanding` invoice must not show a Paid badge). `fixtures-trial-onboarding-teardown`, the
+`recompute_package_extensions` bound, and HANDOVER §3 graduation remain the open non-urgent items.
+
 ## 8.68 (2026-08-18) — CREDIT-NOTE DOUBLE-CREDIT FIX (Wave D), LIVE
 
 **A re-toggled attendance correction doubled a parent's credit — fixed, deployed, migration applied
@@ -412,25 +445,6 @@ trigger-vs-trigger window; the complete fix needs `generate-invoices` to lock th
 BACKLOG); the admin void UI (`CN001` says "contact support" until it exists — BACKLOG); HANDOVER §3
 graduation (still parked). `fixtures-trial-onboarding-teardown`, the `markable_floor` stranding, and
 the `recompute_package_extensions` bound remain the open Wave D items.
-
-## 8.67 (2026-08-17, third session) — ADMIN UI: RESPONSIVE SCALING + COLLAPSIBLE GROUPED SIDEBAR
-
-**Two APP-ONLY pushes, no migration/function** (`43bef0c`, `88d88a5`). (1) The admin panel now
-**auto-scales down on narrower screens** — root font-size media queries in `globals.css`, so the
-whole rem-based UI shrinks like a zoom-out and fits a small laptop without manual zoom. (2) The
-tenant sidebar went from **20 flat tabs to 4 top-level + 4 collapsible groups** (Families /
-Billing / Scheduling / Settings): multi-open, localStorage-remembered, auto-expands the active
-page's group, and a collapsed group's header carries the amber "stuck family" badge of any child.
-Labels clarified — **Lesson Coaches → Substitutes** (route `/lesson-coaches` → `/substitutes`, 308
-redirect), **Coach Wages → Wages**, sidebar-only Unassigned/Levels. The flat `NAV` stays the
-security source of truth (`scopeForPath`); grouping is a presentational overlay (`NAV_GROUPS` /
-`groupedNavFor`) — **§7.183, don't nest NAV.** Verified admin vitest **438** (+11 nav-grouping),
-both typechecks, production build, real-browser collapse/expand + label render + the 308.
-
-**A GitHub outage** blocked Vercel's auto-deploy mid-session; shipped via the dashboard's **Create
-Deployment** button (§11.27). Two build traps graduated: **§7.181** (a `*/` inside a CSS comment
-closes it — broke `next build`) and **§7.182** (`next build` beside a live `next dev` corrupts
-`.next` → 200 with an empty page). PRD §7.13/§7.16 + Superadmin Panel · `docs/DEPLOYMENT.md` §11.27.
 
 ---
 
@@ -502,20 +516,17 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — Wave D's credit-note fix SHIPPED LIVE 2026-08-18 (§8.68). Wave B/C empty.
+### THE NEXT BUILD — Wave D COMPLETE (§8.69, all three shipped LIVE 2026-08-18). Wave B/C empty.
 
-The double-credit fix + the `tenants.suspend` drop are live (`b59e17f`, migration `20260818000100`,
-prod-confirmed). **No migration is in flight now** (§7.55 — one at a time). Remaining Wave D, all
-latent traps, none urgent:
+The ordering-guard, the engine-side credit lock, and the admin void are all live and prod-confirmed
+(`1a17d33`→`8766682`; migrations `…200`/`…300`). **No migration is in flight now** (§7.55 — one at a
+time). What remains is small, latent, non-urgent:
 
-- **Sealing a LATER month strands an earlier unsealed one** (`markable_floor` — moves it for every
-  business; measure prod first, property-test the matrix). The most consequential of the four.
 - `fixtures-trial-onboarding-teardown` deletes invoices it doesn't own; bound
   `recompute_package_extensions`; HANDOVER §3 graduation (docs tax).
-- **Two follow-ups this session raised** (both in `BACKLOG.md`): the **engine-side credit-note lock**
-  — the trigger now takes `FOR UPDATE`, but `generate-invoices` still draws notes down without a row
-  lock, so the un-correction/drawdown race is only *partly* closed (dormant: 0 notes, manual billing);
-  and an **admin void action**, so `CN001`'s "contact support" has a real destination.
+- **One follow-up this wave raised** (in `BACKLOG.md`): **partial-payment accounting for a
+  voided-credit reopen** — an already-cash-paid invoice reopens at the higher net while its
+  `payment_records` stand, so the admin reconciles by hand (dormant: 0 notes; void itself is race-safe).
 
 Then *Later* (owner-only accounting page, accrual). Full ranking + settled decisions (revenue
 **ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**): `BACKLOG.md`.
@@ -552,12 +563,12 @@ Then *Later* (owner-only accounting page, accrual). Full ranking + settled decis
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260817000100` (credit-note email
-tracking, §8.64); production confirmed caught up 2026-08-17 via `supabase migration list --linked`,
-**0 pending**. **§8.64 is the freshest worked example, and the first where the APPS had to wait on a
-NEW edge function** — pushing `main` first would have shipped two callers of a function that did not
-exist (prod count → migration → gate → function v1 → grant dump → apps last;
-`docs/DEPLOYMENT.md` §11.25). The rule stands:
+**The migration queue is EMPTY.** The latest applied is `20260818000300` (Wave D admin void, §8.69);
+production confirmed caught up 2026-08-18 via `supabase migration list --linked`, **0 pending**.
+**§8.69 (DEPLOYMENT §11.28) is the freshest worked example of the full sequence** — RISK-7 prod
+dry-run → two migrations → engine v24 → emails v2 → grant dump → apps LAST; a git push deploys neither
+migrations nor edge functions. §8.64 (§11.25) is the earlier example where the APPS had to wait on a
+NEW edge function. The rule stands:
 migrations to prod (engine too when `core.ts` changes — it did NOT for either email feature) FIRST,
 apps to `main` LAST.
 §7.123 still applies to signatures. Whatever comes next: still one at

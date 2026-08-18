@@ -2997,3 +2997,13 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     distinct `ERRCODE` and map `error.code` to a real message
     (`SwimSyncApp/lib/attendanceSaveError.ts`). Any refusing trigger on a batch-written table
     needs this pairing, or the refusal is indistinguishable from a transient failure. (§8.68)
+
+187. **To prove an EDGE FUNCTION deploy actually shipped your code, `supabase functions
+    download <slug>` then check `git status` is clean.** §7.31/§7.51 say a 200 proves nothing —
+    grep the served bundle for a string only the new build has. For edge functions there is
+    nothing public to grep (they run behind auth/JWT), but `functions download` **overwrites the
+    local function directory with the DEPLOYED source**, so a **clean `git status` afterward is
+    proof the live bundle byte-matches your committed branch** — and a diff is proof it does not.
+    Pair it with `supabase functions list` (the `version` bumps on each deploy). Used to confirm
+    `generate-invoices` v24 and `credit-note-emails` v2 on 2026-08-18. Note the download mutates
+    your working tree, so do it on a clean tree you can inspect, not mid-edit. (§8.69)

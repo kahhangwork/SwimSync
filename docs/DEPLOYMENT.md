@@ -607,3 +607,17 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     the new build. **Rollback:** app-only — Vercel "promote previous deployment", no DOWN file.
     **Reference:** the responsive `*/`-in-CSS-comment build break is §7.181; the
     build-vs-dev `.next` corruption is §7.182; the flat-`NAV`-as-security invariant is §7.183.
+
+28. **Deploy record (2026-08-18): Wave D — ordering-guard + credit-lock + admin void** (§8.69).
+    Order run: RISK-7 prod dry-run (read-only, clean) → `supabase db push` applied migrations
+    `20260818000200` (`apply_credit_to_invoice`) + `000300` (`void_credit_note` + `credit_applications.reversed_at`
+    + trigger v9) → `supabase functions deploy generate-invoices` (**v24**, guard + RPC call) →
+    `supabase functions deploy credit-note-emails` (**v2**, reversed filter) → grant dump →
+    `git push origin main` LAST (admin Void button + CN001 copy; Vercel). Still **five** edge functions —
+    two got new versions, none added. **Grants confirmed on prod:** `apply_credit_to_invoice` =
+    service_role EXECUTE only; `void_credit_note` = authenticated EXECUTE only. **Deploy proof:** each
+    function `download`ed and `git status` clean (§7.187), versions via `functions list`; app build is
+    auth-gated (confirm Vercel green in the dashboard, §11.27). **Rollback:** committed + rehearsed DOWN
+    files for both migrations (`supabase/rollback/20260818000200…`, `…000300…`) — the void DOWN's header
+    caveats that dropping `reversed_at` after a live void erases which draws were reversed. Full record +
+    RISK gates: `docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md`.

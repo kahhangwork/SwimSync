@@ -56,6 +56,8 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `constraints.test.sql` (6) | one-invoice-per-parent-per-month, one active enrolment per student **PER CLASS** (plus the positive case — a second, non-overlapping class is allowed — and the overlap refusal; the old wording said "two active class enrolments" and would have gone on passing while describing a rule Wave 2 deleted, because the statement re-inserts the SAME class), positive-only credit applications, credit notes immutable to app roles — that last one asserts a **`42501`** now, not a silent zero-row UPDATE: since `20260804000600` the grant is gone as well as the policy, so the privilege check fails first (§7.88) |
 | `credit_note_trigger.test.sql` (11) | the `handle_attendance_update` auto credit-note trigger (billable→non-billable on an invoiced lesson); **11.6** the correction leaves the original invoice intact (not modified/deleted) and the note links back to it |
 | `credit_note_double_credit.test.sql` (15) | the symmetric ledger (`20260818000100`, §8.68): a re-toggled correction reuses ONE note (never a second, so no doubled credit), `absent→present` voids an undrawn note and returns the balance, un-correcting an already-DRAWN credit RAISEs `CN001`, and `UNIQUE(invoice_item_id)` rejects a manual duplicate. RED-proven against the pre-fix trigger (tests 5-7); the raw $60 double was reproduced separately (pre-fix trigger + no index) |
+| `credit_drawdown.test.sql` (§8.69) | `apply_credit_to_invoice` (`20260818000200`): FIFO order across notes, partial draw leaves the note `available` with the remainder, full draw flips `applied` + stamps, cap by balance and by `p_max`, a `reversed` note is never drawn, the self-heal branch, tenant scoping, balance never negative, and **idempotency** — a second call for the same invoice draws $0 and moves the balance once (RED against a non-idempotent body) |
+| `void_credit_note.test.sql` (§8.69) | the admin void (`20260818000300`): undrawn void (note `reversed`, balance −amount, audit), drawn void (application reversed, invoice restored to `outstanding`, balance −remainder-only, `>= 0`), partial draw, refusals (already-reversed / blank reason / wrong-tenant admin / coach / parent — nothing written), the **`CN001` exit end-to-end** (spent note → un-correct raises → void → same un-correct now succeeds), **re-toggle after void** (RED against the pre-v9 trigger), `payment_records` unchanged on reopen, and `credit_applied == SUM(non-reversed applications)` |
 | `rls_isolation.test.sql` (10) | RLS parent/parent isolation + superadmin sees all; **11.3** a parent sees all their children across coaches while each coach sees only students in their own classes |
 | `edge_cases.test.sql` (9) | PRD §11: **11.2** a child created before assignment defaults to unassigned with an empty (not error) class view, **11.4** no bare `trial` status, **11.5** re-enrol after unenrol keeps history, **11.8** unenrol leaves `credit_balance` untouched |
 | `tenant_isolation.test.sql` (24) | cross-tenant isolation across **two full tenants** — neither can see the other's families, classes, coaches, invoices, credit notes or attendance (§8.1) |
@@ -212,6 +214,16 @@ still bills, which a naive "widen `billableStudentIds`" fix would have put at ri
 class deliberately: without it that class blocks too and `sealed === false` would be true
 whatever the guest class did (§7.111 applies only to the class under test).
 
+_And (added 2026-08-18, §8.69):_ **`orderingGuard.test.ts`** — the engine ordering-guard.
+The P1–P4 property matrix over three months × {billable, empty, all-absent} content in all six
+billing orders (blocks the earliest unbilled earlier month, skips empty/all-absent, releases
+once it bills, no unsealed billable month left below the floor), plus `force` does not bypass,
+cron shape hits it identically, two-tenant isolation, the RISK-3 prod-shape replay (one sealed
+month → next in order → no block), a below-floor skip that pins `computeMarkableFloor`'s
+seal-term (RED against dropping it), and two §7.18 cross-checks that the guard's verdict matches
+the engine's own complete/incomplete verdict. RED-proven: neutralising the guard fails exactly
+the seven block-assertions.
+
 _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
@@ -229,7 +241,10 @@ guards), `lib/trialConvert.test.ts` (the §7.180 two-press guard), `lib/makeupFr
 match), so a platform admin, a coach whose `tenant_id` happens to match, and a disabled admin all
 get **no button** rather than a 403 rendered as "Edge Function returned a non-2xx status code"
 (§7.173); plus the `hasApplications` term, which is the only thing that sees a **partly** spent
-note. The student
+note. **2026-08-18 added `lib/creditNoteVoidState.test.ts`** (§8.69) — the Credit Notes page's Void
+gate + confirm label, pure: the button shows only for the viewer's own tenant's **non-reversed**
+notes (a voided note reads reversed via `reversed_at`, not as still-spent), and a **drawn** note's
+confirm names the amount and the invoice(s) that return to outstanding. The student
 rename (2026-08-14) added `lib/claimNaming.test.ts` — the claim-approval naming decisions,
 pure: the certainty-dependent picker default (parent's name for a confirmed claim, current for
 `unsure`, proven red by defaulting to the parent's always) and that a post-approve rename
