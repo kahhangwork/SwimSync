@@ -7,7 +7,7 @@
 // line that leaves the coach stuck.
 export function attendanceSaveErrorMessage(code: string | undefined): string {
   if (code === "CN001") {
-    return "This lesson's credit was already applied to an invoice, so re-marking it present was refused. None of your changes were saved — this credit has to be reversed manually, so please contact support.";
+    return "This lesson's credit was already applied to an invoice, so re-marking it present was refused. None of your changes were saved — ask your admin to void this lesson's credit note on the Credit Notes page, then mark it again.";
   }
   return "Failed to save attendance. Please try again.";
 }

@@ -314,6 +314,47 @@ Deno.test("⚠ RISK 2: once the credit is applied, the note is reported spent an
   }
 });
 
+// ── Item 3 — a REVERSED draw is not spent (a voided note becomes sendable) ───
+
+Deno.test("Item 3: a note whose draws are all REVERSED is NOT reported spent", async () => {
+  const { s, note } = await scenarioWithCreditNote();
+  try {
+    // Draw the credit down for real, exactly as ⚠ RISK 2 does.
+    const f1 = await s.addSession("2026-06-06");
+    await s.mark(f1, "present");
+    await s.completeMonth("2026-06");
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
+      mode: "manual",
+      force: true,
+      billing_month: "2026-06",
+      now: s.now,
+    });
+
+    // Pre-condition: it IS spent while the draw is live.
+    const before = await findSpentNoteIds(s.db, [note.id]);
+    assert(before.ok && before.spent.has(note.id), "live draw ⇒ spent");
+
+    // A void marks the draw reversed (void_credit_note does this; here we set the
+    // column directly — the Deno client is service_role, not a tenant admin).
+    await s.db
+      .from("credit_applications")
+      .update({ reversed_at: new Date().toISOString() })
+      .eq("credit_note_id", note.id);
+
+    // Now it is NOT spent — the re-issued credit can email again. RED against the
+    // pre-Item-3 findSpentNoteIds, which counted the reversed row.
+    const after = await findSpentNoteIds(s.db, [note.id]);
+    assert(after.ok, "query ok");
+    assert(
+      !after.spent.has(note.id),
+      "a note with only reversed draws is not spent",
+    );
+  } finally {
+    await s.teardown();
+  }
+});
+
 // ── ⚠ RISK 11 — the balance is a per-(parent, tenant) aggregate ─────────────
 
 Deno.test("⚠ RISK 11: the balance is the parent's TOTAL with that business, not the note", async () => {

@@ -22,7 +22,7 @@
 -- helpers that had no ACL of their own (§7.25).
 
 BEGIN;
-SELECT plan(4);
+SELECT plan(6);
 
 -- ── 1. THE GENERAL RULE ───────────────────────────────────────────────────────
 -- has_function_privilege() resolves a NULL proacl to the Postgres default
@@ -81,6 +81,26 @@ SELECT ok(
   AND NOT has_function_privilege('authenticated', 'public.next_package_ref(uuid,text)', 'EXECUTE')
   AND NOT has_function_privilege('service_role', 'public.next_package_ref(uuid,text)', 'EXECUTE'),
   'next_package_ref is callable by NOBODY');
+
+-- ── 5. void_credit_note (20260818000300) — the admin void ─────────────────────
+-- Self-authorises (is_tenant_admin of the note's business), so the admin calls
+-- it directly: authenticated YES. anon and service_role NO — it is not an
+-- unauthenticated surface and the engine has no reason to void.
+SELECT ok(
+  has_function_privilege('authenticated', 'public.void_credit_note(uuid,text)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.void_credit_note(uuid,text)', 'EXECUTE')
+  AND NOT has_function_privilege('service_role', 'public.void_credit_note(uuid,text)', 'EXECUTE'),
+  'void_credit_note is callable by authenticated ONLY');
+
+-- ── 6. apply_credit_to_invoice (20260818000200) — engine-only, and STAYS so ───
+-- Item 3 does CREATE OR REPLACE on it (adding the reversed_at filter). CREATE OR
+-- REPLACE preserves grants, but pin it: the engine-only surface must not have
+-- silently gained authenticated/anon, the opposite-polarity mistake.
+SELECT ok(
+  has_function_privilege('service_role', 'public.apply_credit_to_invoice(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('anon', 'public.apply_credit_to_invoice(uuid)', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'public.apply_credit_to_invoice(uuid)', 'EXECUTE'),
+  'apply_credit_to_invoice is callable by service_role ONLY (survives the Item 3 replace)');
 
 SELECT * FROM finish();
 ROLLBACK;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { exportCsv, type CsvColumn } from "@/lib/csv";
@@ -15,6 +15,10 @@ import {
   creditNoteEmailView,
   resendBlockedLabel,
 } from "@/lib/creditNoteEmailState";
+import {
+  creditNoteVoidView,
+  voidConfirmMessage,
+} from "@/lib/creditNoteVoidState";
 
 type CreditNoteRow = {
   id: string;
@@ -31,7 +35,10 @@ type CreditNoteRow = {
   email_sent_at: string | null;
   tenant_id: string;
   applied_to_invoice_id: string | null;
-  /** ⚠ RISK 2 — status stays 'available' while a note is PARTLY drawn down. */
+  /** ⚠ RISK 2 — status stays 'available' while a note is PARTLY drawn down. Counts
+   *  LIVE draws only (reversed_at IS NULL): a voided-then-reactivated note carries
+   *  reversed rows that are no longer "spent", so counting them would wrongly block
+   *  the resend AND read as drawn on the void confirm (Item 3, RISK 6). */
   has_applications: boolean;
 };
 
@@ -84,6 +91,11 @@ export default function CreditNotesPage() {
   const [resendError, setResendError] = useState<Record<string, string>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
+  // Void flow: which note's inline confirm is open, its reason, in-flight set, errors.
+  const [voidOpen, setVoidOpen] = useState<string | null>(null);
+  const [voidReason, setVoidReason] = useState("");
+  const [voiding, setVoiding] = useState<Set<string>>(new Set());
+  const [voidError, setVoidError] = useState<Record<string, string>>({});
 
   useEffect(() => {
     // Payment-method chips: fire-and-forget, a failed RPC only means no chips.
@@ -115,7 +127,7 @@ export default function CreditNotesPage() {
       const { data, error } = await supabase
         .from("credit_notes")
         .select(
-          "id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, email_sent_at, tenant_id, credit_applications(credit_note_id), students(id, full_name), parents(profiles(full_name))"
+          "id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, email_sent_at, tenant_id, credit_applications(credit_note_id, reversed_at), students(id, full_name), parents(profiles(full_name))"
         )
         .order("issued_at", { ascending: false });
 
@@ -141,7 +153,9 @@ export default function CreditNotesPage() {
           email_sent_at: cn.email_sent_at ?? null,
           tenant_id: cn.tenant_id,
           applied_to_invoice_id: cn.applied_to_invoice_id ?? null,
-          has_applications: (cn.credit_applications ?? []).length > 0,
+          has_applications: (cn.credit_applications ?? []).some(
+            (a: { reversed_at: string | null }) => a.reversed_at === null
+          ),
         }))
       );
       setLoading(false);
@@ -219,6 +233,49 @@ export default function CreditNotesPage() {
       return;
     }
     markEmailed(noteId);
+  }
+
+  // Void one note. The RPC re-checks authority + already-reversed on its own; this
+  // reopens any drawn invoice server-side. On success the row goes 'reversed' and
+  // its live-application flag clears, so the Void button and any Resend disappear.
+  async function voidNote(cn: CreditNoteRow) {
+    const reason = voidReason.trim();
+    if (!reason) {
+      setVoidError((prev) => ({ ...prev, [cn.id]: "A reason is required." }));
+      return;
+    }
+    setVoiding((prev) => new Set(prev).add(cn.id));
+    setVoidError((prev) => {
+      const { [cn.id]: _drop, ...rest } = prev;
+      return rest;
+    });
+
+    const { error } = await supabase.rpc("void_credit_note", {
+      p_note_id: cn.id,
+      p_reason: reason,
+    });
+
+    setVoiding((prev) => {
+      const next = new Set(prev);
+      next.delete(cn.id);
+      return next;
+    });
+
+    if (error) {
+      // Inline, never an Alert. The RPC's messages are admin-readable as-is.
+      setVoidError((prev) => ({ ...prev, [cn.id]: error.message }));
+      return;
+    }
+
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.id === cn.id
+          ? { ...n, status: "reversed", has_applications: false, applied_to_invoice_id: null }
+          : n
+      )
+    );
+    setVoidOpen(null);
+    setVoidReason("");
   }
 
   const filtered = notes.filter((cn) => {
@@ -335,7 +392,8 @@ export default function CreditNotesPage() {
             </Tr>
           ) : (
             visible.map((cn) => (
-              <Tr key={cn.id}>
+              <Fragment key={cn.id}>
+              <Tr>
                 <Td className="font-mono text-xs text-gray-700">
                   {cn.reference_number}
                 </Td>
@@ -359,9 +417,31 @@ export default function CreditNotesPage() {
                 </Td>
                 <Td className="text-gray-500">{cn.created_at}</Td>
                 <Td>
-                  <StatusBadge
-                    status={creditNoteStatusLabel(cn.status)}
-                  />
+                  <div className="flex flex-col gap-1">
+                    <StatusBadge status={creditNoteStatusLabel(cn.status)} />
+                    {(() => {
+                      const vv = creditNoteVoidView(
+                        {
+                          status: cn.status,
+                          hasLiveApplications: cn.has_applications,
+                          tenantId: cn.tenant_id,
+                        },
+                        viewer
+                      );
+                      if (!vv.canVoid) return null;
+                      return (
+                        <button
+                          onClick={() => {
+                            setVoidOpen(voidOpen === cn.id ? null : cn.id);
+                            setVoidReason("");
+                          }}
+                          className="w-fit rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                        >
+                          Void
+                        </button>
+                      );
+                    })()}
+                  </div>
                 </Td>
                 <Td>
                   {(() => {
@@ -406,6 +486,64 @@ export default function CreditNotesPage() {
                   })()}
                 </Td>
               </Tr>
+              {voidOpen === cn.id && (
+                <Tr>
+                  <Td colSpan={9} className="bg-red-50/40">
+                    {(() => {
+                      const vv = creditNoteVoidView(
+                        {
+                          status: cn.status,
+                          hasLiveApplications: cn.has_applications,
+                          tenantId: cn.tenant_id,
+                        },
+                        viewer
+                      );
+                      return (
+                        <div className="flex flex-col gap-2 py-1">
+                          <p className="text-sm text-gray-700">
+                            {voidConfirmMessage(
+                              vv.isDrawn,
+                              cn.amount,
+                              cn.reference_number
+                            )}
+                          </p>
+                          <textarea
+                            value={voidReason}
+                            onChange={(e) => setVoidReason(e.target.value)}
+                            placeholder="Reason for voiding (required) — recorded in the audit log"
+                            rows={2}
+                            className="w-full max-w-xl rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-300"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => voidNote(cn)}
+                              disabled={voiding.has(cn.id)}
+                              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {voiding.has(cn.id) ? "Voiding…" : "Confirm void"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setVoidOpen(null);
+                                setVoidReason("");
+                              }}
+                              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          {voidError[cn.id] && (
+                            <span className="text-xs text-red-600">
+                              {voidError[cn.id]}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </Td>
+                </Tr>
+              )}
+              </Fragment>
             ))
           )}
         </Tbody>

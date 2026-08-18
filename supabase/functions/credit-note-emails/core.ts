@@ -108,6 +108,12 @@ export async function findUnsentById(
  * ⚠ RISK 2 — `status` alone is insufficient: the engine leaves status 'available'
  * while a note is PARTLY drawn down (engine core.ts:1437-1445), so
  * credit_applications is the only reliable signal.
+ *
+ * ⚠ Item 3 — filters `reversed_at IS NULL`: a draw REVERSED by an admin void is no
+ * longer spent. A note voided then re-activated (handle_attendance_update) is
+ * 'available' again with its old draws marked reversed; without this filter those
+ * rows would read as "spent" forever and the re-issued credit email would never
+ * send. Mirrors the trigger's own spend-signal and apply_credit_to_invoice.
  */
 export async function findSpentNoteIds(
   svc: SupabaseClient,
@@ -117,6 +123,7 @@ export async function findSpentNoteIds(
   const { data, error } = await svc
     .from("credit_applications")
     .select("credit_note_id")
+    .is("reversed_at", null)
     .in("credit_note_id", noteIds);
   if (error) return { ok: false, reason: `applications check failed: ${error.message}` };
   const spent = new Set<string>();
