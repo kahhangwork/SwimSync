@@ -671,7 +671,10 @@ Deno.test("deferral is reported even when NO class was tallied", async () => {
 // day of the month.
 
 Deno.test("run day: auto run before the configured day generates nothing", async () => {
-  const s = await newScenario({ price: 30 });
+  // enrolledAt at the billing month so earlier months are genuinely empty — an
+  // enrolment defaulting to now() with a far-future billing month leaves the
+  // intervening months unmarked, which the ordering-guard correctly blocks on.
+  const s = await newScenario({ price: 30, enrolledAt: "2027-03-01" });
   try {
     const a = await s.addSession("2027-03-06"); await s.mark(a, "present");
 
@@ -698,7 +701,7 @@ Deno.test("run day: auto run before the configured day generates nothing", async
 });
 
 Deno.test("run day: auto run on the configured day generates normally", async () => {
-  const s = await newScenario({ price: 30 });
+  const s = await newScenario({ price: 30, enrolledAt: "2027-04-01" });
   try {
     const a = await s.addSession("2027-04-03"); await s.mark(a, "present");
     await s.completeMonth("2027-04", undefined, new Date("2027-05-07T02:00:00Z")); // the month's other Saturdays rained off
@@ -722,7 +725,7 @@ Deno.test("run day: auto run on the configured day generates normally", async ()
 Deno.test("run day: a MANUAL run before the day generates anyway", async () => {
   // The admin pressing Generate is an explicit instruction — a schedule meant
   // for the unattended cron must never block it.
-  const s = await newScenario({ price: 30 });
+  const s = await newScenario({ price: 30, enrolledAt: "2027-05-01" });
   try {
     const a = await s.addSession("2027-05-01"); await s.mark(a, "present");
     await s.completeMonth("2027-05", undefined, new Date("2027-06-01T02:00:00Z"));
@@ -743,7 +746,7 @@ Deno.test("run day: a MANUAL run before the day generates anyway", async () => {
 });
 
 Deno.test("run day: honours a changed setting, and SGT decides the day", async () => {
-  const s = await newScenario({ price: 30 });
+  const s = await newScenario({ price: 30, enrolledAt: "2027-06-01" });
   try {
     const a = await s.addSession("2027-06-05"); await s.mark(a, "present");
     await s.completeMonth("2027-06", undefined, new Date("2027-07-14T17:00:00Z"));
@@ -1345,7 +1348,8 @@ Deno.test("credit earned in one tenant is NOT spendable in another", async () =>
     await b.db.from("parent_students")
       .insert({ parent_id: a.parentId, student_id: stu.data!.id });
     await b.db.from("student_class_enrolments")
-      .insert({ student_id: stu.data!.id, class_id: b.classId, is_active: true });
+      .insert({ student_id: stu.data!.id, class_id: b.classId, is_active: true,
+                enrolled_at: "2026-11-01" }); // start at the billing month, not now()
 
     const s2 = await b.addSession("2026-11-07");
     await b.mark(s2, "present", stu.data!.id);
@@ -1386,7 +1390,8 @@ Deno.test("a parent with children in TWO tenants gets TWO invoices that month", 
     await b.db.from("parent_students")
       .insert({ parent_id: a.parentId, student_id: stu.data!.id });
     await b.db.from("student_class_enrolments")
-      .insert({ student_id: stu.data!.id, class_id: b.classId, is_active: true });
+      .insert({ student_id: stu.data!.id, class_id: b.classId, is_active: true,
+                enrolled_at: "2026-12-01" }); // start at the billing month, not now()
     const s2 = await b.addSession("2026-12-06");
     await b.mark(s2, "present", stu.data!.id);
     await b.mark(s2, "cancelled_rain");     // b's own child, same session

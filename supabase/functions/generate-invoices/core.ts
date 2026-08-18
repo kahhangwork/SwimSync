@@ -42,6 +42,7 @@ import {
   expectedStudentsOn,
   studentsEnrolledOn,
 } from "./attendanceCompleteness.ts";
+import { earliestBlockingEarlierMonth } from "./orderingGuard.ts";
 
 // Attendance statuses that result in a charge to the parent.
 // Per PRD 5.4: only Present and Paid Trial are billable.
@@ -129,6 +130,9 @@ export type GenerateResult = {
   invoices_created?: number;
   classes_still_incomplete?: number;
   parents_deferred?: number;
+  /** Present when status is "earlier_month_unbilled": the earliest earlier month
+   *  ("YYYY-MM") that must be billed before this one can be. */
+  earlier_unbilled_month?: string;
   /** True when this run left the month finished and closed — no further run
    *  will process it (they short-circuit on the sealed-month guard). */
   sealed?: boolean;
@@ -323,6 +327,37 @@ async function generateForTenant(
           "Invoices for this billing month were previously finalised. Skipping.",
       };
     }
+  }
+
+  // ── Ordering guard: never seal a LATER month over an earlier unbilled one ──
+  // orderingGuard.ts. Refuses to bill M while an EARLIER unsealed month still
+  // has unbilled lessons, naming the earliest — because sealing M advances the
+  // floor past that month and permanently strands its unmarked lessons (BACKLOG
+  // "Sealing a LATER month strands an earlier unsealed one"; PRD §7.7 has no
+  // override). Applies to manual, auto AND forced runs: there is no legitimate
+  // out-of-order seal, so like the two guards above it takes no `force` bypass.
+  // Placed here so a suspended/auto-disabled/sealed month still short-circuits
+  // first. Read-only and fail-skippable — null on any uncertainty, never a
+  // wrongful halt (RISK 1). In-order billing has no earlier unsealed month, so
+  // this returns null and the run is byte-identical (RISK 3).
+  const blockingEarlier = await earliestBlockingEarlierMonth(
+    supabase,
+    tenantId,
+    billingMonth,
+    now
+  );
+  if (blockingEarlier) {
+    return {
+      tenant_id: tenantId,
+      billing_month: billingMonth,
+      status: "earlier_month_unbilled",
+      earlier_unbilled_month: blockingEarlier,
+      message:
+        `Cannot generate invoices for ${billingMonth}: an earlier month ` +
+        `(${blockingEarlier}) still has lessons that are not billed yet. ` +
+        `Bill ${blockingEarlier} first — billing a later month would seal it and ` +
+        `permanently strand ${blockingEarlier}'s unmarked lessons.`,
+    };
   }
 
   // ── Run-day guard (automatic, non-forced runs only) ───────────────────────

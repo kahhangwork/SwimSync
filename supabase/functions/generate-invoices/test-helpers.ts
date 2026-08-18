@@ -104,9 +104,15 @@ export function monthEnded(
     now = new Date(Date.UTC(y, m, 8, 2 - 8));
   }
 
-  // Enrol from the first day of the PREVIOUS month, so the entire billing
-  // month's expected lessons derive (the floor is the earliest enrolment).
-  const enrolledAt = `${new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10)}`;
+  // Enrol from the FIRST DAY OF THE BILLING MONTH. The whole month's expected
+  // lessons still derive — windowFrom is monthStart either way (core.ts:630) —
+  // but no lesson is invented in the PREVIOUS month. The old default backdated a
+  // full month earlier, which created a phantom unmarked prior month that the
+  // engine ordering-guard (correctly, for production) reads as an earlier
+  // unbilled month and blocks the current one on. Production enrolments start
+  // when the customer starts, so an earlier month is genuinely empty — this
+  // mirrors that. A test that needs a real prior month passes enrolledAt itself.
+  const enrolledAt = `${billingMonth}-01`;
 
   return { billingMonth, now, enrolledAt };
 }
