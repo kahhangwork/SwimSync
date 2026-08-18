@@ -80,7 +80,13 @@ function monthsInclusive(from: string, to: string): string[] {
  *   LEAST(1st of last month, COALESCE(month after latest sealed month, created_at))
  * so a date `>= floor` here is a date the coach can still mark there. Getting
  * this EARLIER than the true floor would risk blocking on an unmarkable lesson
- * (the unrecoverable direction), so it is pinned against the DB in the tests.
+ * (the unrecoverable direction). Pinned in orderingGuard.test.ts three ways: the
+ * `floor:` unit tests assert the SQL semantics (LEAST / seal-term / created_at
+ * fallback); the `below-floor` test exercises the seal term end-to-end in that
+ * dangerous direction; and the guard-vs-engine cross-checks pin the whole
+ * predicate against the engine's real verdict. (It is NOT compared to a live
+ * markable_floor() call — service_role cannot EXECUTE it; markable_floor.test.sql
+ * owns the SQL side, and if that formula ever changes, change this to match.)
  */
 export function computeMarkableFloor(
   now: Date,

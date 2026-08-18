@@ -162,6 +162,38 @@ Deno.test("P2: an EMPTY month before the enrolment does not block", async () => 
   }
 });
 
+// ── Below-floor: an already-stranded month is NOT the guard's to block ────────
+// The guard prevents FUTURE stranding; a month already below the floor (a legacy
+// gap from before the guard) is one-time remediation's job, not the guard's —
+// arm 2 skips every date < floor. This ALSO pins computeMarkableFloor's seal term
+// in the DANGEROUS direction: were the floor computed too EARLY, this unmarked
+// January would read as >= floor and the guard would WRONGLY block on a lesson no
+// coach can mark — the one unrecoverable failure the fail-skippable rule exists to
+// avoid. So this test goes red if the seal term is dropped from the floor.
+
+Deno.test("below-floor: an unmarked month beneath the floor does NOT block", async () => {
+  const s = await newScenario({ price: 30, enrolledAt: `${M1}-01` });
+  try {
+    // A legacy GAP: seal M2 DIRECTLY (a pre-existing state the guard would itself
+    // have prevented), leaving M1 unsealed with an unmarked expected lesson. With
+    // M2 the max seal, floor = month-after-M2 = 2027-03-01, so all of M1 (January)
+    // sits below it.
+    await s.addSession(PRESENT_DATE[M1]); // an M1 session, left UNMARKED
+    await s.db.from("billing_periods")
+      .insert({ tenant_id: s.tenantId, billing_month: M2 });
+    assertEquals(await isSealed(s, M2), true);
+
+    // Bill M3. The only unsealed earlier month is M1, and it is entirely below the
+    // floor → arm 2 skips it, arm 1 finds no billable row → M1 does not block.
+    await seedBillable(s, M3);
+    const res = await bill(s, M3, { force: true });
+    assertEquals(res.status, "complete — billing month sealed");
+    assertEquals(await isSealed(s, M3), true);
+  } finally {
+    await s.teardown();
+  }
+});
+
 // ── P3 (releases) ────────────────────────────────────────────────────────────
 
 Deno.test("P3: billing the blocker releases the later month", async () => {
