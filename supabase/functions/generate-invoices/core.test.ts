@@ -312,6 +312,51 @@ Deno.test("carry-forward: credit exceeding the invoice leaves a partial note and
   }
 });
 
+Deno.test("credit_applied records the ACTUAL draw, not the estimate, when balance and notes disagree", async () => {
+  // The estimate-vs-truth hole (Item 2, 20260818000200). The engine pre-computes
+  // `credit` from the pooled balance and writes it onto the invoice at INSERT. If
+  // the balance and the note ledger disagree — exactly what a concurrent reversal
+  // produces — the OLD engine left that ESTIMATE on the invoice while the drawdown
+  // consumed less. apply_credit_to_invoice now trues credit_applied up to what the
+  // notes actually funded, in the same transaction as the draw.
+  //
+  // RED (§7.25): against the pre-Item-2 engine this asserts 20 but gets 30.
+  const s = await newScenario({ price: 30, billing: monthEnded("2026-06") });
+  try {
+    // Month 1: one $20 lesson → correct to absent → a $20 credit note.
+    await s.setRate({ from: "2026-05-01", price: 20 });
+    const j1 = await s.addSession("2026-05-02"); await s.mark(j1, "present");
+    await s.completeMonth("2026-05");
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-05", now: s.now });
+    await s.mark(j1, "absent");
+    assertEquals(await s.creditBalance(), 20);
+
+    // Simulate a stale / over-counted balance: the pool says 30, the notes hold 20.
+    await s.db.from("parent_tenant_balances")
+      .update({ credit_balance: 30 })
+      .eq("parent_id", s.parentId).eq("tenant_id", s.tenantId);
+
+    // Month 2: gross $60. Estimate credit = min(30, 60) = 30; notes only fund 20.
+    await s.setRate({ from: "2026-06-01", price: 30 });
+    const f1 = await s.addSession("2026-06-06"); await s.mark(f1, "present");
+    const f2 = await s.addSession("2026-06-13"); await s.mark(f2, "present");
+    await s.completeMonth("2026-06");
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-06", now: s.now });
+
+    const inv = await getInvoice(s.db, s.parentId, "2026-06");
+    assertEquals(inv!.credit_applied, 20); // the TRUTH, not the $30 estimate
+    assertEquals(inv!.net, 40);            // 60 − 20, not 60 − 30
+    assertEquals(await s.creditBalance(), 10); // 30 − 20 actually drawn
+    // No checkInvariants() here: the balance was DELIBERATELY bumped out of step
+    // with the notes to force the estimate/truth divergence, so the pool-vs-notes
+    // invariant cannot hold — that inconsistency is the scenario, not a bug.
+  } finally {
+    await s.teardown();
+  }
+});
+
 Deno.test("result.created surfaces new invoices with line items (for emailing)", async () => {
   const s = await newScenario({ price: 30, billing: monthEnded("2026-03") });
   try {

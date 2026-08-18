@@ -1422,90 +1422,39 @@ async function generateForTenant(
       }
     }
 
-    // Apply credit balance FIFO. Draw down each credit note by the
-    // AMOUNT ACTUALLY CONSUMED and record every draw in the
-    // credit_applications ledger, so the note ledger reconciles with
-    // the invoice (a $30 note covering a $20 invoice consumes $20 and
-    // stays available for the remaining $10). See
-    // 20260711000100_credit_applications.sql.
+    // ── Draw credit + true up the invoice in ONE DB transaction (Item 2) ─────
+    // apply_credit_to_invoice (20260818000200) locks the balance row and the
+    // notes FOR UPDATE — serialising against the credit-note trigger's
+    // un-correction, which also takes FOR UPDATE (20260818000100), and against
+    // Item 3's void — draws FIFO, and writes the invoice's OWN
+    // credit_applied/net_amount/status. It is idempotent per invoice, so the
+    // §7.17 retry path cannot draw the same credit twice. The engine keeps only
+    // the RETURNED allocation, for the email/log figures: `credit`/`net`
+    // computed above were an ESTIMATE for the insert, which the RPC has now
+    // trued up. They agree except when the pooled balance and the note ledger
+    // disagree — exactly the double-decrement window this closes.
+    // Only when the estimate drew something: with credit === 0 nothing is drawn
+    // and the insert's credit_applied/net (both from the same estimate) are
+    // already the truth, so there is no discrepancy to reconcile and no
+    // double-draw window to guard — skip the round-trip.
+    let creditApplied = credit;
     if (credit > 0) {
-      const nowIso = new Date().toISOString();
-
-      // Available notes, oldest first (FIFO).
-      // Scoped to this tenant: drawing a school's note against a private
-      // coach's invoice would move money between businesses. This filter is
-      // the only thing preventing it — service_role bypasses RLS.
-      const { data: availCNs } = await supabase
-        .from("credit_notes")
-        .select("id, amount")
-        .eq("parent_id", parentId)
-        .eq("tenant_id", tenantId)
-        .eq("status", "available")
-        .order("issued_at", { ascending: true });
-
-      let remaining = credit; // total credit still to allocate to this invoice
-
-      for (const cn of availCNs ?? []) {
-        if (remaining <= 0) break;
-
-        // Amount of THIS note already spent on earlier invoices.
-        const { data: priorApps } = await supabase
-          .from("credit_applications")
-          .select("amount")
-          .eq("credit_note_id", cn.id);
-        const used = (priorApps ?? []).reduce(
-          (s, a) => s + Number(a.amount),
-          0
-        );
-        const noteRemaining = Number(cn.amount) - used;
-        if (noteRemaining <= 0) {
-          // Shouldn't happen for an 'available' note; self-heal the flag.
-          await supabase
-            .from("credit_notes")
-            .update({ status: "applied" })
-            .eq("id", cn.id);
-          continue;
-        }
-
-        const draw = Math.min(noteRemaining, remaining);
-
-        await supabase.from("credit_applications").insert({
-          credit_note_id: cn.id,
+      const { data: allocated, error: creditErr } = await supabase.rpc(
+        "apply_credit_to_invoice",
+        { p_invoice_id: invoice.id }
+      );
+      if (creditErr) {
+        invoiceWriteFailed = true;
+        log.push({
+          parent_id: parentId,
           invoice_id: invoice.id,
-          amount: draw,
-          applied_at: nowIso,
+          error: `apply_credit_to_invoice failed: ${creditErr.message}`,
         });
-
-        // Flip to 'applied' only once the note is fully consumed.
-        if (draw >= noteRemaining) {
-          await supabase
-            .from("credit_notes")
-            .update({
-              status: "applied",
-              applied_to_invoice_id: invoice.id,
-              applied_at: nowIso,
-            })
-            .eq("id", cn.id);
-        }
-
-        remaining -= draw;
+        continue;
       }
-
-      // Deduct what was actually allocated, from the PER-TENANT balance.
-      const allocated = credit - remaining;
-      await supabase
-        .from("parent_tenant_balances")
-        .update({
-          credit_balance: available - allocated,
-          updated_at: nowIso,
-        })
-        .eq("parent_id", parentId)
-        .eq("tenant_id", tenantId);
-
-      // (The dual-write to the deprecated parents.credit_balance was removed
-      // here in phase 4, together with the last reader of it. Keeping it would
-      // now double-count: the column no longer exists.)
+      creditApplied = Number(allocated ?? 0);
     }
+    const netApplied = gross - packageApplied - creditApplied;
 
     invoicesCreated++;
     created.push({
@@ -1515,8 +1464,8 @@ async function generateForTenant(
       billing_month: billingMonth,
       gross,
       package: packageApplied,
-      credit,
-      net,
+      credit: creditApplied,
+      net: netApplied,
       items: items.map((i) => ({
         student_id: i.student_id,
         session_date: i.session_date,
@@ -1530,8 +1479,8 @@ async function generateForTenant(
       billing_month: billingMonth,
       gross,
       package: packageApplied,
-      credit,
-      net,
+      credit: creditApplied,
+      net: netApplied,
     });
   }
 
