@@ -2963,3 +2963,37 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `NAV` into nested groups — tempting, and `/simplify` might propose it — would break the
     gate silently. That the `navFor`/`scopeForPath` unit tests still pass unchanged is the
     proof it didn't move; keep them that way. (§8.67)
+
+184. **A one-time dedup that marks rows and a NON-partial `UNIQUE` index in the same
+    migration collide — and a 0-row local DB hides it completely.** The credit-note
+    double-credit fix (`20260818000100`) first wrote its dedup to mark younger duplicate
+    notes `status='reversed'` (keeping their `invoice_item_id`), then added
+    `CREATE UNIQUE INDEX ON credit_notes(invoice_item_id)` — non-partial, so the kept row and
+    its reversed twin still collide and the whole (transactional) migration ABORTS on prod,
+    exactly for the data it exists to repair. `supabase db reset` passed because production
+    holds 0 credit notes, so no duplicate was ever built locally. Fix: the dedup **DELETEs**
+    the duplicates (they were undrawn → no `credit_applications` FK), leaving one row per item
+    TOTAL, which the full unique index needs. Do NOT "fix" it with a partial index instead —
+    the trigger's `SELECT … WHERE invoice_item_id = …` would then match 1-live + N-reversed
+    and could re-activate the wrong row. Verified by replaying steps 3→5 on synthetic
+    duplicates. Lesson: a migration whose repair path is unreachable locally must be tested on
+    hand-built dirty data before it ships. (§8.68)
+
+185. **A column can exist on the running DB but be created by NO migration — schema DRIFT —
+    so a bare `DROP COLUMN` breaks `db reset` and would error on prod.** `tenants.suspend` was
+    present in the local Postgres (some earlier hand-edit) yet no migration file creates it;
+    `information_schema` on prod showed it absent entirely. A plain `ALTER TABLE … DROP COLUMN
+    suspend` therefore fails on a fresh `db reset` ("column does not exist") AND on prod. Use
+    `DROP COLUMN IF EXISTS`. More broadly: local and cloud disagree by construction (§7.39,
+    §7.89) — verify a column's existence in `information_schema`, never assume the running DB
+    equals the migration history. (§8.68)
+
+186. **A `FOR EACH ROW` trigger that RAISEs aborts the WHOLE batch upsert, not just its row —
+    and the app shows a useless generic toast unless it decodes the SQLSTATE.** The coach
+    attendance save is one `.upsert(rows)` of the entire roster; when the credit-note trigger
+    RAISEs `CN001` (refusing to un-correct a spent credit) on one student's row, PostgREST
+    rolls back every row and supabase-js returns one error. The old handler discarded
+    `error.message` and showed "please try again" — a retry-forever trap. Fix: raise with a
+    distinct `ERRCODE` and map `error.code` to a real message
+    (`SwimSyncApp/lib/attendanceSaveError.ts`). Any refusing trigger on a batch-written table
+    needs this pairing, or the refusal is indistinguishable from a transient failure. (§8.68)
