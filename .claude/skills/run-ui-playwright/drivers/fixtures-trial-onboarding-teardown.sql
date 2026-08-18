@@ -41,6 +41,29 @@ BEGIN
     WHERE ss.student_id = s.id AND s.full_name = 'Fixture Walkin';
   DELETE FROM students WHERE full_name = 'Fixture Walkin';
 
+  -- Any invoice the driver produced that BILLS one of THIS fixture's lessons —
+  -- scoped to our own class, exactly as the attendance/session deletes below are.
+  -- A tenant-wide `Generate Invoices` run also invoices the seed's and any sibling
+  -- worktree's students for this same month; those rows are NOT ours to delete
+  -- (§7.63 — a fixture owns only its own rows). invoice_items go with the invoice
+  -- via ON DELETE CASCADE. In normal operation this matches ZERO rows — the walk-in
+  -- is unclaimed and nobody else is enrolled in this class, so the fixture produces
+  -- no invoice of its own — which is the correct footprint. The scope stays here
+  -- for the day this class gains a claimed enrolee.
+  --
+  -- MUST run BEFORE the lesson_sessions delete below: invoice_items.lesson_session_id
+  -- is a RESTRICT FK, so a session that is still invoiced cannot be deleted. Clearing
+  -- the invoice first (cascading its items) is what makes that future case tear down
+  -- clean instead of aborting on the FK.
+  DELETE FROM invoices i
+   WHERE i.tenant_id = v_tenant
+     AND i.billing_month = to_char(v_month, 'YYYY-MM')
+     AND EXISTS (
+       SELECT 1 FROM invoice_items ii
+        JOIN lesson_sessions ls ON ls.id = ii.lesson_session_id
+        WHERE ii.invoice_id = i.id
+          AND ls.class_id = v_class);
+
   -- Every attendance row the fixture wrote across that month, for ANY student —
   -- it marked the whole roster, not just its own child.
   DELETE FROM attendance a
@@ -58,13 +81,10 @@ BEGIN
      AND ls.session_date <  v_month + INTERVAL '1 month'
      AND NOT EXISTS (SELECT 1 FROM attendance a WHERE a.lesson_session_id = ls.id);
 
-  -- Any invoice + seal the driver produced by generating that month.
-  DELETE FROM invoice_items ii USING invoices i
-    WHERE ii.invoice_id = i.id
-      AND i.tenant_id = v_tenant
-      AND i.billing_month = to_char(v_month, 'YYYY-MM');
-  DELETE FROM invoices
-    WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
+  -- The seal for that month. The fixture's own setup clears this too (symmetric),
+  -- and the load-bearing assertion is that the driver does NOT seal, so this is
+  -- defensive. billing_periods is one row per (tenant, month) with no class axis,
+  -- so it stays tenant+month-scoped to match the setup's own DELETE.
   DELETE FROM billing_periods
     WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
 
@@ -89,11 +109,15 @@ SELECT
       AND billing_month = to_char(
             date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date)
             - INTERVAL '1 month', 'YYYY-MM'))                            AS seal,
-  (SELECT count(*) FROM invoices
-    WHERE tenant_id = '70000000-0000-0000-0000-000000000001'
-      AND billing_month = to_char(
+  (SELECT count(*) FROM invoices i
+    WHERE i.tenant_id = '70000000-0000-0000-0000-000000000001'
+      AND i.billing_month = to_char(
             date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date)
-            - INTERVAL '1 month', 'YYYY-MM'))                            AS invoices,
+            - INTERVAL '1 month', 'YYYY-MM')
+      AND EXISTS (SELECT 1 FROM invoice_items ii
+                    JOIN lesson_sessions ls ON ls.id = ii.lesson_session_id
+                   WHERE ii.invoice_id = i.id
+                     AND ls.class_id = 'fb000000-0000-0000-0000-000000000001')) AS invoices,
   (SELECT count(*) FROM classes
     WHERE tenant_id = '70000000-0000-0000-0000-000000000001')            AS seed_class_intact,
   (SELECT count(*) FROM classes
