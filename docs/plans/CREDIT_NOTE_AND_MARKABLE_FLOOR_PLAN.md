@@ -635,15 +635,25 @@ Signature simplified to `(p_invoice_id)` — invoice is the single source of sco
   estimate-vs-truth test RED against current engine (`credit_applied=30` with $20 notes).
 - [ ] **Deploy step (owed):** `supabase db push` (migration) → `supabase functions deploy generate-invoices` → grant dump.
 
-**Item 3 (before deploying migration → functions → apps):**
-- [ ] **RISK 4** — `payment_records`/`paid` consumers grepped and each shown to key off
-  `status`; reopened-invoice pgTAP asserts `payment_records` unchanged + reminder/total re-counts it.
-- [ ] **RISK 5** — full §8.68 `credit_note_double_credit.test.sql` green + unchanged count;
-  newest trigger body confirmed via `pg_get_functiondef()`; DOWN byte-diff verified.
-- [ ] **RISK 6** — `grep credit_applications` count equals consumers accounted for; each marked
-  live-only or raw; `credit_applied == SUM(non-reversed applications)` pinned in pgTAP.
-- [ ] Re-toggle-after-void test RED against the 20260818000100 trigger; DOWN caveat (columns
-  drop erases reversal history) written into the DOWN header.
+**Item 3 (before deploying migration → functions → apps):** — branch `feature/item3-admin-void`
+(`b18375f`, off Item 2). Migration `20260818000300`. pgTAP **1171** (void 28), Deno **229 ×2**,
+admin vitest **452** + typecheck, app jest **391** + typecheck.
+- [x] **RISK 4** — consumers grepped; all key off `status` EXCEPT the parent view's `Paid {paid_at}`
+  badge → **DEVIATION FROM PLAN (accepted):** the void CLEARS `paid_at`/`paid_marked_by`/`paid_claimed_at`
+  on reopened invoices (an `outstanding` invoice must not show a Paid badge); `payment_records` left
+  immutable; `confirm_invoice_paid` still works (gates on `status='paid'`). pgTAP pins payment_records
+  unchanged. **KNOWN v1 EDGE (flag to user):** voiding a credit drawn on an already-CASH-PAID invoice
+  reopens it to `net += amount` outstanding while its `payment_records` show the old lower net — the
+  admin reconciles the difference by hand (no partial-payment accounting in v1; dormant, 0 notes on prod).
+- [x] **RISK 5** — newest trigger body confirmed via `pg_get_functiondef()`; §8.68 suite untouched, still
+  15 tests, green; trigger v9 diff is EXACTLY edits A+B (verified by body diff); DOWN restores §8.68 byte-faithful.
+- [x] **RISK 6** — every `credit_applications` consumer filters `reversed_at IS NULL` (apply_credit both
+  sums, trigger `v_cn_drawn`, `credit-note-emails/findSpentNoteIds`, admin `has_applications`);
+  `credit_applied == SUM(non-reversed)` pinned in pgTAP.
+- [x] Re-toggle-after-void test RED against the 20260818000100 trigger (RED-proofing caught a weak first
+  assertion; the true re-toggle fails 2 tests without edit A); DOWN caveat written into the header.
+  Also: `audit_log_tenant_of()` gained a `credit_note` arm (§8.28 requires every entity type registered).
+- [ ] **Deploy step (owed):** migration → `credit-note-emails` deploy → apps to `main` LAST; grant dump.
 
 **Graduate the durable ones:** at `/update-docs`, RISK 2 (RPC-commits-then-retry double-draw)
 and RISK 6 (grep every `credit_applications` consumer for `reversed_at`) outlive this task —
