@@ -29,7 +29,8 @@ type DbStatus =
   | "cancelled_rain"
   | "cancelled_coach"
   | "trial_paid"
-  | "trial_free";
+  | "trial_free"
+  | "holiday";
 
 type FilterOption = "All" | "Present" | "Absent" | "Cancelled" | "Trial";
 
@@ -58,6 +59,7 @@ const STATUS_LABEL: Record<DbStatus, string> = {
   cancelled_coach:  "Cancelled (Coach)",
   trial_paid:       "Trial — Paid",
   trial_free:       "Trial — Free",
+  holiday:          "Public Holiday",
 };
 
 const STATUS_ICON: Record<DbStatus, { name: string; color: string }> = {
@@ -67,6 +69,7 @@ const STATUS_ICON: Record<DbStatus, { name: string; color: string }> = {
   cancelled_coach: { name: "ban",              color: "#ea580c" },
   trial_paid:      { name: "star",             color: "#2563eb" },
   trial_free:      { name: "star-outline",     color: "#2563eb" },
+  holiday:         { name: "calendar",         color: "#9333ea" },
 };
 
 function matchesFilter(status: DbStatus, filter: FilterOption): boolean {

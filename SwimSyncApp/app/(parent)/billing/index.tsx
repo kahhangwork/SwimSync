@@ -15,7 +15,6 @@ import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import { invoiceLabel } from "@/lib/invoiceLabel";
 import { confirmAction } from "@/lib/confirm";
-import { packageExtensionState } from "@/lib/packageExtension";
 import ReferralSection from "@/components/ReferralSection";
 
 type Tab = "Invoices" | "Packages" | "Credit Notes";
@@ -63,8 +62,7 @@ type ParentPackage = {
    *  the RPC is the single derivation (PACKAGES_DESIGN.md ⚠ RISK 4). */
   live_lessons_remaining: number | null;
   live_value_remaining: number | null;
-  ph_extension_weeks: number;
-  ph_ack_weeks_parent: number;
+  holiday_extension_days: number;
 };
 
 type PackageProduct = {
@@ -116,7 +114,6 @@ export default function BillingScreen() {
   const [products, setProducts] = useState<PackageProduct[]>([]);
   const [parentId, setParentId] = useState<string | null>(null);
   const [requestingId, setRequestingId] = useState<string | null>(null);
-  const [acking, setAcking] = useState<string | null>(null);
   const [packageError, setPackageError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   /** PER-INVOICE, not a single boolean like the detail screen's `claiming` —
@@ -177,14 +174,9 @@ export default function BillingScreen() {
     }
     setParentId(parent.id);
 
-    // On-load recompute of holiday extensions for this parent's own packages
-    // (⚠ RISK 4 — idempotent; best-effort so a failure never blocks the page).
-    try {
-      await supabase.rpc("recompute_package_extensions", { p_parent: parent.id });
-    } catch {
-      /* ignore — the read below still shows the last computed state */
-    }
-
+    // Holiday extensions are event-driven now (reconcile trigger,
+    // 20260818000700): expires_on is already current when this page reads it,
+    // so there is no pre-read recompute call any more.
     const [invoicesRes, creditNotesRes, packagesRes, liveRes, productsRes] =
       await Promise.all([
         supabase
@@ -207,7 +199,7 @@ export default function BillingScreen() {
         // RLS scopes these to this parent's own packages.
         supabase
           .from("parent_packages")
-          .select("id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, status, offered_by, expires_on, requested_at, ph_extension_weeks, ph_ack_weeks_parent, class_categories(name), tenants(display_name)")
+          .select("id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, status, offered_by, expires_on, requested_at, holiday_extension_days, class_categories(name), tenants(display_name)")
           .in("status", ["pending", "active"])
           .order("requested_at", { ascending: false }),
 
@@ -275,8 +267,7 @@ export default function BillingScreen() {
           expires_on: p.expires_on,
           live_lessons_remaining: live ? Number(live.live_lessons_remaining) : null,
           live_value_remaining: live ? Number(live.live_value_remaining) : null,
-          ph_extension_weeks: p.ph_extension_weeks ?? 0,
-          ph_ack_weeks_parent: p.ph_ack_weeks_parent ?? 0,
+          holiday_extension_days: p.holiday_extension_days ?? 0,
         };
       })
     );
@@ -312,23 +303,6 @@ export default function BillingScreen() {
 
   /** Request a package: a PENDING row (the DB snapshots the product's terms
    *  and forces pending for parents), then straight to the PayNow screen. */
-  const acknowledgeExtension = useCallback(
-    async (packageId: string) => {
-      setAcking(packageId);
-      const { error } = await supabase.rpc("acknowledge_package_extension", {
-        p_package_id: packageId,
-        p_as: "parent",
-      });
-      setAcking(null);
-      if (error) {
-        setPackageError("Could not acknowledge that. Please try again.");
-        return;
-      }
-      loadData();
-    },
-    [loadData]
-  );
-
   const requestPackage = useCallback(
     async (product: PackageProduct) => {
       if (!parentId) return;
@@ -629,39 +603,13 @@ export default function BillingScreen() {
                           </Text>
                         </View>
                       )}
-                      {/* Loud while the holiday extension exceeds what this
-                          parent has acknowledged; a quiet note once acked. */}
-                      {(() => {
-                        const st = packageExtensionState(
-                          pkg.ph_extension_weeks,
-                          pkg.ph_ack_weeks_parent
-                        );
-                        return st === "loud" ? (
-                          <View className="mt-2 rounded-xl bg-amber-50 p-3">
-                            <Text className="text-xs font-semibold text-amber-800">
-                              Good news — your package was extended by{" "}
-                              {pkg.ph_extension_weeks} week
-                              {pkg.ph_extension_weeks === 1 ? "" : "s"} for public
-                              holidays.
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() => acknowledgeExtension(pkg.id)}
-                              disabled={acking !== null}
-                              className="mt-2 self-start rounded-lg bg-amber-500 px-3 py-1.5"
-                            >
-                              <Text className="text-xs font-bold text-white">
-                                {acking === pkg.id ? "…" : "Got it"}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        ) : st === "quiet" ? (
-                          <Text className="mt-1 text-xs text-gray-400">
-                            Includes +{pkg.ph_extension_weeks} week
-                            {pkg.ph_extension_weeks === 1 ? "" : "s"} for public
-                            holidays
-                          </Text>
-                        ) : null;
-                      })()}
+                      {pkg.holiday_extension_days > 0 && (
+                        <Text className="mt-1 text-xs text-gray-400">
+                          Includes +{pkg.holiday_extension_days} day
+                          {pkg.holiday_extension_days === 1 ? "" : "s"} for public
+                          holidays
+                        </Text>
+                      )}
                     </>
                   ) : (
                     <>

@@ -36,7 +36,8 @@ export type DbStatus =
   | "cancelled_rain"
   | "cancelled_coach"
   | "trial_paid"
-  | "trial_free";
+  | "trial_free"
+  | "holiday";
 
 export type LessonProgress =
   /** Nobody is expected — no enrolments and no trial bookings on this date. */
@@ -89,6 +90,7 @@ const STATUS_ORDER: DbStatus[] = [
   "cancelled_coach",
   "trial_paid",
   "trial_free",
+  "holiday",
 ];
 
 /**
@@ -108,6 +110,7 @@ export const STATUS_LABEL: Record<DbStatus, string> = {
   cancelled_coach: "cancelled (coach)",
   trial_paid: "trial (paid)",
   trial_free: "trial (free)",
+  holiday: "public holiday",
 };
 
 /**

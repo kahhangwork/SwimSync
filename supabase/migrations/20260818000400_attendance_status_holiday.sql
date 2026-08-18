@@ -1,0 +1,23 @@
+-- ============================================================
+-- Holiday attendance, step 1 of 4: the new attendance status value.
+--
+-- `holiday` — a lesson that did not run because the day is a public holiday.
+-- Non-billable (it is deliberately absent from the engine's BILLABLE set,
+-- generate-invoices/core.ts), so it charges nobody and draws no package; and it
+-- drives a per-package validity extension via the reconcile trigger added in
+-- 20260818000700. Only a tenant admin may set it (guarded there); a coach sees it
+-- read-only.
+--
+-- ALONE IN ITS OWN MIGRATION ON PURPOSE. Postgres allows ALTER TYPE ... ADD VALUE
+-- inside a transaction, but the new value cannot be USED until that transaction
+-- commits — and every migration file is one transaction. Adding it here lets the
+-- later migrations reference 'holiday' in guards, RPCs and triggers. Same reason
+-- as 20260718000400_tenant_roles_enum.sql.
+--
+-- The value is PERMANENT: dropping an enum value in Postgres means rewriting the
+-- type. If this feature is ever rolled back, holiday rows are converted to
+-- 'cancelled_coach' (non-billable, gate-clearing, renderable everywhere) and the
+-- value is simply left unwritable — see each _DOWN.sql from step 4 on.
+-- ============================================================
+
+ALTER TYPE attendance_status ADD VALUE IF NOT EXISTS 'holiday';

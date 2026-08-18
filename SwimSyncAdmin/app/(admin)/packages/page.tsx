@@ -26,7 +26,6 @@ import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { todayInSg } from "@/lib/lessonDates";
-import { packageExtensionState } from "@/lib/packageExtension";
 import { defaultConfirmStart, pickOfferProduct } from "@/lib/packageOffers";
 import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { WhatsAppQueue, type WaQueueRow } from "@/components/WhatsAppQueue";
@@ -72,8 +71,7 @@ type Purchase = {
   requested_at: string;
   start_date: string | null;
   expires_on: string | null;
-  ph_extension_weeks: number;
-  ph_ack_weeks_admin: number;
+  holiday_extension_days: number;
   manual_extension_days: number;
   /** PKG-YYYY-NNNN (20260809000100). What an incoming PayNow line is matched
    *  back to — the parent's QR carries it as the bill reference. NOT NULL in
@@ -199,16 +197,11 @@ export default function PackagesPage() {
     setLoading(true);
     setError(null);
 
-    // On-load recompute so holiday extensions reflect the current calendar and
-    // enrolments (⚠ RISK 4 — idempotent, so this is cheap and safe to call every
-    // load). Best-effort: a failure must not stop the page rendering.
+    // Holiday extensions are event-driven now (reconcile trigger,
+    // 20260818000700): expires_on is already current when this page reads it,
+    // so there is no pre-read recompute call any more.
     const tenant = await myTenantId();
     if (tenant) {
-      try {
-        await supabase.rpc("recompute_package_extensions", { p_tenant: tenant });
-      } catch {
-        /* best-effort: a failed recompute must not stop the page rendering */
-      }
       const { data: t } = await supabase
         .from("tenants")
         .select("display_name, default_package_product_id, referral_enabled, referral_discount_type, referral_discount_value")
@@ -245,7 +238,7 @@ export default function PackagesPage() {
       supabase
         .from("parent_packages")
         .select(
-          "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, requested_at, start_date, expires_on, ph_extension_weeks, ph_ack_weeks_admin, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
+          "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, requested_at, start_date, expires_on, holiday_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
         )
         .order("status")
         .order("requested_at", { ascending: false }),
@@ -336,8 +329,7 @@ export default function PackagesPage() {
         requested_at: p.requested_at,
         start_date: p.start_date,
         expires_on: p.expires_on,
-        ph_extension_weeks: p.ph_extension_weeks ?? 0,
-        ph_ack_weeks_admin: p.ph_ack_weeks_admin ?? 0,
+        holiday_extension_days: p.holiday_extension_days ?? 0,
         manual_extension_days: p.manual_extension_days ?? 0,
         reference_number: p.reference_number ?? null,
         offered_by: p.offered_by ?? null,
@@ -664,20 +656,6 @@ export default function PackagesPage() {
     load();
   }
 
-  async function acknowledgeExtension(p: Purchase) {
-    setBusy(true);
-    const { error: err } = await supabase.rpc("acknowledge_package_extension", {
-      p_package_id: p.id,
-      p_as: "admin",
-    });
-    setBusy(false);
-    if (err) {
-      setError("Could not acknowledge that extension.");
-      return;
-    }
-    load();
-  }
-
   async function submitExtend() {
     if (!extending) return;
     const weeks = Number(extendWeeks);
@@ -705,21 +683,6 @@ export default function PackagesPage() {
     setExtending(null);
     setExtendWeeks("1");
     setExtendReason("");
-    load();
-  }
-
-  async function acknowledgeAllExtensions() {
-    const tenant = await myTenantId();
-    if (!tenant) return;
-    setBusy(true);
-    const { error: err } = await supabase.rpc("acknowledge_all_extensions", {
-      p_tenant: tenant,
-    });
-    setBusy(false);
-    if (err) {
-      setError("Could not acknowledge the extensions.");
-      return;
-    }
     load();
   }
 
@@ -925,14 +888,6 @@ export default function PackagesPage() {
   });
   const visibleHeld = heldSort.apply(held);
   const activeProducts = products.filter((p) => p.is_active);
-  // A package is LOUD for the admin while its holiday extension exceeds what
-  // the admin has acknowledged.
-  const loudCount = held.filter(
-    (p) =>
-      packageExtensionState(p.ph_extension_weeks, p.ph_ack_weeks_admin) ===
-      "loud"
-  ).length;
-
   return (
     <div>
       <PageHeader
@@ -1244,15 +1199,6 @@ export default function PackagesPage() {
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-bold text-gray-900">Who holds one</h2>
           <div className="flex gap-2">
-            {loudCount > 0 && (
-              <Button
-                variant="outline"
-                onClick={acknowledgeAllExtensions}
-                disabled={busy}
-              >
-                Acknowledge all ({loudCount})
-              </Button>
-            )}
             <Button variant="outline" onClick={() => setSaleModal(true)}>
               Record a sale
             </Button>
@@ -1342,32 +1288,12 @@ export default function PackagesPage() {
                           expired
                         </span>
                       )}
-                      {/* Loud while the extension exceeds the admin's ack; a
-                          quiet permanent note once acknowledged. */}
-                      {(() => {
-                        const st = packageExtensionState(
-                          p.ph_extension_weeks,
-                          p.ph_ack_weeks_admin
-                        );
-                        return st === "loud" ? (
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                              Extended +{p.ph_extension_weeks} wk
-                            </span>
-                            <button
-                              onClick={() => acknowledgeExtension(p)}
-                              disabled={busy}
-                              className="text-xs font-medium text-sky-600 hover:underline"
-                            >
-                              Acknowledge
-                            </button>
-                          </div>
-                        ) : st === "quiet" ? (
-                          <div className="mt-0.5 text-xs text-gray-400">
-                            +{p.ph_extension_weeks} wk · public holidays
-                          </div>
-                        ) : null;
-                      })()}
+                      {p.holiday_extension_days > 0 && (
+                        <div className="mt-0.5 text-xs text-gray-400">
+                          +{p.holiday_extension_days} day
+                          {p.holiday_extension_days === 1 ? "" : "s"} · public holidays
+                        </div>
+                      )}
                       {p.manual_extension_days > 0 && (
                         <div className="mt-0.5 text-xs text-gray-400">
                           +{p.manual_extension_days} day

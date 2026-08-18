@@ -15,7 +15,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(17);
+SELECT plan(15);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -123,13 +123,9 @@ SELECT throws_ok($$
    WHERE id='bf000000-0000-0000-0000-000000000001'
 $$, '23514', NULL, 'parent cannot set manual_extension_days');
 SELECT throws_ok($$
-  UPDATE parent_packages SET ph_extension_weeks = 9
+  UPDATE parent_packages SET holiday_extension_days = 9
    WHERE id='bf000000-0000-0000-0000-000000000001'
-$$, '23514', NULL, 'parent cannot set ph_extension_weeks');
-SELECT throws_ok($$
-  UPDATE parent_packages SET ph_ack_weeks_parent = 9
-   WHERE id='bf000000-0000-0000-0000-000000000001'
-$$, '23514', NULL, 'parent cannot pre-acknowledge (ph_ack_weeks_parent)');
+$$, '23514', NULL, 'parent cannot set holiday_extension_days');
 SELECT throws_ok($$
   UPDATE parent_packages SET validity_weeks = 99
    WHERE id='bf000000-0000-0000-0000-000000000001'
@@ -157,10 +153,6 @@ SELECT throws_ok($$
   UPDATE parent_packages SET start_date = '2027-01-01'
    WHERE id='bf000000-0000-0000-0000-000000000001'
 $$, '23514', NULL, 'admin cannot move start_date on an active package');
-SELECT throws_ok($$
-  UPDATE parent_packages SET ph_ack_weeks_admin = 9
-   WHERE id='bf000000-0000-0000-0000-000000000001'
-$$, '23514', NULL, 'admin cannot directly set ph_ack_weeks_admin (RPC only)');
 SELECT lives_ok($$
   UPDATE parent_packages SET start_date = '2026-12-15'
    WHERE id='bf000000-0000-0000-0000-000000000002'

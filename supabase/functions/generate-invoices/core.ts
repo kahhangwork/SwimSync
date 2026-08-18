@@ -1140,18 +1140,11 @@ async function generateForTenant(
     };
   }
 
-  // Refresh holiday extensions before reading expiries, so this run bills
-  // against the CURRENT calendar and enrolments rather than a stale expires_on
-  // (⚠ #1 — the recompute is idempotent, so this is cheap; service scope, all
-  // this tenant's active packages). Best-effort: a failure must not abort a
-  // billing run — the stored expiry is still a valid, if slightly stale, window.
-  {
-    const { error: recErr } = await supabase.rpc(
-      "recompute_package_extensions",
-      { p_tenant: tenantId },
-    );
-    if (recErr) log.push({ tenant_id: tenantId, recompute_warning: recErr.message });
-  }
+  // Holiday extensions are now event-driven: a lesson marked 'holiday' extends
+  // its covering package as it is marked (recompute_holiday trigger,
+  // 20260818000700), so expires_on is already current here — no pre-billing
+  // recompute pass is needed. (The old calendar-scan recompute_package_extensions
+  // is retired.)
 
   // ── Active prepaid packages for this tenant, in draw order ────────────────
   // FIFO by earliest expiry (tie: confirmed_at, then id) — the exact order

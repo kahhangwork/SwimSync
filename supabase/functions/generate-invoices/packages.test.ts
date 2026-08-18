@@ -581,15 +581,13 @@ Deno.test("a holiday extension funds a lesson in the tail that would otherwise b
     const productId = await addProduct(s, { lessons: 10, rate: 30, weeks: 2 });
     const pkgId = await buyPackage(s, productId, "2027-01-01T04:00:00Z", "2027-01-02");
 
-    // The holiday lands on a Saturday inside [2027-01-02, 2027-01-16); the
-    // enrolled Saturday class makes it an affected week ⇒ +1 week.
-    await s.db.from("tenant_public_holidays").insert({
-      tenant_id: s.tenantId, holiday_date: "2027-01-09", name: "Test PH",
-    });
-    const { data: changed } = await s.db.rpc("recompute_package_extensions", {
-      p_tenant: s.tenantId,
-    });
-    assertEquals(Number(changed), 1, "the extension applied");
+    // Mark the in-window Saturday 2027-01-09 as a 'holiday' — that voids the
+    // lesson AND extends the covering package by the tenant's holiday_extension_days
+    // (default 7 = one week), pushing the end from 2027-01-16 to 2027-01-23.
+    const hol = await s.addSession("2027-01-09"); await s.mark(hol, "holiday");
+    const { data: extd } = await s.db.from("parent_packages")
+      .select("holiday_extension_days").eq("id", pkgId).single();
+    assertEquals(extd!.holiday_extension_days, 7, "the holiday extended the package by 7 days");
 
     // The tail lesson (2027-01-23 > nominal end 2027-01-16, ≤ extended 2027-01-23).
     const tail = await s.addSession("2027-01-23"); await s.mark(tail, "present");
@@ -629,21 +627,20 @@ Deno.test("extending a package after a month is sealed changes no invoice and no
     assertEquals(before!.package_applied, 30); // the January lesson drew
     assertEquals(await pkgRemaining(s, pkgId), 270);
 
-    // Now a public holiday lands on a Saturday inside the window; recompute
-    // extends the package's expiry (proves the recompute fired)…
-    await s.db.from("tenant_public_holidays").insert({
-      tenant_id: s.tenantId, holiday_date: "2027-01-16", name: "Test PH",
-    });
-    const { data: changed } = await s.db.rpc("recompute_package_extensions", {
-      p_tenant: s.tenantId,
-    });
-    assertEquals(Number(changed), 1, "the package's extension moved");
+    // Now void a DIFFERENT in-window Saturday (2027-01-16, already a
+    // cancelled_rain session from completeMonth) as a 'holiday'. That extends the
+    // package's expiry — proving the event fired — without touching the sealed
+    // January invoice: cancelled_rain→holiday is non-billable→non-billable, so no
+    // credit note, and holiday draws nothing.
+    const { data: sat16 } = await s.db.from("lesson_sessions")
+      .select("id").eq("class_id", s.classId).eq("session_date", "2027-01-16").single();
+    await s.mark(sat16!.id, "holiday");
     const { data: pkg } = await s.db
       .from("parent_packages")
-      .select("ph_extension_weeks, expires_on, value_remaining")
+      .select("holiday_extension_days, expires_on, value_remaining")
       .eq("id", pkgId)
       .single();
-    assertEquals(pkg!.ph_extension_weeks, 1, "extended by a week");
+    assertEquals(pkg!.holiday_extension_days, 7, "extended by 7 days");
 
     // …but the SEALED January invoice and the balance are untouched, and a
     // re-run bills nothing new.

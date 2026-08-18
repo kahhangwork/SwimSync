@@ -50,7 +50,7 @@ type AttendanceRow = {
 };
 
 const STATUS_FILTERS = [
-  "All","present","absent","cancelled_rain","cancelled_coach","trial_paid","trial_free",
+  "All","present","absent","cancelled_rain","cancelled_coach","trial_paid","trial_free","holiday",
 ];
 
 const STATUS_LABELS: Record<string, string> = {
@@ -60,6 +60,7 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled_coach: "Cancelled (Coach)",
   trial_paid: "Trial (Paid)",
   trial_free: "Trial (Free)",
+  holiday: "Public Holiday",
 };
 
 /**

@@ -1,17 +1,20 @@
--- pgTAP: live public-holiday validity extension + acknowledge (20260815000200).
--- Plan ⚠ RISK 4/5. Window: start 2026-03-01 (Sun), 10 weeks ⇒ nominal_end
--- 2026-05-10 (Sun). Class weekdays: Mon + Wed. Holidays chosen against the
--- verified calendar: 2026-03-02 Mon (wk A), 2026-03-04 Wed (wk A too),
--- 2026-03-09 Mon (wk B), 2026-05-11 Mon (in the extended TAIL), 2026-03-03 Tue
--- (no class). Self-contained; own tenant; rolls back.
+-- pgTAP: event-driven public-holiday validity extension (20260818000700).
+-- Marking a lesson 'holiday' extends the covering package by the tenant's
+-- holiday_extension_days, deduped per (package, date), reversible. Replaces the
+-- retired calendar-scan recompute (20260815000200).
+--
+-- Window: package start 2026-03-01 (Sun), 10 weeks => nominal end 2026-05-10.
+-- Mon class; holiday Mondays in window: 2026-03-02, 03-09, 03-16, 03-23; tail
+-- (after nominal end): 2026-05-11. Self-contained; own tenant; rolls back.
+-- Runs as postgres, so the attendance window guard (20260727000100) and the
+-- admin-only holiday guard (20260818000800) both exempt it at the current_user seam.
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(20);
+SELECT plan(14);
 
-INSERT INTO tenants (id, slug, display_name, join_code) VALUES
-  ('da000000-0000-0000-0000-000000000001','hx','Holiday Ext','SWIM-HXT'),
-  ('da000000-0000-0000-0000-000000000002','hx2','Other Biz','SWIM-HXT2');
+INSERT INTO tenants (id, slug, display_name, join_code, holiday_extension_days) VALUES
+  ('da000000-0000-0000-0000-000000000001','hx','Holiday Ext','SWIM-HXT', 7);
 
 INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
@@ -25,10 +28,6 @@ VALUES
   ('00000000-0000-0000-0000-000000000000','dc000000-0000-0000-0000-000000000001',
    'authenticated','authenticated','hx-parent@test.local', crypt('x', gen_salt('bf')), now(),
    '{"provider":"email"}','{"full_name":"HX Parent","role":"parent"}',
-   now(), now(), '','','',''),
-  ('00000000-0000-0000-0000-000000000000','dc000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','hx-parent2@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}','{"full_name":"HX Parent2","role":"parent"}',
    now(), now(), '','','','');
 
 INSERT INTO parent_tenants (parent_id, tenant_id)
@@ -38,30 +37,29 @@ FROM parents p JOIN profiles pr ON pr.id = p.profile_id WHERE pr.email='hx-paren
 INSERT INTO class_categories (id, tenant_id, name) VALUES
   ('de000000-0000-0000-0000-000000000001','da000000-0000-0000-0000-000000000001','Group');
 
--- Mon + Wed classes (coach = admin).
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
                      location_name, price_per_lesson, category_id)
 SELECT 'df000000-0000-0000-0000-000000000001', co.id, 'Mon', 'monday',
        '10:00','11:00','Pool', 50.00, 'de000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='hx-admin@test.local';
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
-SELECT 'df000000-0000-0000-0000-000000000002', co.id, 'Wed', 'wednesday',
-       '10:00','11:00','Pool', 50.00, 'de000000-0000-0000-0000-000000000001'
-FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='hx-admin@test.local';
 
-INSERT INTO students (id, full_name, date_of_birth, assignment_status, tenant_id, created_by)
-VALUES ('55000000-0000-0000-0000-0000000000d1','HX Kid','2018-05-05','assigned',
-        'da000000-0000-0000-0000-000000000001','dc000000-0000-0000-0000-000000000001');
+-- Two siblings, ONE parent (the dedup case): both enrolled in the Mon class.
+INSERT INTO students (id, full_name, date_of_birth, assignment_status, tenant_id, created_by) VALUES
+  ('55000000-0000-0000-0000-0000000000d1','HX Kid1','2018-05-05','assigned',
+   'da000000-0000-0000-0000-000000000001','dc000000-0000-0000-0000-000000000001'),
+  ('55000000-0000-0000-0000-0000000000d2','HX Kid2','2019-06-06','assigned',
+   'da000000-0000-0000-0000-000000000001','dc000000-0000-0000-0000-000000000001');
 INSERT INTO parent_students (parent_id, student_id)
-SELECT p.id, '55000000-0000-0000-0000-0000000000d1'
-FROM parents p JOIN profiles pr ON pr.id=p.profile_id WHERE pr.email='hx-parent@test.local';
+SELECT p.id, s.id
+FROM parents p JOIN profiles pr ON pr.id=p.profile_id AND pr.email='hx-parent@test.local'
+CROSS JOIN (VALUES ('55000000-0000-0000-0000-0000000000d1'::uuid),
+                   ('55000000-0000-0000-0000-0000000000d2'::uuid)) s(id);
+INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at) VALUES
+  ('55000000-0000-0000-0000-0000000000d1','df000000-0000-0000-0000-000000000001', true, '2026-03-01'),
+  ('55000000-0000-0000-0000-0000000000d2','df000000-0000-0000-0000-000000000001', true, '2026-03-01');
 
--- Enrol the kid in the Mon class only (Wed added mid-test).
-INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
-VALUES ('55000000-0000-0000-0000-0000000000d1','df000000-0000-0000-0000-000000000001', true, '2026-03-01');
-
--- All-classes product (category NULL), 10 weeks. Active package, start 2026-03-01.
+-- All-classes product (category NULL), 10 weeks; active package for the parent,
+-- start 2026-03-01. The lifecycle trigger sets expires_on = nominal end.
 INSERT INTO package_products (id, tenant_id, name, lesson_count, rate_per_lesson, validity_weeks)
 VALUES ('d0000000-0000-0000-0000-000000000001','da000000-0000-0000-0000-000000000001',
         '20 lessons', 20, 30.00, 10);
@@ -70,129 +68,94 @@ SELECT 'd1000000-0000-0000-0000-000000000001','da000000-0000-0000-0000-000000000
        p.id,'d0000000-0000-0000-0000-000000000001','active','2026-03-01'
 FROM parents p JOIN profiles pr ON pr.id=p.profile_id WHERE pr.email='hx-parent@test.local';
 
--- ── 1. Baseline: no holidays ⇒ no extension, expiry = nominal end ────────────
-SELECT is((SELECT recompute_package_extensions('da000000-0000-0000-0000-000000000001')), 0,
-  'no holidays ⇒ nothing changes');
-SELECT is((SELECT expires_on FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
-  DATE '2026-05-10', 'expiry is the nominal end');
+-- Lesson sessions, one per Monday we test.
+INSERT INTO lesson_sessions (id, class_id, session_date, start_time, end_time) VALUES
+  ('12000000-0000-0000-0000-000000000302','df000000-0000-0000-0000-000000000001','2026-03-02','10:00','11:00'),
+  ('12000000-0000-0000-0000-000000000309','df000000-0000-0000-0000-000000000001','2026-03-09','10:00','11:00'),
+  ('12000000-0000-0000-0000-000000000316','df000000-0000-0000-0000-000000000001','2026-03-16','10:00','11:00'),
+  ('12000000-0000-0000-0000-000000000323','df000000-0000-0000-0000-000000000001','2026-03-23','10:00','11:00'),
+  ('12000000-0000-0000-0000-000000000511','df000000-0000-0000-0000-000000000001','2026-05-11','10:00','11:00');
 
--- ── 2. A holiday on the Mon class weekday, in window ⇒ +1 week ───────────────
-INSERT INTO tenant_public_holidays (tenant_id, holiday_date, name)
-VALUES ('da000000-0000-0000-0000-000000000001','2026-03-02','Holiday Mon A');
-SELECT is((SELECT recompute_package_extensions('da000000-0000-0000-0000-000000000001')), 1,
-  'one package extended');
-SELECT is((SELECT ph_extension_weeks FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
-  1, 'ph_extension_weeks = 1');
-SELECT is((SELECT expires_on FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
-  DATE '2026-05-17', 'expiry pushed one week (2026-05-10 + 7)');
+-- Helper: mark/unmark a student 'holiday' on a session.
+-- (inline INSERT/DELETE below; marked_by = the admin profile.)
 
--- ── 3. Idempotent: re-run writes nothing and logs no second event ───────────
-SELECT is((SELECT recompute_package_extensions('da000000-0000-0000-0000-000000000001')), 0,
-  'a second recompute changes nothing (idempotent)');
-SELECT is((SELECT count(*)::int FROM package_extension_events
+-- ── 1. Baseline: no holidays ⇒ expiry is the nominal end ─────────────────────
+SELECT is((SELECT expires_on FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  DATE '2026-05-10', 'baseline expiry is the nominal end');
+
+-- ── 2-4. Mark kid1 holiday on 2026-03-02 ⇒ +7 days, one state row ────────────
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
+VALUES ('12000000-0000-0000-0000-000000000302','55000000-0000-0000-0000-0000000000d1','holiday',
+        'db000000-0000-0000-0000-000000000001');
+SELECT is((SELECT holiday_extension_days FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  7, 'one holiday ⇒ +7 days accumulator');
+SELECT is((SELECT expires_on FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  DATE '2026-05-17', 'expiry pushed 7 days (2026-05-10 + 7)');
+SELECT is((SELECT count(*)::int FROM package_holiday_extensions
             WHERE parent_package_id='d1000000-0000-0000-0000-000000000001'),
-  1, 'exactly one audit event so far');
+  1, 'exactly one state row');
 
--- ── 4. No cascade: a holiday in the extended TAIL is not counted ────────────
-INSERT INTO tenant_public_holidays (tenant_id, holiday_date, name)
-VALUES ('da000000-0000-0000-0000-000000000001','2026-05-11','Tail Mon');
-SELECT is((SELECT recompute_package_extensions('da000000-0000-0000-0000-000000000001')), 0,
-  'a holiday after the nominal end never extends (no cascade)');
+-- ── 5-6. SIBLING dedup: kid2 holiday, SAME date ⇒ still +7, still one row ─────
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
+VALUES ('12000000-0000-0000-0000-000000000302','55000000-0000-0000-0000-0000000000d2','holiday',
+        'db000000-0000-0000-0000-000000000001');
+SELECT is((SELECT holiday_extension_days FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  7, 'two siblings sharing one package, same holiday ⇒ +7 ONCE (dedup per package,date)');
+SELECT is((SELECT count(*)::int FROM package_holiday_extensions
+            WHERE parent_package_id='d1000000-0000-0000-0000-000000000001'),
+  1, 'still exactly one state row for that date');
 
--- ── 5. A holiday in a DIFFERENT week ⇒ +2 total ─────────────────────────────
-INSERT INTO tenant_public_holidays (tenant_id, holiday_date, name)
-VALUES ('da000000-0000-0000-0000-000000000001','2026-03-09','Holiday Mon B');
-SELECT recompute_package_extensions('da000000-0000-0000-0000-000000000001');
-SELECT is((SELECT ph_extension_weeks FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
-  2, 'two distinct affected weeks ⇒ +2');
+-- ── 7-8. A DIFFERENT date accumulates (+7 more = 14) ─────────────────────────
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
+VALUES ('12000000-0000-0000-0000-000000000309','55000000-0000-0000-0000-0000000000d1','holiday',
+        'db000000-0000-0000-0000-000000000001');
+SELECT is((SELECT holiday_extension_days FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  14, 'a second distinct holiday date ⇒ +7 more (per-date)');
+SELECT is((SELECT expires_on FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  DATE '2026-05-24', 'expiry now +14');
 
--- ── 6. THE EDGE CASE: two classes both hit in the SAME week ⇒ still +2 ───────
-INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
-VALUES ('55000000-0000-0000-0000-0000000000d1','df000000-0000-0000-0000-000000000002', true, '2026-03-01');
-INSERT INTO tenant_public_holidays (tenant_id, holiday_date, name)
-VALUES ('da000000-0000-0000-0000-000000000001','2026-03-04','Holiday Wed same week');
-SELECT recompute_package_extensions('da000000-0000-0000-0000-000000000001');
-SELECT is((SELECT ph_extension_weeks FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
-  2, 'a second holiday in an already-counted week adds NOTHING (per-week, not per-lesson)');
+-- ── 9. NO CASCADE: a holiday in the extended tail is outside the nominal window ─
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
+VALUES ('12000000-0000-0000-0000-000000000511','55000000-0000-0000-0000-0000000000d1','holiday',
+        'db000000-0000-0000-0000-000000000001');
+SELECT is((SELECT holiday_extension_days FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  14, 'a holiday after the nominal end never extends (no cascade)');
 
--- ── 7. A holiday on a weekday with no enrolled class is ignored ─────────────
-INSERT INTO tenant_public_holidays (tenant_id, holiday_date, name)
-VALUES ('da000000-0000-0000-0000-000000000001','2026-03-03','Tue, no class');
-SELECT recompute_package_extensions('da000000-0000-0000-0000-000000000001');
-SELECT is((SELECT ph_extension_weeks FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
-  2, 'a holiday matching no scheduled lesson does not extend');
+-- ── 10-11. REVERSAL is exact: un-mark the 2026-03-09 holiday ⇒ back to 7 ──────
+DELETE FROM attendance
+WHERE lesson_session_id='12000000-0000-0000-0000-000000000309'
+  AND student_id='55000000-0000-0000-0000-0000000000d1';
+SELECT is((SELECT holiday_extension_days FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  7, 'un-marking a holiday retracts exactly its days');
+SELECT is((SELECT expires_on FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  DATE '2026-05-17', 'expiry back to +7');
 
--- ── 8-9. Acknowledge (admin), then SHRINK clamps the ack ────────────────────
-CREATE TEMP TABLE hx_ids AS SELECT
-  (SELECT p.id FROM parents p JOIN profiles pr ON pr.id=p.profile_id WHERE pr.email='hx-parent@test.local') AS parent1,
-  (SELECT p.id FROM parents p JOIN profiles pr ON pr.id=p.profile_id WHERE pr.email='hx-parent2@test.local') AS parent2;
+-- ── 12. CONFIGURABLE days: raise to 10, a NEW holiday adds 10 ────────────────
+UPDATE tenants SET holiday_extension_days = 10 WHERE id='da000000-0000-0000-0000-000000000001';
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
+VALUES ('12000000-0000-0000-0000-000000000316','55000000-0000-0000-0000-0000000000d1','holiday',
+        'db000000-0000-0000-0000-000000000001');
+SELECT is((SELECT holiday_extension_days FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  17, 'a new holiday uses the CURRENT setting (7 already applied + 10 new = 17)');
 
-SET LOCAL ROLE authenticated;
-SET LOCAL "request.jwt.claims" TO '{"sub":"db000000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT lives_ok($$ SELECT acknowledge_package_extension('d1000000-0000-0000-0000-000000000001') $$,
-  'admin acknowledges the extension');
-SELECT is((SELECT ph_ack_weeks_admin FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
-  2, 'admin ack high-water = current extension (2) ⇒ not loud');
-RESET ROLE;
+-- ── 13. RISK 3 — reversal reads applied_days from state, not the live setting ─
+-- The 2026-03-02 rows were applied at 7. Set the tenant to 0, then un-mark BOTH
+-- siblings on that date: the retraction removes exactly 7 (the stored value),
+-- never the current 0 and never a re-derivation.
+UPDATE tenants SET holiday_extension_days = 0 WHERE id='da000000-0000-0000-0000-000000000001';
+DELETE FROM attendance WHERE lesson_session_id='12000000-0000-0000-0000-000000000302';
+SELECT is((SELECT holiday_extension_days FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
+  10, 'un-marking a holiday applied at 7 removes 7 even after the setting changed to 0');
 
--- Remove a holiday ⇒ shrink to 1; the ack clamps to 1 (LEAST), so the badge
--- is quiet — but a later re-bump will exceed it and go loud again.
-DELETE FROM tenant_public_holidays WHERE holiday_date='2026-03-09'
-  AND tenant_id='da000000-0000-0000-0000-000000000001';
-SELECT recompute_package_extensions('da000000-0000-0000-0000-000000000001');
-SELECT is((SELECT ph_extension_weeks || '/' || ph_ack_weeks_admin
-            FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
-  '1/1', 'shrink lowers the extension AND clamps the ack down to it');
-
--- Re-add ⇒ +2 again, ack still 1 ⇒ LOUD for the admin (2 > 1).
-INSERT INTO tenant_public_holidays (tenant_id, holiday_date, name)
-VALUES ('da000000-0000-0000-0000-000000000001','2026-03-09','Holiday Mon B again');
-SELECT recompute_package_extensions('da000000-0000-0000-0000-000000000001');
-SELECT ok(
-  (SELECT ph_extension_weeks > ph_ack_weeks_admin
-     FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
-  'a re-bump after a shrink goes loud again');
-
--- ── 10. Authorization: a parent cannot recompute another business ──────────
-SET LOCAL ROLE authenticated;
-SET LOCAL "request.jwt.claims" TO '{"sub":"dc000000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT throws_ok($$ SELECT recompute_package_extensions('da000000-0000-0000-0000-000000000002') $$,
-  '42501', NULL, 'a parent cannot recompute a tenant they are not in');
-
--- ── 11. A parent cannot acknowledge a package they do not own ───────────────
--- parent2 (in no tenant, not the owner) tries to ack parent1's package.
-SET LOCAL "request.jwt.claims" TO '{"sub":"dc000000-0000-0000-0000-000000000002","role":"authenticated"}';
-SELECT throws_ok($$
-  SELECT acknowledge_package_extension('d1000000-0000-0000-0000-000000000001','parent') $$,
-  '42501', NULL, 'a non-owning parent cannot acknowledge as parent');
-RESET ROLE;
-
--- ── 12-13. acknowledge_all_extensions: admin-only, tenant-scoped ─────────────
--- A DIFFERENT-tenant admin clears nothing here.
-INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
-  email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at,
-  updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)
-VALUES ('00000000-0000-0000-0000-000000000000','db000000-0000-0000-0000-000000000002',
-   'authenticated','authenticated','hx-admin2@test.local', crypt('x', gen_salt('bf')), now(),
-   '{"provider":"email"}',
-   '{"full_name":"HX Admin2","role":"tenant_admin","tenant_id":"da000000-0000-0000-0000-000000000002"}',
-   now(), now(), '','','','');
-
-SET LOCAL ROLE authenticated;
-SET LOCAL "request.jwt.claims" TO '{"sub":"db000000-0000-0000-0000-000000000002","role":"authenticated"}';
-SELECT throws_ok($$
-  SELECT acknowledge_all_extensions('da000000-0000-0000-0000-000000000001') $$,
-  '42501', NULL, 'an admin of another tenant cannot acknowledge tenant A''s packages');
--- The rightful admin clears the one loud package.
-SET LOCAL "request.jwt.claims" TO '{"sub":"db000000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT is(
-  (SELECT acknowledge_all_extensions('da000000-0000-0000-0000-000000000001')),
-  1, 'the business''s admin acknowledges all its loud packages');
-RESET ROLE;
-SELECT ok(
-  (SELECT ph_ack_weeks_admin = ph_extension_weeks
-     FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001'),
-  'after acknowledge-all the admin badge is quiet');
+-- ── 14. CONFIG 0 writes no state row ────────────────────────────────────────
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
+VALUES ('12000000-0000-0000-0000-000000000323','55000000-0000-0000-0000-0000000000d1','holiday',
+        'db000000-0000-0000-0000-000000000001');
+SELECT is((SELECT holiday_extension_days FROM parent_packages WHERE id='d1000000-0000-0000-0000-000000000001')
+          || '/' ||
+          (SELECT count(*)::text FROM package_holiday_extensions
+            WHERE parent_package_id='d1000000-0000-0000-0000-000000000001' AND holiday_date='2026-03-23'),
+  '10/0', 'a holiday under a 0-day setting extends nothing and writes no state row');
 
 SELECT * FROM finish();
 ROLLBACK;

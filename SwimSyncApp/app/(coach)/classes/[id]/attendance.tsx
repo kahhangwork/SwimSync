@@ -38,14 +38,19 @@ import {
 } from "@/lib/creditNoteEmail";
 import PrimaryButton from "@/components/PrimaryButton";
 
-type TopStatus = "unmarked" | "present" | "absent" | "cancelled" | "trial";
+// "holiday" is READ-ONLY here: a public-holiday void is set by the tenant admin
+// (mark_day_holiday) and the DB guard refuses a coach touching it. The coach sees
+// it, never sets it — so it is excluded from the settable buttons, "Set all", the
+// save validation, and the save payload below.
+type TopStatus = "unmarked" | "present" | "absent" | "cancelled" | "trial" | "holiday";
 type DBStatus =
   | "present"
   | "absent"
   | "cancelled_rain"
   | "cancelled_coach"
   | "trial_paid"
-  | "trial_free";
+  | "trial_free"
+  | "holiday";
 
 type StudentRow = {
   id: string;
@@ -90,6 +95,7 @@ function fromDBStatus(status: DBStatus): { top: TopStatus; sub: string | null } 
     case "cancelled_coach": return { top: "cancelled", sub: "coach" };
     case "trial_paid":      return { top: "trial",     sub: "paid" };
     case "trial_free":      return { top: "trial",     sub: "free" };
+    case "holiday":         return { top: "holiday",   sub: null };
   }
 }
 
@@ -533,7 +539,9 @@ export default function MarkAttendanceScreen() {
     const apply = () => {
       setAttendance((prev) =>
         applyBulkStatus(
-          students.map((s) => s.id),
+          // Never re-mark a holiday row — the guard refuses a coach clearing one,
+          // and a single refused row fails the whole batch save (§7.67).
+          students.filter((s) => prev[s.id]?.top !== "holiday").map((s) => s.id),
           prev,
           { top: opt.top, sub: opt.sub }
         )
@@ -559,6 +567,9 @@ export default function MarkAttendanceScreen() {
     // Validate all statuses are complete
     for (const student of students) {
       const state = attendance[student.id];
+      // A holiday row is admin-owned and read-only here — it needs no marking and
+      // is left out of the save payload below, so don't demand a status for it.
+      if (state?.top === "holiday") continue;
       if (!state || state.top === "unmarked") {
         showToast(`Please mark attendance for ${student.full_name}.`, "error");
         return;
@@ -639,13 +650,18 @@ export default function MarkAttendanceScreen() {
     const rows = buildAttendanceRows(
       finalSessionId,
       session!.id,
-      students.map((student) => ({
-        studentId: student.id,
-        status: toDBStatus(
-          attendance[student.id].top,
-          attendance[student.id].sub
-        )!,
-      }))
+      students
+        // EXCLUDE holiday rows: the DB guard refuses a coach writing 'holiday', and
+        // one refused row rolls back the whole batch upsert (§7.67). Leaving them
+        // out of the payload keeps the admin's void untouched by a coach save.
+        .filter((student) => attendance[student.id].top !== "holiday")
+        .map((student) => ({
+          studentId: student.id,
+          status: toDBStatus(
+            attendance[student.id].top,
+            attendance[student.id].sub
+          )!,
+        }))
     );
 
     const { error: upsertError } = await supabase
@@ -938,10 +954,23 @@ export default function MarkAttendanceScreen() {
                   </View>
                 )}
 
+                {/* Public-holiday void — read-only. Set by the admin; a coach
+                    cannot change it (the DB guard refuses), so no buttons show. */}
+                {state.top === "holiday" && (
+                  <View className="flex-row items-center gap-1.5 mb-1">
+                    <View className="w-2 h-2 rounded-full bg-purple-400" />
+                    <Text className="text-xs text-purple-500 font-medium">
+                      Public holiday — no charge
+                    </Text>
+                  </View>
+                )}
+
                 {/* Top-level status buttons. A make-up guest gets the ordinary
                     statuses only: the trial statuses price by the trial rate,
                     and a make-up is not a trial. Affordance, not the guard —
-                    the engine prices a mismark at the class rate. */}
+                    the engine prices a mismark at the class rate. Hidden for a
+                    holiday row, which is read-only. */}
+                {state.top !== "holiday" && (
                 <View className="flex-row gap-2">
                   {TOP_STATUSES.filter(
                     ({ key }) => !(student.isMakeup && key === "trial")
@@ -969,6 +998,7 @@ export default function MarkAttendanceScreen() {
                     );
                   })}
                 </View>
+                )}
 
                 {/* Cancelled sub-type */}
                 {state.top === "cancelled" && (
