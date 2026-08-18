@@ -3007,3 +3007,31 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     Pair it with `supabase functions list` (the `version` bumps on each deploy). Used to confirm
     `generate-invoices` v24 and `credit-note-emails` v2 on 2026-08-18. Note the download mutates
     your working tree, so do it on a clean tree you can inspect, not mid-edit. (§8.69)
+
+188. **Transition tables are SINGLE-EVENT only — a trigger with `REFERENCING ... TABLE` and
+    more than one event is rejected** (`ERROR: transition tables cannot be specified for
+    triggers with more than one event`). So a statement-level trigger that must reconcile on
+    INSERT *and* UPDATE *and* DELETE is **three triggers sharing one function**, not one
+    `AFTER INSERT OR UPDATE OR DELETE`. The function branches on `TG_OP` and reads whichever of
+    `newtab`/`oldtab` exists for that event; make it idempotent, because a single `.upsert`
+    fires both the INSERT trigger (new rows) and the UPDATE trigger (conflicted rows) in one
+    statement. (Holiday reconcile, `20260818000700`; §8.70.)
+
+189. **`CREATE OR REPLACE FUNCTION` cannot rename an input parameter** (`ERROR: cannot change
+    name of input parameter`), just as it cannot change the result type (§7.150). Renaming a
+    param — e.g. `p_ph_ext_weeks`→`p_holiday_days` when a formula's meaning flips weeks→days —
+    forces **`DROP FUNCTION` + `CREATE` + re-`GRANT` in the same migration**: a recreated
+    function is callable by nobody until granted (§7.87), and a missing grant breaks every
+    caller (here, every package sale via the invoker lifecycle trigger). If the type signature
+    is unchanged, existing callers still resolve — but census them and re-run their suite,
+    because a same-typed arg whose *meaning* changed (weeks→days) is a silent ×7 error in any
+    caller you miss. (`package_effective_end` rework, `20260818000600`; §8.70.)
+
+190. **A coverage/attribution resolver lifted from the billing engine must carry the engine's
+    TENANT filter, or it leaks across businesses.** The engine draws packages with
+    `.eq("tenant_id", …)` FIRST; a resolver that copied only the category+window+FIFO rules but
+    dropped the tenant scope would extend a parent's category-NULL package (held in business A)
+    because of a holiday in business B — a package the engine would never draw for that lesson.
+    A parent spanning two tenants is the trigger. Any function that reuses the draw predicate
+    for a side effect (extension, credit, report) needs the tenant clause too. Caught in review
+    before ship; `holiday_covering_package` takes `p_tenant_id`. (§8.70.)

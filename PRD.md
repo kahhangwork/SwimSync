@@ -1811,19 +1811,24 @@ cash paid always equals value granted — nothing to reconcile.
   once the package is active (a wrong one is cancel-and-resell). A future-start package is
   *not yet* coverage — the payment-method chip reads ad-hoc, and the engine bills those
   lessons ad-hoc, until its start date arrives.
-- **Validity auto-extends for public holidays, loudly** *(implemented 2026-08-15)*. Each
-  business keeps its own **holiday calendar** (Admin → Holidays: add dates by hand or
-  **import a data.gov.sg CSV**, with a link to the source). When a scheduled lesson — for
-  any covered child's current class — would fall on one of those dates, the package's
-  validity extends by **one week per affected week** (two of a child's classes hit in the
-  same week is +1 week, not +2; the extension self-scales with more children/classes).
-  It **recomputes live** — over the current calendar and enrolments, at every relevant
-  change and page load and before every billing run — and is **loud**: a badge on the
-  parent app *and* the admin panel announces "+N weeks for public holidays" until that
-  side taps **Acknowledge** (the two acknowledge independently; the admin has
-  *Acknowledge all*), after which a quiet permanent note remains and it re-alerts only if
-  a later holiday extends it further. An extension can never touch an already-billed
-  month.
+- **A public holiday is VOIDED by the admin, which both skips the charge and extends the
+  package** *(implemented 2026-08-19 — replaced the calendar-scan auto-extension of
+  2026-08-15)*. Each business still keeps its own **holiday calendar** (Admin → Holidays:
+  add by hand or **import a data.gov.sg CSV**), and it still hides holiday dates from the
+  parent's upcoming-lessons list. What changed is the mechanism: on the Holidays page the
+  admin presses **Void lessons** for a date (each row shows whether it is already voided
+  and how many lessons; a single **Restore** undoes it). Voiding marks every scheduled
+  lesson that day — every expected student, enrolled or a trial/make-up guest — with a new
+  **`holiday` attendance status**, which is **non-billable** (nobody is charged, no package
+  is drawn) *and* extends each covering package's validity by a **tenant-configurable
+  number of days** (default 7, set on the same page). The extension is **event-driven** —
+  applied at the moment the lesson is marked, not recomputed on every page load — and is
+  **deduplicated per package**: two children sharing one package, one holiday, extends it
+  once. Coverage is judged against the package's nominal window, so an extension never
+  pulls in further holidays, and **un-voiding reverses it exactly**. `holiday` is
+  **admin-only, enforced in the database** (a coach sees it read-only; the DB refuses a
+  coach setting, clearing, or deleting it). A voided lesson already billed at `present`
+  auto-issues a **cash** credit note (§7.8), value-equivalent to the drawn package lesson.
 - **The admin can also extend a package by hand** *(implemented 2026-08-15)* — a
   discretionary number of weeks with an optional reason, stacked on top of any holiday
   extension and recorded in an audit trail. Shortening is not an option (that is

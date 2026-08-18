@@ -1,14 +1,13 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-18 — **WAVE D COMPLETE (§8.69), LIVE.** Three shipped + deployed: an engine
-**ordering-guard** (billing refuses a later month while an earlier one is unbilled — stranding fixed
-at the source), the **engine-side credit lock** (`apply_credit_to_invoice`, one locked idempotent
-transaction), and the **admin void** for a credit note (CN001's destination). Migrations
-`20260818000200/000300`, engine v24, emails v2; apps last. §7.187 · PRD §5.6/§7.7 · plan
-`docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md`._
+_Last updated: 2026-08-19 — **EVENT-DRIVEN PUBLIC-HOLIDAY VOIDS (§8.70), LIVE.** A `holiday` attendance
+status (admin-only, DB-guarded) voids a day's lessons — non-billable AND extends each covering package by
+a configurable days setting, deduped per (package,date), reversible. Replaces + drops the calendar-scan
+`recompute_package_extensions`. 8 migrations `…000400`–`…001100` (contract held back until apps), engine
+v25, both apps. §7.188-190 · PRD §7.16 · DEPLOYMENT §11.29 · `docs/plans/HOLIDAY_ATTENDANCE_RUNBOOK.md`._
 
-_Previously, 2026-08-18 (§8.68) — symmetric credit notes: a re-toggled correction no longer doubles a
-parent's credit; one note per line, `CN001` refuses a spent un-correction. Migration `20260818000100`. §7.184–186._
+_Previously, 2026-08-18 (§8.69) — Wave D: engine ordering-guard + credit lock (`apply_credit_to_invoice`) +
+admin void for a credit note. Migrations `…000200/000300`, engine v24. §7.187 · PRD §5.6/§7.7._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -158,13 +157,13 @@ This is the half of "verified" that a PRD cannot tell you, so it is the part of 
 earns its place. **Shipped ≠ exercised**, and a guard that has never fired in production
 is a guard whose first real firing is still ahead of you.
 
-- **Packages** — no package has been sold on production, so the whole 2026-08-15 weeks/start-date
-  layer is dormant too: **no start date, holiday extension, acknowledge or manual-extend has ever
-  fired on real data.** First firing is the first sale. Its guards (the §7.156/§7.157 pins, the
-  no-cascade recompute, the sealed-month safety) are all verified locally only. **Renewal offers
-  (§8.60) are dormant on the same premise** — no offer created on prod, so supersede, the public
-  `/package` page, and the RISK 1/2/4/12 guards (§7.158–§7.162) have never fired on real data;
-  first firing is the first offer.
+- **Packages** — no package sold on production, so the weeks/start-date layer is dormant: no start
+  date, manual-extend, or **holiday void-extension (§8.70)** has fired on real data (§7.156/§7.157 pins,
+  no-cascade coverage, sealed-month safety verified locally only). The holiday voids are dormant on a
+  double premise — **0 packages AND 0 holidays voided on prod** — so `mark_day_holiday`, the reconcile
+  trigger, the admin-only guard and the late-buyer path have never fired there; first firing is the
+  first `Void lessons`. **Renewal offers (§8.60) are dormant too** — no offer on prod, so supersede, the
+  `/package` page and the RISK 1/2/4/12 guards (§7.158–§7.162) have never fired.
 - **Billing a month LATE** — no production month has been billed late, so `markable_floor`'s
   reopened window has never been used. That is the point: it is insurance, shipped ahead of
   the trigger its own backlog item named.
@@ -392,6 +391,32 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.70 (2026-08-19) — EVENT-DRIVEN PUBLIC-HOLIDAY VOIDS, LIVE
+
+**The "bound `recompute_package_extensions`" backlog trap became a re-architecture, shipped + deployed to
+prod.** A new `holiday` attendance status (**admin-only, DB-guarded** — coach sees it read-only) voids a
+day's lessons: **non-billable** (no charge, no package draw) AND **event-extends** each covering package by
+the tenant's configurable `holiday_extension_days` (default 7), **deduped per (package, date)**, reversible,
+coverage judged on the nominal window (no cascade). This REPLACES the calendar-scan
+`recompute_package_extensions` (dropped) — there is no standing per-load scan any more. The admin acts from
+Holidays → **Void lessons** (each row shows voided-state + a Restore). A billed `present→holiday` auto-issues
+a cash credit note. 8 migrations `…000400`–`…001100` (expand/contract — the contract migration was held back
+via a `.hold` rename until both apps shipped), engine **v25**, both apps. §7.188-190 · PRD §7.16 · DEPLOYMENT
+§11.29 · runbook `docs/plans/HOLIDAY_ATTENDANCE_RUNBOOK.md`.
+
+Built `/plan-with-confidence` → `/plan-review` (Fable, **4 blocking defects** folded into the plan:
+transition-tables-are-single-event §7.188, CREATE-OR-REPLACE-can't-rename-a-param §7.189, a one-directional
+admin guard, deploy-order) → `/commit-review` (Fable, **5 more fixed pre-commit**:
+leftover recompute callers still in the apps, missing tenant scope on the coverage resolver §7.190, UTC date
+casts, a `FOR UPDATE` deadlock, a swallowed save error). Verified pgTAP **1179**, Deno **229 ×2**, admin
+vitest **447**, app jest **387**, both typechecks; the deploy was gated on a served-bundle grep (old columns
+0 hits, new strings present). `03b25e3`.
+
+**Deliberately not done:** the loud/quiet **ack badge was DROPPED** (the extension shows as a quiet "+N days"
+line, no Acknowledge); holiday extensions are **not** written to `package_extension_events` (their audit is
+the `package_holiday_extensions` state table); **Admin per-lesson attendance marking** filed to BACKLOG (the
+void is whole-day only). (Open items incl. the owed grant dump → §9.)
+
 ## 8.69 (2026-08-18, second session) — WAVE D: ORDERING-GUARD + CREDIT LOCK + ADMIN VOID, LIVE
 
 **Three latent Wave-D items shipped and deployed to prod in one sequenced wave.** (1) **Ordering-guard**
@@ -418,33 +443,6 @@ invoice reopens at the higher net while its `payment_records` stand, so the admi
 (BACKLOG, dormant on 0 notes). The `paid_at`-clearing on reopen departs from the plan's original "leave
 paid_at" (an `outstanding` invoice must not show a Paid badge). `fixtures-trial-onboarding-teardown`, the
 `recompute_package_extensions` bound, and HANDOVER §3 graduation remain the open non-urgent items.
-
-## 8.68 (2026-08-18) — CREDIT-NOTE DOUBLE-CREDIT FIX (Wave D), LIVE
-
-**A re-toggled attendance correction doubled a parent's credit — fixed, deployed, migration applied
-to prod.** `present→absent→present→absent` used to mint a SECOND credit note and add `+amount` twice
-(one $30 lesson → $60 of credit), because the trigger had no `absent→present` branch. Now SYMMETRIC:
-one `credit_notes` row reused per `invoice_item_id` (`UNIQUE(invoice_item_id)`); `absent→present`
-voids an undrawn note (−balance), a re-correction re-activates it (never doubling), and un-correcting
-an already-DRAWN credit is refused (`CN001` — three spend signals + `FOR UPDATE`), because reversing
-spent credit would reopen a past invoice. One-time dedup (DELETE undrawn dups, reconciled) is a no-op
-on prod (0 notes). Also dropped the drifted `tenants.suspend` (`IF EXISTS`). Migration
-`20260818000100` + committed DOWN (rehearsed clean). Apps deploy FIRST — they only *tolerate* the new
-states: parent hides reversed notes, admin labels "Reversed"/"Credit voided", coach decodes `CN001`;
-plus Wave D's advisory PayNow mobile check and the makeups/trials date-column nowrap.
-
-Built `/plan-with-confidence` → `/plan-review` (Fable, 8 risks verified in code) → `/commit-review`
-(Fable) — which caught a **CRITICAL** dedup-vs-`UNIQUE`-index collision (masked locally by 0 notes)
-and fixed it (DELETE, not reverse) before commit. Verified pgTAP **+15** (double RED-proven; raw $60
-reproduced separately), Deno **×2**, admin vitest **443**, app jest **391**, CI green; prod
-`migration list` remote-confirmed `20260818000100`. **Traps → §7.184–186; behaviour → PRD §5.6; two
-follow-ups → BACKLOG.** `c4d78f5`→`b59e17f`. Plan: `docs/plans/WAVE_D_PLAN.md`.
-
-**Deliberately not done:** the engine-side credit-note lock (the trigger's `FOR UPDATE` closes the
-trigger-vs-trigger window; the complete fix needs `generate-invoices` to lock the note too — dormant,
-BACKLOG); the admin void UI (`CN001` says "contact support" until it exists — BACKLOG); HANDOVER §3
-graduation (still parked). `fixtures-trial-onboarding-teardown`, the `markable_floor` stranding, and
-the `recompute_package_extensions` bound remain the open Wave D items.
 
 ---
 
@@ -516,17 +514,17 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — Wave D COMPLETE (§8.69, all three shipped LIVE 2026-08-18). Wave B/C empty.
+### THE NEXT BUILD — Public-holiday voids shipped LIVE 2026-08-19 (§8.70). Wave B/C empty.
 
-The ordering-guard, the engine-side credit lock, and the admin void are all live and prod-confirmed
-(`1a17d33`→`8766682`; migrations `…200`/`…300`). **No migration is in flight now** (§7.55 — one at a
-time). What remains is small, latent, non-urgent:
+Holiday voiding is live and prod-confirmed (`03b25e3`; migrations `…000400`–`…001100`, engine v25, both
+apps). **No migration is in flight now** (§7.55 — one at a time). What remains is small, latent, non-urgent:
 
-- `fixtures-trial-onboarding-teardown` deletes invoices it doesn't own; bound
-  `recompute_package_extensions`; HANDOVER §3 graduation (docs tax).
-- **One follow-up this wave raised** (in `BACKLOG.md`): **partial-payment accounting for a
-  voided-credit reopen** — an already-cash-paid invoice reopens at the higher net while its
-  `payment_records` stand, so the admin reconciles by hand (dormant: 0 notes; void itself is race-safe).
+- **Owed from this deploy:** the remote **grant dump** (§7.39/§7.89) for the new `package_holiday_extensions`
+  table + `mark_day_holiday`/`unmark_day_holiday` RPCs — local `table_grants` is green, cloud not yet confirmed.
+- **New follow-up** (in `BACKLOG.md`): **Admin per-lesson attendance marking** — the void is whole-day only,
+  so voiding one class of many, or correcting a single lesson, has no admin surface yet.
+- Still open: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on 0 notes);
+  HANDOVER §3 graduation (docs tax).
 
 Then *Later* (owner-only accounting page, accrual). Full ranking + settled decisions (revenue
 **ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**): `BACKLOG.md`.
@@ -563,11 +561,12 @@ Then *Later* (owner-only accounting page, accrual). Full ranking + settled decis
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260818000300` (Wave D admin void, §8.69);
-production confirmed caught up 2026-08-18 via `supabase migration list --linked`, **0 pending**.
-**§8.69 (DEPLOYMENT §11.28) is the freshest worked example of the full sequence** — RISK-7 prod
-dry-run → two migrations → engine v24 → emails v2 → grant dump → apps LAST; a git push deploys neither
-migrations nor edge functions. §8.64 (§11.25) is the earlier example where the APPS had to wait on a
+**The migration queue is EMPTY.** The latest applied is `20260818001100` (holiday contract, §8.70);
+production confirmed caught up 2026-08-19 via `supabase migration list --linked`, **0 pending**.
+**§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
+**expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract
+migration LAST (held back by a `.hold` rename until the apps stopped reading the dropped columns);
+a git push deploys neither migrations nor edge functions. §8.64 (§11.25) is the earlier example where the APPS had to wait on a
 NEW edge function. The rule stands:
 migrations to prod (engine too when `core.ts` changes — it did NOT for either email feature) FIRST,
 apps to `main` LAST.

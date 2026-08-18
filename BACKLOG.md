@@ -1,13 +1,15 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-18 — **Wave D closed** (§8.69): the markable_floor stranding, the engine-side
-credit-note lock, and the admin void all SHIPPED — removed from the queue; added the partial-payment
-reopen edge. **Build order re-ranked** after referrals shipped (§8.61 exhausted the
-queue). No rework-critical sequence remains, so this is now decisions + a flat value pool. **Three
-decisions settled with the user:** revenue is **ACCRUAL** (unblocks the owner-only accounting page),
-reminders stay **MANUAL** for now (parks the cron-gated nudge tail), **multi-language REFUSED**
-(→ Deliberately not doing). *More polished dashboards* retired to the same place. New shape: Wave B
-(email chain) → Wave C (value-ranked independents) → Wave D (latent traps) → Later._
+_Last updated: 2026-08-19 — **Public-holiday voids shipped LIVE** (§8.70, PRD §7.16): the
+"bound recompute" trap turned into a re-architecture — a `holiday` attendance status voids a day's
+lessons (non-billable) and event-extends packages by a configurable days setting; the calendar-scan
+`recompute_package_extensions` is gone. Two Wave-D traps closed (that item + `fixtures-trial-onboarding-teardown`).
+One item added: **Admin per-lesson attendance marking** (Admin and operations). Wave D now holds only
+`recompute_package_extensions` bound → DONE, leaving `recompute_package_extensions` scale moot._
+
+_Previously, 2026-08-18 — **Wave D closed** (§8.69): the markable_floor stranding, the engine-side
+credit-note lock, and the admin void all SHIPPED. Revenue **ACCRUAL**, reminders **MANUAL**,
+multi-language **REFUSED**. Shape: Wave B (email chain) → Wave C (independents) → Wave D (latent traps) → Later._
 
 _Previously, 2026-08-15 — **Package renewal automation shipped LIVE** (PRD §7.16 *Renewal
 offers*, `docs/DEPLOYMENT.md` §11.22): admin offers + `/package` pay page + Generate-all +
@@ -396,10 +398,12 @@ Email-confirmation copy, Tick off swimming skills (M).
 - ~~**A PayNow ID that can't build a QR**~~ — **DONE 2026-08-18** (§8.68). Advisory warning at
   the admin save (`SwimSyncAdmin/lib/paynow.ts`, mirrors `buildPayNowPayload`'s mobile check);
   a UEN has no checksum so only the mobile shape is verifiable, which is all the real builder checks.
-- **`fixtures-trial-onboarding-teardown` deletes invoices it doesn't own** (S) — the next
-  fixture touching invoices trips `credit_notes_invoice_item_id_fkey`.
-- **Bound `recompute_package_extensions`** (S) — scale, not today; verify the resurrection
-  assumption before adding the bound.
+- ~~**`fixtures-trial-onboarding-teardown` deletes invoices it doesn't own**~~ — **DONE 2026-08-18**
+  (`e401ed7`). The invoice delete is now scoped to the fixture's own class (`invoice_items → lesson_sessions.class_id`)
+  and ordered before the session delete; a sibling worktree's invoices survive.
+- ~~**Bound `recompute_package_extensions`**~~ — **SUPERSEDED 2026-08-19** (§8.70). The scan is
+  gone entirely: holiday extension is now event-driven (marked at attendance time), so there is
+  no standing per-load scan left to bound. `recompute_package_extensions` was dropped.
 - ~~**A re-toggled attendance correction issues a SECOND credit note and DOUBLES the credit**~~
   — **DONE 2026-08-18** (§8.68, migration `20260818000100`). Symmetric ledger: one `credit_notes`
   row reused per `invoice_item_id` (`UNIQUE(invoice_item_id)` + `lesson_session_id` index);

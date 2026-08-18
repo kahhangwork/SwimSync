@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.68** | 2026-08-18 | Symmetric credit notes — a re-toggled correction stops doubling a parent's credit; CN001 refuses un-correcting spent credit | §7.184-186 · PRD §5.6 |
 | **8.67** | 2026-08-17 | Admin UI polish: responsive auto-scaling + collapsible grouped sidebar (4+4); Lesson Coaches→Substitutes (308), Coach Wages→Wages | §7.181-183 · §11.27 |
 | **8.66** | 2026-08-17 | Wave C LIVE (app-only): CSV export, convert-a-trial, parent upcoming-lessons, make-up-from-Attendance, Change History | §7.179-180 · PRD §7.5/7.17/7.20 · WAVE_C_PLAN.md |
 | **8.65** | 2026-08-17 | CI red 20 commits on a typed "future" fixture date; a page-count pin hid a latent PGRST201 that emptied the package catalogue (prod 0 rows, no loss) | §7.176–178 |

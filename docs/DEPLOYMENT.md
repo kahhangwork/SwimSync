@@ -621,3 +621,17 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     files for both migrations (`supabase/rollback/20260818000200…`, `…000300…`) — the void DOWN's header
     caveats that dropping `reversed_at` after a live void erases which draws were reversed. Full record +
     RISK gates: `docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md`.
+
+29. **Deploy record (2026-08-19): event-driven public-holiday voids** (§8.70). An **expand/contract**
+    across 8 migrations, sequenced so the contract never runs before the apps. Order run: prod dry-run
+    (reachable, 8 pending) → **held the contract migration back** by renaming it `…001100_holiday_contract.sql.hold`
+    (the CLI only picks up `<ts>_name.sql`; §7.49's move-the-file, done via extension) → `supabase db push`
+    applied `20260818000400`–`001000` (7) → `supabase functions deploy generate-invoices` (**v25**, recompute
+    call removed) → `git push origin …:main` (both apps; Vercel) → **GATE:** grepped the served parent Expo
+    bundle — `ph_extension_weeks`/`ph_ack_weeks_parent` = 0 hits, `holiday_extension_days` = 6 + "Public Holiday"
+    = 1 (new build live) → renamed the contract back and `supabase db push` applied `…001100` (drops the
+    weeks/ack columns + `recompute_package_extensions` + `acknowledge_*`). `migration list --linked` confirms
+    all 8 `remote` filled. The `pgdelta` cert stack trace printed on both pushes and is the normal §7.55 noise.
+    **Rollback:** `supabase/rollback/20260818_holiday_attendance_DOWN.sql` (rehearsed locally; dormant-safe —
+    prod holds 0 packages/0 holidays). Runbook: `docs/plans/HOLIDAY_ATTENDANCE_RUNBOOK.md`. **Follow-up:** the
+    post-deploy remote grant dump (§7.39/§7.89) for the new table + 2 RPCs is still owed.
