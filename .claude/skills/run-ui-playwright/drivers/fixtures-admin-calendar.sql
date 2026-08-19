@@ -117,7 +117,62 @@ WHERE ls.class_id = 'ca1c1a55-0000-0000-0000-000000000001'
   AND ls.session_date = (now() AT TIME ZONE 'Asia/Singapore')::date - 7
 ON CONFLICT (lesson_session_id, student_id) DO NOTHING;
 
--- Expect: classes = 2, kids = 4, enrolments = 4, makeup = 1, sessions = 2, sub = 1, marks = 2.
+
+-- ---- A BILLED lesson 20 weeks back with an APPLIED credit (the CN001 case) ----
+-- verify-admin-lesson-detail.mjs opens this lesson and tries to re-mark Bravo
+-- present: the credit-note lock refuses (CN001) and the page must show the
+-- mapped message, not "try again". 140 days = 20 weeks, so it is the same
+-- weekday, far below any markable floor. Fixture as postgres (guard-exempt).
+INSERT INTO auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+) VALUES (
+  '00000000-0000-0000-0000-000000000000','ca100000-0000-0000-0000-0000000000d1',
+  'authenticated','authenticated','calendar-parent@swimsync.test',
+  crypt('password123', gen_salt('bf')), NOW(),
+  '{"provider":"email","providers":["email"]}',
+  '{"full_name":"Calendar Parent","role":"parent"}',
+  NOW(), NOW(), '', '', '', ''
+) ON CONFLICT (id) DO NOTHING;
+INSERT INTO parent_tenants (parent_id, tenant_id)
+SELECT p.id, '70000000-0000-0000-0000-000000000001' FROM parents p
+ WHERE p.profile_id = 'ca100000-0000-0000-0000-0000000000d1'
+ON CONFLICT ON CONSTRAINT parent_tenants_parent_id_tenant_id_key DO NOTHING;
+INSERT INTO parent_students (parent_id, student_id)
+SELECT p.id, 'ca199999-0000-0000-0000-000000000002' FROM parents p
+ WHERE p.profile_id = 'ca100000-0000-0000-0000-0000000000d1'
+ON CONFLICT (parent_id, student_id) DO NOTHING;
+
+INSERT INTO lesson_sessions (id, class_id, session_date, status)
+VALUES ('ca15e555-0000-0000-0000-000000000003','ca1c1a55-0000-0000-0000-000000000001',
+        (now() AT TIME ZONE 'Asia/Singapore')::date - 140, 'completed')
+ON CONFLICT (class_id, session_date) DO NOTHING;
+INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
+VALUES ('ca15e555-0000-0000-0000-000000000003','ca199999-0000-0000-0000-000000000002','present',
+        'c0000000-0000-0000-0000-000000000001')
+ON CONFLICT (lesson_session_id, student_id) DO NOTHING;
+INSERT INTO invoices (tenant_id, id, parent_id, billing_month, gross_amount, credit_applied, net_amount, status)
+SELECT '70000000-0000-0000-0000-000000000001','ca100000-0000-0000-0000-0000000000e1', p.id,
+       to_char((now() AT TIME ZONE 'Asia/Singapore')::date - 140, 'YYYY-MM'), 25.00, 0.00, 25.00, 'outstanding'
+  FROM parents p WHERE p.profile_id = 'ca100000-0000-0000-0000-0000000000d1'
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO invoice_items (invoice_id, student_id, lesson_session_id, attendance_status, amount, class_title, session_date)
+SELECT 'ca100000-0000-0000-0000-0000000000e1','ca199999-0000-0000-0000-000000000002',
+       'ca15e555-0000-0000-0000-000000000003','present', 25.00, 'Cal Rose Full',
+       (now() AT TIME ZONE 'Asia/Singapore')::date - 140
+WHERE NOT EXISTS (SELECT 1 FROM invoice_items WHERE lesson_session_id = 'ca15e555-0000-0000-0000-000000000003');
+-- The correction mints the credit note (trigger); then draw it down.
+UPDATE attendance SET status = 'absent', edit_reason = 'fixture: CN001 setup'
+ WHERE lesson_session_id = 'ca15e555-0000-0000-0000-000000000003'
+   AND student_id = 'ca199999-0000-0000-0000-000000000002' AND status = 'present';
+INSERT INTO credit_applications (credit_note_id, invoice_id, amount)
+SELECT cn.id, 'ca100000-0000-0000-0000-0000000000e1', 25.00
+  FROM credit_notes cn
+ WHERE cn.lesson_session_id = 'ca15e555-0000-0000-0000-000000000003'
+   AND NOT EXISTS (SELECT 1 FROM credit_applications ca WHERE ca.credit_note_id = cn.id);
+
+-- Expect: classes = 2, kids = 4, enrolments = 4, makeup = 1, sessions = 3, sub = 1, marks = 3, applied = 1.
 SELECT
   (SELECT count(*) FROM classes WHERE id::text LIKE 'ca1c1a55-%')                          AS classes,
   (SELECT count(*) FROM students WHERE id::text LIKE 'ca199999-%')                         AS kids,
@@ -127,4 +182,6 @@ SELECT
   (SELECT count(*) FROM session_coaches sc JOIN lesson_sessions ls ON ls.id = sc.lesson_session_id
     WHERE ls.class_id::text LIKE 'ca1c1a55-%')                                             AS sub,
   (SELECT count(*) FROM attendance a JOIN lesson_sessions ls ON ls.id = a.lesson_session_id
-    WHERE ls.class_id::text LIKE 'ca1c1a55-%')                                             AS marks;
+    WHERE ls.class_id::text LIKE 'ca1c1a55-%')                                             AS marks,
+  (SELECT count(*) FROM credit_applications ca JOIN credit_notes cn ON cn.id = ca.credit_note_id
+    WHERE cn.lesson_session_id = 'ca15e555-0000-0000-0000-000000000003')                   AS applied;

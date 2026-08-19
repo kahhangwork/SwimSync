@@ -1176,24 +1176,6 @@ constraint is the real gate here, not the feature.
 
 ## Admin and operations
 
-### Admin per-lesson attendance marking — **M** `[found 2026-08-18 while planning the Holiday feature]`
-Give the tenant admin a place in the admin panel to mark/edit attendance for a **specific
-lesson**, not just view it.
-
-**Why:** today the admin's `/attendance` page is **read-only** — only the coach app writes
-attendance (admin `attendance/page.tsx` is a SELECT; the marking `.upsert` lives in the
-coach app). An admin regularly needs to set/correct attendance directly: a coach forgot, a
-billing dispute, or voiding **one** class on a public holiday when most-but-not-all classes
-are cancelled (the planned Holiday feature voids a **whole day** only —
-`mark_day_holiday(tenant, date)`).
-
-**Notes:** admin has no attendance write path today, so this needs a real one — a
-`SECURITY DEFINER` RPC or a scoped policy (mind the declared-whitelist grant rule §7.87, and
-that money-moving statuses like `'holiday'` stay admin-gated). Composes with the Holiday
-feature: once this exists, a per-class holiday void falls out naturally and the whole-day-only
-limit is subsumed. Watch the marking-window guard / `markable_floor` (§8.15) and the
-credit-note trigger (a `present→X` edit after billing auto-credits, `20260309000500`).
-
 ### An owner-only accounting page — **M** — _raised 2026-08-08, not a priority_
 One page showing what the business actually earned and paid out — revenue, wages paid,
 outstanding — **visible to the owner and not to co-admins**.

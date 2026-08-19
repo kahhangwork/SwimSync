@@ -15,6 +15,14 @@ CREATE TEMP TABLE cal_sessions AS
    WHERE class_id IN ('ca1c1a55-0000-0000-0000-000000000001',
                       'ca1c1a55-0000-0000-0000-000000000002');
 
+-- Billing rows first (the CN001 fixture): applications → notes → items → invoice.
+DELETE FROM credit_applications WHERE credit_note_id IN
+  (SELECT id FROM credit_notes WHERE lesson_session_id IN (SELECT id FROM cal_sessions));
+DELETE FROM credit_notes    WHERE lesson_session_id IN (SELECT id FROM cal_sessions);
+DELETE FROM invoice_items   WHERE lesson_session_id IN (SELECT id FROM cal_sessions)
+                               OR invoice_id = 'ca100000-0000-0000-0000-0000000000e1';
+DELETE FROM invoices        WHERE id = 'ca100000-0000-0000-0000-0000000000e1';
+
 DELETE FROM attendance             WHERE lesson_session_id IN (SELECT id FROM cal_sessions);
 DELETE FROM session_coach_absences WHERE lesson_session_id IN (SELECT id FROM cal_sessions);
 DELETE FROM session_coaches        WHERE lesson_session_id IN (SELECT id FROM cal_sessions);
@@ -52,6 +60,12 @@ DELETE FROM class_rates WHERE class_id IN ('ca1c1a55-0000-0000-0000-000000000001
                                            'ca1c1a55-0000-0000-0000-000000000002');
 DELETE FROM classes WHERE id IN ('ca1c1a55-0000-0000-0000-000000000001',
                                  'ca1c1a55-0000-0000-0000-000000000002');
+
+-- The parent and their account.
+DELETE FROM parent_tenants WHERE parent_id IN (SELECT id FROM parents WHERE profile_id = 'ca100000-0000-0000-0000-0000000000d1');
+DELETE FROM parents        WHERE profile_id = 'ca100000-0000-0000-0000-0000000000d1';
+DELETE FROM auth.users     WHERE id = 'ca100000-0000-0000-0000-0000000000d1';
+DELETE FROM profiles       WHERE id = 'ca100000-0000-0000-0000-0000000000d1';
 
 -- The substitute coach and their account.
 DELETE FROM coach_rates WHERE coach_id IN (

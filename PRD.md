@@ -1122,9 +1122,44 @@ needs an explicit path: the **business's admin** schedules an extra lesson on an
 appears on the coach's class and in their unmarked-lesson list, and they record it
 exactly as they would any other lesson.
 
-**The coach cannot schedule one, and the admin still cannot record attendance.** This is
-the same split §7.17 draws for trials — an arrangement is the admin's, an observation is
-the coach's — and there remains no attendance-writing anywhere in the admin panel.
+**The coach cannot schedule one.** ~~And the admin still cannot record attendance~~ —
+*(superseded 2026-08-19)* the admin **can** now record and correct attendance, on the
+**lesson page** (§7.22): the same save as the coach app, under the same database guards.
+The arrangement/observation split still holds for *scheduling* — only the admin arranges
+an extra lesson, and either the coach or the admin records it.
+
+#### The admin marks attendance on the lesson page *(implemented 2026-08-19)*
+
+**Admin panel → Lessons** (a week of every coach's lessons, grouped by day, with a
+**Needs marking** mode that lists every lesson from the business's marking floor to today
+that is not fully marked — floor-scoped, never week-scoped) and **Calendar → double-click**
+both open **`/lessons/[classId]/[date]`**, one lesson addressed by class and date (never a
+session id — the row may not exist yet). There the admin:
+
+- **Marks attendance** per expected student (enrolled by span + trial/make-up guests, the
+  billing gate's own set) with *Present / Absent / Cancelled (rain|coach) / Trial (paid|free —
+  trial guests only) / Public holiday* and **Set all**. Saving is the coach app's exact path —
+  create the `lesson_sessions` row if missing, **one upsert of only the rows that changed**,
+  an `audit_log` row (`attendance_saved`, actor the admin), then the bounded credit-note
+  email when a billed status was left. **Every database guard applies unchanged and there is
+  no override**: the marking window (a date below the floor shows *"That lesson is closed"*;
+  rows that already have a mark stay editable as corrections, new rows do not), the weekday
+  rule (an off-weekday date with no session is *"not a lesson"* — no Save is offered), the
+  credit-note lock (re-marking a row whose credit is already applied is refused with the
+  CN001 message — *none of your changes were saved*), and the holiday admin-only seam.
+- **Voids one lesson for a public holiday** — the per-lesson complement of Holidays → *Void
+  lessons* (§7.16), for the day when most-but-not-all classes are cancelled. Setting any row
+  to *Public holiday* asks for confirmation naming how many students and the package
+  extension days; the coach app's own save **leaves a holiday row untouched** (it never sends
+  one), so a coach cannot silently re-bill a voided lesson.
+- **Assigns or removes the substitute coach** for the lesson (`assign_session_coach`; the
+  Lesson Coaches rules) and sees the class's shadows read-only.
+- **Books a make-up or a trial into this lesson** (host class and date fixed; a make-up asks
+  which class it replaces when the child has more than one). A full lesson (`x/max`) asks
+  *"Book anyway?"* — the count is advisory, the admin is the authority; **no RPC refuses on
+  capacity** (BACKLOG).
+- **Does not** write shadow absences — that stays the coach's "coaches present" checklist; a
+  missing row means *present and paid*, the recoverable direction.
 
 #### Bulk "Set all to…" *(implemented)*
 
@@ -2508,6 +2543,9 @@ admin can see at a glance which class at a given time has a free slot for a make
   roster beside it. Weeks start on **Monday**.
 - The view, date and filters live in the URL, so refresh/back keep position; **Today** is
   computed when pressed, never stored (§7.95).
+- **Double-click → the lesson page** (§7.6 *The admin marks attendance on the lesson page*),
+  where attendance, the substitute and guest bookings are changed. The **Lessons** page
+  (Scheduling → Lessons) is the list form of the same data, with a *Needs marking* mode.
 
 ---
 

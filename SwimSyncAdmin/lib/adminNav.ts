@@ -45,6 +45,7 @@ import {
   Gift,
   History,
   CalendarDays,
+  ListChecks,
 } from "lucide-react";
 
 /** A page's audience. `tenant` = shows ONE business. `platform` = cross-tenant. */
@@ -70,6 +71,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/parents",      label: "Parents",              icon: UsersRound,      scope: "tenant"   },
   { href: "/attendance",   label: "Attendance",           icon: CalendarCheck,   scope: "tenant"   },
   { href: "/calendar",     label: "Calendar",             icon: CalendarDays,    scope: "tenant"   },
+  { href: "/lessons",      label: "Lessons",              icon: ListChecks,      scope: "tenant"   },
   { href: "/substitutes",  label: "Substitutes",          icon: ArrowLeftRight,  scope: "tenant"   },
   { href: "/trials",       label: "Trials",               icon: Sparkles,        scope: "tenant"   },
   { href: "/makeups",      label: "Make-ups",             icon: RefreshCcw,      scope: "tenant"   },
@@ -168,7 +170,7 @@ export const TOP_LEVEL_HREFS: readonly string[] = [
 export const NAV_GROUPS: readonly NavGroup[] = [
   { id: "families",   label: "Families",   hrefs: ["/trials", "/unassigned", "/claims", "/parents"] },
   { id: "billing",    label: "Billing",    hrefs: ["/invoices", "/credit-notes", "/packages", "/referrals", "/wages"] },
-  { id: "scheduling", label: "Scheduling", hrefs: ["/makeups", "/substitutes", "/holidays"] },
+  { id: "scheduling", label: "Scheduling", hrefs: ["/lessons", "/makeups", "/substitutes", "/holidays"] },
   { id: "settings",   label: "Settings",   hrefs: ["/levels", "/coaches", "/admins", "/history"] },
 ];
 
