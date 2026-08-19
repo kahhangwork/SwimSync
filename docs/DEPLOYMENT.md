@@ -633,5 +633,8 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     weeks/ack columns + `recompute_package_extensions` + `acknowledge_*`). `migration list --linked` confirms
     all 8 `remote` filled. The `pgdelta` cert stack trace printed on both pushes and is the normal §7.55 noise.
     **Rollback:** `supabase/rollback/20260818_holiday_attendance_DOWN.sql` (rehearsed locally; dormant-safe —
-    prod holds 0 packages/0 holidays). Runbook: `docs/plans/HOLIDAY_ATTENDANCE_RUNBOOK.md`. **Follow-up:** the
-    post-deploy remote grant dump (§7.39/§7.89) for the new table + 2 RPCs is still owed.
+    prod holds 0 packages/0 holidays). Runbook: `docs/plans/HOLIDAY_ATTENDANCE_RUNBOOK.md`. **Grant dump
+    confirmed clean on prod 2026-08-19** (§7.39/§7.89): `anon` holds no EXECUTE on any new function and no
+    SELECT on `package_holiday_extensions`; `authenticated` has EXECUTE only on `mark_day_holiday`/`unmark_day_holiday`
+    and SELECT-only on the state table; `recompute_package_extensions`/`acknowledge_*` and the weeks/ack columns
+    are gone.

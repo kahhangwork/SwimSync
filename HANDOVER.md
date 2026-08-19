@@ -415,7 +415,7 @@ vitest **447**, app jest **387**, both typechecks; the deploy was gated on a ser
 **Deliberately not done:** the loud/quiet **ack badge was DROPPED** (the extension shows as a quiet "+N days"
 line, no Acknowledge); holiday extensions are **not** written to `package_extension_events` (their audit is
 the `package_holiday_extensions` state table); **Admin per-lesson attendance marking** filed to BACKLOG (the
-void is whole-day only). (Open items incl. the owed grant dump → §9.)
+void is whole-day only). Grant dump confirmed clean on prod 2026-08-19.
 
 ## 8.69 (2026-08-18, second session) — WAVE D: ORDERING-GUARD + CREDIT LOCK + ADMIN VOID, LIVE
 
@@ -519,8 +519,6 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 Holiday voiding is live and prod-confirmed (`03b25e3`; migrations `…000400`–`…001100`, engine v25, both
 apps). **No migration is in flight now** (§7.55 — one at a time). What remains is small, latent, non-urgent:
 
-- **Owed from this deploy:** the remote **grant dump** (§7.39/§7.89) for the new `package_holiday_extensions`
-  table + `mark_day_holiday`/`unmark_day_holiday` RPCs — local `table_grants` is green, cloud not yet confirmed.
 - **New follow-up** (in `BACKLOG.md`): **Admin per-lesson attendance marking** — the void is whole-day only,
   so voiding one class of many, or correcting a single lesson, has no admin surface yet.
 - Still open: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on 0 notes);
