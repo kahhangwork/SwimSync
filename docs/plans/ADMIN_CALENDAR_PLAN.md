@@ -1,6 +1,6 @@
 # Admin Calendar + Lesson Detail + Lessons List — Plan
 
-_Written 2026-08-19 via `/plan-with-confidence`. Status: **PLANNED, not started.**_
+_Written 2026-08-19 via `/plan-with-confidence`. Status: **SHIPPED 2026-08-19 — all three slices LIVE** (§8.71; deploy record DEPLOYMENT §11.30)._
 _Product-risk review 2026-08-19: claims verified against the code; mitigations folded inline as
 `⚠ RISK n MITIGATION` (n = rank, 1 = highest blast radius); corrections marked `✎ corrected by review:`.
 The ranked list lives in the Pre-commit gate at the end._

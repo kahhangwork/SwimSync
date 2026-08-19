@@ -519,6 +519,32 @@ the converged RPC Mark Paid, and the public page's paid state. **The fixture res
 invoice on every load** — re-load before each run. Requires `supabase functions serve
 public-invoice` alongside both dev servers. What it deliberately does NOT prove: a real
 bank app accepting the QR (that is the manual release gate);
+`verify-admin-calendar.mjs` (+ `fixtures-admin-calendar.sql` / `-teardown.sql`, 21 checks) drives
+the admin **Calendar**: two overlapping fixture classes land in two lanes, cards read `3/3 FULL` and
+`1+1/6` (enrolled + make-up guest / capacity), the substitute reads `(Sub)`, hover lists the roster
+with the MAKE-UP chip, click pins, Today/‹/› move the URL date, the time gutter stays at x=0 after a
+horizontal scroll, month/agenda render, the coach filter keeps the substitute's lesson, double-click
+lands on `/lessons/…` — and, read through psql, **the `lesson_sessions` count is unchanged after the
+whole run** (the calendar is read-only by construction; ADMIN_CALENDAR_PLAN RISK 4).
+`verify-admin-lesson-detail.mjs` (same fixture — it is mapped in `run-all-drivers.sh`; 25 checks;
+needs Expo too) drives the **lesson page** and the **Lessons** list: Needs-marking lists the partial
+lesson and a row opens it; an admin save lands as attendance rows AND an `audit_log`
+`attendance_saved` row (psql); `/attendance` shows the mark; a per-lesson Holiday confirms with the
+count; a below-floor lesson shows the closed banner with the billed row still editable as a
+correction, and re-marking a row whose credit is applied is refused with the CN001 message (the
+fixture builds a billed lesson + applied credit); an off-weekday date is "not a lesson" (no Save);
+assign/remove a substitute; booking a make-up into the FULL lesson goes through "Book anyway" and the
+guest appears as `3+1/3`; then the **coach app** opens the same lesson, saves, and the admin's
+holiday row survives (RISK 7). **Re-load the fixture between runs** — the driver writes.
+Unit: `lib/calendarLessons.test.ts` (31 — incl. the SGT retirement cut-off pair and the
+`enrolled+guests === expectedStudentsOn` parity assertion), `lib/adminAttendanceSave.test.ts` (11 —
+mock deps: only changed rows sent, holiday kept, each step's error surfaced by name, no
+`session_coach_absences` call), `lib/lessonMarking.test.ts`, `lib/classColours.test.ts`,
+`lib/timeOfDay.test.ts`, `components/calendar/LessonCard.test.tsx`, and
+`lib/attendanceSave.drift.test.ts` (five coach-app helper copies byte-identical). pgTAP:
+`class_capacity_colour.test.sql` (12) and `admin_marks_attendance.test.sql` (22 — a PURE tenant admin
+creates the session, upserts incl. holiday, writes the audit row, is refused below the floor / off
+weekday / ahead of today / on another tenant, mints exactly one credit note and meets CN001).
 `verify-makeups.mjs` (+ `fixtures-makeups.sql` and its `-teardown.sql`) drives a make-up —
 an enrolled child guesting one lesson of another same-category class — end to end through
 both real UIs (15 checks): the admin's booking form is child-first via **one search box

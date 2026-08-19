@@ -3035,3 +3035,22 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     A parent spanning two tenants is the trigger. Any function that reuses the draw predicate
     for a side effect (extension, credit, report) needs the tenant clause too. Caught in review
     before ship; `holiday_covering_package` takes `p_tenant_id`. (§8.70.)
+
+191. **Tailwind only generates classes it can SEE in `content` — and `SwimSyncAdmin`'s globs scanned
+    `app/` and `components/` only, so literal class strings in `lib/` were purged.** The class
+    colour palette (`lib/classColours.ts`, `"bg-rose-100 border-rose-500 …"`) rendered as blank
+    swatches with no error anywhere. Fixed by adding `./lib/**/*.{ts,tsx}` to `tailwind.config.ts`
+    — and **a `content` change needs the dev server restarted** (`rm -rf .next`), HMR does not
+    re-scan. The page was visually verified before the restart and looked broken *after* the
+    fix, which is what made it cost time. (§8.71.)
+
+192. **`audit_log_insert` was COACH-SHAPED** (`actor_id = auth.uid() AND entity_type =
+    'lesson_session' AND coach_owns_session(entity_id)`, `20260804000300`), so the first
+    non-coach client writer of an attendance audit row — the admin lesson page — was refused
+    **42501** on exactly that step while `lesson_sessions`/`attendance` accepted the same admin.
+    Proven red in pgTAP before the policy was widened by one disjunct (`can_admin_tenant(
+    session_tenant(entity_id))`, `20260819000100`). Any NEW actor that writes a client-side audit
+    row needs its own disjunct; the INSERT grant already exists, so `table_grants` stays green
+    either way — which is also why the gap was invisible to every grant check. The coach app's
+    `await supabase.from("audit_log").insert(…)` is UNCHECKED, so on that path the refusal would
+    have been silent; the admin save checks it and reports step `"audit"`. (§8.71.)

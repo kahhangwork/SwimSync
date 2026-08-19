@@ -1,13 +1,13 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-19 — **EVENT-DRIVEN PUBLIC-HOLIDAY VOIDS (§8.70), LIVE.** A `holiday` attendance
-status (admin-only, DB-guarded) voids a day's lessons — non-billable AND extends each covering package by
-a configurable days setting, deduped per (package,date), reversible. Replaces + drops the calendar-scan
-`recompute_package_extensions`. 8 migrations `…000400`–`…001100` (contract held back until apps), engine
-v25, both apps. §7.188-190 · PRD §7.16 · DEPLOYMENT §11.29 · `docs/plans/HOLIDAY_ATTENDANCE_RUNBOOK.md`._
+_Last updated: 2026-08-19 (evening) — **ADMIN CALENDAR + LESSON PAGE (§8.71), LIVE.** Class capacity +
+colour; `/calendar` (day/week/month/agenda, `enrolled+guests/max`, Sub, hover roster, double-click → lesson);
+`/lessons` + `/lessons/[classId]/[date]` where the admin marks attendance (incl. per-lesson Holiday) through
+the coach app's exact save path, assigns a substitute, books a guest. 1 migration, 3 app pushes. §7.191-192 ·
+PRD §7.3/§7.6/§7.22 · DEPLOYMENT §11.30 · `docs/plans/ADMIN_CALENDAR_PLAN.md`._
 
-_Previously, 2026-08-18 (§8.69) — Wave D: engine ordering-guard + credit lock (`apply_credit_to_invoice`) +
-admin void for a credit note. Migrations `…000200/000300`, engine v24. §7.187 · PRD §5.6/§7.7._
+_Previously, 2026-08-19 (§8.70) — event-driven public-holiday voids, LIVE: `holiday` status voids a day,
+event-extends packages; 8 migrations, engine v25. §7.188-190 · PRD §7.16 · DEPLOYMENT §11.29._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -30,7 +30,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.178** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.192** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -127,7 +127,6 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | Creating a business in-app | UI + backend, LIVE 2026-07-21 | PRD §4.4 · §8.9 |
 | A child can exist before their parent | pgTAP + Deno + driver, LIVE | PRD §7.17 · §8.10 |
 | A parent can claim the child their coach already added | pgTAP + vitest + driver, LIVE | PRD §7.18 · §8.12 |
-| A booked trial is visible to everyone who needs it | driver, LIVE | PRD §7.17 · §8.11 |
 | A parent's contact details can be corrected | vitest + driver, LIVE | PRD §7.19 · §8.14 |
 | The attendance window is a DB rule; a mid-month joiner no longer blocks a month | pgTAP, LIVE | PRD §7.5 · §8.15 |
 | A month billed LATE can no longer be permanently unbillable (`markable_floor`) | pgTAP 18, LIVE | PRD §7.6 · §8.32 |
@@ -146,6 +145,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | **An admin's audit trail REFUSES their deletion — it is never destroyed to permit one; most admins are therefore undeletable and Deactivate is the route** | pgTAP 925 + driver 24/24, LIVE 2026-08-13 | PRD §4.3 · §7.153 · §8.52 |
 | **Wave 5, admin authority — owner REASSIGNED (platform-only) · coach DISABLED (atomic handover, pure-coach ban) · tenant SUSPENDED (staff+parents dark, staff banned, engine skips; already-sent invoice links deliberately keep working)** | pgTAP 27+55+88 + vitest + 3 drivers, LIVE 2026-08-13 | PRD §4.3, §4.4 · §8.49–8.51 |
 | **A parent is emailed when a credit note is issued** — one per note, lesson details from the invoice's snapshot, two labelled amounts; an applied note is refused; admin **Resend** for a miss | Deno + vitest + jest, LIVE 2026-08-17 **DORMANT** | PRD §7.8 · §8.64 |
+| **The ADMIN marks attendance (lesson page) + sees every coach's lessons (Calendar) — the coach app's SAVE PATH, every DB guard unchanged, NO override; the calendar NEVER writes; capacity is ADVISORY (Book anyway), not a guard** | pgTAP 34 + vitest + 2 drivers (21 + 25), LIVE 2026-08-19 | PRD §7.6, §7.22 · §8.71 |
 | Automated tests — pgTAP + Deno backend, vitest + jest-expo apps, all in CI on push | CI | `docs/TESTING.md` §5 |
 
 **Counts are deliberately not written here.** The runner is the fact; a number in prose is
@@ -391,6 +391,33 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.71 (2026-08-19, evening) — ADMIN CALENDAR + LESSON PAGE, LIVE
+
+**The tenant admin can now see every coach's lessons on one calendar and act on one lesson.** Built
+from `/plan-with-confidence` → `/plan-review` (a second Fable agent verified the plan's RLS claims
+against the migrations and folded 10 ranked mitigations inline — `docs/plans/ADMIN_CALENDAR_PLAN.md`
+is the record) and shipped in three slices, each reviewed, verified and deployed before the next:
+**A** one migration (`20260819000100`: `class_categories.default_capacity`, `classes.capacity`,
+`classes.colour`, and ONE policy disjunct so a pure tenant admin can write the `attendance_saved`
+audit row — the only step RLS refused, proven red in pgTAP first, §7.192) + Classes-form fields;
+**B** `/calendar` (PRD §7.22); **C** `/lessons/[classId]/[date]` + `/lessons` (PRD §7.6). Verified:
+pgTAP **1213 ×2**, admin vitest **516**, both typechecks, drivers `verify-admin-calendar` **21/21** and
+`verify-admin-lesson-detail` **25/25** (incl. the coach-app round-trip), fixture round-trips clean,
+each Vercel build proven by a served-bundle grep, grant dump clean on prod. Testing map: TESTING §5;
+deploy record: DEPLOYMENT §11.30.
+
+**Findings worth the next reader's minute:** the admin needed **no new write RPC** — `sessions_write`
+and `attendance_write` already admitted `can_admin_tenant`, and the whole marking-window / weekday /
+holiday / CN001 guard stack applies to the admin unchanged (no override, by design). The calendar's
+count **is the billing gate's expected set** by construction (`expectedStudentsOn`), the calendar
+**never writes** (a driver asserts the `lesson_sessions` count through psql), and the retired-class
+cut-off follows the engine's SGT date, not `mark_day_holiday`'s `::date` (now a BACKLOG item).
+
+**Deliberately not done (all in `BACKLOG.md` → Admin and operations):** a location entity (the
+filter is distinct `location_name`); capacity as a hard limit in the booking RPCs (it is advisory —
+"Book anyway?"); the `mark_day_holiday` UTC-date drift; a Lessons sidebar badge (needs a callable
+tenant-scoped count RPC); and the admin save writes **no shadow absences** (a missing row = paid).
+
 ## 8.70 (2026-08-19) — EVENT-DRIVEN PUBLIC-HOLIDAY VOIDS, LIVE
 
 **The "bound `recompute_package_extensions`" backlog trap became a re-architecture, shipped + deployed to
@@ -416,48 +443,6 @@ vitest **447**, app jest **387**, both typechecks; the deploy was gated on a ser
 line, no Acknowledge); holiday extensions are **not** written to `package_extension_events` (their audit is
 the `package_holiday_extensions` state table); **Admin per-lesson attendance marking** filed to BACKLOG (the
 void is whole-day only). Grant dump confirmed clean on prod 2026-08-19.
-
-## 8.69 (2026-08-18, second session) — WAVE D: ORDERING-GUARD + CREDIT LOCK + ADMIN VOID, LIVE
-
-**Three latent Wave-D items shipped and deployed to prod in one sequenced wave.** (1) **Ordering-guard**
-(Item 1, engine-only, `generate-invoices` v24): billing refuses to seal a month while an EARLIER unsealed
-month has unbilled lessons, naming the earliest; no `force` bypass; empty/all-absent months skippable;
-fail-open. **`markable_floor` UNCHANGED** — the "lower the floor" contiguity fix was REJECTED in review,
-because lowering the floor re-exposes already-sealed months to the coach. (2) **Engine-side credit lock**
-(Item 2, migration `20260818000200`): the credit drawdown moved into one locked DB transaction
-(`apply_credit_to_invoice`), idempotent per invoice + folds the invoice truth-up in (also fixed a latent
-estimate-vs-truth bug). (3) **Admin void** (Item 3, migration `20260818000300`): `void_credit_note`
-(tenant-admin only) reopens drawn invoices to outstanding + clears settlement stamps, leaves
-`payment_records`; `credit_applications.reversed_at` + trigger v9; the admin **Void button**, and **CN001**
-now points there.
-
-Built via `/plan-with-confidence` → `/plan-review` (8 product risks, mitigations folded INTO the plan) →
-three forks (one per item), each diff-reviewed + re-verified by me. Deploy order: RISK-7 prod dry-run
-(clean) → migrations → engine v24 → emails v2 → grant dump → apps LAST. Verified pgTAP **1171**, Deno
-**229 ×2**, admin vitest **452**, app jest **391**, both typechecks. **All reasoning, the 8 RISK gates,
-and the deploy record live in `docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md`** — behaviour → PRD
-§5.6/§7.7; trap → §7.187; deploy → DEPLOYMENT §11.28; one follow-up → BACKLOG. `1a17d33`→`8766682`.
-
-**Deliberately not done:** partial-payment accounting for a voided-credit reopen — an already-cash-paid
-invoice reopens at the higher net while its `payment_records` stand, so the admin reconciles by hand
-(BACKLOG, dormant on 0 notes). The `paid_at`-clearing on reopen departs from the plan's original "leave
-paid_at" (an `outstanding` invoice must not show a Paid badge). `fixtures-trial-onboarding-teardown`, the
-`recompute_package_extensions` bound, and HANDOVER §3 graduation remain the open non-urgent items.
-
----
-
-### Older sessions — the ledger
-
-**Moved to `docs/SESSIONS.md`** (2026-08-10) — 51 rows, one per session, every number
-intact. It was 21.5 KB of a file that is read at the start of every session, and §8's job
-here is the two most recent sessions; for the rest, one hop costs the same as scrolling
-past them.
-
-**Never delete a row there** — they are cited by number from applied migrations, which can
-never be corrected. **A new row is a POINTER: 200 characters, hard cap** — see that file's
-header for what happens when it isn't.
-
----
 
 ## 9. Next steps (pick with the user)
 
@@ -514,23 +499,25 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — Public-holiday voids shipped LIVE 2026-08-19 (§8.70). Wave B/C empty.
+### THE NEXT BUILD — Admin calendar + lesson page shipped LIVE 2026-08-19 (§8.71). Queue open.
 
-Holiday voiding is live and prod-confirmed (`03b25e3`; migrations `…000400`–`…001100`, engine v25, both
-apps). **No migration is in flight now** (§7.55 — one at a time). What remains is small, latent, non-urgent:
+**No migration is in flight** (§7.55). The calendar wave left four small, non-urgent follow-ups in
+`BACKLOG.md` → *Admin and operations* — pick by need, not by order:
 
-- **New follow-up** (in `BACKLOG.md`): **Admin per-lesson attendance marking** — the void is whole-day only,
-  so voiding one class of many, or correcting a single lesson, has no admin surface yet.
-- Still open: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on 0 notes);
-  HANDOVER §3 graduation (docs tax).
+- **Capacity as a hard limit** in `book_makeup`/`book_trial` (S) — capacity shipped advisory; this is
+  the one that unblocks *Parent self-enrolment*.
+- **A location entity** (M) — the calendar's Location filter is distinct `location_name` text.
+- **`mark_day_holiday` `::date` (UTC) vs the engine's SGT date** (S, dormant drift).
+- **Lessons sidebar badge** (S) — needs one small tenant-scoped count RPC.
 
-Then *Later* (owner-only accounting page, accrual). Full ranking + settled decisions (revenue
-**ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**): `BACKLOG.md`.
+Still open from earlier: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on
+0 notes); HANDOVER §3 graduation (docs tax). Then *Later* (owner-only accounting page, accrual). Full
+ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**):
+`BACKLOG.md`.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
-> low-balance email, automated reminders. Plus the **crash-safe email claim** item, which now covers
-> `credit_notes.email_sent_at` as well as the invoice column — and is *sharper* for credit notes,
-> since they have no automatic retry pass.
+> low-balance email, automated reminders, and the **crash-safe email claim** (covers
+> `credit_notes.email_sent_at` too).
 
 ### Triage rules, when the sweep does redden
 
@@ -559,8 +546,10 @@ Then *Later* (owner-only accounting page, accrual). Full ranking + settled decis
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260818001100` (holiday contract, §8.70);
-production confirmed caught up 2026-08-19 via `supabase migration list --linked`, **0 pending**.
+**The migration queue is EMPTY.** The latest applied is `20260819000100` (capacity/colour + the admin
+audit-row policy arm, §8.71); production confirmed caught up 2026-08-19 via `supabase migration list
+--linked`, **0 pending**. §11.30 is the freshest slice-by-slice example (migration remote-confirmed
+BEFORE the UI that selects its columns merged).
 **§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
 **expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract
 migration LAST (held back by a `.hold` rename until the apps stopped reading the dropped columns);

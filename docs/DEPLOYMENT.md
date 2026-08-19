@@ -638,3 +638,17 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     SELECT on `package_holiday_extensions`; `authenticated` has EXECUTE only on `mark_day_holiday`/`unmark_day_holiday`
     and SELECT-only on the state table; `recompute_package_extensions`/`acknowledge_*` and the weeks/ack columns
     are gone.
+
+30. **Deploy record (2026-08-19): admin calendar + lesson page** (§8.71). Slice-by-slice, the
+    migrations→apps order held by construction: `supabase db push` applied `20260819000100`
+    (capacity/colour columns + the `audit_log_insert` arm) and `migration list --linked` showed it
+    remote **before** the Classes-form UI that selects `capacity`/`colour` merged to `main` — a
+    column-adding migration and the UI that reads the column ship in different vehicles, and the UI
+    first would have 400'd the Classes page for every tenant. **Grant dump after:** `anon` EXECUTE
+    still **18**; the policy body on prod matches; `authenticated` holds SELECT,INSERT on `audit_log`
+    (unchanged — the widening is policy-only). Then three `git push …:main` (A-UI, B, C), each
+    proven by a served-bundle grep (`"Calendar colour"` in the classes chunk, `"Every lesson of every
+    coach"` in the calendar chunk; §7.31). No edge function changed. **Rollback:**
+    `supabase/rollback/20260819000100_class_capacity_colour_DOWN.sql` (rehearsed: exactly pgTAP test 7
+    — the admin audit row — reddens, UP restores it). Plan + inline risk gates:
+    `docs/plans/ADMIN_CALENDAR_PLAN.md`.

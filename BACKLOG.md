@@ -1,15 +1,13 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-19 — **Public-holiday voids shipped LIVE** (§8.70, PRD §7.16): the
-"bound recompute" trap turned into a re-architecture — a `holiday` attendance status voids a day's
-lessons (non-billable) and event-extends packages by a configurable days setting; the calendar-scan
-`recompute_package_extensions` is gone. Two Wave-D traps closed (that item + `fixtures-trial-onboarding-teardown`).
-One item added: **Admin per-lesson attendance marking** (Admin and operations). Wave D now holds only
-`recompute_package_extensions` bound → DONE, leaving `recompute_package_extensions` scale moot._
+_Last updated: 2026-08-19 (evening) — **Admin calendar + lesson page shipped LIVE** (§8.71, PRD §7.3/
+§7.6/§7.22): class capacity + colour, `/calendar` (day/week/month/agenda), `/lessons` + the lesson page
+(admin marks attendance incl. per-lesson Holiday, substitutes, guest bookings). **Admin per-lesson
+attendance marking DONE and removed.** Four follow-ups filed under *Admin and operations*: a location
+entity, capacity as a hard limit, the `mark_day_holiday` UTC-date drift, a Lessons sidebar badge._
 
-_Previously, 2026-08-18 — **Wave D closed** (§8.69): the markable_floor stranding, the engine-side
-credit-note lock, and the admin void all SHIPPED. Revenue **ACCRUAL**, reminders **MANUAL**,
-multi-language **REFUSED**. Shape: Wave B (email chain) → Wave C (independents) → Wave D (latent traps) → Later._
+_Previously, 2026-08-19 (morning) — **Public-holiday voids shipped LIVE** (§8.70, PRD §7.16): a `holiday`
+attendance status voids a day's lessons and event-extends packages; `recompute_package_extensions` is gone._
 
 _Previously, 2026-08-15 — **Package renewal automation shipped LIVE** (PRD §7.16 *Renewal
 offers*, `docs/DEPLOYMENT.md` §11.22): admin offers + `/package` pay page + Generate-all +
@@ -433,7 +431,7 @@ Email-confirmation copy, Tick off swimming skills (M).
 settlements, no partial figure), and the trainee-coach payroll dependency is **discharged**
 (shipped 2026-08-12). So this now waits on nothing but priority. Needs no capability model.
 **Split co-admin permissions (M)** — *yes eventually*; the accounting page does not wait
-on it. Parent self-enrolment (M — *needs class capacity, which does not exist*),
+on it. Parent self-enrolment (M — *needs capacity as a HARD limit; the informational column now exists*),
 Coach-assisted assignment (M), Household split billing (M — *needs a credit-splitting
 rule*), Auto PayNow detection (L — *the CSV-import M is the 10% worth doing first*),
 In-app payment gateway (L), Native store builds (M — *deferred; not spending the $99 yet*)
@@ -1081,8 +1079,11 @@ Let parents pick and join a class themselves rather than waiting for the superad
 **Why:** assignment is a manual superadmin step today, so every new family stalls until
 someone gets to it. That's the bottleneck in the onboarding push happening right now.
 
-**Notes:** needs class capacity — which doesn't exist yet — or parents will overfill a
-lane. A lighter middle ground: let the parent express a *preference* at signup that the
+**Notes:** ~~needs class capacity — which doesn't exist yet~~ — **class capacity EXISTS since
+2026-08-19** (`class_categories.default_capacity` + `classes.capacity`, PRD §7.3), so the primitive
+is there; what is still missing is a **DB-side refusal** on it (see *Capacity as a hard limit*
+below) — today capacity is informational, so self-enrolment would still overfill a lane.
+A lighter middle ground: let the parent express a *preference* at signup that the
 superadmin approves, which removes the back-and-forth without giving up control.
 Related: coach-assisted assignment below.
 
@@ -1175,6 +1176,58 @@ constraint is the real gate here, not the feature.
 ---
 
 ## Admin and operations
+
+### A location entity (venue) — **M** `[raised 2026-08-19 while building the admin calendar]`
+Promote `classes.location_name` (free text) to a `locations` table the class references, so the
+calendar, Lessons list and a future Maps link filter and group by a real venue.
+
+**Why:** the calendar's Location filter (PRD §7.22) is built on *distinct `location_name` values*,
+which works for one business at one pool but fragments the moment "Clementi" and "Clementi SC" both
+exist. A multi-venue business (the OClass reference the user showed) wants columns per venue in the
+day view, not a dropdown over strings.
+
+**Notes:** the filter and the Maps item (`location_address`) are the two consumers; an expand/
+contract migration (add table + FK, backfill from distinct names, keep the text column until both
+apps read the FK). Per-venue columns in the day view are the UI half. Not urgent: production is one
+location.
+
+### Capacity as a hard limit in `book_makeup` / `book_trial` (and enrolment) — **S** `[raised 2026-08-19]`
+A DB-side refusal when a booking or enrolment would exceed the class's effective capacity.
+
+**Why:** capacity shipped **informational** on purpose (PRD §7.3/§7.22): the admin lesson page asks
+"This lesson is full — book anyway?" and the admin is the authority. A hard rule is what parent
+self-enrolment needs, and it should live in the RPCs, not the UI (§7.32).
+
+**Notes:** **Deliberately NOT added in the calendar wave** — both RPCs are billing-adjacent with their
+own test matrices, and a capacity rule inside them is its own migration wave. Effective capacity =
+`classes.capacity ?? class_categories.default_capacity ?? unlimited`; count = enrolled on the date by
+span + uncancelled guests (the `expectedStudentsOn` union), never `is_active`.
+
+### `mark_day_holiday` uses `deactivated_at::date` (UTC) where the engine uses SGT — **S** `[found 2026-08-19 in plan review]`
+The whole-day void's "class still running on that date" predicate casts `deactivated_at::date` (the
+server's UTC date); the billing engine (`core.ts`, `dateInTimeZone`), `classCoverage.ts` and the
+calendar (`toSgDate`) use the SGT date.
+
+**Why:** a class retired between 00:00 and 08:00 SGT is "still running" to the RPC for one extra day
+— it would void (and package-extend) a lesson the engine never expects. Dormant today (0 holidays
+with a same-day retirement) but it is a drift between two copies of one rule (§7.18's shape).
+
+**Notes:** one-line fix in a `CREATE OR REPLACE` of `mark_day_holiday`/`unmark_day_holiday`
+(`(deactivated_at AT TIME ZONE 'Asia/Singapore')::date`), plus a pgTAP case at the boundary. Not done
+in the calendar wave to keep that wave's one migration to one concern.
+
+### Lessons "needs marking" badge in the sidebar — **S** `[raised 2026-08-19]`
+An amber count on Scheduling → Lessons for lessons below today that are not fully marked (the coach
+app's NEEDS MARKING, for the admin).
+
+**Why:** the Lessons page has the mode, but nothing on other pages says there is a backlog.
+
+**Notes:** the sidebar loads on every navigation, and the only accurate source today is the
+client-side union over all enrolments/sessions/bookings (what the page itself does) — too heavy
+for a badge. `class_unmarked_lesson_dates(class_id)` exists but is deliberately callable by nobody
+(`20260809000400`). Needs a small SECURITY DEFINER `tenant_unmarked_lesson_count()` (tenant-scoped,
+`can_admin_tenant` gated, EXECUTE to `authenticated`) — one migration, then the badge is the
+`badges` map in `components/Sidebar.tsx`.
 
 ### An owner-only accounting page — **M** — _raised 2026-08-08, not a priority_
 One page showing what the business actually earned and paid out — revenue, wages paid,
