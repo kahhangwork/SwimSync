@@ -72,15 +72,24 @@ try {
 
   // ── Lesson page, last week's Rose: 3 rows, Alpha present, Bravo absent, Charlie unmarked ──
   await page.screenshot({ path: shot("admin-lesson-rose-lastweek.png"), fullPage: true });
-  const statusOf = async (sid) => page.locator(`[data-testid="roster-row"][data-student="${sid}"] select`).inputValue();
+  // Statuses are BUTTONS (the coach app's shape): the pressed one carries the value.
+  const statusOf = async (sid) => {
+    const pressed = page.locator(`[data-testid="roster-row"][data-student="${sid}"] [data-status][aria-pressed="true"]`);
+    if ((await pressed.count()) === 0) return "";
+    // The most specific pressed button (a reason like cancelled_rain beats "cancelled")
+    const vals = await pressed.evaluateAll((els) => els.map((e) => e.getAttribute("data-status")));
+    return vals.find((v) => v.includes("_")) ?? vals[0];
+  };
+  const setStatus = (sid, status) => page.locator(`[data-testid="roster-row"][data-student="${sid}"] [data-status="${status}"]`).click();
+  const statusDisabled = (sid) => page.locator(`[data-testid="roster-row"][data-student="${sid}"] [data-status="present"]`).isDisabled();
   check("roster shows the three enrolled children with their marks", (await page.getByTestId("roster-row").count()) === 3);
   check("Alpha present, Bravo absent, Charlie unmarked (as loaded)", (await statusOf(ALPHA)) === "present" && (await statusOf(BRAVO)) === "absent" && (await statusOf(CHARLIE)) === "");
   check("Save is disabled until something changes", await page.getByTestId("save-attendance").isDisabled());
 
   // Mark: Bravo → present, Charlie → present, Alpha → holiday (confirm)
-  await page.locator(`[data-testid="roster-row"][data-student="${BRAVO}"] select`).selectOption("present");
-  await page.locator(`[data-testid="roster-row"][data-student="${CHARLIE}"] select`).selectOption("present");
-  await page.locator(`[data-testid="roster-row"][data-student="${ALPHA}"] select`).selectOption("holiday");
+  await setStatus(BRAVO, "present");
+  await setStatus(CHARLIE, "present");
+  await setStatus(ALPHA, "holiday");
   await page.getByTestId("save-attendance").click();
   const confirmBtn = page.getByTestId("confirm-holiday");
   await confirmBtn.waitFor({ timeout: 5000 });
@@ -116,8 +125,8 @@ try {
   // Nobody was enrolled 20 weeks back (the fixture back-dates enrolments 30
   // days), so the only row is Bravo's billed mark — shown because a marked row
   // is a correction, and corrections stay editable below the floor.
-  check("the billed row (Bravo, absent) is shown and editable as a correction", (await page.getByTestId("roster-row").count()) === 1 && !(await page.locator(`[data-testid="roster-row"][data-student="${BRAVO}"] select`).isDisabled()));
-  await page.locator(`[data-testid="roster-row"][data-student="${BRAVO}"] select`).selectOption("present");
+  check("the billed row (Bravo, absent) is shown and editable as a correction", (await page.getByTestId("roster-row").count()) === 1 && !(await statusDisabled(BRAVO)));
+  await setStatus(BRAVO, "present");
   await page.getByTestId("save-attendance").click();
   await page.getByTestId("save-message").waitFor({ timeout: 15000 });
   const cnMsg = await page.getByTestId("save-message").innerText();

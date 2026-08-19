@@ -193,7 +193,7 @@ describe("sidebar grouping (presentation layer over NAV)", () => {
       "/students",
       "/classes",
       "/calendar",
-      "/attendance",
+      "/lessons",
     ]);
   });
 
@@ -218,7 +218,9 @@ describe("groupIdForPath (auto-expand the active group)", () => {
     expect(groupIdForPath("/invoices")).toBe("billing");
     expect(groupIdForPath("/claims")).toBe("families");
     expect(groupIdForPath("/holidays")).toBe("scheduling");
-    expect(groupIdForPath("/history")).toBe("settings");
+    expect(groupIdForPath("/history")).toBe("log");
+    expect(groupIdForPath("/attendance")).toBe("log");
+    expect(groupIdForPath("/lessons")).toBeNull(); // top-level since 2026-08-19
   });
 
   it("opens the group for a detail route", () => {

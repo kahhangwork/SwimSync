@@ -114,13 +114,15 @@ try {
   // (c544f74 — NOT its reverted first attempt b3933d1) and 18 → 19 for
   // Referrals (e59af21), bumped together on 2026-08-17); 19 → 20 for Change
   // History (2026-08-17, Wave C — bumped IN THE SAME PUSH as the nav change,
-  // which is the §7.178 lesson applied).
+  // which is the §7.178 lesson applied); 20 → 22 for Calendar + Lessons
+  // (2026-08-19 — bumped one push LATE: the two pages landed in 31913fe and
+  // 946209c and this pin was only raised with the nav regroup that followed).
   // That Referrals bump was three nights late: the 08-14 nightly saw 18, the
   // 08-15 and 08-16 ones saw 19, and all three were left red. Designed-to-redden
   // only pays if someone bumps it the next morning.
   // `SwimSyncAdmin/lib/adminNav.ts` is the fact — count its scope:"tenant" rows.
-  // Since 2026-08-17 the sidebar GROUPS 16 of the 20 into 4 collapsible drawers
-  // (Families/Billing/Scheduling/Settings), so a collapsed group hides its child
+  // Since 2026-08-17 the sidebar GROUPS most pages into collapsible drawers
+  // (Families/Billing/Scheduling/Log/Settings since 2026-08-19), so a collapsed group hides its child
   // <a>s from the DOM. Expand every group first, then the full inventory is back
   // and the exact-count guard still means what it always did.
   await page.evaluate(() => {
@@ -136,7 +138,7 @@ try {
       a.getAttribute("href")
     )
   );
-  check("sidebar shows the 20 business pages", tenantLinks.length === 20,
+  check("sidebar shows the 22 business pages", tenantLinks.length === 22,
     `${tenantLinks.length}: ${JSON.stringify(tenantLinks)}`);
   check("sidebar does NOT show Platform", !tenantLinks.includes("/platform"));
 

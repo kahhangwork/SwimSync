@@ -1258,6 +1258,7 @@ export default function ClassesPage() {
         title={editingId ? "Edit Class" : "Create New Class"}
         open={showModal}
         onClose={() => setShowModal(false)}
+        size="lg"
       >
         <div className="space-y-4">
           <Field
@@ -1267,6 +1268,7 @@ export default function ClassesPage() {
             onChange={setTitle}
           />
 
+          <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Coach
@@ -1301,6 +1303,7 @@ export default function ClassesPage() {
                 </option>
               ))}
             </select>
+          </div>
           </div>
 
           {/* Rendered unconditionally now: a category is REQUIRED, so hiding
@@ -1352,19 +1355,21 @@ export default function ClassesPage() {
             />
           </div>
 
-          <Field
-            label="Location"
-            placeholder="e.g. Buona Vista SC"
-            value={location}
-            onChange={setLocation}
-          />
-          <Field
-            label="Rate per Lesson (S$)"
-            placeholder="40"
-            type="number"
-            value={rate}
-            onChange={setRate}
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              label="Location"
+              placeholder="e.g. Buona Vista SC"
+              value={location}
+              onChange={setLocation}
+            />
+            <Field
+              label="Rate per Lesson (S$)"
+              placeholder="40"
+              type="number"
+              value={rate}
+              onChange={setRate}
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>

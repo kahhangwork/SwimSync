@@ -2545,7 +2545,8 @@ admin can see at a glance which class at a given time has a free slot for a make
   computed when pressed, never stored (§7.95).
 - **Double-click → the lesson page** (§7.6 *The admin marks attendance on the lesson page*),
   where attendance, the substitute and guest bookings are changed. The **Lessons** page
-  (Scheduling → Lessons) is the list form of the same data, with a *Needs marking* mode.
+  (top-level, beside Calendar) is the list form of the same data, with a *Needs marking* mode. The
+  read-only attendance audit lives under **Log → Attendance Log** (with Change History).
 
 ---
 

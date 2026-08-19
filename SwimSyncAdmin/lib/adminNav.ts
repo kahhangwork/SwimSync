@@ -69,7 +69,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/claims",       label: "Parent Requests",      icon: UserCheck,       scope: "tenant"   },
   { href: "/levels",       label: "Levels",               icon: Waves,           scope: "tenant"   },
   { href: "/parents",      label: "Parents",              icon: UsersRound,      scope: "tenant"   },
-  { href: "/attendance",   label: "Attendance",           icon: CalendarCheck,   scope: "tenant"   },
+  { href: "/attendance",   label: "Attendance Log",       icon: CalendarCheck,   scope: "tenant"   },
   { href: "/calendar",     label: "Calendar",             icon: CalendarDays,    scope: "tenant"   },
   { href: "/lessons",      label: "Lessons",              icon: ListChecks,      scope: "tenant"   },
   { href: "/substitutes",  label: "Substitutes",          icon: ArrowLeftRight,  scope: "tenant"   },
@@ -163,15 +163,19 @@ export const TOP_LEVEL_HREFS: readonly string[] = [
   "/students",
   "/classes",
   "/calendar",
-  "/attendance",
+  "/lessons",
 ];
 
 /** Task-based groups. See HANDOVER §3 for why the dormant pages sit here. */
 export const NAV_GROUPS: readonly NavGroup[] = [
   { id: "families",   label: "Families",   hrefs: ["/trials", "/unassigned", "/claims", "/parents"] },
   { id: "billing",    label: "Billing",    hrefs: ["/invoices", "/credit-notes", "/packages", "/referrals", "/wages"] },
-  { id: "scheduling", label: "Scheduling", hrefs: ["/lessons", "/makeups", "/substitutes", "/holidays"] },
-  { id: "settings",   label: "Settings",   hrefs: ["/levels", "/coaches", "/admins", "/history"] },
+  { id: "scheduling", label: "Scheduling", hrefs: ["/makeups", "/substitutes", "/holidays"] },
+  // The read-only records: the attendance audit (money axis, CSV) and change
+  // history. Marking moved front-and-centre to /lessons on 2026-08-19; the log
+  // is what you consult, not where you work.
+  { id: "log",        label: "Log",        hrefs: ["/attendance", "/history"] },
+  { id: "settings",   label: "Settings",   hrefs: ["/levels", "/coaches", "/admins"] },
 ];
 
 export type GroupedNav = {
