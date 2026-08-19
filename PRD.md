@@ -2472,6 +2472,43 @@ directly, and no gateway takes a percentage. What the product supplies is
 Parents with accounts see the same dynamic QR on the in-app PayNow screen (web;
 native keeps the static image).
 
+### 7.22 Admin Calendar *(implemented 2026-08-19)*
+
+SwimSync shall show the tenant admin **every lesson of every coach** on one calendar, so the
+admin can see at a glance which class at a given time has a free slot for a make-up.
+
+- **Admin panel → Calendar** (`/calendar`): **Day / Week / Month / Agenda** views, **Today**,
+  ‹ ›, a **Location** filter (the distinct `location_name` values of the business's classes —
+  there is no location entity yet, see BACKLOG) and a **Coach** filter (who *teaches* the
+  lesson, i.e. the substitute when there is one).
+- **What a lesson is.** The weekday pattern of every class ∪ every existing `lesson_sessions`
+  row in the range (so extra lessons show and future lessons show before anyone marks them), minus
+  dates on/after a retired class's SGT retirement date. **The calendar never creates a lesson
+  row** — it is read-only; writing happens on the lesson page (§7.6).
+- **The card** carries the class **colour** (§7.3), the class title, the **coach** (a substitute
+  is named and marked **(Sub)** in red — the money axis, never `classes.coach_id`), and the count
+  **`enrolled+guests/max`** following the `2+1` roster convention: enrolled on that date by
+  enrolment span, plus uncancelled trial and make-up guests booked into that lesson, over the
+  class's capacity (its own, else the category default; no suffix when unlimited). **The count is
+  the billing gate's expected set by construction** — it is computed by the same
+  `expectedStudentsOn` the invoice engine uses, so a slot the calendar calls free is one the gate
+  agrees is free. A full class reads red + **FULL**. Time is not printed on the grid card (the
+  axis says it); it is on the agenda card and in the tooltip.
+- **State on the card:** dashed border = attendance not fully marked (past lesson, or today's
+  after it ended), ✓ = fully marked, faded + *Holiday* = voided for a public holiday, *extra* =
+  off-schedule.
+- **Hover** shows the roster — every expected child with their attendance glyph (✓ present,
+  ✗ absent, ~ cancelled, T trial, H holiday, ○ unmarked) and *trial* / *make-up* chips. **Click
+  pins** the tooltip (keyboard/touch reachable; Escape unpins); **double-click** (or Enter) opens
+  the lesson page `/lessons/[classId]/[date]`.
+- **Day and week** are a time grid (30-minute rows) that scrolls **both ways**: concurrent lessons
+  sit side by side in lanes of a minimum width rather than being squeezed, and the **time column
+  and day header stay fixed** while scrolling. **Month** shows up to three chips per day and
+  `+N more` / the day number jumps to that day. **Agenda** lists seven days with each lesson's
+  roster beside it. Weeks start on **Monday**.
+- The view, date and filters live in the URL, so refresh/back keep position; **Today** is
+  computed when pressed, never stored (§7.95).
+
 ---
 
 ## 8. Non-Functional Requirements

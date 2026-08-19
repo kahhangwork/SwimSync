@@ -3,7 +3,7 @@ import { launch, loginAdmin, dumpText } from "./lib.mjs";
 const OUT = process.env.SHOT_DIR || "/tmp";
 const { browser, page } = await launch();
 
-const routes = ["/attendance", "/students", "/dashboard"];
+const routes = ["/attendance", "/students", "/dashboard", "/calendar"];
 
 try {
   await loginAdmin(page, "superadmin@swimsync.test", "password123");

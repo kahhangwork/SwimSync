@@ -44,6 +44,7 @@ import {
   CalendarX,
   Gift,
   History,
+  CalendarDays,
 } from "lucide-react";
 
 /** A page's audience. `tenant` = shows ONE business. `platform` = cross-tenant. */
@@ -68,6 +69,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/levels",       label: "Levels",               icon: Waves,           scope: "tenant"   },
   { href: "/parents",      label: "Parents",              icon: UsersRound,      scope: "tenant"   },
   { href: "/attendance",   label: "Attendance",           icon: CalendarCheck,   scope: "tenant"   },
+  { href: "/calendar",     label: "Calendar",             icon: CalendarDays,    scope: "tenant"   },
   { href: "/substitutes",  label: "Substitutes",          icon: ArrowLeftRight,  scope: "tenant"   },
   { href: "/trials",       label: "Trials",               icon: Sparkles,        scope: "tenant"   },
   { href: "/makeups",      label: "Make-ups",             icon: RefreshCcw,      scope: "tenant"   },
@@ -158,6 +160,7 @@ export const TOP_LEVEL_HREFS: readonly string[] = [
   "/dashboard",
   "/students",
   "/classes",
+  "/calendar",
   "/attendance",
 ];
 

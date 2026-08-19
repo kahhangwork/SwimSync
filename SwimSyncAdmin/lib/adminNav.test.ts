@@ -36,12 +36,14 @@ describe("navFor", () => {
     const hrefs = navFor(A_TENANT).map((n) => n.href);
     // 11 + Packages (2026-07-20) + Trials (2026-07-25) + Parent Requests
     // (2026-07-26) + Make-ups (2026-08-02) + Admins (2026-08-06) + Lesson
-    // Coaches (2026-08-11) + Holidays (2026-08-15) + Referrals (2026-08-15).
+    // Coaches (2026-08-11) + Holidays (2026-08-15) + Referrals (2026-08-15)
+    // + Calendar (2026-08-19).
     // The count is asserted
     // deliberately: NAV also drives RequiresTenant's route gate, so a page added
     // here without being thought about is a page gated by accident rather than
     // on purpose.
-    expect(hrefs).toHaveLength(20);
+    expect(hrefs).toHaveLength(21);
+    expect(hrefs).toContain("/calendar");
     expect(hrefs).toContain("/history");
     expect(hrefs).toContain("/dashboard");
     expect(hrefs).toContain("/wages");
@@ -183,12 +185,13 @@ describe("sidebar grouping (presentation layer over NAV)", () => {
     expect(orphans).toEqual([]);
   });
 
-  it("leads the top level with the four daily pages, in order", () => {
+  it("leads the top level with the five daily pages, in order", () => {
     const g = groupedNavFor(A_TENANT);
-    expect(g.topLevel.slice(0, 4).map((n) => n.href)).toEqual([
+    expect(g.topLevel.slice(0, 5).map((n) => n.href)).toEqual([
       "/dashboard",
       "/students",
       "/classes",
+      "/calendar",
       "/attendance",
     ]);
   });
