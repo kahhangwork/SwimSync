@@ -771,6 +771,15 @@ SwimSync shall allow superadmin to manage classes.
 - Set class price per lesson
 - Set class active/inactive status
 - Assign a coach to a class
+- *(implemented 2026-08-19)* Set a **maximum number of students** and a **calendar colour**.
+  Capacity lives in two places: a **default per class category** (Packages page → *Class
+  categories* → *Max*; blank = no limit) and an optional **per-class override** (Classes form →
+  *Max students*; blank = the category's default). It is **informational** — the Classes table
+  shows `students / max` and the admin calendar shows `enrolled+guests / max` so a free slot is
+  visible — and **nothing refuses an enrolment or a booking on it**. The colour is one of
+  **12 fixed swatches** (a palette *key*, never a hex value; unset = neutral grey), chosen per
+  class because one class can hold children of several levels. Neither is effective-dated:
+  they are written beside `set_class_terms`, never inside it.
 
 *(implemented 2026-08-09)* **"Active" means SCHEDULING, and never billing.** A class that
 stops running is **retired**, not deleted, and the lessons it already taught still bill
@@ -2591,6 +2600,8 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 | **location_address** | String | No | Optional full address |
 | **price_per_lesson** | Decimal | Yes | Rate charged per lesson |
 | **is_active** | Boolean | Yes | Active flag (default true) |
+| **capacity** | Smallint | No | *(2026-08-19)* Max students for this class; NULL = the category's `default_capacity` (NULL there = unlimited). Informational only |
+| **colour** | String | No | *(2026-08-19)* Calendar palette key (`sky`, `rose`, …), never hex; NULL = neutral |
 | **created_at** | Timestamp | Yes | Record creation timestamp |
 | **updated_at** | Timestamp | Yes | Last update timestamp |
 

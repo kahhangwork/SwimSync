@@ -4,6 +4,9 @@ const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
+    // lib/ holds literal class strings too (lib/classColours.ts — the class
+    // colour palette). Without this line those swatches render blank.
+    "./lib/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {

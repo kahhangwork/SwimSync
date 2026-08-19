@@ -36,6 +36,9 @@ type Category = {
   name: string;
   class_count: number;
   default_product_id: string | null;
+  /** Default max students for a class in this category; NULL = no limit.
+   *  Overridable per class on the Classes page (20260819000100). */
+  default_capacity: number | null;
 };
 
 type Product = {
@@ -220,7 +223,7 @@ export default function PackagesPage() {
     const [catRes, prodRes, purRes, liveRes, ptRes, childRes] = await Promise.all([
       supabase
         .from("class_categories")
-        .select("id, name, default_product_id, classes(id)")
+        .select("id, name, default_product_id, default_capacity, classes(id)")
         .order("name"),
       // ⚠ THE FK IS NAMED ON PURPOSE. `class_categories(name)` is AMBIGUOUS
       // from package_products — category_id → class_categories.id (this one)
@@ -278,6 +281,7 @@ export default function PackagesPage() {
         name: c.name,
         class_count: (c.classes ?? []).length,
         default_product_id: c.default_product_id ?? null,
+        default_capacity: c.default_capacity ?? null,
       }))
     );
 
@@ -415,6 +419,30 @@ export default function PackagesPage() {
     setBusy(false);
     if (err) {
       setError("Could not set that default.");
+      return;
+    }
+    setError(null);
+    load();
+  }
+
+  /** Set (or clear, with "") a category's default max students. The CHECK
+   *  refuses 0 / negatives; the field is validated here so the message names
+   *  the field rather than a constraint. */
+  async function setCategoryCapacity(categoryId: string, raw: string) {
+    const trimmed = raw.trim();
+    const value = trimmed === "" ? null : Number(trimmed);
+    if (value !== null && (!Number.isInteger(value) || value < 1)) {
+      setError("Max students must be a whole number of 1 or more, or blank for no limit.");
+      return;
+    }
+    setBusy(true);
+    const { error: err } = await supabase
+      .from("class_categories")
+      .update({ default_capacity: value })
+      .eq("id", categoryId);
+    setBusy(false);
+    if (err) {
+      setError("Could not set that max students.");
       return;
     }
     setError(null);
@@ -1078,6 +1106,28 @@ export default function PackagesPage() {
                         </option>
                       ))}
                     </select>
+                    <label className="text-xs text-gray-400" htmlFor={`cap-${c.id}`}>
+                      Max:
+                    </label>
+                    <input
+                      // Keyed on the STORED value: a refused save (CHECK or RLS)
+                      // reloads and remounts the field back to what the DB holds.
+                      key={`${c.id}-${c.default_capacity ?? ""}`}
+                      id={`cap-${c.id}`}
+                      type="number"
+                      min={1}
+                      step={1}
+                      placeholder="∞"
+                      defaultValue={c.default_capacity ?? ""}
+                      disabled={busy}
+                      onBlur={(e) => {
+                        const next = e.target.value.trim();
+                        const cur = c.default_capacity == null ? "" : String(c.default_capacity);
+                        if (next !== cur) setCategoryCapacity(c.id, next);
+                      }}
+                      title="Default max students per class in this category (blank = no limit). Each class can override it."
+                      className="w-14 rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                    />
                     <span className="text-xs text-gray-500">
                       {c.class_count} class{c.class_count === 1 ? "" : "es"}
                     </span>

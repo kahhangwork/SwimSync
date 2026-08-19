@@ -21,6 +21,7 @@ import {
 } from "@/lib/classRoster";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
 import { PackageChip } from "@/components/PackageChip";
+import { CLASS_COLOURS, colourFor } from "@/lib/classColours";
 
 type ClassRow = {
   id: string;
@@ -33,6 +34,12 @@ type ClassRow = {
   location_name: string;
   price_per_lesson: number;
   category_id: string | null;
+  /** Max students for THIS class; NULL = the category default (below), NULL
+   *  there too = unlimited. Informational — nothing refuses on it (20260819000100). */
+  capacity: number | null;
+  category_default_capacity: number | null;
+  /** A palette KEY from lib/classColours.ts, never a hex value; NULL = neutral. */
+  colour: string | null;
   student_count: number;
   /** ⚠ THE CLASS's OWN FLAG — NOT the enrolment's. `is_active` exists on
    *  `students`, on `student_class_enrolments` AND on `classes`, and this page
@@ -154,8 +161,15 @@ export default function ClassesPage() {
   // it scopes prepaid packages and decides the trial price, so "no category"
   // would mean "this trial has no price". Every business has at least the two
   // defaults, created with it.
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<
+    { id: string; name: string; default_capacity: number | null }[]
+  >([]);
   const [categoryId, setCategoryId] = useState("");
+  // Capacity + colour are informational (calendar "x/y" count and card colour),
+  // not effective-dated and not money, so they travel with category_id: the
+  // same plain UPDATE beside set_class_terms, never inside it.
+  const [capacity, setCapacity] = useState("");
+  const [colour, setColour] = useState<string | null>(null);
 
   // ── Scheduling a lesson off the class's usual weekday ─────────────────────
   // The admin ARRANGES the lesson; the coach MARKS it. Same split as booking a
@@ -274,7 +288,7 @@ export default function ClassesPage() {
   async function loadCategories() {
     const { data } = await supabase
       .from("class_categories")
-      .select("id, name")
+      .select("id, name, default_capacity")
       .order("name");
     setCategories(data ?? []);
   }
@@ -293,7 +307,7 @@ export default function ClassesPage() {
     const { data } = await supabase
       .from("classes")
       .select(
-        "id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id, is_active, deactivated_at, coaches(profiles(full_name)), student_class_enrolments(id, is_active)"
+        "id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id, capacity, colour, is_active, deactivated_at, coaches(profiles(full_name)), class_categories(default_capacity), student_class_enrolments(id, is_active)"
       )
       .order("day_of_week")
       .order("start_time");
@@ -310,6 +324,9 @@ export default function ClassesPage() {
         location_name: c.location_name,
         price_per_lesson: Number(c.price_per_lesson),
         category_id: c.category_id ?? null,
+        capacity: c.capacity ?? null,
+        category_default_capacity: c.class_categories?.default_capacity ?? null,
+        colour: c.colour ?? null,
         student_count: (c.student_class_enrolments ?? []).filter(
           (e: any) => e.is_active
         ).length,
@@ -446,6 +463,8 @@ export default function ClassesPage() {
     setLocation("");
     setRate("");
     setCategoryId("");
+    setCapacity("");
+    setColour(null);
     setSaveError(null);
     setEditingId(null);
   }
@@ -461,6 +480,8 @@ export default function ClassesPage() {
     setLocation(cls.location_name);
     setRate(String(cls.price_per_lesson));
     setCategoryId(cls.category_id ?? "");
+    setCapacity(cls.capacity == null ? "" : String(cls.capacity));
+    setColour(cls.colour);
     setSaveError(null);
     setEditingId(cls.id);
     setShowModal(true);
@@ -478,6 +499,13 @@ export default function ClassesPage() {
       setSaveError("Please choose a category.");
       return;
     }
+    // Empty = "use the category default"; anything else must be a whole
+    // number ≥ 1 or the CHECK (capacity > 0) answers with a raw constraint name.
+    const capacityValue = capacity.trim() === "" ? null : Number(capacity);
+    if (capacityValue !== null && (!Number.isInteger(capacityValue) || capacityValue < 1)) {
+      setSaveError("Capacity must be a whole number of 1 or more, or left blank.");
+      return;
+    }
     setSaving(true);
     setSaveError(null);
 
@@ -490,6 +518,8 @@ export default function ClassesPage() {
       location_name: location,
       price_per_lesson: parseFloat(rate),
       category_id: categoryId,
+      capacity: capacityValue,
+      colour,
     };
 
     // Editing goes through set_class_terms, never a bare UPDATE. Price and
@@ -530,10 +560,12 @@ export default function ClassesPage() {
     if (editingId) {
       const { error: catErr } = await supabase
         .from("classes")
-        .update({ category_id: categoryId || null })
+        // ONE statement for all three non-terms fields: one failure mode, one
+        // "Saved, but…" message, no third partial-save state.
+        .update({ category_id: categoryId || null, capacity: capacityValue, colour })
         .eq("id", editingId);
       if (catErr) {
-        setSaveError(`Saved, but the category was not: ${catErr.message}`);
+        setSaveError(`Saved, but the category, capacity and colour were not: ${catErr.message}`);
         setSaving(false);
         return;
       }
@@ -758,6 +790,11 @@ export default function ClassesPage() {
             visible.map((cls) => (
               <Tr key={cls.id}>
                 <Td className="font-medium text-gray-900">
+                  <span
+                    aria-hidden
+                    className={`mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle ${colourFor(cls.colour).dot}`}
+                    title={colourFor(cls.colour).label}
+                  />
                   {cls.title}
                   {!cls.is_active && (
                     <span
@@ -807,6 +844,20 @@ export default function ClassesPage() {
                       rosterByClass.get(cls.id)?.trials.length ?? 0
                     )}
                   </button>
+                  {/* "/ 6" = the class's own capacity, else its category's
+                      default; nothing when both are unlimited. */}
+                  {(cls.capacity ?? cls.category_default_capacity) != null && (
+                    <span
+                      className="ml-1 text-xs text-gray-500"
+                      title={
+                        cls.capacity != null
+                          ? "Maximum students for this class"
+                          : "Maximum students (category default)"
+                      }
+                    >
+                      / {cls.capacity ?? cls.category_default_capacity}
+                    </span>
+                  )}
                 </Td>
                 <Td>
                   <div className="flex items-center gap-2">
@@ -1314,6 +1365,63 @@ export default function ClassesPage() {
             value={rate}
             onChange={setRate}
           />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Max students
+              </label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                placeholder={
+                  categories.find((c) => c.id === categoryId)?.default_capacity
+                    ?.toString() ?? "No limit"
+                }
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Blank = the category&apos;s default. Shown on the calendar as
+                &ldquo;students / max&rdquo;; nothing is refused on it.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Calendar colour
+              </label>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Calendar colour">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={colour === null}
+                  title="No colour"
+                  onClick={() => setColour(null)}
+                  className={`h-7 w-7 rounded-full border border-gray-300 bg-white text-[10px] text-gray-500 ${
+                    colour === null ? "ring-2 ring-offset-1 ring-gray-400" : ""
+                  }`}
+                >
+                  —
+                </button>
+                {CLASS_COLOURS.map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={colour === c.key}
+                    aria-label={c.label}
+                    title={c.label}
+                    onClick={() => setColour(c.key)}
+                    className={`h-7 w-7 rounded-full ${c.dot} ${
+                      colour === c.key ? `ring-2 ring-offset-1 ${c.ring}` : ""
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
 
           {/* Only asked when the money actually moved. These are genuinely
               different intents and the wrong one is expensive either way: a
