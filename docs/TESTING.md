@@ -527,9 +527,11 @@ with the MAKE-UP chip, click pins, Today/‹/› move the URL date, the time gut
 horizontal scroll, month/agenda render, the coach filter keeps the substitute's lesson, double-click
 lands on `/lessons/…` — and, read through psql, **the `lesson_sessions` count is unchanged after the
 whole run** (the calendar is read-only by construction; ADMIN_CALENDAR_PLAN RISK 4).
-`verify-admin-lesson-detail.mjs` (same fixture — it is mapped in `run-all-drivers.sh`; 26 checks;
-needs Expo too) drives the **lesson page** and the **Lessons** list: Needs-marking lists the partial
-lesson and a row opens it; an admin save lands as attendance rows AND an `audit_log`
+`verify-admin-lesson-detail.mjs` (same fixture — it is mapped in `run-all-drivers.sh`; 27 checks;
+needs Expo too) drives the **lesson page** and the **Lessons** list: the **sidebar Lessons badge
+equals the `mode=needs` page-row count** (§7.18 parity — the `tenant_unmarked_lesson_count` RPC vs the
+page's own predicate; proven red by breaking the SQL's "ended" `OR`→`AND`); Needs-marking lists the
+partial lesson and a row opens it; an admin save lands as attendance rows AND an `audit_log`
 `attendance_saved` row (psql); `/attendance` shows the mark; a per-lesson Holiday confirms with the
 count; a below-floor lesson shows the closed banner with the billed row still editable as a
 correction, and re-marking a row whose credit is applied is refused with the CN001 message (the
@@ -557,6 +559,12 @@ escape), and the **booking** RPCs refuse the over-cap guest by span (a duplicate
 unique index not "full" — RISK 1; an already-booked child hears "already booked"; a coach is
 admin-refused on every direct path; `add_unclaimed_student`'s coach arm is covered; the
 closed-today-still-covers and future-guest asymmetries are pinned — RISK 6).
+`tenant_unmarked_lesson_count.test.sql` (13 — the Lessons-badge count, `20260820000300`, a scalar
+copy of `/lessons?mode=needs`): built up one class at a time so each assertion pins one behaviour —
+a past untouched lesson and a partial one count; fully-marked / fully-holiday / today-not-ended /
+before-the-floor do not; a guest-only trial lesson counts; a retired class's post-retirement pattern
+date is skipped unless a session row exists; plus the authz gate (stranger / other tenant's admin /
+coach refused, platform admin allowed).
 `verify-makeups.mjs` (+ `fixtures-makeups.sql` and its `-teardown.sql`) drives a make-up —
 an enrolled child guesting one lesson of another same-category class — end to end through
 both real UIs (15 checks): the admin's booking form is child-first via **one search box
