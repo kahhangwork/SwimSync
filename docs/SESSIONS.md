@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.71** | 2026-08-19 | Admin calendar + lesson page LIVE: capacity/colour, `/calendar`, `/lessons` (admin marks attendance) | §7.191-192 · PRD §7.3/§7.6/§7.22 · DEPLOYMENT §11.30 |
 | **8.70** | 2026-08-19 | Public-holiday voids LIVE: `holiday` status event-extends packages; calendar-scan recompute dropped; engine v25 | §7.188-190 · PRD §7.16 · DEPLOYMENT §11.29 |
 | **8.69** | 2026-08-18 | Wave D LIVE: engine ordering-guard (no force), credit lock `apply_credit_to_invoice`, admin void of a credit note; engine v24 | §7.187 · PRD §5.6/§7.7 · WAVE_D_PLAN.md |
 | **8.68** | 2026-08-18 | Symmetric credit notes — a re-toggled correction stops doubling a parent's credit; CN001 refuses un-correcting spent credit | §7.184-186 · PRD §5.6 |

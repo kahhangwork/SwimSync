@@ -1,11 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-20 — **Nightly sweep un-reddened (§8.72).** One driver fix: `invoice-controls` measured the
-toggle in pixels; the admin root font-size now scales with viewport width, so it asserts in rem. No product change,
-no migration. §7.193 · TESTING §5. Tonight's run (`gh run list --workflow=ui-drivers.yml`) is the proof, not this line._
+_Last updated: 2026-08-21 — **Capacity is a HARD limit · holiday retirement boundary is SGT-inclusive · Lessons
+sidebar badge — all LIVE (§8.73).** 3 migrations (`20260820000100/200/300`), grant dump clean, no engine deploy; a
+Fable pre-deploy review fixed two pgTAP time-bombs first (§7.194-196). PRD §7.3/§7.6/§7.22 · DEPLOYMENT §11.31 · plan
+in `docs/plans/CAPACITY_HOLIDAY_BADGE_PLAN.md`._
 
-_Previously, 2026-08-19 (§8.71) — admin Calendar + Lesson page, LIVE: capacity + colour, `/calendar`, `/lessons/[classId]/[date]`;
-1 migration, 3 app pushes. §7.191-192 · PRD §7.3/§7.6/§7.22 · DEPLOYMENT §11.30 · `docs/plans/ADMIN_CALENDAR_PLAN.md`._
+_Previously, 2026-08-20 (§8.72) — nightly sweep un-reddened: `invoice-controls` now asserts in rem, not pixels (§7.193)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -28,7 +28,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.192** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.196** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -214,6 +214,11 @@ is a guard whose first real firing is still ahead of you.
   make-up-from-Attendance need data states the single private-coach account rarely produces; CSV export
   and parent upcoming-lessons do nothing until there is data. **Change History is the exception — LIVE,
   showing the real `audit_log` trail immediately.** Don't rediscover the four quiet ones as bugs.
+- **The capacity HARD limit and the holiday SGT boundary (§8.73)** are LIVE but DORMANT: no production
+  class carries a `capacity`/`default_capacity`, so the guard **refuses nothing** until a maximum is set
+  (its correct production state is "no observable change" — don't rediscover it as broken), and no
+  holiday has a same-day retirement, so the SGT `>=` fix has never fired. **The Lessons sidebar badge is
+  the exception — LIVE**, showing the real needs-marking backlog immediately (PRD §7.3/§7.6/§7.22).
 
 *(Corrected 2026-08-10: this list also carried "production has 0 attendance rows", which
 had been false since 2026-07-26 and directly contradicted the REAL BILLING note below.
@@ -389,6 +394,25 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.73 (2026-08-21) — CAPACITY HARD LIMIT · HOLIDAY SGT BOUNDARY · LESSONS BADGE, all LIVE
+
+**The three planned calendar-wave follow-ups shipped**, backend-first, three migrations one at a time
+(`docs/plans/CAPACITY_HOLIDAY_BADGE_PLAN.md` is the record; its Decisions table was settled with the
+user): **A** `mark_day_holiday`'s retirement predicate is now SGT + inclusive (`>=`), fixing a two-axis
+drift (§7.195); **B** capacity is a **HARD limit** — bookings refused by the expected set, enrolments by
+the active roster, for everyone incl. the admin, no override, "Book anyway" gone; **C** a granted
+`tenant_unmarked_lesson_count` drives an amber **Lessons sidebar badge** mirroring `/lessons?mode=needs`.
+Behaviour: PRD §7.3/§7.6/§7.22. Deploy: DEPLOYMENT §11.31 (grant dump clean, no engine deploy).
+
+**Verified:** pgTAP **1258** (63 files; two new 29 + 13, red-first proven), Deno ×2, admin typecheck +
+vitest **516**, drivers `verify-admin-lesson-detail` **27/27** (a badge==page-rows parity pin, proven red
+by breaking the SQL), `verify-admin-calendar` **21/21**, `verify-makeups` 15/15.
+
+**A Fable Senior-Engineer review ran before the push** and caught two pgTAP **time-bombs** — fixed dates
+that fall below the rolling billing floor, turning CI red on its own (§7.194) — plus a dead trigger arm;
+all fixed and re-verified first. Two follow-ups filed in `BACKLOG.md`: a last-seat capacity race, and a
+raw-`UPDATE` retirement hole. Gotchas §7.194-196.
+
 ## 8.72 (2026-08-20) — NIGHTLY SWEEP TRIAGED: ONE DRIVER, RED ON A RULER, NOT A BUG
 
 **`invoice-controls` had been 14/18 for three nights (2026-08-17..19) and the product had not moved.**
@@ -398,33 +422,6 @@ in rem (`22adfd1`, 18/18 locally). Gotcha §7.193; TESTING §5 updated. The 08-1
 different set (`packages`, `parent-claim`, `platform-admin-scope`), cleared by the 08-17 session. The
 triage followed §9's own rule — *check which moved, the product or the assumption* — and the cheap
 tell was the ratio: 38.5/44 = 14/16. Nothing else touched; no migration, no deploy.
-
-## 8.71 (2026-08-19, evening) — ADMIN CALENDAR + LESSON PAGE, LIVE
-
-**The tenant admin can now see every coach's lessons on one calendar and act on one lesson.** Built
-from `/plan-with-confidence` → `/plan-review` (a second Fable agent verified the plan's RLS claims
-against the migrations and folded 10 ranked mitigations inline — `docs/plans/ADMIN_CALENDAR_PLAN.md`
-is the record) and shipped in three slices, each reviewed, verified and deployed before the next:
-**A** one migration (`20260819000100`: `class_categories.default_capacity`, `classes.capacity`,
-`classes.colour`, and ONE policy disjunct so a pure tenant admin can write the `attendance_saved`
-audit row — the only step RLS refused, proven red in pgTAP first, §7.192) + Classes-form fields;
-**B** `/calendar` (PRD §7.22); **C** `/lessons/[classId]/[date]` + `/lessons` (PRD §7.6). Verified:
-pgTAP **1213 ×2**, admin vitest **516**, both typechecks, drivers `verify-admin-calendar` **21/21** and
-`verify-admin-lesson-detail` **25/25** (incl. the coach-app round-trip), fixture round-trips clean,
-each Vercel build proven by a served-bundle grep, grant dump clean on prod. Testing map: TESTING §5;
-deploy record: DEPLOYMENT §11.30.
-
-**Findings worth the next reader's minute:** the admin needed **no new write RPC** — `sessions_write`
-and `attendance_write` already admitted `can_admin_tenant`, and the whole marking-window / weekday /
-holiday / CN001 guard stack applies to the admin unchanged (no override, by design). The calendar's
-count **is the billing gate's expected set** by construction (`expectedStudentsOn`), the calendar
-**never writes** (a driver asserts the `lesson_sessions` count through psql), and the retired-class
-cut-off follows the engine's SGT date, not `mark_day_holiday`'s `::date` (now a BACKLOG item).
-
-**Deliberately not done (all in `BACKLOG.md` → Admin and operations):** a location entity (the
-filter is distinct `location_name`); capacity as a hard limit in the booking RPCs (it is advisory —
-"Book anyway?"); the `mark_day_holiday` UTC-date drift; a Lessons sidebar badge (needs a callable
-tenant-scoped count RPC); and the admin save writes **no shadow absences** (a missing row = paid).
 
 ## 9. Next steps (pick with the user)
 
@@ -485,16 +482,17 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — Admin calendar + lesson page shipped LIVE 2026-08-19 (§8.71). Queue open.
+### THE NEXT BUILD — capacity/holiday/badge shipped LIVE 2026-08-21 (§8.73). Queue open.
 
-**No migration is in flight** (§7.55). The calendar wave left four small, non-urgent follow-ups in
-`BACKLOG.md` → *Admin and operations* — pick by need, not by order:
+**No migration is in flight** (§7.55). The capacity/holiday/badge wave is done and deployed; the one
+calendar-wave follow-up left is **a location entity** (M) — the calendar's Location filter is distinct
+`location_name` text (`BACKLOG.md` → *Admin and operations*). It unblocks nothing urgent.
 
-- **Capacity as a hard limit** in `book_makeup`/`book_trial` (S) — capacity shipped advisory; this is
-  the one that unblocks *Parent self-enrolment*.
-- **A location entity** (M) — the calendar's Location filter is distinct `location_name` text.
-- **`mark_day_holiday` `::date` (UTC) vs the engine's SGT date** (S, dormant drift).
-- **Lessons sidebar badge** (S) — needs one small tenant-scoped count RPC.
+**Worth doing next, both from this session's review** (`BACKLOG.md`): the **capacity last-seat race**
+(S — no `FOR UPDATE` on the class row, so two concurrent writers can breach a "hard" limit; dormant at
+single-admin scale) and the **raw-`UPDATE` retirement hole** (S — `classes_write` is `FOR ALL`, so a
+PostgREST `UPDATE` bypasses `deactivate_class()`'s refusals). Then **Parent self-enrolment** (M) — now
+that capacity is a real guard, only the parent-facing flow remains.
 
 Still open from earlier: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on
 0 notes); HANDOVER §3 graduation (docs tax). Then *Later* (owner-only accounting page, accrual). Full
@@ -532,10 +530,10 @@ ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · mult
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260819000100` (capacity/colour + the admin
-audit-row policy arm, §8.71); production confirmed caught up 2026-08-19 via `supabase migration list
---linked`, **0 pending**. §11.30 is the freshest slice-by-slice example (migration remote-confirmed
-BEFORE the UI that selects its columns merged).
+**The migration queue is EMPTY.** The latest applied is `20260820000300` (the Lessons-badge count fn,
+§8.73); production confirmed caught up 2026-08-21 via `supabase migration list --linked`, **0 pending**.
+**DEPLOYMENT §11.31 is the freshest worked example** — three migrations one at a time, grant dump clean,
+no engine deploy, apps last.
 **§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
 **expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract
 migration LAST (held back by a `.hold` rename until the apps stopped reading the dropped columns);

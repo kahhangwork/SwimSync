@@ -652,3 +652,21 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `supabase/rollback/20260819000100_class_capacity_colour_DOWN.sql` (rehearsed: exactly pgTAP test 7
     — the admin audit row — reddens, UP restores it). Plan + inline risk gates:
     `docs/plans/ADMIN_CALENDAR_PLAN.md`.
+
+31. **Deploy record (2026-08-21): capacity hard limit + holiday retirement boundary + Lessons
+    badge** (§8.73, `docs/plans/CAPACITY_HOLIDAY_BADGE_PLAN.md`). Backend-first, three migrations one
+    at a time, **no engine change** (`core.ts` untouched — the SQL functions it reads changed, not the
+    engine). Sequence: (1) `supabase db push` — `20260820000100` (holiday SGT `>=`), `20260820000200`
+    (capacity: two ungranted helpers, `book_makeup`/`book_trial` CREATE OR REPLACE same-signature, the
+    `enforce_class_capacity` trigger), `20260820000300` (the granted `tenant_unmarked_lesson_count`);
+    `migration list --linked` shows all three `remote` filled; the `pgdelta` cert stack trace printed
+    again alongside `Finished` — normal (§7.55), not an incident; the apply-time DO probes (§7.87) ran
+    on prod without aborting, which IS the grant assertion. (2) **Grant dump** (`supabase db dump
+    --linked`): `class_effective_capacity` / `class_expected_count` `REVOKE … PUBLIC` with **no**
+    grant (callable by nobody), `tenant_unmarked_lesson_count` `authenticated` only, the two RPCs
+    unchanged, **zero `anon`** anywhere — clean. (3) apps to `main` → Vercel (Sidebar badge + lesson
+    page's removed "Book anyway"). **Rollback:** three committed DOWN files, each rehearsed locally
+    (§7.93). **Dormant on prod:** production classes carry no `capacity`/`default_capacity`, so the
+    hard limit refuses nothing until a maximum is set; the badge shows the real needs-marking backlog
+    immediately. Pre-deploy Senior-Engineer review (Fable agent) fixed two test time-bombs (§7.194)
+    and a dead trigger arm before the push.

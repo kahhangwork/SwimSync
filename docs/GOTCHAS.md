@@ -3063,3 +3063,41 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     changed. Read `getComputedStyle(document.documentElement).fontSize` in the same `evaluate` and
     assert in rem (±0.5px for sub-pixel layout). `verify-admin-table-geometry` measures ratios and
     was unaffected. (§8.72.)
+
+194. **A pgTAP FIXTURE WITH FIXED CALENDAR DATES IS A TIME-BOMB — IT GOES RED ON ITS OWN AS
+    THE BILLING FLOOR ROLLS FORWARD, WITH NO CODE CHANGE.** `markable_floor()` is "1st of last
+    month" (or the month after the latest sealed month), so a never-sealed test tenant's window
+    moves on the 1st of every month. Two new files this session (`class_capacity_limit`,
+    `tenant_unmarked_lesson_count`) pinned `book_makeup`/`book_trial` dates and enrolment spans to
+    literal dates like `2026-08-24` / `2026-07-06`; those pass in the month they were written and
+    fall **below the floor** a month or two later — `book_makeup` then refuses with "that month has
+    been billed", or the unmarked-count window drops the lesson, and `supabase test db` (the fact
+    every session starts from) goes red on a product nobody touched. Caught in the pre-deploy review,
+    before it detonated. **The house style is dates RELATIVE to `today_sg()`** (`today_sg() - 14`,
+    `today_sg() + 4`, weekday computed from the same) — the same §7.7 family as client date bugs,
+    on the fixture's side of the wire. Audit: a literal `'2026-` inside a `.test.sql` booking or
+    span is the smell. (2026-08-20.)
+
+195. **A TIMESTAMPTZ BOUNDARY HAS TWO AXES — TIMEZONE *AND* INCLUSIVITY — AND A PREDICATE CAN
+    DRIFT ON BOTH WHILE ITS SIBLING SIX LINES AWAY IS RIGHT.** `mark_day_holiday`'s "is this class
+    still running on `p_date`?" test read `deactivated_at::date > p_date`: the bare `::date` is the
+    server's UTC date (§7.7), so a class retired 00:00–08:00 SGT counted as running one extra day;
+    and `>` is exclusive, while the engine clamps a retired class's expected dates at the SGT
+    retirement date **inclusive** (`core.ts` `expectedTo = lastScheduledDate`, `dates.ts` `ms <= end`).
+    Two independent drifts in one comparison — and the enrolment predicate in the *same function*
+    already cast SGT and carried a comment naming the hazard. Fixing the timezone without the
+    inclusivity, or vice versa, would have left it half-wrong and passing most tests. When you touch
+    a date/timestamp comparison, check BOTH: which zone the `::date` lands in, and whether the
+    endpoint is `>`/`>=`. Fixed SGT + `>=` in `20260820000100`. (2026-08-20.)
+
+196. **A UI FIXTURE WRITTEN WITH `ON CONFLICT … DO NOTHING` DOES NOT RESTORE A COLUMN A DRIVER
+    MUTATED — SO A DRIVER THAT WRITES TO FIXTURE ROWS MUST RESTORE THEM ITSELF.** `verify-admin-
+    lesson-detail` now raises a class's `capacity` mid-run (to prove the hard limit's escape hatch),
+    and `fixtures-admin-calendar.sql` re-inserts that class with `ON CONFLICT (id) DO NOTHING` — so a
+    plain fixture RE-LOAD (the driver's documented between-runs step) leaves the mutated `capacity`
+    in place, and a sibling `verify-admin-calendar` run without a full `supabase db reset` then reads
+    `3/4` instead of `3/3 · FULL` and fails. Two fixes, both needed: the fixture's conflict clause
+    became `DO UPDATE SET capacity = EXCLUDED.capacity` (and its trailing SELECT asserts the value),
+    and the driver restores the column (and deletes the row it booked) in a `finally`. The general
+    rule: a `DO NOTHING` fixture is only idempotent for rows nothing else writes; the moment a driver
+    writes fixture rows, a re-load is not a reset. (2026-08-20.)

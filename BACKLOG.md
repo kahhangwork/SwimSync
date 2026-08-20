@@ -1,10 +1,10 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-19 (evening) — **Admin calendar + lesson page shipped LIVE** (§8.71, PRD §7.3/
-§7.6/§7.22): class capacity + colour, `/calendar` (day/week/month/agenda), `/lessons` + the lesson page
-(admin marks attendance incl. per-lesson Holiday, substitutes, guest bookings). **Admin per-lesson
-attendance marking DONE and removed.** Four follow-ups filed under *Admin and operations*: a location
-entity, capacity as a hard limit, the `mark_day_holiday` UTC-date drift, a Lessons sidebar badge._
+_Last updated: 2026-08-21 — **Three calendar-wave follow-ups SHIPPED LIVE** (§8.73, PRD §7.3/§7.6/§7.22):
+capacity is now a **HARD limit** (bookings + enrolment, admin included, no override), `mark_day_holiday`'s
+retirement boundary is SGT-inclusive, and the **Lessons sidebar badge** is live. All three deleted from
+below. Two new items filed from the pre-deploy review (a capacity last-seat race; a raw-UPDATE retirement
+hole). Still open under *Admin and operations*: the **location entity**._
 
 _Previously, 2026-08-19 (morning) — **Public-holiday voids shipped LIVE** (§8.70, PRD §7.16): a `holiday`
 attendance status voids a day's lessons and event-extends packages; `recompute_package_extensions` is gone._
@@ -352,6 +352,10 @@ Actions drawer. **Also discharged** *A Playwright driver for the weeks/holiday p
 ~~**NEXT — Parent referral codes (M)**~~ — **SHIPPED LIVE 2026-08-15** (§8.61, `docs/DEPLOYMENT.md`
 §11.23): migration `20260815000700` + `public-package` v2 + `package-emails` v3 + both apps, on prod,
 grant dump clean, RISK 12 checks 0/0. DORMANT (no business has enabled it).
+
+**SHIPPED LIVE 2026-08-21 — Capacity hard limit + holiday retirement boundary + Lessons badge** (§8.73,
+`docs/plans/CAPACITY_HOLIDAY_BADGE_PLAN.md`, DEPLOYMENT §11.31): three migrations, holiday → capacity →
+badge, no engine change, grant dump clean. The location entity is the one calendar-wave follow-up left.
 
 **Build order re-ranked 2026-08-16 after referrals shipped.** No rework-critical sequence remains —
 the queue is now a decision-gated tail plus a flat value pool. Three decisions settled (table above):
@@ -1079,10 +1083,10 @@ Let parents pick and join a class themselves rather than waiting for the superad
 **Why:** assignment is a manual superadmin step today, so every new family stalls until
 someone gets to it. That's the bottleneck in the onboarding push happening right now.
 
-**Notes:** ~~needs class capacity — which doesn't exist yet~~ — **class capacity EXISTS since
-2026-08-19** (`class_categories.default_capacity` + `classes.capacity`, PRD §7.3), so the primitive
-is there; what is still missing is a **DB-side refusal** on it (see *Capacity as a hard limit*
-below) — today capacity is informational, so self-enrolment would still overfill a lane.
+**Notes:** the capacity primitive is now a **hard limit, enforced since 2026-08-20**
+(`class_expected_count()` / `enforce_class_capacity()`, PRD §7.3) — a self-enrol RPC calls the first
+and is covered by the second, so overfilling a lane is already refused. What remains is the parent-facing
+flow itself (a class picker, the join, the payment-method question).
 A lighter middle ground: let the parent express a *preference* at signup that the
 superadmin approves, which removes the back-and-forth without giving up control.
 Related: coach-assisted assignment below.
@@ -1191,43 +1195,35 @@ contract migration (add table + FK, backfill from distinct names, keep the text 
 apps read the FK). Per-venue columns in the day view are the UI half. Not urgent: production is one
 location.
 
-### Capacity as a hard limit in `book_makeup` / `book_trial` (and enrolment) — **S** `[raised 2026-08-19]`
-A DB-side refusal when a booking or enrolment would exceed the class's effective capacity.
+### Capacity's last-seat check has no concurrency lock — **S** `[found 2026-08-20 in pre-deploy review]`
+The capacity trigger (`enforce_class_capacity`) and the booking RPCs (`class_expected_count`) read a
+`count(*)` under READ COMMITTED with **no lock on the class row**, so two simultaneous writers for the
+last seat each see cap−1 and both commit → cap+1, silently.
 
-**Why:** capacity shipped **informational** on purpose (PRD §7.3/§7.22): the admin lesson page asks
-"This lesson is full — book anyway?" and the admin is the authority. A hard rule is what parent
-self-enrolment needs, and it should live in the RPCs, not the UI (§7.32).
+**Why:** capacity is sold as a **hard** limit (PRD §7.3), and this is the one input that can breach it.
+No money impact and self-healing on the roster page, and a single-admin tenant essentially never
+races — which is why it shipped without the lock — but the mechanism is real.
 
-**Notes:** **Deliberately NOT added in the calendar wave** — both RPCs are billing-adjacent with their
-own test matrices, and a capacity rule inside them is its own migration wave. Effective capacity =
-`classes.capacity ?? class_categories.default_capacity ?? unlimited`; count = enrolled on the date by
-span + uncancelled guests (the `expectedStudentsOn` union), never `is_active`.
+**Notes:** close it with `SELECT 1 FROM classes WHERE id = NEW.class_id FOR UPDATE` before the count in
+both the trigger and the RPCs (`20260820000200`). Serialises concurrent bookings/enrolments for one
+class only; cheap. Do it the day a tenant gains a second admin or a parent-facing self-enrol path.
 
-### `mark_day_holiday` uses `deactivated_at::date` (UTC) where the engine uses SGT — **S** `[found 2026-08-19 in plan review]`
-The whole-day void's "class still running on that date" predicate casts `deactivated_at::date` (the
-server's UTC date); the billing engine (`core.ts`, `dateInTimeZone`), `classCoverage.ts` and the
-calendar (`toSgDate`) use the SGT date.
+### A raw PostgREST `UPDATE` can retire a class, bypassing `deactivate_class()` — **S** `[found 2026-08-20 in pre-deploy review]`
+`classes_write` is `FOR ALL`, and the `classes_inactive_requires_deactivated_at` CHECK is satisfied when
+the date is supplied — so `UPDATE classes SET is_active = false, deactivated_at = now()` from a raw
+PostgREST call retires a class **without** `deactivate_class()`'s three refusals (uncancelled future
+guests, unmarked lessons ≥ floor, open enrolments). The `20260810000100` header's claim that "a raw
+UPDATE cannot supply the date" is **wrong** and should be corrected there.
 
-**Why:** a class retired between 00:00 and 08:00 SGT is "still running" to the RPC for one extra day
-— it would void (and package-extend) a lesson the engine never expects. Dormant today (0 holidays
-with a same-day retirement) but it is a drift between two copies of one rule (§7.18's shape).
+**Why:** every admin write goes through the RPC today, so it is dormant — but it is a hole in a
+destructive guard, and the calendar/badge code reason about "a retired class holds zero active
+enrolments", an invariant this path can break.
 
-**Notes:** one-line fix in a `CREATE OR REPLACE` of `mark_day_holiday`/`unmark_day_holiday`
-(`(deactivated_at AT TIME ZONE 'Asia/Singapore')::date`), plus a pgTAP case at the boundary. Not done
-in the calendar wave to keep that wave's one migration to one concern.
-
-### Lessons "needs marking" badge in the sidebar — **S** `[raised 2026-08-19]`
-An amber count on Scheduling → Lessons for lessons below today that are not fully marked (the coach
-app's NEEDS MARKING, for the admin).
-
-**Why:** the Lessons page has the mode, but nothing on other pages says there is a backlog.
-
-**Notes:** the sidebar loads on every navigation, and the only accurate source today is the
-client-side union over all enrolments/sessions/bookings (what the page itself does) — too heavy
-for a badge. `class_unmarked_lesson_dates(class_id)` exists but is deliberately callable by nobody
-(`20260809000400`). Needs a small SECURITY DEFINER `tenant_unmarked_lesson_count()` (tenant-scoped,
-`can_admin_tenant` gated, EXECUTE to `authenticated`) — one migration, then the badge is the
-`badges` map in `components/Sidebar.tsx`.
+**Notes:** the clean fix is to move `deactivate_class()`'s refusals into a `BEFORE UPDATE` trigger on
+`classes` (or narrow `classes_write` so a client cannot flip `is_active`). Related product question,
+also surfaced 2026-08-20: **`add_unclaimed_student(… 'ongoing' …)` lets the class's own coach enrol a
+brand-new child** (`c.coach_id = current_coach_id()`), which "coaches must not add students" (§7.17)
+does not cover — decide whether that arm should exist.
 
 ### An owner-only accounting page — **M** — _raised 2026-08-08, not a priority_
 One page showing what the business actually earned and paid out — revenue, wages paid,

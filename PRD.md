@@ -774,9 +774,12 @@ SwimSync shall allow superadmin to manage classes.
 - *(implemented 2026-08-19)* Set a **maximum number of students** and a **calendar colour**.
   Capacity lives in two places: a **default per class category** (Packages page → *Class
   categories* → *Max*; blank = no limit) and an optional **per-class override** (Classes form →
-  *Max students*; blank = the category's default). It is **informational** — the Classes table
-  shows `students / max` and the admin calendar shows `enrolled+guests / max` so a free slot is
-  visible — and **nothing refuses an enrolment or a booking on it**. The colour is one of
+  *Max students*; blank = the category's default). *(enforced 2026-08-20)* The Classes table
+  shows `students / max` and the admin calendar shows `enrolled+guests / max`, and the database
+  **refuses** anything that would exceed it — a booking when the lesson's expected set (enrolled
+  by span + guests) reaches the maximum, an enrolment when the active roster does — for
+  **everyone, the admin included; there is no override**. A full class is fixed by raising its
+  maximum. The colour is one of
   **12 fixed swatches** (a palette *key*, never a hex value; unset = neutral grey), chosen per
   class because one class can hold children of several levels. Neither is effective-dated:
   they are written beside `set_class_terms`, never inside it.
@@ -1132,7 +1135,9 @@ an extra lesson, and either the coach or the admin records it.
 
 **Admin panel → Lessons** (a week of every coach's lessons, grouped by day, with a
 **Needs marking** mode that lists every lesson from the business's marking floor to today
-that is not fully marked — floor-scoped, never week-scoped) and **Calendar → double-click**
+that is not fully marked — floor-scoped, never week-scoped; *(2026-08-20)* the **sidebar Lessons
+link carries an amber badge** of that same count, so the backlog is visible from any page) and
+**Calendar → double-click**
 both open **`/lessons/[classId]/[date]`**, one lesson addressed by class and date (never a
 session id — the row may not exist yet). There the admin:
 
@@ -1155,9 +1160,10 @@ session id — the row may not exist yet). There the admin:
 - **Assigns or removes the substitute coach** for the lesson (`assign_session_coach`; the
   Lesson Coaches rules) and sees the class's shadows read-only.
 - **Books a make-up or a trial into this lesson** (host class and date fixed; a make-up asks
-  which class it replaces when the child has more than one). A full lesson (`x/max`) asks
-  *"Book anyway?"* — the count is advisory, the admin is the authority; **no RPC refuses on
-  capacity** (BACKLOG).
+  which class it replaces when the child has more than one). *(enforced 2026-08-20)* A full
+  lesson (`x/max`) is **refused by the database** — an inline notice says so and points at
+  raising the class's maximum; there is no "Book anyway". Capacity is a hard limit for everyone,
+  the admin included (§7.3).
 - **Does not** write shadow absences — that stays the coach's "coaches present" checklist; a
   missing row means *present and paid*, the recoverable direction.
 
@@ -1862,7 +1868,10 @@ cash paid always equals value granted — nothing to reconcile.
   parent's upcoming-lessons list. What changed is the mechanism: on the Holidays page the
   admin presses **Void lessons** for a date (each row shows whether it is already voided
   and how many lessons; a single **Restore** undoes it). Voiding marks every scheduled
-  lesson that day — every expected student, enrolled or a trial/make-up guest — with a new
+  lesson that day — for every class still running on that date, judged by its **SGT
+  retirement date, inclusive** *(2026-08-20; a class retired 00:00–08:00 SGT was previously
+  missed by a day, so its already-marked lessons kept billing)* — and every expected
+  student, enrolled or a trial/make-up guest, with a new
   **`holiday` attendance status**, which is **non-billable** (nobody is charged, no package
   is drawn) *and* extends each covering package's validity by a **tenant-configurable
   number of days** (default 7, set on the same page). The extension is **event-driven** —
@@ -2524,8 +2533,9 @@ admin can see at a glance which class at a given time has a free slot for a make
   is named and marked **(Sub)** in red — the money axis, never `classes.coach_id`), and the count
   **`enrolled+guests/max`** following the `2+1` roster convention: enrolled on that date by
   enrolment span, plus uncancelled trial and make-up guests booked into that lesson, over the
-  class's capacity (its own, else the category default; no suffix when unlimited). **The count is
-  the billing gate's expected set by construction** — it is computed by the same
+  class's capacity (its own, else the category default; no suffix when unlimited). *(2026-08-20)*
+  This same count is now the **guard's** number — the figure the booking/enrolment refusal reports
+  (§7.3). **The count is the billing gate's expected set by construction** — it is computed by the same
   `expectedStudentsOn` the invoice engine uses, so a slot the calendar calls free is one the gate
   agrees is free. A full class reads red + **FULL**. Time is not printed on the grid card (the
   axis says it); it is on the agenda card and in the tooltip.
@@ -2676,7 +2686,7 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 | **location_address** | String | No | Optional full address |
 | **price_per_lesson** | Decimal | Yes | Rate charged per lesson |
 | **is_active** | Boolean | Yes | Active flag (default true) |
-| **capacity** | Smallint | No | *(2026-08-19)* Max students for this class; NULL = the category's `default_capacity` (NULL there = unlimited). Informational only |
+| **capacity** | Smallint | No | *(2026-08-19; enforced 2026-08-20)* Max students for this class; NULL = the category's `default_capacity` (NULL there = unlimited). A hard limit — a booking is refused when the lesson's expected set reaches it, an enrolment when the active roster does (§7.3) |
 | **colour** | String | No | *(2026-08-19)* Calendar palette key (`sky`, `rose`, …), never hex; NULL = neutral |
 | **created_at** | Timestamp | Yes | Record creation timestamp |
 | **updated_at** | Timestamp | Yes | Last update timestamp |
