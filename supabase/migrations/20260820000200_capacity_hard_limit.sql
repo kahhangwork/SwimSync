@@ -362,7 +362,11 @@ BEGIN
 
   -- ── Capacity: a hard refusal for EVERYONE, admin included (Decision 1) ────
   -- Same rule as book_makeup: the expected set on p_session_date against the
-  -- effective maximum, AFTER every refusal above.
+  -- effective maximum, AFTER every refusal above. (A duplicate live trial is
+  -- still caught by trial_bookings_live_slot_uniq -> 23505; at capacity the
+  -- count check may fire first and read "full" — a cosmetic edge, kept because
+  -- book_trial has never carried its own duplicate sentence and trial_onboarding
+  -- pins the index behaviour.)
   v_cap := class_effective_capacity(p_class_id);
   IF v_cap IS NOT NULL AND class_expected_count(p_class_id, p_session_date) >= v_cap THEN
     RAISE EXCEPTION
@@ -415,7 +419,13 @@ BEGIN
   -- Only an OPENING matters: a closed span (add_unclaimed_student's 'trial' row)
   -- occupies no seat, and a closing UPDATE frees one.
   IF NOT NEW.is_active THEN RETURN NEW; END IF;
-  IF TG_OP = 'UPDATE' AND OLD.is_active THEN RETURN NEW; END IF;   -- §7.57: detect the update
+  -- §7.57: detect the update. `OLD.class_id = NEW.class_id` is load-bearing —
+  -- a row MOVED to another class with is_active untouched (true->true) is a NEW
+  -- opening in the destination and must be checked there; without this term the
+  -- early return would skip it, so the `UPDATE OF … class_id` arm on the trigger
+  -- would be dead. No live path sets class_id today; this is the structural
+  -- insurance the trigger declaration claims (verified 2026-08-20 review).
+  IF TG_OP = 'UPDATE' AND OLD.is_active AND OLD.class_id = NEW.class_id THEN RETURN NEW; END IF;
   v_cap := class_effective_capacity(NEW.class_id);
   IF v_cap IS NULL THEN RETURN NEW; END IF;
   -- ⚠ RISK 1 / §7.126: `e.student_id <> NEW.student_id` is NOT redundant with
@@ -456,10 +466,10 @@ COMMENT ON COLUMN public.class_categories.default_capacity IS
 -- overload PostgREST calls instead (§7.87, §7.123, §7.124).
 DO $$
 BEGIN
-  IF (SELECT count(*) FROM pg_proc WHERE proname = 'book_makeup') <> 1 THEN
+  IF (SELECT count(*) FROM pg_proc WHERE proname = 'book_makeup' AND pronamespace = 'public'::regnamespace) <> 1 THEN
     RAISE EXCEPTION 'book_makeup has a stray overload — PostgREST resolution is now ambiguous (§7.124)';
   END IF;
-  IF (SELECT count(*) FROM pg_proc WHERE proname = 'book_trial') <> 1 THEN
+  IF (SELECT count(*) FROM pg_proc WHERE proname = 'book_trial' AND pronamespace = 'public'::regnamespace) <> 1 THEN
     RAISE EXCEPTION 'book_trial has a stray overload (§7.124)';
   END IF;
   IF pg_get_function_arguments('public.book_makeup(uuid,date,uuid,uuid)'::regprocedure) NOT LIKE '%DEFAULT NULL%' THEN

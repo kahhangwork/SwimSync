@@ -13,8 +13,10 @@
 -- add_unclaimed_student are called as the admin (they read auth.uid()); the
 -- coach cases switch to the coach.
 --
--- Dates are fixed and in the future (booking dates >= 2026-08-24) so span
--- coverage never depends on the wall clock (§7.7/§7.122). Own tenant; rolls back.
+-- DATES ARE RELATIVE TO today_sg() (§7.7): booking targets run on weekday(today+4)
+-- and bookings land on today+4 / today+18 (future, past the billed floor, matching
+-- the class weekday). Fixed dates would slip below markable_floor as the month
+-- rolls and turn the suite red on its own. Own tenant; rolls back.
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
@@ -43,23 +45,26 @@ INSERT INTO class_categories (id, tenant_id, name, default_capacity) VALUES
   ('ce900000-0000-0000-0000-000000000001','ca900000-0000-0000-0000-000000000001','Group', 2),
   ('ce900000-0000-0000-0000-000000000002','ca900000-0000-0000-0000-000000000001','Uncapped', NULL);
 
--- All coached by cap-coach; distinct times so a child in several never clashes
--- (trg_enrolment_schedule). J is Thursday (its own case needs a distinct day).
+-- All coached by cap-coach, ALL on weekday(today+4) with distinct times so a child
+-- in several never clashes (trg_enrolment_schedule) and every booking on today+4
+-- matches the class weekday.
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
                      location_name, price_per_lesson, category_id, capacity)
-SELECT x.id, co.id, x.title, x.dow::day_of_week, x.st::time, x.et::time, 'Pool', 50.00, x.cat, x.cap
+SELECT x.id, co.id, x.title,
+       (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg()+4)::int+1]::day_of_week,
+       x.st::time, x.et::time, 'Pool', 50.00, x.cat, x.cap
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id
 CROSS JOIN (VALUES
-  ('cf900000-0000-0000-0000-000000000001'::uuid,'K','monday','10:00','11:00','ce900000-0000-0000-0000-000000000001'::uuid, 3::smallint),
-  ('cf900000-0000-0000-0000-000000000002'::uuid,'L','monday','11:00','12:00','ce900000-0000-0000-0000-000000000001'::uuid, NULL::smallint),
-  ('cf900000-0000-0000-0000-000000000003'::uuid,'U','monday','12:00','13:00','ce900000-0000-0000-0000-000000000002'::uuid, NULL::smallint),
-  ('cf900000-0000-0000-0000-000000000004'::uuid,'H','monday','13:00','14:00','ce900000-0000-0000-0000-000000000001'::uuid, 10::smallint),
-  ('cf900000-0000-0000-0000-000000000005'::uuid,'M','monday','14:00','15:00','ce900000-0000-0000-0000-000000000001'::uuid, 3::smallint),
-  ('cf900000-0000-0000-0000-000000000006'::uuid,'E','monday','15:00','16:00','ce900000-0000-0000-0000-000000000001'::uuid, 3::smallint),
-  ('cf900000-0000-0000-0000-000000000007'::uuid,'J','thursday','10:00','11:00','ce900000-0000-0000-0000-000000000001'::uuid, 3::smallint),
-  ('cf900000-0000-0000-0000-000000000008'::uuid,'P','monday','16:00','17:00','ce900000-0000-0000-0000-000000000001'::uuid, 2::smallint),
-  ('cf900000-0000-0000-0000-000000000009'::uuid,'L2','monday','17:00','18:00','ce900000-0000-0000-0000-000000000001'::uuid, 2::smallint)
-  ) AS x(id,title,dow,st,et,cat,cap)
+  ('cf900000-0000-0000-0000-000000000001'::uuid,'K','10:00','11:00','ce900000-0000-0000-0000-000000000001'::uuid, 3::smallint),
+  ('cf900000-0000-0000-0000-000000000002'::uuid,'L','11:00','12:00','ce900000-0000-0000-0000-000000000001'::uuid, NULL::smallint),
+  ('cf900000-0000-0000-0000-000000000003'::uuid,'U','12:00','13:00','ce900000-0000-0000-0000-000000000002'::uuid, NULL::smallint),
+  ('cf900000-0000-0000-0000-000000000004'::uuid,'H','13:00','14:00','ce900000-0000-0000-0000-000000000001'::uuid, 10::smallint),
+  ('cf900000-0000-0000-0000-000000000005'::uuid,'M','14:00','15:00','ce900000-0000-0000-0000-000000000001'::uuid, 3::smallint),
+  ('cf900000-0000-0000-0000-000000000006'::uuid,'E','15:00','16:00','ce900000-0000-0000-0000-000000000001'::uuid, 3::smallint),
+  ('cf900000-0000-0000-0000-000000000007'::uuid,'J','16:00','17:00','ce900000-0000-0000-0000-000000000001'::uuid, 3::smallint),
+  ('cf900000-0000-0000-0000-000000000008'::uuid,'P','17:00','18:00','ce900000-0000-0000-0000-000000000001'::uuid, 2::smallint),
+  ('cf900000-0000-0000-0000-000000000009'::uuid,'L2','18:00','19:00','ce900000-0000-0000-0000-000000000001'::uuid, 2::smallint)
+  ) AS x(id,title,st,et,cat,cap)
 WHERE pr.email='cap-coach@test.local';
 
 INSERT INTO students (id, full_name, date_of_birth, assignment_status, tenant_id, created_by)
@@ -73,7 +78,7 @@ FROM (VALUES ('01'),('02'),('03'),('04'),('05'),('06'),('07'),('08'),('09'),
              ('40'),('41'),('42'),('43'),('50')) AS s(n);
 
 -- Guests GA/GB/GC and PG/PG2 live in home class H (CATG, cap 10) so they are
--- make-up eligible into K/L2/P (same category, not their own class).
+-- make-up eligible into K/L2/P/J (same category, not their own class).
 INSERT INTO student_class_enrolments (student_id, class_id, is_active) VALUES
   ('55900000-0000-0000-0000-00000000000a','cf900000-0000-0000-0000-000000000004', true),  -- GA
   ('55900000-0000-0000-0000-00000000000b','cf900000-0000-0000-0000-000000000004', true),  -- GB
@@ -82,14 +87,14 @@ INSERT INTO student_class_enrolments (student_id, class_id, is_active) VALUES
   ('55900000-0000-0000-0000-000000000043','cf900000-0000-0000-0000-000000000004', true); -- PG2
 
 -- ══ Cases 1–2: K roster fills to 3, the 4th is refused (Decision 3 roster) ════
--- S3 (…03) enrolled in the FUTURE (2026-09-01) — counts toward the roster
+-- S3 (…03) enrolled in the FUTURE (today+11) — counts toward the roster
 -- (is_active) but not toward a booking span before its start (cases 9/10).
-SELECT lives_ok($$
+SELECT lives_ok(format($$
   INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at) VALUES
     ('55900000-0000-0000-0000-000000000001','cf900000-0000-0000-0000-000000000001', true, now()),
     ('55900000-0000-0000-0000-000000000002','cf900000-0000-0000-0000-000000000001', true, now()),
-    ('55900000-0000-0000-0000-000000000003','cf900000-0000-0000-0000-000000000001', true, '2026-09-01')
-$$, '1: three enrolments fill K (cap 3)');
+    ('55900000-0000-0000-0000-000000000003','cf900000-0000-0000-0000-000000000001', true, %L)
+$$, (today_sg()+11)::timestamptz), '1: three enrolments fill K (cap 3)');
 SELECT throws_ok($$
   INSERT INTO student_class_enrolments (student_id, class_id, is_active)
   VALUES ('55900000-0000-0000-0000-000000000004','cf900000-0000-0000-0000-000000000001', true) $$,
@@ -156,53 +161,53 @@ SELECT throws_ok($$
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"cb900000-0000-0000-0000-000000000001","role":"authenticated"}';
 
--- Case 9: on 2026-09-14 all three K spans cover (S3 started 2026-09-01) -> full.
-SELECT throws_ok($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000001','2026-09-14',
-                                       '55900000-0000-0000-0000-00000000000a') $$,
+-- Case 9: on today+18 all three K spans cover (S3 started today+11) -> full.
+SELECT throws_ok(format($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000001',%L,
+                                       '55900000-0000-0000-0000-00000000000a') $$, today_sg()+18),
   'P0001', NULL, '9: a make-up into K on a fully-covered date is refused (3 of 3)');
--- Case 10: on 2026-08-24 S3 has not started -> only 2 spans -> a guest fits.
-SELECT lives_ok($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000001','2026-08-24',
-                                      '55900000-0000-0000-0000-00000000000a') $$,
+-- Case 10: on today+4 S3 has not started -> only 2 spans -> a guest fits.
+SELECT lives_ok(format($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000001',%L,
+                                      '55900000-0000-0000-0000-00000000000a') $$, today_sg()+4),
   '10: a make-up into K on a date before a child''s span start lives (2 of 3, span not is_active)');
 
--- Case 11: L2 has 1 enrolled (LA) + 1 make-up guest (GB) on D=2026-08-24; a 2nd guest is refused.
+-- Case 11: L2 has 1 enrolled (LA) + 1 make-up guest (GB) on D=today+4; a 2nd guest is refused.
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
   VALUES ('55900000-0000-0000-0000-000000000050','cf900000-0000-0000-0000-000000000009', true, now());
-SELECT book_makeup('cf900000-0000-0000-0000-000000000009','2026-08-24','55900000-0000-0000-0000-00000000000b'); -- GB (setup)
-SELECT throws_ok($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000009','2026-08-24',
-                                       '55900000-0000-0000-0000-00000000000c') $$,
+SELECT book_makeup('cf900000-0000-0000-0000-000000000009', today_sg()+4,'55900000-0000-0000-0000-00000000000b'); -- GB (setup)
+SELECT throws_ok(format($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000009',%L,
+                                       '55900000-0000-0000-0000-00000000000c') $$, today_sg()+4),
   'P0001', NULL, '11: a 2nd make-up guest into L2 (1 enrolled + 1 guest) is refused (2 of 2)');
 
 -- Case 12: cancelling the guest frees the seat; rebooking lives.
 SELECT cancel_makeup_booking((SELECT id FROM makeup_bookings
    WHERE student_id='55900000-0000-0000-0000-00000000000b'
      AND class_id='cf900000-0000-0000-0000-000000000009'
-     AND session_date='2026-08-24' AND cancelled_at IS NULL));
-SELECT lives_ok($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000009','2026-08-24',
-                                      '55900000-0000-0000-0000-00000000000c') $$,
+     AND session_date=today_sg()+4 AND cancelled_at IS NULL));
+SELECT lives_ok(format($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000009',%L,
+                                      '55900000-0000-0000-0000-00000000000c') $$, today_sg()+4),
   '12: after cancelling a guest, rebooking L2 lives — the seat freed');
 
 -- Case 13: rebooking a child already booked into a full K hears "already booked", not "full".
-SELECT throws_ok($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000001','2026-08-24',
-                                       '55900000-0000-0000-0000-00000000000a') $$,
+SELECT throws_ok(format($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000001',%L,
+                                       '55900000-0000-0000-0000-00000000000a') $$, today_sg()+4),
   'P0001', 'that child is already booked into that lesson',
   '13: a duplicate booking into a full lesson hears "already booked", not "full"');
 
 -- Case 14: a trial into a full L2 is refused (L2 on D now holds LA + GC = 2).
-SELECT throws_ok($$ SELECT book_trial('cf900000-0000-0000-0000-000000000009','2026-08-24',
-                                      '55900000-0000-0000-0000-00000000000d') $$,
+SELECT throws_ok(format($$ SELECT book_trial('cf900000-0000-0000-0000-000000000009',%L,
+                                      '55900000-0000-0000-0000-00000000000d') $$, today_sg()+4),
   'P0001', NULL, '14: a trial into a full L2 is refused (2 of 2)');
 RESET ROLE;
 
 -- ══ Case 15: the direct write paths are admin-only (Decision 4) ══════════════
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"cb900000-0000-0000-0000-000000000002","role":"authenticated"}';  -- coach
-SELECT throws_ok($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000003','2026-08-24',
-                                       '55900000-0000-0000-0000-00000000000a') $$,
+SELECT throws_ok(format($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000003',%L,
+                                       '55900000-0000-0000-0000-00000000000a') $$, today_sg()+4),
   'P0001', 'only this business''s admin may book a make-up',
   '15a: a coach cannot book a make-up');
-SELECT throws_ok($$ SELECT book_trial('cf900000-0000-0000-0000-000000000003','2026-08-24',
-                                      '55900000-0000-0000-0000-00000000000d') $$,
+SELECT throws_ok(format($$ SELECT book_trial('cf900000-0000-0000-0000-000000000003',%L,
+                                      '55900000-0000-0000-0000-00000000000d') $$, today_sg()+4),
   'P0001', 'only this business''s admin may book a trial',
   '15b: a coach cannot book a trial');
 SELECT throws_ok($$
@@ -260,34 +265,34 @@ SELECT lives_ok($$
 
 -- ══ Case 19 (RISK 6): a child closed still covers its date by span ═══════════
 -- J (cap 3): JA,JB,JC enrolled well in the past; JC closed with unenrolled_at on
--- the booking date (raw UPDATE so the date is fixed, clock-independent — the RPC
+-- the booking date (raw UPDATE so the date is fixed relative to today — the RPC
 -- sets now(); the ASYMMETRY is what matters). JD added in the future.
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at) VALUES
-  ('55900000-0000-0000-0000-000000000030','cf900000-0000-0000-0000-000000000007', true, '2026-08-01'),
-  ('55900000-0000-0000-0000-000000000031','cf900000-0000-0000-0000-000000000007', true, '2026-08-01'),
-  ('55900000-0000-0000-0000-000000000032','cf900000-0000-0000-0000-000000000007', true, '2026-08-01'); -- J at 3/3
-UPDATE student_class_enrolments SET is_active = false, unenrolled_at = '2026-09-03'
+  ('55900000-0000-0000-0000-000000000030','cf900000-0000-0000-0000-000000000007', true, now() - INTERVAL '30 days'),
+  ('55900000-0000-0000-0000-000000000031','cf900000-0000-0000-0000-000000000007', true, now() - INTERVAL '30 days'),
+  ('55900000-0000-0000-0000-000000000032','cf900000-0000-0000-0000-000000000007', true, now() - INTERVAL '30 days'); -- J at 3/3
+UPDATE student_class_enrolments SET is_active = false, unenrolled_at = (today_sg()+4)::timestamptz
   WHERE student_id='55900000-0000-0000-0000-000000000032' AND class_id='cf900000-0000-0000-0000-000000000007';
-SELECT lives_ok($$
+SELECT lives_ok(format($$
   INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
-  VALUES ('55900000-0000-0000-0000-000000000033','cf900000-0000-0000-0000-000000000007', true, '2026-09-10') $$,
+  VALUES ('55900000-0000-0000-0000-000000000033','cf900000-0000-0000-0000-000000000007', true, %L) $$, (today_sg()+11)::timestamptz),
   '19a: with one closed, a new enrolment lives — the roster sees 2 active');
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"cb900000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT throws_ok($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000007','2026-09-03',
-                                       '55900000-0000-0000-0000-00000000000a') $$,
-  'P0001', NULL, '19b: a make-up on 2026-09-03 is refused (3 of 3) — the closed child still covers by span, JD does not');
+SELECT throws_ok(format($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000007',%L,
+                                       '55900000-0000-0000-0000-00000000000a') $$, today_sg()+4),
+  'P0001', NULL, '19b: a make-up on today+4 is refused (3 of 3) — the closed child still covers by span, JD does not');
 RESET ROLE;
 
 -- ══ Case 20 (RISK 6): a FUTURE guest does not block a roster seat ════════════
--- P (cap 2): PA enrolled, plus a make-up guest PG on 2026-08-24. A 2nd PERMANENT
+-- P (cap 2): PA enrolled, plus a make-up guest PG on today+4. A 2nd PERMANENT
 -- enrolment still lives (the roster sees 1). Then the booking axis reads 3 on
 -- that date and a further guest is refused.
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
   VALUES ('55900000-0000-0000-0000-000000000040','cf900000-0000-0000-0000-000000000008', true, now());
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"cb900000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT book_makeup('cf900000-0000-0000-0000-000000000008','2026-08-24','55900000-0000-0000-0000-000000000042'); -- PG (setup)
+SELECT book_makeup('cf900000-0000-0000-0000-000000000008', today_sg()+4,'55900000-0000-0000-0000-000000000042'); -- PG (setup)
 RESET ROLE;
 SELECT lives_ok($$
   INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at)
@@ -295,11 +300,10 @@ SELECT lives_ok($$
   '20a: a 2nd permanent enrolment into P lives — a future guest does not take a roster seat');
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"cb900000-0000-0000-0000-000000000001","role":"authenticated"}';
-SELECT throws_ok($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000008','2026-08-24',
-                                       '55900000-0000-0000-0000-000000000043') $$,
-  'P0001', NULL, '20b: a further guest into P on 2026-08-24 is refused (3 of 2) — 2 roster spans + 1 guest');
+SELECT throws_ok(format($$ SELECT book_makeup('cf900000-0000-0000-0000-000000000008',%L,
+                                       '55900000-0000-0000-0000-000000000043') $$, today_sg()+4),
+  'P0001', NULL, '20b: a further guest into P on today+4 is refused (3 of 2) — 2 roster spans + 1 guest');
 RESET ROLE;
 
 SELECT * FROM finish();
 ROLLBACK;
-
