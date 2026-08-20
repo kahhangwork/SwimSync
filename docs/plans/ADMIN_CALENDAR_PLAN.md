@@ -284,6 +284,11 @@ Add `/calendar` to `smoke-admin-screens.mjs`.
     is the authority. (prohibition) **Do not add a capacity check inside `book_makeup`/`book_trial`** in
     this wave — both are billing-adjacent RPCs with their own test matrices; a DB-side capacity rule is
     its own migration wave and a BACKLOG item.
+    - **SUPERSEDED 2026-08-20** (`docs/plans/CAPACITY_HOLIDAY_BADGE_PLAN.md` Decision 1, `20260820000200`):
+      the user settled that capacity is a HARD refusal for everyone, admin included. "Book anyway" is
+      removed and `book_makeup`/`book_trial` (and enrolment, via a trigger) now refuse over-capacity.
+      A full class is fixed by raising its maximum, not by booking past it. Left here as the record —
+      history is not rewritten.
 - Deep-link safety: resolve everything from `(classId, date)`; refuse a date not on the weekday and with
   no session row ("This class doesn't run on Tuesday") instead of inventing a lesson.
   - ⚠ RISK 4 MITIGATION (assertion): the DB already refuses this (`assert_class_runs_on` in
