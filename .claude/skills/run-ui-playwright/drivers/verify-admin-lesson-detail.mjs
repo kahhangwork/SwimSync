@@ -62,6 +62,25 @@ page.on("pageerror", (e) => pageErrors.push(e.message));
 try {
   await loginAdmin(page, "coach@swimsync.test");
 
+  // ── Badge parity (§7.18, RISK 5): the sidebar Lessons badge (RPC
+  // tenant_unmarked_lesson_count, the FULL markable-window backlog) MUST equal
+  // the page's mode=needs row count (same backlog). Read BEFORE any marking
+  // below changes N. NOTE the week-mode "Needs marking (N)" tab is deliberately
+  // NOT compared: its needsCount is scoped to the current week's range, a
+  // legitimately different number from the full-window badge. (Nightly runs
+  // ~04:30 SGT, before the fixture lessons' 11:00/11:30 end — no clock flake.)
+  await page.goto(`${ADMIN}/lessons`, { waitUntil: "networkidle" });
+  await page.getByTestId("needs-marking-toggle").waitFor({ timeout: 15000 });
+  const badgeEl = page.locator('[title*="still need"][title*="marking"]');
+  const badgeN = (await badgeEl.count()) > 0 ? parseInt((await badgeEl.first().innerText()).trim(), 10) : 0;
+  await page.goto(`${ADMIN}/lessons?mode=needs`, { waitUntil: "networkidle" });
+  await page.getByTestId("lesson-row").first().waitFor({ timeout: 15000 });
+  const rowN = await page.getByTestId("lesson-row").count();
+  check(
+    `Lessons sidebar badge == mode=needs page rows, and >= 1 (§7.18: badge ${badgeN} / rows ${rowN})`,
+    badgeN === rowN && rowN >= 1,
+  );
+
   // ── Lessons list: Needs marking lists the partial lesson; a row opens it ──
   await page.goto(`${ADMIN}/lessons?mode=needs`, { waitUntil: "networkidle" });
   await page.getByTestId("lesson-row").first().waitFor({ timeout: 15000 });

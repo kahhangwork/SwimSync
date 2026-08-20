@@ -30,6 +30,9 @@ function badgeTitle(href: string, count: number): string {
   if (href === "/claims") {
     return `${count} parent${count === 1 ? " is" : "s are"} waiting — they cannot add that child until you decide`;
   }
+  if (href === "/lessons") {
+    return `${count} lesson${count === 1 ? "" : "s"} below today still need${count === 1 ? "s" : ""} marking`;
+  }
   return `${count}`;
 }
 
@@ -57,6 +60,12 @@ export function Sidebar() {
   // is what makes the silence visible from anywhere. Re-read on navigation so
   // settling a line drops it without a reload.
   const [orphanLines, setOrphanLines] = useState(0);
+  // Lessons below today still needing a mark (the /lessons?mode=needs count).
+  // Same reasoning as the two badges above: nothing emails the admin, the list
+  // only renders on the Lessons page, and unmarked attendance silently blocks
+  // billing (§8i) — this count makes the backlog visible from anywhere. Re-read
+  // on navigation so marking a lesson drops it without a reload.
+  const [needsMarking, setNeedsMarking] = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -78,6 +87,15 @@ export function Sidebar() {
     supabase
       .rpc("unbilled_sealed_lessons", { p_tenant: tenantId })
       .then(({ data }) => setOrphanLines((data ?? []).length));
+  }, [pathname, tenantId]);
+
+  useEffect(() => {
+    // The RPC authorises per tenant (platform admins have none — skip). A RAISE
+    // (e.g. a stale tenant_id) renders no badge, never a crash or NaN.
+    if (!tenantId) return;
+    supabase
+      .rpc("tenant_unmarked_lesson_count", { p_tenant: tenantId })
+      .then(({ data, error }) => setNeedsMarking(error ? 0 : Number(data ?? 0)));
   }, [pathname, tenantId]);
 
   useEffect(() => {
@@ -152,6 +170,7 @@ export function Sidebar() {
   const badges: Record<string, number> = {
     "/invoices": orphanLines,
     "/claims": pendingClaims,
+    "/lessons": needsMarking,
   };
 
   const grouped =
