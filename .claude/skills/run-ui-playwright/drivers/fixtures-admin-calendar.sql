@@ -47,7 +47,10 @@ FROM coaches co,
        ('ca1c1a55-0000-0000-0000-000000000002'::uuid, 'Cal Emerald Open', '10:30', '11:30', 6, 'emerald')
      ) AS v(id, title, t1, t2, cap, colour)
 WHERE co.profile_id = 'c0000000-0000-0000-0000-000000000001'
-ON CONFLICT (id) DO NOTHING;
+-- DO UPDATE, not DO NOTHING: verify-admin-lesson-detail raises Rose's capacity to
+-- book a guest and is now the guard's own test; a re-load must restore it to the
+-- fixture value (3/6) or a sibling calendar driver reads a stale 3/4 (RISK 4).
+ON CONFLICT (id) DO UPDATE SET capacity = EXCLUDED.capacity;
 
 -- ---- Children ----
 INSERT INTO students (id, full_name, tenant_id, assignment_status, is_active) VALUES
@@ -184,4 +187,6 @@ SELECT
   (SELECT count(*) FROM attendance a JOIN lesson_sessions ls ON ls.id = a.lesson_session_id
     WHERE ls.class_id::text LIKE 'ca1c1a55-%')                                             AS marks,
   (SELECT count(*) FROM credit_applications ca JOIN credit_notes cn ON cn.id = ca.credit_note_id
-    WHERE cn.lesson_session_id = 'ca15e555-0000-0000-0000-000000000003')                   AS applied;
+    WHERE cn.lesson_session_id = 'ca15e555-0000-0000-0000-000000000003')                   AS applied,
+  -- rose_cap must read 3 (RISK 4): the DO UPDATE restores it after a driver run.
+  (SELECT capacity FROM classes WHERE id = 'ca1c1a55-0000-0000-0000-000000000001')          AS rose_cap;

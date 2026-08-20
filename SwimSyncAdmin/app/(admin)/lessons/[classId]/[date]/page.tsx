@@ -110,7 +110,6 @@ export default function LessonPage() {
   const [bookHome, setBookHome] = useState("");
   const [bookBusy, setBookBusy] = useState(false);
   const [bookError, setBookError] = useState<string | null>(null);
-  const [bookConfirmFull, setBookConfirmFull] = useState(false);
 
   const today = todayInSg();
   const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
@@ -409,8 +408,7 @@ export default function LessonPage() {
       setBookError("Choose which class this make-up replaces.");
       return;
     }
-    if (full) setBookConfirmFull(true);
-    else void doBook();
+    void doBook();
   }
   async function cancelBooking(row: RosterRow) {
     if (!row.bookingId) return;
@@ -694,6 +692,11 @@ export default function LessonPage() {
               <p className="text-xs text-gray-500">A trial child must not be enrolled anywhere. To add a brand-new child, use the Trials page.</p>
             </>
           )}
+          {full && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800" data-testid="full-notice">
+              This lesson is full ({countText}). The database will refuse a booking — raise the class&apos;s maximum on the Classes page to add one.
+            </p>
+          )}
           {bookError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{bookError}</p>}
           <div className="flex gap-2 pt-1">
             <Button variant="outline" className="flex-1" onClick={() => setBookKind(null)}>
@@ -706,22 +709,8 @@ export default function LessonPage() {
         </div>
       </Modal>
 
-      <Modal title="This lesson is full" open={bookConfirmFull} onClose={() => setBookConfirmFull(false)}>
-        <p className="text-sm text-gray-700">
-          {cls.title} on {formatSgDate(date)} already has {countText}. The count is advisory — book anyway?
-        </p>
-        <div className="mt-4 flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={() => setBookConfirmFull(false)}>
-            Cancel
-          </Button>
-          <Button className="flex-1" data-testid="book-anyway" onClick={() => { setBookConfirmFull(false); void doBook(); }}>
-            Book anyway
-          </Button>
-        </div>
-      </Modal>
-
       <p className="mt-3 text-xs text-gray-400">
-        Saving writes attendance exactly as the coach app does; the marking window, weekday rule and credit-note lock are enforced by the database and cannot be overridden here. Substitutes and shadows follow the Lesson Coaches rules.
+        Saving writes attendance exactly as the coach app does; the marking window, weekday rule, capacity and credit-note lock are enforced by the database and cannot be overridden here. Substitutes and shadows follow the Lesson Coaches rules.
       </p>
     </div>
   );

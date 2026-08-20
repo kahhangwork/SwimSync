@@ -11,14 +11,18 @@
 //     re-marking a row whose credit is already applied is refused with the
 //     mapped CN001 message (RISK 2) — no retry, no override;
 //   • an off-weekday date with no session is "not a lesson": no Save at all;
-//   • assign / remove a substitute; book a make-up into a FULL lesson only via
-//     "Book anyway" (RISK 3), and the guest then appears with x+1/cap;
+//   • assign / remove a substitute; a make-up into a FULL lesson is REFUSED by
+//     the database (capacity is a HARD limit since 20260820000200 — no
+//     "Book anyway"); after raising the class's maximum the guest appears x+1/cap;
 //   • the Lessons list's Needs-marking mode lists the partial lesson and a row
 //     click lands on the lesson page.
 //
-// Setup: supabase + seed; fixtures-admin-calendar.sql loaded (RE-LOAD between
-// runs — this driver writes through the UI); admin dev on :3000; Expo web on
-// :8081 for the coach round trip.
+// Setup: supabase + seed; fixtures-admin-calendar.sql loaded; admin dev on :3000;
+// Expo web on :8081 for the coach round trip. A RE-RUN NEEDS A FULL db reset, not
+// just a fixture re-load: this driver books Delta into Rose and writes attendance
+// through the UI, and the fixture's ON CONFLICT does not remove those. The
+// capacity it raises IS restored in finally (and the fixture re-asserts it), so a
+// sibling verify-admin-calendar after a fixture re-load reads Rose at 3/3 again.
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
@@ -153,20 +157,34 @@ try {
   body = await page.locator("body").innerText();
   check("removing it returns to the class's own coach", /Teaching:\s*Coach Marcus/.test(body));
 
-  // ── Book a make-up into the FULL Rose lesson: Book anyway ────────────────
+  // ── Book a make-up into the FULL Rose lesson: the DATABASE refuses ────────
+  // Capacity is a hard limit (20260820000200); there is no "Book anyway".
   check("Rose today reads 3/3 · FULL", /3\/3/.test(await page.getByTestId("lesson-count").innerText()));
   await page.getByRole("button", { name: /Book a make-up into this lesson/ }).click();
   await page.getByLabel("Child", { exact: true }).waitFor({ timeout: 5000 });
   await page.getByLabel("Child", { exact: true }).selectOption(DELTA);
   await page.getByTestId("book-guest").click();
-  const anyway = page.getByTestId("book-anyway");
-  await anyway.waitFor({ timeout: 5000 });
-  check("booking into a full lesson asks 'Book anyway?' (RISK 3 — advisory, not a guard)", true);
-  await anyway.click();
+  await page.waitForTimeout(2000);
+  let bookBody = await page.locator("body").innerText();
+  check(
+    "a make-up into a full lesson is REFUSED by the DB — sentence shown, no 'Book anyway', guest not added, still 3/3",
+    /is full on .*\(3 of 3\)/.test(bookBody) &&
+      (await page.getByTestId("book-anyway").count()) === 0 &&
+      (await page.locator(`[data-testid="roster-row"][data-student="${DELTA}"]`).count()) === 0 &&
+      /3\/3/.test(await page.getByTestId("lesson-count").innerText()),
+    bookBody.replace(/\s+/g, " ").slice(0, 160),
+  );
+  // Raise Rose's maximum; the booking now succeeds -> 3+1/4 (the always-open exit).
+  sql(`UPDATE classes SET capacity = 4 WHERE id='${ROSE}'`);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /Book a make-up into this lesson/ }).click();
+  await page.getByLabel("Child", { exact: true }).waitFor({ timeout: 5000 });
+  await page.getByLabel("Child", { exact: true }).selectOption(DELTA);
+  await page.getByTestId("book-guest").click();
   await page.waitForTimeout(2500);
   const deltaRow = page.locator(`[data-testid="roster-row"][data-student="${DELTA}"]`);
-  check("the make-up guest appears in the roster with a Make-up chip", (await deltaRow.count()) === 1 && /Make-up/i.test(await deltaRow.innerText()));
-  check("the count becomes 3+1/3", /3\+1\/3/.test(await page.getByTestId("lesson-count").innerText()), await page.getByTestId("lesson-count").innerText());
+  check("after raising the maximum, the make-up guest appears with a Make-up chip", (await deltaRow.count()) === 1 && /Make-up/i.test(await deltaRow.innerText()));
+  check("the count becomes 3+1/4", /3\+1\/4/.test(await page.getByTestId("lesson-count").innerText()), await page.getByTestId("lesson-count").innerText());
   await page.screenshot({ path: shot("admin-lesson-rose-today.png"), fullPage: true });
 
   check("no uncaught page errors (admin)", pageErrors.length === 0, pageErrors.join(" || "));
@@ -190,6 +208,17 @@ try {
   check("DB: the coach's save left the admin's holiday row untouched (RISK 7)", afterCoach === "holiday", afterCoach);
   await cctx.close();
 } finally {
+  // Restore Rose to its fixture state (RISK 4): capacity 3 and no driver-booked
+  // Delta guest, so a sibling verify-admin-calendar after a fixture re-load reads
+  // 3/3 · FULL even if this run crashed mid-way.
+  try {
+    sql(`UPDATE classes SET capacity = 3 WHERE id='${ROSE}'`);
+    sql(`DELETE FROM makeup_bookings WHERE class_id='${ROSE}' AND student_id='${DELTA}'`);
+    const roseCap = sql(`SELECT capacity FROM classes WHERE id='${ROSE}'`);
+    check("cleanup: Rose restored to capacity 3, driver-booked guest removed", roseCap === "3", roseCap);
+  } catch (e) {
+    check("cleanup: Rose restored to capacity 3, driver-booked guest removed", false, String(e).slice(0, 120));
+  }
   await browser.close();
 }
 

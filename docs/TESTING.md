@@ -527,16 +527,20 @@ with the MAKE-UP chip, click pins, Today/‹/› move the URL date, the time gut
 horizontal scroll, month/agenda render, the coach filter keeps the substitute's lesson, double-click
 lands on `/lessons/…` — and, read through psql, **the `lesson_sessions` count is unchanged after the
 whole run** (the calendar is read-only by construction; ADMIN_CALENDAR_PLAN RISK 4).
-`verify-admin-lesson-detail.mjs` (same fixture — it is mapped in `run-all-drivers.sh`; 25 checks;
+`verify-admin-lesson-detail.mjs` (same fixture — it is mapped in `run-all-drivers.sh`; 26 checks;
 needs Expo too) drives the **lesson page** and the **Lessons** list: Needs-marking lists the partial
 lesson and a row opens it; an admin save lands as attendance rows AND an `audit_log`
 `attendance_saved` row (psql); `/attendance` shows the mark; a per-lesson Holiday confirms with the
 count; a below-floor lesson shows the closed banner with the billed row still editable as a
 correction, and re-marking a row whose credit is applied is refused with the CN001 message (the
 fixture builds a billed lesson + applied credit); an off-weekday date is "not a lesson" (no Save);
-assign/remove a substitute; booking a make-up into the FULL lesson goes through "Book anyway" and the
-guest appears as `3+1/3`; then the **coach app** opens the same lesson, saves, and the admin's
-holiday row survives (RISK 7). **Re-load the fixture between runs** — the driver writes.
+assign/remove a substitute; booking a make-up into the FULL lesson is **REFUSED by the database**
+(capacity is a hard limit since `20260820000200` — no "Book anyway"; the refusal sentence shows and
+the guest is not added), and after **raising the class's maximum** the guest appears as `3+1/4`; then
+the **coach app** opens the same lesson, saves, and the admin's holiday row survives (RISK 7). The
+`finally` restores Rose to capacity 3 and removes the driver-booked guest; the fixture's
+`ON CONFLICT DO UPDATE` re-asserts `rose_cap = 3` (plan RISK 4). **A re-run needs a full `db reset`,
+not just a fixture re-load** — the driver books and marks through the UI.
 Unit: `lib/calendarLessons.test.ts` (31 — incl. the SGT retirement cut-off pair and the
 `enrolled+guests === expectedStudentsOn` parity assertion), `lib/adminAttendanceSave.test.ts` (11 —
 mock deps: only changed rows sent, holiday kept, each step's error surfaced by name, no
@@ -546,6 +550,13 @@ mock deps: only changed rows sent, holiday kept, each step's error surfaced by n
 `class_capacity_colour.test.sql` (12) and `admin_marks_attendance.test.sql` (22 — a PURE tenant admin
 creates the session, upserts incl. holiday, writes the audit row, is refused below the floor / off
 weekday / ahead of today / on another tenant, mints exactly one credit note and meets CN001).
+`class_capacity_limit.test.sql` (29 — capacity as a HARD limit, `20260820000200`): the two axes of
+Decision 3 — a **roster** trigger refuses the over-cap enrolment (own cap / inherited default /
+unlimited / closed-span frees a seat / reactivation / same-statement multi-row / the raise-the-max
+escape), and the **booking** RPCs refuse the over-cap guest by span (a duplicate child hits the
+unique index not "full" — RISK 1; an already-booked child hears "already booked"; a coach is
+admin-refused on every direct path; `add_unclaimed_student`'s coach arm is covered; the
+closed-today-still-covers and future-guest asymmetries are pinned — RISK 6).
 `verify-makeups.mjs` (+ `fixtures-makeups.sql` and its `-teardown.sql`) drives a make-up —
 an enrolled child guesting one lesson of another same-category class — end to end through
 both real UIs (15 checks): the admin's booking form is child-first via **one search box
