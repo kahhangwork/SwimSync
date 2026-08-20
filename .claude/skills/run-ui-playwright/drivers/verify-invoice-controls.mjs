@@ -38,8 +38,12 @@ async function toggleBox(page) {
     const t = btn.getBoundingClientRect();
     const k = btn.querySelector("span").getBoundingClientRect();
     return {
-      track: { w: Math.round(t.width), h: Math.round(t.height), l: Math.round(t.left), r: Math.round(t.right) },
-      knob: { w: Math.round(k.width), h: Math.round(k.height), l: Math.round(k.left), r: Math.round(k.right) },
+      track: { w: t.width, h: t.height, l: t.left, r: t.right },
+      knob: { w: k.width, h: k.height, l: k.left, r: k.right },
+      // Tailwind sizes are rem-based and globals.css shrinks the root font-size
+      // below 1536px wide (16 -> 15 -> 14 -> 13px). Pixel pins moved with it
+      // (§7.73 family: 3 red nights, 2026-08-17..19); measure in rem instead.
+      rem: parseFloat(getComputedStyle(document.documentElement).fontSize),
       pressed: btn.getAttribute("aria-pressed"),
       disabled: btn.disabled,
     };
@@ -47,17 +51,20 @@ async function toggleBox(page) {
 }
 
 function assertToggleGeometry(label, b) {
-  // The track must not be squashed by its flex row. w-11 h-6 = 44x24.
-  check(`${label}: track is its full 44x24, not squashed`,
-    b.track.w === 44 && b.track.h === 24, `${b.track.w}x${b.track.h}`);
-  // h-5 w-5 = 20x20.
-  check(`${label}: knob is 20x20`,
-    b.knob.w === 20 && b.knob.h === 20, `${b.knob.w}x${b.knob.h}`);
+  // Sizes in rem: w-11 h-6 = 2.75 x 1.5rem (44x24 at 16px), h-5 w-5 = 1.25rem.
+  // Half a pixel of slack covers sub-pixel layout at a 13/15px root.
+  const px = (rem) => rem * b.rem;
+  const near = (a, rem) => Math.abs(a - px(rem)) <= 0.5;
+  const dims = (o) => `${o.w.toFixed(1)}x${o.h.toFixed(1)} @ ${b.rem}px root`;
+  check(`${label}: track is its full 2.75x1.5rem, not squashed`,
+    near(b.track.w, 2.75) && near(b.track.h, 1.5), dims(b.track));
+  check(`${label}: knob is 1.25x1.25rem`,
+    near(b.knob.w, 1.25) && near(b.knob.h, 1.25), dims(b.knob));
   // The regression that made this look broken: the knob riding or overhanging
   // the edge. Both ends, so neither position can hide it.
   check(`${label}: knob sits fully INSIDE the track`,
-    b.knob.l >= b.track.l && b.knob.r <= b.track.r,
-    `knob ${b.knob.l}..${b.knob.r} vs track ${b.track.l}..${b.track.r}`);
+    b.knob.l >= b.track.l - 0.5 && b.knob.r <= b.track.r + 0.5,
+    `knob ${b.knob.l.toFixed(1)}..${b.knob.r.toFixed(1)} vs track ${b.track.l.toFixed(1)}..${b.track.r.toFixed(1)}`);
 }
 
 const { browser, page } = await launch();
