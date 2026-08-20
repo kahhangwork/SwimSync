@@ -483,7 +483,8 @@ panel and a second browser context - mismatched confirmation email refused, join
 the delivery outcome stated explicitly, `invited` -> accept -> **the new admin signs in** ->
 `active` (15 checks; the sign-in is the load-bearing one, per 7.19);
 `verify-invoice-controls.mjs` drives the admin invoice controls — it MEASURES the toggle's
-track and knob rects from the DOM (§7.34) in both states and asserts the knob stays inside the
+track and knob rects from the DOM (§7.34) **in rem, not pixels** (§7.193 — the admin root
+font-size shrinks with viewport width) in both states and asserts the knob stays inside the
 track, that a click round-trips through the DB, and that the billing month defaults to and is
 capped at the last completed month;
 `verify-trial-onboarding.mjs` (+ `fixtures-trial-onboarding.sql`) drives the case of a

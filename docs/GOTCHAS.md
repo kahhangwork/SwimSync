@@ -3054,3 +3054,12 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     either way — which is also why the gap was invisible to every grant check. The coach app's
     `await supabase.from("audit_log").insert(…)` is UNCHECKED, so on that path the refusal would
     have been silent; the admin save checks it and reports step `"audit"`. (§8.71.)
+
+193. **The admin panel auto-scales its ROOT FONT-SIZE below 1536px wide** (`globals.css`, `43bef0c`:
+    16 → 15 → 14 → 13px at 1536/1280/1152), and every Tailwind size is rem-based, so **a driver that
+    pins a pixel size is pinning the viewport**. `verify-invoice-controls` asserted the toggle at
+    `44x24` (= `w-11 h-6` at 16px); at the drivers' 1280px viewport the root is 14px, the track
+    renders 38.5x21, and the sweep was red three nights (2026-08-17..19) on a product that had not
+    changed. Read `getComputedStyle(document.documentElement).fontSize` in the same `evaluate` and
+    assert in rem (±0.5px for sub-pixel layout). `verify-admin-table-geometry` measures ratios and
+    was unaffected. (§8.72.)

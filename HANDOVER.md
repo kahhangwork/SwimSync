@@ -1,13 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-19 (evening) — **ADMIN CALENDAR + LESSON PAGE (§8.71), LIVE.** Class capacity +
-colour; `/calendar` (day/week/month/agenda, `enrolled+guests/max`, Sub, hover roster, double-click → lesson);
-`/lessons` + `/lessons/[classId]/[date]` where the admin marks attendance (incl. per-lesson Holiday) through
-the coach app's exact save path, assigns a substitute, books a guest. 1 migration, 3 app pushes. §7.191-192 ·
-PRD §7.3/§7.6/§7.22 · DEPLOYMENT §11.30 · `docs/plans/ADMIN_CALENDAR_PLAN.md`._
+_Last updated: 2026-08-20 — **Nightly sweep un-reddened (§8.72).** One driver fix: `invoice-controls` measured the
+toggle in pixels; the admin root font-size now scales with viewport width, so it asserts in rem. No product change,
+no migration. §7.193 · TESTING §5. Tonight's run (`gh run list --workflow=ui-drivers.yml`) is the proof, not this line._
 
-_Previously, 2026-08-19 (§8.70) — event-driven public-holiday voids, LIVE: `holiday` status voids a day,
-event-extends packages; 8 migrations, engine v25. §7.188-190 · PRD §7.16 · DEPLOYMENT §11.29._
+_Previously, 2026-08-19 (§8.71) — admin Calendar + Lesson page, LIVE: capacity + colour, `/calendar`, `/lessons/[classId]/[date]`;
+1 migration, 3 app pushes. §7.191-192 · PRD §7.3/§7.6/§7.22 · DEPLOYMENT §11.30 · `docs/plans/ADMIN_CALENDAR_PLAN.md`._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -391,6 +389,16 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.72 (2026-08-20) — NIGHTLY SWEEP TRIAGED: ONE DRIVER, RED ON A RULER, NOT A BUG
+
+**`invoice-controls` had been 14/18 for three nights (2026-08-17..19) and the product had not moved.**
+The 08-17 auto-scale (`43bef0c`) shrinks the admin root font-size to 14px at the drivers' 1280px
+viewport; the driver pinned the toggle at `44x24` pixels. It now reads the root font-size and asserts
+in rem (`22adfd1`, 18/18 locally). Gotcha §7.193; TESTING §5 updated. The 08-14..16 reds were a
+different set (`packages`, `parent-claim`, `platform-admin-scope`), cleared by the 08-17 session. The
+triage followed §9's own rule — *check which moved, the product or the assumption* — and the cheap
+tell was the ratio: 38.5/44 = 14/16. Nothing else touched; no migration, no deploy.
+
 ## 8.71 (2026-08-19, evening) — ADMIN CALENDAR + LESSON PAGE, LIVE
 
 **The tenant admin can now see every coach's lessons on one calendar and act on one lesson.** Built
@@ -417,32 +425,6 @@ cut-off follows the engine's SGT date, not `mark_day_holiday`'s `::date` (now a 
 filter is distinct `location_name`); capacity as a hard limit in the booking RPCs (it is advisory —
 "Book anyway?"); the `mark_day_holiday` UTC-date drift; a Lessons sidebar badge (needs a callable
 tenant-scoped count RPC); and the admin save writes **no shadow absences** (a missing row = paid).
-
-## 8.70 (2026-08-19) — EVENT-DRIVEN PUBLIC-HOLIDAY VOIDS, LIVE
-
-**The "bound `recompute_package_extensions`" backlog trap became a re-architecture, shipped + deployed to
-prod.** A new `holiday` attendance status (**admin-only, DB-guarded** — coach sees it read-only) voids a
-day's lessons: **non-billable** (no charge, no package draw) AND **event-extends** each covering package by
-the tenant's configurable `holiday_extension_days` (default 7), **deduped per (package, date)**, reversible,
-coverage judged on the nominal window (no cascade). This REPLACES the calendar-scan
-`recompute_package_extensions` (dropped) — there is no standing per-load scan any more. The admin acts from
-Holidays → **Void lessons** (each row shows voided-state + a Restore). A billed `present→holiday` auto-issues
-a cash credit note. 8 migrations `…000400`–`…001100` (expand/contract — the contract migration was held back
-via a `.hold` rename until both apps shipped), engine **v25**, both apps. §7.188-190 · PRD §7.16 · DEPLOYMENT
-§11.29 · runbook `docs/plans/HOLIDAY_ATTENDANCE_RUNBOOK.md`.
-
-Built `/plan-with-confidence` → `/plan-review` (Fable, **4 blocking defects** folded into the plan:
-transition-tables-are-single-event §7.188, CREATE-OR-REPLACE-can't-rename-a-param §7.189, a one-directional
-admin guard, deploy-order) → `/commit-review` (Fable, **5 more fixed pre-commit**:
-leftover recompute callers still in the apps, missing tenant scope on the coverage resolver §7.190, UTC date
-casts, a `FOR UPDATE` deadlock, a swallowed save error). Verified pgTAP **1179**, Deno **229 ×2**, admin
-vitest **447**, app jest **387**, both typechecks; the deploy was gated on a served-bundle grep (old columns
-0 hits, new strings present). `03b25e3`.
-
-**Deliberately not done:** the loud/quiet **ack badge was DROPPED** (the extension shows as a quiet "+N days"
-line, no Acknowledge); holiday extensions are **not** written to `package_extension_events` (their audit is
-the `package_holiday_extensions` state table); **Admin per-lesson attendance marking** filed to BACKLOG (the
-void is whole-day only). Grant dump confirmed clean on prod 2026-08-19.
 
 ## 9. Next steps (pick with the user)
 
@@ -484,6 +466,10 @@ for one marked inactive.
 > **Re-read the run, not this paragraph.** `gh run list --workflow=ui-drivers.yml` and the
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
+
+**State on 2026-08-20:** red every night since 08-14; the last survivor (`invoice-controls`, a pixel
+pin under the rem auto-scale, §7.193) was fixed on `22adfd1`. The 08-20 run should be the first green
+— if it is not, the failing name is new, so triage it as new.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
