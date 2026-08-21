@@ -295,19 +295,17 @@ export default function LessonCoachesPage() {
     }
 
     const who = coaches.find((c) => c.id === pickedCoach)?.name ?? "That coach";
-    const isCover = pickedCoach !== selected.coach_id;
     setPicking(null);
     setPickedCoach("");
     // Reload before releasing the buttons: re-enabling them mid-refetch lets a
     // second assignment fire against rows that are about to be replaced.
     await reload();
     setBusy(false);
+    // The picker excludes the class's own coach (they teach it anyway, and the DB
+    // refuses assigning them — 20260821000100), so a saved pick is always a real
+    // cover: the lesson moves onto the substitute's marking list.
     setMessage(
-      isCover
-        ? `${who} is now teaching ${formatSgDate(date)}. This lesson has moved onto their marking list and off ${selected.coach_name}'s.`
-        : // Pinning the class's own coach is not a cover, and saying it moved
-          // "off Coach A's list" when A is the one assigned reads as a bug.
-          `${who} is pinned to ${formatSgDate(date)} — they already teach this class, so nothing has moved.`
+      `${who} is now teaching ${formatSgDate(date)}. This lesson has moved onto their marking list and off ${selected.coach_name}'s.`
     );
   }
 
@@ -473,11 +471,16 @@ export default function LessonCoachesPage() {
                             className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
                           >
                             <option value="">Who taught it?</option>
-                            {coaches.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
+                            {/* Exclude the class's own coach: they teach it anyway,
+                                so assigning them records no cover and the DB refuses
+                                it (20260821000100). A substitute is a DIFFERENT coach. */}
+                            {coaches
+                              .filter((c) => c.id !== selected?.coach_id)
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
                           </select>
                           <Button
                             size="sm"
