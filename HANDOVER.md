@@ -1,10 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-21 — **A no-op substitute is REFUSED: assigning the coach who already teaches a lesson (the
-paid coach) records no cover, so the DB refuses it and both admin pickers hide them — LIVE (§8.74).** One migration
-`20260821000100` (CREATE OR REPLACE, no grant change, no engine). PRD §7.6 · DEPLOYMENT §11.32 · gotcha §7.197._
+_Last updated: 2026-08-21 — **Two DB hardening guards SHIPPED + DEPLOYED to prod (§8.75): the capacity
+last-seat race now takes a `FOR UPDATE` class-row lock (§7.198); the raw-`UPDATE` retirement hole and its
+date-move sibling are closed by a BEFORE UPDATE, `auth.uid()`-trust-boundaried trigger (§7.199).** Migrations
+`20260821000200/300`; no engine or app change. DEPLOYMENT §11.33._
 
-_Previously, 2026-08-21 (§8.73) — capacity HARD limit · holiday retirement SGT-inclusive · Lessons sidebar badge, all LIVE (§11.31)._
+_Previously, 2026-08-21 (§8.74) — a no-op substitute is REFUSED; both admin pickers hide the paid coach (§7.197 · DEPLOYMENT §11.32)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -217,7 +218,10 @@ is a guard whose first real firing is still ahead of you.
   class carries a `capacity`/`default_capacity`, so the guard **refuses nothing** until a maximum is set
   (its correct production state is "no observable change" — don't rediscover it as broken), and no
   holiday has a same-day retirement, so the SGT `>=` fix has never fired. **The Lessons sidebar badge is
-  the exception — LIVE**, showing the real needs-marking backlog immediately (PRD §7.3/§7.6/§7.22).
+  the exception — LIVE**, showing the real needs-marking backlog immediately (PRD §7.3/§7.6/§7.22). The two
+  §8.75 guards (capacity `FOR UPDATE` lock §7.198, raw-retire trigger §7.199) are LIVE-but-dormant for the
+  same shape: one admin cannot race a seat, and every retire goes through the RPC today — first firing needs
+  a second admin or a parent self-enrol path.
 
 *(Corrected 2026-08-10: this list also carried "production has 0 attendance rows", which
 had been false since 2026-07-26 and directly contradicted the REAL BILLING note below.
@@ -393,6 +397,28 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.75 (2026-08-21) — TWO CONCURRENCY/INTEGRITY GUARDS on `classes` — SHIPPED and DEPLOYED to prod
+
+**Both were the §8.73 review's two filed follow-ups.** (1) The HARD capacity limit was a check-then-insert
+with no row lock, so two writers for the last seat could both pass under READ COMMITTED and breach the cap;
+`book_makeup`/`book_trial`/`enforce_class_capacity` now take `FOR UPDATE` on the class row before the count
+(only when a cap applies — unlimited classes never lock). §7.198. (2) `classes_write` FOR ALL + a table
+UPDATE grant let an authenticated admin retire a class by a raw PostgREST UPDATE, skipping
+`deactivate_class()`'s three refusals; they are extracted into `assert_class_retirable()` and enforced for
+every user-context path by a BEFORE UPDATE trigger — an RLS policy can't (WITH CHECK never sees OLD). Trust
+boundary: `auth.uid() IS NOT NULL`, so service_role/superuser stay exempt (the engine's Deno tests and
+fixtures force states freely). §7.199. Migrations `20260821000200/300`. Deploy: DEPLOYMENT §11.33.
+
+**Verified:** pgTAP full suite PASS — two new files, `class_capacity_lock` (structural lock pin) and
+`class_retirement_guard` (12), both proven **red-first**; Deno ×2 **229/229**; admin typecheck + vitest
+**516**. Migrations-only to prod (`remote` filled, objects re-confirmed from a `db dump`); no engine
+(`core.ts` untouched) or app change. TESTING §5.
+
+**A Fable Senior-Engineer review ran before the commit** and caught a **sibling hole** — a raw false→false
+move of `deactivated_at` on an already-retired class — closed in the same trigger, plus test-discrimination
+and lock-pin hardening. One finding filed to `BACKLOG.md`: a **booking-vs-concurrent-retire** race, distinct
+from the last-seat one.
+
 ## 8.74 (2026-08-21) — A NO-OP SUBSTITUTE IS REFUSED — the paid coach can't cover their own lesson
 
 **The admin "assign a coach to this lesson" control installs a per-lesson SUBSTITUTE, and assigning the
@@ -411,25 +437,6 @@ and cascades 14 failures), full suite green; admin typecheck + vitest **516**. M
 **A Fable Senior-Engineer review ran before the commit** and caught the PRD doc-gate line and the
 Substitutes-page show-then-error inconsistency — both fixed in the same push, and the now-dead "nothing has
 moved" branch removed with it. No new backlog items; the two capacity follow-ups from §8.73 still stand.
-
-## 8.73 (2026-08-21) — CAPACITY HARD LIMIT · HOLIDAY SGT BOUNDARY · LESSONS BADGE, all LIVE
-
-**The three planned calendar-wave follow-ups shipped**, backend-first, three migrations one at a time
-(`docs/plans/CAPACITY_HOLIDAY_BADGE_PLAN.md` is the record; its Decisions table was settled with the
-user): **A** `mark_day_holiday`'s retirement predicate is now SGT + inclusive (`>=`), fixing a two-axis
-drift (§7.195); **B** capacity is a **HARD limit** — bookings refused by the expected set, enrolments by
-the active roster, for everyone incl. the admin, no override, "Book anyway" gone; **C** a granted
-`tenant_unmarked_lesson_count` drives an amber **Lessons sidebar badge** mirroring `/lessons?mode=needs`.
-Behaviour: PRD §7.3/§7.6/§7.22. Deploy: DEPLOYMENT §11.31 (grant dump clean, no engine deploy).
-
-**Verified:** pgTAP **1258** (63 files; two new 29 + 13, red-first proven), Deno ×2, admin typecheck +
-vitest **516**, drivers `verify-admin-lesson-detail` **27/27** (a badge==page-rows parity pin, proven red
-by breaking the SQL), `verify-admin-calendar` **21/21**, `verify-makeups` 15/15.
-
-**A Fable Senior-Engineer review ran before the push** and caught two pgTAP **time-bombs** — fixed dates
-that fall below the rolling billing floor, turning CI red on its own (§7.194) — plus a dead trigger arm;
-all fixed and re-verified first. Two follow-ups filed in `BACKLOG.md`: a last-seat capacity race, and a
-raw-`UPDATE` retirement hole. Gotchas §7.194-196.
 
 ## 9. Next steps (pick with the user)
 
@@ -490,18 +497,18 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — substitute no-op refusal shipped LIVE 2026-08-21 (§8.74). Queue open.
+### THE NEXT BUILD — the two capacity-wave guards shipped + deployed 2026-08-21 (§8.75). Queue open.
 
-**No migration is in flight** (§7.55). The capacity/holiday/badge wave (§8.73) and the substitute no-op
-refusal (§8.74) are done and deployed; the one calendar-wave follow-up left is **a location entity** (M) —
-the calendar's Location filter is distinct `location_name` text (`BACKLOG.md` → *Admin and operations*). It
-unblocks nothing urgent.
+**No migration is in flight** (§7.55). Both §8.73-review follow-ups (the capacity last-seat lock §7.198 and
+the raw-`UPDATE` retirement guard §7.199) are done and DEPLOYED. The one calendar-wave follow-up left is
+**a location entity** (M) — the calendar's Location filter is distinct `location_name` text (`BACKLOG.md` →
+*Admin and operations*). It unblocks nothing urgent.
 
-**Worth doing next, both from the §8.73 review** (`BACKLOG.md`): the **capacity last-seat race**
-(S — no `FOR UPDATE` on the class row, so two concurrent writers can breach a "hard" limit; dormant at
-single-admin scale) and the **raw-`UPDATE` retirement hole** (S — `classes_write` is `FOR ALL`, so a
-PostgREST `UPDATE` bypasses `deactivate_class()`'s refusals). Then **Parent self-enrolment** (M) — now
-that capacity is a real guard, only the parent-facing flow remains.
+**Worth doing next** (`BACKLOG.md`): **Parent self-enrolment** (M) — capacity is now a real guard, so only
+the parent-facing flow remains. Newly filed from the §8.75 review: a **booking-vs-concurrent-retire** race
+(S — a booking can land in a class retired in the same instant; distinct from the shipped last-seat one, and
+its uncapped case needs a decision about locking unlimited classes). Also open: the `add_unclaimed_student`
+coach-arm product question (should the class's own coach be able to enrol a brand-new child?).
 
 Still open from earlier: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on
 0 notes); HANDOVER §3 graduation (docs tax). Then *Later* (owner-only accounting page, accrual). Full
@@ -539,10 +546,11 @@ ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · mult
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260821000100` (the substitute no-op guard,
-§8.74); production confirmed caught up 2026-08-21 via `supabase migration list --linked`, **0 pending**.
-**DEPLOYMENT §11.32 is the freshest worked example** — one CREATE-OR-REPLACE migration, no grant dump
-needed (same signature, no new object), no engine deploy, apps last.
+**The migration queue is EMPTY.** The latest applied is `20260821000300` (the retirement guard, §8.75);
+production confirmed caught up 2026-08-21 via `supabase migration list --linked`, **0 pending**.
+**DEPLOYMENT §11.33 is the freshest worked example** — two migrations, one adding a NEW function + trigger,
+so a `db dump` grant/object check was taken (unlike §11.32); no engine, no app deploy. §11.32 is the simpler
+same-signature CREATE-OR-REPLACE (no grant dump needed).
 **§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
 **expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract
 migration LAST (held back by a `.hold` rename until the apps stopped reading the dropped columns);

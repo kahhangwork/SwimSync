@@ -565,6 +565,19 @@ a past untouched lesson and a partial one count; fully-marked / fully-holiday / 
 before-the-floor do not; a guest-only trial lesson counts; a retired class's post-retirement pattern
 date is skipped unless a session row exists; plus the authz gate (stranger / other tenant's admin /
 coach refused, platform admin allowed).
+`class_capacity_lock.test.sql` (3 — the last-seat lock, `20260821000200`, §7.198): a **structural pin** that
+`book_makeup` / `book_trial` / `enforce_class_capacity` each hold a `FROM classes WHERE id … FOR UPDATE`
+before the count — a true two-writer race is not provable in single-session pgTAP (one transaction, rolled
+back), so this asserts the lock statement is present, matched by the whole `FROM classes WHERE id … FOR
+UPDATE` shape (not a bare `FOR UPDATE` a comment could satisfy), proven red against the pre-lock build.
+`class_retirement_guard.test.sql` (12 — the raw-`UPDATE` retirement guard, `20260821000300`, §7.199): an
+**authenticated** raw retire of a class with an open enrolment / a future guest is refused by
+`trg_class_retirement_guard`, and nothing is written; a clean class retires and reactivates; a false→false
+move of `deactivated_at` on an already-retired class is refused (the date-move sibling); an ordinary edit of
+an obstructed **active** class and reactivation of an obstructed **inactive** one are NOT blocked (the §7.112
+partners); and the `auth.uid()` trust boundary is pinned — a no-user (superuser/service_role) context is
+exempt, which is what lets the Deno engine tests and the pgTAP fixtures force retired states (they clear
+`request.jwt.claims`, since `RESET ROLE` alone leaves the LOCAL claim set). Red-first proven.
 `verify-makeups.mjs` (+ `fixtures-makeups.sql` and its `-teardown.sql`) drives a make-up —
 an enrolled child guesting one lesson of another same-category class — end to end through
 both real UIs (15 checks): the admin's booking form is child-first via **one search box

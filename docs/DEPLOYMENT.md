@@ -681,3 +681,21 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     (`core.ts` untouched). **Rollback:** committed `20260821000100_..._DOWN.sql` restores the pre-guard
     body. **Dormant on prod:** single private coach = paid coach = the class coach, so the picker sits
     empty and the guard's first real firing needs a second coach.
+
+33. **Deploy record (2026-08-21): two hardening guards on `classes`** (§8.75, §7.198/§7.199). Two
+    migrations: `20260821000200` (capacity `FOR UPDATE` last-seat lock — three CREATE OR REPLACE, **same
+    signatures**) and `20260821000300` (raw-`UPDATE` retirement guard — a **new** `assert_class_retirable()`
+    revoked-from-all, a **new** BEFORE UPDATE trigger, and `deactivate_class` CREATE OR REPLACE to delegate).
+    Sequence: (1) `supabase db push` — the `pgdelta` cert stack trace printed alongside `Finished` again
+    (§7.55, normal); `migration list --linked` shows `remote` filled for **both**. (2) **Object + grant
+    check** via `supabase db dump --linked`: the 3 `FOR UPDATE` lock statements present, `trg_class_retirement_guard`
+    present, both new functions `REVOKE ALL … FROM PUBLIC`, **zero `anon`** on the new function; the
+    migrations' own apply-time DO-block probes asserted the same on prod (a migration commits only if they
+    pass). **No table grant touched** (§7.87 whitelist unchanged). (3) **No app or engine deploy** —
+    `core.ts` untouched, no app code changed (both apps call the RPCs, never raw writes on `classes`).
+    **Rollback (documented, not a committed DOWN file — additive guards, visible/reversible failure mode):**
+    re-apply the function bodies from `20260820000200` + `20260809000300` (both unchanged in git) and
+    `DROP TRIGGER trg_class_retirement_guard` + `DROP FUNCTION guard_class_retirement, assert_class_retirable`.
+    **Dormant on prod:** one admin cannot race the last seat, and every retire goes through the RPC today —
+    first real firing needs a second admin or a parent self-enrol path. A pre-commit Fable review closed a
+    date-move sibling hole (§7.199) before the push.
