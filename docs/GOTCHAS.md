@@ -3101,3 +3101,19 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     and the driver restores the column (and deletes the row it booked) in a `finally`. The general
     rule: a `DO NOTHING` fixture is only idempotent for rows nothing else writes; the moment a driver
     writes fixture rows, a re-load is not a reset. (2026-08-20.)
+
+197. **A "NO-OP SUBSTITUTE" REFUSAL COMPARES THE PAID COACH (`class_rate_on().paid_coach_id`), NEVER
+    `classes.coach_id` — BECAUSE `is_cover` DOES.** `assign_session_coach` installs a per-lesson
+    substitute; assigning the coach who already teaches the lesson records no cover
+    (`lessonAttribution.is_cover` is `subCoach != termsCoach`, false) and leaves only a dead-end "Remove
+    substitute" control — a private coach hit exactly that assigning themselves. The guard added in
+    `20260821000100` refuses it, and the predicate is the MONEY axis (the class rate's paid coach on that
+    date), not the access axis (`classes.coach_id`). The two coincide for a private coach but **diverge
+    after a handover**: on a past date the old paid coach is still `class_rate_on().paid_coach_id` while
+    `classes.coach_id` is the new coach — so a "fix" that compared `classes.coach_id` would refuse a
+    legitimate handover-correction cover (pinning the old coach back) *and* allow the real no-op. The UI
+    pickers exclude the same coach: lesson-detail via `termsCoachOn(rates,…)` (exact); the Substitutes
+    page via `classes.coach_id` (it is an access-axis tool that never loads rates — identical in prod,
+    and the DB is the backstop for the unreachable handover cell). The guard sits **before** the
+    resolve-or-create so a refusal leaves no `lesson_sessions` row. To revert to the class's own coach you
+    REMOVE the substitute, never assign them. (2026-08-21.)

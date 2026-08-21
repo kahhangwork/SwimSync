@@ -670,3 +670,14 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     hard limit refuses nothing until a maximum is set; the badge shows the real needs-marking backlog
     immediately. Pre-deploy Senior-Engineer review (Fable agent) fixed two test time-bombs (§7.194)
     and a dead trigger arm before the push.
+
+32. **Deploy record (2026-08-21): refuse a no-op substitute** (§8.74, §7.197). One migration,
+    `20260821000100` — `assign_session_coach` (3-arg) CREATE OR REPLACE, **same signature**, adds a guard
+    refusing the paid coach (`class_rate_on().paid_coach_id`) as their own substitute. Sequence: (1)
+    `supabase db push` — `migration list --linked` shows `remote` filled; the `pgdelta` cert stack trace
+    printed alongside `Finished` again (§7.55, normal). (2) **No grant dump** — CREATE OR REPLACE of an
+    already-granted function, no new object, no privilege change. (3) apps to `main` → Vercel (picker
+    relabel + hide the paid coach on both substitute surfaces), both builds green. **No engine change**
+    (`core.ts` untouched). **Rollback:** committed `20260821000100_..._DOWN.sql` restores the pre-guard
+    body. **Dormant on prod:** single private coach = paid coach = the class coach, so the picker sits
+    empty and the guard's first real firing needs a second coach.
