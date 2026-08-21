@@ -1179,24 +1179,35 @@ contract migration (add table + FK, backfill from distinct names, keep the text 
 apps read the FK). Per-venue columns in the day view are the UI half. Not urgent: production is one
 location.
 
-### A booking can land in a class retired in the SAME instant — **S** `[found 2026-08-21 in commit review]`
-`book_makeup`/`book_trial` read `classes.is_active` at the top, then (for a capped class) block on the new
-`FOR UPDATE` class-row lock. If a concurrent `deactivate_class()` commits while they wait, they resume with
-a stale `is_active = true` and INSERT a guest into a now-retired class — the invariant refusal 2 exists to
-stop. On an **uncapped** class the same race exists with **no** lock at all (the FK's `FOR KEY SHARE` does
-not serialise against a non-key `UPDATE`). Distinct from the last-seat race (§7.198, shipped) — that one is
-booking-vs-booking; this is booking-vs-retire.
+### A booking can land in a class retired in the SAME instant — **SHIPPED 2026-08-21 (§7.200, `20260821000400`)**
+`book_makeup`/`book_trial` read `classes.is_active` at the top, then (for a capped class) block on the
+`FOR UPDATE` class-row lock. A concurrent `deactivate_class()` committing in the gap left them resuming with
+a stale `is_active = true` and inserting a guest into a now-retired class; on an **uncapped** class no lock
+was taken at all (the FK's `FOR KEY SHARE` does not serialise against a non-key `UPDATE`). **Fixed:** the
+lock is now taken UNCONDITIONALLY, is_active is re-read under it, and `class_effective_capacity()` is read
+under it too (closing the stale-`v_cap` half). The reverse direction (retire racing an in-flight booking)
+was already covered by `trg_class_retirement_guard` re-running `assert_class_retirable` after the lock
+releases (§7.199). Structural pgTAP pin `booking_retire_race.test.sql` (8, red-first); Deno ×2 229/229.
+Was distinct from the last-seat race (§7.198, shipped) — that one was booking-vs-booking; this was
+booking-vs-retire.
 
-**Why:** dormant at single-admin scale (one admin cannot race themselves), no money impact, and rare. But
-it re-opens the "a retired class holds zero live guests" invariant the calendar/badge lean on.
+### The ROSTER axis has the SAME booking-vs-retire race — **S** `[found 2026-08-21 while shipping §7.200]`
+The twin of §7.200 on the enrolment side. `enforce_enrolment_schedule()` reads `classes.is_active` in its
+BEFORE trigger (refusing entry to a retired class) WITHOUT a lock, and `enforce_class_capacity()` takes the
+`FOR UPDATE` lock only when the class is capped and never re-checks is_active. So an enrolment racing a
+concurrent `deactivate_class()` can land an ACTIVE enrolment in a now-retired class — same broken invariant
+("a retired class holds zero active enrolments"), reachable on an uncapped class with no lock at all.
 
-**Notes:** the capped case is a near-free add to `book_makeup`/`book_trial` — re-check under the existing
-lock: `PERFORM 1 FROM classes WHERE id = p_class_id AND is_active FOR UPDATE`, raise "no longer running" on
-zero rows, and move the `class_effective_capacity()` read AFTER the lock so a concurrent capacity *decrease*
-is seen too (the stale-`v_cap` half, also from the review). The **uncapped** case needs the lock taken
-unconditionally, which trades the "unlimited classes never lock" optimisation — decide that deliberately.
-Do it the day a tenant gains a second admin (parent self-enrolment, the other trigger this once named, was
-refused 2026-08-21 — see *Deliberately not doing*).
+**Why:** dormant at single-admin scale (assignment is a superadmin action; one admin cannot race
+themselves), no money impact, rare. Filed rather than folded into §7.200 because `enforce_enrolment_schedule`
+is a prohibition-heavy trigger (HANDOVER §3: must NOT consult the counterparty's `is_active`) and deserves
+its own red-first coverage, and the booking axis was the one the review named.
+
+**Notes:** the fix mirrors §7.200 — in `enforce_class_capacity()` (which already owns the lock path) take the
+class-row `FOR UPDATE` UNCONDITIONALLY and re-read `NEW.class_id`'s is_active under it, raising the same
+"has been retired — restore it on the Classes page" message. Careful: the re-check is on `NEW.class_id`
+(the class being ENTERED), never on a counterparty — that prohibition is about the overlap check's `c2`, not
+this. Do it the day a tenant gains a second admin, alongside any other roster-vs-retire hardening.
 
 ### A raw PostgREST `UPDATE` and the `add_unclaimed_student` coach arm — **S** `[found 2026-08-20]`
 The raw-`UPDATE` retirement hole itself **shipped fixed** (§7.199, `20260821000300`: a `BEFORE UPDATE`
