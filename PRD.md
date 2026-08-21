@@ -3247,7 +3247,6 @@ The following section provides a screen-by-screen reference for each SwimSync us
 
 ### Phase 3 — Future Features
 
-- Coach-assisted assignment workflow
 - Makeup classes and multi-class enrolment per student
 - Auto-reminders and parent notifications
 - Exports and richer payment workflows

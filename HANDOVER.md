@@ -221,7 +221,7 @@ is a guard whose first real firing is still ahead of you.
   the exception — LIVE**, showing the real needs-marking backlog immediately (PRD §7.3/§7.6/§7.22). The two
   §8.75 guards (capacity `FOR UPDATE` lock §7.198, raw-retire trigger §7.199) are LIVE-but-dormant for the
   same shape: one admin cannot race a seat, and every retire goes through the RPC today — first firing needs
-  a second admin or a parent self-enrol path.
+  a second admin (a parent self-enrol path won't come — refused 2026-08-21).
 
 *(Corrected 2026-08-10: this list also carried "production has 0 attendance rows", which
 had been false since 2026-07-26 and directly contradicted the REAL BILLING note below.
@@ -504,8 +504,10 @@ the raw-`UPDATE` retirement guard §7.199) are done and DEPLOYED. The one calend
 **a location entity** (M) — the calendar's Location filter is distinct `location_name` text (`BACKLOG.md` →
 *Admin and operations*). It unblocks nothing urgent.
 
-**Worth doing next** (`BACKLOG.md`): **Parent self-enrolment** (M) — capacity is now a real guard, so only
-the parent-facing flow remains. Newly filed from the §8.75 review: a **booking-vs-concurrent-retire** race
+**Worth doing next** (`BACKLOG.md`): **class assignment stays a superadmin action** — both ways to take the
+admin out of the loop were REFUSED 2026-08-21, parent self-enrolment *and* coach-assisted assignment (moved
+to *Deliberately not doing*); the onboarding bottleneck is answered by better admin tooling, not delegation.
+Newly filed from the §8.75 review: a **booking-vs-concurrent-retire** race
 (S — a booking can land in a class retired in the same instant; distinct from the shipped last-seat one, and
 its uncapped case needs a decision about locking unlimited classes). Also open: the `add_unclaimed_student`
 coach-arm product question (should the class's own coach be able to enrol a brand-new child?).

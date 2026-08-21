@@ -435,8 +435,7 @@ Email-confirmation copy, Tick off swimming skills (M).
 settlements, no partial figure), and the trainee-coach payroll dependency is **discharged**
 (shipped 2026-08-12). So this now waits on nothing but priority. Needs no capability model.
 **Split co-admin permissions (M)** — *yes eventually*; the accounting page does not wait
-on it. Parent self-enrolment (M — *needs capacity as a HARD limit; the informational column now exists*),
-Coach-assisted assignment (M), Household split billing (M — *needs a credit-splitting
+on it. Household split billing (M — *needs a credit-splitting
 rule*), Auto PayNow detection (L — *the CSV-import M is the 10% worth doing first*),
 In-app payment gateway (L), Native store builds (M — *deferred; not spending the $99 yet*)
 → Push notifications (M — *blocked by it*), Check the logo for brand collisions (S —
@@ -1077,21 +1076,6 @@ with no new personal data and no regulatory question at all.
 name *and* the same birthday at one business. That has never happened, and the identity
 index would refuse the second one loudly rather than silently confusing them.
 
-### Parent self-enrolment into classes — **M** `[MVP-excluded]`
-Let parents pick and join a class themselves rather than waiting for the superadmin.
-
-**Why:** assignment is a manual superadmin step today, so every new family stalls until
-someone gets to it. That's the bottleneck in the onboarding push happening right now.
-
-**Notes:** the capacity primitive is now a **hard limit, enforced since 2026-08-20**
-(`class_expected_count()` / `enforce_class_capacity()`, PRD §7.3) — a self-enrol RPC calls the first
-and is covered by the second, so overfilling a lane is already refused. What remains is the parent-facing
-flow itself (a class picker, the join, the payment-method question).
-A lighter middle ground: let the parent express a *preference* at signup that the
-superadmin approves, which removes the back-and-forth without giving up control.
-Related: coach-assisted assignment below.
-
-
 ### Maps integration — **S** `[MVP-excluded]`
 Tap a class location to open it in Maps.
 
@@ -1211,7 +1195,8 @@ lock: `PERFORM 1 FROM classes WHERE id = p_class_id AND is_active FOR UPDATE`, r
 zero rows, and move the `class_effective_capacity()` read AFTER the lock so a concurrent capacity *decrease*
 is seen too (the stale-`v_cap` half, also from the review). The **uncapped** case needs the lock taken
 unconditionally, which trades the "unlimited classes never lock" optimisation — decide that deliberately.
-Do it the day a tenant gains a second admin or a parent-facing self-enrol path.
+Do it the day a tenant gains a second admin (parent self-enrolment, the other trigger this once named, was
+refused 2026-08-21 — see *Deliberately not doing*).
 
 ### A raw PostgREST `UPDATE` and the `add_unclaimed_student` coach arm — **S** `[found 2026-08-20]`
 The raw-`UPDATE` retirement hole itself **shipped fixed** (§7.199, `20260821000300`: a `BEFORE UPDATE`
@@ -1313,17 +1298,6 @@ Excel evaluating it), and a **cap-block** that refuses to emit when the source f
 truncated (keyed on the unfiltered fetch count, not the filtered view — a client filter that
 shrinks a capped 1000 rows to 50 does not make the export complete). Excel unit is dollars,
 exported raw for summing; UTF-8 BOM for unicode names. Both safeguards graduate to §7.
-
-### Coach-assisted assignment workflow — **M** `[Phase 3]`
-Let a coach assign students to their own classes, not just the superadmin.
-
-**Why:** the superadmin is a bottleneck for a step the coach is better placed to do —
-they're the one who knows which lane a child belongs in. It's only invisible today
-because the coach and the superadmin are the same person.
-
-**Notes:** this is the assumption that breaks first if SwimSync ever serves a second
-coach. RLS already has `coach_serves_parent()`-style helpers to build on. Related to
-parent self-enrolment — both attack the same bottleneck from different ends.
 
 ### Better filtering and search — **S** `[Phase 2]`
 Search across the admin tables, and per-table filters beyond Attendance.
@@ -1620,4 +1594,6 @@ Kept so the reasoning doesn't get re-litigated.
 | **Typing `<Thead>`'s children so a `<Tr>` inside it fails typecheck** | Considered 2026-07-26 while fixing the Levels table (`docs/GOTCHAS.md` §7.54) and declined by the user in favour of a call-site scan test. It would be the stronger guard in principle — the mistake becomes unrepresentable rather than merely detected — but React's `children` typing does not express "only these element types" cleanly, so it needs casts or a wrapper at call sites, and it would put a fiddly type on the component that backs **all 14 admin tables**. `components/Table.test.tsx` catches the same mistake in CI, names the file and the exact fix, and risks nothing at runtime. Note the earlier failure this replaces: the previous attempt at prevention was a **docblock asserting the broken form was "unrepresentable"**, which it was not — the lesson is that the guard must be executable, not that it must be a type. |
 | **Any invoice or payment count in the COACH app** | Settled with the user 2026-08-02 while removing the coach's Billing tab. The Today screen carried an "Outstanding" tile counting unpaid invoices across every parent the coach serves, and the obvious repair was to relabel it *Unpaid invoices* and make it tappable. The user rejected the whole category: **a coach does not need to know how many invoices are unpaid — that is an admin-app question.** Since fee-free payment collection shipped (PRD §7.21), everything that makes an invoice actionable — the `INV-YYYY-NNNN` reference, the dynamic QR, the WhatsApp queue, the "parent says paid" badge, the **Claimed** filter — lives on `admin.swimsync.sg`, so a number on the coach's phone can only ever prompt a decision the coach cannot act on well. It was also **not today-scoped and not lesson-shaped** while sitting between "Classes Today" and "Students Today", so it read as a fact about today's lessons. A private coach holds the tenant-admin role anyway and loses nothing. **Don't re-add a count, a badge or a filter here** (PRD §7.9; the prohibition is also a comment in `(coach)/schedule/index.tsx`). |
 | **Individually disabling a PARENT account** | Considered and dropped 2026-07-19, restated when tenant suspension shipped (2026-08-13, the last of the disabling controls). Families leaving a business is handled by tenant-level active/inactive (`parent_tenants.is_active`), which is the actual common case — and a whole business going dark is tenant suspension (PRD §4.4). The only genuine platform-level trigger for a parent is a PDPA consent-withdrawal request — where "can't log in, records retained" is right, since IRAS requires ~5 years of financial records — and that has never happened. If it ever does, the mechanism staff disabling uses (auth ban + read-back) applies unchanged; parents are otherwise **never** auth-banned, because a parent is multi-tenant and a ban is account-level (WAVE_5_PLAN.md decision 5). |
+| **Parent self-enrolment into classes** (a parent picks and joins a class themselves) | Refused 2026-08-21 with the user: **parents should not choose their own class.** Which lane a child belongs in is a coaching judgement — ability, age, temperament — not a parent's pick, and letting parents self-select would put children in the wrong class and undo the streaming the school does deliberately. The onboarding stall this was meant to cure (a new family waits for the admin to assign each child) is real, but the fix is to speed up the *admin* side, not to hand the decision to parents. Note this closes the door on parents *choosing*; a lighter **preference-at-signup that the admin approves** was not what was rejected and could still be revisited if the assignment queue ever genuinely hurts. The capacity/schedule/retired-class DB guards built for this (§8.75, 2026-08-20/21) stand on their own and lose nothing. |
+| **Coach-assisted assignment workflow** (a coach assigns students to their own classes, not just the superadmin) | Refused 2026-08-21 with the user, alongside parent self-enrolment. **Class assignment stays a superadmin action** — the two candidate ways to remove the admin from the loop, letting the *parent* pick and letting the *coach* pick, were both rejected, so this is a deliberate single point of control, not an oversight. The onboarding bottleneck it named is real but is answered by better admin tooling, not by delegating the decision. This was previously "the only sanctioned route at this bottleneck" once parent self-enrol was refused; that framing is now void — neither route is sanctioned. Revisit only if a real second-coach tenant makes admin-only assignment genuinely painful, and even then the question is *coach-assisted* (coach proposes, admin confirms), not coach-authoritative. |
 | **A CI gate on documentation size** (`scripts/check-doc-budget.sh` — byte budget on `HANDOVER.md`, line cap on `CLAUDE.md`, wired into `repo-invariants`) | Built, proven to fail correctly on a one-byte growth, and **reverted the same day** at the user's call (`cb70808` holds it; `6013082` removed it). The case *for* is strong and is recorded in **§7.119**: instruction alone has now failed twice, taking `HANDOVER.md` to 290 KB and then to 91 KB, and the repo already uses exactly this pattern for a rule that kept being forgotten (`check-teardowns.sh`, whose own header says *"A note in a document does not catch that; a failing build does."*). The case *against* won on two counts, both fair: **failing a build on a documentation byte-count is disproportionate** when the same push carries a billing fix, and the ratchet as built was seeded at the file's *exact* current size, so the next session's first legitimate §9 addition would have reddened CI with no headroom at all. What replaced it: the same limits as **countable rules** in `/update-docs` — ledger row ≤200 chars, ≤1 `_Previously,_`, ≤45,000 bytes — measured at the **start** of Step 5 rather than asked as a Final-check question, which is the specific failure the old rule had (five consecutive sessions answered it and waived it). **If `HANDOVER.md` regrows a third time, restore the script from `cb70808` rather than re-wording the rule a fourth time** — that escalation is written into `/update-docs`'s Final check, so it does not depend on anyone remembering this row. |
