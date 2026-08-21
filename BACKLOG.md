@@ -1183,24 +1183,6 @@ contract migration (add table + FK, backfill from distinct names, keep the text 
 apps read the FK). Per-venue columns in the day view are the UI half. Not urgent: production is one
 location.
 
-### The ROSTER axis has the SAME booking-vs-retire race — **S** `[found 2026-08-21 while shipping §7.200]`
-The twin of §7.200 on the enrolment side. `enforce_enrolment_schedule()` reads `classes.is_active` in its
-BEFORE trigger (refusing entry to a retired class) WITHOUT a lock, and `enforce_class_capacity()` takes the
-`FOR UPDATE` lock only when the class is capped and never re-checks is_active. So an enrolment racing a
-concurrent `deactivate_class()` can land an ACTIVE enrolment in a now-retired class — same broken invariant
-("a retired class holds zero active enrolments"), reachable on an uncapped class with no lock at all.
-
-**Why:** dormant at single-admin scale (assignment is a superadmin action; one admin cannot race
-themselves), no money impact, rare. Filed rather than folded into §7.200 because `enforce_enrolment_schedule`
-is a prohibition-heavy trigger (HANDOVER §3: must NOT consult the counterparty's `is_active`) and deserves
-its own red-first coverage, and the booking axis was the one the review named.
-
-**Notes:** the fix mirrors §7.200 — in `enforce_class_capacity()` (which already owns the lock path) take the
-class-row `FOR UPDATE` UNCONDITIONALLY and re-read `NEW.class_id`'s is_active under it, raising the same
-"has been retired — restore it on the Classes page" message. Careful: the re-check is on `NEW.class_id`
-(the class being ENTERED), never on a counterparty — that prohibition is about the overlap check's `c2`, not
-this. Do it the day a tenant gains a second admin, alongside any other roster-vs-retire hardening.
-
 ### A raw PostgREST `UPDATE` and the `add_unclaimed_student` coach arm — **S** `[found 2026-08-20]`
 The raw-`UPDATE` retirement hole itself **shipped fixed** (§7.199, `20260821000300`: a `BEFORE UPDATE`
 trigger enforces the three refusals — and the date-move sibling — on any authenticated raw write). One
