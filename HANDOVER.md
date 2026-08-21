@@ -1,10 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-21 (4th) — **`add_unclaimed_student`'s ONGOING arm is now ADMIN-ONLY** (§8.79, §7.202):
-the class's-own-coach arm is closed, so every new child goes through the admin — both `add_unclaimed_student`
-kinds require the tenant admin. Migration `20260821000600`; DEPLOYMENT §11.36. Commit `0a86f5b`._
+_Last updated: 2026-08-21 (5th) — **parent Attendance→Upcoming now lists make-ups + extra lessons** (§8.80,
+PRD §7): the weekly projection merges booked make-ups (badged *Make-up*) and admin off-schedule extra lessons
+(badged *Extra lesson*); explicit rows win a same-day collision. App-only, deployed. Commit `8cf219c`. Phase B
+(advance-cancel a lesson, reflected as struck "Cancelled") is PLANNED — `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`._
 
-_Previously, 2026-08-21 (§8.78) — both retire-race axes SHIPPED + DEPLOYED: enrolment (§7.201, `20260821000500`) joined booking (§7.200, `20260821000400`); `is_active` re-read under a `FOR UPDATE` lock on both entry paths. DEPLOYMENT §11.35._
+_Previously, 2026-08-21 (§8.79) — `add_unclaimed_student`'s ONGOING arm is now ADMIN-ONLY: every new child goes through the admin. Migration `20260821000600`; DEPLOYMENT §11.36. Commit `0a86f5b`._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -397,6 +398,26 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.80 (2026-08-21) — Parent Upcoming lists make-ups + extra lessons — SHIPPED and DEPLOYED (app-only)
+
+**The Attendance→Upcoming view is now the one complete forward view.** It merged only the weekly weekday
+projection (minus public holidays); it now also lists booked **make-ups** (host class, badged *Make-up*) and
+admin off-schedule **extra lessons** in the child's class (badged *Extra lesson*). Explicit rows are pushed
+before the projection in `computeUpcomingLessons`, so they win a same-(class,date) collision and are NOT
+holiday-subtracted (booked evidence, not a guess). App-only — the push to `main` is the full deploy (no
+migration, no engine). PRD §7 updated. Commit `8cf219c`.
+
+**Pre-commit review hardening** (fable agent): a stale-response load ticket (a mid-load child switch can't
+paint the wrong child's make-ups); a failed holiday read is fail-safe (show nothing, never a closed-pool
+lesson); selection kept across refocus; `formatSgDate` on rows; horizon bound + cancelled-session filter +
+unique make-up dedup key. **Verified:** typecheck clean, jest **396** PASS.
+
+**Phase B (advance-cancel a lesson) is PLANNED, not built** — `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`
+carries it with the billing-risk mitigations AS STEPS; BACKLOG *Admin and operations* → *Advance-cancel a
+lesson* (M). It authors a migration + touches the engine, so start from the root checkout, migration first.
+RISK 1 (subtract cancelled dates from `expectedDates` ONLY, never the union) and RISK 4 (mark-refusal in the
+`guard_attendance_date()` trigger, not the UI) graduate to §7 when it ships.
+
 ## 8.79 (2026-08-21) — `add_unclaimed_student` ONGOING arm made ADMIN-ONLY — SHIPPED and DEPLOYED to prod
 
 **The coach arm is CLOSED — every new child goes through the admin.** `add_unclaimed_student(… 'ongoing' …)`
@@ -410,21 +431,6 @@ is unchanged — one coach who IS the admin. §7.202. Migration `20260821000600`
 refused, admin does the add, `created_by`=admin; `class_capacity_limit` 16a: coach hits the auth gate, never
 capacity); Deno ×2 **229/229**. Same-signature CREATE OR REPLACE so no grant dump; **committed DOWN rehearsed**.
 Docs: PRD §7.17 corrected, BACKLOG item deleted, TESTING §5. Commits `0a86f5b` · `441d93f` · `d254c11`.
-
-## 8.78 (2026-08-21) — ENROLMENT-vs-CONCURRENT-RETIRE race CLOSED — SHIPPED and DEPLOYED to prod
-
-**The §8.77 roster-axis twin, now fixed — both entry paths to a retired class are race-safe.**
-`enforce_enrolment_schedule()` refuses an enrolment into a retired class but read `classes.is_active`
-unlocked, so a `deactivate_class()` in the gap could land an ACTIVE enrolment in a now-retired class. §7.198's
-lock didn't cover it: capacity and is_active are two separate triggers, and on an uncapped class the capacity
-one returns early without locking. **Fix:** add `FOR UPDATE` to the trigger's own class read — is_active read
-under the lock, unconditionally, on `NEW.class_id` only (the `c2` overlap read stays lock-free and
-is_active-blind, by prohibition). Reverse direction already covered by `trg_class_retirement_guard` (§7.199).
-§7.201. Migration `20260821000500`; deploy DEPLOYMENT §11.35.
-
-**Verified:** pgTAP **1284** PASS — new `enrolment_retire_race.test.sql` (2), a structural pin proven
-**red-first**; Deno ×2 **229/229**. Migration-only, same-signature CREATE OR REPLACE so no grant dump; no
-engine or app change. TESTING §5.
 
 ## 9. Next steps (pick with the user)
 
@@ -485,17 +491,19 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — coach-arm closed + both retire-race axes deployed 2026-08-21 (§8.77–§8.79). Queue open.
+### THE NEXT BUILD — Phase A (make-ups + extra lessons in parent Upcoming) shipped 2026-08-21 (§8.80). Phase B queued.
 
-**No migration is in flight** (§7.55). Latest applied is `20260821000600` (the coach-arm closure, §8.79);
-before it, both retire-race axes (§7.200 booking, §7.201 roster). The one calendar-wave follow-up left is **a
-location entity** (M) — the calendar's Location filter is distinct `location_name` text (`BACKLOG.md` →
-*Admin and operations*). It unblocks nothing urgent.
+**The obvious next build is Phase B — Advance-cancel a lesson.** Plan is written and risk-reviewed:
+`docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md` (billing-risk mitigations baked in AS STEPS); BACKLOG *Admin
+and operations* → *Advance-cancel a lesson* (M). **It authors a migration + touches the billing engine**, so:
+start from the **root checkout** (never a worktree — §7.55), migration ALONE on a `db/…` branch FIRST
+(`cancelled_at` + `cancel_lesson`/`restore_lesson`), land on `main`, then engine (`core.ts`) → apps. The two
+load-bearing gates: **RISK 1** subtract cancelled dates from `expectedDates` ONLY, never the union (§7.18 /
+core.ts:735); **RISK 4** the mark-refusal lives in `guard_attendance_date()`, not the UI (§7.199).
 
-**Worth doing next** (`BACKLOG.md`): **class assignment stays a superadmin action** — all three routes to take
-the admin out of the loop are now settled and REFUSED: parent self-enrolment, coach-assisted assignment (both
-*Deliberately not doing*, 2026-08-21) and the `add_unclaimed_student` coach arm (CLOSED this session, §8.79,
-§7.202). The onboarding bottleneck is answered by better admin tooling, not delegation.
+**No migration is in flight** (§7.55). Latest applied is `20260821000600` (coach-arm closure, §8.79). The one
+calendar-wave follow-up still open is **a location entity** (M, `BACKLOG.md` → *Admin and operations*) — the
+Location filter is distinct `location_name` text. Unblocks nothing urgent.
 
 Still open from earlier: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on
 0 notes); HANDOVER §3 graduation (docs tax). Then *Later* (owner-only accounting page, accrual). Full

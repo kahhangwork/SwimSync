@@ -291,7 +291,10 @@ the bug it prevents — *"NEVER says nobody when only inactive children hold the
 **2026-08-17 (Wave C)** added `lib/upcomingLessons.test.ts` — the parent upcoming-lessons
 projection (weekday walk over ~4 weeks, per-`(class,date)` dedup), with the **public-holiday
 exclusion proven red** (§7.179-era Wave C): a date on `tenant_public_holidays` is dropped, so
-the app never lists a lesson on a day the pool is closed. **2026-08-17
+the app never lists a lesson on a day the pool is closed. **2026-08-21** extended it for
+make-ups + extra lessons (§8.80): explicit rows tagged `kind`, pushed before the projection so
+they **win a same-`(class,date)` collision** (asserted by kind), are **not** holiday-subtracted,
+and the horizon bounds are inclusive at both ends. **2026-08-17
 added `lib/creditNoteEmail.test.ts`** — two things. (a) The **ordering** pin: the credit-note email
 request is `await`ed (bounded 3s) BEFORE `leaveScreen()`, because that is a `router.replace` which
 unmounts the screen — an unawaited fetch is issued milliseconds before its own destruction, and a

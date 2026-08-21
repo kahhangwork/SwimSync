@@ -1,9 +1,13 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-21 (3rd) — **`add_unclaimed_student` coach arm CLOSED** (§7.202, `20260821000600`):
+_Last updated: 2026-08-21 (4th) — **parent Upcoming now shows make-ups + extra lessons** (§8.80, PRD §7):
+Wave C's ranked five are all shipped, so that list was corrected to reality. New item filed under
+*Admin and operations*: **Advance-cancel a lesson** (M, PLANNED — `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`),
+the Phase B follow-up that reflects a cancelled lesson in Upcoming._
+
+_Previously, 2026-08-21 (3rd) — **`add_unclaimed_student` coach arm CLOSED** (§7.202, `20260821000600`):
 the ONGOING arm is now admin-only, so a class's own coach can no longer create-and-enrol a child — matching
-§7.17 and the same-day refusals of parent self-enrolment and coach-assisted assignment. Item deleted from
-below. Still open under *Admin and operations*: the **location entity**._
+§7.17 and the same-day refusals of parent self-enrolment and coach-assisted assignment._
 
 _Previously, 2026-08-21 (2nd) — **booking- AND enrolment-vs-retire races SHIPPED** (§7.200 `20260821000400`,
 §7.201 `20260821000500`): both entry paths to a retired class re-read `is_active` under a `FOR UPDATE` lock.
@@ -381,22 +385,18 @@ click-through queue stops scaling.
 
 ### Wave C — independent, pick by value (no edges between them)
 
-Ranked by value; build any, in roughly this order:
+**All five ranked Wave C items have SHIPPED** — struck in their own sections below:
+1. ~~Convert a trial into an enrolled student~~ — DONE 2026-08-17.
+2. ~~Upcoming lessons view for parents~~ — DONE 2026-08-17; **make-ups + extra lessons added
+   2026-08-21** (§8.80, PRD §7). The ad-hoc *cancellation* follow-up is Phase B of
+   `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md` — see *Advance-cancel a lesson* below.
+3. ~~Book a make-up from the Attendance page~~ — DONE 2026-08-17.
+4. ~~Attendance edit history view~~ — DONE 2026-08-17 (the Change History page).
+5. ~~Export to CSV~~ — DONE 2026-08-17.
 
-1. **Convert a trial into an enrolled student** (S) — conversion has no home today; Wave 2
-   (2026-08-11) unblocked it. Reuse the guarded insert Unassigned Children performs.
-2. **Upcoming lessons view for parents** (S) — the most-asked question the app can't answer;
-   point `lib/lessonDates.ts` at the future, don't pre-generate sessions.
-3. **Book a make-up from the Attendance page** (S) — entry point at the natural moment; must
-   ask WHICH class the make-up replaces when the child has >1 (PRD §7.20). Wave 2 unblocked it.
-4. **Attendance edit history view** (S) — dispute resolution; blocker cleared 2026-08-09
-   (`20260809000200`), the delete-purge hole closed 2026-08-13 (`20260813000400`, delete now
-   REFUSED). Render backend-written rows as "system", diff the `to_jsonb` snapshots.
-5. ~~**Export to CSV**~~ — **DONE 2026-08-17** (all three tables; see below).
-
-Lower-value S pool, no order: Maps deep link, Better filtering/search, Moving a student
-between businesses (two silent loose ends), the family-status client-side scan,
-Email-confirmation copy, Tick off swimming skills (M).
+**Wave C is exhausted bar the lower-value S pool, no order:** Maps deep link, Better
+filtering/search, Moving a student between businesses (two silent loose ends), the
+family-status client-side scan, Email-confirmation copy, Tick off swimming skills (M).
 
 ### Wave D — latent traps: cheap now, silently worse later
 
@@ -1167,6 +1167,29 @@ constraint is the real gate here, not the feature.
 ---
 
 ## Admin and operations
+
+### Advance-cancel a lesson (reflected in parent Upcoming) — **M** `[raised 2026-08-21; PLANNED]`
+Let a tenant admin cancel a specific FUTURE lesson (class + date — a whole lesson that did not
+run: rain, coach sick), reflected as a struck "Cancelled" row in the parent Attendance→Upcoming
+view. Full plan (Phase B), with the billing-risk mitigations baked in as steps:
+`docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`.
+
+**Why:** the Upcoming view (PRD §7, shipped 2026-08-17 + extended 2026-08-21, §8.80) is a pure
+weekday projection; only whole-day public holidays are subtracted. A one-off single-lesson
+cancellation has **no mechanism today** — `cancelled_rain`/`cancelled_coach` are attendance
+statuses set at marking, at/after the date, never in advance. So a parent is told to turn up to
+a lesson the coach already knows is off.
+
+**Notes — billing-critical, do NOT shortcut:** cancellation is SESSION-level (a new
+`lesson_sessions.cancelled_at`), not per-student marks — a child who enrols between cancel-time
+and bill-time would otherwise re-block the month. The engine must subtract cancelled dates from
+**`expectedDates` ONLY**, never from the `sessionByDate`/`bookingsByDate` union (that is the
+§7.18 / core.ts:735 clamp under a new name — it trades a loud block for a silent permanent
+underbill). The mark-refusal belongs in the `guard_attendance_date()` trigger, not the UI
+(§7.199 — a `FOR ALL` policy + grant is raw-PostgREST-bypassable). Admin-only; cancel refuses
+past/today, a session with attendance rows, and a date holding a live make-up/trial booking (it
+names them); restore refuses a sealed month. Admin homes: the lesson detail page AND a Classes-page
+entry. RISK 1 and RISK 4 graduate to `docs/GOTCHAS.md` §7 when it ships.
 
 ### A location entity (venue) — **M** `[raised 2026-08-19 while building the admin calendar]`
 Promote `classes.location_name` (free text) to a `locations` table the class references, so the
