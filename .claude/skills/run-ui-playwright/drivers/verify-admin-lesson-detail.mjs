@@ -171,7 +171,7 @@ try {
   await page.waitForTimeout(2500);
   let body = await page.locator("body").innerText();
   check("assigning a substitute shows them as Teaching … (Sub)", /Teaching:\s*Calendar Sub/.test(body) && /\(Sub\)/.test(body));
-  await page.getByText(/Remove the assigned coach/).click();
+  await page.getByRole("button", { name: /Remove substitute/ }).click();
   await page.waitForTimeout(2500);
   body = await page.locator("body").innerText();
   check("removing it returns to the class's own coach", /Teaching:\s*Coach Marcus/.test(body));

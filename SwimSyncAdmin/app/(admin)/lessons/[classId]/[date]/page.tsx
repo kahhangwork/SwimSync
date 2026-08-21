@@ -24,7 +24,7 @@ import { dayOfWeekOf, formatSgDate, todayInSg, toSgDate, type DayOfWeek } from "
 import { formatTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { expectedStudentsOn, studentsEnrolledOn, type EnrolmentSpan } from "@/lib/attendanceCompleteness";
-import { attributeLessons, type AbsenceRow, type ClassRateRow, type ClassShadowRow, type SubstituteRow } from "@/lib/lessonAttribution";
+import { attributeLessons, termsCoachOn, type AbsenceRow, type ClassRateRow, type ClassShadowRow, type SubstituteRow } from "@/lib/lessonAttribution";
 import { fetchMarkableFloor } from "@/lib/markableFloor";
 import { formatCount, isFull } from "@/lib/calendarLessons";
 import { saveAdminAttendance, type SaveEntry } from "@/lib/adminAttendanceSave";
@@ -90,6 +90,7 @@ export default function LessonPage() {
   const [draft, setDraft] = useState<Record<string, DbStatus | null>>({});
   const [coaches, setCoaches] = useState<CoachOpt[]>([]);
   const [attr, setAttr] = useState<{ mainId: string | null; isCover: boolean; subRowId: string | null; shadowIds: string[] } | null>(null);
+  const [termsCoachId, setTermsCoachId] = useState<string | null>(null);
   const [floor, setFloor] = useState<string | null>(null);
   const [actorId, setActorId] = useState<string | null>(null);
   const [holidayDays, setHolidayDays] = useState<number>(7);
@@ -252,6 +253,7 @@ export default function LessonPage() {
         absences,
       }).get(sid ?? "pending");
       setAttr({ mainId: a?.main_coach_id ?? null, isCover: a?.is_cover ?? false, subRowId, shadowIds: a?.shadow_coach_ids ?? [] });
+      setTermsCoachId(termsCoachOn((ratesRes.data ?? []) as ClassRateRow[], classId, date));
 
       const kidRows = (kidsRes.data ?? []) as any[];
       setKids(
@@ -301,6 +303,13 @@ export default function LessonPage() {
 
   const dirty = roster.some((r) => (draft[r.studentId] ?? null) !== r.prev);
   const mainName = coaches.find((c) => c.id === attr?.mainId)?.name ?? "—";
+  // The coach the class rate already pays teaches this lesson anyway, so
+  // assigning them records no cover — the DB refuses it (20260821000100). Exclude
+  // that coach from the picker so the UI never offers what the DB will reject.
+  // Falls back to the class's own coach before rates have loaded.
+  const excludedCoachId = termsCoachId ?? cls?.coach_id ?? null;
+  const classCoachName = coaches.find((c) => c.id === excludedCoachId)?.name ?? "the class's coach";
+  const substituteOptions = coaches.filter((c) => c.id !== excludedCoachId);
 
   // ── Save ────────────────────────────────────────────────────────────────
   async function doSave() {
@@ -589,23 +598,29 @@ export default function LessonPage() {
                   Shadow: {attr.shadowIds.map((id) => coaches.find((c) => c.id === id)?.name ?? "Unknown").join(", ")} (read-only; managed on the Classes page)
                 </p>
               )}
-              <div className="mt-3 flex items-center gap-2">
-                <select aria-label="Substitute coach" className="flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm" value={coachPick} onChange={(e) => setCoachPick(e.target.value)} disabled={coachBusy}>
-                  <option value="">Assign a coach to this lesson…</option>
-                  {coaches.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <Button size="sm" onClick={assignCoach} disabled={!coachPick || coachBusy}>
-                  Assign
-                </Button>
+              <div className="mt-3">
+                <p className="text-xs font-medium text-gray-600">Assign a substitute for this lesson</p>
+                <p className="mt-0.5 text-xs text-gray-400">
+                  Covers this one lesson only — it does not change {classCoachName}, the class&apos;s regular coach.
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <select aria-label="Substitute coach" className="flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm" value={coachPick} onChange={(e) => setCoachPick(e.target.value)} disabled={coachBusy}>
+                    <option value="">Choose a substitute…</option>
+                    {substituteOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button size="sm" onClick={assignCoach} disabled={!coachPick || coachBusy}>
+                    Assign
+                  </Button>
+                </div>
               </div>
               {attr?.subRowId && (
-                <button type="button" onClick={removeCover} disabled={coachBusy} className="mt-2 text-xs text-red-600 hover:underline">
-                  Remove the assigned coach (back to the class&apos;s own coach)
-                </button>
+                <Button variant="outline" size="sm" onClick={removeCover} disabled={coachBusy} className="mt-3">
+                  Remove substitute (back to {classCoachName})
+                </Button>
               )}
               {coachMsg && <p className="mt-2 text-xs text-red-700">{coachMsg}</p>}
             </section>

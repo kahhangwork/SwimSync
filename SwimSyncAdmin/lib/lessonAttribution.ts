@@ -84,7 +84,7 @@ export type LessonAttribution = {
  * latest rate with `effective_from <= date`. Reads `paid_coach_id`, never
  * `classes.coach_id`.
  */
-function termsCoachOn(
+export function termsCoachOn(
   rates: readonly ClassRateRow[],
   classId: string,
   date: string

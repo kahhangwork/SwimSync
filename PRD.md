@@ -1158,7 +1158,10 @@ session id — the row may not exist yet). There the admin:
   extension days; the coach app's own save **leaves a holiday row untouched** (it never sends
   one), so a coach cannot silently re-bill a voided lesson.
 - **Assigns or removes the substitute coach** for the lesson (`assign_session_coach`; the
-  Lesson Coaches rules) and sees the class's shadows read-only.
+  Lesson Coaches rules) and sees the class's shadows read-only. *(enforced 2026-08-21)* A
+  substitute must be a **different** coach: assigning the coach the class rate already pays on
+  that date records no cover, so it is **refused by the database** and hidden from the picker;
+  to go back to the class's own coach, use **Remove substitute** (§7.13).
 - **Books a make-up or a trial into this lesson** (host class and date fixed; a make-up asks
   which class it replaces when the child has more than one). *(enforced 2026-08-20)* A full
   lesson (`x/max`) is **refused by the database** — an inline notice says so and points at
