@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-21 (2nd) — **Booking-vs-concurrent-retire race SHIPPED + DEPLOYED (§8.77, §7.200):
-`book_makeup`/`book_trial` now lock the class row unconditionally and re-read `is_active` under it — a booking
-can't land in a class retired the same instant.** Migration `20260821000400`; DEPLOYMENT §11.34; ROSTER-axis twin filed. Commit `c168972`._
+_Last updated: 2026-08-21 (3rd) — **BOTH entry paths to a retired class are now race-safe: the ENROLMENT
+axis (§8.78, §7.201) joins the booking axis (§8.77, §7.200). `enforce_enrolment_schedule` now reads
+`is_active` under a `FOR UPDATE` lock on the entered class.** Migration `20260821000500`; DEPLOYMENT §11.35. Commit `820e174`._
 
-_Previously, 2026-08-21 (§8.76) — parent self-enrolment AND coach-assisted assignment both REFUSED; class assignment stays a superadmin action. Both in `BACKLOG.md` → Deliberately not doing; docs-only. Commit `929a2e2`._
+_Previously, 2026-08-21 (§8.77) — booking-vs-retire race SHIPPED + DEPLOYED: `book_makeup`/`book_trial` lock the class row unconditionally and re-read `is_active`. Migration `20260821000400`; DEPLOYMENT §11.34. Commit `c168972`._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -218,10 +218,10 @@ is a guard whose first real firing is still ahead of you.
   (its correct production state is "no observable change" — don't rediscover it as broken), and no
   holiday has a same-day retirement, so the SGT `>=` fix has never fired. **The Lessons sidebar badge is
   the exception — LIVE**, showing the real needs-marking backlog immediately (PRD §7.3/§7.6/§7.22). The two
-  §8.75 guards (capacity `FOR UPDATE` lock §7.198, raw-retire trigger §7.199) **and the §8.77 booking-vs-retire
-  lock (§7.200)** are LIVE-but-dormant for the same shape: one admin cannot race a seat or a retire, and every
-  retire goes through the RPC today — first firing needs a second admin (a parent self-enrol path won't come —
-  refused 2026-08-21).
+  §8.75 guards (capacity `FOR UPDATE` lock §7.198, raw-retire trigger §7.199) **and both retire-race locks —
+  booking §7.200 (§8.77) and enrolment §7.201 (§8.78)** are LIVE-but-dormant for the same shape: one admin
+  cannot race a seat or a retire, and every retire goes through the RPC today — first firing needs a second
+  admin (a parent self-enrol path won't come — refused 2026-08-21).
 
 *(Corrected 2026-08-10: this list also carried "production has 0 attendance rows", which
 had been false since 2026-07-26 and directly contradicted the REAL BILLING note below.
@@ -397,6 +397,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.78 (2026-08-21) — ENROLMENT-vs-CONCURRENT-RETIRE race CLOSED — SHIPPED and DEPLOYED to prod
+
+**The §8.77 roster-axis twin, now fixed — both entry paths to a retired class are race-safe.**
+`enforce_enrolment_schedule()` refuses an enrolment into a retired class but read `classes.is_active`
+unlocked, so a `deactivate_class()` in the gap could land an ACTIVE enrolment in a now-retired class. §7.198's
+lock didn't cover it: capacity and is_active are two separate triggers, and on an uncapped class the capacity
+one returns early without locking. **Fix:** add `FOR UPDATE` to the trigger's own class read — is_active read
+under the lock, unconditionally, on `NEW.class_id` only (the `c2` overlap read stays lock-free and
+is_active-blind, by prohibition). Reverse direction already covered by `trg_class_retirement_guard` (§7.199).
+§7.201. Migration `20260821000500`; deploy DEPLOYMENT §11.35.
+
+**Verified:** pgTAP **1284** PASS — new `enrolment_retire_race.test.sql` (2), a structural pin proven
+**red-first**; Deno ×2 **229/229**. Migration-only, same-signature CREATE OR REPLACE so no grant dump; no
+engine or app change. TESTING §5.
+
 ## 8.77 (2026-08-21) — BOOKING-vs-CONCURRENT-RETIRE race CLOSED — SHIPPED and DEPLOYED to prod
 
 **The §8.75 review's own filed follow-up, now fixed.** `book_makeup`/`book_trial` read `classes.is_active`
@@ -417,15 +432,6 @@ change. TESTING §5.
 `enforce_class_capacity` locks only when capped and never re-checks is_active, the same race on the enrolment
 path. Filed to `BACKLOG.md` (S), not fixed — a prohibition-heavy trigger deserving its own red-first coverage,
 and the booking axis was the one the review named.
-
-## 8.76 (2026-08-21) — PARENT SELF-ENROLMENT and COACH-ASSISTED ASSIGNMENT both REFUSED — assignment stays a superadmin action
-
-**Both ways to take the admin out of the class-assignment loop were rejected with the user**: a parent
-picking their own class (which lane a child belongs in is a coaching judgement, not a parent's pick, and
-self-selection undoes the school's streaming) and a coach assigning to their own classes. Class assignment is
-a deliberate single point of control; the onboarding stall it was meant to cure is answered by better admin
-tooling, not delegation. Both moved to `BACKLOG.md` → *Deliberately not doing* with full reasoning; §9, the
-§8.75 dormant note, and PRD's Phase 3 roadmap repointed. **Docs-only, no code.** Commit `929a2e2`.
 
 ## 9. Next steps (pick with the user)
 
@@ -486,20 +492,18 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — the booking-vs-retire race shipped + deployed 2026-08-21 (§8.77). Queue open.
+### THE NEXT BUILD — both retire-race axes shipped + deployed 2026-08-21 (§8.77, §8.78). Queue open.
 
-**No migration is in flight** (§7.55). The §8.75-review follow-up (the booking-vs-concurrent-retire race,
-§7.200) is done and DEPLOYED. The one calendar-wave follow-up left is **a location entity** (M) — the
-calendar's Location filter is distinct `location_name` text (`BACKLOG.md` → *Admin and operations*). It
-unblocks nothing urgent.
+**No migration is in flight** (§7.55). Both retire-race fixes are done and DEPLOYED — the booking axis
+(§7.200) and its roster-axis twin (§7.201). The one calendar-wave follow-up left is **a location entity**
+(M) — the calendar's Location filter is distinct `location_name` text (`BACKLOG.md` → *Admin and
+operations*). It unblocks nothing urgent.
 
-**Worth doing next** (`BACKLOG.md`): the **ROSTER-axis twin** of §7.200 (S — `enforce_enrolment_schedule` +
-`enforce_class_capacity` have the same stale-`is_active` race on the enrolment path; newly filed, mirrors the
-§7.200 fix but touches a prohibition-heavy trigger). Also open: **class assignment stays a superadmin action**
-— both ways to take the admin out of the loop were REFUSED 2026-08-21, parent self-enrolment *and*
-coach-assisted assignment (moved to *Deliberately not doing*); the onboarding bottleneck is answered by better
-admin tooling, not delegation. And the `add_unclaimed_student` coach-arm product question (should the class's
-own coach be able to enrol a brand-new child?).
+**Worth doing next** (`BACKLOG.md`): **class assignment stays a superadmin action** — both ways to take the
+admin out of the loop were REFUSED 2026-08-21, parent self-enrolment *and* coach-assisted assignment (moved to
+*Deliberately not doing*); the onboarding bottleneck is answered by better admin tooling, not delegation. Also
+open: the `add_unclaimed_student` coach-arm product question (should the class's own coach be able to enrol a
+brand-new child?).
 
 Still open from earlier: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on
 0 notes); HANDOVER §3 graduation (docs tax). Then *Later* (owner-only accounting page, accrual). Full
@@ -537,11 +541,11 @@ ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · mult
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260821000400` (the booking-vs-retire race, §8.77);
+**The migration queue is EMPTY.** The latest applied is `20260821000500` (the enrolment-vs-retire race, §8.78);
 production confirmed caught up 2026-08-21 via `supabase migration list --linked`, **0 pending**.
-**DEPLOYMENT §11.34 is the freshest worked example** — one migration, same-signature CREATE OR REPLACE, so NO
-grant dump was needed (§11.32 pattern); no engine, no app deploy. §11.33 is the recent contrast: two
-migrations, one adding a NEW function + trigger, so a `db dump` grant/object check WAS taken.
+**DEPLOYMENT §11.35 is the freshest worked example** — one migration, same-signature CREATE OR REPLACE of a
+trigger function, so NO grant dump was needed (§11.32/§11.34 pattern); no engine, no app deploy. §11.33 is the
+recent contrast: two migrations, one adding a NEW function + trigger, so a `db dump` grant/object check WAS taken.
 **§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
 **expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract
 migration LAST (held back by a `.hold` rename until the apps stopped reading the dropped columns);

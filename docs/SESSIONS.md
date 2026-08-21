@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.76** | 2026-08-21 | Parent self-enrolment AND coach-assisted assignment both REFUSED — assignment stays superadmin; docs-only | `BACKLOG.md` → *Deliberately not doing* · PRD Phase 3 |
 | **8.75** | 2026-08-21 | Two `classes` hardening guards SHIPPED+DEPLOYED: capacity last-seat `FOR UPDATE` lock; raw-`UPDATE` retirement guard trigger | §7.198/§7.199 · DEPLOYMENT §11.33 |
 | **8.74** | 2026-08-21 | No-op substitute REFUSED (`assign_session_coach`, `20260821000100`); both admin pickers hide the paid coach | §7.197 · PRD §7.6 · DEPLOYMENT §11.32 |
 | **8.73** | 2026-08-21 | Capacity HARD limit · holiday retirement SGT-inclusive · Lessons sidebar badge, all LIVE; 3 migrations | §7.194-196 · PRD §7.3/§7.6/§7.22 · DEPLOYMENT §11.31 |

@@ -3177,3 +3177,21 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     shown in pgTAP's single rolled-back txn, so `booking_retire_race.test.sql` is a STRUCTURAL pin (lock
     present on both paths, is_active re-check present, lock precedes the capacity read, ordering
     lock→recheck→INSERT), proven red-first. (2026-08-21.)
+
+201. **THE ENROLMENT AXIS HAS THE SAME RETIRE RACE AS §7.200 — LOCK THE ENTERED CLASS BEFORE READING
+    `is_active`.** `enforce_enrolment_schedule()` refuses an enrolment into a RETIRED class, but read
+    `classes.is_active` with an UNLOCKED SELECT — so a `deactivate_class()` committing in the gap could land
+    an ACTIVE enrolment in a now-retired class, breaking the "a retired class holds zero active enrolments"
+    invariant (an inactive class is invisible to every role who could clear it, §7.109). §7.198's lock did
+    NOT cover this: capacity and is_active are TWO DIFFERENT triggers on `student_class_enrolments`
+    (`trg_class_capacity` fires first, then `trg_enrolment_schedule`), and on an UNCAPPED class the capacity
+    one returns early WITHOUT locking. `20260821000500` adds `FOR UPDATE` to this trigger's own class read
+    (`… WHERE c.id = NEW.class_id FOR UPDATE`), so is_active is read UNDER the lock, unconditionally. ⚠ THE
+    LOCK IS ON `NEW.class_id` ONLY — the class being ENTERED. The half-two overlap check reads sibling
+    classes (`c2`) and must stay lock-free and `is_active`-BLIND, a standing prohibition (HANDOVER §3): an
+    inactive counterparty provably holds no enrolment BECAUSE entry to a retired class is refused, so the
+    overlap check must not consult `c2.is_active`. The reverse direction (a retire racing the enrolment) is
+    already caught by `trg_class_retirement_guard` (§7.199) re-running `assert_class_retirable` once this lock
+    releases — its roster count then sees the committed enrolment. No new deadlock: the trigger locks exactly
+    one row, so it cannot be in a lock cycle. Structural pin `enrolment_retire_race.test.sql`, red-first.
+    (2026-08-21.)

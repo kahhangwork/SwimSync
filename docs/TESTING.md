@@ -586,6 +586,13 @@ the lock now precedes the `class_effective_capacity` read (so it is UNCONDITIONA
 `v_cap` — the discriminator against the pre-`20260821000400` body), and that the order is
 lock→re-check→INSERT. Red-first proven: restore the `20260821000200` bodies and assertions 3–8 go red while
 1–2 (the lock string, already present for the capped path) stay green — that split is the file's signature.
+`enrolment_retire_race.test.sql` (2 — the roster-axis twin, `20260821000500`, §7.201): the same STRUCTURAL
+pin on `enforce_enrolment_schedule`, asserting its class read carries `FOR UPDATE` and that the lock is on the
+ENTERED class (`WHERE c.id = NEW.class_id … FOR UPDATE`) so `is_active` is read under it. Red-first proven:
+both go red on the pre-`20260821000500` body (unlocked read). A count-of-`FOR UPDATE` assertion was dropped
+on purpose — the token also appears in the function's explanatory comment, so a text count can't separate the
+SQL lock from the prose (fragile, not protective); the "lock the entered class only" prohibition is carried by
+the migration header and the function comment instead.
 `verify-makeups.mjs` (+ `fixtures-makeups.sql` and its `-teardown.sql`) drives a make-up —
 an enrolled child guesting one lesson of another same-category class — end to end through
 both real UIs (15 checks): the admin's booking form is child-first via **one search box

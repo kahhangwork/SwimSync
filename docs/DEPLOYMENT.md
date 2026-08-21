@@ -714,3 +714,16 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `20260821000200` (unchanged in git). **Dormant on prod:** one admin cannot race themselves; first real
     firing needs a second admin. The ROSTER-axis twin (`enforce_enrolment_schedule`) is filed in `BACKLOG.md`,
     not deployed.
+
+35. **Deploy record (2026-08-21): enrolment-vs-concurrent-retire race** (§8.78, §7.201). One migration,
+    `20260821000500` — one CREATE OR REPLACE of the trigger function `enforce_enrolment_schedule`, adding
+    `FOR UPDATE` to its class read so `is_active` is read under a lock (the roster-axis twin of §11.34's
+    booking fix). Sequence: (1) `supabase db push` — printed a `failed to cache migrations catalog` pgdelta
+    warning alongside `Finished` (same harmless cache/cert noise as the §7.55 stack trace); `Applying …
+    20260821000500` printed and `migration list --linked` shows `remote` filled, **0 pending**. (2) **No
+    grant dump** — same-signature CREATE OR REPLACE of a trigger function (no EXECUTE grant to move), no new
+    object except… none; the migration's own DO-block probe asserted the `FOR UPDATE` present and the trigger
+    intact on prod. (3) **No app or engine deploy** — `core.ts` untouched, no app change. **Rollback
+    (documented, not a committed DOWN — same-signature replace):** re-apply the `enforce_enrolment_schedule`
+    body from `20260811000100` (unchanged in git). **Dormant on prod:** assignment is a superadmin action;
+    one admin cannot race themselves — first firing needs a second admin.
