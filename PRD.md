@@ -1173,8 +1173,16 @@ below the marking floor, and never for a retired class. A holiday void leaves a 
 alone, and un-voiding a day never deletes one. Both actions are audited (`lesson_cancelled`,
 `lesson_restored`).
 
-*Not yet decided:* what an advance cancel means for a **prepaid package** (a holiday void extends
-the package; a cancel currently does not) — `BACKLOG.md`.
+**A cancel extends a covering prepaid package** *(implemented 2026-08-21)*, exactly as a public
+holiday does: each active package that would have funded a cancelled lesson (resolved by the same
+category + nominal-window coverage) has its validity extended by the tenant's
+`holiday_extension_days`, and **restoring** the lesson retracts it. Deduplicated per (package,
+date) — two children sharing one package, one cancelled date, extends it once — and it never
+cascades past the package's nominal window. The extension is **snapshotted at cancel time**: a
+family that enrols *after* a lesson was cancelled is not retro-extended (they never paid for that
+week). Shown on the admin Packages row and the parent Billing card as *+N days · cancelled lessons*
+alongside the holiday line. Still open on `BACKLOG.md`: whether the admin may cancel **today's**
+lesson (locked to future-only — the coach's rain/coach mark is today's path).
 
 #### The admin marks attendance on the lesson page *(implemented 2026-08-19)*
 

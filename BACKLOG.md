@@ -1,9 +1,12 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-21 (5th) — **Advance-cancel a lesson SHIPPED** (§8.81, PRD §7.6): the item at the top
-of the build order is deleted; two decide-first follow-ups filed under *Admin and operations* →
-*Advance-cancel follow-ups* (package extension on cancel; cancelling TODAY from the admin panel). The
-queue's head is now **A location entity** (M)._
+_Last updated: 2026-08-21 (6th) — **Advance-cancel EXTENDS a prepaid package SHIPPED** (`20260821000800`,
+PRD §7.6): a cancel extends the covering package by `holiday_extension_days`, restore retracts it — the
+holiday twin. That follow-up is struck under *Advance-cancel follow-ups*; only *cancelling TODAY* remains
+there. The queue's head is now **A location entity** (M)._
+
+_Previously, 2026-08-21 (5th) — **Advance-cancel a lesson SHIPPED** (§8.81, PRD §7.6): the item at the top
+of the build order was deleted; two decide-first follow-ups filed under *Advance-cancel follow-ups*._
 
 _Previously, 2026-08-21 (4th) — **parent Upcoming now shows make-ups + extra lessons** (§8.80, PRD §7);
 Wave C's ranked five all shipped._
@@ -1171,14 +1174,13 @@ constraint is the real gate here, not the feature.
 
 ## Admin and operations
 
-### Advance-cancel follow-ups — **S each, decide first** `[raised 2026-08-21 while shipping advance-cancel]`
-Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). Two questions were scoped out
-deliberately, as product decisions rather than code:
+### Advance-cancel follow-ups — **S, decide first** `[raised 2026-08-21 while shipping advance-cancel]`
+Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). One follow-up remains; the other
+SHIPPED:
 
-- **What a cancel means for a PREPAID PACKAGE.** A holiday void extends the covering package by the
-  tenant's `holiday_extension_days` (the reconcile trigger); an advance cancel currently does **not**
-  — the package family loses that week. Same mechanism would work (extend on cancel, retract on
-  restore), but it is a promise to the family, so the user decides. Dormant on prod: 0 packages.
+- ~~**What a cancel means for a PREPAID PACKAGE.**~~ **SHIPPED 2026-08-21** (`20260821000800`, PRD §7.6):
+  a cancel extends the covering package by the tenant's `holiday_extension_days`, restore retracts it —
+  the holiday twin, snapshotted at cancel time. Dormant on prod: 0 packages.
 - **Cancelling TODAY's lesson from the admin panel.** Locked out in the plan ("advance means
   advance"): today/past is the coach's `cancelled_rain`/`cancelled_coach` mark, which the admin can
   also set on the lesson page (§7.22). Revisit only if the admin asks to call off a lesson that

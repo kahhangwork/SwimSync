@@ -63,6 +63,7 @@ type ParentPackage = {
   live_lessons_remaining: number | null;
   live_value_remaining: number | null;
   holiday_extension_days: number;
+  cancel_extension_days: number;
 };
 
 type PackageProduct = {
@@ -199,7 +200,7 @@ export default function BillingScreen() {
         // RLS scopes these to this parent's own packages.
         supabase
           .from("parent_packages")
-          .select("id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, status, offered_by, expires_on, requested_at, holiday_extension_days, class_categories(name), tenants(display_name)")
+          .select("id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, status, offered_by, expires_on, requested_at, holiday_extension_days, cancel_extension_days, class_categories(name), tenants(display_name)")
           .in("status", ["pending", "active"])
           .order("requested_at", { ascending: false }),
 
@@ -268,6 +269,7 @@ export default function BillingScreen() {
           live_lessons_remaining: live ? Number(live.live_lessons_remaining) : null,
           live_value_remaining: live ? Number(live.live_value_remaining) : null,
           holiday_extension_days: p.holiday_extension_days ?? 0,
+          cancel_extension_days: p.cancel_extension_days ?? 0,
         };
       })
     );
@@ -608,6 +610,13 @@ export default function BillingScreen() {
                           Includes +{pkg.holiday_extension_days} day
                           {pkg.holiday_extension_days === 1 ? "" : "s"} for public
                           holidays
+                        </Text>
+                      )}
+                      {pkg.cancel_extension_days > 0 && (
+                        <Text className="mt-1 text-xs text-gray-400">
+                          Includes +{pkg.cancel_extension_days} day
+                          {pkg.cancel_extension_days === 1 ? "" : "s"} for cancelled
+                          lessons
                         </Text>
                       )}
                     </>

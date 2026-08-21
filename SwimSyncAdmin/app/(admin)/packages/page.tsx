@@ -75,6 +75,7 @@ type Purchase = {
   start_date: string | null;
   expires_on: string | null;
   holiday_extension_days: number;
+  cancel_extension_days: number;
   manual_extension_days: number;
   /** PKG-YYYY-NNNN (20260809000100). What an incoming PayNow line is matched
    *  back to — the parent's QR carries it as the bill reference. NOT NULL in
@@ -241,7 +242,7 @@ export default function PackagesPage() {
       supabase
         .from("parent_packages")
         .select(
-          "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, requested_at, start_date, expires_on, holiday_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
+          "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, requested_at, start_date, expires_on, holiday_extension_days, cancel_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
         )
         .order("status")
         .order("requested_at", { ascending: false }),
@@ -334,6 +335,7 @@ export default function PackagesPage() {
         start_date: p.start_date,
         expires_on: p.expires_on,
         holiday_extension_days: p.holiday_extension_days ?? 0,
+        cancel_extension_days: p.cancel_extension_days ?? 0,
         manual_extension_days: p.manual_extension_days ?? 0,
         reference_number: p.reference_number ?? null,
         offered_by: p.offered_by ?? null,
@@ -1342,6 +1344,12 @@ export default function PackagesPage() {
                         <div className="mt-0.5 text-xs text-gray-400">
                           +{p.holiday_extension_days} day
                           {p.holiday_extension_days === 1 ? "" : "s"} · public holidays
+                        </div>
+                      )}
+                      {p.cancel_extension_days > 0 && (
+                        <div className="mt-0.5 text-xs text-gray-400">
+                          +{p.cancel_extension_days} day
+                          {p.cancel_extension_days === 1 ? "" : "s"} · cancelled lessons
                         </div>
                       )}
                       {p.manual_extension_days > 0 && (

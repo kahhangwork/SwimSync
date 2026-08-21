@@ -1220,7 +1220,7 @@ async function generateForTenant(
       // bought mid-month covers lessons from its start onward, and a package
       // that has expired by GENERATION time still pays for lessons taken while
       // it was live. expires_on is the ONE effective end (start + validity +
-      // holiday + manual extensions), written by package_effective_end in the
+      // holiday + cancel + manual extensions), written by package_effective_end in the
       // DB — never re-derive it here, or it forks from package_live_balances
       // and the §7.18 pin breaks silently (⚠ RISK 2 prohibition).
       startsOn: String(p.start_date),
