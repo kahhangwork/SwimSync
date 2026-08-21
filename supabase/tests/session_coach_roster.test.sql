@@ -9,7 +9,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(40);
+SELECT plan(41);
 
 -- ── fixture ────────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code, rain_pays_coach)
@@ -158,6 +158,16 @@ SELECT throws_ok(
        (SELECT id FROM _foreign)) $$,
   NULL, NULL,
   'a coach of ANOTHER business cannot be rostered onto this lesson');
+
+-- The class's OWN (paid) coach is a NO-OP substitute — the row records no cover
+-- (is_cover is false) and leaves only a dead-end "Remove substitute" control, the
+-- confusing state a private coach hit assigning themselves. Refused at the DB, not
+-- just the UI. Coach A is the paid coach here (seed_class_rate). (20260821000100)
+SELECT throws_ok(
+  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-08',
+       (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000002')) $$,
+  NULL, NULL,
+  'the class''s own paid coach is REFUSED as a substitute — a cover names a different coach');
 
 
 -- ═══ 2. THE SUBSTITUTE WALKS THE WHOLE LESSON (RISK 1 + RISK 4) ════════════
