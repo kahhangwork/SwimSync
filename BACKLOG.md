@@ -1,14 +1,13 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-21 (2nd) — **booking-vs-concurrent-retire race SHIPPED** (§7.200, `20260821000400`):
-`book_makeup`/`book_trial` now take the class-row `FOR UPDATE` lock unconditionally and re-read `is_active`
-under it. Deleted from below. **Newly filed:** the ROSTER-axis twin (`enforce_enrolment_schedule` +
-`enforce_class_capacity` have the same stale-`is_active` race) — **S**, not fixed. Still open: the
-`add_unclaimed_student` coach-arm question, and under *Admin and operations* the **location entity**._
+_Last updated: 2026-08-21 (3rd) — **`add_unclaimed_student` coach arm CLOSED** (§7.202, `20260821000600`):
+the ONGOING arm is now admin-only, so a class's own coach can no longer create-and-enrol a child — matching
+§7.17 and the same-day refusals of parent self-enrolment and coach-assisted assignment. Item deleted from
+below. Still open under *Admin and operations*: the **location entity**._
 
-_Previously, 2026-08-21 — **Two hardening fixes SHIPPED** (§7.198/§7.199): the capacity last-seat race
-now takes a `FOR UPDATE` class-row lock, and the raw-`UPDATE` retirement hole (plus its date-move sibling)
-is closed by a `BEFORE UPDATE` guard trigger. Both deleted from below._
+_Previously, 2026-08-21 (2nd) — **booking- AND enrolment-vs-retire races SHIPPED** (§7.200 `20260821000400`,
+§7.201 `20260821000500`): both entry paths to a retired class re-read `is_active` under a `FOR UPDATE` lock.
+The ROSTER-axis twin filed here that day was itself the §7.201 fix. Both deleted from below._
 
 _Previously, 2026-08-19 (morning) — **Public-holiday voids shipped LIVE** (§8.70, PRD §7.16): a `holiday`
 attendance status voids a day's lessons and event-extends packages; `recompute_package_extensions` is gone._
@@ -1182,13 +1181,6 @@ day view, not a dropdown over strings.
 contract migration (add table + FK, backfill from distinct names, keep the text column until both
 apps read the FK). Per-venue columns in the day view are the UI half. Not urgent: production is one
 location.
-
-### A raw PostgREST `UPDATE` and the `add_unclaimed_student` coach arm — **S** `[found 2026-08-20]`
-The raw-`UPDATE` retirement hole itself **shipped fixed** (§7.199, `20260821000300`: a `BEFORE UPDATE`
-trigger enforces the three refusals — and the date-move sibling — on any authenticated raw write). One
-related product question surfaced alongside it and is **still open**: `add_unclaimed_student(… 'ongoing' …)`
-lets the class's OWN coach enrol a brand-new child (`c.coach_id = current_coach_id()`), which "coaches must
-not add students" (§7.17) does not cover — decide whether that arm should exist.
 
 ### An owner-only accounting page — **M** — _raised 2026-08-08, not a priority_
 One page showing what the business actually earned and paid out — revenue, wages paid,

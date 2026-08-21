@@ -204,10 +204,11 @@ A coach uses SwimSync to manage attendance and payment tracking for students ass
 - **Cannot create student profiles.** *(This restriction was briefly lifted on 2026-07-25
   and REINSTATED on 2026-07-25 — see §7.17. Slice 1 gave the coach an "Add a walk-in" form
   on the attendance screen; the next session removed it when a trial became a **booking
-  arranged ahead of time by the business's admin**. `add_unclaimed_student()` still accepts
-  a coach caller server-side, but no coach UI reaches it — the coach app calls no RPCs at
-  all. A private coach adds children through their **tenant admin** account, which they
-  hold anyway.)*
+  arranged ahead of time by the business's admin**. `add_unclaimed_student()` **no longer
+  accepts a coach caller** — the ONGOING arm was made admin-only on 2026-08-21 (§7.202),
+  joining the TRIAL arm, so both kinds require the tenant admin; no coach UI ever reached it
+  regardless. A private coach adds children through their **tenant admin** account, which
+  they hold anyway.)*
 - Cannot assign children to classes in MVP
 - Cannot view children not assigned to their own classes
 - *(implemented)* Cannot see a **colleague's** classes either. Cross-class visibility
@@ -2235,7 +2236,7 @@ next:
 | 3 | **Name + date of birth** both match | |
 | 4 | **Name** alone — the given name, or two matching name parts | Last resort |
 
-**The contact number is required when a coach books a trial or adds a student**, precisely
+**The contact number is required when the admin books a trial or adds a student**, precisely
 so ranks 1–2 do the work. A name is written many ways — "Ethan Tan Ah Beng" and "Tan Ah
 Beng Ethan" are one child, as are a nickname and a full name — and matching on it is
 guessing at a string. A contact detail is not a guess.
