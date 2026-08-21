@@ -1,11 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-21 — **Two DB hardening guards SHIPPED + DEPLOYED to prod (§8.75): the capacity
-last-seat race now takes a `FOR UPDATE` class-row lock (§7.198); the raw-`UPDATE` retirement hole and its
-date-move sibling are closed by a BEFORE UPDATE, `auth.uid()`-trust-boundaried trigger (§7.199).** Migrations
-`20260821000200/300`; no engine or app change. DEPLOYMENT §11.33._
+_Last updated: 2026-08-21 — **Parent self-enrolment AND coach-assisted assignment both REFUSED (§8.76):
+class assignment stays a superadmin action — both ways to take the admin out of the loop were rejected.
+Both moved to `BACKLOG.md` → Deliberately not doing; docs-only, no code.** Commit `929a2e2`._
 
-_Previously, 2026-08-21 (§8.74) — a no-op substitute is REFUSED; both admin pickers hide the paid coach (§7.197 · DEPLOYMENT §11.32)._
+_Previously, 2026-08-21 (§8.75) — two DB hardening guards SHIPPED + DEPLOYED: capacity last-seat `FOR UPDATE` lock (§7.198); raw-`UPDATE` retirement guard trigger (§7.199). Migrations `20260821000200/300`; DEPLOYMENT §11.33._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -397,6 +396,15 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.76 (2026-08-21) — PARENT SELF-ENROLMENT and COACH-ASSISTED ASSIGNMENT both REFUSED — assignment stays a superadmin action
+
+**Both ways to take the admin out of the class-assignment loop were rejected with the user**: a parent
+picking their own class (which lane a child belongs in is a coaching judgement, not a parent's pick, and
+self-selection undoes the school's streaming) and a coach assigning to their own classes. Class assignment is
+a deliberate single point of control; the onboarding stall it was meant to cure is answered by better admin
+tooling, not delegation. Both moved to `BACKLOG.md` → *Deliberately not doing* with full reasoning; §9, the
+§8.75 dormant note, and PRD's Phase 3 roadmap repointed. **Docs-only, no code.** Commit `929a2e2`.
+
 ## 8.75 (2026-08-21) — TWO CONCURRENCY/INTEGRITY GUARDS on `classes` — SHIPPED and DEPLOYED to prod
 
 **Both were the §8.73 review's two filed follow-ups.** (1) The HARD capacity limit was a check-then-insert
@@ -418,25 +426,6 @@ fixtures force states freely). §7.199. Migrations `20260821000200/300`. Deploy:
 move of `deactivated_at` on an already-retired class — closed in the same trigger, plus test-discrimination
 and lock-pin hardening. One finding filed to `BACKLOG.md`: a **booking-vs-concurrent-retire** race, distinct
 from the last-seat one.
-
-## 8.74 (2026-08-21) — A NO-OP SUBSTITUTE IS REFUSED — the paid coach can't cover their own lesson
-
-**The admin "assign a coach to this lesson" control installs a per-lesson SUBSTITUTE, and assigning the
-coach who already teaches it recorded no cover (`is_cover` false) while leaving a dead-end "Remove
-substitute" button — the confusing state a private coach hit assigning themselves.** Fixed on both axes:
-the DB now REFUSES it (`assign_session_coach`, `20260821000100`, CREATE OR REPLACE, same signature), and
-both admin pickers hide that coach (lesson-detail + the Substitutes page). The predicate is the paid coach,
-**not `classes.coach_id`** — prohibition + placement in **§7.197**. The picker was also relabelled "Assign a
-substitute for this lesson" and "Remove substitute" became a proper Button. Behaviour: PRD §7.6. Deploy:
-DEPLOYMENT §11.32.
-
-**Verified:** pgTAP **red-first** (`session_coach_roster` plan 40→41 — without the guard the assign succeeds
-and cascades 14 failures), full suite green; admin typecheck + vitest **516**. Migration-first to prod
-(`remote` filled), apps to `main` last, both Vercel builds green. No engine change (`core.ts` untouched).
-
-**A Fable Senior-Engineer review ran before the commit** and caught the PRD doc-gate line and the
-Substitutes-page show-then-error inconsistency — both fixed in the same push, and the now-dead "nothing has
-moved" branch removed with it. No new backlog items; the two capacity follow-ups from §8.73 still stand.
 
 ## 9. Next steps (pick with the user)
 
