@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -15,12 +15,15 @@ import {
   todayInSg,
   toSgDate,
   expectedLessonDates,
+  formatSgDate,
   type DayOfWeek,
 } from "@/lib/lessonDates";
 import {
   computeUpcomingLessons,
+  UPCOMING_HORIZON_DAYS,
   type UpcomingLesson,
 } from "@/lib/upcomingLessons";
+import { addDays } from "@/lib/scheduleWeek";
 import Card from "@/components/Card";
 
 type DbStatus =
@@ -121,6 +124,11 @@ export default function AttendanceScreen() {
   const [hasExpectedLesson, setHasExpectedLesson] = useState(false);
   // Lessons scheduled in the next ~4 weeks (derived, not stored). Holidays removed.
   const [upcoming, setUpcoming] = useState<UpcomingLesson[]>([]);
+  // Guards against a stale response winning: each loadAttendance run takes a
+  // ticket; a run only commits its state if its ticket is still the latest.
+  // Without this, switching child mid-load could paint child A's make-ups under
+  // child B (a wrong "Make-up" badge is actively misleading).
+  const loadIdRef = useRef(0);
 
   // Load the parent's children once on focus
   const loadChildren = useCallback(async () => {
@@ -151,8 +159,13 @@ export default function AttendanceScreen() {
     }));
 
     setChildren(childList);
-    if (childList.length > 0 && !selectedChildId) {
-      setSelectedChildId(childList[0].id);
+    // Functional update, NOT a `!selectedChildId` closure read: this callback's
+    // deps are [session], so the captured selectedChildId is stale on every
+    // refocus and the guard would keep resetting the selection to the first
+    // child (and re-trigger the heavier loadAttendance). `prev ?? …` only
+    // defaults when nothing is selected yet.
+    if (childList.length > 0) {
+      setSelectedChildId((prev) => prev ?? childList[0].id);
     }
     setLoadingChildren(false);
   }, [session]);
@@ -166,6 +179,8 @@ export default function AttendanceScreen() {
   // Load attendance whenever selected child changes
   const loadAttendance = useCallback(async () => {
     if (!selectedChildId) return;
+    const myLoadId = ++loadIdRef.current;
+    const fresh = () => myLoadId === loadIdRef.current;
     setLoadingRecords(true);
 
     const { data } = await supabase
@@ -191,6 +206,7 @@ export default function AttendanceScreen() {
         b.session_date.localeCompare(a.session_date)
       );
 
+    if (!fresh()) return; // a newer child selection is in flight
     setRecords(mapped);
 
     // Has any lesson fallen due since this child joined? Derived from each
@@ -211,11 +227,13 @@ export default function AttendanceScreen() {
       .eq("is_active", true);
 
     const today = todayInSg();
+    const horizon = addDays(today, UPCOMING_HORIZON_DAYS);
     const activeClasses = (enrolments ?? []).map((enr: any) => ({
       enr,
       cls: Array.isArray(enr.classes) ? enr.classes[0] : enr.classes,
     }));
 
+    if (!fresh()) return;
     setHasExpectedLesson(
       activeClasses.some(({ enr, cls }) => {
         const day = cls?.day_of_week as DayOfWeek | undefined;
@@ -227,32 +245,103 @@ export default function AttendanceScreen() {
       })
     );
 
-    // Upcoming lessons: derived from each class's weekday over the next ~4 weeks,
-    // minus this tenant's public holidays (RLS returns only the parent's tenant).
-    const horizonRows = activeClasses.filter(({ cls }) => cls?.day_of_week && cls?.title);
-    if (horizonRows.length > 0) {
-      const { data: holidayRows } = await supabase
+    // Upcoming lessons, from three sources merged in computeUpcomingLessons():
+    //   • the weekly projection off each active enrolment's weekday, minus this
+    //     tenant's public holidays (RLS returns only the parent's tenant);
+    //   • booked make-ups — the child guesting one lesson in another (HOST) class;
+    //   • admin off-schedule extra lessons in the child's own class.
+    // Make-ups and extras are EXPLICIT rows, so they win any (class, date)
+    // collision with the projection (see the helper's precedence note).
+    const activeClassIds = activeClasses
+      .map(({ cls }) => cls?.id as string | undefined)
+      .filter((id): id is string => !!id);
+
+    const [
+      { data: holidayRows, error: holidayErr },
+      { data: makeupRows, error: makeupErr },
+      { data: extraRows, error: extraErr },
+    ] = await Promise.all([
+      supabase
         .from("tenant_public_holidays")
         .select("holiday_date")
-        .gte("holiday_date", today);
-      const holidays = new Set(
-        (holidayRows ?? []).map((h: any) => h.holiday_date as string)
-      );
-      setUpcoming(
-        computeUpcomingLessons(
-          horizonRows.map(({ cls }, i) => ({
-            class_id: (cls.id as string) ?? `enr-${i}`,
-            day_of_week: cls.day_of_week as DayOfWeek,
-            class_title: cls.title as string,
-            time_label: timeLabel(cls.start_time ?? null, cls.end_time ?? null),
-          })),
-          today,
-          holidays
+        .gte("holiday_date", today)
+        .lte("holiday_date", horizon),
+      supabase
+        .from("makeup_bookings")
+        .select(
+          "id, session_date, classes!makeup_bookings_class_id_fkey(id, title, start_time, end_time)"
         )
-      );
-    } else {
+        .eq("student_id", selectedChildId)
+        .is("cancelled_at", null)
+        .gte("session_date", today)
+        .lte("session_date", horizon),
+      activeClassIds.length
+        ? supabase
+            .from("lesson_sessions")
+            .select("class_id, session_date, start_time, end_time, classes(title)")
+            .not("off_schedule_reason", "is", null)
+            .neq("status", "cancelled")
+            .in("class_id", activeClassIds)
+            .gte("session_date", today)
+            .lte("session_date", horizon)
+        : Promise.resolve({ data: [] as any[], error: null }),
+    ]);
+
+    if (!fresh()) return;
+
+    if (makeupErr) console.warn("upcoming: make-up read failed", makeupErr.message);
+    if (extraErr) console.warn("upcoming: extra-lesson read failed", extraErr.message);
+
+    // A failed HOLIDAY read is fail-safe, not fail-open: if we cannot know which
+    // days the pool is closed, projecting weekly lessons could tell a parent to
+    // turn up on a holiday (the RISK 4 the helper exists to prevent). So on a
+    // holiday-read error, show nothing rather than a possibly-wrong list.
+    if (holidayErr) {
+      console.warn("upcoming: holiday read failed", holidayErr.message);
       setUpcoming([]);
+      setLoadingRecords(false);
+      return;
     }
+
+    const holidays = new Set(
+      (holidayRows ?? []).map((h: any) => h.holiday_date as string)
+    );
+
+    const enrolmentInputs = activeClasses
+      .filter(({ cls }) => cls?.day_of_week && cls?.title)
+      .map(({ cls }, i) => ({
+        class_id: (cls.id as string) ?? `enr-${i}`,
+        day_of_week: cls.day_of_week as DayOfWeek,
+        class_title: cls.title as string,
+        time_label: timeLabel(cls.start_time ?? null, cls.end_time ?? null),
+      }));
+
+    const makeupInputs = (makeupRows ?? []).map((m: any) => {
+      const c = Array.isArray(m.classes) ? m.classes[0] : m.classes;
+      return {
+        // Fall back to the booking id (never null) rather than a shared literal,
+        // so two same-date make-ups with an unreadable host class do not collapse
+        // to one dedup key.
+        class_id: (c?.id as string) ?? `makeup:${m.id}`,
+        class_title: (c?.title as string) ?? "another class",
+        session_date: m.session_date as string,
+        time_label: timeLabel(c?.start_time ?? null, c?.end_time ?? null),
+      };
+    });
+
+    const extraInputs = (extraRows ?? []).map((s: any) => {
+      const c = Array.isArray(s.classes) ? s.classes[0] : s.classes;
+      return {
+        class_id: s.class_id as string,
+        class_title: (c?.title as string) ?? "Extra lesson",
+        session_date: s.session_date as string,
+        time_label: timeLabel(s.start_time ?? null, s.end_time ?? null),
+      };
+    });
+
+    setUpcoming(
+      computeUpcomingLessons(enrolmentInputs, today, holidays, makeupInputs, extraInputs)
+    );
 
     setLoadingRecords(false);
   }, [selectedChildId]);
@@ -361,11 +450,32 @@ export default function AttendanceScreen() {
                 <Card key={u.key} className="flex-row items-center gap-3 mb-2">
                   <Ionicons name="calendar-outline" size={24} color="#0ea5e9" />
                   <View className="flex-1">
-                    <Text className="text-sm font-semibold text-gray-800">
-                      {u.class_title}
-                    </Text>
+                    <View className="flex-row items-center gap-2">
+                      <Text className="text-sm font-semibold text-gray-800">
+                        {u.class_title}
+                      </Text>
+                      {u.kind !== "class" && (
+                        <View
+                          className={`px-2 py-0.5 rounded-full ${
+                            u.kind === "makeup" ? "bg-emerald-100" : "bg-violet-100"
+                          }`}
+                        >
+                          <Text
+                            className={`text-[10px] font-bold uppercase tracking-wide ${
+                              u.kind === "makeup" ? "text-emerald-700" : "text-violet-700"
+                            }`}
+                          >
+                            {u.kind === "makeup" ? "Make-up" : "Extra lesson"}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     <Text className="text-xs text-gray-500">
-                      {formatDate(u.session_date)}
+                      {formatSgDate(u.session_date, {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                       {u.time_label ? ` · ${u.time_label}` : ""}
                     </Text>
                   </View>

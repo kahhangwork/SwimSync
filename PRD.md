@@ -1023,15 +1023,20 @@ has an attendance record on it — the same rule the invoice engine applies.
 > from the span each enrolment actually covers, in the coach's app, the admin's gap
 > report and the billing engine alike.
 
-**Upcoming lessons** *(implemented 2026-08-17)*: the parent Attendance screen now shows an
-**Upcoming** section above the marked history, listing the lessons scheduled for the selected
-child over roughly the next four weeks. The dates are **derived at read time** from each active
-enrolment's weekday (the same `expectedLessonDates` logic the coach's unmarked-lessons view
-uses) — **no sessions are pre-generated**. A date that falls on one of the business's
+**Upcoming lessons** *(implemented 2026-08-17; make-ups + extra lessons added 2026-08-21)*:
+the parent Attendance screen shows an **Upcoming** section above the marked history, listing the
+lessons scheduled for the selected child over roughly the next four weeks. It merges **three
+sources**: the weekly projection off each active enrolment's weekday (**derived at read time**
+via the same `expectedLessonDates` logic the coach's unmarked-lessons view uses — **no sessions
+are pre-generated**); the child's booked **make-ups** (guesting one lesson in another class,
+badged *Make-up*); and admin-scheduled **extra lessons** in the child's own class (off-schedule
+sessions, badged *Extra lesson*). Make-ups and extra lessons are explicit rows, so they take
+precedence over a same-day projected slot. A projected date that falls on one of the business's
 **public holidays** (`tenant_public_holidays`) is removed, so the app never sends a family to a
-closed pool. It is a forward projection of the schedule, not a promise about individual
-lessons: an **ad-hoc cancellation or reschedule** recorded against a specific `lesson_session`
-is not yet reflected (a noted follow-up). The status filter applies only to the history below.
+closed pool — but an explicit make-up/extra is shown regardless (it is booked evidence, not a
+guess). It remains a forward projection, not a promise about individual lessons: an **ad-hoc
+cancellation** of a specific lesson is not yet reflected (a noted follow-up). The status filter
+applies only to the history below.
 
 ### 7.6 Attendance Management
 
