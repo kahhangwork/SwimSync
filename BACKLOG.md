@@ -1,10 +1,14 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-21 — **Two hardening fixes SHIPPED** (§7.198/§7.199): the capacity last-seat race
-now takes a `FOR UPDATE` class-row lock, and the raw-`UPDATE` retirement hole (plus its date-move sibling)
-is closed by a `BEFORE UPDATE` guard trigger. Both deleted from below. Newly filed from the commit review:
-a **booking-vs-concurrent-retire** race (distinct from the last-seat one). Still open: the
+_Last updated: 2026-08-21 (2nd) — **booking-vs-concurrent-retire race SHIPPED** (§7.200, `20260821000400`):
+`book_makeup`/`book_trial` now take the class-row `FOR UPDATE` lock unconditionally and re-read `is_active`
+under it. Deleted from below. **Newly filed:** the ROSTER-axis twin (`enforce_enrolment_schedule` +
+`enforce_class_capacity` have the same stale-`is_active` race) — **S**, not fixed. Still open: the
 `add_unclaimed_student` coach-arm question, and under *Admin and operations* the **location entity**._
+
+_Previously, 2026-08-21 — **Two hardening fixes SHIPPED** (§7.198/§7.199): the capacity last-seat race
+now takes a `FOR UPDATE` class-row lock, and the raw-`UPDATE` retirement hole (plus its date-move sibling)
+is closed by a `BEFORE UPDATE` guard trigger. Both deleted from below._
 
 _Previously, 2026-08-19 (morning) — **Public-holiday voids shipped LIVE** (§8.70, PRD §7.16): a `holiday`
 attendance status voids a day's lessons and event-extends packages; `recompute_package_extensions` is gone._
@@ -1178,18 +1182,6 @@ day view, not a dropdown over strings.
 contract migration (add table + FK, backfill from distinct names, keep the text column until both
 apps read the FK). Per-venue columns in the day view are the UI half. Not urgent: production is one
 location.
-
-### A booking can land in a class retired in the SAME instant — **SHIPPED 2026-08-21 (§7.200, `20260821000400`)**
-`book_makeup`/`book_trial` read `classes.is_active` at the top, then (for a capped class) block on the
-`FOR UPDATE` class-row lock. A concurrent `deactivate_class()` committing in the gap left them resuming with
-a stale `is_active = true` and inserting a guest into a now-retired class; on an **uncapped** class no lock
-was taken at all (the FK's `FOR KEY SHARE` does not serialise against a non-key `UPDATE`). **Fixed:** the
-lock is now taken UNCONDITIONALLY, is_active is re-read under it, and `class_effective_capacity()` is read
-under it too (closing the stale-`v_cap` half). The reverse direction (retire racing an in-flight booking)
-was already covered by `trg_class_retirement_guard` re-running `assert_class_retirable` after the lock
-releases (§7.199). Structural pgTAP pin `booking_retire_race.test.sql` (8, red-first); Deno ×2 229/229.
-Was distinct from the last-seat race (§7.198, shipped) — that one was booking-vs-booking; this was
-booking-vs-retire.
 
 ### The ROSTER axis has the SAME booking-vs-retire race — **S** `[found 2026-08-21 while shipping §7.200]`
 The twin of §7.200 on the enrolment side. `enforce_enrolment_schedule()` reads `classes.is_active` in its

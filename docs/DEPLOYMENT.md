@@ -699,3 +699,18 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     **Dormant on prod:** one admin cannot race the last seat, and every retire goes through the RPC today —
     first real firing needs a second admin or a parent self-enrol path. A pre-commit Fable review closed a
     date-move sibling hole (§7.199) before the push.
+
+34. **Deploy record (2026-08-21): booking-vs-concurrent-retire race** (§8.77, §7.200). One migration,
+    `20260821000400` — two CREATE OR REPLACE, **same signatures** (`book_makeup`, `book_trial`): the
+    capacity block becomes a lock-first / re-check-`is_active` / count block, closing the race a booking ran
+    against a simultaneous `deactivate_class()`. Sequence: (1) `supabase db push` — the `pgdelta` cert stack
+    trace printed alongside `Finished` again (§7.55, normal); `migration list --linked` shows `remote` filled
+    for `20260821000400`, **0 pending**. (2) **No grant dump needed** — same-signature CREATE OR REPLACE
+    preserves ACLs, no new object, no privilege touched (§11.32 pattern, not §11.33); the migration's own
+    apply-time DO-block probes asserted EXECUTE-for-authenticated / none-for-anon / lock-present /
+    is_active-recheck-present on prod (a migration commits only if they pass). (3) **No app or engine
+    deploy** — `core.ts` untouched, no app code changed (both apps call the RPCs). **Rollback (documented,
+    not a committed DOWN — same-signature replace):** re-apply the `book_makeup`/`book_trial` bodies from
+    `20260821000200` (unchanged in git). **Dormant on prod:** one admin cannot race themselves; first real
+    firing needs a second admin. The ROSTER-axis twin (`enforce_enrolment_schedule`) is filed in `BACKLOG.md`,
+    not deployed.

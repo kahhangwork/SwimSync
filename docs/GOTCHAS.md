@@ -3154,3 +3154,26 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     shifting it on an already-retired class widens its expectation window (found in the pre-commit review;
     a fabricated FIRST date on a raw retire is accepted — the load-bearing invariant is that a set date does
     not move). (2026-08-21.)
+
+200. **A BOOKING MUST RE-READ `is_active` UNDER THE CLASS-ROW LOCK, AND THE LOCK MUST BE UNCONDITIONAL — OR
+    IT RACES A CONCURRENT RETIRE AND LANDS A GUEST IN A DEAD CLASS.** `book_makeup`/`book_trial` read
+    `classes.is_active` at the top WITHOUT a lock, refuse a retired host, then insert a guest. A
+    `deactivate_class()` committing in that gap left the guest in a now-retired class — unmarkable (no coach
+    screen renders one), month-blocking with no override, breaking the "a retired class holds zero live
+    guests" invariant the calendar and Lessons badge lean on. §7.198's `FOR UPDATE` lock did NOT close this:
+    it was taken only for a CAPPED class and AFTER the is_active read, so (a) an UNCAPPED class took no lock
+    at all — the `makeup_bookings`/`trial_bookings` FK on `class_id` takes only FOR KEY SHARE, which does
+    NOT serialise against the non-key `is_active` UPDATE — and (b) even capped, is_active was never re-read.
+    `20260821000400` takes the class-row `FOR UPDATE` UNCONDITIONALLY, re-reads `is_active` under it (refuse
+    if now retired), and reads `class_effective_capacity()` under it too (closing §7.198's stale-`v_cap`
+    half — a concurrent capacity DECREASE is now seen). The REVERSE direction (a retire racing an in-flight
+    booking) needs no change: `trg_class_retirement_guard` (§7.199) re-runs `assert_class_retirable` when the
+    booking's lock releases, and its count then sees the committed guest and refuses the retire — safe both
+    ways round. ⚠ Taking the lock unconditionally trades §7.198's "unlimited classes never lock" optimisation
+    and WIDENS the accepted make-up cross-reference deadlock (40P01, retryable) from capped-only to every
+    class — both deliberate. ⚠ THE ROSTER AXIS HAS THE SAME RACE via `enforce_enrolment_schedule` (reads
+    is_active unlocked) + `enforce_class_capacity` (locks only when capped, never re-checks is_active) — NOT
+    fixed here, filed in `BACKLOG.md`; the booking axis was the one the review named. Concurrency can't be
+    shown in pgTAP's single rolled-back txn, so `booking_retire_race.test.sql` is a STRUCTURAL pin (lock
+    present on both paths, is_active re-check present, lock precedes the capacity read, ordering
+    lock→recheck→INSERT), proven red-first. (2026-08-21.)

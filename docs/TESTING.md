@@ -578,6 +578,14 @@ an obstructed **active** class and reactivation of an obstructed **inactive** on
 partners); and the `auth.uid()` trust boundary is pinned — a no-user (superuser/service_role) context is
 exempt, which is what lets the Deno engine tests and the pgTAP fixtures force retired states (they clear
 `request.jwt.claims`, since `RESET ROLE` alone leaves the LOCAL claim set). Red-first proven.
+`booking_retire_race.test.sql` (8 — the booking-vs-concurrent-retire close, `20260821000400`, §7.200): a
+**structural pin**, same limitation as `class_capacity_lock` (a two-writer interleave is not provable in
+single-session pgTAP). Asserts on both `book_makeup`/`book_trial` bodies that the `FOR UPDATE` class-row lock
+is present, that an under-lock `is_active` re-check (`WHERE id = p_class_id AND is_active`) follows it, that
+the lock now precedes the `class_effective_capacity` read (so it is UNCONDITIONAL, no longer gated by
+`v_cap` — the discriminator against the pre-`20260821000400` body), and that the order is
+lock→re-check→INSERT. Red-first proven: restore the `20260821000200` bodies and assertions 3–8 go red while
+1–2 (the lock string, already present for the capped path) stay green — that split is the file's signature.
 `verify-makeups.mjs` (+ `fixtures-makeups.sql` and its `-teardown.sql`) drives a make-up —
 an enrolled child guesting one lesson of another same-category class — end to end through
 both real UIs (15 checks): the admin's booking form is child-first via **one search box
