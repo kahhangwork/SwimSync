@@ -227,6 +227,19 @@ seal-term (RED against dropping it), and two §7.18 cross-checks that the guard'
 the engine's own complete/incomplete verdict. RED-proven: neutralising the guard fails exactly
 the seven block-assertions.
 
+_And (added 2026-08-21, §7.203):_ **`cancelledLessons.test.ts`** (3) — advance-cancelled lessons
+and the completeness gate. (1) A cancelled date with nothing on it neither blocks nor bills
+(control first: the untouched date blocks, then the cancel clears it and the month seals at the
+three marked lessons). (2) **⚠ RISK 1 — the prohibition pin:** a cancelled date that ALSO holds a
+live make-up booking is `incomplete_attendance`, NOT sealed, and the block names exactly the
+guest (the enrolled child is not expected at a cancelled lesson) — this is what proves the
+subtraction touched `expectedDates` only, never the `sessionByDate`/`bookingsByDate` union.
+(3) `present` rows written onto a cancelled session (impossible through the product — the
+trigger refuses — written here as service_role) still bill: the engine does not depend on the
+RPC's refusals. Sessions are inserted directly with `status: 'cancelled'` + `cancelled_at` (the
+CHECK requires both); the home class in (2) is completed with `completeMonth()` so only the host
+can be what blocks (§7.111's shape).
+
 _PRD §11 edge cases are now all individually tested_ — 11.1 & 11.7 (Deno),
 11.2/11.4/11.5/11.8 (`edge_cases`), 11.3 (`rls_isolation`), 11.6 (`credit_note_trigger`).
 
@@ -546,7 +559,21 @@ the **coach app** opens the same lesson, saves, and the admin's holiday row surv
 `finally` restores Rose to capacity 3 and removes the driver-booked guest; the fixture's
 `ON CONFLICT DO UPDATE` re-asserts `rose_cap = 3` (plan RISK 4). **A re-run needs a full `db reset`,
 not just a fixture re-load** — the driver books and marks through the UI.
-Unit: `lib/calendarLessons.test.ts` (31 — incl. the SGT retirement cut-off pair and the
+`verify-cancel-lesson.mjs` (same fixture — mapped in `run-all-drivers.sh`; 17 checks; needs Expo too;
+§7.203/§7.204) drives **advance-cancel**: NEXT WEEK's Rose lesson (Rose runs on today's weekday, so
+today+7 is always a real future lesson) offers *Cancel this lesson*; the confirm is disabled until a
+reason is typed; after confirming, the cancelled banner shows the reason, Save/Set-all/booking are
+disabled, *Restore* replaces *Cancel*, and psql reads `status=cancelled` + `cancelled_at` + the reason;
+the read-only calendar's day view shows the Rose card with the **Cancelled** chip; the Classes page's
+*Cancel a lesson* entry used on a PAST date renders the RPC's own "has not happened yet" refusal and
+writes nothing (RISK 2, §7.32); the **coach app's** Schedule → next week → the fixture's COMING UP day
+expanded BY NAME (§7.101) shows the Rose card struck "Cancelled by your admin"; Restore clears the
+banner, re-offers Cancel, and the row is a plain scheduled session with one `lesson_cancelled` + one
+`lesson_restored` audit row. **Re-runnable**: the `finally` deletes the bare session row the cancel
+created (restore keeps the row, flag cleared), so the fixture's session count is unchanged.
+Unit: `lib/calendarLessons.test.ts` (33 — incl. the advance-cancel pair: a cancelled session is
+progress `cancelled` with nobody enrolled and the reason carried, and a live guest on it is still an
+expected unmarked guest; the SGT retirement cut-off pair and the
 `enrolled+guests === expectedStudentsOn` parity assertion), `lib/adminAttendanceSave.test.ts` (11 —
 mock deps: only changed rows sent, holiday kept, each step's error surfaced by name, no
 `session_coach_absences` call), `lib/lessonMarking.test.ts`, `lib/classColours.test.ts`,
@@ -590,6 +617,21 @@ the lock now precedes the `class_effective_capacity` read (so it is UNCONDITIONA
 `v_cap` — the discriminator against the pre-`20260821000400` body), and that the order is
 lock→re-check→INSERT. Red-first proven: restore the `20260821000200` bodies and assertions 3–8 go red while
 1–2 (the lock string, already present for the capped path) stay green — that split is the file's signature.
+`advance_cancel_lesson.test.sql` (35 — advance-cancel a lesson, `20260821000700`, §7.203/§7.204): the
+`cancel_lesson`/`restore_lesson` RPCs and every guard the migration touches. Authz (stranger refused on both);
+RISK 2 (past and TODAY refused — the coach's `cancelled_rain` mark is that path; a session with attendance rows
+refused; restore into a month sealed in `billing_periods` refused); RISK 3 (a live trial guest on the date is
+refused BY NAME; `book_trial` and `schedule_extra_lesson` refuse a cancelled date); RISK 4 (a raw `attendance`
+INSERT on a cancelled session is refused by `guard_attendance_date()` — 14 for a future date, where the message
+must say "cancelled" not "has not happened yet", and **19 for a PAST one**, the stale-screen shape); the client
+cannot set or clear the cancel columns (`guard_session_date`); the CHECK ties `status` to `cancelled_at` even
+for a superuser; the two SQL copies of "owed a mark" skip the cancelled date and count it again after restore;
+`mark_day_holiday` voids nothing on it and `unmark_day_holiday` does not delete it; audit rows; grants. Dates
+are `today_sg()`-relative (§7.7) — Class A runs on TODAY's weekday with 00:00–00:01 times so today's lesson
+always counts as ended for the badge count. **Red-first, measured two ways:** with the FIVE pre-migration bodies
+(guard + the two unmarked functions + the two holiday functions) 14, 19, 26, 27, 32, 33-pre, 33 go red — and 20/21
+stay green ONLY because the old guard let 19's mark leak, so a second probe with just the two old unmarked
+bodies turns 20 and 21 red. That two-step is the file's signature.
 `enrolment_retire_race.test.sql` (2 — the roster-axis twin, `20260821000500`, §7.201): the same STRUCTURAL
 pin on `enforce_enrolment_schedule`, asserting its class read carries `FOR UPDATE` and that the lock is on the
 ENTERED class (`WHERE c.id = NEW.class_id … FOR UPDATE`) so `is_active` is read under it. Red-first proven:

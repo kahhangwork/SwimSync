@@ -81,6 +81,54 @@ describe("computeUpcomingLessons", () => {
       time_label: "5:00 PM – 6:00 PM",
     };
 
+    // Advance-cancel (plan Phase B, Step B5): a cancelled lesson is SHOWN,
+    // struck, never hidden — and it is the strongest fact of the three.
+    describe("cancelled lessons", () => {
+      const cancelledMonday: UpcomingExplicit = {
+        class_id: "c1",
+        class_title: "Toddler 2",
+        session_date: "2026-08-24", // the child's own Monday lesson, called off
+        time_label: "5:00 PM – 6:00 PM",
+        reason: "Pool closed — heavy rain forecast",
+      };
+
+      it("replaces the projected weekly row with ONE struck 'cancelled' row carrying the reason", () => {
+        const out = computeUpcomingLessons([mondayClass], MONDAY, new Set(), [], [], [cancelledMonday]);
+        const rows = out.filter((u) => u.session_date === "2026-08-24");
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ kind: "cancelled", reason: "Pool closed — heavy rain forecast" });
+        // Every other Monday is still a live projected lesson.
+        expect(out.filter((u) => u.kind === "class").map((u) => u.session_date)).toEqual([
+          "2026-08-17",
+          "2026-08-31",
+          "2026-09-07",
+          "2026-09-14",
+        ]);
+      });
+
+      it("RISK 5: a cancelled EXTRA lesson reads 'cancelled', never 'extra'", () => {
+        const out = computeUpcomingLessons(
+          [mondayClass], MONDAY, new Set(), [], [extra],
+          [{ ...extra, reason: "Coach unwell" }]
+        );
+        const rows = out.filter((u) => u.session_date === "2026-08-19");
+        expect(rows).toHaveLength(1);
+        expect(rows[0].kind).toBe("cancelled");
+      });
+
+      it("is not holiday-subtracted, and obeys the today/horizon bounds like every explicit row", () => {
+        const onHoliday = computeUpcomingLessons([mondayClass], MONDAY, new Set(["2026-08-24"]), [], [], [cancelledMonday]);
+        expect(onHoliday.find((u) => u.session_date === "2026-08-24")?.kind).toBe("cancelled");
+        const past = computeUpcomingLessons([mondayClass], MONDAY, new Set(), [], [], [{ ...cancelledMonday, session_date: "2026-08-10" }]);
+        expect(past.find((u) => u.session_date === "2026-08-10")).toBeUndefined();
+      });
+
+      it("projected and make-up rows carry reason: null", () => {
+        const out = computeUpcomingLessons([mondayClass], MONDAY, new Set(), [makeup]);
+        expect(out.every((u) => u.reason === null)).toBe(true);
+      });
+    });
+
     it("includes a booked make-up, tagged kind 'makeup'", () => {
       const out = computeUpcomingLessons([mondayClass], MONDAY, new Set(), [makeup]);
       const row = out.find((u) => u.session_date === "2026-08-20");

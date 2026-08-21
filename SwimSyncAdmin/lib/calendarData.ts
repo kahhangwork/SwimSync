@@ -45,7 +45,7 @@ export async function loadCalendarData(range: DateRange): Promise<CalendarLoad> 
       supabase.from("class_rates").select("class_id, effective_from, paid_coach_id"),
       supabase
         .from("lesson_sessions")
-        .select("id, class_id, session_date, off_schedule_reason")
+        .select("id, class_id, session_date, off_schedule_reason, cancelled_at, cancellation_reason")
         .gte("session_date", range.from)
         .lte("session_date", range.to),
       // No is_active filter: the SPAN decides who was expected on a date

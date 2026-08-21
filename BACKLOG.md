@@ -371,14 +371,9 @@ accrual, manual reminders, multi-language refused. The order below: **Wave B** t
 chain → **Wave C** value-ranked independents → **Wave D** latent traps → **Later** big features →
 deliberately-last. Sections restructured below.
 
-> **NEXT — Advance-cancel a lesson (M)** `[top of queue 2026-08-21]`. The Phase B follow-up to
-> the make-ups/extra-lessons Upcoming work (§8.80): let the admin cancel a specific FUTURE lesson,
-> reflected as a struck "Cancelled" row in the parent Upcoming view. **Planned and risk-reviewed** —
-> `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`; full item under *Admin and operations* below. It
-> authors a migration + touches the billing engine, so: root checkout, migration ALONE first, then
-> engine → apps. The two load-bearing gates — **RISK 1** subtract cancelled dates from `expectedDates`
-> ONLY (never the `sessionByDate`/`bookingsByDate` union — that is the §7.18 clamp under a new name);
-> **RISK 4** the mark-refusal lives in `guard_attendance_date()`, not the UI (§7.199).
+> ~~**NEXT — Advance-cancel a lesson (M)**~~ — **SHIPPED 2026-08-21** (PRD §7.6 *Advance-cancel*,
+> §7.203/§7.204, `20260821000700`). Its two decide-first follow-ups are filed under *Admin and
+> operations* → *Advance-cancel follow-ups*. The queue's head is now **A location entity (M)**.
 
 ### Wave B — the one genuine internal chain — **EXHAUSTED bar the cron-gated tail**
 
@@ -398,8 +393,8 @@ click-through queue stops scaling.
 **All five ranked Wave C items have SHIPPED** — struck in their own sections below:
 1. ~~Convert a trial into an enrolled student~~ — DONE 2026-08-17.
 2. ~~Upcoming lessons view for parents~~ — DONE 2026-08-17; **make-ups + extra lessons added
-   2026-08-21** (§8.80, PRD §7). The ad-hoc *cancellation* follow-up is Phase B of
-   `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md` — see *Advance-cancel a lesson* below.
+   2026-08-21** (§8.80, PRD §7); **cancelled lessons added 2026-08-21** (advance-cancel, PRD §7.6).
+   `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md` is complete.
 3. ~~Book a make-up from the Attendance page~~ — DONE 2026-08-17.
 4. ~~Attendance edit history view~~ — DONE 2026-08-17 (the Change History page).
 5. ~~Export to CSV~~ — DONE 2026-08-17.
@@ -1178,28 +1173,21 @@ constraint is the real gate here, not the feature.
 
 ## Admin and operations
 
-### Advance-cancel a lesson (reflected in parent Upcoming) — **M** `[raised 2026-08-21; PLANNED]`
-Let a tenant admin cancel a specific FUTURE lesson (class + date — a whole lesson that did not
-run: rain, coach sick), reflected as a struck "Cancelled" row in the parent Attendance→Upcoming
-view. Full plan (Phase B), with the billing-risk mitigations baked in as steps:
-`docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`.
+### Advance-cancel follow-ups — **S each, decide first** `[raised 2026-08-21 while shipping advance-cancel]`
+Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). Two questions were scoped out
+deliberately, as product decisions rather than code:
 
-**Why:** the Upcoming view (PRD §7, shipped 2026-08-17 + extended 2026-08-21, §8.80) is a pure
-weekday projection; only whole-day public holidays are subtracted. A one-off single-lesson
-cancellation has **no mechanism today** — `cancelled_rain`/`cancelled_coach` are attendance
-statuses set at marking, at/after the date, never in advance. So a parent is told to turn up to
-a lesson the coach already knows is off.
+- **What a cancel means for a PREPAID PACKAGE.** A holiday void extends the covering package by the
+  tenant's `holiday_extension_days` (the reconcile trigger); an advance cancel currently does **not**
+  — the package family loses that week. Same mechanism would work (extend on cancel, retract on
+  restore), but it is a promise to the family, so the user decides. Dormant on prod: 0 packages.
+- **Cancelling TODAY's lesson from the admin panel.** Locked out in the plan ("advance means
+  advance"): today/past is the coach's `cancelled_rain`/`cancelled_coach` mark, which the admin can
+  also set on the lesson page (§7.22). Revisit only if the admin asks to call off a lesson that
+  morning *before* the roster exists — the RPC's `p_date <= today_sg()` refusal is the one line.
 
-**Notes — billing-critical, do NOT shortcut:** cancellation is SESSION-level (a new
-`lesson_sessions.cancelled_at`), not per-student marks — a child who enrols between cancel-time
-and bill-time would otherwise re-block the month. The engine must subtract cancelled dates from
-**`expectedDates` ONLY**, never from the `sessionByDate`/`bookingsByDate` union (that is the
-§7.18 / core.ts:735 clamp under a new name — it trades a loud block for a silent permanent
-underbill). The mark-refusal belongs in the `guard_attendance_date()` trigger, not the UI
-(§7.199 — a `FOR ALL` policy + grant is raw-PostgREST-bypassable). Admin-only; cancel refuses
-past/today, a session with attendance rows, and a date holding a live make-up/trial booking (it
-names them); restore refuses a sealed month. Admin homes: the lesson detail page AND a Classes-page
-entry. RISK 1 and RISK 4 graduate to `docs/GOTCHAS.md` §7 when it ships.
+Cosmetic, not filed separately: the coach Schedule's collapsed COMING UP day summary still counts a
+cancelled lesson in its "N lessons"; the card inside is struck.
 
 ### A location entity (venue) — **M** `[raised 2026-08-19 while building the admin calendar]`
 Promote `classes.location_name` (free text) to a `locations` table the class references, so the

@@ -5,9 +5,10 @@
 // (WAVE_C_PLAN.md): expectedLessonDates has no holiday awareness, so a naive
 // list would tell a parent to turn up on a day the business has declared the
 // pool closed. tenant_public_holidays holds those dates and parents can read
-// their own tenant's rows (RLS), so this helper subtracts them. Ad-hoc
-// lesson_sessions cancellations are NOT reflected — that is a named follow-up,
-// not covered here.
+// their own tenant's rows (RLS), so this helper subtracts them. A lesson the
+// admin CANCELLED in advance (lesson_sessions.cancelled_at, 20260821000700) is
+// passed in as an explicit row and rendered struck "Cancelled" — shown, not
+// hidden, so the parent sees WHY there is no lesson that day.
 //
 // `today` is passed in, never read from a clock (§7.7).
 
@@ -33,9 +34,11 @@ export type UpcomingExplicit = {
   class_title: string;
   session_date: string; // YYYY-MM-DD
   time_label: string;
+  /** Why the admin cancelled it — only meaningful on a `cancelled` row. */
+  reason?: string | null;
 };
 
-export type UpcomingKind = "class" | "makeup" | "extra";
+export type UpcomingKind = "class" | "makeup" | "extra" | "cancelled";
 
 export type UpcomingLesson = {
   key: string;
@@ -44,6 +47,8 @@ export type UpcomingLesson = {
   session_date: string; // YYYY-MM-DD
   time_label: string;
   kind: UpcomingKind;
+  /** The admin's cancellation reason on a `cancelled` row; null otherwise. */
+  reason: string | null;
 };
 
 /** Every lesson a child is expected at from `today` through the horizon, one per
@@ -53,11 +58,12 @@ export type UpcomingLesson = {
  *  any (class, date) collision with the weekly projection (the projection dedups
  *  against `seen`, which is first-wins). This ordering is structural, not a comment
  *  to remember: a projected weekly date is a GUESS, a make-up/extra row is a booked
- *  fact, so the fact must be the one that survives — and, once cancellations land, a
- *  struck row must never lose to a plain projected one.
- *    1. `makeups`  — booked make-ups (host class), kind "makeup"
- *    2. `extras`   — admin off-schedule lessons in the child's class, kind "extra"
- *    3. projection — each enrolment's weekday walk, kind "class", holiday dates removed
+ *  fact, so the fact must be the one that survives — and a struck "Cancelled" row
+ *  must never lose to a plain projected (or extra) one, which is why it goes first.
+ *    1. `cancelled` — lessons the admin cancelled in advance, kind "cancelled" (struck)
+ *    2. `makeups`   — booked make-ups (host class), kind "makeup"
+ *    3. `extras`    — admin off-schedule lessons in the child's class, kind "extra"
+ *    4. projection  — each enrolment's weekday walk, kind "class", holiday dates removed
  *
  *  Explicit rows are filtered to `today <= date <= horizon` but are NOT holiday-subtracted
  *  (evidence is not clamped by the holiday guess — the same principle as the engine's
@@ -68,6 +74,7 @@ export function computeUpcomingLessons(
   holidays: ReadonlySet<string>,
   makeups: readonly UpcomingExplicit[] = [],
   extras: readonly UpcomingExplicit[] = [],
+  cancelled: readonly UpcomingExplicit[] = [],
 ): UpcomingLesson[] {
   const horizon = addDays(today, UPCOMING_HORIZON_DAYS);
   const out: UpcomingLesson[] = [];
@@ -87,9 +94,14 @@ export function computeUpcomingLessons(
         session_date: r.session_date,
         time_label: r.time_label,
         kind,
+        reason: kind === "cancelled" ? (r.reason ?? null) : null,
       });
     }
   };
+  // A cancellation is the strongest fact of the three: it wins over an extra
+  // lesson on the same (class, date) — an extra that was later cancelled must
+  // read "Cancelled", never "Extra lesson" (plan RISK 5).
+  pushExplicit(cancelled, "cancelled");
   pushExplicit(makeups, "makeup");
   pushExplicit(extras, "extra");
 
@@ -107,6 +119,7 @@ export function computeUpcomingLessons(
         session_date: date,
         time_label: enr.time_label,
         kind: "class",
+        reason: null,
       });
     }
   }

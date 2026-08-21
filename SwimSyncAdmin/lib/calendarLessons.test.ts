@@ -130,6 +130,35 @@ describe("buildCalendarLessons — dates", () => {
     expect(out.find((l) => l.date === "2026-08-10")!.offPattern).toBe(false);
   });
 
+  // Advance-cancel (20260821000700): the same substitution the engine makes —
+  // a cancelled session expects nobody ENROLLED, its live guests still count.
+  it("a cancelled session is progress 'cancelled', expects nobody enrolled, and carries the reason", () => {
+    const out = build({
+      sessions: [{ id: "sc", class_id: "c1", session_date: "2026-08-10", off_schedule_reason: null, cancelled_at: "2026-08-01T02:00:00Z", cancellation_reason: "Pool closed" }],
+    });
+    const c = out.find((l) => l.date === "2026-08-10")!;
+    expect(c.progress).toBe("cancelled");
+    expect(c.enrolled).toBe(0);
+    expect(c.students).toEqual([]);
+    expect(c.cancellationReason).toBe("Pool closed");
+    // The neighbouring Monday is untouched (past, nothing marked → unmarked).
+    const n = out.find((l) => l.date === "2026-08-17")!;
+    expect(n.progress).toBe("unmarked");
+    expect(n.enrolled).toBe(2);
+    expect(n.cancellationReason).toBeNull();
+  });
+
+  it("a live guest on a cancelled date is still an expected, unmarked guest (the engine's RISK 1 shape)", () => {
+    const out = build({
+      sessions: [{ id: "sc", class_id: "c1", session_date: "2026-08-10", off_schedule_reason: null, cancelled_at: "2026-08-01T02:00:00Z", cancellation_reason: "x" }],
+      bookings: [{ kind: "makeup", student_id: "g1", class_id: "c1", session_date: "2026-08-10", cancelled_at: null, full_name: "Guest" }],
+    });
+    const c = out.find((l) => l.date === "2026-08-10")!;
+    expect(c.progress).toBe("cancelled");
+    expect(c.guests).toBe(1);
+    expect(c.students.map((s) => s.id)).toEqual(["g1"]);
+  });
+
   it("ignores session rows outside the range", () => {
     const out = build({
       sessions: [{ id: "sx", class_id: "c1", session_date: "2026-09-12", off_schedule_reason: null }],

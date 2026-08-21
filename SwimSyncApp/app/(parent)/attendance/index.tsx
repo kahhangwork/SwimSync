@@ -260,6 +260,7 @@ export default function AttendanceScreen() {
       { data: holidayRows, error: holidayErr },
       { data: makeupRows, error: makeupErr },
       { data: extraRows, error: extraErr },
+      { data: cancelledRows, error: cancelledErr },
     ] = await Promise.all([
       supabase
         .from("tenant_public_holidays")
@@ -275,12 +276,27 @@ export default function AttendanceScreen() {
         .is("cancelled_at", null)
         .gte("session_date", today)
         .lte("session_date", horizon),
+      // Extra lessons that are still ON. `cancelled_at` is the flag the admin's
+      // cancel_lesson() sets (20260821000700); a cancelled extra is read by the
+      // query below and rendered struck, never as a live "Extra lesson"
+      // (plan RISK 5 — the Phase A forward-debt, paid here).
       activeClassIds.length
         ? supabase
             .from("lesson_sessions")
             .select("class_id, session_date, start_time, end_time, classes(title)")
             .not("off_schedule_reason", "is", null)
-            .neq("status", "cancelled")
+            .is("cancelled_at", null)
+            .in("class_id", activeClassIds)
+            .gte("session_date", today)
+            .lte("session_date", horizon)
+        : Promise.resolve({ data: [] as any[], error: null }),
+      // Lessons the admin cancelled in advance, in any of the child's classes —
+      // shown struck "Cancelled" so the parent sees WHY there is no lesson.
+      activeClassIds.length
+        ? supabase
+            .from("lesson_sessions")
+            .select("class_id, session_date, start_time, end_time, cancellation_reason, classes(title)")
+            .not("cancelled_at", "is", null)
             .in("class_id", activeClassIds)
             .gte("session_date", today)
             .lte("session_date", horizon)
@@ -291,6 +307,7 @@ export default function AttendanceScreen() {
 
     if (makeupErr) console.warn("upcoming: make-up read failed", makeupErr.message);
     if (extraErr) console.warn("upcoming: extra-lesson read failed", extraErr.message);
+    if (cancelledErr) console.warn("upcoming: cancelled-lesson read failed", cancelledErr.message);
 
     // A failed HOLIDAY read is fail-safe, not fail-open: if we cannot know which
     // days the pool is closed, projecting weekly lessons could tell a parent to
@@ -339,8 +356,26 @@ export default function AttendanceScreen() {
       };
     });
 
+    const cancelledInputs = (cancelledRows ?? []).map((s: any) => {
+      const c = Array.isArray(s.classes) ? s.classes[0] : s.classes;
+      return {
+        class_id: s.class_id as string,
+        class_title: (c?.title as string) ?? "Lesson",
+        session_date: s.session_date as string,
+        time_label: timeLabel(s.start_time ?? null, s.end_time ?? null),
+        reason: (s.cancellation_reason as string | null) ?? null,
+      };
+    });
+
     setUpcoming(
-      computeUpcomingLessons(enrolmentInputs, today, holidays, makeupInputs, extraInputs)
+      computeUpcomingLessons(
+        enrolmentInputs,
+        today,
+        holidays,
+        makeupInputs,
+        extraInputs,
+        cancelledInputs
+      )
     );
 
     setLoadingRecords(false);
@@ -447,30 +482,61 @@ export default function AttendanceScreen() {
                 Upcoming
               </Text>
               {upcoming.map((u) => (
-                <Card key={u.key} className="flex-row items-center gap-3 mb-2">
-                  <Ionicons name="calendar-outline" size={24} color="#0ea5e9" />
+                <Card
+                  key={u.key}
+                  className={`flex-row items-center gap-3 mb-2 ${
+                    u.kind === "cancelled" ? "opacity-70" : ""
+                  }`}
+                >
+                  <Ionicons
+                    name={u.kind === "cancelled" ? "close-circle-outline" : "calendar-outline"}
+                    size={24}
+                    color={u.kind === "cancelled" ? "#9ca3af" : "#0ea5e9"}
+                  />
                   <View className="flex-1">
                     <View className="flex-row items-center gap-2">
-                      <Text className="text-sm font-semibold text-gray-800">
+                      <Text
+                        className={`text-sm font-semibold ${
+                          u.kind === "cancelled"
+                            ? "text-gray-500 line-through"
+                            : "text-gray-800"
+                        }`}
+                      >
                         {u.class_title}
                       </Text>
                       {u.kind !== "class" && (
                         <View
                           className={`px-2 py-0.5 rounded-full ${
-                            u.kind === "makeup" ? "bg-emerald-100" : "bg-violet-100"
+                            u.kind === "makeup"
+                              ? "bg-emerald-100"
+                              : u.kind === "cancelled"
+                              ? "bg-gray-200"
+                              : "bg-violet-100"
                           }`}
                         >
                           <Text
                             className={`text-[10px] font-bold uppercase tracking-wide ${
-                              u.kind === "makeup" ? "text-emerald-700" : "text-violet-700"
+                              u.kind === "makeup"
+                                ? "text-emerald-700"
+                                : u.kind === "cancelled"
+                                ? "text-gray-600"
+                                : "text-violet-700"
                             }`}
                           >
-                            {u.kind === "makeup" ? "Make-up" : "Extra lesson"}
+                            {u.kind === "makeup"
+                              ? "Make-up"
+                              : u.kind === "cancelled"
+                              ? "Cancelled"
+                              : "Extra lesson"}
                           </Text>
                         </View>
                       )}
                     </View>
-                    <Text className="text-xs text-gray-500">
+                    <Text
+                      className={`text-xs ${
+                        u.kind === "cancelled" ? "text-gray-400 line-through" : "text-gray-500"
+                      }`}
+                    >
                       {formatSgDate(u.session_date, {
                         day: "numeric",
                         month: "short",
@@ -478,6 +544,9 @@ export default function AttendanceScreen() {
                       })}
                       {u.time_label ? ` · ${u.time_label}` : ""}
                     </Text>
+                    {u.kind === "cancelled" && u.reason ? (
+                      <Text className="text-xs text-gray-500 mt-0.5">{u.reason}</Text>
+                    ) : null}
                   </View>
                 </Card>
               ))}

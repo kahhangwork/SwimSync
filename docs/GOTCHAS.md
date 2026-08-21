@@ -3210,3 +3210,37 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     the admin does the add, `created_by`=admin) and `class_capacity_limit` 16a (the coach now hits the AUTH
     gate, never capacity). Committed DOWN (`supabase/rollback/20260821000600…DOWN.sql`) restores the arm,
     rehearsed. (2026-08-21.)
+
+203. **A cancelled-date subtraction is the `bookingsByDate` clamp under a new name — subtract from
+    `expectedDates` ONLY, never from the union.** Advance-cancel (`cancel_lesson`, `20260821000700`) marks a
+    `lesson_sessions` row `cancelled_at`; the engine must then neither block on it nor bill it. The tempting
+    edit is to drop the date from `datesToCheck` — and that is §7.18's shape exactly: a cancelled date that
+    ALSO carries a live make-up/trial booking, or real attendance rows, must still reach the gate, or the
+    month SEALS over the guest (a silent permanent underbill, §11.6) where it should block, loudly.
+    `core.ts` therefore (1) filters `cancelledDates` out of `expectedDates` — the weekday PROJECTION, a guess —
+    and (2) makes `unmarkedOn()` call `expectedStudentsOn(date, [], bookingsByDate)` for a cancelled date:
+    spans withheld, bookings kept, still the ONE shared definition so the booking half cannot drift. The row
+    stays in `sessionIds`/`sessionByDate`, so attendance rows on it still bill (the engine does not depend on
+    the RPC refusing to create that state). The SQL copies of "owed a mark" (`class_unmarked_lesson_dates`,
+    `tenant_unmarked_lesson_count`), the admin calendar builder and both coach screens make the SAME
+    substitution — five answers, one rule. Pinned by `cancelledLessons.test.ts` ("cancelled date WITH a live
+    make-up booking ⇒ `incomplete_attendance`, NOT sealed"). `cancel_lesson()` refuses today/past (the coach's
+    `cancelled_rain`/`cancelled_coach` mark is that path), a marked session, and a date holding live guests —
+    NAMED, under the §7.198/§7.200 class-row lock; `book_makeup`/`book_trial`/`schedule_extra_lesson` refuse a
+    cancelled date under the same lock. `restore_lesson()` refuses a month sealed in `billing_periods` — the
+    marking floor does NOT cover that (it is LEAST(calendar, month-after-seal), so a sealed month inside the
+    calendar window is still markable by design, §8.48). (2026-08-21.)
+
+204. **A cancelled-session mark-refusal belongs in `guard_attendance_date()`, not the UI** — §7.199's
+    raw-PostgREST lesson on the attendance axis. The coach app hiding a cancelled lesson (Schedule card
+    struck, NEEDS MARKING excluding it, the attendance screen showing "This lesson was cancelled") is
+    COSMETIC: a screen loaded before the cancel, a deep link, or a raw POST still reaches the `attendance`
+    table, where `attendance_write` is a `FOR ALL` policy plus a table grant. `20260821000700` extends the
+    BEFORE INSERT trigger: after the existing correction carve-out (an existing row is always editable — the
+    credit-note flow must never be closed by a flag), a NEW row whose session has `cancelled_at` is refused,
+    and the check sits BEFORE `assert_markable_date` so a future cancelled lesson says "cancelled", not "has
+    not happened yet". The clients cannot write the cancel columns either (`guard_session_date` refuses set
+    AND clear — a raw clear would restore past `restore_lesson()`'s sealed-month refusal), and a CHECK ties
+    `status = 'cancelled'` to `cancelled_at` so the old enum column and the new flag cannot disagree. Pinned
+    red-first by `advance_cancel_lesson.test.sql` 19: a PAST cancelled session refuses a raw INSERT — on the
+    pre-migration trigger body that INSERT SUCCEEDS. (2026-08-21.)

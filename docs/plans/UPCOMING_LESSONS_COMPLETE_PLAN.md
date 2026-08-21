@@ -183,19 +183,31 @@ _A few days. Touches the billing engine — the test matrix is most of it._
 ## Pre-commit gate
 
 **The three highest-value boxes — a month's revenue rides on each. Cannot tick ⇒ blocker:**
-- [ ] **RISK 1** — Deno test: cancelled date + live make-up booking ⇒ `incomplete_attendance`,
+- [x] **RISK 1** — Deno test: cancelled date + live make-up booking ⇒ `incomplete_attendance`,
       NOT sealed. (Proves the subtraction touched `expectedDates` only, never the union.)
-- [ ] **RISK 2** — pgTAP: `cancel_lesson` refuses past/today, refuses a session with attendance
-      rows; `restore_lesson` refuses a sealed month.
-- [ ] **RISK 4** — pgTAP: a raw `attendance` INSERT on a cancelled session is refused by the
-      trigger (not just hidden by B3's UI).
+      `cancelledLessons.test.ts`, 2026-08-21.
+- [x] **RISK 2** — pgTAP: `cancel_lesson` refuses past/today, refuses a session with attendance
+      rows; `restore_lesson` refuses a sealed month. `advance_cancel_lesson.test.sql` 2, 3, 30, 24.
+- [x] **RISK 4** — pgTAP: a raw `attendance` INSERT on a cancelled session is refused by the
+      trigger (not just hidden by B3's UI). `advance_cancel_lesson.test.sql` 14 (future) and 19
+      (PAST — red on the pre-migration trigger body).
 
 **The rest:**
-- [ ] Phase A tests proven RED before the fix (RISK 6 dedup assertions included).
-- [ ] RISK 5 — B5 amended the A2 queries; jest red-first that a cancelled extra is struck, not live.
-- [ ] `npm test` + `npm run typecheck` green in both apps.
-- [ ] Phase B: Deno suite run TWICE, both green (§7.15).
-- [ ] Phase B: migration DOWN rehearsed; RISK 7 remote grant dump clean for both new functions.
+- [x] Phase A tests proven RED before the fix (RISK 6 dedup assertions included). (2026-08-21, §8.80)
+- [x] RISK 5 — B5 amended the A2 queries; jest red-first that a cancelled extra is struck, not live.
+      (`upcomingLessons.test.ts` → "cancelled lessons"; the extras query now reads `cancelled_at IS NULL`.)
+- [x] `npm test` + `npm run typecheck` green in both apps. (jest 400, vitest 519.)
+- [x] Phase B: Deno suite run TWICE, both green (§7.15). (232 / 232.)
+- [x] Phase B: migration DOWN rehearsed (applied, probed, re-applied — `20260821000700…DOWN.sql`).
+- [ ] RISK 7 remote grant dump clean for both new functions — AT DEPLOY.
+
+**Graduated 2026-08-21:** RISK 1 → `docs/GOTCHAS.md` §7.203; RISK 4 → §7.204.
+
+**Not built, deliberately scoped out (in `BACKLOG.md`):** a UI driver for the cancel/restore flow
+(`verify-cancel-lesson`); what an advance cancel means for a PREPAID PACKAGE (a holiday void extends
+the package; a cancel currently does not — a product decision, not an omission the code can settle);
+cancelling TODAY's lesson from the admin panel (the coach's `cancelled_rain`/`cancelled_coach` mark is
+the path, as locked above — revisit if the admin asks for it).
 
 ## Graduate on landing
 When Phase B ships, promote to `docs/GOTCHAS.md` §7 (they outlive this plan file):

@@ -55,6 +55,9 @@ type Session = {
   progress: LessonProgress;
   /** "3 present · 2 cancelled (rain)", or "" when nothing is recorded. */
   summary: string;
+  /** Cancelled in advance by the admin (cancel_lesson) — nothing to mark. */
+  cancelled?: boolean;
+  cancelReason?: string | null;
 };
 
 type ClassInfo = {
@@ -212,6 +215,8 @@ export default function ClassRosterScreen() {
       .select(`
         id,
         session_date,
+        cancelled_at,
+        cancellation_reason,
         attendance(id, student_id, status)
       `)
       .eq("class_id", id)
@@ -358,15 +363,18 @@ export default function ClassRosterScreen() {
         (s.attendance ?? []).map((a: any) => a.student_id)
       );
       // Enrolled students PLUS anyone booked for a trial that day — the shared
-      // rule, so this screen and the engine count the same people.
-      const expectedHere = expectedStudentsOn(
-        s.session_date,
-        enrolmentSpans,
-        bookedByDate
-      );
+      // rule, so this screen and the engine count the same people. A lesson
+      // the admin CANCELLED in advance expects nobody enrolled (the engine's
+      // `unmarkedOn` makes the same substitution) — its bookings still count.
+      const cancelled = s.cancelled_at != null;
+      const expectedHere = cancelled
+        ? expectedStudentsOn(s.session_date, [], bookedByDate)
+        : expectedStudentsOn(s.session_date, enrolmentSpans, bookedByDate);
       return {
         id: s.id,
         session_date: s.session_date,
+        cancelled,
+        cancelReason: (s.cancellation_reason as string | null) ?? null,
         // Every past lesson has ended by definition — this list is bounded to
         // `<= todayDate` — so `upcoming` is unreachable here.
         progress: lessonProgress(expectedHere, markedIds, { hasEnded: true }),
@@ -420,6 +428,13 @@ export default function ClassRosterScreen() {
     const sessionIdByDate = new Map<string, string>(
       (sessionData ?? []).map((s: any) => [s.session_date as string, s.id as string])
     );
+    // Dates the admin cancelled in advance: nobody enrolled is due, so such a
+    // date must neither be synthesised as unmarked nor become the Mark target.
+    const cancelledDates = new Set<string>(
+      (sessionData ?? [])
+        .filter((s: any) => s.cancelled_at != null)
+        .map((s: any) => s.session_date as string)
+    );
     const sessionDates = [...sessionIdByDate.keys()];
     const seen = new Set(rows.map((r) => r.session_date));
 
@@ -434,7 +449,9 @@ export default function ClassRosterScreen() {
       // class had any enrolments — the job the per-class enrolment floor used
       // to do, moved to where it can distinguish "no students yet" from "a
       // guest is booked". A guest-only date survives it; an empty one does not.
-      const expectedHere = expectedStudentsOn(date, enrolmentSpans, bookedByDate);
+      const expectedHere = cancelledDates.has(date)
+        ? expectedStudentsOn(date, [], bookedByDate)
+        : expectedStudentsOn(date, enrolmentSpans, bookedByDate);
       if (expectedHere.length === 0) continue;
 
       // Primary action targets the most recent lesson anyone was due at.
@@ -781,6 +798,7 @@ export default function ClassRosterScreen() {
         ) : (
           <View className="gap-2">
             {sessions.map((session) => {
+              const cancelled = session.cancelled === true;
               const complete = isFinished(session.progress);
               const unmarked = session.id === null;
               return (
@@ -795,36 +813,59 @@ export default function ClassRosterScreen() {
                 >
                   <Card
                     className={`flex-row items-center gap-3 ${
-                      unmarked ? "border-orange-200 bg-orange-50" : ""
+                      cancelled
+                        ? "opacity-60"
+                        : unmarked
+                        ? "border-orange-200 bg-orange-50"
+                        : ""
                     }`}
                   >
                     <View
                       className={`w-9 h-9 rounded-full items-center justify-center ${
-                        complete ? "bg-green-100" : "bg-orange-100"
+                        cancelled
+                          ? "bg-gray-100"
+                          : complete
+                          ? "bg-green-100"
+                          : "bg-orange-100"
                       }`}
                     >
                       <Ionicons
-                        name={complete ? "checkmark" : "alert"}
+                        name={cancelled ? "close" : complete ? "checkmark" : "alert"}
                         size={18}
-                        color={complete ? "#16a34a" : "#ea580c"}
+                        color={cancelled ? "#6b7280" : complete ? "#16a34a" : "#ea580c"}
                       />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-semibold text-gray-800">
+                      <Text
+                        className={`text-sm font-semibold ${
+                          cancelled ? "text-gray-500 line-through" : "text-gray-800"
+                        }`}
+                      >
                         {formatDate(session.session_date)}
                       </Text>
                       <Text
                         className={`text-xs ${
-                          complete ? "text-green-600" : "text-orange-500"
+                          cancelled
+                            ? "text-gray-500"
+                            : complete
+                            ? "text-green-600"
+                            : "text-orange-500"
                         }`}
                       >
-                        {progressLabel(session.progress)}
+                        {cancelled
+                          ? "Cancelled by your admin"
+                          : progressLabel(session.progress)}
                       </Text>
                       {/* Omitted entirely when nothing is recorded — never a
-                          dangling separator. */}
+                          dangling separator. A cancelled lesson shows its
+                          reason instead, so the coach knows why it is struck. */}
                       {session.summary ? (
                         <Text className="text-xs text-gray-500 mt-0.5">
                           {session.summary}
+                        </Text>
+                      ) : cancelled && session.cancelReason ? (
+                        <Text className="text-xs text-gray-500 mt-0.5">
+                          {session.cancelReason}
                         </Text>
                       ) : null}
                     </View>

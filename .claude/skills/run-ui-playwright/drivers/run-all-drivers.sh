@@ -96,6 +96,9 @@ fixture_for() {
     # The lesson page driver marks, covers and books INTO the calendar fixture's
     # classes (and its CN001 billed lesson); the two drivers share one fixture.
     admin-lesson-detail) echo "fixtures-admin-calendar.sql" ;;
+    # cancel-lesson cancels and restores NEXT WEEK's Rose lesson of the same
+    # fixture (Rose runs on today's weekday); it deletes the bare row it made.
+    cancel-lesson) echo "fixtures-admin-calendar.sql" ;;
     # tenant-branding registers its parent through the REAL UI first and loads
     # fixtures-phase4-billing.sql itself afterwards. Pre-loading that fixture
     # here seeds the same email and the UI registration dies on a duplicate —

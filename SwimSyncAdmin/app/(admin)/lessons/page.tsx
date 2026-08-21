@@ -50,6 +50,7 @@ const PROGRESS_LABEL: Record<CalendarLesson["progress"], { text: string; cls: st
   complete: { text: "Marked", cls: "bg-emerald-100 text-emerald-800" },
   holiday: { text: "Holiday", cls: "bg-gray-100 text-gray-500" },
   "no-students": { text: "Nobody expected", cls: "bg-gray-100 text-gray-500" },
+  cancelled: { text: "Cancelled", cls: "bg-gray-100 text-gray-500" },
 };
 
 function LessonsInner() {

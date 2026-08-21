@@ -86,6 +86,9 @@ export function LessonTooltip({ lesson, x, y, pinned, onClose }: Props) {
         <div className="text-gray-400">Shadow: {lesson.shadowNames.join(", ")}</div>
       )}
       {lesson.holidayName && <div className="text-gray-400">Public holiday: {lesson.holidayName}</div>}
+      {lesson.progress === "cancelled" && (
+        <div className="text-gray-400">Cancelled{lesson.cancellationReason ? `: ${lesson.cancellationReason}` : ""}</div>
+      )}
 
       <ul className="mt-2 space-y-0.5">
         {lesson.students.length === 0 && <li className="text-gray-400">Nobody expected</li>}

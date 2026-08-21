@@ -164,6 +164,11 @@ export type CalendarSession = {
   class_id: string;
   session_date: string;
   off_schedule_reason: string | null;
+  /** Set when the admin cancelled the lesson in advance (cancel_lesson,
+   *  20260821000700). A cancelled lesson expects nobody enrolled and is shown
+   *  faded + "Cancelled", like a holiday void. */
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
 };
 
 export type CalendarEnrolment = {
@@ -193,7 +198,7 @@ export type CalendarAttendance = {
 
 export type CalendarHoliday = { holiday_date: string; name: string };
 
-export type LessonProgress = "upcoming" | "unmarked" | "partial" | "complete" | "holiday" | "no-students";
+export type LessonProgress = "upcoming" | "unmarked" | "partial" | "complete" | "holiday" | "no-students" | "cancelled";
 
 export type CalendarStudent = {
   id: string;
@@ -228,6 +233,8 @@ export type CalendarLesson = {
   marked: number;
   offPattern: boolean;
   holidayName: string | null;
+  /** The admin's reason when `progress === "cancelled"`; null otherwise. */
+  cancellationReason: string | null;
   students: CalendarStudent[];
 };
 
@@ -369,8 +376,15 @@ export function buildCalendarLessons(input: BuildInput): CalendarLesson[] {
     const key = `${cls.id}|${date}`;
     const spans = spansByClass.get(cls.id) ?? [];
     const bookedByDate = bookedByClassDate.get(cls.id) ?? new Map<string, string[]>();
-    const enrolledIds = studentsEnrolledOn(date, spans);
-    const expectedIds = expectedStudentsOn(date, spans, bookedByDate);
+    // A lesson the admin cancelled in advance expects nobody ENROLLED — the
+    // same substitution the engine's gate makes (core.ts `unmarkedOn`): spans
+    // withheld, bookings kept (none can exist on a cancelled date; if one did
+    // it must still show as an expected, unmarked guest).
+    const cancelled = session?.cancelled_at != null;
+    const enrolledIds = cancelled ? [] : studentsEnrolledOn(date, spans);
+    const expectedIds = cancelled
+      ? expectedStudentsOn(date, [], bookedByDate)
+      : expectedStudentsOn(date, spans, bookedByDate);
     const enrolledSet = new Set(enrolledIds);
     const guests = expectedIds.length - enrolledIds.length;
 
@@ -392,7 +406,8 @@ export function buildCalendarLessons(input: BuildInput): CalendarLesson[] {
     }));
 
     let progress: LessonProgress;
-    if (expectedIds.length === 0) progress = "no-students";
+    if (cancelled) progress = "cancelled";
+    else if (expectedIds.length === 0) progress = "no-students";
     else if (marked > 0 && students.every((s) => s.status === "holiday")) progress = "holiday";
     else if (marked === 0) progress = hasEnded ? "unmarked" : "upcoming";
     else if (marked < expectedIds.length) progress = "partial";
@@ -424,6 +439,7 @@ export function buildCalendarLessons(input: BuildInput): CalendarLesson[] {
       marked,
       offPattern: dayOfWeekOf(date) !== cls.day_of_week,
       holidayName: holidayByDate.get(date) ?? null,
+      cancellationReason: cancelled ? session?.cancellation_reason ?? null : null,
       students,
     });
   }

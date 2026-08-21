@@ -110,6 +110,8 @@ type WeekLesson = {
   guests: number;
   /** Who is teaching it. `owner` unless an admin has rostered somebody. */
   role: LessonRole;
+  /** Cancelled in advance by the admin — shown struck, never marked. */
+  cancelled: boolean;
 };
 
 /** A lesson that should have happened but has no complete attendance. */
@@ -254,12 +256,21 @@ function DaySection({
               <Card>
                 <View className="flex-row items-start justify-between">
                   <View className="flex-1">
-                    <Text className="text-sm font-bold text-gray-900">
+                    <Text
+                      className={`text-sm font-bold ${
+                        l.cancelled ? "text-gray-500 line-through" : "text-gray-900"
+                      }`}
+                    >
                       {l.title}
                     </Text>
                     <Text className="text-xs text-gray-500 mt-0.5">
                       {formatTime(l.startTime)} – {formatTime(l.endTime)}
                     </Text>
+                    {l.cancelled && (
+                      <Text className="text-xs font-semibold text-gray-500 mt-0.5">
+                        Cancelled by your admin
+                      </Text>
+                    )}
                     <RoleBadge role={l.role} />
                   </View>
                   <ProgressChip progress={l.progress} />
@@ -470,7 +481,7 @@ export default function ScheduleScreen() {
     const sessionsRes = classIds.length > 0
       ? await supabase
           .from("lesson_sessions")
-          .select("id, class_id, session_date, attendance(student_id, status)")
+          .select("id, class_id, session_date, cancelled_at, attendance(student_id, status)")
           .in("class_id", classIds)
           .gte("session_date", rangeStart)
           .lte("session_date", rangeEnd)
@@ -483,6 +494,9 @@ export default function ScheduleScreen() {
       string,
       {
         id: string;
+        /** Cancelled in advance by the admin (cancel_lesson): expects nobody
+         *  enrolled, takes no marks (the DB trigger refuses — this is cosmetic). */
+        cancelled: boolean;
         markedStudentIds: Set<string>;
         statusByStudent: Map<string, DbStatus>;
       }
@@ -497,6 +511,7 @@ export default function ScheduleScreen() {
     windowSessions.forEach((s: any) => {
       sessionByClassDate.set(`${s.class_id}:${s.session_date}`, {
         id: s.id,
+        cancelled: s.cancelled_at != null,
         markedStudentIds: new Set(
           (s.attendance ?? []).map((a: any) => a.student_id)
         ),
@@ -642,7 +657,13 @@ export default function ScheduleScreen() {
        *  the client became the only effective billing gate once before (§7.18). */
       const lessonAt = (date: string): WeekLesson => {
         const sess = sessionByClassDate.get(`${cls.id}:${date}`);
-        const expected = expectedStudentsOn(date, enrolmentSpans, bookedHere);
+        // A lesson the admin cancelled in advance expects nobody ENROLLED — the
+        // spans are withheld, the bookings are not (the same substitution the
+        // engine makes, core.ts `unmarkedOn`; a live guest on a cancelled date
+        // cannot exist, but if it did it must still show as owed a mark).
+        const expected = sess?.cancelled
+          ? expectedStudentsOn(date, [], bookedHere)
+          : expectedStudentsOn(date, enrolmentSpans, bookedHere);
         // Students vs guests, split out of the SAME array that feeds the chip —
         // by subtraction, so the head-count and the chip's denominator cannot
         // disagree (the `2+1`-not-`3` rule, PRD §7.3/§7.17).
@@ -669,6 +690,7 @@ export default function ScheduleScreen() {
           // the database can answer that, and it is asked once, below, for the
           // handful of lessons where the answer can still change anything.
           role: roleAt(date),
+          cancelled: sess?.cancelled ?? false,
         };
       };
 
@@ -721,7 +743,10 @@ export default function ScheduleScreen() {
       // weekday dates are still suppressed, by `expected.length === 0` below.
       for (const date of datesIn(backlogFrom, todayDate)) {
         const sess = sessionByClassDate.get(`${cls.id}:${date}`);
-        const expected = expectedStudentsOn(date, enrolmentSpans, bookedHere);
+        // Cancelled by the admin: nobody enrolled is owed a mark (see lessonAt).
+        const expected = sess?.cancelled
+          ? expectedStudentsOn(date, [], bookedHere)
+          : expectedStudentsOn(date, enrolmentSpans, bookedHere);
         if (expected.length === 0) continue; // nobody to mark
         if (isLessonFullyMarked(expected, sess?.markedStudentIds)) continue;
         // A lesson that has not ENDED yet is not overdue — today's 5pm class at
@@ -1049,9 +1074,18 @@ export default function ScheduleScreen() {
 
                         <View className="flex-row items-start justify-between mb-3">
                           <View className="flex-1">
-                            <Text className="text-base font-bold text-gray-900">
+                            <Text
+                              className={`text-base font-bold ${
+                                l.cancelled ? "text-gray-500 line-through" : "text-gray-900"
+                              }`}
+                            >
                               {l.title}
                             </Text>
+                            {l.cancelled && (
+                              <Text className="text-xs font-semibold text-gray-500 mt-0.5">
+                                Cancelled by your admin — nothing to mark
+                              </Text>
+                            )}
                             <View className="flex-row items-center gap-1.5 mt-1">
                               <Ionicons name="time-outline" size={13} color="#6b7280" />
                               <Text className="text-xs text-gray-500">

@@ -313,13 +313,30 @@ export default function MarkAttendanceScreen() {
     // above. The pair is unique, so this is the only answer there is.
     const { data: existingSession } = await supabase
       .from("lesson_sessions")
-      .select("id")
+      .select("id, cancelled_at, cancellation_reason")
       .eq("class_id", id)
       .eq("session_date", date)
       .maybeSingle();
     const sid: string | null = existingSession?.id ?? null;
 
     if (token !== loadToken.current) return;
+
+    // A lesson the admin CANCELLED in advance takes no marks. Said here, in the
+    // same place a closed date is refused — and this is the cosmetic half: the
+    // database trigger (guard_attendance_date, 20260821000700) refuses the
+    // write whatever this screen shows, so a stale screen cannot mark it.
+    if (existingSession?.cancelled_at) {
+      const reason = (existingSession as any).cancellation_reason as string | null;
+      setBlocked({
+        ok: false,
+        title: "This lesson was cancelled",
+        detail: `Your business's admin cancelled ${classTitle || "this lesson"} on ${formatDate(date)}${
+          reason ? ` — ${reason}` : ""
+        }. Nothing is marked for a cancelled lesson; if it is going ahead after all, ask them to restore it.`,
+      });
+      setLoading(false);
+      return;
+    }
 
     // Stamped with the date it was resolved FOR, so nothing downstream can
     // mistake it for this screen's current lesson after a param change.

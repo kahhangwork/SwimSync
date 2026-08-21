@@ -25,6 +25,7 @@ const BASE: CalendarLesson = {
   marked: 0,
   offPattern: false,
   holidayName: null,
+  cancellationReason: null,
   students: [],
 };
 
@@ -35,6 +36,12 @@ describe("LessonCard", () => {
     expect(screen.getByText("Coach A")).toBeTruthy();
     expect(screen.getByTestId("lesson-count").textContent).toBe("4+1/6");
     expect(screen.queryByText(/10:00/)).toBeNull();
+  });
+
+  it("fades a cancelled lesson and labels it, with the reason on hover", () => {
+    render(<LessonCard lesson={{ ...BASE, progress: "cancelled", cancellationReason: "Pool closed" }} />);
+    expect(screen.getByTestId("lesson-card").className).toContain("opacity-50");
+    expect(screen.getByText("Cancelled").getAttribute("title")).toBe("Cancelled: Pool closed");
   });
 
   it("flags a full class in red with FULL, counting guests toward capacity", () => {

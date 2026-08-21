@@ -86,6 +86,8 @@ export default function LessonPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [cls, setCls] = useState<ClassInfo | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  /** Set when the admin cancelled this lesson in advance (cancel_lesson). */
+  const [cancelled, setCancelled] = useState<{ reason: string | null } | null>(null);
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [draft, setDraft] = useState<Record<string, DbStatus | null>>({});
   const [coaches, setCoaches] = useState<CoachOpt[]>([]);
@@ -111,6 +113,14 @@ export default function LessonPage() {
   const [bookHome, setBookHome] = useState("");
   const [bookBusy, setBookBusy] = useState(false);
   const [bookError, setBookError] = useState<string | null>(null);
+  // Advance-cancel / restore (plan Phase B, Step B4). Every rule is enforced by
+  // cancel_lesson()/restore_lesson() themselves — future-only, no guests, no
+  // marks, not into a billed month — and their message is RENDERED, not
+  // pre-empted (§7.32: a limit only the admin screen applies is not a limit).
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const today = todayInSg();
   const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
@@ -135,7 +145,7 @@ export default function LessonPage() {
             .select("id, title, day_of_week, start_time, end_time, location_name, coach_id, category_id, colour, capacity, is_active, deactivated_at, class_categories(default_capacity)")
             .eq("id", classId)
             .maybeSingle(),
-          supabase.from("lesson_sessions").select("id").eq("class_id", classId).eq("session_date", date).maybeSingle(),
+          supabase.from("lesson_sessions").select("id, cancelled_at, cancellation_reason").eq("class_id", classId).eq("session_date", date).maybeSingle(),
           supabase.from("coaches").select("id, profiles(full_name)"),
           supabase
             .from("student_class_enrolments")
@@ -185,6 +195,8 @@ export default function LessonPage() {
       setHolidayDays(Number(tenantRes.data?.holiday_extension_days ?? 7));
       const sid = (sessionRes.data?.id as string | undefined) ?? null;
       setSessionId(sid);
+      const sessRow = sessionRes.data as { cancelled_at?: string | null; cancellation_reason?: string | null } | null;
+      setCancelled(sessRow?.cancelled_at ? { reason: sessRow.cancellation_reason ?? null } : null);
 
       const coachList: CoachOpt[] = ((coachesRes.data ?? []) as any[])
         .map((x) => ({ id: x.id, name: x.profiles?.full_name ?? "Unknown coach" }))
@@ -419,6 +431,32 @@ export default function LessonPage() {
     }
     void doBook();
   }
+  // ── Cancel / restore the whole lesson ───────────────────────────────────
+  async function doCancelLesson() {
+    setCancelBusy(true);
+    setCancelError(null);
+    const { error } = await supabase.rpc("cancel_lesson", { p_class_id: classId, p_date: date, p_reason: cancelReason });
+    setCancelBusy(false);
+    if (error) {
+      setCancelError(error.message);
+      return;
+    }
+    setCancelOpen(false);
+    setCancelReason("");
+    reload();
+  }
+  async function doRestoreLesson() {
+    setCancelBusy(true);
+    setSaveMsg(null);
+    const { error } = await supabase.rpc("restore_lesson", { p_class_id: classId, p_date: date });
+    setCancelBusy(false);
+    if (error) {
+      setSaveMsg({ kind: "error", text: `Could not restore the lesson: ${error.message}` });
+      return;
+    }
+    reload();
+  }
+
   async function cancelBooking(row: RosterRow) {
     if (!row.bookingId) return;
     const fn = row.kind === "trial" ? "cancel_trial_booking" : "cancel_makeup_booking";
@@ -470,11 +508,39 @@ export default function LessonPage() {
         }
         subtitle={`${formatSgDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${formatTime(cls.start_time)} – ${formatTime(cls.end_time)} · ${cls.location_name}`}
         action={
-          <Link href="/classes" className="text-sm text-sky-700 hover:underline">
-            Classes page →
-          </Link>
+          <div className="flex items-center gap-3">
+            {/* Cancel is offered only for a FUTURE lesson of a running class —
+                the RPC refuses today/past anyway (the coach's cancelled_rain /
+                cancelled_coach mark is that path). Restore whenever cancelled;
+                its sealed-month refusal is rendered from the RPC. */}
+            {cancelled ? (
+              <Button size="sm" variant="outline" data-testid="restore-lesson" onClick={doRestoreLesson} disabled={cancelBusy}>
+                {cancelBusy ? "Restoring…" : "Restore this lesson"}
+              </Button>
+            ) : (
+              !notALesson && isFuture && cls.is_active && (
+                <Button size="sm" variant="outline" data-testid="cancel-lesson" onClick={() => { setCancelError(null); setCancelOpen(true); }}>
+                  Cancel this lesson
+                </Button>
+              )
+            )}
+            <Link href="/classes" className="text-sm text-sky-700 hover:underline">
+              Classes page →
+            </Link>
+          </div>
         }
       />
+
+      {cancelled && (
+        <div data-testid="lesson-cancelled" className="mb-4 rounded-xl border border-gray-300 bg-gray-50 p-4 text-sm text-gray-800">
+          <p className="font-semibold">This lesson is cancelled.</p>
+          <p className="mt-1">
+            {cancelled.reason ? <>Reason: <span className="italic">{cancelled.reason}</span>. </> : null}
+            Parents see it struck out under Upcoming, the coach has nothing to mark, and the billing month does not wait for it.
+            Guests cannot be booked into it. If it is going ahead after all, restore it.
+          </p>
+        </div>
+      )}
 
       {notALesson ? (
         <div data-testid="not-a-lesson" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -500,7 +566,7 @@ export default function LessonPage() {
                   aria-label="Set all to"
                   className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs"
                   value=""
-                  disabled={isFuture || roster.length === 0}
+                  disabled={isFuture || roster.length === 0 || !!cancelled}
                   onChange={(e) => {
                     if (e.target.value) setAll(e.target.value as DbStatus);
                   }}
@@ -573,7 +639,7 @@ export default function LessonPage() {
             )}
 
             <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 px-4 py-3">
-              <Button onClick={requestSave} disabled={saving || !dirty || isFuture} data-testid="save-attendance">
+              <Button onClick={requestSave} disabled={saving || !dirty || isFuture || !!cancelled} data-testid="save-attendance">
                 {saving ? "Saving…" : "Save attendance"}
               </Button>
               {dirty && !saving && <span className="text-xs text-gray-500">Unsaved changes</span>}
@@ -631,10 +697,10 @@ export default function LessonPage() {
                 {guestCount === 0 ? "No trial or make-up guests booked into this lesson." : `${guestCount} guest${guestCount === 1 ? "" : "s"} booked — they appear in the attendance table above.`}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setBookKind("makeup"); setBookError(null); }} disabled={date < today}>
+                <Button size="sm" variant="outline" onClick={() => { setBookKind("makeup"); setBookError(null); }} disabled={date < today || !!cancelled}>
                   Book a make-up into this lesson
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => { setBookKind("trial"); setBookError(null); }} disabled={date < today}>
+                <Button size="sm" variant="outline" onClick={() => { setBookKind("trial"); setBookError(null); }} disabled={date < today || !!cancelled}>
                   Book a trial into this lesson
                 </Button>
               </div>
@@ -643,6 +709,37 @@ export default function LessonPage() {
           </div>
         </div>
       )}
+
+      {/* ── Cancel this lesson (reason required) ───────────────────────── */}
+      <Modal title={`Cancel ${cls.title} on ${formatSgDate(date)}?`} open={cancelOpen} onClose={() => setCancelOpen(false)}>
+        <div className="space-y-3 text-sm">
+          <p className="text-gray-600">
+            The whole lesson is called off — rain, the coach away. Every parent sees it struck out under Upcoming with your reason,
+            the coach has nothing to mark, and the billing month does not wait for it. A single child not coming is an absence, not this.
+          </p>
+          <label className="block">
+            <span className="text-xs font-medium text-gray-600">Reason (the parents and the coach see this)</span>
+            <input
+              aria-label="Cancellation reason"
+              data-testid="cancel-reason"
+              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm"
+              placeholder="e.g. Heavy rain forecast — pool closed"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              disabled={cancelBusy}
+            />
+          </label>
+          {cancelError && <p data-testid="cancel-error" className="rounded-lg bg-red-50 px-3 py-2 text-red-700">{cancelError}</p>}
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => setCancelOpen(false)} disabled={cancelBusy}>
+              Keep the lesson
+            </Button>
+            <Button className="flex-1" data-testid="confirm-cancel-lesson" onClick={doCancelLesson} disabled={cancelBusy || cancelReason.trim() === ""}>
+              {cancelBusy ? "Cancelling…" : "Cancel the lesson"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* ── Confirm: holiday void ───────────────────────────────────────── */}
       <Modal title="Void as a public holiday?" open={confirmHoliday !== null} onClose={() => setConfirmHoliday(null)}>

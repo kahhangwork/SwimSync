@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, CalendarPlus, Users, Archive, RotateCcw } from "lucide-react";
+import { Plus, Pencil, CalendarPlus, CalendarX, Users, Archive, RotateCcw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
@@ -187,6 +187,17 @@ export default function ClassesPage() {
   const [extraSaving, setExtraSaving] = useState(false);
   const [extraError, setExtraError] = useState<string | null>(null);
   const [extraDone, setExtraDone] = useState<string | null>(null);
+
+  // ── Cancelling a lesson in advance (plan Phase B) ─────────────────────────
+  // The second home for cancel_lesson() — the first is the lesson page reached
+  // from the Calendar. Class + future date + reason; every refusal (today/past,
+  // guests booked, already marked) is the RPC's own and is rendered verbatim.
+  const [cancelFor, setCancelFor] = useState<ClassRow | null>(null);
+  const [cancelDate, setCancelDate] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelSaving, setCancelSaving] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelDone, setCancelDone] = useState<string | null>(null);
 
   // ── Retiring a class ──────────────────────────────────────────────────────
   // Hidden by DEFAULT, not absent: a retired class is ordinary clutter on a
@@ -610,6 +621,33 @@ export default function ClassesPage() {
     setExtraDate("");
   }
 
+  function openCancel(cls: ClassRow) {
+    setCancelFor(cls);
+    setCancelDate("");
+    setCancelReason("");
+    setCancelError(null);
+    setCancelDone(null);
+  }
+
+  async function handleCancelLesson() {
+    if (!cancelFor) return;
+    setCancelSaving(true);
+    setCancelError(null);
+    const { error } = await supabase.rpc("cancel_lesson", {
+      p_class_id: cancelFor.id,
+      p_date: cancelDate,
+      p_reason: cancelReason,
+    });
+    setCancelSaving(false);
+    if (error) {
+      setCancelError(error.message);
+      return;
+    }
+    setCancelDone(cancelDate);
+    setCancelReason("");
+    setCancelDate("");
+  }
+
   // ── Retire / restore ──────────────────────────────────────────────────────
   // Both refusal messages come from deactivate_class() itself and are RENDERED,
   // never swallowed: each one names the children, the booked guests or the
@@ -895,6 +933,17 @@ export default function ClassesPage() {
                         Extra lesson
                       </button>
                     )}
+                    {cls.is_active && (
+                      <button
+                        onClick={() => openCancel(cls)}
+                        data-testid="cancel-lesson-entry"
+                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                        title="Call off one upcoming lesson of this class — parents see it struck out"
+                      >
+                        <CalendarX className="h-3.5 w-3.5 shrink-0" />
+                        Cancel a lesson
+                      </button>
+                    )}
                     {cls.is_active ? (
                       <button
                         onClick={() => {
@@ -972,6 +1021,67 @@ export default function ClassesPage() {
             </Button>
             <Button onClick={handleRetire} disabled={retireSaving}>
               {retireSaving ? "Retiring…" : "Retire class"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Cancel a lesson in advance */}
+      <Modal
+        title={cancelFor ? `Cancel a lesson — ${cancelFor.title}` : "Cancel a lesson"}
+        open={cancelFor !== null}
+        onClose={() => setCancelFor(null)}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Call off ONE upcoming lesson of this class — rain, the coach away.
+            Parents see it struck out under Upcoming with your reason, the coach
+            has nothing to mark, and the billing month does not wait for it.{" "}
+            <span className="text-gray-700">A lesson that already happened</span>{" "}
+            is recorded by the coach as cancelled (rain / coach) instead.
+          </p>
+
+          <Field
+            label="Date"
+            placeholder=""
+            value={cancelDate}
+            onChange={setCancelDate}
+            type="date"
+          />
+
+          <Field
+            label="Reason"
+            value={cancelReason}
+            onChange={setCancelReason}
+            placeholder="e.g. Heavy rain forecast — pool closed"
+          />
+          <p className="-mt-2 text-xs text-gray-400">
+            Shown to every parent in the class and to the coach.
+          </p>
+
+          {cancelError && (
+            <p data-testid="cancel-error" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              {cancelError}
+            </p>
+          )}
+
+          {cancelDone && (
+            <p data-testid="cancel-done" className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+              Cancelled for {cancelDone}. Open the lesson from the Calendar to restore it.
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setCancelFor(null)}>
+              Close
+            </Button>
+            <Button
+              className="flex-1"
+              data-testid="confirm-cancel-lesson"
+              onClick={handleCancelLesson}
+              disabled={cancelSaving || !cancelDate || cancelReason.trim() === ""}
+            >
+              {cancelSaving ? "Cancelling…" : "Cancel the lesson"}
             </Button>
           </div>
         </div>

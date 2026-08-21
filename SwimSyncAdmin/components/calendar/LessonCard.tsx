@@ -34,7 +34,9 @@ export function LessonCard({
   const colour = colourFor(lesson.colourKey);
   const full = isFull(lesson.enrolled, lesson.guests, lesson.capacity);
   const count = formatCount(lesson.enrolled, lesson.guests, lesson.capacity);
-  const dim = lesson.progress === "holiday";
+  // Faded for the two "this lesson is not happening" states: a holiday void
+  // and an advance cancellation.
+  const dim = lesson.progress === "holiday" || lesson.progress === "cancelled";
   const needsMark = lesson.progress === "unmarked" || lesson.progress === "partial";
 
   const title = `${lesson.title} · ${lesson.start}–${lesson.end} · ${lesson.mainCoach.name}${
@@ -101,6 +103,14 @@ export function LessonCard({
         )}
         {lesson.progress === "holiday" && (
           <span className="ml-auto shrink-0 rounded bg-white/70 px-1 text-[10px] font-medium">Holiday</span>
+        )}
+        {lesson.progress === "cancelled" && (
+          <span
+            className="ml-auto shrink-0 rounded bg-white/70 px-1 text-[10px] font-medium"
+            title={lesson.cancellationReason ? `Cancelled: ${lesson.cancellationReason}` : "Cancelled"}
+          >
+            Cancelled
+          </span>
         )}
       </div>
       {layout === "full" && (

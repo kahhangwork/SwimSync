@@ -1023,20 +1023,22 @@ has an attendance record on it — the same rule the invoice engine applies.
 > from the span each enrolment actually covers, in the coach's app, the admin's gap
 > report and the billing engine alike.
 
-**Upcoming lessons** *(implemented 2026-08-17; make-ups + extra lessons added 2026-08-21)*:
+**Upcoming lessons** *(implemented 2026-08-17; make-ups + extra lessons added 2026-08-21;
+cancelled lessons added 2026-08-21)*:
 the parent Attendance screen shows an **Upcoming** section above the marked history, listing the
-lessons scheduled for the selected child over roughly the next four weeks. It merges **three
+lessons scheduled for the selected child over roughly the next four weeks. It merges **four
 sources**: the weekly projection off each active enrolment's weekday (**derived at read time**
 via the same `expectedLessonDates` logic the coach's unmarked-lessons view uses — **no sessions
 are pre-generated**); the child's booked **make-ups** (guesting one lesson in another class,
-badged *Make-up*); and admin-scheduled **extra lessons** in the child's own class (off-schedule
-sessions, badged *Extra lesson*). Make-ups and extra lessons are explicit rows, so they take
-precedence over a same-day projected slot. A projected date that falls on one of the business's
-**public holidays** (`tenant_public_holidays`) is removed, so the app never sends a family to a
-closed pool — but an explicit make-up/extra is shown regardless (it is booked evidence, not a
-guess). It remains a forward projection, not a promise about individual lessons: an **ad-hoc
-cancellation** of a specific lesson is not yet reflected (a noted follow-up). The status filter
-applies only to the history below.
+badged *Make-up*); admin-scheduled **extra lessons** in the child's own class (off-schedule
+sessions, badged *Extra lesson*); and lessons the admin **cancelled in advance** (§7.6 *Advance-
+cancel*), shown **struck through, badged *Cancelled*, with the admin's reason** — shown rather than
+hidden, so the parent sees *why* there is no lesson that day. Explicit rows win a same-day
+collision with the projection, and a cancellation wins over an extra lesson (an extra later
+cancelled reads *Cancelled*, never *Extra lesson*). A projected date that falls on one of the
+business's **public holidays** (`tenant_public_holidays`) is removed, so the app never sends a
+family to a closed pool — but an explicit make-up/extra/cancelled row is shown regardless (it is
+booked evidence, not a guess). The status filter applies only to the history below.
 
 ### 7.6 Attendance Management
 
@@ -1136,6 +1138,43 @@ exactly as they would any other lesson.
 **lesson page** (§7.22): the same save as the coach app, under the same database guards.
 The arrangement/observation split still holds for *scheduling* — only the admin arranges
 an extra lesson, and either the coach or the admin records it.
+
+#### Advance-cancel a lesson: the admin calls off a FUTURE lesson *(implemented 2026-08-21)*
+
+The mirror image of an extra lesson. The **business's admin** cancels a whole lesson (class +
+date) that has **not happened yet** — rain forecast, coach away — with a **required reason**,
+from the **lesson page** (Calendar → lesson → *Cancel this lesson*) or the **Classes page**
+(*Cancel a lesson*: class + date + reason). A single child not coming is an **absence**, not
+this. The cancellation is recorded **on the session** (`lesson_sessions.cancelled_at`, with
+`status = 'cancelled'` kept coherent by a CHECK), never as per-child marks — so a child who
+enrols between the cancel and the billing run is not expected at it either.
+
+What a cancelled lesson means, everywhere at once (one rule, five readers — §7.203):
+- **Parent** — Upcoming shows it struck *Cancelled* with the reason (§7.5).
+- **Coach** — the Schedule card is struck *Cancelled by your admin*; it leaves NEEDS MARKING and
+  the class roster's backlog; opening it says the lesson was cancelled and offers nothing to mark.
+  **The refusal is the database's** (`guard_attendance_date()`, §7.204), not the screen's: a
+  stale screen, a deep link or a raw request cannot record attendance on it.
+- **Billing** — the engine neither expects nor bills it (it satisfies the completeness gate the way
+  a holiday mark does), and the Lessons badge / retire check agree. A live guest on that date would
+  still block the month, loudly — which is why a cancel **refuses** while any trial/make-up booking
+  sits on the date (it names them), and booking a guest or scheduling an extra lesson onto a
+  cancelled date is refused in turn.
+- **Admin calendar** — faded with a *Cancelled* chip, like a holiday void; guests cannot be booked
+  into it.
+
+**Refusals, all the RPC's own and rendered verbatim:** today or a past date (*"if it did not run,
+record it as cancelled (rain / coach) on its attendance screen"* — the coach's existing
+`cancelled_rain`/`cancelled_coach` mark is that path, unchanged); a session that already has
+attendance rows (a marked lesson ran); a date holding live guests; a retired class. Cancelling twice
+is a no-op. **Restore** (lesson page) reverses it, but never into a month already sealed in
+`billing_periods` (a restored-into-billed lesson could never be invoiced — it stays cancelled), never
+below the marking floor, and never for a retired class. A holiday void leaves a cancelled lesson
+alone, and un-voiding a day never deletes one. Both actions are audited (`lesson_cancelled`,
+`lesson_restored`).
+
+*Not yet decided:* what an advance cancel means for a **prepaid package** (a holiday void extends
+the package; a cancel currently does not) — `BACKLOG.md`.
 
 #### The admin marks attendance on the lesson page *(implemented 2026-08-19)*
 

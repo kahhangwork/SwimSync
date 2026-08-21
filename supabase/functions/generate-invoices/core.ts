@@ -542,7 +542,7 @@ async function generateForTenant(
     // Sessions for this class within the billing month
     const { data: sessions } = await supabase
       .from("lesson_sessions")
-      .select("id, session_date")
+      .select("id, session_date, cancelled_at")
       .eq("class_id", cls.id)
       .gte("session_date", monthStart)
       .lte("session_date", monthEnd)
@@ -554,6 +554,18 @@ async function generateForTenant(
     );
     const sessionByDate = new Map<string, string>(
       (sessions ?? []).map((s) => [s.session_date as string, s.id as string])
+    );
+
+    // ── Lessons the admin CANCELLED IN ADVANCE (cancel_lesson, 20260821000700) ──
+    // A cancelled session expects nobody who is merely ENROLLED. It is still a
+    // session row — it stays in `sessionIds` (so any attendance rows on it are
+    // read and billed as usual) and in `sessionByDate` (so the date still
+    // reaches the gate). What changes is only WHO is expected there: see
+    // `expectedDates` and `unmarkedOn()` below, and the prohibition at each.
+    const cancelledDates = new Set<string>(
+      (sessions ?? [])
+        .filter((s) => s.cancelled_at !== null && s.cancelled_at !== undefined)
+        .map((s) => s.session_date as string)
     );
 
     // ── Trial bookings: a child expected at ONE lesson ──────────────────────
@@ -703,9 +715,24 @@ async function generateForTenant(
         ? lastScheduledDate
         : windowTo;
 
-    const expectedDates = activeStudentIds.length && expectedTo !== null
+    // ⚠ NAMED PROHIBITION — cancelled dates may be subtracted ONLY from
+    // `expectedDates`, the weekday PROJECTION. They must NEVER be filtered out
+    // of the `sessionByDate` or `bookingsByDate` contributions to
+    // `datesToCheck` below, and never from the billable set. This is the
+    // `bookingsByDate` clamp (§7.18, the prohibition further down) under a new
+    // name: a cancelled date that ALSO carries a live make-up/trial booking, or
+    // real attendance rows, must still reach the gate — cancel_lesson() refuses
+    // to create either state, but the engine must not have to trust that. A
+    // cancelled session satisfies the gate the way a holiday mark does: via
+    // `unmarkedOn()` returning nobody for it, which happens ONLY when the date
+    // has no live booking. Subtracting from the union instead would trade a
+    // loud block for a silent permanent underbill (§11.6: a sealed month's
+    // lesson can never be billed after). The Deno test "cancelled date WITH a
+    // live make-up booking ⇒ incomplete_attendance, NOT sealed" is the pin.
+    const expectedDates = (activeStudentIds.length && expectedTo !== null
       ? expectedLessonDates(String(cls.day_of_week), windowFrom, expectedTo)
-      : [];
+      : []
+    ).filter((d) => !cancelledDates.has(d));
 
     // Nothing recorded, nothing due AND NOBODY BOOKED — this class has no
     // bearing on the month.
@@ -818,7 +845,15 @@ async function generateForTenant(
       // joined on the 20th was never expected on the 6th.
       // expectedStudentsOn() is the shared definition — do not inline the union
       // (§7.18: four hand-written copies caused a live underbill).
-      const expected = expectedStudentsOn(date, enrolmentSpans, bookingsByDate);
+      //
+      // A CANCELLED lesson expects nobody enrolled — the spans are withheld, the
+      // BOOKINGS are not (a live guest on a cancelled date is an impossible
+      // state cancel_lesson() refuses; if it ever exists it must BLOCK, loudly,
+      // not seal — see the prohibition above `expectedDates`). Still the shared
+      // definition, called with no spans, so the booking half cannot drift.
+      const expected = cancelledDates.has(date)
+        ? expectedStudentsOn(date, [], bookingsByDate)
+        : expectedStudentsOn(date, enrolmentSpans, bookingsByDate);
       const sessId = sessionByDate.get(date);
       if (!sessId) return expected;
       return expected.filter((s) => !attSet.has(`${sessId}:${s}`));
