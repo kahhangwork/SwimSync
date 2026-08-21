@@ -21,7 +21,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(34);
+SELECT plan(35);
 
 -- ── Two businesses, so the tenant boundary can be probed ───────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -107,16 +107,34 @@ SELECT is(
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000c1","role":"authenticated"}';
 
--- 5-9. The class's own coach CAN add an ongoing student, and its shape.
+-- 5. The class's OWN coach can NO LONGER add an ongoing student. The coach arm
+--    was CLOSED 2026-08-21 (§7.202) — every new child goes through the admin,
+--    the same delegation refused for parent self-enrolment and coach-assisted
+--    assignment. (c1 is class A's own coach, set at line 108.)
+SELECT throws_ok(
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Coach Ongoing','ongoing') $$,
+  'not permitted to add a student to this class',
+  'the class''s own coach can NO LONGER add an ONGOING student — admin-only now');
+
+-- 6. Nor may that coach create a trial — that arm always was admin-only.
+--    Schools arrange trials at the admin, and a private coach IS the admin.
+SELECT throws_ok(
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Coach Trial','trial','2026-08-01'::date) $$,
+  'only this business''s admin may book a trial',
+  'a COACH cannot book a trial');
+
+SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
+
+-- 7-11. The ADMIN adds the ongoing child — now the ONLY path — and its shape.
 SELECT lives_ok(
   $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Ongoing Kid','ongoing') $$,
-  'the CLASS''S OWN COACH can add an ONGOING unclaimed student');
+  'the ADMIN adds an ONGOING unclaimed student — the coach arm is gone');
 SELECT is((SELECT tenant_id FROM students WHERE full_name='Ongoing Kid'),
   '66666666-0000-0000-0000-000000000001'::uuid,
   'pinned to the CLASS''s tenant — §7.42, nothing downstream would catch a wrong one');
 SELECT is((SELECT created_by FROM students WHERE full_name='Ongoing Kid'),
-  '66000000-0000-0000-0000-0000000000c1'::uuid,
-  'created_by is the calling coach, not postgres');
+  '66000000-0000-0000-0000-0000000000a1'::uuid,
+  'created_by is the calling ADMIN, not the coach and not postgres');
 SELECT is((SELECT COUNT(*)::INT FROM parent_students ps JOIN students s ON s.id=ps.student_id
             WHERE s.full_name='Ongoing Kid'), 0,
   'an unclaimed student has no parent link — that absence IS the definition');
@@ -126,22 +144,13 @@ SELECT is((SELECT e.is_active FROM student_class_enrolments e JOIN students s ON
 
 -- ══ TRIALS ARE BOOKINGS ═════════════════════════════════════════════════════
 
--- 10. A COACH may no longer create a trial. Schools arrange them at the admin,
---     and a private coach IS the admin.
-SELECT throws_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Coach Trial','trial','2026-08-01'::date) $$,
-  'only this business''s admin may book a trial',
-  'a COACH cannot book a trial');
-
-SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
-
--- 11. The admin can, and it books AHEAD — 2026-08-01 is in the future relative
+-- 12. The admin can also book a trial, and it books AHEAD — 2026-08-01 is in the future relative
 --     to nothing in particular; what matters is that no attendance is asserted.
 SELECT lives_ok(
   $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Trial Kid','trial','2026-08-01'::date) $$,
   'the ADMIN can create a child and book their trial');
 
--- 12-15. A booking is NOT an enrolment, NOT attendance, and NOT a session.
+-- 13-16. A booking is NOT an enrolment, NOT attendance, and NOT a session.
 --        This is the whole correction: nothing about the outcome is claimed.
 SELECT is((SELECT COUNT(*)::INT FROM student_class_enrolments e JOIN students s ON s.id=e.student_id
             WHERE s.full_name='Trial Kid'), 0,

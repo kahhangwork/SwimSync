@@ -216,13 +216,15 @@ SELECT throws_ok($$
   '42501', NULL, '15c: a coach cannot INSERT an enrolment directly (RLS, admin-only)');
 RESET ROLE;
 
--- ══ Case 16: add_unclaimed_student('ongoing') hits capacity on BOTH arms ═════
--- K is full (3 active). The coach's own arm and the admin arm both enrol through
--- the definer body, so the trigger refuses both (Decision 4, corrected).
+-- ══ Case 16: add_unclaimed_student('ongoing') — the coach arm is CLOSED ══════
+-- K is full (3 active), but the coach never reaches the capacity trigger: the
+-- ONGOING arm became admin-only on 2026-08-21 (§7.202), so the class's own
+-- coach is refused at the AUTH gate first. Only the admin arm reaches capacity.
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"cb900000-0000-0000-0000-000000000002","role":"authenticated"}';  -- coach owns K
 SELECT throws_ok($$ SELECT add_unclaimed_student('cf900000-0000-0000-0000-000000000001','New Kid C','ongoing') $$,
-  'P0001', NULL, '16a: the class''s own coach cannot enrol into a full K (is full)');
+  'not permitted to add a student to this class',
+  '16a: the class''s own coach is refused at the AUTH gate — the coach arm is closed, capacity never reached');
 SET LOCAL "request.jwt.claims" TO '{"sub":"cb900000-0000-0000-0000-000000000001","role":"authenticated"}';  -- admin
 SELECT throws_ok($$ SELECT add_unclaimed_student('cf900000-0000-0000-0000-000000000001','New Kid A','ongoing') $$,
   'P0001', NULL, '16b: the admin cannot enrol into a full K (is full)');
