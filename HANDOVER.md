@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-21 (3rd) — **BOTH entry paths to a retired class are now race-safe: the ENROLMENT
-axis (§8.78, §7.201) joins the booking axis (§8.77, §7.200). `enforce_enrolment_schedule` now reads
-`is_active` under a `FOR UPDATE` lock on the entered class.** Migration `20260821000500`; DEPLOYMENT §11.35. Commit `820e174`._
+_Last updated: 2026-08-21 (4th) — **`add_unclaimed_student`'s ONGOING arm is now ADMIN-ONLY** (§8.79, §7.202):
+the class's-own-coach arm is closed, so every new child goes through the admin — both `add_unclaimed_student`
+kinds require the tenant admin. Migration `20260821000600`; DEPLOYMENT §11.36. Commit `0a86f5b`._
 
-_Previously, 2026-08-21 (§8.77) — booking-vs-retire race SHIPPED + DEPLOYED: `book_makeup`/`book_trial` lock the class row unconditionally and re-read `is_active`. Migration `20260821000400`; DEPLOYMENT §11.34. Commit `c168972`._
+_Previously, 2026-08-21 (§8.78) — both retire-race axes SHIPPED + DEPLOYED: enrolment (§7.201, `20260821000500`) joined booking (§7.200, `20260821000400`); `is_active` re-read under a `FOR UPDATE` lock on both entry paths. DEPLOYMENT §11.35._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -253,8 +253,8 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
   `SwimSyncApp/lib/studentStatus.ts`), so the narrower pattern misses the very call whose
   signature change caused §7.123. Found while writing this bullet, which is the third time
   this fact has been wrong. A private coach arranges trials through their tenant-admin
-  account; `add_unclaimed_student()` still accepts a coach caller server-side (pgTAP pins it),
-  but no UI reaches it. §8.10/§8.11.
+  account; `add_unclaimed_student()` is **admin-only on both arms** as of §7.202 (2026-08-21) —
+  the coach caller it once accepted server-side is refused, and no UI ever reached it. §8.10/§8.11.
 - **NEEDS MARKING is FLOOR-scoped and deliberately ignores the week selector** — week-scoping
   hides a straggler the coach has no reason to look for, and unmarked attendance blocks
   billing with no override (§8i). `verify-schedule-week.mjs` pins it, proven red by scoping
@@ -397,6 +397,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.79 (2026-08-21) — `add_unclaimed_student` ONGOING arm made ADMIN-ONLY — SHIPPED and DEPLOYED to prod
+
+**The coach arm is CLOSED — every new child goes through the admin.** `add_unclaimed_student(… 'ongoing' …)`
+let the class's OWN coach (`c.coach_id = current_coach_id()`) create-and-enrol a brand-new child, a carve-out
+from §7.17. Closed: `'ongoing'` now requires `is_tenant_admin()`, joining `'trial'` — both kinds admin-only. A
+DECISION (the user's call), not a bug: the same delegation refused the SAME DAY for parent self-enrolment and
+coach-assisted assignment. No UI ever reached the coach arm (both live callers are the admin panel), so prod
+is unchanged — one coach who IS the admin. §7.202. Migration `20260821000600`; deploy DEPLOYMENT §11.36.
+
+**Verified:** pgTAP **1285** PASS — the two coach-arm pins flipped **red-first** (`trial_onboarding`: own coach
+refused, admin does the add, `created_by`=admin; `class_capacity_limit` 16a: coach hits the auth gate, never
+capacity); Deno ×2 **229/229**. Same-signature CREATE OR REPLACE so no grant dump; **committed DOWN rehearsed**.
+Docs: PRD §7.17 corrected, BACKLOG item deleted, TESTING §5. Commits `0a86f5b` · `441d93f` · `d254c11`.
+
 ## 8.78 (2026-08-21) — ENROLMENT-vs-CONCURRENT-RETIRE race CLOSED — SHIPPED and DEPLOYED to prod
 
 **The §8.77 roster-axis twin, now fixed — both entry paths to a retired class are race-safe.**
@@ -411,27 +425,6 @@ is_active-blind, by prohibition). Reverse direction already covered by `trg_clas
 **Verified:** pgTAP **1284** PASS — new `enrolment_retire_race.test.sql` (2), a structural pin proven
 **red-first**; Deno ×2 **229/229**. Migration-only, same-signature CREATE OR REPLACE so no grant dump; no
 engine or app change. TESTING §5.
-
-## 8.77 (2026-08-21) — BOOKING-vs-CONCURRENT-RETIRE race CLOSED — SHIPPED and DEPLOYED to prod
-
-**The §8.75 review's own filed follow-up, now fixed.** `book_makeup`/`book_trial` read `classes.is_active`
-unlocked at the top, then inserted a guest — a `deactivate_class()` committing in that gap left the guest in
-a now-retired class (unmarkable, month-blocking, invariant broken). §8.75's `FOR UPDATE` lock didn't cover
-it: taken only for a CAPPED class and after the is_active read, so an UNCAPPED class took no lock at all (the
-booking FK's FOR KEY SHARE doesn't serialise against a non-key is_active UPDATE) and even capped never
-re-read is_active. **Fix:** take the lock UNCONDITIONALLY, re-read is_active under it, read capacity under it
-too (closing §7.198's stale-`v_cap` half). The reverse direction was already covered by
-`trg_class_retirement_guard` (§7.199). §7.200. Migration `20260821000400`; deploy DEPLOYMENT §11.34.
-
-**Verified:** pgTAP full suite **1282** PASS — new `booking_retire_race.test.sql` (8), a structural pin
-proven **red-first** (assertions 3–8 fail on the old bodies, 1–2 stay green); Deno ×2 **229/229**.
-Migration-only to prod, same-signature CREATE OR REPLACE so no grant dump (§11.32 pattern); no engine or app
-change. TESTING §5.
-
-**Left deliberately:** the **ROSTER-axis twin** — `enforce_enrolment_schedule` reads is_active unlocked and
-`enforce_class_capacity` locks only when capped and never re-checks is_active, the same race on the enrolment
-path. Filed to `BACKLOG.md` (S), not fixed — a prohibition-heavy trigger deserving its own red-first coverage,
-and the booking axis was the one the review named.
 
 ## 9. Next steps (pick with the user)
 
@@ -492,18 +485,17 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — both retire-race axes shipped + deployed 2026-08-21 (§8.77, §8.78). Queue open.
+### THE NEXT BUILD — coach-arm closed + both retire-race axes deployed 2026-08-21 (§8.77–§8.79). Queue open.
 
-**No migration is in flight** (§7.55). Both retire-race fixes are done and DEPLOYED — the booking axis
-(§7.200) and its roster-axis twin (§7.201). The one calendar-wave follow-up left is **a location entity**
-(M) — the calendar's Location filter is distinct `location_name` text (`BACKLOG.md` → *Admin and
-operations*). It unblocks nothing urgent.
+**No migration is in flight** (§7.55). Latest applied is `20260821000600` (the coach-arm closure, §8.79);
+before it, both retire-race axes (§7.200 booking, §7.201 roster). The one calendar-wave follow-up left is **a
+location entity** (M) — the calendar's Location filter is distinct `location_name` text (`BACKLOG.md` →
+*Admin and operations*). It unblocks nothing urgent.
 
-**Worth doing next** (`BACKLOG.md`): **class assignment stays a superadmin action** — both ways to take the
-admin out of the loop were REFUSED 2026-08-21, parent self-enrolment *and* coach-assisted assignment (moved to
-*Deliberately not doing*); the onboarding bottleneck is answered by better admin tooling, not delegation. Also
-open: the `add_unclaimed_student` coach-arm product question (should the class's own coach be able to enrol a
-brand-new child?).
+**Worth doing next** (`BACKLOG.md`): **class assignment stays a superadmin action** — all three routes to take
+the admin out of the loop are now settled and REFUSED: parent self-enrolment, coach-assisted assignment (both
+*Deliberately not doing*, 2026-08-21) and the `add_unclaimed_student` coach arm (CLOSED this session, §8.79,
+§7.202). The onboarding bottleneck is answered by better admin tooling, not delegation.
 
 Still open from earlier: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on
 0 notes); HANDOVER §3 graduation (docs tax). Then *Later* (owner-only accounting page, accrual). Full
@@ -541,11 +533,12 @@ ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · mult
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260821000500` (the enrolment-vs-retire race, §8.78);
+**The migration queue is EMPTY.** The latest applied is `20260821000600` (the coach-arm closure, §8.79);
 production confirmed caught up 2026-08-21 via `supabase migration list --linked`, **0 pending**.
-**DEPLOYMENT §11.35 is the freshest worked example** — one migration, same-signature CREATE OR REPLACE of a
-trigger function, so NO grant dump was needed (§11.32/§11.34 pattern); no engine, no app deploy. §11.33 is the
-recent contrast: two migrations, one adding a NEW function + trigger, so a `db dump` grant/object check WAS taken.
+**DEPLOYMENT §11.36 is the freshest worked example** — one migration, same-signature CREATE OR REPLACE of a
+function, so NO grant dump was needed (§11.32 pattern), and this time with a **committed DOWN, rehearsed** (the
+pattern to copy); no engine, no app deploy. §11.33 is the recent contrast: two migrations, one adding a NEW
+function + trigger, so a `db dump` grant/object check WAS taken.
 **§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
 **expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract
 migration LAST (held back by a `.hold` rename until the apps stopped reading the dropped columns);

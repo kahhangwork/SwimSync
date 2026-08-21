@@ -3195,3 +3195,18 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     releases — its roster count then sees the committed enrolment. No new deadlock: the trigger locks exactly
     one row, so it cannot be in a lock cycle. Structural pin `enrolment_retire_race.test.sql`, red-first.
     (2026-08-21.)
+
+202. **`add_unclaimed_student`'s ONGOING arm is ADMIN-ONLY — do NOT re-add the coach arm.** The `'ongoing'`
+    branch once permitted the class's OWN coach (`c.coach_id = current_coach_id()`) as well as the tenant
+    admin — a carve-out from §7.17 ("coaches must not add students"), justified as "the coach notices the
+    weekly regular first". CLOSED 2026-08-21 (`20260821000600`): `'ongoing'` now requires `is_tenant_admin()`,
+    so BOTH kinds are admin-only (`'trial'` always was). This is a DECISION, not a bug fix — every new child
+    goes through the admin, the same delegation refused the SAME DAY for parent self-enrolment and
+    coach-assisted assignment (`BACKLOG.md` → *Deliberately not doing*; PRD §7.17). No UI ever reached the
+    coach arm — **both live callers are the admin panel** (`SwimSyncAdmin/app/(admin)/{trials,students}/page.tsx`),
+    the coach app reaches it by no path — so prod behaviour is unchanged (one coach who IS the admin; the arm
+    could not have fired). ⚠ Don't rediscover the coach arm as a missing feature and re-add it. Same-signature
+    CREATE OR REPLACE, so no grant moved. Tests flipped **red-first**: `trial_onboarding` (own coach refused,
+    the admin does the add, `created_by`=admin) and `class_capacity_limit` 16a (the coach now hits the AUTH
+    gate, never capacity). Committed DOWN (`supabase/rollback/20260821000600…DOWN.sql`) restores the arm,
+    rehearsed. (2026-08-21.)

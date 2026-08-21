@@ -727,3 +727,17 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     (documented, not a committed DOWN — same-signature replace):** re-apply the `enforce_enrolment_schedule`
     body from `20260811000100` (unchanged in git). **Dormant on prod:** assignment is a superadmin action;
     one admin cannot race themselves — first firing needs a second admin.
+
+36. **Deploy record (2026-08-21): `add_unclaimed_student` ONGOING arm is admin-only** (§8.79, §7.202). One
+    migration, `20260821000600` — one CREATE OR REPLACE of `add_unclaimed_student`, **same signature**: the
+    `'ongoing'` branch drops the class's-own-coach OR-arm and now requires `is_tenant_admin()`, matching the
+    `'trial'` branch. Sequence: (1) `supabase db push` — the `failed to cache migrations catalog` pgdelta
+    cert warning printed alongside `Applying … 20260821000600` and `Finished` (the §7.55 harmless noise, seen
+    4× now); `migration list --linked` shows `remote` filled, **0 pending**. (2) **No grant dump** —
+    same-signature CREATE OR REPLACE preserves ACLs, no privilege touched (§11.32 pattern). (3) **No app or
+    engine deploy** — `core.ts` untouched; no coach UI ever reached the arm and both live callers are the
+    admin panel, so nothing app-side changed (the main push rebuilt the unchanged apps on Vercel). **Rollback
+    is a COMMITTED DOWN this time** (`supabase/rollback/20260821000600_ongoing_admin_only_DOWN.sql`, rehearsed
+    locally — applying it turns the two flipped assertions red, re-applying forward returns green), the
+    §11 pattern to copy rather than a git re-apply. **No-op on prod:** the one coach IS the admin, so the arm
+    could not have fired; the deploy keeps prod = `main` and closes the hole before a second coach exists.
