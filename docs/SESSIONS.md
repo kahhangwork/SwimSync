@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.79** | 2026-08-21 | `add_unclaimed_student` ONGOING arm made ADMIN-ONLY (coach arm closed — a decision); `20260821000600` | §7.202 · PRD §7.17 · DEPLOYMENT §11.36 |
 | **8.78** | 2026-08-21 | Enrolment-vs-retire race CLOSED+DEPLOYED: `enforce_enrolment_schedule` reads `is_active` under `FOR UPDATE` on `NEW.class_id` | §7.201 · DEPLOYMENT §11.35 |
 | **8.77** | 2026-08-21 | Booking-vs-retire race CLOSED+DEPLOYED: `book_makeup`/`book_trial` take the class `FOR UPDATE` lock unconditionally, re-read `is_active` | §7.200 · DEPLOYMENT §11.34 |
 | **8.76** | 2026-08-21 | Parent self-enrolment AND coach-assisted assignment both REFUSED — assignment stays superadmin; docs-only | `BACKLOG.md` → *Deliberately not doing* · PRD Phase 3 |

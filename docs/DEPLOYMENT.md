@@ -741,3 +741,29 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     locally — applying it turns the two flipped assertions red, re-applying forward returns green), the
     §11 pattern to copy rather than a git re-apply. **No-op on prod:** the one coach IS the admin, so the arm
     could not have fired; the deploy keeps prod = `main` and closes the hole before a second coach exists.
+
+37. **Deploy record (2026-08-21): advance-cancel a lesson — the FULL sequence, migration → engine → apps**
+    (§7.203, §7.204; PRD §7.6 *Advance-cancel*; plan `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md` Phase B).
+    One migration `20260821000700`: three new `lesson_sessions` columns + two CHECKs, two NEW functions
+    (`cancel_lesson`, `restore_lesson`), seven same-signature CREATE OR REPLACEs (both guard triggers, both
+    booking RPCs, `schedule_extra_lesson`, the two "owed a mark" SQL copies, both holiday-void RPCs).
+    Sequence: (1) `migration list --linked` — exactly one pending. (2) `supabase db push` — the pgdelta
+    `pgdelta-target-ca.crt ENOENT` event-loop trace printed alongside `Finished` (§7.55's harmless noise, 5×
+    now); `migration list --linked` → `remote` filled, **0 pending**. (3) **Remote grant dump**
+    (`supabase db dump --linked -f …`): both new functions show exactly `REVOKE ALL … FROM PUBLIC` +
+    `GRANT ALL … TO "authenticated"` and **no `anon` line** (plan RISK 7 — the deploy blocker that did not
+    fire); both CHECK constraints present; `guard_attendance_date`'s new refusal text present in the dump.
+    (4) **Engine**: `supabase functions deploy generate-invoices` — the FIRST attempt died bundling on a
+    transient TLS `peer closed connection` while fetching a remote import (version stayed 25; nothing
+    deployed); the retry deployed → `functions list` shows **v26**. Don't read a bundling failure as a code
+    problem — re-run once before diagnosing. (5) **Apps LAST**: `git push origin db/advance-cancel-lesson:main`
+    (`39affa9..6c0fe21`); the served-bundle gate passed 45 s later — `swimsync.sg`'s
+    `/_expo/static/js/web/entry-….js` contains `Cancelled by your admin`, a string only the new build has
+    (§7.31). The admin panel's new strings sit behind the auth gate (§11.19's problem) — confirm by logging in
+    and opening a future lesson: *Cancel this lesson* in the header. **Rollback is a COMMITTED DOWN**
+    (`supabase/rollback/20260821000700_advance_cancel_lesson_DOWN.sql`, generated from `pg_get_functiondef()`
+    of the nine pre-migration bodies, rehearsed locally: apply → probes pass → re-apply → 1322 green); its
+    header names the one data consequence (a cancelled row's bare session survives as 'scheduled' and would
+    then EXPECT its children — 0 such rows on prod today). **Dormant on prod by construction:** no lesson
+    has been cancelled, so every new refusal, the trigger arm and the engine branch have never fired there;
+    first firing is the first *Cancel this lesson*.

@@ -1,11 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-21 (5th) — **parent Attendance→Upcoming now lists make-ups + extra lessons** (§8.80,
-PRD §7): the weekly projection merges booked make-ups (badged *Make-up*) and admin off-schedule extra lessons
-(badged *Extra lesson*); explicit rows win a same-day collision. App-only, deployed. Commit `8cf219c`. Phase B
-(advance-cancel a lesson, reflected as struck "Cancelled") is PLANNED — `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`._
+_Last updated: 2026-08-21 (6th) — **Advance-cancel a lesson SHIPPED and DEPLOYED, full sequence** (§8.81; PRD
+§7.6; §7.203/§7.204; DEPLOYMENT §11.37): admin cancels a FUTURE lesson with a reason → parent Upcoming shows it
+struck, coach has nothing to mark (DB trigger refuses), engine neither blocks nor bills. Migration `20260821000700`,
+engine v26, commits `eb43a98` · `6c0fe21`._
 
-_Previously, 2026-08-21 (§8.79) — `add_unclaimed_student`'s ONGOING arm is now ADMIN-ONLY: every new child goes through the admin. Migration `20260821000600`; DEPLOYMENT §11.36. Commit `0a86f5b`._
+_Previously, 2026-08-21 (§8.80) — parent Attendance→Upcoming lists make-ups + extra lessons. App-only. Commit `8cf219c`._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -28,7 +28,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.196** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.204** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -116,9 +116,9 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | Coach wages — effective-dated rates, the pay-decision surface | UI + backend, LIVE | PRD §7.13 · §8.3 |
 | Active/inactive families and children, per business | UI + backend, LIVE | PRD §7.14 · §8.4 |
 | Effective-dated class terms — a lesson is priced by its OWN date | UI + backend, LIVE | PRD §7.3 · §8.3 |
-| Prepaid packages — weeks/start-date/holiday-extension, AND renewal OFFERS (tokenised `/package` pay page + WhatsApp queue + default packages + Students columns/drawer) | pgTAP + Deno + vitest + jest + driver, LIVE 2026-08-15 | PRD §7.16 · §8.59, §8.60 |
+| Prepaid packages — weeks/start-date/holiday-extension, renewal OFFERS (tokenised `/package` pay page + WhatsApp queue + default packages + Students columns/drawer), purchases numbered + QR-payable (`PKG-YYYY-NNNN`, §8.37) | pgTAP + Deno + vitest + jest + driver, LIVE 2026-08-15 | PRD §7.16 · §8.59, §8.60 |
 | **Parent referral codes — double-sided package discount** (`REF-` join code, friend's-first + referrer's-later reward, FIFO, tenant %/$ + per-product override, same-household guard, admin Referrals page) — moves `amount_payable`, never `total_value` | pgTAP 57 + Deno + vitest + jest + `verify-referrals` 13, **LIVE 2026-08-15** | PRD §7.16 · §8.61 |
-| Package purchases numbered + QR-payable (`PKG-YYYY-NNNN`) | pgTAP 12 + 2 drivers, LIVE 2026-08-09 | PRD §7.16 · §8.37 |
+| **Advance-cancel a lesson — admin cancels a FUTURE lesson with a reason; the SESSION carries it; parent struck, coach nothing to mark (DB trigger), engine neither blocks nor bills; a live guest on the date still BLOCKS** | pgTAP 37 + Deno + vitest + jest + 17-check driver, LIVE 2026-08-21 **DORMANT** | PRD §7.6 · §7.203, §7.204 · §8.81 |
 | Every child's name carries their payment method (per-child, category-aware) | pgTAP + vitest, LIVE | PRD §7.16 · §8.23 |
 | Fee-free payment collection — `INV-YYYY-NNNN`, dynamic QR, tokenized page, WhatsApp queue | pgTAP + Deno ×2 + vitest + jest + driver, LIVE | PRD §7.21 · §8.26 |
 | Make-up classes — the guest-pass model | pgTAP + Deno ×2 + vitest + jest + 14-check driver, LIVE | PRD §7.20 · §8.25 |
@@ -398,6 +398,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.81 (2026-08-21) — Advance-cancel a lesson — SHIPPED and DEPLOYED (migration → engine v26 → apps)
+
+**The admin can call off a FUTURE lesson, and every surface agrees.** `cancel_lesson`/`restore_lesson`
+(`20260821000700`) mark the SESSION (`cancelled_at`, CHECK-tied to `status`): parent Upcoming shows it struck
+*Cancelled* with the reason; the coach's Schedule card is struck and it leaves NEEDS MARKING; the admin calendar
+fades it; the engine subtracts it from `expectedDates` ONLY (§7.203) and the mark-refusal is the trigger, not the
+UI (§7.204). Behaviour: PRD §7.6 *Advance-cancel*; deploy record DEPLOYMENT §11.37 (engine deploy died once on a
+transient TLS error — retry before diagnosing); rollback is a committed, rehearsed DOWN.
+
+**Verified:** pgTAP **1322** (new file 37, red-first two ways) · Deno **232 ×2** · jest 400 · vitest 519 ·
+`verify-cancel-lesson` **17/17**. Remote grant dump: both RPCs `authenticated` only, no `anon` (plan RISK 7).
+**Deliberately scoped out → `BACKLOG.md` *Advance-cancel follow-ups*:** what a cancel means for a prepaid package
+(holiday void extends; cancel doesn't — the user's call), and cancelling TODAY from the admin panel. **Dormant on
+prod:** nothing cancelled yet — first firing is the first *Cancel this lesson*.
+
 ## 8.80 (2026-08-21) — Parent Upcoming lists make-ups + extra lessons — SHIPPED and DEPLOYED (app-only)
 
 **The Attendance→Upcoming view is now the one complete forward view.** It merged only the weekly weekday
@@ -412,25 +427,7 @@ paint the wrong child's make-ups); a failed holiday read is fail-safe (show noth
 lesson); selection kept across refocus; `formatSgDate` on rows; horizon bound + cancelled-session filter +
 unique make-up dedup key. **Verified:** typecheck clean, jest **396** PASS.
 
-**Phase B (advance-cancel a lesson) is PLANNED, not built** — `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`
-carries it with the billing-risk mitigations AS STEPS; BACKLOG *Admin and operations* → *Advance-cancel a
-lesson* (M). It authors a migration + touches the engine, so start from the root checkout, migration first.
-RISK 1 (subtract cancelled dates from `expectedDates` ONLY, never the union) and RISK 4 (mark-refusal in the
-`guard_attendance_date()` trigger, not the UI) graduate to §7 when it ships.
-
-## 8.79 (2026-08-21) — `add_unclaimed_student` ONGOING arm made ADMIN-ONLY — SHIPPED and DEPLOYED to prod
-
-**The coach arm is CLOSED — every new child goes through the admin.** `add_unclaimed_student(… 'ongoing' …)`
-let the class's OWN coach (`c.coach_id = current_coach_id()`) create-and-enrol a brand-new child, a carve-out
-from §7.17. Closed: `'ongoing'` now requires `is_tenant_admin()`, joining `'trial'` — both kinds admin-only. A
-DECISION (the user's call), not a bug: the same delegation refused the SAME DAY for parent self-enrolment and
-coach-assisted assignment. No UI ever reached the coach arm (both live callers are the admin panel), so prod
-is unchanged — one coach who IS the admin. §7.202. Migration `20260821000600`; deploy DEPLOYMENT §11.36.
-
-**Verified:** pgTAP **1285** PASS — the two coach-arm pins flipped **red-first** (`trial_onboarding`: own coach
-refused, admin does the add, `created_by`=admin; `class_capacity_limit` 16a: coach hits the auth gate, never
-capacity); Deno ×2 **229/229**. Same-signature CREATE OR REPLACE so no grant dump; **committed DOWN rehearsed**.
-Docs: PRD §7.17 corrected, BACKLOG item deleted, TESTING §5. Commits `0a86f5b` · `441d93f` · `d254c11`.
+Phase B (advance-cancel) shipped the same day — §8.81.
 
 ## 9. Next steps (pick with the user)
 
@@ -473,9 +470,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-20:** red every night since 08-14; the last survivor (`invoice-controls`, a pixel
-pin under the rem auto-scale, §7.193) was fixed on `22adfd1`. The 08-20 run should be the first green
-— if it is not, the failing name is new, so triage it as new.
+**State on 2026-08-21:** the 08-20 *scheduled* run died in **1m24s** (before any driver ran — infra, not
+code; the "dies before checkout" rule below); a **manual dispatch on 08-21 01:30 SGT was GREEN** (1h17m) —
+the first green since 08-14. A new driver joined the sweep today (`verify-cancel-lesson`, 17 checks, passed
+locally against the real UI) — if 08-22 reddens on it, its name is new, so triage it as new.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -491,19 +489,16 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — Phase A (make-ups + extra lessons in parent Upcoming) shipped 2026-08-21 (§8.80). Phase B queued.
+### THE NEXT BUILD — the Upcoming plan is COMPLETE (Phase A §8.80, Phase B §8.81, both 2026-08-21)
 
-**The obvious next build is Phase B — Advance-cancel a lesson.** Plan is written and risk-reviewed:
-`docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md` (billing-risk mitigations baked in AS STEPS); BACKLOG *Admin
-and operations* → *Advance-cancel a lesson* (M). **It authors a migration + touches the billing engine**, so:
-start from the **root checkout** (never a worktree — §7.55), migration ALONE on a `db/…` branch FIRST
-(`cancelled_at` + `cancel_lesson`/`restore_lesson`), land on `main`, then engine (`core.ts`) → apps. The two
-load-bearing gates: **RISK 1** subtract cancelled dates from `expectedDates` ONLY, never the union (§7.18 /
-core.ts:735); **RISK 4** the mark-refusal lives in `guard_attendance_date()`, not the UI (§7.199).
+**Two decisions before any build — `BACKLOG.md` → *Advance-cancel follow-ups*:** (1) should an advance
+cancel **extend a prepaid package** the way a holiday void does (dormant: 0 packages on prod); (2) should the
+admin be able to cancel **today's** lesson (the plan locked "advance only" — the coach's rain/coach mark is
+today's path). Each is S once decided.
 
-**No migration is in flight** (§7.55). Latest applied is `20260821000600` (coach-arm closure, §8.79). The one
-calendar-wave follow-up still open is **a location entity** (M, `BACKLOG.md` → *Admin and operations*) — the
-Location filter is distinct `location_name` text. Unblocks nothing urgent.
+**Then the queue's head is a location entity** (M, `BACKLOG.md` → *Admin and operations*) — the calendar's
+Location filter is distinct `location_name` text. Unblocks nothing urgent. **No migration is in flight**
+(§7.55); latest applied is `20260821000700` (advance-cancel, §8.81).
 
 Still open from earlier: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on
 0 notes); HANDOVER §3 graduation (docs tax). Then *Later* (owner-only accounting page, accrual). Full
@@ -541,12 +536,12 @@ ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · mult
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260821000600` (the coach-arm closure, §8.79);
+**The migration queue is EMPTY.** The latest applied is `20260821000700` (advance-cancel, §8.81);
 production confirmed caught up 2026-08-21 via `supabase migration list --linked`, **0 pending**.
-**DEPLOYMENT §11.36 is the freshest worked example** — one migration, same-signature CREATE OR REPLACE of a
-function, so NO grant dump was needed (§11.32 pattern), and this time with a **committed DOWN, rehearsed** (the
-pattern to copy); no engine, no app deploy. §11.33 is the recent contrast: two migrations, one adding a NEW
-function + trigger, so a `db dump` grant/object check WAS taken.
+**DEPLOYMENT §11.37 is the freshest worked example of the FULL sequence** — migration (two NEW functions, so a
+remote grant dump WAS taken) → engine v26 (first deploy died bundling on a transient TLS error; the retry
+worked) → apps, with a **committed DOWN generated from `pg_get_functiondef()`, rehearsed** (the pattern to copy).
+§11.36 is the same-signature contrast (no grant dump needed, §11.32 pattern).
 **§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
 **expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract
 migration LAST (held back by a `.hold` rename until the apps stopped reading the dropped columns);

@@ -1,14 +1,12 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-21 (4th) — **parent Upcoming now shows make-ups + extra lessons** (§8.80, PRD §7):
-Wave C's ranked five are all shipped, so that list was corrected to reality. New item filed under
-*Admin and operations* and placed at the **TOP of the build order**: **Advance-cancel a lesson**
-(M, PLANNED — `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`), the Phase B follow-up that reflects a
-cancelled lesson in Upcoming._
+_Last updated: 2026-08-21 (5th) — **Advance-cancel a lesson SHIPPED** (§8.81, PRD §7.6): the item at the top
+of the build order is deleted; two decide-first follow-ups filed under *Admin and operations* →
+*Advance-cancel follow-ups* (package extension on cancel; cancelling TODAY from the admin panel). The
+queue's head is now **A location entity** (M)._
 
-_Previously, 2026-08-21 (3rd) — **`add_unclaimed_student` coach arm CLOSED** (§7.202, `20260821000600`):
-the ONGOING arm is now admin-only, so a class's own coach can no longer create-and-enrol a child — matching
-§7.17 and the same-day refusals of parent self-enrolment and coach-assisted assignment._
+_Previously, 2026-08-21 (4th) — **parent Upcoming now shows make-ups + extra lessons** (§8.80, PRD §7);
+Wave C's ranked five all shipped._
 
 _Previously, 2026-08-21 (2nd) — **booking- AND enrolment-vs-retire races SHIPPED** (§7.200 `20260821000400`,
 §7.201 `20260821000500`): both entry paths to a retired class re-read `is_active` under a `FOR UPDATE` lock.
