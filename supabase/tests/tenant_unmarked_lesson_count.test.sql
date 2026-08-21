@@ -178,7 +178,13 @@ SELECT 'bf000000-0000-0000-0000-000000000008', co.id,'C8',
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='ulc-coach@test.local';
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at, unenrolled_at)
 VALUES ('55b00000-0000-0000-0000-000000000009','bf000000-0000-0000-0000-000000000008', false, (today_sg()-14)::timestamptz, (today_sg()-14)::timestamptz);
--- retire with cutoff (today-17) < the lesson date (today-14), SGT
+-- retire with cutoff (today-17) < the lesson date (today-14), SGT.
+-- Clearing request.jwt.claims makes auth.uid() null (RESET ROLE alone does not —
+-- the LOCAL claim lingers), so this is a no-user context and
+-- trg_class_retirement_guard (20260821000300) is exempt by its trust boundary.
+-- That is what lets a fixture force an otherwise-refused retired state, the same
+-- exemption the edge functions' service_role writes get in production.
+SET LOCAL "request.jwt.claims" TO '';
 UPDATE classes SET is_active=false, deactivated_at=(today_sg()-17)::timestamptz
   WHERE id='bf000000-0000-0000-0000-000000000008';
 SET LOCAL ROLE authenticated;

@@ -219,17 +219,21 @@ SELECT lives_ok(
 -- exist, so the prohibition against clamping bookings is enforced by the
 -- schema rather than by a comment someone has to remember.
 --
--- It also closes a real hole: classes_write is FOR ALL TO authenticated and
--- 20260804000600 grants UPDATE, so a tenant admin could retire a class straight
--- over PostgREST, bypassing all three of deactivate_class()'s refusals. The
--- admin panel never does this — but that is the SCREEN applying the limit, not
--- the database (§7.32).
+-- The CHECK is one half of closing a real hole: classes_write is FOR ALL TO
+-- authenticated and 20260804000600 grants UPDATE, so a tenant admin could retire
+-- a class straight over PostgREST. This constraint blocks the NO-DATE shape
+-- below (23514). ⚠ It does NOT, on its own, force retirement through
+-- deactivate_class(): a raw UPDATE CAN supply the date, and the 20260810000100
+-- header's claim otherwise was wrong. The three refusals are enforced for a raw
+-- WITH-DATE retire by trg_class_retirement_guard (20260821000300, §7.199) — see
+-- class_retirement_guard.test.sql. Class 003 is otherwise clean, so here the
+-- trigger passes and it is purely the missing date that raises.
 SELECT throws_ok(
   $$ UPDATE classes SET is_active = false
       WHERE id = '7a777777-1111-0000-0000-000000000003' $$,
   '23514',
   NULL,
-  'a raw UPDATE cannot retire a class — deactivate_class() is the only path, because only it supplies the date');
+  'a raw UPDATE with NO date is refused by the CHECK constraint (the retirement refusals themselves are pinned in class_retirement_guard.test.sql)');
 
 SELECT ok(
   (SELECT is_active FROM classes WHERE id='7a777777-1111-0000-0000-000000000003'),

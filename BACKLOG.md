@@ -1,10 +1,10 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-21 — **Three calendar-wave follow-ups SHIPPED LIVE** (§8.73, PRD §7.3/§7.6/§7.22):
-capacity is now a **HARD limit** (bookings + enrolment, admin included, no override), `mark_day_holiday`'s
-retirement boundary is SGT-inclusive, and the **Lessons sidebar badge** is live. All three deleted from
-below. Two new items filed from the pre-deploy review (a capacity last-seat race; a raw-UPDATE retirement
-hole). Still open under *Admin and operations*: the **location entity**._
+_Last updated: 2026-08-21 — **Two hardening fixes SHIPPED** (§7.198/§7.199): the capacity last-seat race
+now takes a `FOR UPDATE` class-row lock, and the raw-`UPDATE` retirement hole (plus its date-move sibling)
+is closed by a `BEFORE UPDATE` guard trigger. Both deleted from below. Newly filed from the commit review:
+a **booking-vs-concurrent-retire** race (distinct from the last-seat one). Still open: the
+`add_unclaimed_student` coach-arm question, and under *Admin and operations* the **location entity**._
 
 _Previously, 2026-08-19 (morning) — **Public-holiday voids shipped LIVE** (§8.70, PRD §7.16): a `holiday`
 attendance status voids a day's lessons and event-extends packages; `recompute_package_extensions` is gone._
@@ -1195,35 +1195,30 @@ contract migration (add table + FK, backfill from distinct names, keep the text 
 apps read the FK). Per-venue columns in the day view are the UI half. Not urgent: production is one
 location.
 
-### Capacity's last-seat check has no concurrency lock — **S** `[found 2026-08-20 in pre-deploy review]`
-The capacity trigger (`enforce_class_capacity`) and the booking RPCs (`class_expected_count`) read a
-`count(*)` under READ COMMITTED with **no lock on the class row**, so two simultaneous writers for the
-last seat each see cap−1 and both commit → cap+1, silently.
+### A booking can land in a class retired in the SAME instant — **S** `[found 2026-08-21 in commit review]`
+`book_makeup`/`book_trial` read `classes.is_active` at the top, then (for a capped class) block on the new
+`FOR UPDATE` class-row lock. If a concurrent `deactivate_class()` commits while they wait, they resume with
+a stale `is_active = true` and INSERT a guest into a now-retired class — the invariant refusal 2 exists to
+stop. On an **uncapped** class the same race exists with **no** lock at all (the FK's `FOR KEY SHARE` does
+not serialise against a non-key `UPDATE`). Distinct from the last-seat race (§7.198, shipped) — that one is
+booking-vs-booking; this is booking-vs-retire.
 
-**Why:** capacity is sold as a **hard** limit (PRD §7.3), and this is the one input that can breach it.
-No money impact and self-healing on the roster page, and a single-admin tenant essentially never
-races — which is why it shipped without the lock — but the mechanism is real.
+**Why:** dormant at single-admin scale (one admin cannot race themselves), no money impact, and rare. But
+it re-opens the "a retired class holds zero live guests" invariant the calendar/badge lean on.
 
-**Notes:** close it with `SELECT 1 FROM classes WHERE id = NEW.class_id FOR UPDATE` before the count in
-both the trigger and the RPCs (`20260820000200`). Serialises concurrent bookings/enrolments for one
-class only; cheap. Do it the day a tenant gains a second admin or a parent-facing self-enrol path.
+**Notes:** the capped case is a near-free add to `book_makeup`/`book_trial` — re-check under the existing
+lock: `PERFORM 1 FROM classes WHERE id = p_class_id AND is_active FOR UPDATE`, raise "no longer running" on
+zero rows, and move the `class_effective_capacity()` read AFTER the lock so a concurrent capacity *decrease*
+is seen too (the stale-`v_cap` half, also from the review). The **uncapped** case needs the lock taken
+unconditionally, which trades the "unlimited classes never lock" optimisation — decide that deliberately.
+Do it the day a tenant gains a second admin or a parent-facing self-enrol path.
 
-### A raw PostgREST `UPDATE` can retire a class, bypassing `deactivate_class()` — **S** `[found 2026-08-20 in pre-deploy review]`
-`classes_write` is `FOR ALL`, and the `classes_inactive_requires_deactivated_at` CHECK is satisfied when
-the date is supplied — so `UPDATE classes SET is_active = false, deactivated_at = now()` from a raw
-PostgREST call retires a class **without** `deactivate_class()`'s three refusals (uncancelled future
-guests, unmarked lessons ≥ floor, open enrolments). The `20260810000100` header's claim that "a raw
-UPDATE cannot supply the date" is **wrong** and should be corrected there.
-
-**Why:** every admin write goes through the RPC today, so it is dormant — but it is a hole in a
-destructive guard, and the calendar/badge code reason about "a retired class holds zero active
-enrolments", an invariant this path can break.
-
-**Notes:** the clean fix is to move `deactivate_class()`'s refusals into a `BEFORE UPDATE` trigger on
-`classes` (or narrow `classes_write` so a client cannot flip `is_active`). Related product question,
-also surfaced 2026-08-20: **`add_unclaimed_student(… 'ongoing' …)` lets the class's own coach enrol a
-brand-new child** (`c.coach_id = current_coach_id()`), which "coaches must not add students" (§7.17)
-does not cover — decide whether that arm should exist.
+### A raw PostgREST `UPDATE` and the `add_unclaimed_student` coach arm — **S** `[found 2026-08-20]`
+The raw-`UPDATE` retirement hole itself **shipped fixed** (§7.199, `20260821000300`: a `BEFORE UPDATE`
+trigger enforces the three refusals — and the date-move sibling — on any authenticated raw write). One
+related product question surfaced alongside it and is **still open**: `add_unclaimed_student(… 'ongoing' …)`
+lets the class's OWN coach enrol a brand-new child (`c.coach_id = current_coach_id()`), which "coaches must
+not add students" (§7.17) does not cover — decide whether that arm should exist.
 
 ### An owner-only accounting page — **M** — _raised 2026-08-08, not a priority_
 One page showing what the business actually earned and paid out — revenue, wages paid,

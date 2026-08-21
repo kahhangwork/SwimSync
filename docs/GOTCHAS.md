@@ -3117,3 +3117,40 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     and the DB is the backstop for the unreachable handover cell). The guard sits **before** the
     resolve-or-create so a refusal leaves no `lesson_sessions` row. To revert to the class's own coach you
     REMOVE the substitute, never assign them. (2026-08-21.)
+
+198. **A "HARD" CAPACITY LIMIT IS A CHECK-THEN-INSERT, SO IT NEEDS A CLASS-ROW LOCK OR IT IS NOT HARD.**
+    `book_makeup`, `book_trial` and the `enforce_class_capacity` enrolment trigger each read `count(*)` of
+    the expected set / active roster, compare to the effective maximum, then INSERT. Under READ COMMITTED
+    (PostgREST's default) two writers for the LAST seat each run their count before either commits, both
+    read cap−1, both pass, both insert → cap+1, silently. The unique indexes only stop DUPLICATE rows for
+    the SAME child, not two DISTINCT children racing. Fixed in `20260821000200`:
+    `PERFORM 1 FROM classes WHERE id = <class> FOR UPDATE` before every count, inside the `v_cap IS NOT
+    NULL` branch — a class with no cap never locks, so unlimited classes never contend. The second writer
+    blocks on the lock, then re-reads the count under a fresh statement snapshot and is refused. ⚠ A true
+    two-writer race is NOT provable in single-session pgTAP (one transaction, rolled back); the pin in
+    `class_capacity_lock.test.sql` asserts the lock STATEMENT is present on each path — a genuine stress
+    test would need a Deno/bash two-connection harness. The general rule: any "hard" limit enforced as a
+    read-then-write across sessions needs the contended row locked first. (2026-08-21.)
+
+199. **A `FOR ALL` RLS WRITE POLICY + A TABLE `UPDATE` GRANT MEANS AN RPC'S REFUSALS ARE BYPASSABLE BY A
+    RAW PostgREST UPDATE — CLOSE IT WITH A `BEFORE UPDATE` TRIGGER, NOT BY NARROWING THE POLICY.**
+    `deactivate_class()` refuses to retire a class with children on its roster, future guests, or unmarked
+    lessons — but `classes_write` is `FOR ALL TO authenticated` and `20260804000600` grants UPDATE, so a
+    tenant admin could send `UPDATE classes SET is_active=false, deactivated_at=now()` straight over
+    PostgREST and skip all three. The `classes_inactive_requires_deactivated_at` CHECK only blocked the
+    NO-DATE shape — the `20260810000100` header's claim that "a raw UPDATE cannot supply the date" was
+    WRONG. You CANNOT fix this by narrowing the policy: an RLS UPDATE policy's `WITH CHECK` sees only the
+    NEW row, never OLD, so it cannot forbid an `is_active` FLIP. `20260821000300` extracts the three
+    refusals into one `assert_class_retirable()` (SECURITY DEFINER, callable by nobody) and fires it from a
+    `BEFORE UPDATE` trigger on any true→false transition — every path, RPC or raw. ⚠ THE TRUST BOUNDARY IS
+    `auth.uid() IS NOT NULL`: the guard enforces for an authenticated user (RLS has already scoped that
+    write to their own tenant), and EXEMPTS a no-user context — service_role (edge functions AND the Deno
+    engine tests, whose `retire()` helper forces retired-class states the engine must still read) and
+    superuser (seed, migrations, pgTAP fixtures). ⚠ `RESET ROLE` does NOT clear a lingering
+    `SET LOCAL request.jwt.claims`, so a pgTAP fixture forcing a retired state must also
+    `SET LOCAL "request.jwt.claims" TO ''` to make `auth.uid()` null. reactivate_class() (false→true) is
+    never guarded, by standing prohibition. The same trigger also refuses a false→false raw UPDATE that
+    MOVES `deactivated_at` — a sibling hole, since the engine reads that date as how far the class ran, so
+    shifting it on an already-retired class widens its expectation window (found in the pre-commit review;
+    a fabricated FIRST date on a raw retire is accepted — the load-bearing invariant is that a set date does
+    not move). (2026-08-21.)

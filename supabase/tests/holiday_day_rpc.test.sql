@@ -155,6 +155,10 @@ SELECT is(
 
 -- ══ Cases 9–11: the retirement-boundary predicate (plan Phase A) ═════════════
 -- Retire R1/R2/R3 now (raw superuser UPDATE), then void the Tuesday holiday.
+-- Clearing request.jwt.claims makes auth.uid() null (RESET ROLE alone leaves the
+-- LOCAL claim set), so trg_class_retirement_guard (20260821000300) is exempt by
+-- its trust boundary and these fixtures force the retired state freely.
+SET LOCAL "request.jwt.claims" TO '';
 UPDATE classes SET is_active=false, deactivated_at=TIMESTAMPTZ '2026-03-18 01:00:00+08'
   WHERE id='df000000-0000-0000-0000-0000000000c1';  -- D+1 01:00 SGT = D 17:00 UTC
 UPDATE classes SET is_active=false, deactivated_at=TIMESTAMPTZ '2026-03-17 12:00:00+08'
