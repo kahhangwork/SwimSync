@@ -2,8 +2,9 @@
 
 _Last updated: 2026-08-21 (4th) — **parent Upcoming now shows make-ups + extra lessons** (§8.80, PRD §7):
 Wave C's ranked five are all shipped, so that list was corrected to reality. New item filed under
-*Admin and operations*: **Advance-cancel a lesson** (M, PLANNED — `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`),
-the Phase B follow-up that reflects a cancelled lesson in Upcoming._
+*Admin and operations* and placed at the **TOP of the build order**: **Advance-cancel a lesson**
+(M, PLANNED — `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`), the Phase B follow-up that reflects a
+cancelled lesson in Upcoming._
 
 _Previously, 2026-08-21 (3rd) — **`add_unclaimed_student` coach arm CLOSED** (§7.202, `20260821000600`):
 the ONGOING arm is now admin-only, so a class's own coach can no longer create-and-enrol a child — matching
@@ -369,6 +370,15 @@ the queue is now a decision-gated tail plus a flat value pool. Three decisions s
 accrual, manual reminders, multi-language refused. The order below: **Wave B** the one real internal
 chain → **Wave C** value-ranked independents → **Wave D** latent traps → **Later** big features →
 deliberately-last. Sections restructured below.
+
+> **NEXT — Advance-cancel a lesson (M)** `[top of queue 2026-08-21]`. The Phase B follow-up to
+> the make-ups/extra-lessons Upcoming work (§8.80): let the admin cancel a specific FUTURE lesson,
+> reflected as a struck "Cancelled" row in the parent Upcoming view. **Planned and risk-reviewed** —
+> `docs/plans/UPCOMING_LESSONS_COMPLETE_PLAN.md`; full item under *Admin and operations* below. It
+> authors a migration + touches the billing engine, so: root checkout, migration ALONE first, then
+> engine → apps. The two load-bearing gates — **RISK 1** subtract cancelled dates from `expectedDates`
+> ONLY (never the `sessionByDate`/`bookingsByDate` union — that is the §7.18 clamp under a new name);
+> **RISK 4** the mark-refusal lives in `guard_attendance_date()`, not the UI (§7.199).
 
 ### Wave B — the one genuine internal chain — **EXHAUSTED bar the cron-gated tail**
 
