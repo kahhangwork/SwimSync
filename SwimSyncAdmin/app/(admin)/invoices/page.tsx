@@ -28,9 +28,6 @@ type InvoiceRow = {
   gross_amount: number;
   package_applied: number;
   credit_applied: number;
-  /** A prior-period DEBIT (voided-then-paid credit) folded onto this invoice —
-   *  net = gross − package − credit + balance_adjustment. */
-  balance_adjustment: number;
   net_amount: number;
   status: string;
   parent_name: string;
@@ -76,7 +73,6 @@ const INVOICE_CSV_COLUMNS: CsvColumn<InvoiceRow>[] = [
   { header: "Gross", value: (r) => r.gross_amount },
   { header: "Package", value: (r) => r.package_applied },
   { header: "Credit", value: (r) => r.credit_applied },
-  { header: "Adjustment", value: (r) => r.balance_adjustment },
   { header: "Net", value: (r) => r.net_amount },
   { header: "Status", value: (r) => (r.status === "paid" ? "Paid" : "Outstanding") },
   { header: "Parent says paid", value: (r) => (r.paid_claimed_at ? "yes" : "") },
@@ -626,7 +622,7 @@ export default function InvoicesPage() {
     const { data } = await supabase
       .from("invoices")
       .select(
-        "id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, parents(profiles(full_name, phone)), invoice_items(student_name, students(full_name))"
+        "id, billing_month, gross_amount, package_applied, credit_applied, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, parents(profiles(full_name, phone)), invoice_items(student_name, students(full_name))"
       )
       .order("generated_at", { ascending: false });
 
@@ -645,7 +641,6 @@ export default function InvoicesPage() {
           gross_amount: Number(inv.gross_amount),
           package_applied: Number(inv.package_applied),
           credit_applied: Number(inv.credit_applied),
-          balance_adjustment: Number(inv.balance_adjustment ?? 0),
           net_amount: Number(inv.net_amount),
           status: inv.status,
           parent_name: inv.parents?.profiles?.full_name ?? "—",
