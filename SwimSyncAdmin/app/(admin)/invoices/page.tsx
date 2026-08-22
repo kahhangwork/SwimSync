@@ -66,6 +66,17 @@ type UnclaimedStudent = {
  *  never see them — this standing report is the only thing that can. */
 type OrphanLine = UnclaimedStudent & { billing_month: string };
 
+/** A parent's pending DEBIT — money owed from a voided-then-paid credit that has
+ *  not yet been folded onto an invoice (§8.83). Keyed by (parent_id, tenant_id):
+ *  a parent enrolled at two tenants has two balance rows, and this view is scoped
+ *  to the admin's own tenant so tenant B's debit never attaches to tenant A. */
+type PendingDebit = {
+  parent_id: string;
+  tenant_id: string;
+  parent_name: string;
+  debit_balance: number;
+};
+
 // CSV export — what's on screen (post-filter/sort `visible`), raw values so an
 // accountant can sum the money columns. Month stays the raw YYYY-MM (sortable in
 // Excel); status is the badge label, not the lowercased enum.
@@ -155,6 +166,10 @@ export default function InvoicesPage() {
   const [orphanSettling, setOrphanSettling] = useState<string | null>(null);
   const [orphanAmount, setOrphanAmount] = useState<Record<string, string>>({});
   const [orphanError, setOrphanError] = useState<string | null>(null);
+
+  const [pendingDebits, setPendingDebits] = useState<PendingDebit[]>([]);
+  const [writingOff, setWritingOff] = useState<string | null>(null);
+  const [pendingDebitError, setPendingDebitError] = useState<string | null>(null);
   // Lessons the server refused to generate around. Non-empty = blocked.
   const [blockedLessons, setBlockedLessons] = useState<
     {
@@ -199,6 +214,7 @@ export default function InvoicesPage() {
     setTenantId(tid);
     if (!tid) return;
     loadOrphans(tid);
+    loadPendingDebits(tid);
 
     const { data: tenant } = await supabase
       .from("tenants")
@@ -463,6 +479,7 @@ export default function InvoicesPage() {
           } have no parent account to bill.`
         );
         await loadInvoices();
+        if (tenantId) await loadPendingDebits(tenantId);
       } else if (
         // ── FAIL SAFE ON ANYTHING UNRECOGNISED ────────────────────────────
         // Everything below assumes a successful run. Without this, a refusal
@@ -508,6 +525,7 @@ export default function InvoicesPage() {
               : " Month left open — some attendance is still unmarked.")
         );
         await loadInvoices();
+        if (tenantId) await loadPendingDebits(tenantId);
       }
     } catch (e) {
       setGenResult(`Error: ${String(e)}`);
@@ -619,6 +637,69 @@ export default function InvoicesPage() {
     // Refetch rather than filter: a settlement dated through this month also
     // covers the same child's EARLIER sealed months, so other lines can clear.
     await loadOrphans(tenantId);
+  }
+
+  /**
+   * A parent's pending DEBIT, before it bills. Scoped to THIS tenant (RISK 6): a
+   * platform admin sees every tenant's invoices in the table below, but the debit
+   * view is filtered to their own tenant, so tenant B's debit is never shown
+   * against tenant A's rows. A pending debit is one that has NOT yet folded onto
+   * an invoice — `folded_at` lives on the draw, but the balance column is the
+   * authoritative "still owed and uncollected" figure.
+   */
+  async function loadPendingDebits(tid: string) {
+    const { data, error } = await supabase
+      .from("parent_tenant_balances")
+      .select("parent_id, tenant_id, debit_balance, parents(profiles(full_name))")
+      .eq("tenant_id", tid)
+      .gt("debit_balance", 0);
+    if (error) {
+      setPendingDebitError(error.message);
+      setPendingDebits([]); // don't leave a stale list standing behind an error
+      return;
+    }
+    setPendingDebitError(null);
+    setPendingDebits(
+      (data ?? []).map((row: any) => ({
+        parent_id: row.parent_id,
+        tenant_id: row.tenant_id,
+        parent_name: row.parents?.profiles?.full_name ?? "—",
+        debit_balance: Number(row.debit_balance ?? 0),
+      }))
+    );
+  }
+
+  /**
+   * Clear a parent's pending debit so a leaver can be offboarded. The RPC forgives
+   * it in-app (audited); if the money is actually owed, the admin collects it
+   * out-of-band (PayNow/cash) — there is deliberately no in-app charge for this
+   * rare case. A reason is required.
+   */
+  async function handleWriteOff(row: PendingDebit) {
+    const reason = window.prompt(
+      `Write off S$${row.debit_balance.toFixed(2)} owed by ${row.parent_name}?\n\n` +
+        `This clears the pending charge in SwimSync. Collect any money owed ` +
+        `directly (PayNow/cash) first. Enter a reason for the record:`
+    );
+    if (reason === null) return; // cancelled
+    if (reason.trim() === "") {
+      setPendingDebitError("A reason is required to write off a balance.");
+      return;
+    }
+    const key = `${row.parent_id}:${row.tenant_id}`;
+    setWritingOff(key);
+    const { error } = await supabase.rpc("write_off_parent_balance", {
+      p_parent_id: row.parent_id,
+      p_tenant_id: row.tenant_id,
+      p_reason: reason.trim(),
+    });
+    setWritingOff(null);
+    if (error) {
+      setPendingDebitError(error.message);
+      return;
+    }
+    setPendingDebitError(null);
+    if (tenantId) await loadPendingDebits(tenantId);
   }
 
   async function loadInvoices() {
@@ -783,6 +864,58 @@ export default function InvoicesPage() {
           mode is silence, and a message that can be dismissed is gone. Each
           line persists until a settlement covers it. No bulk action, same as
           the unclaimed modal — settling is a decision about money. */}
+      {pendingDebitError && (
+        <p
+          data-testid="pending-debit-error"
+          className="mb-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+        >
+          {pendingDebitError}
+        </p>
+      )}
+
+      {pendingDebits.length > 0 && (
+        <div
+          data-testid="pending-debits"
+          className="mb-5 rounded-2xl border border-indigo-300 bg-indigo-50 p-4"
+        >
+          <p className="text-sm font-semibold text-indigo-900">
+            Pending charges — not yet invoiced
+          </p>
+          <p className="mt-1 text-xs text-indigo-800">
+            A correction to an already-paid invoice left this amount owing. It is
+            folded onto the family&apos;s next invoice automatically. If the family
+            is leaving and has no next invoice, collect it directly, then write it
+            off here so they can be offboarded.
+          </p>
+
+          <ul className="mt-3 space-y-3">
+            {pendingDebits.map((row) => {
+              const key = `${row.parent_id}:${row.tenant_id}`;
+              return (
+                <li
+                  key={key}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2.5"
+                >
+                  <p className="text-sm font-semibold text-gray-800">
+                    {row.parent_name}
+                    <span className="ml-2 font-normal text-gray-600">
+                      owes S${row.debit_balance.toFixed(2)}
+                    </span>
+                  </p>
+                  <Button
+                    variant="outline"
+                    disabled={writingOff === key}
+                    onClick={() => handleWriteOff(row)}
+                  >
+                    Write off
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {orphans.length > 0 && (
         <div
           data-testid="orphan-report"

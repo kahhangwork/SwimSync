@@ -442,18 +442,23 @@ family-status client-side scan, Email-confirmation copy, Tick off swimming skill
   drawing credit against the debit-inclusive base so credit and debit net. Reviewed by `/plan-review`
   (fable) — the single-signed-column idea was replaced with the separate `debit_balance` for ledger
   safety. Two follow-ups filed below. Dormant (0 credit notes on prod). **Deploy via `/deploy` when ready.**
-- **Partial-payment: seamless re-correction of a debited note** (S/M) `[found 2026-08-22 while building]` —
-  today re-correcting (present→absent) a lesson whose credit note was voided-and-debited is **refused
-  (`CN002`)**, because reversing the debit while its invoice discount is frozen history is a multi-flip
-  state machine (double-credit / desync traps in every naive form). **Why:** an admin who voids then
-  re-corrects hits a wall. **Notes:** the safe fix is probably to retract the debit by its
-  `credit_applications.debited_at` mark and re-issue against the same note row (UNIQUE(invoice_item_id)
-  forbids a second note). Deeply dormant; the refusal is safe. `partial_payment.test.sql` pins the refusal.
-- **Partial-payment: admin PRE-BILL debit visibility** (S) `[found 2026-08-22]` — a pending `debit_balance`
-  shows on the parent's NEXT invoice (adjustment line, everywhere) but nowhere before it bills. **Why:** an
-  admin can't see what a parent owes from a void until the next run. **Notes:** surface `debit_balance` on
-  the Invoices/Students view; also warn/block a parent deletion that would cascade a nonzero balance
-  (`parent_tenant_balances … ON DELETE CASCADE`).
+- **Partial-payment: seamless re-correction of a debited note — the FOLDED case only** (M)
+  `[pending case BUILT 2026-08-23]` — re-correcting a voided-and-debited note whose debit is still
+  **PENDING** now **auto-unwinds** it (`20260822000200`, `handle_attendance_update`): the debit is
+  retracted, the undrawn remainder returns to the pool, and the note is restored. **What REMAINS
+  deferred:** once the debit has been **FOLDED** onto a later invoice (or written off), the re-correction
+  still refuses (`CN002`) — reversing a folded/settled charge is the multi-flip state machine. **Why still
+  deferred:** deeply dormant, and `INVOICE_RUNBOOK.md` now has a manual path (issue a credit note on the
+  adjustment invoice). Safe: no silent misbill. `partial_payment_followups.test.sql` pins both arms.
+- ~~**Partial-payment: admin PRE-BILL debit visibility**~~ — **BUILT LOCALLY 2026-08-23, not yet deployed**
+  (`20260822000200`, `docs/plans/PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md`). A "Pending charges — not yet
+  invoiced" panel on the admin Invoices page (tenant-scoped) shows each family's `debit_balance` before it
+  bills, with a **Write off** action (`write_off_parent_balance` — admin-only, audited, reconciliation-
+  safe). The deletion-cascade worry became an **offboard guard** instead: a `parent_tenants` BEFORE UPDATE
+  trigger refuses set-inactive while `debit_balance > 0` (**debit only** — credit is preserved across
+  offboard); the write-off is its exit ramp. A standalone "collect now" charge was designed then
+  **REJECTED** (it forced a `kind` discriminator + an engine change and still only produced a chaseable
+  invoice). Dormant (0 credit notes on prod). Deploy via `/deploy`.
 - ~~**`HANDOVER.md` §3 needs graduating**~~ — **DONE 2026-08-22.** DORMANT trimmed to one line per
   area; the *Production reality* deploy/rollback narrative dropped for a pointer to `docs/DEPLOYMENT.md`
   §11, which already held it (restated in §3 it was a fourth copy that drifts). Prohibitions + the

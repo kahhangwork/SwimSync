@@ -184,6 +184,21 @@ Billing is based on **actual attendance**, so make sure last month is complete:
   after the fact, use an attendance edit (billable → non-billable), which issues
   a credit note; there's no "top-up" for adding lessons after invoicing.
 - **No billable attendance = no invoice** for that parent that month (expected).
+- **"…its charge has already been billed…" when re-correcting a lesson (CN002)** *(2026-08-23)*.
+  Editing a lesson's attendance back to **Present** is refused when its credit note was voided,
+  recovered as an account charge, and that charge has **already been folded onto a later invoice**
+  (or written off). While the charge is still *pending* (shown on the Invoices page as a **pending
+  charge**), the same edit unwinds it automatically — the refusal only appears once it has billed.
+  To fix a genuinely-wrong correction after it has billed: issue a fresh **credit note** on the
+  invoice that carries the *Adjustment* line (an attendance edit on that later lesson), rather than
+  re-editing the original lesson. **Confirm the credit amount equals the folded charge** — an edit on a
+  differently-priced lesson credits *that* lesson's price, so if they differ, split it across two edits.
+  The original paid invoice is immutable by design (§8.83).
+- **"debit fold reconciliation failed" from a Generate run** *(2026-08-23, should never fire on prod)*.
+  The engine refuses to fold a debit whose amount does not trace to its recorded draws — a data-integrity
+  stop, not a normal state. It blocks only that one parent's invoice. Do **not** force it: capture the
+  parent and the message and escalate (it means `debit_balance` and the `credit_applications` draw ledger
+  disagree — a bug or a manual DB edit), rather than editing balances by hand.
 - If **Generate** errors (cold start / transient), just click it again — it's safe
   to retry (won't double-bill).
 - **A finished month gets "closed" (sealed).** When a run leaves every class

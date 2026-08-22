@@ -330,6 +330,14 @@ export default function ParentsPage() {
             <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
               Nothing is deleted. Attendance, invoices and any credit balance are
               kept exactly as they are.
+              {pending.is_active && (
+                <>
+                  {" "}
+                  A <strong>pending charge</strong> (money the family owes) must be
+                  settled or written off — on the Invoices page — before they can be
+                  set inactive.
+                </>
+              )}
             </p>
 
             {actionError && (

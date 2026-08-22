@@ -146,15 +146,18 @@ INSERT INTO invoices (tenant_id, id, parent_id, billing_month, gross_amount, cre
 VALUES ('99999999-0000-0000-0000-0000000000a7','ef000000-0000-0000-0000-000000000004', pg_temp.pid(), '2026-08', 30.00, 30.00, 0.00, 'paid', now(), 'af000000-0000-0000-0000-0000000000a1');
 INSERT INTO invoice_items (invoice_id, student_id, lesson_session_id, attendance_status, amount, class_title, session_date)
 VALUES ('ef000000-0000-0000-0000-000000000004','cf000000-0000-0000-0000-000000000001','df000000-0000-0000-0000-000000000004','present', 30.00, 'PP Class', '2026-08-01');
--- The note as a paid-void would leave it: reversed, its draw debited.
+-- The note as a paid-void would leave it: reversed, its draw debited. The draw is
+-- also FOLDED (billed on a later invoice) — under 20260822000200 an UNFOLDED debit
+-- auto-unwinds on re-correction; only a folded (or written-off) one still refuses.
 INSERT INTO credit_notes (reference_number, parent_id, student_id, student_name, invoice_id,
   invoice_item_id, lesson_session_id, amount, original_status, corrected_status, status, tenant_id, reversed_at)
 SELECT 'CN-pp4', pg_temp.pid(), 'cf000000-0000-0000-0000-000000000001', 'PP Kid',
   'ef000000-0000-0000-0000-000000000004', ii.id, 'df000000-0000-0000-0000-000000000004',
   30.00, 'present', 'absent', 'reversed', '99999999-0000-0000-0000-0000000000a7', now()
 FROM invoice_items ii WHERE ii.invoice_id='ef000000-0000-0000-0000-000000000004';
-INSERT INTO credit_applications (credit_note_id, invoice_id, amount, debited_at, debited_by)
-SELECT cn.id, 'ef000000-0000-0000-0000-000000000004', 30.00, now(), 'af000000-0000-0000-0000-0000000000a1'
+INSERT INTO credit_applications (credit_note_id, invoice_id, amount, debited_at, debited_by, folded_at, folded_invoice_id)
+SELECT cn.id, 'ef000000-0000-0000-0000-000000000004', 30.00, now(), 'af000000-0000-0000-0000-0000000000a1',
+       now(), 'ef000000-0000-0000-0000-000000000004'
 FROM credit_notes cn WHERE cn.reference_number='CN-pp4';
 
 SELECT throws_ok(
