@@ -1,6 +1,12 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-21 (6th) — **Advance-cancel EXTENDS a prepaid package SHIPPED** (`20260821000800`,
+_Last updated: 2026-08-22 — **Two decisions recorded, nothing built.** *A location entity* is DEMOTED
+from the queue's head to **Later** (production is one location; it only bites a multi-venue business), so
+the build order now has **no rework-critical head** — just the Wave D traps and the Later pool. And
+*cancelling TODAY's lesson from the admin panel* is **REFUSED** (advance means advance; today/past is the
+coach's rain/coach mark), moved to *Deliberately not doing* — so *Advance-cancel follow-ups* is now closed._
+
+_Previously, 2026-08-21 (6th) — **Advance-cancel EXTENDS a prepaid package SHIPPED** (`20260821000800`,
 PRD §7.6): a cancel extends the covering package by `holiday_extension_days`, restore retracts it — the
 holiday twin. That follow-up is struck under *Advance-cancel follow-ups*; only *cancelling TODAY* remains
 there. The queue's head is now **A location entity** (M)._
@@ -364,7 +370,8 @@ grant dump clean, RISK 12 checks 0/0. DORMANT (no business has enabled it).
 
 **SHIPPED LIVE 2026-08-21 — Capacity hard limit + holiday retirement boundary + Lessons badge** (§8.73,
 `docs/plans/CAPACITY_HOLIDAY_BADGE_PLAN.md`, DEPLOYMENT §11.31): three migrations, holiday → capacity →
-badge, no engine change, grant dump clean. The location entity is the one calendar-wave follow-up left.
+badge, no engine change, grant dump clean. Its one calendar-wave follow-up, *A location entity*, was
+**demoted to Later 2026-08-22** (production is one location) — see the *Later* section below.
 
 **Build order re-ranked 2026-08-16 after referrals shipped.** No rework-critical sequence remains —
 the queue is now a decision-gated tail plus a flat value pool. Three decisions settled (table above):
@@ -373,8 +380,10 @@ chain → **Wave C** value-ranked independents → **Wave D** latent traps → *
 deliberately-last. Sections restructured below.
 
 > ~~**NEXT — Advance-cancel a lesson (M)**~~ — **SHIPPED 2026-08-21** (PRD §7.6 *Advance-cancel*,
-> §7.203/§7.204, `20260821000700`). Its two decide-first follow-ups are filed under *Admin and
-> operations* → *Advance-cancel follow-ups*. The queue's head is now **A location entity (M)**.
+> §7.203/§7.204, `20260821000700`). Both decide-first follow-ups are now settled (package-extension
+> **SHIPPED** 2026-08-21, §8.82; cancelling-today **REFUSED** 2026-08-22 → *Deliberately not doing*), so
+> *Advance-cancel follow-ups* is closed. **No rework-critical head remains** — the queue is the Wave D
+> latent traps plus the *Later* pool (which now also holds *A location entity*, demoted 2026-08-22).
 
 ### Wave B — the one genuine internal chain — **EXHAUSTED bar the cron-gated tail**
 
@@ -434,8 +443,10 @@ family-status client-side scan, Email-confirmation copy, Tick off swimming skill
   **Notes:** needs a partial-payment / amount-owed model (`net_amount − SUM(payment_records)`), which
   SwimSync's binary paid/outstanding invoice status does not have today. Dormant (0 credit notes on
   prod, so no void has ever reopened a paid invoice). Void itself is race-safe (§8.69's drawdown lock).
-- **`HANDOVER.md` §3 needs graduating** (S) — docs tax; keep the prohibitions +
-  verified-vs-specified, point the rest at the PRD.
+- ~~**`HANDOVER.md` §3 needs graduating**~~ — **DONE 2026-08-22.** DORMANT trimmed to one line per
+  area; the *Production reality* deploy/rollback narrative dropped for a pointer to `docs/DEPLOYMENT.md`
+  §11, which already held it (restated in §3 it was a fourth copy that drifts). Prohibitions + the
+  verified-vs-specified table kept intact, as the item specified. HANDOVER back under the 45 KB budget.
 
 ### Later — big features carrying their own dependencies
 
@@ -444,7 +455,9 @@ family-status client-side scan, Email-confirmation copy, Tick off swimming skill
 settlements, no partial figure), and the trainee-coach payroll dependency is **discharged**
 (shipped 2026-08-12). So this now waits on nothing but priority. Needs no capability model.
 **Split co-admin permissions (M)** — *yes eventually*; the accounting page does not wait
-on it. Household split billing (M — *needs a credit-splitting
+on it. **A location entity / venue (M — *demoted here 2026-08-22*)** — production is one
+location, so promoting `classes.location_name` to a `locations` table only pays off for a
+multi-venue business; full item under *Admin and operations*. Household split billing (M — *needs a credit-splitting
 rule*), Auto PayNow detection (L — *the CSV-import M is the 10% worth doing first*),
 In-app payment gateway (L), Native store builds (M — *deferred; not spending the $99 yet*)
 → Push notifications (M — *blocked by it*), Check the logo for brand collisions (S —
@@ -1174,22 +1187,24 @@ constraint is the real gate here, not the feature.
 
 ## Admin and operations
 
-### Advance-cancel follow-ups — **S, decide first** `[raised 2026-08-21 while shipping advance-cancel]`
-Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). One follow-up remains; the other
-SHIPPED:
+### ~~Advance-cancel follow-ups~~ — **BOTH SETTLED, section closed** `[raised 2026-08-21 while shipping advance-cancel]`
+Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). Both follow-ups are now settled:
 
 - ~~**What a cancel means for a PREPAID PACKAGE.**~~ **SHIPPED 2026-08-21** (`20260821000800`, PRD §7.6):
   a cancel extends the covering package by the tenant's `holiday_extension_days`, restore retracts it —
   the holiday twin, snapshotted at cancel time. Dormant on prod: 0 packages.
-- **Cancelling TODAY's lesson from the admin panel.** Locked out in the plan ("advance means
-  advance"): today/past is the coach's `cancelled_rain`/`cancelled_coach` mark, which the admin can
-  also set on the lesson page (§7.22). Revisit only if the admin asks to call off a lesson that
-  morning *before* the roster exists — the RPC's `p_date <= today_sg()` refusal is the one line.
+- ~~**Cancelling TODAY's lesson from the admin panel.**~~ **REFUSED 2026-08-22** with the user — moved to
+  *Deliberately not doing*. Advance means advance: a lesson happening today or already past is the
+  **coach's** call, marked `cancelled_rain`/`cancelled_coach`, and the admin can already set that same
+  mark from the lesson page (§7.22). A second admin route to call off *today* duplicates the coach's path
+  and buys nothing — the two surfaces would then have to agree on a lesson whose roster may already exist.
+  The RPC's `p_date <= today_sg()` refusal stays as the guard; relaxing it is the one-line change if a real
+  admin ever needs to call off a lesson that morning before the coach has touched it.
 
 Cosmetic, not filed separately: the coach Schedule's collapsed COMING UP day summary still counts a
 cancelled lesson in its "N lessons"; the card inside is struck.
 
-### A location entity (venue) — **M** `[raised 2026-08-19 while building the admin calendar]`
+### A location entity (venue) — **M** — **Later** (demoted 2026-08-22: production is one location) `[raised 2026-08-19 while building the admin calendar]`
 Promote `classes.location_name` (free text) to a `locations` table the class references, so the
 calendar, Lessons list and a future Maps link filter and group by a real venue.
 
@@ -1594,4 +1609,5 @@ Kept so the reasoning doesn't get re-litigated.
 | **Individually disabling a PARENT account** | Considered and dropped 2026-07-19, restated when tenant suspension shipped (2026-08-13, the last of the disabling controls). Families leaving a business is handled by tenant-level active/inactive (`parent_tenants.is_active`), which is the actual common case — and a whole business going dark is tenant suspension (PRD §4.4). The only genuine platform-level trigger for a parent is a PDPA consent-withdrawal request — where "can't log in, records retained" is right, since IRAS requires ~5 years of financial records — and that has never happened. If it ever does, the mechanism staff disabling uses (auth ban + read-back) applies unchanged; parents are otherwise **never** auth-banned, because a parent is multi-tenant and a ban is account-level (WAVE_5_PLAN.md decision 5). |
 | **Parent self-enrolment into classes** (a parent picks and joins a class themselves) | Refused 2026-08-21 with the user: **parents should not choose their own class.** Which lane a child belongs in is a coaching judgement — ability, age, temperament — not a parent's pick, and letting parents self-select would put children in the wrong class and undo the streaming the school does deliberately. The onboarding stall this was meant to cure (a new family waits for the admin to assign each child) is real, but the fix is to speed up the *admin* side, not to hand the decision to parents. Note this closes the door on parents *choosing*; a lighter **preference-at-signup that the admin approves** was not what was rejected and could still be revisited if the assignment queue ever genuinely hurts. The capacity/schedule/retired-class DB guards built for this (§8.75, 2026-08-20/21) stand on their own and lose nothing. |
 | **Coach-assisted assignment workflow** (a coach assigns students to their own classes, not just the superadmin) | Refused 2026-08-21 with the user, alongside parent self-enrolment. **Class assignment stays a superadmin action** — the two candidate ways to remove the admin from the loop, letting the *parent* pick and letting the *coach* pick, were both rejected, so this is a deliberate single point of control, not an oversight. The onboarding bottleneck it named is real but is answered by better admin tooling, not by delegating the decision. This was previously "the only sanctioned route at this bottleneck" once parent self-enrol was refused; that framing is now void — neither route is sanctioned. Revisit only if a real second-coach tenant makes admin-only assignment genuinely painful, and even then the question is *coach-assisted* (coach proposes, admin confirms), not coach-authoritative. |
+| **Cancelling TODAY's (or a past) lesson from the admin panel** | Refused 2026-08-22 with the user, closing the last advance-cancel follow-up. Advance-cancel is deliberately *advance only* — `cancel_lesson`'s `p_date <= today_sg()` refusal. A lesson happening today or already past is the **coach's** call, marked `cancelled_rain`/`cancelled_coach`, and the admin can already set that same mark from the lesson page (PRD §7.6, §7.22). A second admin route to call off today's lesson would duplicate the coach's path and buy nothing — worse, the two surfaces would then have to agree on a lesson whose roster may already exist. **Revisit only if** a real admin needs to call off a lesson *that morning, before the coach has touched it*; the one-line change is relaxing that date refusal, and it stays refused until someone actually asks. |
 | **A CI gate on documentation size** (`scripts/check-doc-budget.sh` — byte budget on `HANDOVER.md`, line cap on `CLAUDE.md`, wired into `repo-invariants`) | Built, proven to fail correctly on a one-byte growth, and **reverted the same day** at the user's call (`cb70808` holds it; `6013082` removed it). The case *for* is strong and is recorded in **§7.119**: instruction alone has now failed twice, taking `HANDOVER.md` to 290 KB and then to 91 KB, and the repo already uses exactly this pattern for a rule that kept being forgotten (`check-teardowns.sh`, whose own header says *"A note in a document does not catch that; a failing build does."*). The case *against* won on two counts, both fair: **failing a build on a documentation byte-count is disproportionate** when the same push carries a billing fix, and the ratchet as built was seeded at the file's *exact* current size, so the next session's first legitimate §9 addition would have reddened CI with no headroom at all. What replaced it: the same limits as **countable rules** in `/update-docs` — ledger row ≤200 chars, ≤1 `_Previously,_`, ≤45,000 bytes — measured at the **start** of Step 5 rather than asked as a Final-check question, which is the specific failure the old rule had (five consecutive sessions answered it and waived it). **If `HANDOVER.md` regrows a third time, restore the script from `cb70808` rather than re-wording the rule a fourth time** — that escalation is written into `/update-docs`'s Final check, so it does not depend on anyone remembering this row. |

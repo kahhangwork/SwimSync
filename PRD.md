@@ -1168,7 +1168,9 @@ What a cancelled lesson means, everywhere at once (one rule, five readers — §
 
 **Refusals, all the RPC's own and rendered verbatim:** today or a past date (*"if it did not run,
 record it as cancelled (rain / coach) on its attendance screen"* — the coach's existing
-`cancelled_rain`/`cancelled_coach` mark is that path, unchanged); a session that already has
+`cancelled_rain`/`cancelled_coach` mark is that path, unchanged; **this advance-only scope is a settled
+decision, not a gap** — a second admin route to cancel *today's* lesson was refused 2026-08-22,
+`BACKLOG.md` → *Deliberately not doing*); a session that already has
 attendance rows (a marked lesson ran); a date holding live guests; a retired class. Cancelling twice
 is a no-op. **Restore** (lesson page) reverses it, but never into a month already sealed in
 `billing_periods` (a restored-into-billed lesson could never be invoiced — it stays cancelled), never

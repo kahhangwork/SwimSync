@@ -90,6 +90,11 @@ Swim-coach attendance & billing app for Singapore. Three roles:
 > next thing to cut since 2026-08-08, and grew from 410 to 469 lines anyway — which is
 > the evidence that **a bullet must pay for itself**. Adding one is fine. Adding one
 > without deleting one needs a reason you can say out loud.
+>
+> *Graduated again 2026-08-22 (the Wave D docs-tax item):* DORMANT trimmed to one line per area,
+> and the *Production reality* deploy/rollback narrative dropped in favour of a pointer to
+> `docs/DEPLOYMENT.md` §11, which already held it — restated here it was a fourth copy that drifts.
+> Verified table + prohibitions kept intact.
 
 The **entire MVP core loop works and is verified across the UI + backend**:
 parent register → add child → superadmin assign → coach attendance →
@@ -153,81 +158,39 @@ a hint that has already drifted. `docs/TESTING.md` §5 says what each suite cove
 
 This is the half of "verified" that a PRD cannot tell you, so it is the part of §3 that
 earns its place. **Shipped ≠ exercised**, and a guard that has never fired in production
-is a guard whose first real firing is still ahead of you.
+is a guard whose first real firing is still ahead of you. **Each of these is dormant for a
+DATA reason, not a bug — don't rediscover any as broken** (the §7.131 shape throughout: with
+one coach who is also the admin, most narrowing is unobservable). One line per area; the
+first-firing trigger is what to watch for.
 
-- **Packages** — no package sold on production, so the weeks/start-date layer is dormant: no start
-  date, manual-extend, or **holiday void-extension (§8.70)** has fired on real data (§7.156/§7.157 pins,
-  no-cascade coverage, sealed-month safety verified locally only). The holiday voids are dormant on a
-  double premise — **0 packages AND 0 holidays voided on prod** — so `mark_day_holiday`, the reconcile
-  trigger, the admin-only guard and the late-buyer path have never fired there; first firing is the
-  first `Void lessons`. **Renewal offers (§8.60) are dormant too** — no offer on prod, so supersede, the
-  `/package` page and the RISK 1/2/4/12 guards (§7.158–§7.162) have never fired.
-- **Billing a month LATE** — no production month has been billed late, so `markable_floor`'s
-  reopened window has never been used. That is the point: it is insurance, shipped ahead of
-  the trigger its own backlog item named.
-- **Retired classes** — production had **zero** inactive classes on deploy day (audited,
-  re-confirmed 2026-08-10), so no class has been retired on real data.
-- **Guest bookings** — production holds **zero** live trial or make-up bookings, so §8.40's
-  new block has never fired there. Which is exactly why it was safe to ship.
-- **Substitutes and shadows** — production holds **zero** `session_coaches` and zero
-  `class_shadow_coaches` rows, and **it cannot usefully hold any yet**: there is one coach,
-  they are also the tenant admin, and every policy is `coach_branch OR can_admin_tenant(…)`,
-  so no narrowing is observable on that account at all (§7.131). The Classes drawer's *Add a
-  shadow* dropdown is therefore **correctly empty** — the class's own coach is excluded, and
-  there is nobody else. **Don't rediscover that as a bug.** It becomes real the day a second
-  coach is hired; `generate_coach_payouts` also skips a coach with no rate, so **no payout has
-  ever been generated on production.** The whole model is verified locally against non-admin
-  coaches in a browser (`verify-coach-roster`, 30 checks) — that is the only place it can be.
-- **Credit-note emails (§8.64), the symmetric double-credit fix (§8.68), AND all of Wave D's credit
-  work (§8.69)** — production holds **0 credit notes**, so nothing has been emailed, the admin's
-  Resend/Void buttons have no row, and none of the guards has **ever fired**: the `CN001` refusal, the
-  engine credit lock (`apply_credit_to_invoice`, drawn only when an invoice applies credit), the admin
-  void, and the `reversed_at` filter are all dormant, and the 0-rows fact is what made every migration's
-  backfill a no-op. First firing of the credit paths is the first post-billing attendance edit leaving
-  `present`/`trial_paid`; of the credit lock, the first billing run that draws a note down.
-  **The ordering-guard (§8.69) is dormant too but for a stronger reason:** prod bills in order (only
-  2026-07 sealed), so the guard is provably a no-op — it fires only on an out-of-order billing attempt.
-- **The orphan-lesson report** — production shows zero lines and the badge has never lit
-  on real data (every July invoice is Paid; nothing has been recorded into July since it
-  was billed). That is the expected state: its first real firing is a backdated
-  enrolment, a backdated make-up/trial, or an absent→present edit after billing.
-- **The Wave 5 controls — none has ever run on real data, and each is dormant for its
-  own CORRECT reason** (§7.131's shape throughout — don't rediscover any as a bug):
-  owner transfer's dropdown offers no target (one admin, the owner); coach disable is
-  refused by its own sole-owner guard (the only coach IS the owner, replacement dropdown
-  correctly empty); tenant suspension has suspended nothing and **should stay that way**
-  — its correct production state is two dormant buttons on the Platform page. Real the
-  day a co-admin or second coach exists. **The admin-delete refusal (§8.52) joins them for
-  the same reason:** all three tenant admins are their own tenant's OWNER, and an owner was
-  already undeletable — so the new refusal has never fired and cannot, until a business has a
-  second admin. Its correct production state is "no observable change". **The Attendance
-  money-axis column (§8.53) joins them too:** with one coach and no class handed over, the
-  money axis equals the access axis, so the Coach column shows exactly the name it showed
-  before. It diverges the day a class changes hands — don't rediscover "same as before" as a
-  regression.
-- **Multiple classes per child** — no production child holds two enrolments yet, so neither
-  schedule guard has ever refused anything real and no admin has pressed *+ Add class*. The
-  first real one is worth watching: it is also the first time `'mixed'` package coverage
-  becomes reachable on real data (PRD §7.16), a code path that was unreachable-by-construction
-  for its whole life until 2026-08-11.
-- **Wave C (§8.66)** — four of the five are dormant for a data reason, not a bug: convert-a-trial and
-  make-up-from-Attendance need data states the single private-coach account rarely produces; CSV export
-  and parent upcoming-lessons do nothing until there is data. **Change History is the exception — LIVE,
-  showing the real `audit_log` trail immediately.** Don't rediscover the four quiet ones as bugs.
-- **The capacity HARD limit and the holiday SGT boundary (§8.73)** are LIVE but DORMANT: no production
-  class carries a `capacity`/`default_capacity`, so the guard **refuses nothing** until a maximum is set
-  (its correct production state is "no observable change" — don't rediscover it as broken), and no
-  holiday has a same-day retirement, so the SGT `>=` fix has never fired. **The Lessons sidebar badge is
-  the exception — LIVE**, showing the real needs-marking backlog immediately (PRD §7.3/§7.6/§7.22). The two
-  §8.75 guards (capacity `FOR UPDATE` lock §7.198, raw-retire trigger §7.199) **and both retire-race locks —
-  booking §7.200 (§8.77) and enrolment §7.201 (§8.78)** are LIVE-but-dormant for the same shape: one admin
-  cannot race a seat or a retire, and every retire goes through the RPC today — first firing needs a second
-  admin (a parent self-enrol path won't come — refused 2026-08-21).
-
-*(Corrected 2026-08-10: this list also carried "production has 0 attendance rows", which
-had been false since 2026-07-26 and directly contradicted the REAL BILLING note below.
-Two claims in one section disagreeing is the cost of restating a fact instead of pointing
-at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
+- **Packages** (§8.70, §8.60) — **0 packages AND 0 holidays voided on prod**, so the
+  weeks/start-date layer, holiday void-extension, renewal offers/supersede, the `/package` page and the
+  RISK 1/2/4/12 guards (§7.156–§7.162) have never fired. First firing: the first `Void lessons` / first offer.
+- **Billing a month LATE** — no late month billed, so `markable_floor`'s reopened window is unused
+  insurance, shipped ahead of its own trigger.
+- **Retired classes** — **0** inactive classes on prod (re-confirmed 2026-08-10); none retired on real data.
+- **Guest bookings** — **0** live trial/make-up bookings, so §8.40's block has never fired (which made it safe to ship).
+- **Substitutes & shadows** — **0** `session_coaches`, **0** `class_shadow_coaches`; the *Add a shadow*
+  dropdown is **correctly empty** (§7.131). No payout ever generated on prod (rate-less coach skipped). Real
+  the day a second coach is hired; verified locally by `verify-coach-roster` (30 checks) — the only place it can be.
+- **All credit work** (§8.64/§8.68/§8.69) — **0 credit notes** on prod, so emails, Resend/Void, the `CN001`
+  refusal, the engine credit lock and the `reversed_at` filter are all dormant (0-rows made every backfill a
+  no-op). **The ordering-guard (§8.69) is a PROVABLE no-op** — prod bills in order (only 2026-07 sealed). First
+  firing: the first post-billing attendance edit leaving `present`/`trial_paid`.
+- **Orphan-lesson report** — 0 lines, badge never lit (every July invoice Paid). First firing: a backdated
+  enrolment/make-up/trial, or an absent→present edit after billing.
+- **Wave 5 controls + admin-delete refusal (§8.52) + Attendance money-axis (§8.53)** — all dormant for the
+  §7.131 reason: owner-transfer has no target, coach-disable is sole-owner-refused, suspension has suspended
+  nothing (correct state: two dormant Platform buttons), admin-delete cannot fire (every admin is their own
+  owner), money-axis == access-axis (one coach, nothing handed over). Real the day a co-admin/second coach
+  exists or a class changes hands.
+- **Multiple classes per child** — no child holds two enrolments yet; neither schedule guard has refused
+  anything real. First real one also first makes `'mixed'` package coverage reachable (PRD §7.16).
+- **Wave C (§8.66)** — 4 of 5 dormant on data (convert-trial, make-up-from-Attendance, CSV, parent upcoming);
+  **Change History is LIVE** (real `audit_log` trail).
+- **Capacity hard limit + holiday SGT boundary + retire-race locks (§8.73/§8.75/§8.77/§8.78)** — no class
+  carries a `capacity`, no same-day holiday retirement, one admin can't race a seat or a retire, so §7.198–§7.201
+  refuse nothing yet; **the Lessons sidebar badge is the exception — LIVE** (PRD §7.3/§7.6/§7.22). First firing needs a second admin.
 
 ### Prohibitions — these live nowhere else
 
@@ -294,73 +257,32 @@ at it — the fact is `SELECT COUNT(*) FROM attendance;`.)*
 
 ### Production reality
 
-> **"CLEAN SLATE" IS A BANNED PHRASE FOR THIS DATABASE — it has now been wrong twice.**
-> The first time (corrected 2026-07-25) it claimed production held "only the superadmin +
-> the real coach/classes" while the dump showed **2 tenants, 9 parents, 11 students,
-> 7 enrolments, 5 classes** — real families who had registered. The second time was
-> 2026-07-26, when the cleanup script ran and "clean slate" was reached for again.
-> **The cleanup deletes named test records, not everything**: it took production from
-> 21 → **9 students** and 12 → **7 parents**, and those survivors are real families.
-> What the cleanup DID zero is **`attendance`, `lesson_sessions` and `invoices`**.
-> Say *"no attendance recorded"* — never *"clean slate"*. The fact is
-> `SELECT COUNT(*) FROM students;`, not this sentence.
->
-> **And as of 2026-07-26, "no attendance recorded" is ALSO out of date** — see below.
-> The rule survives the change: the count is the fact, the sentence is a hint.
+*(Graduated 2026-08-22: the deploy-mechanics and rollback narrative dropped in favour of a pointer to
+`docs/DEPLOYMENT.md` §11, which already held it — restated here it was a fourth copy that drifted. What
+stays below is the small set of production FACTS that live nowhere else, plus the standing prohibitions.)*
 
-> **REAL BILLING EXISTS NOW (2026-08-02).** Real attendance has existed since 2026-07-26
-> (four bugs on the marking path to get there — §8.19); on 2026-08-02 the user **billed
-> July for real** — invoices with `INV-YYYY-NNNN` references generated by the engine,
-> the month sealed in `billing_periods`, **real PayNow money collected against the
-> dynamic QR**, and confirmations written through `confirm_invoice_paid()` with their
-> `payment_records` audit rows.
-> **Do not read a count out of this paragraph.** How many invoices, and how many are
-> paid, is `SELECT status, count(*) FROM invoices GROUP BY 1;` — not this sentence.
-> Two prose counts have already gone stale in this file.
-> One production data change to know about: **all active enrolments were backdated to
-> 2026-07-08** so July's lessons fell inside the marking window. That is why children are
-> billable from the 8th, and it is not repeatable from the UI.
-
-> **`main` = what's live for the WEB APPS ONLY.** Vercel builds both sites from `main`, so a
-> push deploys them — but a push deploys **neither the Edge Function** (`supabase functions
-> deploy`) **nor migrations** (`supabase db push`). Both are separate, manual steps.
-> **This bit us:** migration `20260712000100_coach_read_parent_profile` sat merged-but-
-> undeployed for **six days** — the coach Billing screen could not show parent names in
-> production that whole time, and nothing surfaced it. Applied 2026-07-18 alongside §8a's
-> three. **After any backend change, run `supabase migration list` and check nothing has an
-> empty `remote` column.** `git log origin/main` is the honest answer to
-> "what's in production"; don't trust a SHA written into prose here, including this one.
-> **Production was fully caught up as of 2026-08-17**, through `20260817000100`. **FIVE** edge functions
-> exist: `generate-invoices`, `package-emails` and **`credit-note-emails`** (verify_jwt ON), plus
-> **`public-invoice`** and **`public-package`** (both verify_jwt false, deliberately — the token is
-> the access control). *(Version numbers used to be written here and went stale twice, and this
-> COUNT went stale once — it read FOUR the day a fifth was deployed. `supabase functions list` and
-> `supabase migration list --linked` are the honest answers; this sentence is a hint.)*
-
-> **Rollback cover is uneven, so know which kind you are shipping.** Backups were taken
-> before each production migration through 2026-08-01 (scratchpad, uncommitted — so not
-> findable later); the 2026-08-02 make-ups batch went out with **no fresh backup**, covered
-> only by `supabase/rollback/20260802_makeup_bookings_DOWN.sql`; the 2026-08-04 grant work
-> is covered by a **committed** rollback file
-> (`supabase/rollback/20260804_authenticated_grants_DOWN.sql`), which is the pattern to
-> copy — a scratchpad backup nobody can find is not a rollback plan. The 2026-08-06
-> co-admins migration followed it: `supabase/rollback/20260806_co_admins_DOWN.sql`,
-> committed **before** the deploy.
->
-> The **tenancy** deploys (§8.1) had **opposite orderings** and both were deliberate — phase 4
-> *dropped* columns so the app deployed first; phase 5 only *added*, so migrations went
-> first. **§8's deploy got that wrong**: the push to `main` went out before
-> `supabase db push`, so Vercel shipped an admin calling an RPC that did not exist yet.
-> The rule governs the **push**, not just the migration command — see §7.27.
+- **"CLEAN SLATE" IS A BANNED PHRASE — it has been wrong twice** (2026-07-25, 2026-07-26). Production
+  holds **real families**: the July cleanup deleted named test records only (21→9 students, 12→7 parents),
+  and zeroed `attendance`/`lesson_sessions`/`invoices` — not the families. Say *"no attendance recorded"*
+  if you must, never *"clean slate"*, and read the count, never the sentence: `SELECT COUNT(*) FROM students;`.
+- **REAL BILLING EXISTS since 2026-08-02** — July was billed for real (`INV-YYYY-NNNN`, month sealed,
+  real PayNow money collected, `confirm_invoice_paid()` audit rows). §8.19/§8.26. **Don't read a count from
+  prose** — `SELECT status, count(*) FROM invoices GROUP BY 1;` is the scoreboard.
+- **One non-repeatable production data change:** all active enrolments were **backdated to 2026-07-08**
+  so July's lessons fell inside the marking window — which is why children are billable from the 8th, and
+  it cannot be redone from the UI.
+- **Deploy mechanics + rollback cover → `docs/DEPLOYMENT.md` §11** (also the CLAUDE.md "Deploying" rules):
+  `main` deploys the WEB APPS ONLY; edge functions and migrations are separate manual steps; `supabase
+  migration list --linked` and `supabase functions list` are the honest "what's in prod", never a SHA or
+  a count in prose. Five edge functions today (`public-invoice`/`public-package` are `verify_jwt false` by design).
 
 **Live in production on its own domain (web-first, $0 free tier)** — app at
 **https://swimsync.sg**, admin at **https://admin.swimsync.sg**, real email via
 **Resend** (`noreply@swimsync.sg`).
 
 **Not done yet** (see §9): native **App Store / Play Store** builds remain deferred (web
-app on iPhone for now). *Parent onboarding is no longer a gate — it happened, and July
-was billed on the back of it. Onboarding a new family is routine: they enter the join
-code at `swimsync.sg/welcome`, and the admin assigns each child to a class.*
+app on iPhone for now). Parent onboarding is routine, not a gate: a family enters the join
+code at `swimsync.sg/welcome` and the admin assigns each child to a class.
 ---
 
 ---
@@ -491,20 +413,22 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — the queue's head is a location entity
+### THE NEXT BUILD — no rework-critical head; Wave D traps + the Later pool
 
-**One advance-cancel follow-up remains** (`BACKLOG.md` → *Advance-cancel follow-ups*): should the admin be able
-to cancel **today's** lesson? The plan locked "advance only" (the coach's rain/coach mark is today's path). S
-once decided. *(The other follow-up — package extension on cancel — SHIPPED this session, §8.82.)*
+**Both advance-cancel follow-ups are now settled** (`BACKLOG.md` → *Advance-cancel follow-ups*, closed):
+package-extension SHIPPED this session (§8.82); **cancelling today's lesson from the admin panel is REFUSED**
+(2026-08-22, `BACKLOG.md` → *Deliberately not doing*) — advance means advance, and today/past is the coach's
+`cancelled_rain`/`cancelled_coach` mark, which the admin can already set from the lesson page.
 
-**The queue's head is a location entity** (M, `BACKLOG.md` → *Admin and operations*) — the calendar's
-Location filter is distinct `location_name` text. Unblocks nothing urgent. **No migration is in flight**
-(§7.55); latest applied is `20260821000800` (cancel-package extension, §8.82).
+**No rework-critical head remains.** *A location entity* was **demoted to Later** (2026-08-22): production is
+one location, so it only pays off for a multi-venue business. What's left is the Wave D latent traps (below)
+plus the *Later* pool. **No migration is in flight** (§7.55); latest applied is `20260821000800`
+(cancel-package extension, §8.82).
 
-Still open from earlier: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on
-0 notes); HANDOVER §3 graduation (docs tax). Then *Later* (owner-only accounting page, accrual). Full
-ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**):
-`BACKLOG.md`.
+The one Wave D trap still open: **partial-payment accounting for a voided-credit reopen** (dormant on
+0 notes). Then *Later* (owner-only accounting page, accrual). Full ranking + settled decisions (revenue
+**ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**): `BACKLOG.md`. *(The §3-graduation docs-tax
+item was done this session — the file is back under 45 KB.)*
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers
