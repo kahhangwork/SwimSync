@@ -3260,3 +3260,19 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     cancel must NOT move another package): the date-scoped version turns it red. Corollary: "snapshot at
     cancel time" means NO enrolment trigger and no re-fire on package activation — both documented and pinned,
     not accidental. (2026-08-22.)
+
+206. **A post-payment DEBIT is a SEPARATE `debit_balance` column, NEVER a signed `credit_balance`.** When
+    partial-payment shipped (`20260822000100`, §8.83), the obvious model — let `credit_balance` go negative to
+    mean "the parent owes us" — is UNSAFE and was caught by an adversarial `/plan-review` (fable), not by
+    testing. `credit_balance` is welded to the credit-note ledger: `apply_credit_to_invoice`'s idempotency and
+    per-note used-sums, the correction trigger's three spend-signals, and `void_credit_note`'s undrawn-remainder
+    math all assume `pool = Σ(note amount − live draws)` and `pool ≥ 0`. A negative `credit_balance` lets a
+    note's value be consumed by netting **with no `credit_applications` row**, after which un-correct / admin-void
+    / the credit emails fire on stale ledger state and **overcharge the parent**. So the debit lives in its own
+    `parent_tenant_balances.debit_balance` (CHECK ≥ 0), `credit_balance` keeps its ≥ 0 corruption guard, and the
+    two **coexist and NET at invoice-application time** (`apply` folds the debit into the cash base — `gross −
+    package + debit` — and draws credit against that), never in the balance. Corollaries, all pinned by
+    `partial_payment.test.sql`: a void against a **paid** invoice marks its application `debited_at` ONLY (not
+    `reversed_at`, so the paid invoice's `credit_applied` still reconciles), and **re-correcting a
+    voided-and-debited note is REFUSED (`CN002`)** — the multi-flip debit state machine is deferred (`BACKLOG.md`).
+    **Don't "simplify" this to one signed column.** (2026-08-22.)

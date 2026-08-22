@@ -788,3 +788,21 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     the **unassigned-children sidebar badge** (`08b87ed`, app-only, push = deploy) and the **`/deploy` skill**
     (`ceea58b`, `.claude/` tooling, no deploy surface). **Dormant on prod:** 0 packages, so the extension has
     never fired.
+
+39. **Deploy record (2026-08-22): partial-payment via `debit_balance` — the §11.9 mistake made AGAIN, then
+    RECOVERED cleanly.** (§7.206; PRD §5.6; `docs/plans/PARTIAL_PAYMENT_PLAN.md`; §8.83.) Migration
+    `20260822000100`: additive `invoices.balance_adjustment`, `parent_tenant_balances.debit_balance` (CHECK ≥ 0),
+    `credit_applications.debited_at/by`; three same-signature CREATE OR REPLACEs (`void_credit_note`,
+    `handle_attendance_update`, `apply_credit_to_invoice`). Engine `generate-invoices` **v26→v27** (behavioural:
+    folds the debit). **What went wrong:** the whole feature — migration + engine + APP UI — was committed and
+    pushed to `main` in one go (`ccb7a53`), so the parent invoice / admin invoices pages, which now `SELECT
+    balance_adjustment`, deployed via Vercel against a prod DB lacking the column. **Recovery, the pattern to
+    copy:** immediately reverted ONLY the two app files from `main` (`cbcc58f`, a git action, no prod write) so
+    Vercel rebuilt safe apps; kept the backend on `main`; then ran `/deploy` in order — `supabase db push`
+    (migration list --linked **0 pending**; pgdelta `ENOENT` trace harmless as always), remote grant dump
+    (`apply`→service_role, `void`→authenticated, **no `anon`**; `handle_attendance_update`'s anon grant is
+    pre-existing, CREATE OR REPLACE preserves ACLs), `functions deploy generate-invoices` (v27); ── GATE ── then
+    re-applied the app UI (`153662d`) LAST, now backed by the column. Rollback: committed DOWN
+    (`20260822000100_..._DOWN.sql`), rehearsed (guard refuses to drop columns holding real debit state; clean
+    apply + re-apply, suite green). **Dormant on prod:** 0 credit notes, so no void has posted a debit — first
+    firing is the first void of a credit drawn against a PAID invoice.

@@ -1,11 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-22 — **Advance-cancel EXTENDS a prepaid package** (§8.82; PRD §7.6; §7.205; DEPLOYMENT
-§11.38): a cancel gives the covering package its week back (the holiday twin, per-lesson snapshot). Also this
-session: the unassigned-children sidebar badge (PRD §5.2) and a new `/deploy` skill that gates the app-push
-order. Migration `20260821000800`, DB-only (no engine)._
+_Last updated: 2026-08-22 — **Partial-payment via `debit_balance`: void-on-paid no longer reopens** (§8.83;
+PRD §5.6; §7.206; DEPLOYMENT §11.39). A void of a credit drawn against a PAID invoice posts a debit the next
+invoice folds in (credit + debit net); paid invoices are immutable. Migration `20260822000100`, engine v27,
+SHIPPED + DEPLOYED. Also (doc-only): location entity → Later, cancel-today REFUSED, §3 graduated._
 
-_Previously, 2026-08-21 (§8.81) — advance-cancel a lesson SHIPPED + DEPLOYED (full sequence, migration → engine v26 → apps)._
+_Previously, 2026-08-22 (§8.82) — advance-cancel EXTENDS a prepaid package (`20260821000800`, DB-only); + unassigned sidebar badge, `/deploy` skill._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -173,10 +173,11 @@ first-firing trigger is what to watch for.
 - **Substitutes & shadows** — **0** `session_coaches`, **0** `class_shadow_coaches`; the *Add a shadow*
   dropdown is **correctly empty** (§7.131). No payout ever generated on prod (rate-less coach skipped). Real
   the day a second coach is hired; verified locally by `verify-coach-roster` (30 checks) — the only place it can be.
-- **All credit work** (§8.64/§8.68/§8.69) — **0 credit notes** on prod, so emails, Resend/Void, the `CN001`
-  refusal, the engine credit lock and the `reversed_at` filter are all dormant (0-rows made every backfill a
+- **All credit work** (§8.64/§8.68/§8.69, **+ partial-payment §8.83**) — **0 credit notes** on prod, so emails,
+  Resend/Void, `CN001`, the engine credit lock, the `reversed_at` filter — **and now the whole `debit_balance`
+  path** (void-on-paid → debit, the engine fold, `CN002`) — are all dormant (0-rows made every backfill a
   no-op). **The ordering-guard (§8.69) is a PROVABLE no-op** — prod bills in order (only 2026-07 sealed). First
-  firing: the first post-billing attendance edit leaving `present`/`trial_paid`.
+  firing of the debit path: the first void of a credit drawn against a PAID invoice.
 - **Orphan-lesson report** — 0 lines, badge never lit (every July invoice Paid). First firing: a backdated
   enrolment/make-up/trial, or an absent→present edit after billing.
 - **Wave 5 controls + admin-delete refusal (§8.52) + Attendance money-axis (§8.53)** — all dormant for the
@@ -320,6 +321,28 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.83 (2026-08-22) — Partial-payment via `debit_balance` — void-on-paid no longer reopens; SHIPPED + DEPLOYED
+
+**A void of a credit drawn against a PAID invoice no longer reopens it — paid invoices are now immutable.**
+The old reopen overstated the amount owed against the recorded payment (the Wave D trap). Now the drawn value
+is posted to a new `parent_tenant_balances.debit_balance` (the mirror of `credit_balance`) and the engine folds
+it onto the parent's next invoice as an *"Adjustment"* line, drawing credit against the debit-inclusive base so
+credit and debit NET. Migration `20260822000100`, engine **v26→v27**. Behaviour: PRD §5.6; design +
+deferrals: `docs/plans/PARTIAL_PAYMENT_PLAN.md`.
+
+**A `/plan-review` (fable) changed the design mid-flight** — the obvious "signed `credit_balance`" desyncs the
+credit-note ledger and overcharges; a SEPARATE `debit_balance` was used instead (**§7.206**, the prohibition).
+**Two deliberate scope cuts → `BACKLOG.md`:** re-correcting a voided-and-debited note is refused (`CN002`), and
+admin PRE-BILL debit visibility is deferred. **Verified:** pgTAP 1340 (`partial_payment.test.sql` 17 +
+`void_credit_note` updated) · Deno 234 ×2 · vitest 519 · jest 400 · typechecks clean. **Deploy: DEPLOYMENT
+§11.39** — the §11.9 ordering mistake happened AGAIN (apps pushed with the backend) but was RECOVERED cleanly
+(revert the app files only, land the backend, re-apply apps LAST); rollback rehearsed + committed. **Dormant:**
+0 credit notes on prod, so no debit has posted.
+
+**Also this session (doc-only, `215ed74`):** *A location entity* DEMOTED to Later; *cancelling TODAY's lesson*
+REFUSED (→ *Deliberately not doing*); **HANDOVER §3 graduated** (DORMANT trimmed, Production-reality prose →
+DEPLOYMENT §11 pointer).
+
 ## 8.82 (2026-08-22) — Advance-cancel EXTENDS a prepaid package; + unassigned sidebar badge, `/deploy` skill
 
 **A cancelled lesson now gives the covering package its week back** — the holiday twin, but sourced from
@@ -337,21 +360,6 @@ existed (the remembered "1" was the Dashboard tile); and a new **`/deploy` skill
 app push behind `migration list --linked` 0-pending, so the ordering mistake can't repeat. **Verified:** pgTAP
 1339, Deno 232 ×2, jest 400, vitest 519, typechecks clean. **Dormant on prod:** 0 packages, so the extension has
 never fired.
-
-## 8.81 (2026-08-21) — Advance-cancel a lesson — SHIPPED and DEPLOYED (migration → engine v26 → apps)
-
-**The admin can call off a FUTURE lesson, and every surface agrees.** `cancel_lesson`/`restore_lesson`
-(`20260821000700`) mark the SESSION (`cancelled_at`, CHECK-tied to `status`): parent Upcoming shows it struck
-*Cancelled* with the reason; the coach's Schedule card is struck and it leaves NEEDS MARKING; the admin calendar
-fades it; the engine subtracts it from `expectedDates` ONLY (§7.203) and the mark-refusal is the trigger, not the
-UI (§7.204). Behaviour: PRD §7.6 *Advance-cancel*; deploy record DEPLOYMENT §11.37 (engine deploy died once on a
-transient TLS error — retry before diagnosing); rollback is a committed, rehearsed DOWN.
-
-**Verified:** pgTAP **1322** (new file 37, red-first two ways) · Deno **232 ×2** · jest 400 · vitest 519 ·
-`verify-cancel-lesson` **17/17**. Remote grant dump: both RPCs `authenticated` only, no `anon` (plan RISK 7).
-**Deliberately scoped out → `BACKLOG.md` *Advance-cancel follow-ups*:** what a cancel means for a prepaid package
-(holiday void extends; cancel doesn't — the user's call), and cancelling TODAY from the admin panel. **Dormant on
-prod:** nothing cancelled yet — first firing is the first *Cancel this lesson*.
 
 ## 9. Next steps (pick with the user)
 
@@ -413,22 +421,18 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — no rework-critical head; Wave D traps + the Later pool
+### THE NEXT BUILD — no rework-critical head; a flat value pool
 
-**Both advance-cancel follow-ups are now settled** (`BACKLOG.md` → *Advance-cancel follow-ups*, closed):
-package-extension SHIPPED this session (§8.82); **cancelling today's lesson from the admin panel is REFUSED**
-(2026-08-22, `BACKLOG.md` → *Deliberately not doing*) — advance means advance, and today/past is the coach's
-`cancelled_rain`/`cancelled_coach` mark, which the admin can already set from the lesson page.
+**The last Wave D trap SHIPPED this session** — partial-payment via `debit_balance` (§8.83, deployed).
+**No rework-critical head remains.** *A location entity* is in *Later* (production is one location). **No
+migration is in flight** (§7.55); latest applied is `20260822000100` (partial-payment, §8.83), on prod.
 
-**No rework-critical head remains.** *A location entity* was **demoted to Later** (2026-08-22): production is
-one location, so it only pays off for a multi-venue business. What's left is the Wave D latent traps (below)
-plus the *Later* pool. **No migration is in flight** (§7.55); latest applied is `20260821000800`
-(cancel-package extension, §8.82).
-
-The one Wave D trap still open: **partial-payment accounting for a voided-credit reopen** (dormant on
-0 notes). Then *Later* (owner-only accounting page, accrual). Full ranking + settled decisions (revenue
-**ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**): `BACKLOG.md`. *(The §3-graduation docs-tax
-item was done this session — the file is back under 45 KB.)*
+What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value:
+- **Two partial-payment follow-ups** (both dormant, small): seamless re-correction of a voided-and-debited
+  note (today refused `CN002`), and admin PRE-BILL debit visibility. Neither is urgent.
+- **Later:** owner-only accounting page (accrual — decided), split co-admin permissions, the location entity.
+- Full ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**):
+  `BACKLOG.md`.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers
@@ -461,10 +465,11 @@ item was done this session — the file is back under 45 KB.)*
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260821000800` (cancel-package extension, §8.82);
+**The migration queue is EMPTY.** The latest applied is `20260822000100` (partial-payment, §8.83);
 production confirmed caught up 2026-08-22 via `supabase migration list --linked`, **0 pending**.
 **Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending, the fix for the
-ordering mistake that recurred this session (DEPLOYMENT §11.38, §11.9). **§11.37/§11.38 are the freshest worked
+ordering mistake that recurred AGAIN this session (DEPLOYMENT §11.39, §11.38, §11.9 — recovered by reverting the
+app files only, landing the backend, re-applying apps last). **§11.39/§11.37 are the freshest worked
 examples of the FULL sequence** — a NEW-function migration needs a remote grant dump; apps go to `main` LAST,
 with a **committed DOWN generated from `pg_get_functiondef()`, rehearsed** (the pattern to copy).
 §11.36 is the same-signature contrast (no grant dump needed, §11.32 pattern).
