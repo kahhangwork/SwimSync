@@ -11,7 +11,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(28);
+SELECT plan(29);
 
 -- ── Tenants: T1 (subject) and T2 (a foreign admin) ───────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
@@ -80,6 +80,11 @@ CREATE OR REPLACE FUNCTION pg_temp.setbal(v NUMERIC) RETURNS VOID AS $$
   UPDATE parent_tenant_balances SET credit_balance = v
    WHERE parent_id = pg_temp.pid() AND tenant_id = '99999999-0000-0000-0000-0000000000d1' $$ LANGUAGE sql;
 
+-- debit_balance (the mirror; 20260822000100). Reads what the parent OWES.
+CREATE OR REPLACE FUNCTION pg_temp.dbal() RETURNS NUMERIC AS $$
+  SELECT debit_balance FROM parent_tenant_balances
+   WHERE parent_id = pg_temp.pid() AND tenant_id = '99999999-0000-0000-0000-0000000000d1' $$ LANGUAGE sql;
+
 CREATE OR REPLACE FUNCTION pg_temp.actor(uid TEXT) RETURNS VOID AS $$
   SELECT set_config('request.jwt.claims', json_build_object('sub', uid)::text, true) $$ LANGUAGE sql;
 
@@ -140,8 +145,10 @@ SELECT is((SELECT count(*)::int FROM audit_log WHERE action='credit_note_voided'
              AND entity_id=(SELECT id FROM credit_notes WHERE reference_number='CN-a1')),
   1, '5: an audit row is written');
 
--- ══ SCENARIO B: fully-drawn void reopens a PAID invoice (RISK 4) ════════════════
--- $30 note fully drawn against a $60 invoice whose $30 cash net was PAID.
+-- ══ SCENARIO B: fully-drawn void of a PAID invoice POSTS A DEBIT (20260822000100) ══
+-- $30 note fully drawn against a $60 invoice whose $30 cash net was PAID. The paid
+-- invoice is IMMUTABLE now: it is NOT reopened. The drawn value is recovered as a
+-- debit_balance charge, and the draw is marked debited_at (NOT reversed_at).
 DO $$ DECLARE v UUID; BEGIN
   v := pg_temp.seed_note('b1', 'applied', 30.00, 60.00, 30.00, 30.00, 'paid', true, '2026-03-07', '2026-03');
   INSERT INTO credit_applications (credit_note_id, invoice_id, amount)
@@ -153,24 +160,25 @@ SELECT pg_temp.setbal(0.00);  -- fully drawn note contributes nothing to the poo
 SELECT pg_temp.actor('a1000000-0000-0000-0000-0000000000a1');
 SELECT lives_ok(
   $$SELECT void_credit_note((SELECT id FROM credit_notes WHERE reference_number='CN-b1'), 'clawback')$$,
-  '6: voiding a fully-drawn note succeeds');
-SELECT ok((SELECT reversed_at IS NOT NULL FROM credit_applications
+  '6: voiding a fully-drawn note against a PAID invoice succeeds');
+SELECT ok((SELECT debited_at IS NOT NULL AND reversed_at IS NULL FROM credit_applications
              WHERE invoice_id='e1000000-0000-0000-0000-0000000000b1'),
-  '7: the draw is marked reversed, not deleted');
+  '7: the paid draw is marked debited_at, NOT reversed_at (the discount stands)');
 SELECT row_eq(
   $$SELECT credit_applied, net_amount, status::text, paid_at IS NULL, paid_marked_by IS NULL
       FROM invoices WHERE id='e1000000-0000-0000-0000-0000000000b1'$$,
-  ROW(0.00::numeric, 60.00::numeric, 'outstanding'::text, true, true),
-  '8: invoice reopens — credit 0, net 60, outstanding, settlement stamps cleared');
+  ROW(30.00::numeric, 30.00::numeric, 'paid'::text, false, false),
+  '8: the PAID invoice is UNCHANGED — credit 30, net 30, paid, stamps intact (immutable)');
 SELECT is((SELECT count(*)::int FROM payment_records WHERE invoice_id='e1000000-0000-0000-0000-0000000000b1'),
-  1, '9: RISK 4 — the payment_records row is left untouched (immutable history)');
-SELECT is(pg_temp.bal(), 0.00, '10: balance unchanged — a fully-drawn note had no undrawn remainder');
--- RISK 6 invariant: credit_applied == SUM(non-reversed applications).
+  1, '9: the payment_records row is left untouched (immutable history)');
+SELECT is(pg_temp.bal(), 0.00, '10: credit_balance unchanged — a fully-drawn note had no undrawn remainder');
+SELECT is(pg_temp.dbal(), 30.00, '10b: the drawn $30 is recovered onto debit_balance');
+-- RISK 6 invariant: credit_applied still reconciles with non-reversed applications.
 SELECT is(
   (SELECT credit_applied FROM invoices WHERE id='e1000000-0000-0000-0000-0000000000b1'),
   (SELECT COALESCE(SUM(amount),0) FROM credit_applications
      WHERE invoice_id='e1000000-0000-0000-0000-0000000000b1' AND reversed_at IS NULL),
-  '11: RISK 6 — credit_applied reconciles with non-reversed applications');
+  '11: RISK 6 — credit_applied reconciles with non-reversed applications (paid draw is NOT reversed)');
 
 -- ══ SCENARIO C: partially-drawn void ═══════════════════════════════════════════
 -- $30 note, $20 drawn against a $50 invoice (net 30). Remainder $10 in the pool.

@@ -48,9 +48,12 @@ export type InvoiceEmailData = {
   logoUrl?: string | null;
   billingMonth: string; // YYYY-MM
   gross: number;
-  /** Prepaid package value applied. net = gross − package − credit. */
+  /** Prepaid package value applied. net = gross − package − credit + balanceAdjustment. */
   packageApplied?: number;
   credit: number;
+  /** A prior-period DEBIT (a voided-then-paid credit) folded onto this invoice —
+   *  it ADDS to what's owed, so it renders with a + sign. */
+  balanceAdjustment?: number;
   net: number;
   items: InvoiceEmailItem[];
   appUrl?: string;
@@ -143,6 +146,18 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
               </tr>`
       : "";
 
+  // A prior-period DEBIT ADDS to what's owed (voided-then-paid credit, 20260822000100).
+  const adjustmentRow =
+    (data.balanceAdjustment ?? 0) > 0
+      ? `
+              <tr>
+                <td colspan="2" style="padding:6px 0;font-size:13px;color:#475569;text-align:right;">Adjustment from a prior invoice</td>
+                <td style="padding:6px 0;font-size:13px;color:#dc2626;text-align:right;white-space:nowrap;">+${escapeHtml(
+                  money(data.balanceAdjustment ?? 0)
+                )}</td>
+              </tr>`
+      : "";
+
   const coveredBy =
     (data.packageApplied ?? 0) > 0 && data.credit > 0
       ? "your lesson package and credit balance"
@@ -197,7 +212,7 @@ export function buildInvoiceEmailHtml(data: InvoiceEmailData): string {
                 <td style="padding:10px 0 6px;font-size:13px;color:#0f172a;text-align:right;white-space:nowrap;">${escapeHtml(
                   money(data.gross)
                 )}</td>
-              </tr>${packageRow}${creditRow}
+              </tr>${packageRow}${creditRow}${adjustmentRow}
               <tr>
                 <td colspan="2" style="padding:8px 0;font-size:16px;font-weight:700;color:#0f172a;text-align:right;border-top:2px solid #e2e8f0;">Amount due</td>
                 <td style="padding:8px 0;font-size:16px;font-weight:700;color:${
@@ -355,6 +370,7 @@ async function emailInvoices(
         gross: inv.gross,
         packageApplied: inv.package,
         credit: inv.credit,
+        balanceAdjustment: inv.balance_adjustment,
         net: inv.net,
         appUrl,
         items: inv.items.map((i) => ({
@@ -458,7 +474,7 @@ export async function retryUnsentInvoiceEmails(
     //    below so a crash cannot strand a batch.
     let discover = supabase
       .from("invoices")
-      .select("id, parent_id, tenant_id, billing_month, gross_amount, package_applied, credit_applied, net_amount")
+      .select("id, parent_id, tenant_id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount")
       .eq("tenant_id", tenantId)
       .eq("billing_month", billingMonth)
       .is("invoice_email_sent_at", null);
@@ -533,6 +549,7 @@ export async function retryUnsentInvoiceEmails(
         gross: Number(r.gross_amount),
         package: Number(r.package_applied),
         credit: Number(r.credit_applied),
+        balance_adjustment: Number(r.balance_adjustment ?? 0),
         net: Number(r.net_amount),
         items,
       };

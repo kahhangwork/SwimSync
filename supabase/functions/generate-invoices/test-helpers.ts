@@ -931,7 +931,7 @@ export async function getInvoice(
 ) {
   let q = db
     .from("invoices")
-    .select("id, gross_amount, package_applied, credit_applied, net_amount, status")
+    .select("id, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status")
     .eq("parent_id", parentId)
     .eq("billing_month", billingMonth);
   if (tenantId) q = q.eq("tenant_id", tenantId);
@@ -942,6 +942,7 @@ export async function getInvoice(
     gross: Number(data.gross_amount),
     package_applied: Number(data.package_applied),
     credit_applied: Number(data.credit_applied),
+    balance_adjustment: Number(data.balance_adjustment),
     net: Number(data.net_amount),
     status: data.status as string,
   };

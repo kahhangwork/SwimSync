@@ -435,14 +435,25 @@ family-status client-side scan, Email-confirmation copy, Tick off swimming skill
   migration), which is why `IF EXISTS` was required for a clean `db reset`.
 - ~~**`/makeups` and `/trials` 79px date column**~~ — **DONE 2026-08-18** (§8.68). `whitespace-nowrap`
   on the Date `<Th>`/`<Td>` in both pages.
-- **Partial-payment accounting for a voided-credit reopen** (S/M) `[found 2026-08-18]` — the admin
-  void (§8.69, PRD §5.6) reopens a drawn invoice to `outstanding` with `net += amount`. If that
-  invoice had already been **cash-paid**, it reopens at the higher net while its `payment_records`
-  still show the old lower payment, so the amount-owed reads too high and the admin reconciles by
-  hand. **Why:** correct-to-the-cent parent-facing balances once voids run on real paid invoices.
-  **Notes:** needs a partial-payment / amount-owed model (`net_amount − SUM(payment_records)`), which
-  SwimSync's binary paid/outstanding invoice status does not have today. Dormant (0 credit notes on
-  prod, so no void has ever reopened a paid invoice). Void itself is race-safe (§8.69's drawdown lock).
+- ~~**Partial-payment accounting for a voided-credit reopen**~~ — **BUILT LOCALLY 2026-08-22, not yet
+  deployed** (`20260822000100`, `docs/plans/PARTIAL_PAYMENT_PLAN.md`). Paid invoices are now immutable: a
+  void against a PAID invoice posts the drawn value to a new `parent_tenant_balances.debit_balance` (the
+  mirror of `credit_balance`) instead of reopening it; the engine folds that debit onto the next invoice,
+  drawing credit against the debit-inclusive base so credit and debit net. Reviewed by `/plan-review`
+  (fable) — the single-signed-column idea was replaced with the separate `debit_balance` for ledger
+  safety. Two follow-ups filed below. Dormant (0 credit notes on prod). **Deploy via `/deploy` when ready.**
+- **Partial-payment: seamless re-correction of a debited note** (S/M) `[found 2026-08-22 while building]` —
+  today re-correcting (present→absent) a lesson whose credit note was voided-and-debited is **refused
+  (`CN002`)**, because reversing the debit while its invoice discount is frozen history is a multi-flip
+  state machine (double-credit / desync traps in every naive form). **Why:** an admin who voids then
+  re-corrects hits a wall. **Notes:** the safe fix is probably to retract the debit by its
+  `credit_applications.debited_at` mark and re-issue against the same note row (UNIQUE(invoice_item_id)
+  forbids a second note). Deeply dormant; the refusal is safe. `partial_payment.test.sql` pins the refusal.
+- **Partial-payment: admin PRE-BILL debit visibility** (S) `[found 2026-08-22]` — a pending `debit_balance`
+  shows on the parent's NEXT invoice (adjustment line, everywhere) but nowhere before it bills. **Why:** an
+  admin can't see what a parent owes from a void until the next run. **Notes:** surface `debit_balance` on
+  the Invoices/Students view; also warn/block a parent deletion that would cascade a nonzero balance
+  (`parent_tenant_balances … ON DELETE CASCADE`).
 - ~~**`HANDOVER.md` §3 needs graduating**~~ — **DONE 2026-08-22.** DORMANT trimmed to one line per
   area; the *Production reality* deploy/rollback narrative dropped for a pointer to `docs/DEPLOYMENT.md`
   §11, which already held it (restated in §3 it was a fourth copy that drifts). Prohibitions + the

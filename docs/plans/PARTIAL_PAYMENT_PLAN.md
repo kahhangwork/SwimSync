@@ -1,10 +1,17 @@
 # Partial-payment via an account balance — PLAN
 
-_Drafted 2026-08-22. **Revised 2026-08-22 after `/plan-review` (fable)** — the review found the original
-"one signed `credit_balance`" representation UNSAFE and it was replaced with a separate `debit_balance`
-column (see "Representation" below). Status: **design, not built.** Dormant trigger — production holds 0
-credit notes, so no void has ever reopened a paid invoice. Backlog: `BACKLOG.md` → Wave D →
-*Partial-payment accounting for a voided-credit reopen*._
+_Drafted 2026-08-22. Revised after `/plan-review` (fable) — separate `debit_balance` column, not a signed
+`credit_balance`. **BUILT and verified locally 2026-08-22** (migration `20260822000100`, engine v?, apps):
+pgTAP 1340 (`partial_payment.test.sql` 17 + `void_credit_note.test.sql` updated), Deno 234 ×2, email +2,
+vitest 519, jest 400, typechecks clean. **NOT deployed to prod** — deploy is migration → engine → apps via
+`/deploy`. Dormant (0 credit notes on prod)._
+
+**Built, with two deliberate scope cuts (both in `BACKLOG.md`):**
+- **Re-correcting a voided-and-debited note is REFUSED (`CN002`)** rather than handled — the multi-flip
+  debit state machine (double-credit / desync traps) is deferred. Safe: no silent misbill.
+- **Admin PRE-BILL debit visibility deferred** — a pending debit shows on the next invoice (adjustment
+  line) but there's no widget showing it before it bills. The invoice's `balance_adjustment` covers the
+  billed case everywhere (admin table + CSV, parent detail, email).
 
 The problem (backlog item, §8.69): `void_credit_note` reopens a drawn invoice to `outstanding` with
 `net_amount += amount`. If that invoice was already **cash-paid**, it reopens at the higher net while
@@ -64,6 +71,23 @@ net_amount = gross_amount − package_applied − credit_applied + balance_adjus
 use the full four-term identity, not the three-term one.
 
 ---
+
+## Refinement found while building (2026-08-22, reading the real code)
+
+Credit and debit **coexist** on the account (both columns can be nonzero at once) and **net at
+invoice-application time**, NOT in the balance. Netting them inside `credit_balance` would decrement it
+outside the note-ledger and re-break the invariant (fable risk 1). So:
+- `apply_credit_to_invoice` is **extended** (not a separate fold fn): it reads `debit_balance` under the
+  same lock, sets the cash base to `v_cash = GREATEST(gross − package, 0) + debit`, draws credit FIFO
+  against that debit-inclusive base, decrements `debit_balance`, and writes
+  `net_amount = v_cash − allocated`, `balance_adjustment = debit`. This makes credit and debit cancel on
+  the bill (e.g. $50 credit + $30 debit on a $20 cash invoice → net $0, both cleared).
+- A **paid-invoice** void marks its application `reversed_at` **and** `debited_at` (the discount on the
+  paid invoice stands — not reopened — and the draw is recovered as a debit). The void loop processes
+  `reversed_at IS NULL AND debited_at IS NULL`, so a re-void never double-debits (fable risk 4). An
+  **unpaid**-invoice void keeps the existing reopen.
+- The engine calls the (renamed intent, same-named) settle whenever `credit_balance > 0 OR
+  debit_balance > 0`, and re-reads the trued-up invoice for its email/log figures.
 
 ## The mechanism, end to end
 

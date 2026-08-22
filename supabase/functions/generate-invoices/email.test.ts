@@ -82,6 +82,24 @@ Deno.test("html: net=0 shows 'fully covered by credit', no PayNow prompt", () =>
   assertStringIncludes(html, "Credit applied");
 });
 
+Deno.test("html: a folded debit renders a +Adjustment line and the total reconciles", () => {
+  // 40 lessons + 30 carried debit − 0 credit = 70. The adjustment must appear as
+  // a POSITIVE line so the shown math adds up (fable risk 6, 20260822000100).
+  const withDebit: InvoiceEmailData = {
+    ...sample, gross: 40, credit: 0, balanceAdjustment: 30, net: 70,
+    items: [{ studentName: "Ethan Tan", sessionDate: "2026-07-12", classTitle: "SwimSafer L5", amount: 40 }],
+  };
+  const html = buildInvoiceEmailHtml(withDebit);
+  assertStringIncludes(html, "Adjustment from a prior invoice");
+  assertStringIncludes(html, "+S$30.00"); // adds, not subtracts
+  assertStringIncludes(html, "S$70.00");  // amount due reconciles: 40 + 30
+});
+
+Deno.test("html: no adjustment line when there is no debit", () => {
+  const html = buildInvoiceEmailHtml(sample);
+  assert(!html.includes("Adjustment from a prior invoice"));
+});
+
 Deno.test("html: escapes HTML in dynamic fields", () => {
   const evil = buildInvoiceEmailHtml({
     ...sample,

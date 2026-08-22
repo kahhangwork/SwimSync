@@ -47,6 +47,7 @@ type InvoiceDetail = {
   gross_amount: number;
   package_applied: number;
   credit_applied: number;
+  balance_adjustment: number;
   net_amount: number;
   status: "outstanding" | "paid";
   generated_at: string;
@@ -122,6 +123,7 @@ export default function InvoiceDetailScreen() {
           gross_amount,
           package_applied,
           credit_applied,
+          balance_adjustment,
           net_amount,
           status,
           generated_at,
@@ -189,6 +191,7 @@ export default function InvoiceDetailScreen() {
         gross_amount: Number(inv.gross_amount),
         package_applied: Number((inv as any).package_applied ?? 0),
         credit_applied: Number(inv.credit_applied),
+        balance_adjustment: Number((inv as any).balance_adjustment ?? 0),
         net_amount: Number(inv.net_amount),
         status: inv.status,
         generated_at: inv.generated_at,
@@ -306,6 +309,14 @@ export default function InvoiceDetailScreen() {
                 <Text className="text-sm text-blue-500">Credit Applied</Text>
                 <Text className="text-sm text-blue-500">
                   −S${invoice.credit_applied.toFixed(2)}
+                </Text>
+              </View>
+            )}
+            {invoice.balance_adjustment > 0 && (
+              <View className="flex-row justify-between">
+                <Text className="text-sm text-red-500">Adjustment from a prior invoice</Text>
+                <Text className="text-sm text-red-500">
+                  +S${invoice.balance_adjustment.toFixed(2)}
                 </Text>
               </View>
             )}

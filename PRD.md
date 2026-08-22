@@ -605,14 +605,24 @@ note, doubling the credit — see `HANDOVER.md` §8 / GOTCHAS.)*
 A **tenant admin** (their own business only — not the platform admin) can **void** a credit
 note from the admin Credit Notes page, with a required reason. Voiding is the destination
 for the `CN001` refusal above and for any credit issued in error. It reverses every live
-draw the note has made — each affected invoice is **reopened to `outstanding`** with the
-drawn amount added back to its balance and its settlement stamps cleared — removes the
-note's undrawn remainder from the parent's balance, and marks the note `reversed`. Payment
-records are left untouched as immutable history. **No email is sent to the parent in v1** —
-the admin communicates the reopened balance. If a reopened invoice had already been
-cash-paid, it returns to `outstanding` at the higher net while its recorded payment stands,
-so the admin reconciles the difference by hand (see `BACKLOG.md`). Rationale, guards and the
-drawdown-lock that makes voiding race-safe: `docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md`.
+draw the note has made and marks the note `reversed`; the note's undrawn remainder leaves
+the parent's balance. What happens to each drawn invoice depends on whether it was **paid**:
+
+- A draw against a **still-outstanding** invoice **reopens** it — the drawn amount is added
+  back to its balance and its settlement stamps are cleared.
+- A draw against an **already-paid** invoice is **not** reopened — a paid invoice is immutable.
+  Instead the drawn value is recovered as a **debit on the parent's account**
+  (`parent_tenant_balances.debit_balance`, the mirror of the credit balance), which the billing
+  engine folds onto the parent's **next invoice** as an *"Adjustment from a prior invoice"* line
+  — drawing any available credit against the debit-inclusive total so credit and debit net.
+  *(implemented 2026-08-22, `docs/plans/PARTIAL_PAYMENT_PLAN.md`; replaces the earlier reopen-the-
+  paid-invoice behaviour, which overstated the amount owed against the recorded payment.)*
+
+Payment records are left untouched as immutable history. **No email is sent to the parent in
+v1** — the admin communicates the change. Re-correcting a lesson whose note was voided-and-
+debited is refused (`CN002`) until that charge is settled (`BACKLOG.md`). Rationale, guards and
+the drawdown-lock that makes voiding race-safe:
+`docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md` and `docs/plans/PARTIAL_PAYMENT_PLAN.md`.
 
 #### Credit Note Details
 

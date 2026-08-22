@@ -357,6 +357,81 @@ Deno.test("credit_applied records the ACTUAL draw, not the estimate, when balanc
   }
 });
 
+Deno.test("debit_balance is folded onto the next invoice: net = gross + debit", async () => {
+  // A void-on-paid (20260822000100) leaves the parent owing via debit_balance.
+  // The engine must fold that onto their next invoice. RED (§7.25): the pre-
+  // migration engine neither reads debit_balance nor sets balance_adjustment.
+  const s = await newScenario({ price: 30, billing: monthEnded("2026-06") });
+  try {
+    // Simulate the debit a void-on-paid would have posted.
+    await s.db.from("parent_tenant_balances")
+      .upsert({ parent_id: s.parentId, tenant_id: s.tenantId, credit_balance: 0, debit_balance: 25 });
+
+    const f1 = await s.addSession("2026-06-06"); await s.mark(f1, "present");
+    await s.completeMonth("2026-06");
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-06", now: s.now });
+
+    const inv = await getInvoice(s.db, s.parentId, "2026-06");
+    assertEquals(inv!.gross, 30);
+    assertEquals(inv!.balance_adjustment, 25); // the debit folded on
+    assertEquals(inv!.credit_applied, 0);
+    assertEquals(inv!.net, 55);                 // 30 lessons + 25 carried debit
+    assertEquals(inv!.status, "outstanding");
+
+    const { data: bal } = await s.db.from("parent_tenant_balances")
+      .select("debit_balance").eq("parent_id", s.parentId).eq("tenant_id", s.tenantId).single();
+    assertEquals(Number(bal!.debit_balance), 0); // consumed
+
+    const chk = await checkInvariants(s.db, s.parentId);
+    assert(chk.ok, chk.problems.join("; "));
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("credit and debit NET on the next invoice (50 credit + 30 debit on a 20 invoice → 0)", async () => {
+  // The plan's headline case. A real $50 credit note (from a correction) plus a
+  // $30 carried debit, applied to a $20 lesson month → net 0.
+  const s = await newScenario({ price: 50, billing: monthEnded("2026-06") });
+  try {
+    // Month 1: one $50 lesson → invoice → correct to absent → a $50 credit note.
+    const j1 = await s.addSession("2026-05-02"); await s.mark(j1, "present");
+    await s.completeMonth("2026-05");
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-05", now: s.now });
+    await s.mark(j1, "absent");
+    assertEquals(await s.creditBalance(), 50);
+
+    // Carry a $30 debit (as a void-on-paid elsewhere would leave).
+    await s.db.from("parent_tenant_balances")
+      .update({ debit_balance: 30 }).eq("parent_id", s.parentId).eq("tenant_id", s.tenantId);
+
+    // Month 2: one $20 lesson.
+    await s.setRate({ from: "2026-06-01", price: 20 });
+    const f1 = await s.addSession("2026-06-06"); await s.mark(f1, "present");
+    await s.completeMonth("2026-06");
+    await generateInvoices(s.db, {
+      tenant_id: s.tenantId, mode: "manual", force: true, billing_month: "2026-06", now: s.now });
+
+    const inv = await getInvoice(s.db, s.parentId, "2026-06");
+    assertEquals(inv!.gross, 20);
+    assertEquals(inv!.balance_adjustment, 30);
+    assertEquals(inv!.credit_applied, 50);      // full $50 note drawn against 20+30
+    assertEquals(inv!.net, 0);                  // 20 + 30 − 50
+    assertEquals(inv!.status, "paid");
+    assertEquals(await s.creditBalance(), 0);
+    const { data: bal } = await s.db.from("parent_tenant_balances")
+      .select("debit_balance").eq("parent_id", s.parentId).eq("tenant_id", s.tenantId).single();
+    assertEquals(Number(bal!.debit_balance), 0);
+
+    const chk = await checkInvariants(s.db, s.parentId);
+    assert(chk.ok, chk.problems.join("; "));
+  } finally {
+    await s.teardown();
+  }
+});
+
 Deno.test("result.created surfaces new invoices with line items (for emailing)", async () => {
   const s = await newScenario({ price: 30, billing: monthEnded("2026-03") });
   try {

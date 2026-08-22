@@ -88,9 +88,11 @@ export type CreatedInvoice = {
   tenant_id: string;
   billing_month: string;
   gross: number;
-  /** Prepaid package value applied. net = gross − package − credit. */
+  /** Prepaid package value applied. net = gross − package − credit + balance_adjustment. */
   package: number;
   credit: number;
+  /** A prior-period DEBIT (voided-then-paid credit) folded onto this invoice. */
+  balance_adjustment: number;
   net: number;
   items: CreatedInvoiceItem[];
 };
@@ -1314,17 +1316,22 @@ async function generateForTenant(
     // children WITHIN the tenant.
     const { data: balanceRow } = await supabase
       .from("parent_tenant_balances")
-      .select("credit_balance")
+      .select("credit_balance, debit_balance")
       .eq("parent_id", parentId)
       .eq("tenant_id", tenantId)
       .maybeSingle();
 
     const available = Number(balanceRow?.credit_balance ?? 0);
+    // A DEBIT (parent owes us, from a voided-then-paid credit — 20260822000100)
+    // is folded onto THIS invoice by apply_credit_to_invoice, which draws credit
+    // against the debit-inclusive base so the two net. The values below are an
+    // ESTIMATE for the insert; the RPC trues up net/credit/balance_adjustment.
+    const debit = Number(balanceRow?.debit_balance ?? 0);
     // Gross sums the FINAL line amounts (package-repriced where covered).
     // Package covers its own lines by construction; credit notes then apply
     // to whatever cash remains — the two pots never overlap.
     const gross = items.reduce((s, i) => s + i.amount, 0);
-    const credit = Math.min(available, gross - packageApplied);
+    const credit = Math.min(available, Math.max(gross - packageApplied, 0));
     const net = gross - packageApplied - credit;
 
     // Insert invoice
@@ -1466,7 +1473,9 @@ async function generateForTenant(
     // already the truth, so there is no discrepancy to reconcile and no
     // double-draw window to guard — skip the round-trip.
     let creditApplied = credit;
-    if (credit > 0) {
+    let balanceAdjustment = 0;
+    let netApplied = gross - packageApplied - creditApplied;
+    if (credit > 0 || debit > 0) {
       const { data: allocated, error: creditErr } = await supabase.rpc(
         "apply_credit_to_invoice",
         { p_invoice_id: invoice.id }
@@ -1481,8 +1490,26 @@ async function generateForTenant(
         continue;
       }
       creditApplied = Number(allocated ?? 0);
+      // Re-read the trued-up invoice: the RPC folded any pending debit into
+      // net_amount and set balance_adjustment. These — not the pre-fold estimate
+      // — are the authoritative figures for the email/log.
+      const { data: settled, error: readErr } = await supabase
+        .from("invoices")
+        .select("net_amount, balance_adjustment")
+        .eq("id", invoice.id)
+        .single();
+      if (readErr || !settled) {
+        invoiceWriteFailed = true;
+        log.push({
+          parent_id: parentId,
+          invoice_id: invoice.id,
+          error: `re-read settled invoice failed: ${readErr?.message ?? "no row"}`,
+        });
+        continue;
+      }
+      balanceAdjustment = Number(settled.balance_adjustment ?? 0);
+      netApplied = Number(settled.net_amount ?? netApplied);
     }
-    const netApplied = gross - packageApplied - creditApplied;
 
     invoicesCreated++;
     created.push({
@@ -1493,6 +1520,7 @@ async function generateForTenant(
       gross,
       package: packageApplied,
       credit: creditApplied,
+      balance_adjustment: balanceAdjustment,
       net: netApplied,
       items: items.map((i) => ({
         student_id: i.student_id,
