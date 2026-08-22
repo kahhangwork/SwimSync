@@ -767,3 +767,24 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     then EXPECT its children — 0 such rows on prod today). **Dormant on prod by construction:** no lesson
     has been cancelled, so every new refusal, the trigger arm and the engine branch have never fired there;
     first firing is the first *Cancel this lesson*.
+
+38. **Deploy record (2026-08-22): advance-cancel EXTENDS a prepaid package — and the app went to `main` BEFORE
+    the migration reached prod (the §11.9 mistake, AGAIN).** (§7.205; PRD §7.6.) One migration
+    `20260821000800`: additive column `cancel_extension_days` + state table `package_cancel_extensions`,
+    `package_effective_end` 4→5 args (DROP+CREATE, re-granted), three same-signature CREATE OR REPLACEs
+    (lifecycle, `extend_package`, `apply_holiday_reconcile`), new `apply_cancel_reconcile` + a 3-trigger fan.
+    **NO engine deploy** — the only `core.ts` change was a comment (transpiled bundle identical). **What went
+    wrong:** both commits (migration `b7ce435`, surfaces `81046a0`) were pushed to `main` together via
+    `/commit-review`, which is the Vercel app deploy — so the parent Billing / admin Packages pages, which now
+    `SELECT cancel_extension_days`, were deploying against a prod DB that lacked the column. **Recovery:** the
+    user ran `supabase db push` immediately after (sandbox blocks it; run via `!`), so the migration almost
+    certainly beat the Vercel build — near-zero broken window. (1) `migration list --linked` → `remote` filled,
+    **0 pending** (the check that reveals this class of mistake — the pgdelta `ENOENT` trace printed alongside
+    `Finished` again, harmless). (2) **Remote grant dump** (`db dump --linked`): all three new functions
+    `REVOKE ALL … FROM PUBLIC`; `package_effective_end` grants only `authenticated`+`service_role`; **no `anon`
+    line**. Rollback: committed DOWN, rehearsed (restores the 4-arg formula and the three callers
+    byte-identical). **This deploy is why the `/deploy` skill now exists** (§11.9 + §7.60 codified with a hard
+    gate: `migration list --linked` must be 0-pending before any app push). Also this session, no migration:
+    the **unassigned-children sidebar badge** (`08b87ed`, app-only, push = deploy) and the **`/deploy` skill**
+    (`ceea58b`, `.claude/` tooling, no deploy surface). **Dormant on prod:** 0 packages, so the extension has
+    never fired.

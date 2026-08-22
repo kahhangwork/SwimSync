@@ -1,11 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-21 (6th) — **Advance-cancel a lesson SHIPPED and DEPLOYED, full sequence** (§8.81; PRD
-§7.6; §7.203/§7.204; DEPLOYMENT §11.37): admin cancels a FUTURE lesson with a reason → parent Upcoming shows it
-struck, coach has nothing to mark (DB trigger refuses), engine neither blocks nor bills. Migration `20260821000700`,
-engine v26, commits `eb43a98` · `6c0fe21`._
+_Last updated: 2026-08-22 — **Advance-cancel EXTENDS a prepaid package** (§8.82; PRD §7.6; §7.205; DEPLOYMENT
+§11.38): a cancel gives the covering package its week back (the holiday twin, per-lesson snapshot). Also this
+session: the unassigned-children sidebar badge (PRD §5.2) and a new `/deploy` skill that gates the app-push
+order. Migration `20260821000800`, DB-only (no engine)._
 
-_Previously, 2026-08-21 (§8.80) — parent Attendance→Upcoming lists make-ups + extra lessons. App-only. Commit `8cf219c`._
+_Previously, 2026-08-21 (§8.81) — advance-cancel a lesson SHIPPED + DEPLOYED (full sequence, migration → engine v26 → apps)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -398,6 +398,24 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.82 (2026-08-22) — Advance-cancel EXTENDS a prepaid package; + unassigned sidebar badge, `/deploy` skill
+
+**A cancelled lesson now gives the covering package its week back** — the holiday twin, but sourced from
+CANCELLED lessons + enrolments (migration `20260821000800`, DB-only, NO engine: the only `core.ts` change was a
+comment). Reuses `holiday_extension_days`, `holiday_covering_package`, and a new cancel term on
+`package_effective_end`. **An adversarial review (fable) caught a HIGH bug**: a date-scoped reconcile
+retro-extended late joiners and retro-retracted unenrollers; fixed by keying state **per cancelled LESSON** and
+scoping the reconcile to one (class, date), plus a 3-trigger fan (ins/upd/**del**). Full reasoning **§7.205**;
+behaviour PRD §7.6; tests `docs/TESTING.md` §5 (`cancel_package_extension.test.sql`, 17, red-first ×3); deploy
+**DEPLOYMENT §11.38** — which records the §11.9 ordering mistake **RECURRING** (apps pushed to `main` before the
+migration reached prod; recovered by an immediate `db push`).
+
+**Also, no migration:** the **unassigned-children sidebar badge** (`08b87ed`, PRD §5.2) — an *add*, it never
+existed (the remembered "1" was the Dashboard tile); and a new **`/deploy` skill** (`ceea58b`) that hard-gates the
+app push behind `migration list --linked` 0-pending, so the ordering mistake can't repeat. **Verified:** pgTAP
+1339, Deno 232 ×2, jest 400, vitest 519, typechecks clean. **Dormant on prod:** 0 packages, so the extension has
+never fired.
+
 ## 8.81 (2026-08-21) — Advance-cancel a lesson — SHIPPED and DEPLOYED (migration → engine v26 → apps)
 
 **The admin can call off a FUTURE lesson, and every surface agrees.** `cancel_lesson`/`restore_lesson`
@@ -412,22 +430,6 @@ transient TLS error — retry before diagnosing); rollback is a committed, rehea
 **Deliberately scoped out → `BACKLOG.md` *Advance-cancel follow-ups*:** what a cancel means for a prepaid package
 (holiday void extends; cancel doesn't — the user's call), and cancelling TODAY from the admin panel. **Dormant on
 prod:** nothing cancelled yet — first firing is the first *Cancel this lesson*.
-
-## 8.80 (2026-08-21) — Parent Upcoming lists make-ups + extra lessons — SHIPPED and DEPLOYED (app-only)
-
-**The Attendance→Upcoming view is now the one complete forward view.** It merged only the weekly weekday
-projection (minus public holidays); it now also lists booked **make-ups** (host class, badged *Make-up*) and
-admin off-schedule **extra lessons** in the child's class (badged *Extra lesson*). Explicit rows are pushed
-before the projection in `computeUpcomingLessons`, so they win a same-(class,date) collision and are NOT
-holiday-subtracted (booked evidence, not a guess). App-only — the push to `main` is the full deploy (no
-migration, no engine). PRD §7 updated. Commit `8cf219c`.
-
-**Pre-commit review hardening** (fable agent): a stale-response load ticket (a mid-load child switch can't
-paint the wrong child's make-ups); a failed holiday read is fail-safe (show nothing, never a closed-pool
-lesson); selection kept across refocus; `formatSgDate` on rows; horizon bound + cancelled-session filter +
-unique make-up dedup key. **Verified:** typecheck clean, jest **396** PASS.
-
-Phase B (advance-cancel) shipped the same day — §8.81.
 
 ## 9. Next steps (pick with the user)
 
@@ -489,16 +491,15 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — the Upcoming plan is COMPLETE (Phase A §8.80, Phase B §8.81, both 2026-08-21)
+### THE NEXT BUILD — the queue's head is a location entity
 
-**Two decisions before any build — `BACKLOG.md` → *Advance-cancel follow-ups*:** (1) should an advance
-cancel **extend a prepaid package** the way a holiday void does (dormant: 0 packages on prod); (2) should the
-admin be able to cancel **today's** lesson (the plan locked "advance only" — the coach's rain/coach mark is
-today's path). Each is S once decided.
+**One advance-cancel follow-up remains** (`BACKLOG.md` → *Advance-cancel follow-ups*): should the admin be able
+to cancel **today's** lesson? The plan locked "advance only" (the coach's rain/coach mark is today's path). S
+once decided. *(The other follow-up — package extension on cancel — SHIPPED this session, §8.82.)*
 
-**Then the queue's head is a location entity** (M, `BACKLOG.md` → *Admin and operations*) — the calendar's
+**The queue's head is a location entity** (M, `BACKLOG.md` → *Admin and operations*) — the calendar's
 Location filter is distinct `location_name` text. Unblocks nothing urgent. **No migration is in flight**
-(§7.55); latest applied is `20260821000700` (advance-cancel, §8.81).
+(§7.55); latest applied is `20260821000800` (cancel-package extension, §8.82).
 
 Still open from earlier: **partial-payment accounting for a voided-credit reopen** (Wave D, dormant on
 0 notes); HANDOVER §3 graduation (docs tax). Then *Later* (owner-only accounting page, accrual). Full
@@ -536,11 +537,12 @@ ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · mult
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260821000700` (advance-cancel, §8.81);
-production confirmed caught up 2026-08-21 via `supabase migration list --linked`, **0 pending**.
-**DEPLOYMENT §11.37 is the freshest worked example of the FULL sequence** — migration (two NEW functions, so a
-remote grant dump WAS taken) → engine v26 (first deploy died bundling on a transient TLS error; the retry
-worked) → apps, with a **committed DOWN generated from `pg_get_functiondef()`, rehearsed** (the pattern to copy).
+**The migration queue is EMPTY.** The latest applied is `20260821000800` (cancel-package extension, §8.82);
+production confirmed caught up 2026-08-22 via `supabase migration list --linked`, **0 pending**.
+**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending, the fix for the
+ordering mistake that recurred this session (DEPLOYMENT §11.38, §11.9). **§11.37/§11.38 are the freshest worked
+examples of the FULL sequence** — a NEW-function migration needs a remote grant dump; apps go to `main` LAST,
+with a **committed DOWN generated from `pg_get_functiondef()`, rehearsed** (the pattern to copy).
 §11.36 is the same-signature contrast (no grant dump needed, §11.32 pattern).
 **§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
 **expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract

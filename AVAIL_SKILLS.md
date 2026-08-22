@@ -109,6 +109,20 @@ Two things it enforces that are easy to skip:
 - **Invoke:** `/commit-review`, or ask to "review and commit".
 - **Details:** [.claude/skills/commit-review/SKILL.md](.claude/skills/commit-review/SKILL.md)
 
+#### `deploy` — verify the deploy SEQUENCE, then ship in order
+
+For anything with a **backend** piece (a migration, the engine, an edge
+function) that must reach prod in the right order. Classifies what is changing,
+derives the order — **migrations → engine/functions → apps, apps to `main`
+LAST** — and **hard-gates the app push** behind `supabase migration list
+--linked` showing **0 pending**, so the UI never deploys reading a column/RPC the
+prod DB lacks. Built after that mistake happened more than once (§7.60, §11.9,
+and the `cancel_extension_days` repeat — DEPLOYMENT §11.38). App-only change with
+no backend? Then `/commit-review`'s push already IS the deploy — skip this.
+
+- **Invoke:** `/deploy`, or ask to "deploy" / "ship to prod".
+- **Details:** [.claude/skills/deploy/SKILL.md](.claude/skills/deploy/SKILL.md)
+
 ### `session-start` — get up to speed before touching code
 
 The mirror of `update-docs`. **Reads `HANDOVER.md` — the index — and then stops**,

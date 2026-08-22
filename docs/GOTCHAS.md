@@ -3244,3 +3244,19 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `status = 'cancelled'` to `cancelled_at` so the old enum column and the new flag cannot disagree. Pinned
     red-first by `advance_cancel_lesson.test.sql` 19: a PAST cancelled session refuses a raw INSERT — on the
     pre-migration trigger body that INSERT SUCCEEDS. (2026-08-21.)
+
+205. **A reconcile that reads TIME-VARYING state must be scoped to the ONE unit whose change fired it — never
+    to a shared key.** The holiday reconcile (`20260818000700`) is date-scoped and sound ONLY because its
+    source, `'holiday'` attendance rows, is an immutable fact once written. The advance-cancel package
+    extension (`20260821000800`) draws its covered set from LIVE ENROLMENTS instead, so a date-scoped
+    "recompute desired truth for this date" is UNSOUND: cancelling or restoring a DIFFERENT class on the same
+    date re-runs the reconcile over every cancelled lesson on it against *current* enrolments, retro-extending
+    a family that enrolled AFTER the first cancel and retro-*retracting* one that unenrolled — silently, and
+    nondeterministically (it only fires when some other lesson on the date flips). Caught by an adversarial
+    review as a HIGH finding, not in testing. **Fix: key the state per (package, cancelled LESSON) and scope
+    `apply_cancel_reconcile(class, date)` to that one lesson**, so each cancel is an independent snapshot no
+    later flip can touch; a 3-trigger fan (ins/upd/**del**) also retracts a raw-deleted cancelled session
+    (§7.199's shape). Red-first pinned by `cancel_package_extension.test.sql` 14 (an unrelated same-date
+    cancel must NOT move another package): the date-scoped version turns it red. Corollary: "snapshot at
+    cancel time" means NO enrolment trigger and no re-fire on package activation — both documented and pinned,
+    not accidental. (2026-08-22.)
