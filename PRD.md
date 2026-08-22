@@ -505,7 +505,10 @@ proves DOB insufficient.)*
 ### 5.2 Child Assignment Rules
 
 - Superadmin is responsible for assigning children to coaches/classes in MVP
-- SwimSync web admin panel shall include an **Unassigned Children** section
+- SwimSync web admin panel shall include an **Unassigned Children** section — its
+  sidebar tab (in the *Families* group) carries an **amber count badge** of the
+  active children with no class yet, bubbling to the group header when collapsed,
+  so an unassigned child is visible from any page *(implemented 2026-08-22)*
 - Once assigned, the child appears in the relevant coach's roster and under the parent's account with class details visible
 - A coach should only see children enrolled in that coach's own classes
 

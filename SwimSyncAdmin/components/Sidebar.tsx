@@ -19,8 +19,8 @@ import {
 // drawer shut when another opens punishes exactly that.
 const NAV_OPEN_KEY = "swimsync-admin-nav-open";
 
-// The two amber badges are, per the code below, "the only thing that tells them
-// a family is stuck" — nothing emails the admin. When a badged page is hidden
+// The amber badges are, per the code below, "the only thing that tells them a
+// family is stuck" — nothing emails the admin. When a badged page is hidden
 // inside a collapsed group its count MUST bubble to the group header, or the
 // signal is lost. Titles carry the magnitude the tooltip has always shown.
 function badgeTitle(href: string, count: number): string {
@@ -32,6 +32,9 @@ function badgeTitle(href: string, count: number): string {
   }
   if (href === "/lessons") {
     return `${count} lesson${count === 1 ? "" : "s"} below today still need${count === 1 ? "s" : ""} marking`;
+  }
+  if (href === "/unassigned") {
+    return `${count} child${count === 1 ? "" : "ren"} not yet assigned to a class`;
   }
   return `${count}`;
 }
@@ -66,6 +69,13 @@ export function Sidebar() {
   // billing (§8i) — this count makes the backlog visible from anywhere. Re-read
   // on navigation so marking a lesson drops it without a reload.
   const [needsMarking, setNeedsMarking] = useState(0);
+  // Active children on this business's roster with no class yet
+  // (assignment_status = 'unassigned'). Same reasoning as the badges above:
+  // nothing emails the admin, the list only renders on the Unassigned page, and
+  // a child nobody assigns is a child nobody marks or bills — this count makes
+  // that visible from anywhere. Re-read on navigation so assigning one drops it
+  // without a reload.
+  const [unassignedStudents, setUnassignedStudents] = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -108,6 +118,20 @@ export function Sidebar() {
       .eq("status", "pending")
       .then(({ count }) => setPendingClaims(count ?? 0));
   }, [pathname]);
+
+  useEffect(() => {
+    // Gate on tenantId (a platform admin has none, and the students RLS would
+    // otherwise count across every business). Explicit tenant filter too, so the
+    // count never depends on RLS alone — mirrors the Unassigned page's query.
+    if (!tenantId) return;
+    supabase
+      .from("students")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("assignment_status", "unassigned")
+      .eq("is_active", true)
+      .then(({ count }) => setUnassignedStudents(count ?? 0));
+  }, [pathname, tenantId]);
 
   // Which groups are expanded. Starts empty (all collapsed — the whole point),
   // then hydrated from localStorage in an effect (SSR-safe, same shape as the
@@ -166,11 +190,12 @@ export function Sidebar() {
   const initial = (userName ?? userEmail ?? "A").charAt(0).toUpperCase();
 
   // Badge counts keyed by href, so a link and a collapsed group header read the
-  // same source. Extend this map (not the JSX) if a third badge is ever added.
+  // same source. Extend this map (not the JSX) if another badge is ever added.
   const badges: Record<string, number> = {
     "/invoices": orphanLines,
     "/claims": pendingClaims,
     "/lessons": needsMarking,
+    "/unassigned": unassignedStudents,
   };
 
   const grouped =
@@ -234,9 +259,9 @@ export function Sidebar() {
         {grouped.groups.map(({ group, items }) => {
           const open = openGroups.has(group.id);
           const containsActive = items.some((it) => isActive(it.href));
-          // Sum the children's badges onto the collapsed header. In this IA each
-          // badged page sits in a different group, so the sum is one child's
-          // exact count — but summing keeps it correct if a third badge appears.
+          // Sum the children's badges onto the collapsed header. The "Families"
+          // group holds TWO badged pages (Parent Requests + Unassigned), so this
+          // header can show their combined count; the tooltip below lists each.
           const badged = items.filter((it) => (badges[it.href] ?? 0) > 0);
           const groupCount = badged.reduce((n, it) => n + badges[it.href], 0);
           return (
