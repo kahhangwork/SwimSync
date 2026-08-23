@@ -1,8 +1,10 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-23 — **Partial-payment follow-ups SHIPPED** (§8.84): the pre-bill debit visibility +
-offboard guard + write-off ramp are built (removed from the queue); the debited-note re-correction is narrowed
-to the FOLDED case only (the PENDING case auto-unwinds now). Earlier: *A location entity* is DEMOTED
+_Last updated: 2026-08-23 — **Partial-payment CLOSED** (§8.86): the last follow-up — re-correcting a
+debited note once its debit has **FOLDED** — is **REFUSED** with the user (`CN002` stays; safe, dormant,
+manual runbook path), moved to *Deliberately not doing*. The area is done; nothing partial-payment remains
+in the queue. Earlier (§8.84): the pre-bill debit visibility + offboard guard + write-off ramp SHIPPED;
+Earlier still: *A location entity* is DEMOTED
 from the queue's head to **Later** (production is one location; it only bites a multi-venue business), so
 the build order now has **no rework-critical head** — just the Wave D traps and the Later pool. And
 *cancelling TODAY's lesson from the admin panel* is **REFUSED** (advance means advance; today/past is the
@@ -444,14 +446,12 @@ family-status client-side scan, Email-confirmation copy, Tick off swimming skill
   drawing credit against the debit-inclusive base so credit and debit net. Reviewed by `/plan-review`
   (fable) — the single-signed-column idea was replaced with the separate `debit_balance` for ledger
   safety. Two follow-ups filed below. Dormant (0 credit notes on prod). **Deploy via `/deploy` when ready.**
-- **Partial-payment: seamless re-correction of a debited note — the FOLDED case only** (M)
-  `[pending case BUILT 2026-08-23]` — re-correcting a voided-and-debited note whose debit is still
-  **PENDING** now **auto-unwinds** it (`20260822000200`, `handle_attendance_update`): the debit is
-  retracted, the undrawn remainder returns to the pool, and the note is restored. **What REMAINS
-  deferred:** once the debit has been **FOLDED** onto a later invoice (or written off), the re-correction
-  still refuses (`CN002`) — reversing a folded/settled charge is the multi-flip state machine. **Why still
-  deferred:** deeply dormant, and `INVOICE_RUNBOOK.md` now has a manual path (issue a credit note on the
-  adjustment invoice). Safe: no silent misbill. `partial_payment_followups.test.sql` pins both arms.
+- ~~**Partial-payment: seamless re-correction of a debited note — the FOLDED case only**~~ (M) — **WON'T
+  DO, decided 2026-08-23 with the user.** The PENDING case shipped (auto-unwind, §8.84); the FOLDED case —
+  re-correcting a note whose debit has already landed on a later invoice (or been written off) — will keep
+  **refusing (`CN002`)**. Moved to *Deliberately not doing*: it needs three mistakes on the same invoice,
+  is deeply dormant (0 credit notes on prod), the refusal is a **safe loud failure with no misbill**, and
+  `INVOICE_RUNBOOK.md` already has the manual path (credit note on the adjustment invoice).
 - ~~**Partial-payment: admin PRE-BILL debit visibility**~~ — **BUILT LOCALLY 2026-08-23, not yet deployed**
   (`20260822000200`, `docs/plans/PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md`). A "Pending charges — not yet
   invoiced" panel on the admin Invoices page (tenant-scoped) shows each family's `debit_balance` before it
@@ -1605,6 +1605,7 @@ Kept so the reasoning doesn't get re-litigated.
 | **A parent-facing swimming-ability picker** | Removed on purpose (PRD §5.1). Parents self-reporting ability isn't information anyone trusted; the class a child is in is the real signal. If levels return they should be **coach-defined** — see the backlog item above. |
 | **Re-adding Notification Preferences / Help & Support buttons** | Removed as dead stubs with empty handlers, not lost (`docs/ARCHITECTURE.md` §12). Build the feature first, then the button. |
 | **`Alert.alert` for user feedback** | A **no-op on RN-web**, so it silently does nothing on the deployed app. Use `confirmAction` / the global Toast / inline form errors instead (`docs/ARCHITECTURE.md` §12a). The only sanctioned use left is the native-only media-library permission prompt. |
+| **Auto-reversing a FOLDED partial-payment debit** (seamless re-correction once the debit is on a later invoice) | Refused 2026-08-23 with the user. The full debit lifecycle is: void a credit note on a **paid** invoice → a `debit_balance` debit → the engine **folds** it onto the next invoice. Re-correcting (flipping the lesson back) while the debit is still **PENDING** auto-unwinds it (shipped §8.84). Once **FOLDED**, re-correction keeps **refusing (`CN002`)** rather than reaching into a downstream — possibly paid, possibly sealed-month — invoice to unwind it. That is the multi-flip state machine, **M** effort, and it only triggers on a *third* mistake against the *same* invoice. It is deeply dormant (**0** credit notes on prod), the refusal is a **safe loud failure — no silent misbill**, and `INVOICE_RUNBOOK.md` has the manual path (credit note on the adjustment invoice). **Revisit only if** a real tenant hits `CN002` in anger. Pinned by `partial_payment_followups.test.sql` (§7.206–§7.207). |
 | **Invoicing a child immediately when they are set inactive** | Proposed as "settle up what they owe on the way out"; rejected 2026-07-18. Invoices are `UNIQUE(parent_id, billing_month)`, so an early partial-month invoice makes the regular run skip that parent via the `already_exists` guard — stranding their **siblings'** lessons for that month. That is exactly the multi-class underbilling bug the same session fixed, re-entered through a new door. It also breaks PRD §7.7's one-complete-calendar-month rule. The normal cycle already bills them correctly, because billing follows **attendance rows** rather than current enrolment (HANDOVER §8). |
 | **An override on the completed-month guard** | Considered and refused 2026-07-19 while building it. Billing a month that has not ended is never legitimate: the attendance gate ignores lessons that have not happened yet, so a mid-month run reads as **complete**, bills what exists and **seals** the month — after which the rest of that month can never be billed (a sealed month is skipped; the `already_exists` guard skips the parent even if reopened). An override could therefore only ever produce that loss. Same reasoning as the attendance-block row below, and `force` was deliberately kept to its single meaning — skip the sealed-month guard — rather than growing a second one. If someone wants to bill mid-month, the answer is to wait, not to override. (`docs/GOTCHAS.md` §7.32, §8.6.) |
 | **An override / "Generate anyway" on the attendance block** | Removed deliberately 2026-07-18 (PRD §7.7). The case it appeared to serve — a class that genuinely didn't run — is already handled *inside* the completeness rule by marking everyone `cancelled_rain`/`cancelled_coach`. So the bypass wasn't covering a legitimate case; it was letting an unrecorded lesson through into a **permanent** underbill, because a lesson can never be added to an invoice that already exists (§11.6). The escape hatch for a class that can't be completed is removing the student, not overriding the check. |

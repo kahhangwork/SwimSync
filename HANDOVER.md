@@ -1,12 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-23 — **Tenant-admin invite link now lasts 24 hours, and the email says so**
-(§8.85; PRD §4.4; §7.210). Bumped Supabase auth `mailer_otp_exp` 3600→86400 on PROD (Management API PATCH) +
-local `config.toml`, and stated the 24h in the invite email copy. It is a GLOBAL knob — magic-link and
-password-recovery links are now 24h too; there is no invite-only setting. App-only + a prod config change,
-SHIPPED + DEPLOYED. Engine + migrations UNCHANGED._
+_Last updated: 2026-08-23 — **Partial-payment CLOSED** (§8.86, DOCS-ONLY). The last follow-up — seamlessly
+re-correcting a voided-and-debited note once its debit has **FOLDED** — was refused with the user; it keeps
+returning `CN002` (safe loud failure, deeply dormant, manual runbook path exists). Recorded in `BACKLOG.md` →
+*Deliberately not doing*. No code, no migration, no engine change; behaviour unchanged._
 
-_Previously, 2026-08-23 (§8.84) — partial-payment follow-ups: auto-unwind a pending debit, offboard guard + write-off ramp (`20260822000200`, engine unchanged)._
+_Previously, 2026-08-23 (§8.85) — tenant-admin invite link now lasts 24h and the email says so; bumped auth `mailer_otp_exp` 3600→86400 on prod + local (a GLOBAL knob). App-only, SHIPPED + DEPLOYED._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -323,6 +322,18 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.86 (2026-08-23) — Partial-payment CLOSED: the FOLDED re-correction refused → *Deliberately not doing*; DOCS-ONLY
+
+**The last open partial-payment follow-up was refused with the user, closing the area.** Seamlessly
+re-correcting a voided-and-debited note once its debit has already been **FOLDED** onto a later invoice (or
+written off) will keep returning **`CN002`**. Rationale: it is a **safe loud failure — no silent misbill**,
+deeply dormant (**0** credit notes on prod), triggered only by a *third* mistake on the *same* invoice, and
+`INVOICE_RUNBOOK.md` already has the manual path (credit note on the adjustment invoice). Reversing a
+folded/settled charge is the multi-flip state machine (M) — not worth building on anticipation. Decision
+recorded in `BACKLOG.md` → *Deliberately not doing* (§7.206–§7.207, `partial_payment_followups.test.sql` pins
+both arms). **No code, no migration, no engine change; behaviour unchanged** (the refusal already shipped in
+§8.83/§8.84).
+
 ## 8.85 (2026-08-23) — Tenant-admin invite link lasts 24h, and the email says so; SHIPPED + DEPLOYED
 
 **The link the platform admin emails a new tenant admin now expires in 24 hours, up from 1, and the email
@@ -340,28 +351,6 @@ after the PATCH. **Deploy order honoured:** prod config (the backend dependency)
 email can't lie in the gap. App-only push (`34db287`); no migration, no engine change. **Dormant note:** no new
 business has been provisioned since, so the 24h link is unexercised on real data — first firing is the next
 Platform → New business invite.
-
-## 8.84 (2026-08-23) — Partial-payment follow-ups: auto-unwind a pending debit, offboard guard + write-off ramp; SHIPPED + DEPLOYED
-
-**Two BACKLOG follow-ups to §8.83, shipped and deployed to prod in order.** (a) Re-correcting a
-voided-and-debited note now **auto-unwinds** the debit when it is still PENDING (not yet folded onto an
-invoice) — refining §7.206's blanket `CN002`, which now fires only once the charge is billed or written off.
-(b) A tenant-scoped **"Pending charges" panel** on the admin Invoices page shows a family's `debit_balance`
-before it bills, with an audited **Write off** action. An **offboard guard** (`BEFORE UPDATE` trigger on
-`parent_tenants`, DEBIT-ONLY — credit is preserved) refuses set-inactive while a debit is owed; the write-off
-is its exit ramp. Migration `20260822000200`, engine **UNCHANGED** (the fold is all in-SQL). Behaviour PRD §5.6.
-
-**Two adversarial reviews earned their keep.** A `/plan-review` (fable) rejected **collect-now** (a standalone
-same-month invoice): it collides with `UNIQUE(parent,tenant,month)` and would make the engine skip the whole
-month (§7.208), an engine change for a chaseable-invoice-only payoff — the **write-off ramp** replaced it. A
-pre-merge **senior-engineer review** caught a CRITICAL lock-ordering **double-refund** (the auto-unwind read
-the balance before locking it — §7.207) plus 11 lesser findings, 10 fixed. **Verified:** pgTAP
-`partial_payment_followups.test.sql` 33 + `partial_payment` updated, suite PASS; red-first proven; DOWN
-rehearsed ×2; Deno 236 ×2; vitest 519; typecheck clean; UI driven end-to-end. **Deploy: DEPLOYMENT §11.40** —
-migration → grant dump → GATE → apps LAST, in order (no §11.9 repeat). **Dormant:** 0 credit notes on prod.
-
-**One follow-up REMAINS** (`BACKLOG.md`): re-correcting a note whose debit has already FOLDED still refuses
-(`CN002`) — the multi-flip state machine; `INVOICE_RUNBOOK.md` has the manual path.
 
 ## 9. Next steps (pick with the user)
 
@@ -426,14 +415,16 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 ### THE NEXT BUILD — no rework-critical head; a flat value pool
 
 **This session (§8.85) shipped the 24h invite link** — app-only + a prod auth-config change, no queue impact.
-The partial-payment follow-ups shipped the session before (§8.84, deployed). **No rework-critical head remains.**
+The partial-payment follow-ups shipped the session before (§8.84, deployed); its final follow-up (the FOLDED
+re-correction) was **refused 2026-08-23 → *Deliberately not doing***, so partial-payment is CLOSED. **No rework-critical head remains.**
 *A location entity* is in *Later* (production is one location). **No migration is in flight** (§7.55); latest
 applied is `20260822000200` (partial-payment follow-ups, §8.84), on prod, 0 pending.
 
 What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value:
-- **One partial-payment follow-up remains** (dormant, M): re-correcting a note whose debit has already
-  FOLDED still refuses (`CN002`) — the multi-flip state machine; `INVOICE_RUNBOOK.md` has the manual path.
-  The PENDING case and pre-bill visibility both shipped (§8.84).
+- **Partial-payment is CLOSED.** The last follow-up (re-correcting a note whose debit has already FOLDED —
+  the multi-flip state machine) was **refused 2026-08-23 with the user** → *Deliberately not doing*. It keeps
+  refusing (`CN002`): a safe loud failure, deeply dormant, `INVOICE_RUNBOOK.md` has the manual path. The
+  PENDING case and pre-bill visibility both shipped (§8.84).
 - **Later:** owner-only accounting page (accrual — decided), split co-admin permissions, the location entity.
 - Full ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**):
   `BACKLOG.md`.
