@@ -386,8 +386,27 @@ deliberately-last. Sections restructured below.
 > ~~**NEXT — Advance-cancel a lesson (M)**~~ — **SHIPPED 2026-08-21** (PRD §7.6 *Advance-cancel*,
 > §7.203/§7.204, `20260821000700`). Both decide-first follow-ups are now settled (package-extension
 > **SHIPPED** 2026-08-21, §8.82; cancelling-today **REFUSED** 2026-08-22 → *Deliberately not doing*), so
-> *Advance-cancel follow-ups* is closed. **No rework-critical head remains** — the queue is the Wave D
-> latent traps plus the *Later* pool (which now also holds *A location entity*, demoted 2026-08-22).
+> *Advance-cancel follow-ups* is closed.
+
+**Re-rank CONFIRMED 2026-08-23 (partial-payment closed).** A full rework-cost pass over the whole
+queue found **no rework-critical head and no dependency chain left** — the earlier "flat value pool"
+call still holds. **Wave D is now EXHAUSTED** (every latent trap closed — the last, the partial-payment
+FOLDED re-correction, was refused → *Deliberately not doing*, §8.86). So the standing pointer "the queue
+is the Wave D traps plus Later" is retired: what remains is one ready M, a flat value pool, and one soft
+edge. The pass produced three durable findings, recorded so they are not re-derived:
+
+- **One ready M, highest value, waits on nothing — *An owner-only accounting page*.** Decided (accrual),
+  needs no capability model (`is_tenant_owner()` exists), payroll dependency discharged. Build it when
+  priority allows; it carries zero rework risk.
+- **One soft edge in the value pool: *A location entity* → *Maps integration*.** Maps reads
+  `location_address`; built on the free-text `location_name` it gets reworked onto the FK later. If either
+  is wanted, do the location entity first. Both stay low-priority (prod is one location).
+- **Two retrofit-tax deferrals are CHOICES, not free — surfaced so they don't drift silently.**
+  *Split co-admin permissions* (every ungated admin surface built meanwhile is one to retrofit — user's
+  call is "yes eventually, not now") and *A location entity* (cheap now at 2 consumers, dearer per
+  venue-aware screen). Neither is due today; both accrue cost while parked.
+
+Everything else in *Wave C*'s S pool and *Later* has **no edge** — pick by value.
 
 ### Wave B — the one genuine internal chain — **EXHAUSTED bar the cron-gated tail**
 
@@ -909,14 +928,21 @@ worked by hand. This is the parent-side, no-admin-action version. **Notes:** all
 exist — `package_renewal_candidates()` is the "who", `package-emails` the delivery — so it
 is a scheduled check away, gated on cron (same blocker as the invoice reminder chain).
 
-### Bound `recompute_package_extensions` — **S** `[found 2026-08-15]`
-`recompute_package_extensions` loops every `status='active'` package on each Packages/Billing
-page load. Status never flips at expiry, so the set grows unboundedly over years.
+### ~~Bound `recompute_package_extensions`~~ — **S** — **SUPERSEDED 2026-08-19** (§8.70)
+The scan is **gone entirely** — holiday extension became event-driven (marked at attendance
+time), so there is no standing per-load scan left to bound; `recompute_package_extensions`
+was dropped. Struck here on 2026-08-23 after a re-rank found it still listed as live while
+Wave D already marked it superseded — the two-places drift the ⚠ at the top of Build order warns about.
+
+Original entry, kept for the reasoning:
+`recompute_package_extensions` looped every `status='active'` package on each Packages/Billing
+page load. Status never flips at expiry, so the set grew unboundedly over years.
 
 **Why:** a per-load full scan is fine at a few dozen packages, a problem at thousands.
-**Notes:** bounding it (skip packages whose effective end is > N months past) is safe **only**
+**Notes:** bounding it (skip packages whose effective end is > N months past) was safe **only**
 if a late-added holiday inside an old nominal window can still resurrect an expired package —
-verify that assumption before adding the bound. (Fable review #9, deferred from the weeks work.)
+which is exactly why the event-driven replacement is correct: extension now happens at the
+holiday mark, not on a scan that would have to be un-bounded to catch it. (Fable review #9.)
 
 ### In-app package refunds — **S**
 Record a refund against a cancelled package instead of settling fully offline.
