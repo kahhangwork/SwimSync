@@ -271,8 +271,12 @@ secure_password_change = false
 max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
-# Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+# Number of seconds before the email OTP expires (defaults to 1 hour). Set to
+# 86400 (24h) on 2026-08-23 so the tenant-admin invite link lasts 24 hours; the
+# email copy in SwimSyncAdmin/lib/inviteEmail.ts is coupled to this value. This
+# governs ALL email links (invite, magic-link, password recovery), not just
+# invites.
+otp_expiry = 86400
 
 # Production SMTP (Resend) — configured on the CLOUD project via the Supabase
 # dashboard (Authentication → Emails → SMTP Settings), NOT here: the API key must

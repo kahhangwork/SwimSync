@@ -50,6 +50,11 @@ export function buildInviteEmailSubject(data: InviteEmailData): string {
     : "Set up your business on SwimSync";
 }
 
+// The "expires 24 hours" line below is COUPLED to Supabase auth's
+// `mailer_otp_exp` (supabase/config.toml `otp_expiry`, and the cloud project's
+// Authentication setting) — that is the single knob that governs how long the
+// emailed link is valid. If that value changes, change this copy to match, or
+// the email lies. Set to 86400 (24h) on 2026-08-23.
 export function buildInviteEmailHtml(data: InviteEmailData): string {
   const name = escapeHtml(data.adminName?.trim() || "there");
   const biz = escapeHtml(data.businessName?.trim() || "your business");
@@ -102,8 +107,9 @@ export function buildInviteEmailHtml(data: InviteEmailData): string {
                     : ""
                 }
                 <p style="margin:16px 0 0;font-size:12px;color:#94a3b8;line-height:1.6;">
-                  This link can only be used once. If it has expired, ask your
-                  SwimSync contact to send you a new invite.
+                  This link can only be used once and expires 24 hours after it
+                  was sent. If it has expired, ask your SwimSync contact to send
+                  you a new invite.
                 </p>
               </td>
             </tr>

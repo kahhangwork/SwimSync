@@ -43,6 +43,10 @@ describe("buildInviteEmailHtml", () => {
     expect(buildInviteEmailHtml(base)).not.toContain("join code is");
   });
 
+  it("tells the recipient the link expires in 24 hours", () => {
+    expect(buildInviteEmailHtml(base)).toContain("expires 24 hours");
+  });
+
   it("escapes HTML in the business name so a quote cannot break the markup", () => {
     const html = buildInviteEmailHtml({
       ...base,
