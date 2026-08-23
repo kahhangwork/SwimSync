@@ -3311,3 +3311,15 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     its balance read is `FOR UPDATE` (no TOCTOU vs a concurrent void). DEBIT-ONLY — credit is preserved across
     offboard by design. Pinned by `partial_payment_followups.test.sql` (deactivating the last child with a debit
     RAISEs). (2026-08-23.)
+
+210. **`mailer_otp_exp` is ONE global knob for EVERY email-link lifetime — there is no invite-only expiry.** The
+    tenant-admin invite (`generateLink({type:'invite'})`, `provision-tenant/route.ts`), the co-admin invite,
+    magic-links and password-recovery links ALL share Supabase auth's `mailer_otp_exp` (`otp_expiry` in
+    `config.toml`). Raising it to give the invite 24h gives password-reset 24h too — that is the trade, and there
+    is no per-type override. **Change it on PROD via the Management API** (`PATCH
+    /v1/projects/{ref}/config/auth` with `{"mailer_otp_exp": N}`), **NOT `supabase config push`** — that CLI verb
+    is push-only and overwrites the WHOLE remote auth config from local `config.toml`, clobbering anything set in
+    the dashboard. The CLI cannot READ the remote value either (`supabase config` has only `push`); read it via
+    the same endpoint with GET, or the dashboard (Authentication → Email → OTP expiry). The invite email's
+    "expires 24 hours" copy (`inviteEmail.ts`) is COUPLED to this value — change both together or the email lies.
+    Set to 86400 (24h) 2026-08-23. (§8.85.)

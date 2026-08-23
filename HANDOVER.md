@@ -1,12 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-23 — **Partial-payment follow-ups: auto-unwind a pending debit, offboard guard +
-write-off ramp** (§8.84; PRD §5.6; §7.207–§7.209; DEPLOYMENT §11.40). Re-correcting a voided-and-debited note
-now auto-unwinds the debit while it is still PENDING (refunds nothing already billed); a family owing a debit
-can't be offboarded until it is written off; admins see pending charges before they bill. Migration
-`20260822000200`, engine UNCHANGED, SHIPPED + DEPLOYED. Collect-now designed then REJECTED for the write-off ramp._
+_Last updated: 2026-08-23 — **Tenant-admin invite link now lasts 24 hours, and the email says so**
+(§8.85; PRD §4.4; §7.210). Bumped Supabase auth `mailer_otp_exp` 3600→86400 on PROD (Management API PATCH) +
+local `config.toml`, and stated the 24h in the invite email copy. It is a GLOBAL knob — magic-link and
+password-recovery links are now 24h too; there is no invite-only setting. App-only + a prod config change,
+SHIPPED + DEPLOYED. Engine + migrations UNCHANGED._
 
-_Previously, 2026-08-22 (§8.83) — partial-payment via `debit_balance`: a void against a PAID invoice posts a debit the next invoice folds in, no longer reopens (`20260822000100`, engine v27)._
+_Previously, 2026-08-23 (§8.84) — partial-payment follow-ups: auto-unwind a pending debit, offboard guard + write-off ramp (`20260822000200`, engine unchanged)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -323,6 +323,24 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.85 (2026-08-23) — Tenant-admin invite link lasts 24h, and the email says so; SHIPPED + DEPLOYED
+
+**The link the platform admin emails a new tenant admin now expires in 24 hours, up from 1, and the email
+states it.** The expiry is Supabase auth's `mailer_otp_exp` (`otp_expiry` in `config.toml`) — a SINGLE global
+knob, so magic-link and password-recovery links became 24h too; there is no invite-only setting (§7.210).
+Prod's cloud auth config was PATCHed `mailer_otp_exp: 86400` via the **Management API** (not `supabase config
+push`, which is push-only and would clobber the whole remote auth config); `config.toml` mirrors it locally.
+The invite email (`SwimSyncAdmin/lib/inviteEmail.ts`) now reads *"expires 24 hours after it was sent"*, coupled
+to the knob by a comment so the copy can't silently drift. Behaviour: PRD §4.4.
+
+**How it was found:** the user asked the pre-change expiry; a read via the Management API GET confirmed prod was
+3600 (1h), matching the repo. **Verified:** vitest `inviteEmail.test.ts` 13 (new assertion red-first by
+inspection — the string is unique to the edit) + admin typecheck clean; prod `mailer_otp_exp` GET-confirmed 86400
+after the PATCH. **Deploy order honoured:** prod config (the backend dependency) FIRST, app to `main` LAST — the
+email can't lie in the gap. App-only push (`34db287`); no migration, no engine change. **Dormant note:** no new
+business has been provisioned since, so the 24h link is unexercised on real data — first firing is the next
+Platform → New business invite.
+
 ## 8.84 (2026-08-23) — Partial-payment follow-ups: auto-unwind a pending debit, offboard guard + write-off ramp; SHIPPED + DEPLOYED
 
 **Two BACKLOG follow-ups to §8.83, shipped and deployed to prod in order.** (a) Re-correcting a
@@ -344,28 +362,6 @@ migration → grant dump → GATE → apps LAST, in order (no §11.9 repeat). **
 
 **One follow-up REMAINS** (`BACKLOG.md`): re-correcting a note whose debit has already FOLDED still refuses
 (`CN002`) — the multi-flip state machine; `INVOICE_RUNBOOK.md` has the manual path.
-
-## 8.83 (2026-08-22) — Partial-payment via `debit_balance` — void-on-paid no longer reopens; SHIPPED + DEPLOYED
-
-**A void of a credit drawn against a PAID invoice no longer reopens it — paid invoices are now immutable.**
-The old reopen overstated the amount owed against the recorded payment (the Wave D trap). Now the drawn value
-is posted to a new `parent_tenant_balances.debit_balance` (the mirror of `credit_balance`) and the engine folds
-it onto the parent's next invoice as an *"Adjustment"* line, drawing credit against the debit-inclusive base so
-credit and debit NET. Migration `20260822000100`, engine **v26→v27**. Behaviour: PRD §5.6; design +
-deferrals: `docs/plans/PARTIAL_PAYMENT_PLAN.md`.
-
-**A `/plan-review` (fable) changed the design mid-flight** — the obvious "signed `credit_balance`" desyncs the
-credit-note ledger and overcharges; a SEPARATE `debit_balance` was used instead (**§7.206**, the prohibition).
-**Two deliberate scope cuts → `BACKLOG.md`:** re-correcting a voided-and-debited note is refused (`CN002`), and
-admin PRE-BILL debit visibility is deferred. **Verified:** pgTAP 1340 (`partial_payment.test.sql` 17 +
-`void_credit_note` updated) · Deno 234 ×2 · vitest 519 · jest 400 · typechecks clean. **Deploy: DEPLOYMENT
-§11.39** — the §11.9 ordering mistake happened AGAIN (apps pushed with the backend) but was RECOVERED cleanly
-(revert the app files only, land the backend, re-apply apps LAST); rollback rehearsed + committed. **Dormant:**
-0 credit notes on prod, so no debit has posted.
-
-**Also this session (doc-only, `215ed74`):** *A location entity* DEMOTED to Later; *cancelling TODAY's lesson*
-REFUSED (→ *Deliberately not doing*); **HANDOVER §3 graduated** (DORMANT trimmed, Production-reality prose →
-DEPLOYMENT §11 pointer).
 
 ## 9. Next steps (pick with the user)
 
@@ -429,10 +425,10 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 
 ### THE NEXT BUILD — no rework-critical head; a flat value pool
 
-**The partial-payment follow-ups SHIPPED this session** (§8.84, deployed): auto-unwind a pending debit, the
-pending-charges panel, the offboard guard + write-off ramp. **No rework-critical head remains.** *A location
-entity* is in *Later* (production is one location). **No migration is in flight** (§7.55); latest applied is
-`20260822000200` (partial-payment follow-ups, §8.84), on prod, 0 pending.
+**This session (§8.85) shipped the 24h invite link** — app-only + a prod auth-config change, no queue impact.
+The partial-payment follow-ups shipped the session before (§8.84, deployed). **No rework-critical head remains.**
+*A location entity* is in *Later* (production is one location). **No migration is in flight** (§7.55); latest
+applied is `20260822000200` (partial-payment follow-ups, §8.84), on prod, 0 pending.
 
 What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value:
 - **One partial-payment follow-up remains** (dormant, M): re-correcting a note whose debit has already

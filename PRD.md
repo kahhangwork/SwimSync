@@ -417,7 +417,9 @@ too?*, which decides whether they get a coach record. A **"Private coach / Swim 
 dropdown was removed 2026-08-01**: it stored an answer nothing ever read, and asked the
 platform admin to declare something unknowable at creation time. The
 business exists immediately, with its **join code**, and that person is emailed a one-time
-link to choose a password.
+link to choose a password. *(implemented 2026-08-23: the link is valid for **24 hours**,
+and the email says so. Expiry is Supabase auth's single `mailer_otp_exp` knob, so it also
+governs magic-link and password-recovery links — there is no invite-only setting; §7.210.)*
 
 **One question decides the shape of the business: does this person also teach?** If they
 do, they get a coach account alongside their admin one — that is the private-coach-as-a-
