@@ -46,6 +46,7 @@ import {
   History,
   CalendarDays,
   ListChecks,
+  Calculator,
 } from "lucide-react";
 
 /** A page's audience. `tenant` = shows ONE business. `platform` = cross-tenant. */
@@ -83,6 +84,10 @@ export const NAV: readonly NavItem[] = [
   { href: "/coaches",      label: "Coaches",              icon: UserCog,         scope: "tenant"   },
   { href: "/admins",       label: "Admins",               icon: ShieldCheck,     scope: "tenant"   },
   { href: "/wages",        label: "Wages",                icon: Wallet,          scope: "tenant"   },
+  // Owner-only, but listed as a plain tenant page — the /admins precedent: the
+  // link shows for every admin and the PAGE owner-gates (hiding is not the
+  // boundary; the RPCs refuse a non-owner). No `owner` nav scope by design.
+  { href: "/accounting",   label: "Accounting",           icon: Calculator,      scope: "tenant"   },
   { href: "/history",      label: "Change History",       icon: History,         scope: "tenant"   },
   { href: "/platform",     label: "Platform",             icon: Globe,           scope: "platform" },
 ];
@@ -169,7 +174,7 @@ export const TOP_LEVEL_HREFS: readonly string[] = [
 /** Task-based groups. See HANDOVER §3 for why the dormant pages sit here. */
 export const NAV_GROUPS: readonly NavGroup[] = [
   { id: "families",   label: "Families",   hrefs: ["/trials", "/unassigned", "/claims", "/parents"] },
-  { id: "billing",    label: "Billing",    hrefs: ["/invoices", "/credit-notes", "/packages", "/referrals", "/wages"] },
+  { id: "billing",    label: "Billing",    hrefs: ["/invoices", "/credit-notes", "/packages", "/referrals", "/wages", "/accounting"] },
   { id: "scheduling", label: "Scheduling", hrefs: ["/makeups", "/substitutes", "/holidays"] },
   // The read-only records: the attendance audit (money axis, CSV) and change
   // history. Marking moved front-and-centre to /lessons on 2026-08-19; the log

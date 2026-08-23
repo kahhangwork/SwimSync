@@ -2645,6 +2645,39 @@ admin can see at a glance which class at a given time has a free slot for a make
   (top-level, beside Calendar) is the list form of the same data, with a *Needs marking* mode. The
   read-only attendance audit lives under **Log → Attendance Log** (with Change History).
 
+### 7.23 Owner-only Accounting *(implemented 2026-08-23)*
+
+SwimSync tracked money **in** (invoices) and money **out** (coach wages, §7.13) but never
+summed either into "what did the business make this month?". The Accounting page
+(Admin → Billing → **Accounting**) is that single answer, for **one closed month at a time**.
+
+**Owner-only.** The figures are visible to the business **owner**, not to co-admins — it is
+the first concrete thing a co-admin should not see. The gate is `is_tenant_owner()`; no
+capability model. The nav link shows for every admin (like Admins), but the page shows a
+co-admin an *Owner only* notice, and the two RPCs (`accounting_months`,
+`accounting_summary`) **refuse a non-owner server-side** — the page's hiding is honesty, the
+server is the boundary.
+
+**Accrual basis** (decided 2026-08-16): revenue is what was *issued for* the month, not cash
+received. Four figures per month:
+
+- **Revenue** = each invoice's `net_amount` **minus** its `balance_adjustment` (a prior
+  month's debit folded onto this month's invoice is not this month's earning), **plus** live
+  `paid_outside` settlements covering the month. A **breakdown** (gross − packages − credit −
+  prior-month debit = invoiced; + settlements = revenue) makes any figure auditable.
+- **Outstanding** = the month's still-unpaid invoices (raw `net_amount`, the same definition
+  the Invoices page uses); it legitimately changes over time as invoices get paid.
+- **Wages** = accrued cost of lessons **taught** that month (a period's own payout items plus
+  corrections reallocated to it by `original_period`).
+- **Net** = Revenue − Wages.
+
+**Never a partial figure.** Only **closed** (billing-sealed) months are offered, and the
+summary RPC refuses an unsealed month outright. Wages are **withheld** (shown as *Run coach
+payouts to see*, not a number) whenever a rated coach has no payout run for the month —
+because a partial wage sum would silently overstate Net. A month whose payouts are still
+**draft** shows the figure with a *may change* note. A business with no rated coach (the
+private-coach case) shows Wages S$0 and Net = Revenue.
+
 ---
 
 ## 8. Non-Functional Requirements

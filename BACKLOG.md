@@ -1,6 +1,12 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-23 — **Partial-payment CLOSED** (§8.86): the last follow-up — re-correcting a
+_Last updated: 2026-08-23 — **An owner-only accounting page SHIPPED** (PRD §7.23,
+`20260823000100`): the highest-value ready M is built — an owner-gated accrual P&L per closed month
+(Revenue / Outstanding / Wages / Net). Struck from the re-rank findings, the *Later* pool, and its own
+section. The queue's flat value pool loses its one clearly-ranked head; what remains has no edge — pick
+by value (location entity, the Wave C S-pool, Later)._
+
+_Previously, 2026-08-23 — **Partial-payment CLOSED** (§8.86): the last follow-up — re-correcting a
 debited note once its debit has **FOLDED** — is **REFUSED** with the user (`CN002` stays; safe, dormant,
 manual runbook path), moved to *Deliberately not doing*. The area is done; nothing partial-payment remains
 in the queue. Earlier (§8.84): the pre-bill debit visibility + offboard guard + write-off ramp SHIPPED;
@@ -395,9 +401,10 @@ FOLDED re-correction, was refused → *Deliberately not doing*, §8.86). So the 
 is the Wave D traps plus Later" is retired: what remains is one ready M, a flat value pool, and one soft
 edge. The pass produced three durable findings, recorded so they are not re-derived:
 
-- **One ready M, highest value, waits on nothing — *An owner-only accounting page*.** Decided (accrual),
-  needs no capability model (`is_tenant_owner()` exists), payroll dependency discharged. Build it when
-  priority allows; it carries zero rework risk.
+- ~~**One ready M, highest value, waits on nothing — *An owner-only accounting page*.**~~ **SHIPPED
+  2026-08-23** (PRD §7.23, `20260823000100`): owner-gated accrual P&L per closed month — Revenue /
+  Outstanding / Wages / Net, wages withheld when payouts are unrun. Built exactly as the decision predicted
+  (accrual, `is_tenant_owner()`, no capability model). Zero rework, as called.
 - **One soft edge in the value pool: *A location entity* → *Maps integration*.** Maps reads
   `location_address`; built on the free-text `location_name` it gets reworked onto the FK later. If either
   is wanted, do the location entity first. Both stay low-priority (prod is one location).
@@ -487,12 +494,10 @@ family-status client-side scan, Email-confirmation copy, Tick off swimming skill
 
 ### Later — big features carrying their own dependencies
 
-**An owner-only accounting page (M — *absorbs Revenue reporting*)** — **accrual chosen
-2026-08-16** (revenue = invoices issued that month; sum issued invoices + `paid_outside`
-settlements, no partial figure), and the trainee-coach payroll dependency is **discharged**
-(shipped 2026-08-12). So this now waits on nothing but priority. Needs no capability model.
-**Split co-admin permissions (M)** — *yes eventually*; the accounting page does not wait
-on it. **A location entity / venue (M — *demoted here 2026-08-22*)** — production is one
+~~**An owner-only accounting page (M — *absorbs Revenue reporting*)**~~ — **SHIPPED 2026-08-23**
+(PRD §7.23, `20260823000100`). Accrual as chosen; owner-gated; no capability model, as predicted.
+**Split co-admin permissions (M)** — *yes eventually*; the accounting page did not wait
+on it (and shipping it added no gated surface — it is owner-gated, not co-admin-scoped). **A location entity / venue (M — *demoted here 2026-08-22*)** — production is one
 location, so promoting `classes.location_name` to a `locations` table only pays off for a
 multi-venue business; full item under *Admin and operations*. Household split billing (M — *needs a credit-splitting
 rule*), Auto PayNow detection (L — *the CSV-import M is the 10% worth doing first*),
@@ -966,7 +971,7 @@ rule and a decision about which parent's credit balance a correction lands in. C
 pooled **per parent** (`docs/ARCHITECTURE.md` §6), so splitting invoices without splitting credit
 would produce a ledger nobody can explain.
 
-### ~~Revenue reporting~~ — **ABSORBED 2026-08-08** into *An owner-only accounting page*
+### ~~Revenue reporting~~ — **ABSORBED** into the accounting page, **SHIPPED 2026-08-23** (PRD §7.23)
 Tell a business what it actually earned in a month.
 
 **Absorbed, not dropped.** The content is now the main half of *An owner-only accounting
@@ -1262,29 +1267,21 @@ contract migration (add table + FK, backfill from distinct names, keep the text 
 apps read the FK). Per-venue columns in the day view are the UI half. Not urgent: production is one
 location.
 
-### An owner-only accounting page — **M** — _raised 2026-08-08, not a priority_
-One page showing what the business actually earned and paid out — revenue, wages paid,
-outstanding — **visible to the owner and not to co-admins**.
+### ~~An owner-only accounting page~~ — **M** — **SHIPPED 2026-08-23** (PRD §7.23)
+An owner-gated accrual P&L, one closed month at a time: **Revenue** (net_amount −
+balance_adjustment + `paid_outside` settlements covering the month), **Outstanding**,
+**Wages** (accrued, withheld when payouts are unrun), **Net**. Migration
+`20260823000100_accounting_summary.sql` (two owner-gated RPCs), page
+`SwimSyncAdmin/app/(admin)/accounting/`.
 
-**Why:** raised by the user while deciding whether co-admin permissions need splitting. It
-is the first concrete thing a co-admin should *not* see, and the reason the answer to
-"split co-admin permissions" is *yes eventually, not now*.
-
-**Notes:**
-
-- **This needs NO capability model.** "Owner only" is already expressible —
-  `tenants.owner_profile_id` and `is_tenant_owner()` shipped 2026-08-06. So this page can
-  be built whenever it becomes a priority, and it does **not** wait on
-  *Split co-admin permissions*. Recording that explicitly, because the two look coupled and
-  are not.
-- **This absorbs _Revenue reporting_** as its main content. Its decide-first question is
-  **settled: ACCRUAL** (revenue = invoices *issued* that month), chosen with the user
-  2026-08-16. It still inherits *do not ship a partial figure* — two sources must be summed,
-  `invoices` issued that month **plus** `student_settlements.amount` where
-  `kind = 'paid_outside'`.
-- Wages paid out come from `coach_payouts`, which is already draft→frozen per period. The
-  trainee-coach dependency is **discharged** — shadows ship two payout rows already
-  (`20260812000200`), so the payroll half exists and this reads it rather than reinventing it.
+Built exactly as the item predicted: **no capability model** (`is_tenant_owner()`),
+**accrual** (chosen 2026-08-16), **do-not-ship-a-partial-figure** honoured (wages return
+NULL, not a partial sum, when a rated coach has no payout run). Two things the build
+*found* and the plan-review hardened, kept because they are the hard-won part:
+`balance_adjustment` had to be **subtracted** from revenue (it is a prior month's debit
+folded onto this month's invoice), and `wages_state` is a **per-rated-coach coverage**
+check, not "any payout row exists" — a coach rated after the run would otherwise read as
+final and overstate Net.
 
 ### Split co-admin permissions — **M**
 Restrict what individual co-admins can do — e.g. an assistant who can mark attendance and
