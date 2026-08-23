@@ -1,11 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-22 — **Partial-payment via `debit_balance`: void-on-paid no longer reopens** (§8.83;
-PRD §5.6; §7.206; DEPLOYMENT §11.39). A void of a credit drawn against a PAID invoice posts a debit the next
-invoice folds in (credit + debit net); paid invoices are immutable. Migration `20260822000100`, engine v27,
-SHIPPED + DEPLOYED. Also (doc-only): location entity → Later, cancel-today REFUSED, §3 graduated._
+_Last updated: 2026-08-23 — **Partial-payment follow-ups: auto-unwind a pending debit, offboard guard +
+write-off ramp** (§8.84; PRD §5.6; §7.207–§7.209; DEPLOYMENT §11.40). Re-correcting a voided-and-debited note
+now auto-unwinds the debit while it is still PENDING (refunds nothing already billed); a family owing a debit
+can't be offboarded until it is written off; admins see pending charges before they bill. Migration
+`20260822000200`, engine UNCHANGED, SHIPPED + DEPLOYED. Collect-now designed then REJECTED for the write-off ramp._
 
-_Previously, 2026-08-22 (§8.82) — advance-cancel EXTENDS a prepaid package (`20260821000800`, DB-only); + unassigned sidebar badge, `/deploy` skill._
+_Previously, 2026-08-22 (§8.83) — partial-payment via `debit_balance`: a void against a PAID invoice posts a debit the next invoice folds in, no longer reopens (`20260822000100`, engine v27)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -28,7 +29,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.204** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.209** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -173,11 +174,12 @@ first-firing trigger is what to watch for.
 - **Substitutes & shadows** — **0** `session_coaches`, **0** `class_shadow_coaches`; the *Add a shadow*
   dropdown is **correctly empty** (§7.131). No payout ever generated on prod (rate-less coach skipped). Real
   the day a second coach is hired; verified locally by `verify-coach-roster` (30 checks) — the only place it can be.
-- **All credit work** (§8.64/§8.68/§8.69, **+ partial-payment §8.83**) — **0 credit notes** on prod, so emails,
-  Resend/Void, `CN001`, the engine credit lock, the `reversed_at` filter — **and now the whole `debit_balance`
-  path** (void-on-paid → debit, the engine fold, `CN002`) — are all dormant (0-rows made every backfill a
-  no-op). **The ordering-guard (§8.69) is a PROVABLE no-op** — prod bills in order (only 2026-07 sealed). First
-  firing of the debit path: the first void of a credit drawn against a PAID invoice.
+- **All credit work** (§8.64/§8.68/§8.69, **+ partial-payment §8.83/§8.84**) — **0 credit notes** on prod, so
+  emails, Resend/Void, `CN001`, the engine credit lock, the `reversed_at` filter — **the whole `debit_balance`
+  path** (void-on-paid → debit, the engine fold, `CN002`), **and now the follow-ups** (the pending-debit
+  auto-unwind, the pending-charges panel, the offboard guard, `write_off_parent_balance`) — are all dormant
+  (0-rows made every backfill a no-op). **The ordering-guard (§8.69) is a PROVABLE no-op** — prod bills in order
+  (only 2026-07 sealed). First firing of the debit path: the first void of a credit drawn against a PAID invoice.
 - **Orphan-lesson report** — 0 lines, badge never lit (every July invoice Paid). First firing: a backdated
   enrolment/make-up/trial, or an absent→present edit after billing.
 - **Wave 5 controls + admin-delete refusal (§8.52) + Attendance money-axis (§8.53)** — all dormant for the
@@ -321,6 +323,28 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.84 (2026-08-23) — Partial-payment follow-ups: auto-unwind a pending debit, offboard guard + write-off ramp; SHIPPED + DEPLOYED
+
+**Two BACKLOG follow-ups to §8.83, shipped and deployed to prod in order.** (a) Re-correcting a
+voided-and-debited note now **auto-unwinds** the debit when it is still PENDING (not yet folded onto an
+invoice) — refining §7.206's blanket `CN002`, which now fires only once the charge is billed or written off.
+(b) A tenant-scoped **"Pending charges" panel** on the admin Invoices page shows a family's `debit_balance`
+before it bills, with an audited **Write off** action. An **offboard guard** (`BEFORE UPDATE` trigger on
+`parent_tenants`, DEBIT-ONLY — credit is preserved) refuses set-inactive while a debit is owed; the write-off
+is its exit ramp. Migration `20260822000200`, engine **UNCHANGED** (the fold is all in-SQL). Behaviour PRD §5.6.
+
+**Two adversarial reviews earned their keep.** A `/plan-review` (fable) rejected **collect-now** (a standalone
+same-month invoice): it collides with `UNIQUE(parent,tenant,month)` and would make the engine skip the whole
+month (§7.208), an engine change for a chaseable-invoice-only payoff — the **write-off ramp** replaced it. A
+pre-merge **senior-engineer review** caught a CRITICAL lock-ordering **double-refund** (the auto-unwind read
+the balance before locking it — §7.207) plus 11 lesser findings, 10 fixed. **Verified:** pgTAP
+`partial_payment_followups.test.sql` 33 + `partial_payment` updated, suite PASS; red-first proven; DOWN
+rehearsed ×2; Deno 236 ×2; vitest 519; typecheck clean; UI driven end-to-end. **Deploy: DEPLOYMENT §11.40** —
+migration → grant dump → GATE → apps LAST, in order (no §11.9 repeat). **Dormant:** 0 credit notes on prod.
+
+**One follow-up REMAINS** (`BACKLOG.md`): re-correcting a note whose debit has already FOLDED still refuses
+(`CN002`) — the multi-flip state machine; `INVOICE_RUNBOOK.md` has the manual path.
+
 ## 8.83 (2026-08-22) — Partial-payment via `debit_balance` — void-on-paid no longer reopens; SHIPPED + DEPLOYED
 
 **A void of a credit drawn against a PAID invoice no longer reopens it — paid invoices are now immutable.**
@@ -342,24 +366,6 @@ admin PRE-BILL debit visibility is deferred. **Verified:** pgTAP 1340 (`partial_
 **Also this session (doc-only, `215ed74`):** *A location entity* DEMOTED to Later; *cancelling TODAY's lesson*
 REFUSED (→ *Deliberately not doing*); **HANDOVER §3 graduated** (DORMANT trimmed, Production-reality prose →
 DEPLOYMENT §11 pointer).
-
-## 8.82 (2026-08-22) — Advance-cancel EXTENDS a prepaid package; + unassigned sidebar badge, `/deploy` skill
-
-**A cancelled lesson now gives the covering package its week back** — the holiday twin, but sourced from
-CANCELLED lessons + enrolments (migration `20260821000800`, DB-only, NO engine: the only `core.ts` change was a
-comment). Reuses `holiday_extension_days`, `holiday_covering_package`, and a new cancel term on
-`package_effective_end`. **An adversarial review (fable) caught a HIGH bug**: a date-scoped reconcile
-retro-extended late joiners and retro-retracted unenrollers; fixed by keying state **per cancelled LESSON** and
-scoping the reconcile to one (class, date), plus a 3-trigger fan (ins/upd/**del**). Full reasoning **§7.205**;
-behaviour PRD §7.6; tests `docs/TESTING.md` §5 (`cancel_package_extension.test.sql`, 17, red-first ×3); deploy
-**DEPLOYMENT §11.38** — which records the §11.9 ordering mistake **RECURRING** (apps pushed to `main` before the
-migration reached prod; recovered by an immediate `db push`).
-
-**Also, no migration:** the **unassigned-children sidebar badge** (`08b87ed`, PRD §5.2) — an *add*, it never
-existed (the remembered "1" was the Dashboard tile); and a new **`/deploy` skill** (`ceea58b`) that hard-gates the
-app push behind `migration list --linked` 0-pending, so the ordering mistake can't repeat. **Verified:** pgTAP
-1339, Deno 232 ×2, jest 400, vitest 519, typechecks clean. **Dormant on prod:** 0 packages, so the extension has
-never fired.
 
 ## 9. Next steps (pick with the user)
 
@@ -423,13 +429,15 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 
 ### THE NEXT BUILD — no rework-critical head; a flat value pool
 
-**The last Wave D trap SHIPPED this session** — partial-payment via `debit_balance` (§8.83, deployed).
-**No rework-critical head remains.** *A location entity* is in *Later* (production is one location). **No
-migration is in flight** (§7.55); latest applied is `20260822000100` (partial-payment, §8.83), on prod.
+**The partial-payment follow-ups SHIPPED this session** (§8.84, deployed): auto-unwind a pending debit, the
+pending-charges panel, the offboard guard + write-off ramp. **No rework-critical head remains.** *A location
+entity* is in *Later* (production is one location). **No migration is in flight** (§7.55); latest applied is
+`20260822000200` (partial-payment follow-ups, §8.84), on prod, 0 pending.
 
 What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value:
-- **Two partial-payment follow-ups** (both dormant, small): seamless re-correction of a voided-and-debited
-  note (today refused `CN002`), and admin PRE-BILL debit visibility. Neither is urgent.
+- **One partial-payment follow-up remains** (dormant, M): re-correcting a note whose debit has already
+  FOLDED still refuses (`CN002`) — the multi-flip state machine; `INVOICE_RUNBOOK.md` has the manual path.
+  The PENDING case and pre-bill visibility both shipped (§8.84).
 - **Later:** owner-only accounting page (accrual — decided), split co-admin permissions, the location entity.
 - Full ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**):
   `BACKLOG.md`.
@@ -465,14 +473,14 @@ What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value:
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260822000100` (partial-payment, §8.83);
-production confirmed caught up 2026-08-22 via `supabase migration list --linked`, **0 pending**.
-**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending, the fix for the
-ordering mistake that recurred AGAIN this session (DEPLOYMENT §11.39, §11.38, §11.9 — recovered by reverting the
-app files only, landing the backend, re-applying apps last). **§11.39/§11.37 are the freshest worked
-examples of the FULL sequence** — a NEW-function migration needs a remote grant dump; apps go to `main` LAST,
-with a **committed DOWN generated from `pg_get_functiondef()`, rehearsed** (the pattern to copy).
-§11.36 is the same-signature contrast (no grant dump needed, §11.32 pattern).
+**The migration queue is EMPTY.** The latest applied is `20260822000200` (partial-payment follow-ups, §8.84);
+production confirmed caught up 2026-08-23 via `supabase migration list --linked`, **0 pending**.
+**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending. **§11.40 is the
+freshest worked example of the FULL sequence done IN ORDER** — a NEW-function migration
+(`write_off_parent_balance`) needing a remote grant dump → GATE → apps to `main` LAST, with a committed
+rehearsed DOWN (no §11.9 repeat this time). §11.39/§11.37 are earlier full-sequence examples; **§11.38 records
+the §11.9 ordering mistake recurring** (recovered by reverting the app files only, landing the backend,
+re-applying apps last). §11.36 is the same-signature contrast (no grant dump needed, §11.32 pattern).
 **§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
 **expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract
 migration LAST (held back by a `.hold` rename until the apps stopped reading the dropped columns);

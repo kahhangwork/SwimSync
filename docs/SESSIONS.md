@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.82** | 2026-08-22 | Advance-cancel EXTENDS a prepaid package (`20260821000800`, DB-only); + unassigned sidebar badge, `/deploy` skill | §7.205 · PRD §7.6 · DEPLOYMENT §11.38 |
 | **8.81** | 2026-08-21 | Advance-cancel a lesson SHIPPED + DEPLOYED (`cancel_lesson`/`restore_lesson`, `20260821000700`, engine v26); every surface agrees, mark-refusal is the DB trigger | §7.203/§7.204 · PRD §7.6 · DEPLOYMENT §11.37 |
 | **8.80** | 2026-08-21 | Parent Upcoming also lists booked make-ups + admin extra lessons (explicit rows win, not holiday-subtracted); app-only `8cf219c` | PRD §7 · `computeUpcomingLessons` |
 | **8.79** | 2026-08-21 | `add_unclaimed_student` ONGOING arm made ADMIN-ONLY (coach arm closed — a decision); `20260821000600` | §7.202 · PRD §7.17 · DEPLOYMENT §11.36 |

@@ -3275,4 +3275,39 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `partial_payment.test.sql`: a void against a **paid** invoice marks its application `debited_at` ONLY (not
     `reversed_at`, so the paid invoice's `credit_applied` still reconciles), and **re-correcting a
     voided-and-debited note is REFUSED (`CN002`)** — the multi-flip debit state machine is deferred (`BACKLOG.md`).
-    **Don't "simplify" this to one signed column.** (2026-08-22.)
+    **Don't "simplify" this to one signed column.** (2026-08-22.) *(§7.206's blanket `CN002` was later refined:
+    the PENDING case auto-unwinds — §7.207, §8.84.)*
+
+207. **The auto-unwind of a pending debit MUST take the balance row `FOR UPDATE` BEFORE it reads whether the draw
+    is still pending — reading first is a silent DOUBLE REFUND.** `20260822000200` (§8.84) made re-correcting a
+    voided-and-debited note AUTO-UNWIND the debit while it is still pending (refining §7.206). The first cut ran
+    its reversibility check and its drawn-sum SELECT with NO lock on `parent_tenant_balances`; a senior-engineer
+    review caught it before merge. Under READ COMMITTED a concurrent `apply_credit_to_invoice` (a billing run —
+    exactly when debits fold) or `write_off_parent_balance` committing BETWEEN the check and the SUM makes the
+    guard pass on the pre-commit snapshot while the SUM reads 0 on the post-commit snapshot → the note is
+    re-credited IN FULL against a charge already billed/settled. The `debit_balance ≥ 0` CHECK does NOT save you
+    (subtracting 0 is legal). Fix: `PERFORM 1 FROM parent_tenant_balances … FOR UPDATE` at the top of the debited
+    branch, before any read — it serialises against `apply`'s and `write_off`'s own balance locks (`apply` already
+    stamps `folded_at` only after its own `FOR UPDATE`). The clearing UPDATE must ALSO carry `AND folded_at IS NULL
+    AND written_off_at IS NULL` so it can never strip a billed/settled draw. Pinned by
+    `partial_payment_followups.test.sql`. (2026-08-23.)
+
+208. **A standalone/adjustment invoice in the CURRENT month collides with `UNIQUE(parent_id, tenant_id,
+    billing_month)` and makes the engine SKIP the whole month — a silent permanent underbill.** Designing "collect
+    a pending debit now" (§8.84) as a second same-month invoice hit this: the constraint (`20260718001100`) forbids
+    two invoices per parent per month, and the engine's re-run guard (`core.ts` ~:1266) skips a parent who already
+    has ANY invoice that month (`already_exists`) — so a collect-now invoice would make the monthly run skip that
+    family's real lessons, seal the month, and never reprocess. Any future second-invoice-per-month feature needs
+    an `invoices.kind` discriminator (`'lessons'`/`'adjustment'`), a partial unique index per kind, and the
+    engine's already-exists guard filtered to `kind='lessons'` — an ENGINE change, not just a new RPC. Caught in a
+    `/plan-review` (fable); collect-now was dropped for a write-off ramp instead. (2026-08-23.)
+
+209. **To block an action several RPCs can trigger, guard the shared TABLE write, not each RPC.** The offboard
+    guard (§8.84 — a family owing a pending debit cannot be set inactive) was first scoped to
+    `set_parent_tenant_active`. But the everyday offboard (deactivate the last child) flips `parent_tenants.is_active`
+    via `set_students_active`'s "no active children left" consequence rule (`20260719001200`), and
+    `close_student_enrolment` delegates to it — a coach path too. A per-RPC guard is bypassable by all of them. The
+    guard is a `BEFORE UPDATE` trigger on `parent_tenants` (WHEN is_active true→false), so EVERY path inherits it;
+    its balance read is `FOR UPDATE` (no TOCTOU vs a concurrent void). DEBIT-ONLY — credit is preserved across
+    offboard by design. Pinned by `partial_payment_followups.test.sql` (deactivating the last child with a debit
+    RAISEs). (2026-08-23.)

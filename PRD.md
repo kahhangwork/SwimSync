@@ -620,9 +620,23 @@ the parent's balance. What happens to each drawn invoice depends on whether it w
 
 Payment records are left untouched as immutable history. **No email is sent to the parent in
 v1** — the admin communicates the change. Re-correcting a lesson whose note was voided-and-
-debited is refused (`CN002`) until that charge is settled (`BACKLOG.md`). Rationale, guards and
-the drawdown-lock that makes voiding race-safe:
-`docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md` and `docs/plans/PARTIAL_PAYMENT_PLAN.md`.
+debited **auto-unwinds the debit while it is still pending** (not yet folded onto an invoice),
+restoring the note exactly; once that charge has been **billed (folded) or written off** the
+re-correction is refused (`CN002`) — reversing a settled charge is deferred (`BACKLOG.md`;
+`INVOICE_RUNBOOK.md` has the manual path). *(implemented 2026-08-23,
+`docs/plans/PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md`.)*
+
+A pending debit is **visible to the admin before it bills** — a *"Pending charges — not yet
+invoiced"* panel on the Invoices page, with an audited **Write off** action that clears it. A
+family that **owes a pending debit cannot be set inactive** until it is written off or settled
+(a **debit-only** guard on the shared membership flip — credit is deliberately preserved across
+offboard). A standalone "collect now" charge was considered and **rejected** (it forced an
+engine change and only produced a chaseable invoice); money owed is settled out-of-band.
+*(implemented 2026-08-23.)*
+
+Rationale, guards and the drawdown-lock that makes voiding race-safe:
+`docs/plans/CREDIT_NOTE_AND_MARKABLE_FLOOR_PLAN.md`, `docs/plans/PARTIAL_PAYMENT_PLAN.md` and
+`docs/plans/PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md`.
 
 #### Credit Note Details
 

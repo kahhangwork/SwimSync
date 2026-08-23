@@ -1,6 +1,8 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-22 — **Two decisions recorded, nothing built.** *A location entity* is DEMOTED
+_Last updated: 2026-08-23 — **Partial-payment follow-ups SHIPPED** (§8.84): the pre-bill debit visibility +
+offboard guard + write-off ramp are built (removed from the queue); the debited-note re-correction is narrowed
+to the FOLDED case only (the PENDING case auto-unwinds now). Earlier: *A location entity* is DEMOTED
 from the queue's head to **Later** (production is one location; it only bites a multi-venue business), so
 the build order now has **no rework-critical head** — just the Wave D traps and the Later pool. And
 *cancelling TODAY's lesson from the admin panel* is **REFUSED** (advance means advance; today/past is the

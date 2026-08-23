@@ -806,3 +806,20 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     (`20260822000100_..._DOWN.sql`), rehearsed (guard refuses to drop columns holding real debit state; clean
     apply + re-apply, suite green). **Dormant on prod:** 0 credit notes, so no void has posted a debit — first
     firing is the first void of a credit drawn against a PAID invoice.
+
+40. **Deploy record (2026-08-23): partial-payment follow-ups — the FULL sequence, done IN ORDER (§11.9 avoided).**
+    (§7.207–§7.209; PRD §5.6; `docs/plans/PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md`; §8.84.) Migration `20260822000200`:
+    additive `credit_applications.folded_at/folded_invoice_id/written_off_at/written_off_by`; three same-signature
+    CREATE OR REPLACEs (`apply_credit_to_invoice`, `handle_attendance_update`, `guard_parent_offboard_balance`);
+    one new `BEFORE UPDATE` trigger on `parent_tenants`; one NEW SECURITY DEFINER fn `write_off_parent_balance`.
+    **Engine UNCHANGED** (`core.ts` untouched — the fold is all in-SQL; no version bump). App change: admin
+    Invoices + Parents pages. Sequence: (1) `supabase db push` — `20260822000200` remote filled, `migration list
+    --linked` **0 pending** (pgdelta `ENOENT` cert trace alongside `Finished`, harmless as always). (2) **Remote
+    grant dump** — `write_off_parent_balance` is `REVOKE ALL … FROM PUBLIC` + `GRANT … authenticated`, **no
+    `anon`** (§7.39 passed). (3) ── GATE: 0 pending + grants clean ── (4) apps → `main` LAST (`git push …:main`,
+    `040d3ab..62f3ab7`, Vercel rebuild); live admin 200. Rollback: committed DOWN (`20260822000200_..._DOWN.sql`),
+    rehearsed twice (guard refuses to drop columns holding `folded_at`/`written_off_at` state; clean apply +
+    teardown + re-apply, suite green). A `/plan-review` and a pre-merge senior-engineer review caught a CRITICAL
+    lock-ordering double-refund (§7.207) and the collect-now UNIQUE trap (§7.208) before they shipped. **Dormant on
+    prod:** 0 credit notes — first firing is the first re-correction of a pending voided-and-debited note, or the
+    first write-off.
