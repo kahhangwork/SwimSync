@@ -1,11 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-23 — **Partial-payment CLOSED** (§8.86, DOCS-ONLY). The last follow-up — seamlessly
-re-correcting a voided-and-debited note once its debit has **FOLDED** — was refused with the user; it keeps
-returning `CN002` (safe loud failure, deeply dormant, manual runbook path exists). Recorded in `BACKLOG.md` →
-*Deliberately not doing*. No code, no migration, no engine change; behaviour unchanged._
+_Last updated: 2026-08-24 — **Owner-only accounting page SHIPPED + DEPLOYED** (§8.87, PRD §7.23,
+`20260823000100`). An owner-gated accrual P&L per closed month — Revenue / Outstanding / Wages / Net, with a
+revenue breakdown; wages WITHHELD (not a partial sum) when payouts are unrun. Two new SECURITY DEFINER RPCs
+(`is_tenant_owner` gate), admin `/accounting` page. Live on prod, grant dump clean, DORMANT (no owner has
+viewed it). `/plan-review` + senior review caught three wrong-number bugs pre-ship._
 
-_Previously, 2026-08-23 (§8.85) — tenant-admin invite link now lasts 24h and the email says so; bumped auth `mailer_otp_exp` 3600→86400 on prod + local (a GLOBAL knob). App-only, SHIPPED + DEPLOYED._
+_Previously, 2026-08-23 (§8.86) — Partial-payment CLOSED: the FOLDED re-correction refused → *Deliberately not doing* (`CN002` stays). Docs-only, behaviour unchanged._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -193,6 +194,11 @@ first-firing trigger is what to watch for.
 - **Capacity hard limit + holiday SGT boundary + retire-race locks (§8.73/§8.75/§8.77/§8.78)** — no class
   carries a `capacity`, no same-day holiday retirement, one admin can't race a seat or a retire, so §7.198–§7.201
   refuse nothing yet; **the Lessons sidebar badge is the exception — LIVE** (PRD §7.3/§7.6/§7.22). First firing needs a second admin.
+- **Owner-only accounting page (§8.87, PRD §7.23)** — LIVE on prod but **no owner has opened it**; the
+  "never a partial figure" guard (wages WITHHELD when payouts unrun) and the `draft`/`run_payouts` states have
+  never fired on real data. Prod is a rate-less solo coach, so Wages=0/Net=Revenue is the only branch reachable
+  today; the wages-coverage branches go live the day a second, rated coach exists. First real figures: the first
+  time the owner views a billed month.
 
 ### Prohibitions — these live nowhere else
 
@@ -322,6 +328,26 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.87 (2026-08-24) — Owner-only accounting page: accrual P&L per closed month; SHIPPED + DEPLOYED
+
+**The highest-value ready backlog item is built and live** (PRD §7.23, `20260823000100`, DEPLOYMENT §11.41).
+Admin → Billing → **Accounting**, owner-only (`is_tenant_owner()`): pick a closed (billing-sealed) month →
+Revenue / Outstanding / Wages / Net + a revenue breakdown. Two new read-only SECURITY DEFINER RPCs
+(`accounting_months`, `accounting_summary`); admin `/accounting` page (`lib/accounting.ts`).
+
+**Accrual, never a partial figure.** Revenue = `net_amount − balance_adjustment` (a prior month's folded debit
+is not this month's earning) + live `paid_outside` settlements covering the month. Wages = accrued cost of
+lessons taught (period items + corrections reallocated by `original_period`), WITHHELD as NULL ("Run coach
+payouts") when a rated coach has no payout run — a per-rated-coach **coverage** check, not "any payout row".
+
+**How it was built:** `/plan-with-confidence` → `/plan-review` (fable) → build → `/commit-review` (fable senior
+review) → `/deploy`. The reviews caught three wrong-number bugs pre-ship (all proven RED): `balance_adjustment`
+inflating revenue, adjustment-exclusion losing corrections, and a `final` figure that could still move on a
+later draft. Verified: pgTAP 38, admin vitest 532, typecheck, live UI drive (owner sees figures, co-admin
+blocked). Reasoning graduated to PRD §7.23, the migration comments, DEPLOYMENT §11.41, TESTING §5,
+`docs/plans/ACCOUNTING_PAGE_PLAN.md`. **Dormant on prod:** no owner has opened it — first real figures appear
+the first time an owner views a billed month.
+
 ## 8.86 (2026-08-23) — Partial-payment CLOSED: the FOLDED re-correction refused → *Deliberately not doing*; DOCS-ONLY
 
 **The last open partial-payment follow-up was refused with the user, closing the area.** Seamlessly
@@ -333,24 +359,6 @@ folded/settled charge is the multi-flip state machine (M) — not worth building
 recorded in `BACKLOG.md` → *Deliberately not doing* (§7.206–§7.207, `partial_payment_followups.test.sql` pins
 both arms). **No code, no migration, no engine change; behaviour unchanged** (the refusal already shipped in
 §8.83/§8.84).
-
-## 8.85 (2026-08-23) — Tenant-admin invite link lasts 24h, and the email says so; SHIPPED + DEPLOYED
-
-**The link the platform admin emails a new tenant admin now expires in 24 hours, up from 1, and the email
-states it.** The expiry is Supabase auth's `mailer_otp_exp` (`otp_expiry` in `config.toml`) — a SINGLE global
-knob, so magic-link and password-recovery links became 24h too; there is no invite-only setting (§7.210).
-Prod's cloud auth config was PATCHed `mailer_otp_exp: 86400` via the **Management API** (not `supabase config
-push`, which is push-only and would clobber the whole remote auth config); `config.toml` mirrors it locally.
-The invite email (`SwimSyncAdmin/lib/inviteEmail.ts`) now reads *"expires 24 hours after it was sent"*, coupled
-to the knob by a comment so the copy can't silently drift. Behaviour: PRD §4.4.
-
-**How it was found:** the user asked the pre-change expiry; a read via the Management API GET confirmed prod was
-3600 (1h), matching the repo. **Verified:** vitest `inviteEmail.test.ts` 13 (new assertion red-first by
-inspection — the string is unique to the edit) + admin typecheck clean; prod `mailer_otp_exp` GET-confirmed 86400
-after the PATCH. **Deploy order honoured:** prod config (the backend dependency) FIRST, app to `main` LAST — the
-email can't lie in the gap. App-only push (`34db287`); no migration, no engine change. **Dormant note:** no new
-business has been provisioned since, so the 24h link is unexercised on real data — first firing is the next
-Platform → New business invite.
 
 ## 9. Next steps (pick with the user)
 
@@ -414,19 +422,17 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 
 ### THE NEXT BUILD — no rework-critical head; a flat value pool
 
-**This session (§8.85) shipped the 24h invite link** — app-only + a prod auth-config change, no queue impact.
-The partial-payment follow-ups shipped the session before (§8.84, deployed); its final follow-up (the FOLDED
-re-correction) was **refused 2026-08-23 → *Deliberately not doing***, so partial-payment is CLOSED. **No rework-critical head remains.**
-*A location entity* is in *Later* (production is one location). **No migration is in flight** (§7.55); latest
-applied is `20260822000200` (partial-payment follow-ups, §8.84), on prod, 0 pending.
+**This session (§8.87) shipped the owner-only accounting page** — the highest-value ready M, now built +
+deployed (PRD §7.23). **That was the one clearly-ranked head; nothing rework-critical remains.** **No migration
+is in flight** (§7.55); latest applied is `20260823000100` (accounting RPCs, §8.87), on prod, 0 pending.
 
-What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value:
-- **Partial-payment is CLOSED.** The last follow-up (re-correcting a note whose debit has already FOLDED —
-  the multi-flip state machine) was **refused 2026-08-23 with the user** → *Deliberately not doing*. It keeps
-  refusing (`CN002`): a safe loud failure, deeply dormant, `INVOICE_RUNBOOK.md` has the manual path. The
-  PENDING case and pre-bill visibility both shipped (§8.84).
-- **Later:** owner-only accounting page (accrual — decided), split co-admin permissions, the location entity.
-- Full ranking + settled decisions (revenue **ACCRUAL** · reminders **MANUAL** · multi-language **REFUSED**):
+What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value (no edges between them):
+- **The value pool** — *A location entity* → *Maps* (soft edge: do location first if Maps is wanted; prod is
+  one location so low value), plus the Wave C S-pool (better filtering/search, family-status scan,
+  student-between-businesses, email-confirmation copy, tick-off swim skills).
+- **Two parked retrofit-tax choices** (not free while parked): *Split co-admin permissions* (yes eventually —
+  the accounting page needed none, being owner-gated not co-admin-scoped), and the *location entity*.
+- Settled decisions (revenue **ACCRUAL** now *realised* · reminders **MANUAL** · multi-language **REFUSED**):
   `BACKLOG.md`.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
@@ -460,12 +466,14 @@ What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value:
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260822000200` (partial-payment follow-ups, §8.84);
-production confirmed caught up 2026-08-23 via `supabase migration list --linked`, **0 pending**.
-**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending. **§11.40 is the
-freshest worked example of the FULL sequence done IN ORDER** — a NEW-function migration
-(`write_off_parent_balance`) needing a remote grant dump → GATE → apps to `main` LAST, with a committed
-rehearsed DOWN (no §11.9 repeat this time). §11.39/§11.37 are earlier full-sequence examples; **§11.38 records
+**The migration queue is EMPTY.** The latest applied is `20260823000100` (accounting RPCs, §8.87);
+production confirmed caught up 2026-08-24 via `supabase migration list --linked`, **0 pending**.
+**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending. **§11.41 is the
+freshest worked example of the FULL sequence done IN ORDER** — two NEW read-only functions needing a remote
+grant dump → GATE → apps to `main` LAST, verifying the auth-gated page by grepping its NEW route chunk (§8.64's
+technique for §11.25's gap), with a committed rehearsed DOWN. §11.40/§11.39/§11.37 are earlier full-sequence examples; **§11.38 records
+the §11.9 ordering mistake recurring** (recovered by reverting the app files only, landing the backend,
+re-applying apps last). §11.36 is the same-signature contrast (no grant dump needed, §11.32 pattern). §11.39/§11.37 are earlier full-sequence examples; **§11.38 records
 the §11.9 ordering mistake recurring** (recovered by reverting the app files only, landing the backend,
 re-applying apps last). §11.36 is the same-signature contrast (no grant dump needed, §11.32 pattern).
 **§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first

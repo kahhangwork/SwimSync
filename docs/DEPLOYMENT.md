@@ -823,3 +823,19 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     lock-ordering double-refund (§7.207) and the collect-now UNIQUE trap (§7.208) before they shipped. **Dormant on
     prod:** 0 credit notes — first firing is the first re-correction of a pending voided-and-debited note, or the
     first write-off.
+
+41. **Deploy record (2026-08-24, SGT: pushed 2026-08-23 late — owner-only accounting page — FULL sequence IN ORDER.**
+    (PRD §7.23; `docs/plans/ACCOUNTING_PAGE_PLAN.md`; §8.87.) Migration `20260823000100`: TWO new SECURITY DEFINER
+    read-only fns (`accounting_months`, `accounting_summary`), no column/table/policy. **Engine UNCHANGED**
+    (`core.ts` untouched — no version bump). App change: admin `/accounting` page + nav. Sequence: (1) `supabase db
+    push` — `20260823000100` remote filled, `migration list --linked` **0 pending** (pgdelta cert trace alongside
+    `Finished`, harmless). (2) **Remote grant dump** — both fns `REVOKE ALL … FROM PUBLIC` + `GRANT … authenticated`,
+    **no `anon`/`PUBLIC`** (§7.39 passed). (3) ── GATE: 0 pending + grants clean ── (4) apps → `main` LAST (`git push
+    …:main`, `19cdb3e..0146a80`, Vercel). (5) **Post-deploy proof via the §11.25-gap technique** (§8.64): the page is
+    auth-gated so its bundle can't be grepped from the login route, but the **route chunk that did not exist before**
+    — `/_next/static/chunks/app/%28admin%29/accounting/page-*.js` — is served anonymously and contains `Run coach
+    payouts to see` / `Owner only` / `accounting_summary`. Rollback: committed + rehearsed DOWN
+    (`20260823000100_..._DOWN.sql`, UP→DOWN→UP clean — both fns drop and restore; read-only, no data). `/plan-review`
+    + a pre-commit senior review caught a draft-adjustment wrong-number (a `final` figure that could still move) and
+    a stale-response race before they shipped. **Dormant on prod:** no sealed month carries a settlement/rated coach
+    yet, and no owner has opened the page — first real figures appear the first time an owner views a billed month.
