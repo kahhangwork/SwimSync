@@ -83,24 +83,33 @@ INSERT INTO class_categories (id, tenant_id, name) VALUES
 
 -- Host H (host coach, Group, SATURDAY) · Home M (home coach, Group, SUNDAY) ·
 -- Private PC (home coach, Private, MONDAY) · Inactive IC (host coach, Group).
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id, is_active)
+                     location_id, price_per_lesson, category_id, is_active)
 SELECT 'cf000000-0000-0000-0000-000000000001', co.id, 'Mkp Host Sat', 'saturday',
-       '10:00','11:00','Test Pool', 40.00, 'cc000000-0000-0000-0000-000000000001', TRUE
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 40.00, 'cc000000-0000-0000-0000-000000000001', TRUE
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'mkp-host-coach@test.local';
 
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id, is_active)
+                     location_id, price_per_lesson, category_id, is_active)
 SELECT 'cf000000-0000-0000-0000-000000000002', co.id, 'Mkp Home Sun', 'sunday',
-       '10:00','11:00','Test Pool', 35.00, 'cc000000-0000-0000-0000-000000000001', TRUE
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 35.00, 'cc000000-0000-0000-0000-000000000001', TRUE
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'mkp-home-coach@test.local';
 
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id, is_active)
+                     location_id, price_per_lesson, category_id, is_active)
 SELECT 'cf000000-0000-0000-0000-000000000003', co.id, 'Mkp Private Mon', 'monday',
-       '10:00','11:00','Test Pool', 70.00, 'cc000000-0000-0000-0000-000000000002', TRUE
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 70.00, 'cc000000-0000-0000-0000-000000000002', TRUE
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'mkp-home-coach@test.local';
 
@@ -111,10 +120,10 @@ WHERE pr.email = 'mkp-home-coach@test.local';
 -- INSERT raises 23514 and the whole file dies before its first assertion —
 -- which is exactly how the constraint found this fixture.
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id, is_active,
+                     location_id, price_per_lesson, category_id, is_active,
                      deactivated_at)
 SELECT 'cf000000-0000-0000-0000-000000000004', co.id, 'Mkp Retired Sat', 'saturday',
-       '10:00','11:00','Test Pool', 40.00, 'cc000000-0000-0000-0000-000000000001', FALSE,
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 40.00, 'cc000000-0000-0000-0000-000000000001', FALSE,
        now()
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'mkp-host-coach@test.local';

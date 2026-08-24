@@ -76,11 +76,20 @@ VALUES ('3b000000-0000-0000-0000-000000000002','1b000000-0000-0000-0000-00000000
 
 -- The class meets on WHATEVER DAY IT IS TODAY, so the lesson below always falls
 -- inside the attendance window however far in the future this is run (§7.74).
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
+                     location_id, price_per_lesson, category_id)
 SELECT '3b000000-0000-0000-0000-000000000003', c.id, 'Stranger Class',
        lower(to_char(today_sg(),'FMday'))::day_of_week,
-       '10:00','11:00','Pool S', 25, '3b000000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 25, '3b000000-0000-0000-0000-000000000001'
   FROM coaches c WHERE c.profile_id = '2b000000-0000-0000-0000-0000000000c2';
 
 INSERT INTO students (id, full_name, date_of_birth, assignment_status, tenant_id, level_id)

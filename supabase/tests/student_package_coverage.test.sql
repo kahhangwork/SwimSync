@@ -82,26 +82,35 @@ INSERT INTO package_products (id, tenant_id, name, category_id, lesson_count,
   ('be000000-0000-0000-0000-000000000003','ba000000-0000-0000-0000-000000000002',
    'B 10 Lessons','bc000000-0000-0000-0000-000000000002',10,30.00,12);
 
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
+                     location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000001', co.id, 'Cov Group Sat', 'saturday',
-       '10:00','11:00','Test Pool', 50.00, 'bc000000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 50.00, 'bc000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'cov-admin-a@test.local';
 
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
+                     location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000002', co.id, 'Cov Private Sun', 'sunday',
-       '10:00','11:00','Test Pool', 70.00, 'bc000000-0000-0000-0000-000000000003'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 70.00, 'bc000000-0000-0000-0000-000000000003'
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'cov-admin-a@test.local';
 
 -- A second Group class, so a child can hold two enrolments in the SAME category
 -- (Kid Y below). Wednesday, so it cannot overlap Cov Group Sat.
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
+                     location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000003', co.id, 'Cov Group Wed', 'wednesday',
-       '10:00','11:00','Test Pool', 50.00, 'bc000000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 50.00, 'bc000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'cov-admin-a@test.local';
 

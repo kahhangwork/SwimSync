@@ -1272,10 +1272,13 @@ Until then the columns survive as a trigger-maintained mirror, so nothing drifts
 
 **Maps** (below) now builds directly on `locations.address` — no rework, the free-text dependency is gone.
 
-### Location contract sweep — drop the free-text columns — **S** `[raised 2026-08-24 while shipping the location entity, §8.88]`
-Un-hold `20260824000200_locations_entity_contract.sql.hold`: it sets `classes.location_id` NOT NULL and
-drops `classes.location_name` / `classes.location_address`. Written + proven locally already; the blocker is a
-mechanical fixture sweep, so this is deferred, not designed.
+### ~~Location contract sweep — drop the free-text columns~~ — **S** — **BUILT + VERIFIED 2026-08-24 (on `main`, prod-deploy pending)**
+The fixture sweep is done: `20260824000200_locations_entity_contract.sql` is un-held (`.hold` removed), all
+~50 pgTAP fixtures + `seed.sql` now write `location_id`, `disable_coach()` is redefined inside the contract
+migration to stop reading the dropped record fields, and `locations.test.sql`'s two expand-only cases are gone.
+Verified on the CONTRACT schema: `supabase test db` 1442 green, Deno 236×2 green. **The only step left is the
+prod deploy** — the migration DROPs `classes.location_name` / `classes.location_address` (a one-way contract),
+so it lands LAST via `/deploy` (`supabase db push` + a grant re-check). Historical context below.
 
 **Why:** the free-text columns are now dead weight — the app only writes `location_id`, and the sync trigger
 keeps them as a mirror. Dropping them removes the drift surface and the trigger. Not urgent (nothing reads them

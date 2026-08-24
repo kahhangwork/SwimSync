@@ -128,20 +128,29 @@ SELECT t.id, 'Default Group' FROM tenants t
 
 -- Classes: SX/SY in S (coach SC), KX/KY in K (coach KC). Saturday throughout;
 -- 2026-08-01 is a Saturday.
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT 'e5aa0000-0000-0000-0000-000000000011', c.id, 'Suspend Lane','saturday','09:00','10:00','Pool',40,
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT 'e5aa0000-0000-0000-0000-000000000011', c.id, 'Suspend Lane','saturday','09:00','10:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'),40,
        (SELECT cc.id FROM class_categories cc WHERE cc.tenant_id=c.tenant_id AND lower(trim(cc.name))='default group')
   FROM coaches c WHERE c.profile_id='e5aa0000-0000-0000-0000-0000000000c1';
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT 'e5aa0000-0000-0000-0000-000000000012', c.id, 'Suspend Makeup Lane','saturday','11:00','12:00','Pool',40,
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT 'e5aa0000-0000-0000-0000-000000000012', c.id, 'Suspend Makeup Lane','saturday','11:00','12:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'),40,
        (SELECT cc.id FROM class_categories cc WHERE cc.tenant_id=c.tenant_id AND lower(trim(cc.name))='default group')
   FROM coaches c WHERE c.profile_id='e5aa0000-0000-0000-0000-0000000000c1';
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT 'e5bb0000-0000-0000-0000-000000000011', c.id, 'Keep Lane','saturday','09:00','10:00','Pool',40,
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT 'e5bb0000-0000-0000-0000-000000000011', c.id, 'Keep Lane','saturday','09:00','10:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'),40,
        (SELECT cc.id FROM class_categories cc WHERE cc.tenant_id=c.tenant_id AND lower(trim(cc.name))='default group')
   FROM coaches c WHERE c.profile_id='e5bb0000-0000-0000-0000-0000000000c1';
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT 'e5bb0000-0000-0000-0000-000000000012', c.id, 'Keep Makeup Lane','saturday','11:00','12:00','Pool',40,
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT 'e5bb0000-0000-0000-0000-000000000012', c.id, 'Keep Makeup Lane','saturday','11:00','12:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'),40,
        (SELECT cc.id FROM class_categories cc WHERE cc.tenant_id=c.tenant_id AND lower(trim(cc.name))='default group')
   FROM coaches c WHERE c.profile_id='e5bb0000-0000-0000-0000-0000000000c1';
 

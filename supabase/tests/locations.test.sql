@@ -5,14 +5,16 @@
 -- worth pinning: tenant isolation (RLS + the cross-tenant FK guard), the
 -- DATABASE-enforced archive rule (a location an ACTIVE class uses cannot be
 -- archived — the admin page's pre-check is UX only, PostgREST is a second
--- writer), the partial-unique that makes a name reusable after archiving, and
--- the expand-window sync trigger that resolves location_id from location_name.
+-- writer), and the partial-unique that makes a name reusable after archiving.
+-- The expand-window sync-trigger cases (a class written with only location_name)
+-- were dropped by the CONTRACT migration (20260824000200), which removed the
+-- free-text columns and the trigger; only the location_id path remains.
 --
 -- Its own tenants, so nothing here depends on another fixture's state.
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(18);
+SELECT plan(14);
 
 -- The check that would have caught the three RLS-off leaks (tenant_levels).
 SELECT ok(
@@ -62,9 +64,9 @@ INSERT INTO locations (id, tenant_id, name, address, sort_order) VALUES
 
 -- An ACTIVE class in A at Bishan, so archiving Bishan is blocked below.
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id, tenant_id, location_id)
+                     price_per_lesson, category_id, tenant_id, location_id)
 SELECT 'af000000-0000-0000-0000-000000000001', c.id, 'Loc Class', 'monday',
-       '10:00','11:00','Bishan Pool', 25, 'ad000000-0000-0000-0000-000000000001',
+       '10:00','11:00', 25, 'ad000000-0000-0000-0000-000000000001',
        'ac000000-0000-0000-0000-000000000001','ae000000-0000-0000-0000-000000000001'
   FROM coaches c WHERE c.profile_id = 'ab000000-0000-0000-0000-0000000000c1';
 
@@ -129,25 +131,9 @@ SELECT throws_ok($$
 $$, '23503', NULL,
   'a location a class references cannot be hard-deleted (RESTRICT backstop)');
 
--- ── Sync trigger: a class written with only location_name gets a location_id ─
-SELECT lives_ok($$
-  INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                       location_name, price_per_lesson, category_id, tenant_id)
-  SELECT 'af000000-0000-0000-0000-000000000002', c.id, 'Sync Class', 'tuesday',
-         '10:00','11:00','  Sengkang Pool  ', 25,
-         'ad000000-0000-0000-0000-000000000001','ac000000-0000-0000-0000-000000000001'
-    FROM coaches c WHERE c.profile_id = 'ab000000-0000-0000-0000-0000000000c1'
-$$, 'a class can be written with only location_name (old-admin path)');
-
-SELECT is(
-  (SELECT l.name FROM classes c JOIN locations l ON l.id = c.location_id
-    WHERE c.id = 'af000000-0000-0000-0000-000000000002'),
-  'Sengkang Pool',
-  'the sync trigger resolved+trimmed a new location_id from the name');
-
--- ── Reverse: a class written with only location_id (the NEW-admin path) gets ──
--- its NOT NULL location_name mirrored from the entity.  This is what lets the
--- contract migration drop the free-text columns without an app change.
+-- ── The NEW-admin path: a class written with only location_id ────────────────
+-- After the contract migration this is the ONLY way a class gets a location; the
+-- free-text location_name column and its expand-window sync trigger are gone.
 SELECT lives_ok($$
   INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
                        price_per_lesson, category_id, tenant_id, location_id)
@@ -157,23 +143,6 @@ SELECT lives_ok($$
          'ae000000-0000-0000-0000-000000000002'
     FROM coaches c WHERE c.profile_id = 'ab000000-0000-0000-0000-0000000000c1'
 $$, 'a class can be written with only location_id (new-admin path)');
-
-SELECT is(
-  (SELECT location_name FROM classes WHERE id = 'af000000-0000-0000-0000-000000000003'),
-  'Clementi Pool',
-  'the sync trigger mirrored location_name from the entity');
-
--- ── Finding 1: an OLD-app rename must RESOLVE, not be reverted ────────────────
--- location_name changes while location_id is left as-is (the deployed old admin's
--- free-text edit). Direction B must re-resolve location_id from the new name; the
--- pre-fix trigger sent this down the mirror path and silently reverted it.
-UPDATE classes SET location_name = 'Yishun Pool'
- WHERE id = 'af000000-0000-0000-0000-000000000003';
-SELECT is(
-  (SELECT l.name FROM classes c JOIN locations l ON l.id = c.location_id
-    WHERE c.id = 'af000000-0000-0000-0000-000000000003'),
-  'Yishun Pool',
-  'an old-app rename (location_name only) re-resolves location_id, not reverted');
 
 -- ── Archive ALLOWED once only a RETIRED class references it ──────────────────
 -- Retire both classes on Bishan, then Bishan archives cleanly.

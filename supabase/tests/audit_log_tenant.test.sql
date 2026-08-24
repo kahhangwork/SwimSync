@@ -41,11 +41,22 @@ VALUES ('a0d17000-0000-0000-0000-0000000000f1','a0d17000-0000-0000-0000-00000000
 INSERT INTO class_categories (id, tenant_id, name)
 VALUES ('a0d17000-0000-0000-0000-0000000000e1','a0d17000-0000-0000-0000-000000000001','Group');
 
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, tenant_id, category_id, coach_id, title, day_of_week,
-                     start_time, end_time, location_name, price_per_lesson)
+                     start_time, end_time, location_id, price_per_lesson)
 VALUES ('a0d17000-0000-0000-0000-0000000000b1','a0d17000-0000-0000-0000-000000000001',
         'a0d17000-0000-0000-0000-0000000000e1','a0d17000-0000-0000-0000-0000000000f1',
-        'AUDIT Class','monday','09:00','10:00','AUDIT Pool',40);
+        'AUDIT Class','monday','09:00','10:00',
+        (SELECT l.id FROM locations l WHERE l.tenant_id = 'a0d17000-0000-0000-0000-000000000001'
+            AND lower(trim(l.name)) = 'default location'),40);
 
 -- The student belongs to business B while the CLASS belongs to A: assertion 3
 -- then distinguishes "derived from the entity" from "derived from anything else

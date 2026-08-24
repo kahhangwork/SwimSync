@@ -232,3 +232,129 @@ ALTER TABLE classes ALTER COLUMN location_id SET NOT NULL;
 -- ── 5. Drop the free-text columns ────────────────────────────────────────────
 ALTER TABLE classes DROP COLUMN location_name;
 ALTER TABLE classes DROP COLUMN location_address;
+
+-- ── 6. disable_coach stops reading the dropped record fields ──────────────────
+-- disable_coach() does `SELECT c.* INTO v_class` (a RECORD) and passed
+-- v_class.location_name / v_class.location_address positionally into
+-- set_class_terms.  plpgsql binds record fields at EXECUTION, so after the DROPs
+-- above the disable-with-replacement path throws `record "v_class" has no field
+-- "location_name"` at runtime.  Re-create the function reading location_id only:
+-- pass NULL for the (accepted-and-ignored) free-text params and v_class.location_id
+-- as p_location_id.  Body is otherwise byte-identical to 20260813000200; only the
+-- nested set_class_terms call changed.  Same (UUID, UUID) signature, so this is a
+-- plain CREATE OR REPLACE — grants persist (§11.32), no re-grant needed.
+CREATE OR REPLACE FUNCTION public.disable_coach(
+  p_coach_id             UUID,
+  p_replacement_coach_id UUID DEFAULT NULL
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_coach       coaches%ROWTYPE;
+  v_owner       UUID;
+  v_class       RECORD;
+  v_price       NUMERIC;
+  v_class_names TEXT;
+  v_reassigned  UUID[] := '{}';
+BEGIN
+  SELECT * INTO v_coach FROM coaches WHERE id = p_coach_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'no such coach';
+  END IF;
+
+  IF NOT is_tenant_admin(v_coach.tenant_id) THEN
+    RAISE EXCEPTION 'not permitted to manage coaches for this business';
+  END IF;
+
+  IF v_coach.disabled_at IS NOT NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT t.owner_profile_id INTO v_owner
+    FROM tenants t WHERE t.id = v_coach.tenant_id;
+  IF v_coach.profile_id IS NOT DISTINCT FROM v_owner AND NOT EXISTS (
+    SELECT 1 FROM coaches c
+     WHERE c.tenant_id = v_coach.tenant_id
+       AND c.id <> p_coach_id
+       AND c.disabled_at IS NULL
+  ) THEN
+    RAISE EXCEPTION
+      'this is the owner''s coach account and the business''s only active '
+      'coach — hire another coach before disabling it';
+  END IF;
+
+  IF p_replacement_coach_id IS NOT NULL THEN
+    IF p_replacement_coach_id = p_coach_id THEN
+      RAISE EXCEPTION 'a coach cannot be their own replacement';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM coaches c
+       WHERE c.id = p_replacement_coach_id
+         AND c.tenant_id = v_coach.tenant_id
+         AND c.disabled_at IS NULL
+    ) THEN
+      RAISE EXCEPTION
+        'the replacement must be an active coach of this business';
+    END IF;
+  END IF;
+
+  SELECT string_agg(c.title, ', ' ORDER BY c.title) INTO v_class_names
+    FROM classes c
+   WHERE c.coach_id = p_coach_id AND c.is_active;
+  IF v_class_names IS NOT NULL AND p_replacement_coach_id IS NULL THEN
+    RAISE EXCEPTION
+      'this coach still teaches: %. Choose a replacement coach — the classes '
+      'are handed over and the coach disabled in one step.', v_class_names;
+  END IF;
+
+  FOR v_class IN
+    SELECT c.* FROM classes c
+     WHERE c.coach_id = p_coach_id AND c.is_active
+     ORDER BY c.title
+  LOOP
+    SELECT r.price_per_lesson INTO v_price
+      FROM class_rate_on(v_class.id, today_sg()) r;
+    PERFORM set_class_terms(
+      v_class.id,
+      v_class.title,
+      v_class.day_of_week,
+      v_class.start_time,
+      v_class.end_time,
+      NULL,     -- p_location_name — free-text column dropped (contract), ignored
+      COALESCE(v_price, v_class.price_per_lesson),
+      p_replacement_coach_id,
+      NULL,     -- effective from today
+      FALSE,    -- a handover, never an in-place correction
+      NULL,     -- p_location_address — dropped, ignored
+      v_class.location_id   -- p_location_id: keep the class's location
+    );
+    v_reassigned := v_reassigned || v_class.id;
+  END LOOP;
+
+  UPDATE class_shadow_coaches
+     SET effective_to = GREATEST(effective_from, today_sg()),
+         ended_by     = auth.uid(),
+         ended_at     = NOW()
+   WHERE coach_id = p_coach_id AND effective_to IS NULL;
+
+  DELETE FROM session_coaches sc
+   USING lesson_sessions ls
+   WHERE ls.id = sc.lesson_session_id
+     AND sc.coach_id = p_coach_id
+     AND ls.session_date > today_sg();
+
+  UPDATE coaches SET disabled_at = NOW() WHERE id = p_coach_id;
+
+  INSERT INTO audit_log (actor_id, action, entity_type, entity_id,
+                         old_value, new_value)
+  VALUES (auth.uid(), 'coach_disabled', 'Coach', p_coach_id,
+          jsonb_build_object('disabled_at', NULL),
+          jsonb_build_object(
+            'disabled_at',           NOW(),
+            'replacement_coach_id',  p_replacement_coach_id,
+            'classes_reassigned',    to_jsonb(v_reassigned)));
+END;
+$$;

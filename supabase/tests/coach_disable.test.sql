@@ -105,18 +105,27 @@ SELECT t.id, 'Default Group' FROM tenants t
 -- active class; Y is the replacement's, which the target SHADOWS and
 -- SUBSTITUTES on; Z is the target's RETIRED class — the proof that only
 -- active classes are handed over.
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT 'd15a0000-0000-0000-0000-000000000011', c.id, 'Target Lane', 'saturday','09:00','10:00','Pool', 40,
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT 'd15a0000-0000-0000-0000-000000000011', c.id, 'Target Lane', 'saturday','09:00','10:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 40,
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = c.tenant_id AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id = 'd15a0000-0000-0000-0000-0000000000c1';
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT 'd15a0000-0000-0000-0000-000000000012', c.id, 'Replacement Lane', 'saturday','11:00','12:00','Pool', 40,
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT 'd15a0000-0000-0000-0000-000000000012', c.id, 'Replacement Lane', 'saturday','11:00','12:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 40,
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = c.tenant_id AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id = 'd15a0000-0000-0000-0000-0000000000c2';
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, is_active, deactivated_at, category_id)
-SELECT 'd15a0000-0000-0000-0000-000000000013', c.id, 'Retired Lane', 'saturday','13:00','14:00','Pool', 40, FALSE, now(),
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, is_active, deactivated_at, category_id)
+SELECT 'd15a0000-0000-0000-0000-000000000013', c.id, 'Retired Lane', 'saturday','13:00','14:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 40, FALSE, now(),
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = c.tenant_id AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id = 'd15a0000-0000-0000-0000-0000000000c1';

@@ -56,11 +56,22 @@ INSERT INTO class_categories (id, tenant_id, name) VALUES
   ('4e2cccc0-0000-0000-0000-000000000001','4e211111-0000-0000-0000-000000000001','Default Group'),
   ('4e2cccc0-0000-0000-0000-000000000002','4e211111-0000-0000-0000-000000000002','Default Group');
 
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
+                     location_id, price_per_lesson, category_id)
 VALUES ('4e255555-0000-0000-0000-000000000001','4e211111-0000-0000-0000-000000000001',
   (SELECT id FROM coaches WHERE profile_id='4e200000-0000-0000-0000-0000000000c1'),
-  'MERGE Class A','saturday','10:00','11:00','Pool A', 30,
+  'MERGE Class A','saturday','10:00','11:00',
+  (SELECT l.id FROM locations l WHERE l.tenant_id = '4e211111-0000-0000-0000-000000000001'
+      AND lower(trim(l.name)) = 'default location'), 30,
   '4e2cccc0-0000-0000-0000-000000000001');
 
 -- ── The pair that will actually merge ──────────────────────────────────────

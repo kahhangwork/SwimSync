@@ -60,10 +60,19 @@ FROM (VALUES ('01'),('02'),('03'),('04'),('05'),('06'),('07'),('08'),('09'),('10
 -- Classes are inserted just before the assertion that needs them.
 
 -- ── 1: a past lesson nobody touched (1 expected, 0 rows) counts ──────────────
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000001', co.id,'C1',
        (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg()-14)::int+1]::day_of_week,
-       '10:00','11:00','P',50.00,'be000000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'),50.00,'be000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='ulc-coach@test.local';
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at, unenrolled_at)
 VALUES ('55b00000-0000-0000-0000-000000000001','bf000000-0000-0000-0000-000000000001', false, (today_sg()-14)::timestamptz, (today_sg()-14)::timestamptz);
@@ -74,10 +83,10 @@ SELECT is(tenant_unmarked_lesson_count('ba000000-0000-0000-0000-000000000001'), 
 RESET ROLE;
 
 -- ── 2: a PARTIAL lesson (2 expected, 1 marked) counts ───────────────────────
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000002', co.id,'C2',
        (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg()-14)::int+1]::day_of_week,
-       '10:00','11:00','P',50.00,'be000000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'),50.00,'be000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='ulc-coach@test.local';
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at, unenrolled_at) VALUES
   ('55b00000-0000-0000-0000-000000000002','bf000000-0000-0000-0000-000000000002', false, (today_sg()-14)::timestamptz, (today_sg()-14)::timestamptz),
@@ -93,10 +102,10 @@ SELECT is(tenant_unmarked_lesson_count('ba000000-0000-0000-0000-000000000001'), 
 RESET ROLE;
 
 -- ── 3: a FULLY-MARKED lesson does NOT count ─────────────────────────────────
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000003', co.id,'C3',
        (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg()-14)::int+1]::day_of_week,
-       '10:00','11:00','P',50.00,'be000000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'),50.00,'be000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='ulc-coach@test.local';
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at, unenrolled_at)
 VALUES ('55b00000-0000-0000-0000-000000000004','bf000000-0000-0000-0000-000000000003', false, (today_sg()-14)::timestamptz, (today_sg()-14)::timestamptz);
@@ -111,10 +120,10 @@ SELECT is(tenant_unmarked_lesson_count('ba000000-0000-0000-0000-000000000001'), 
 RESET ROLE;
 
 -- ── 4: a fully-HOLIDAY lesson does NOT count ────────────────────────────────
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000004', co.id,'C4',
        (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg()-14)::int+1]::day_of_week,
-       '10:00','11:00','P',50.00,'be000000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'),50.00,'be000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='ulc-coach@test.local';
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at, unenrolled_at)
 VALUES ('55b00000-0000-0000-0000-000000000005','bf000000-0000-0000-0000-000000000004', false, (today_sg()-14)::timestamptz, (today_sg()-14)::timestamptz);
@@ -129,10 +138,10 @@ SELECT is(tenant_unmarked_lesson_count('ba000000-0000-0000-0000-000000000001'), 
 RESET ROLE;
 
 -- ── 5: a GUEST-ONLY lesson (trial, no enrolments) counts ────────────────────
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000005', co.id,'C5',
        (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg()-14)::int+1]::day_of_week,
-       '10:00','11:00','P',50.00,'be000000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'),50.00,'be000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='ulc-coach@test.local';
 INSERT INTO trial_bookings (tenant_id, student_id, class_id, session_date, category_id, booked_by)
 VALUES ('ba000000-0000-0000-0000-000000000001','55b00000-0000-0000-0000-000000000006','bf000000-0000-0000-0000-000000000005', today_sg()-14,'be000000-0000-0000-0000-000000000001','bb000000-0000-0000-0000-000000000001');
@@ -143,10 +152,10 @@ SELECT is(tenant_unmarked_lesson_count('ba000000-0000-0000-0000-000000000001'), 
 RESET ROLE;
 
 -- ── 6: TODAY's lesson is not yet ended (end 23:59) — does NOT count ─────────
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000006', co.id,'C6',
        (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg())::int+1]::day_of_week,
-       '10:00','23:59','P',50.00,'be000000-0000-0000-0000-000000000001'
+       '10:00','23:59',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'),50.00,'be000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='ulc-coach@test.local';
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at, unenrolled_at)
 VALUES ('55b00000-0000-0000-0000-000000000007','bf000000-0000-0000-0000-000000000006', true, today_sg()::timestamptz, today_sg()::timestamptz);
@@ -157,10 +166,10 @@ SELECT is(tenant_unmarked_lesson_count('ba000000-0000-0000-0000-000000000001'), 
 RESET ROLE;
 
 -- ── 7: a date BEFORE the markable floor does NOT count ──────────────────────
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000007', co.id,'C7',
        (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg()-95)::int+1]::day_of_week,
-       '10:00','11:00','P',50.00,'be000000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'),50.00,'be000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='ulc-coach@test.local';
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at, unenrolled_at)
 VALUES ('55b00000-0000-0000-0000-000000000008','bf000000-0000-0000-0000-000000000007', false, (today_sg()-95)::timestamptz, (today_sg()-95)::timestamptz);
@@ -171,10 +180,10 @@ SELECT is(tenant_unmarked_lesson_count('ba000000-0000-0000-0000-000000000001'), 
 RESET ROLE;
 
 -- ── 8: a RETIRED class — a pattern date AFTER the SGT retirement, no session ─
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
 SELECT 'bf000000-0000-0000-0000-000000000008', co.id,'C8',
        (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg()-14)::int+1]::day_of_week,
-       '10:00','11:00','P',50.00,'be000000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'),50.00,'be000000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='ulc-coach@test.local';
 INSERT INTO student_class_enrolments (student_id, class_id, is_active, enrolled_at, unenrolled_at)
 VALUES ('55b00000-0000-0000-0000-000000000009','bf000000-0000-0000-0000-000000000008', false, (today_sg()-14)::timestamptz, (today_sg()-14)::timestamptz);

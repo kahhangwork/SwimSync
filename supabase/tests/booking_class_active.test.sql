@@ -98,15 +98,24 @@ SELECT t.id, 'Default Group' FROM tenants t
 --   TRIAL   retired, then a trial is attempted into it
 --   EXTRA   retired, then an extra lesson is attempted on it
 --   CONSTR  never retired; the CHECK constraint's subject
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time,
-                     end_time, location_name, price_per_lesson, category_id)
+                     end_time, location_id, price_per_lesson, category_id)
 SELECT
   ids.id, '7a777777-0000-0000-0000-000000000001',
   (SELECT id FROM coaches WHERE profile_id='7a100000-0000-0000-0000-0000000000c1'),
   ids.title,
   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
     )[EXTRACT(DOW FROM bca.d_future)::int + 1]::day_of_week,
-  '10:00','11:00','Pool BCA', 30,
+  '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = '7a777777-0000-0000-0000-000000000001' AND lower(trim(l.name)) = 'default location'), 30,
   (SELECT id FROM class_categories
     WHERE tenant_id='7a777777-0000-0000-0000-000000000001'
       AND lower(trim(name))='default group')

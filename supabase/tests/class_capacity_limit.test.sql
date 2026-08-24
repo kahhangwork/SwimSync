@@ -48,11 +48,20 @@ INSERT INTO class_categories (id, tenant_id, name, default_capacity) VALUES
 -- All coached by cap-coach, ALL on weekday(today+4) with distinct times so a child
 -- in several never clashes (trg_enrolment_schedule) and every booking on today+4
 -- matches the class weekday.
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id, capacity)
+                     location_id, price_per_lesson, category_id, capacity)
 SELECT x.id, co.id, x.title,
        (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday'])[EXTRACT(DOW FROM today_sg()+4)::int+1]::day_of_week,
-       x.st::time, x.et::time, 'Pool', 50.00, x.cat, x.cap
+       x.st::time, x.et::time, (SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 50.00, x.cat, x.cap
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id
 CROSS JOIN (VALUES
   ('cf900000-0000-0000-0000-000000000001'::uuid,'K','10:00','11:00','ce900000-0000-0000-0000-000000000001'::uuid, 3::smallint),

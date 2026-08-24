@@ -36,10 +36,19 @@ INSERT INTO class_categories (id, tenant_id, name) VALUES
   ('de000000-0000-0000-0000-0000000000b1','da000000-0000-0000-0000-0000000000b1','G');
 
 -- Monday class; the holiday is 2026-03-02 (Mon), inside the package window.
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
+                     location_id, price_per_lesson, category_id)
 SELECT 'df000000-0000-0000-0000-0000000000b1', co.id, 'Mon', 'monday',
-       '10:00','11:00','Pool', 50.00, 'de000000-0000-0000-0000-0000000000b1'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 50.00, 'de000000-0000-0000-0000-0000000000b1'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='hr-admin@test.local';
 
 INSERT INTO students (id, full_name, date_of_birth, assignment_status, tenant_id, created_by) VALUES
@@ -79,8 +88,8 @@ INSERT INTO tenant_public_holidays (tenant_id, holiday_date, name)
 VALUES ('da000000-0000-0000-0000-0000000000b1','2026-03-17','Holiday Tue');
 
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
-SELECT x.id, co.id, x.title, 'tuesday', '10:00','11:00','Pool', 50.00,
+                     location_id, price_per_lesson, category_id)
+SELECT x.id, co.id, x.title, 'tuesday', '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 50.00,
        'de000000-0000-0000-0000-0000000000b1'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id
 CROSS JOIN (VALUES

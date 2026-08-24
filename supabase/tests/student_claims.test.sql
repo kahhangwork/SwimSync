@@ -84,11 +84,22 @@ SELECT t.id, 'Default Group' FROM tenants t
    AND NOT EXISTS (SELECT 1 FROM class_categories c
                     WHERE c.tenant_id = t.id AND lower(trim(c.name)) = 'default group');
 
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
+                     location_id, price_per_lesson, category_id)
 VALUES ('c1a55555-0000-0000-0000-000000000001','c1a11111-0000-0000-0000-000000000001',
   (SELECT id FROM coaches WHERE profile_id='c1000000-0000-0000-0000-0000000000c1'),
-  'CLAIM Class A','saturday','10:00','11:00','Pool A', 30,
+  'CLAIM Class A','saturday','10:00','11:00',
+  (SELECT l.id FROM locations l WHERE l.tenant_id = 'c1a11111-0000-0000-0000-000000000001'
+      AND lower(trim(l.name)) = 'default location'), 30,
   (SELECT id FROM class_categories WHERE tenant_id='c1a11111-0000-0000-0000-000000000001'
       AND lower(trim(name))='default group'));
 

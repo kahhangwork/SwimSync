@@ -37,8 +37,17 @@ SELECT t.id, 'Default Group' FROM tenants t
    SELECT 1 FROM class_categories c
     WHERE c.tenant_id = t.id AND lower(trim(c.name)) = 'default group');
 
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT '66000000-0000-0000-0000-000000000001', c.id, 'Long Lane', 'saturday','10:00','11:30','Pool', 40,
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT '66000000-0000-0000-0000-000000000001', c.id, 'Long Lane', 'saturday','10:00','11:30',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 40,
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = c.tenant_id
            AND lower(trim(cc.name)) = 'default group')
@@ -334,8 +343,8 @@ SELECT is(
 
 -- ── A lesson with no terms in force must refuse, not vanish ────────────────
 RESET ROLE;
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, tenant_id, category_id)
-SELECT '66000000-0000-0000-0000-000000000009', c.id, 'Rateless', 'sunday','10:00','11:00','Pool', 40,
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, tenant_id, category_id)
+SELECT '66000000-0000-0000-0000-000000000009', c.id, 'Rateless', 'sunday','10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 40,
        '88888888-0000-0000-0000-000000000001',
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = c.tenant_id

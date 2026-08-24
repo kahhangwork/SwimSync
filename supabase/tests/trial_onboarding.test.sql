@@ -60,15 +60,26 @@ SELECT t.id, 'Default Group' FROM tenants t
    SELECT 1 FROM class_categories c
     WHERE c.tenant_id = t.id AND lower(trim(c.name)) = 'default group');
 
-INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
+INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
 VALUES
   ('66666666-1111-0000-0000-000000000001','66666666-0000-0000-0000-000000000001',
    (SELECT id FROM coaches WHERE profile_id='66000000-0000-0000-0000-0000000000c1'),
-   'TRIAL Class A','saturday','10:00','11:00','Pool A', 30,
+   'TRIAL Class A','saturday','10:00','11:00',
+   (SELECT l.id FROM locations l WHERE l.tenant_id='66666666-0000-0000-0000-000000000001' AND lower(trim(l.name))='default location'), 30,
    (SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000001' AND lower(trim(name))='default group')),
   ('66666666-1111-0000-0000-000000000002','66666666-0000-0000-0000-000000000002',
    (SELECT id FROM coaches WHERE profile_id='66000000-0000-0000-0000-0000000000c2'),
-   'TRIAL Class B','saturday','10:00','11:00','Pool B', 30,
+   'TRIAL Class B','saturday','10:00','11:00',
+   (SELECT l.id FROM locations l WHERE l.tenant_id='66666666-0000-0000-0000-000000000002' AND lower(trim(l.name))='default location'), 30,
    (SELECT id FROM class_categories WHERE tenant_id='66666666-0000-0000-0000-000000000002' AND lower(trim(name))='default group'));
 
 CREATE TEMP TABLE trial_baseline AS SELECT COUNT(*)::INT AS n FROM students;

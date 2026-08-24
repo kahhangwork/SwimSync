@@ -72,10 +72,19 @@ INSERT INTO package_products (id, tenant_id, name, category_id, lesson_count,
    'PO B Product', NULL, 8, 40.00, 12, 4, true);
 
 -- A class in PO Group so a child can be enrolled (RISK 2 candidate scenario).
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
+                     location_id, price_per_lesson, category_id)
 SELECT 'c1f00000-0000-0000-0000-000000000001', co.id, 'PO Group Sat', 'saturday',
-       '10:00','11:00','Test Pool', 40.00, 'c1c00000-0000-0000-0000-000000000001'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 40.00, 'c1c00000-0000-0000-0000-000000000001'
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'po-admin-a@test.local';
 

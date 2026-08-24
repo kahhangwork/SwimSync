@@ -69,14 +69,22 @@ INSERT INTO class_categories (id, tenant_id, name) VALUES
   ('7c000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001', 'Default Private'),
   ('7c000000-0000-0000-0000-000000000002', '70000000-0000-0000-0000-000000000001', 'Default Group');
 
+-- ---- The seed tenant's location ----
+-- The free-text classes.location_name/location_address were promoted to the
+-- per-tenant locations entity (20260824000100 expand / 20260824000200 contract);
+-- classes.location_id is NOT NULL after the contract migration.
+INSERT INTO locations (id, tenant_id, name, address) VALUES
+  ('71000000-0000-0000-0000-000000000001', '70000000-0000-0000-0000-000000000001',
+   'Buona Vista Swimming Complex', '76 Holland Dr, Singapore');
+
 -- ---- A class owned by the coach (Saturday 10-11am) ----
 -- tenant_id is filled by the class_tenant_fill trigger from the coach.
 INSERT INTO classes (
   coach_id, title, day_of_week, start_time, end_time,
-  location_name, location_address, price_per_lesson, category_id
+  location_id, price_per_lesson, category_id
 )
 SELECT co.id, 'Saturday Beginners', 'saturday', '10:00', '11:00',
-       'Buona Vista Swimming Complex', '76 Holland Dr, Singapore', 25.00,
+       '71000000-0000-0000-0000-000000000001', 25.00,
        '7c000000-0000-0000-0000-000000000002'
 FROM coaches co
 WHERE co.profile_id = 'c0000000-0000-0000-0000-000000000001';

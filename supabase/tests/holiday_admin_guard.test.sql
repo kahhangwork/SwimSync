@@ -36,10 +36,19 @@ INSERT INTO class_categories (id, tenant_id, name) VALUES
 
 -- The class is OWNED BY THE NON-ADMIN COACH, so RLS lets that coach write its
 -- attendance — the only thing that may stop them is this guard.
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
+                     location_id, price_per_lesson, category_id)
 SELECT 'df000000-0000-0000-0000-0000000000a1', co.id, 'C', (SELECT dow FROM _t),
-       '10:00','11:00','Pool', 50.00, 'de000000-0000-0000-0000-0000000000a1'
+       '10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 50.00, 'de000000-0000-0000-0000-0000000000a1'
 FROM coaches co JOIN profiles pr ON pr.id=co.profile_id WHERE pr.email='hg-coach@test.local';
 
 INSERT INTO students (id, full_name, date_of_birth, assignment_status, tenant_id, created_by)

@@ -34,16 +34,25 @@ SELECT t.id, 'Default Group' FROM tenants t
 -- 2026-08-08 (the cover, in the past so attendance is markable) and
 -- 2026-07-04 (the settled-month correction). Both MUST be Saturdays or
 -- guard_session_date refuses the insert.
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT '67000000-0000-0000-0000-000000000001', c.id, 'Cover Lane', 'saturday','10:00','11:00','Pool', 40,
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Give every tenant one location to hang classes off,
+-- tenant-agnostic and idempotent (mirrors the Default Group category block).
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT '67000000-0000-0000-0000-000000000001', c.id, 'Cover Lane', 'saturday','10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 40,
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = c.tenant_id AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id = '71000000-0000-0000-0000-000000000002';
 
 -- A SECOND class of Coach A's, never covered — this is what proves the
 -- absence rule still pays the class's own coach.
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT '67000000-0000-0000-0000-000000000002', c.id, 'Plain Lane', 'saturday','12:00','13:00','Pool', 40,
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT '67000000-0000-0000-0000-000000000002', c.id, 'Plain Lane', 'saturday','12:00','13:00',(SELECT l.id FROM locations l WHERE l.tenant_id = c.tenant_id AND lower(trim(l.name)) = 'default location'), 40,
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = c.tenant_id AND lower(trim(cc.name)) = 'default group')
   FROM coaches c WHERE c.profile_id = '71000000-0000-0000-0000-000000000002';

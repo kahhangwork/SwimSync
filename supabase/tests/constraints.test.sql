@@ -36,8 +36,17 @@ SELECT t.id, 'Default Group' FROM tenants t
    SELECT 1 FROM class_categories c
     WHERE c.tenant_id = t.id AND lower(trim(c.name)) = 'default group');
 
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT 'b0000000-0000-0000-0000-000000000002', co.id, 'Con Class', 'saturday','10:00','11:00','Pool', 30,
+-- classes.location_id is NOT NULL since the location contract migration
+-- (20260824000200). Same shape as the Default Group block above: give every
+-- tenant one location to hang classes off, tenant-agnostic and idempotent.
+INSERT INTO locations (tenant_id, name)
+SELECT t.id, 'Default location' FROM tenants t
+ WHERE NOT EXISTS (
+   SELECT 1 FROM locations l
+    WHERE l.tenant_id = t.id AND lower(trim(l.name)) = 'default location');
+
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT 'b0000000-0000-0000-0000-000000000002', co.id, 'Con Class', 'saturday','10:00','11:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 30,
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = co.tenant_id
            AND lower(trim(cc.name)) = 'default group')
@@ -91,8 +100,8 @@ $$, '23505', NULL, 'a student cannot be enrolled in the SAME class twice');
 -- ── 2a. A SECOND, non-overlapping class is now allowed ──────────────────────
 -- The positive half. Con Class is Saturday 10-11; this one is Saturday 14-15,
 -- so it shares a weekday and still does not overlap.
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT 'b0000000-0000-0000-0000-00000000000c', co.id, 'Con Class Two', 'saturday','14:00','15:00','Pool', 30,
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT 'b0000000-0000-0000-0000-00000000000c', co.id, 'Con Class Two', 'saturday','14:00','15:00',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 30,
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = co.tenant_id
            AND lower(trim(cc.name)) = 'default group')
@@ -106,8 +115,8 @@ $$, 'a student CAN hold a second active enrolment in a different class');
 -- ── 2b. …but not one that overlaps a class they are already in ──────────────
 -- Saturday 10:30-11:30 straddles Con Class's 10-11. Refused by
 -- enforce_enrolment_schedule(), not by an index, so the code is P0001.
-INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id)
-SELECT 'b0000000-0000-0000-0000-00000000000d', co.id, 'Con Class Clash', 'saturday','10:30','11:30','Pool', 30,
+INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id)
+SELECT 'b0000000-0000-0000-0000-00000000000d', co.id, 'Con Class Clash', 'saturday','10:30','11:30',(SELECT l.id FROM locations l WHERE l.tenant_id = co.tenant_id AND lower(trim(l.name)) = 'default location'), 30,
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = co.tenant_id
            AND lower(trim(cc.name)) = 'default group')
