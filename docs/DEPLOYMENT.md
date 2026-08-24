@@ -857,3 +857,16 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     11-arg fn, anon-revoke included). **CONTRACT (column drop) NOT deployed** — held as `..._contract.sql.hold`, lands
     LAST after a fixture sweep (~50 pgTAP + seed.sql + `disable_coach`, §7.211). **Dormant on prod:** one backfilled
     location, no admin has opened the page — real the day a second location is added.
+
+43. **Deploy record (2026-08-24): location entity (CONTRACT phase) — the one-way column DROP, landed LAST.**
+    (PRD §7.24; `docs/plans/LOCATION_ENTITY_PLAN.md`; §8.89.) `20260824000200_..._contract.sql` un-held after its
+    fixture sweep — 51 pgTAP + `seed.sql` + 14 UI driver fixtures/teardowns + 3 `verify-*.mjs` (§7.214). Sets
+    `location_id` NOT NULL, DROPs `location_name`/`location_address`, drops the sync trigger, redefines `disable_coach`
+    to stop reading the dropped record fields (§7.211). Sequence: (1) `supabase db push` — `20260824000200` remote
+    filled, **0 pending** (pgdelta cert trace alongside `Finished`, harmless, §7.30). (2) **No grant dump needed** —
+    `set_class_terms` + `disable_coach` are same-signature `CREATE OR REPLACE` (grants persist, §11.32); the migration
+    has NO `GRANT`/`REVOKE` and no new object. (3) **No app/engine deploy** — the apps already read `location_id` +
+    `locations(name/address)` and `core.ts` never read location, so the migration was the ONLY prod step (the
+    "apps LAST" rule is moot with no app change). Verified pre-deploy: `supabase test db` 1442, Deno 236×2, full
+    `check-fixture-roundtrip` (both passes), CI green. **One-way contract** — recovery is re-expand from the entity,
+    not a DOWN. **Dormant on prod:** one location.

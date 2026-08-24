@@ -1,11 +1,10 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-24 — **A location entity BUILT** (PRD §7.24, `20260824000100`, on branch,
-pending deploy): `classes.location_name` promoted to a per-tenant `locations` table (admin CRUD,
-class-form picker, admin + coach filters, parent address/notes). Struck from its own section and the
-value pool; the column-drop CONTRACT migration is written + proven but HELD (needs a fixture sweep).
-What remains in the queue: the Wave C S-pool and Later (Maps now builds on `locations.address`, no
-rework). Pick by value — no edge between them._
+_Last updated: 2026-08-24 — **The location entity SHIPPED + DEPLOYED, expand AND contract** (PRD §7.24,
+`20260824000100`+`…200`, §8.88/§8.89): `classes.location_name` promoted to a per-tenant `locations` table,
+then the free-text columns DROPPED on prod (one-way contract). Struck from its own section and the value pool.
+What remains in the queue: the Wave C S-pool and Later (Maps now builds on `locations.address`, no rework).
+Pick by value — no edge between them._
 
 _Previously, 2026-08-23 — **An owner-only accounting page SHIPPED** (PRD §7.23,
 `20260823000100`): an owner-gated accrual P&L per closed month (Revenue / Outstanding / Wages / Net)._
@@ -1257,7 +1256,7 @@ Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). Both foll
 Cosmetic, not filed separately: the coach Schedule's collapsed COMING UP day summary still counts a
 cancelled lesson in its "N lessons"; the card inside is struck.
 
-### ~~A location entity (venue)~~ — **M** — **SHIPPED + DEPLOYED 2026-08-24** (PRD §7.24, §8.88, `20260824000100`)
+### ~~A location entity (venue)~~ — **M** — **SHIPPED + DEPLOYED 2026-08-24** (PRD §7.24, §8.88/§8.89, `20260824000100`+`…200`)
 Promoted `classes.location_name` (free text) to a per-tenant `locations` table (name/address/notes)
 the class references by FK. Admin → **Locations** CRUD (owner/co-admin), the class form picks from it,
 the Classes list + calendar/lessons filter by it, the coach app filters by it, and the parent child
@@ -1265,33 +1264,12 @@ detail shows the address + notes. Delete = **archive** (a location an active cla
 removed; retired classes keep it; names reusable). `20260824000100_locations_entity_expand.sql` +
 `locations.test.sql`; expand/contract, entity is the single source of truth.
 
-**Column-drop deferred:** the CONTRACT migration (`..._contract.sql.hold`) that drops the free-text
-`location_name`/`location_address` columns is written + proven but HELD — it lands LAST at deploy and
-needs a fixture sweep (~50 pgTAP files + `seed.sql` + `disable_coach()` still insert/read the columns).
-Until then the columns survive as a trigger-maintained mirror, so nothing drifts.
+**Column-drop DONE (§8.89, `20260824000200`):** the CONTRACT migration dropped `location_name`/`location_address`
+on prod, `location_id` is NOT NULL, the sync trigger is gone, `disable_coach` redefined. The fixture sweep it
+needed — 51 pgTAP + `seed.sql` + 14 UI driver fixtures/teardowns + 3 drivers — is the lesson at §7.214 (the
+`.hold` checklist had missed the UI fixtures). One-way contract, no app/engine change. DEPLOYMENT §43.
 
 **Maps** (below) now builds directly on `locations.address` — no rework, the free-text dependency is gone.
-
-### ~~Location contract sweep — drop the free-text columns~~ — **S** — **BUILT + VERIFIED 2026-08-24 (on `main`, prod-deploy pending)**
-The fixture sweep is done: `20260824000200_locations_entity_contract.sql` is un-held (`.hold` removed), all
-~50 pgTAP fixtures + `seed.sql` now write `location_id`, `disable_coach()` is redefined inside the contract
-migration to stop reading the dropped record fields, and `locations.test.sql`'s two expand-only cases are gone.
-Verified on the CONTRACT schema: `supabase test db` 1442 green, Deno 236×2 green. **The only step left is the
-prod deploy** — the migration DROPs `classes.location_name` / `classes.location_address` (a one-way contract),
-so it lands LAST via `/deploy` (`supabase db push` + a grant re-check). Historical context below.
-
-**Why:** the free-text columns are now dead weight — the app only writes `location_id`, and the sync trigger
-keeps them as a mirror. Dropping them removes the drift surface and the trigger. Not urgent (nothing reads them
-today), but they should not linger indefinitely.
-
-**Notes:** dropping the columns breaks every INSERT/read that still names them — as of ship: `seed.sql`,
-~50 pgTAP fixtures (`grep -rln location_name supabase/tests`), and **`disable_coach()`** which does
-`SELECT c.* INTO v_class` then reads `v_class.location_name` (a runtime break, not a compile one — §7.211).
-Do it as its own `db/…` branch: adapt those inserts to `location_id`, redefine `disable_coach` inside the
-contract migration, drop `locations.test.sql`'s two expand-only cases, prove `supabase test db` + Deno green on
-the contract schema, THEN rename `.hold`→`.sql` and deploy it LAST. The full checklist is in the `.hold` header.
-Sync-trigger direction + ordering lessons: §7.213. Bidirectional trigger means the sweep can be prepared and
-verified ahead of the deploy.
 
 ### ~~An owner-only accounting page~~ — **M** — **SHIPPED 2026-08-23** (PRD §7.23)
 An owner-gated accrual P&L, one closed month at a time: **Revenue** (net_amount −

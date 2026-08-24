@@ -3353,3 +3353,15 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     makes the backfill's `UPDATE … SET location_id` fire the mirror path and rewrite every row's free-text columns
     (trimmed name, MIN address) at expand time — breaking the DOWN's "columns untouched" guarantee; create the
     trigger AFTER the backfill so only the FK-guard fires there. (2026-08-24, §8.88.)
+
+214. **An expand/contract column DROP must sweep the UI DRIVER fixtures too — not only `supabase/tests`.** The
+    location contract's `.hold` checklist listed `supabase/tests` (~50 pgTAP) + `seed.sql` + `disable_coach`, and
+    CI's `check-fixture-roundtrip` step went red anyway: the 14 `.claude/skills/run-ui-playwright/drivers/fixtures-*.sql`
+    (+ their teardowns) and three `verify-*.mjs` drivers ALSO insert classes naming the dropped column. Two failure
+    modes, and the first was pre-existing: on the EXPAND schema these fixtures had been LEAKING an auto-created
+    `locations` row past teardown for the whole deploy window (the sync trigger created it, the teardown never
+    deleted it) — a red hiding under a docs-only commit; on the CONTRACT schema the INSERT hard-errors on a dropped
+    column. Sweep them the same way — an explicit `locations` row before the class INSERT → `location_id`, and the
+    teardown DELETEs it AFTER the classes (ON DELETE RESTRICT) — and translate any driver that UPDATEs the dropped
+    column into another non-schedule attribute (`colour`, a palette key). `grep -rln location_name .claude` is the
+    fact the checklist should have named. (2026-08-24, §8.89.)
