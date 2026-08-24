@@ -63,8 +63,13 @@ SELECT 'ab000000-0000-0000-0000-000000000001', 'Default Group'
       AND lower(trim(name)) = 'default group');
 
 -- The class runs on d1's weekday so the lesson dates are real lesson dates.
+-- The location the class sits at (contract: classes.location_id FK).
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('ab000000-1111-0000-0000-0000000010c1','ab000000-0000-0000-0000-000000000001','OrphanRpt Pool')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time,
-                     end_time, location_name, price_per_lesson, category_id)
+                     end_time, location_id, price_per_lesson, category_id)
 SELECT
   'ab000000-1111-0000-0000-000000000001',
   'ab000000-0000-0000-0000-000000000001',
@@ -74,7 +79,7 @@ SELECT
   (ARRAY['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
     )[EXTRACT(DOW FROM (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))
        - INTERVAL '1 month' + INTERVAL '7 days'))::int + 1]::day_of_week,
-  '16:00', '17:00', 'OrphanRpt Pool', 30,
+  '16:00', '17:00', 'ab000000-1111-0000-0000-0000000010c1', 30,
   (SELECT id FROM class_categories
     WHERE tenant_id = 'ab000000-0000-0000-0000-000000000001'
       AND lower(trim(name)) = 'default group')

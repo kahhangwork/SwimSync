@@ -98,23 +98,32 @@ UPDATE auth.users SET banned_until = NOW() + INTERVAL '100 years'
 -- coach — visibility for the parent flows through the child's enrolment, not
 -- the coach. The seed-tenant class borrows the seed coach, same as
 -- fixtures-coach-disable adds classes to the seed tenant.
+-- A location per tenant these classes span (contract: classes.location_id FK):
+-- one in the suspended tenant, one in the seed tenant the Keep Lane lives in.
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('e6aa0000-0000-0000-0000-0000000010c1','e6aa0000-0000-0000-0000-000000000001','SuspendCov Gone Pool'),
+  ('e6aa0000-0000-0000-0000-0000000010c2','70000000-0000-0000-0000-000000000001','SuspendCov Keep Pool')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO classes (
   id, coach_id, title, day_of_week, start_time, end_time,
-  location_name, price_per_lesson, category_id, tenant_id, is_active
+  location_id, price_per_lesson, category_id, tenant_id, is_active
 )
 SELECT v.id, co.id, v.title, tsx.class_dow, v.st::time, v.et::time,
-       'SuspendCov Pool', 40.00, v.cat, v.tenant, TRUE
+       v.loc, 40.00, v.cat, v.tenant, TRUE
   FROM tsx,
        (VALUES
          ('e6aa0000-0000-0000-0000-0000000000aa'::uuid,'SuspendCov Gone Lane',
           'e6aa0000-0000-0000-0000-000000000002'::uuid,
           'e6aa0000-0000-0000-0000-00000000cc01'::uuid,
-          'e6aa0000-0000-0000-0000-000000000001'::uuid,'14:00','15:00'),
+          'e6aa0000-0000-0000-0000-000000000001'::uuid,
+          'e6aa0000-0000-0000-0000-0000000010c1'::uuid,'14:00','15:00'),
          ('e6aa0000-0000-0000-0000-0000000000ab'::uuid,'SuspendCov Keep Lane',
           'c0000000-0000-0000-0000-000000000001'::uuid,
           '7c000000-0000-0000-0000-000000000002'::uuid,
-          '70000000-0000-0000-0000-000000000001'::uuid,'16:30','17:30')
-       ) AS v(id, title, coach_pid, cat, tenant, st, et)
+          '70000000-0000-0000-0000-000000000001'::uuid,
+          'e6aa0000-0000-0000-0000-0000000010c2'::uuid,'16:30','17:30')
+       ) AS v(id, title, coach_pid, cat, tenant, loc, st, et)
   JOIN coaches co ON co.profile_id = v.coach_pid
 ON CONFLICT (id) DO NOTHING;
 

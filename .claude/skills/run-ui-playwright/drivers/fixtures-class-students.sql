@@ -43,15 +43,20 @@ ON CONFLICT (id) DO NOTHING;
 -- ---- The class. Its own class, so the count is deterministic and cannot be
 -- ---- disturbed by another fixture's children landing in the seed class.
 -- day_of_week is TODAY's SGT weekday, so today±7 both fall on class days.
+-- The location the class sits at (contract: classes.location_id FK).
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('c5000000-0000-0000-0000-0000000010c1','70000000-0000-0000-0000-000000000001','ClsRoster Pool')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time,
-                     end_time, location_name, price_per_lesson, category_id,
+                     end_time, location_id, price_per_lesson, category_id,
                      is_active)
 SELECT 'c5000000-0000-0000-0000-0000000000C1'::uuid,
        '70000000-0000-0000-0000-000000000001',
        co.id,
        'ClsRoster Class',
        lower(to_char((now() AT TIME ZONE 'Asia/Singapore')::date, 'FMday'))::day_of_week,
-       '09:00', '10:00', 'ClsRoster Pool', 30.00,
+       '09:00', '10:00', 'c5000000-0000-0000-0000-0000000010c1', 30.00,
        '7c000000-0000-0000-0000-000000000002',
        TRUE
   FROM coaches co

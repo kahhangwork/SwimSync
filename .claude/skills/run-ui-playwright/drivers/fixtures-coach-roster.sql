@@ -116,12 +116,17 @@ SELECT c.id, v.amt, 60, '2026-01-01', v.rate_role::coach_rate_role
 -- Class B is not decoration: check 17 asserts the replaced coach's week is
 -- otherwise INTACT, and without a second unmarked lesson "the rest of the week"
 -- is the empty set and the check is vacuous — "hid everything" would pass.
+-- The location both classes sit at (contract: classes.location_id FK).
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('c7000000-0000-0000-0000-0000000010c1','70000000-0000-0000-0000-000000000001','RosterCov Pool')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO classes (
   id, coach_id, title, day_of_week, start_time, end_time,
-  location_name, price_per_lesson, category_id, tenant_id, is_active
+  location_id, price_per_lesson, category_id, tenant_id, is_active
 )
 SELECT v.id, co.id, v.title, rc.lesson_dow, v.st::time, v.et::time,
-       'RosterCov Pool', 40.00,
+       'c7000000-0000-0000-0000-0000000010c1', 40.00,
        '7c000000-0000-0000-0000-000000000002',
        '70000000-0000-0000-0000-000000000001', TRUE
   FROM rc,

@@ -57,9 +57,9 @@ function seed() {
   teardown();
   // An OWNED Group class (coach looked up by email — its id regenerates).
   sql(`INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-        location_name, price_per_lesson, tenant_id, category_id)
+        location_id, price_per_lesson, tenant_id, category_id)
        SELECT '${CLASS}', co.id, 'Renewal Sat', 'saturday', '09:00', '10:00',
-              'Test Pool', 40, '${T}', '${GROUP_CAT}'
+              '71000000-0000-0000-0000-000000000001', 40, '${T}', '${GROUP_CAT}'
        FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
        WHERE pr.email = 'coach@swimsync.test'`);
   // A Group product, 4-week validity.

@@ -97,10 +97,16 @@ INSERT INTO class_categories (id, tenant_id, name)
 VALUES ('cc100000-0000-0000-0000-000000000002',
         '70000000-0000-0000-0000-000000000001', 'Pkg Private');
 
+-- The location the class sits at (contract: classes.location_id FK).
+-- coach@swimsync.test is the seed tenant, so the location is seeded there.
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('c1100000-0000-0000-0000-0000000010c1','70000000-0000-0000-0000-000000000001','Pkg Pool')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                     location_name, price_per_lesson, category_id)
+                     location_id, price_per_lesson, category_id)
 SELECT 'c1100000-0000-0000-0000-000000000001', co.id, 'Pkg Private Tue',
-       'tuesday', '17:00', '17:30', 'Test Pool', 70.00,
+       'tuesday', '17:00', '17:30', 'c1100000-0000-0000-0000-0000000010c1', 70.00,
        'cc100000-0000-0000-0000-000000000002'
 FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
 WHERE pr.email = 'coach@swimsync.test';

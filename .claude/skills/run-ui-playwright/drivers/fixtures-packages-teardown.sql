@@ -76,6 +76,9 @@ DELETE FROM lesson_sessions
  WHERE class_id = 'c1100000-0000-0000-0000-000000000001';
 DELETE FROM classes
  WHERE id = 'c1100000-0000-0000-0000-000000000001';
+-- The location the class referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations
+ WHERE id = 'c1100000-0000-0000-0000-0000000010c1';
 DELETE FROM class_categories
  WHERE id = 'cc100000-0000-0000-0000-000000000002';
 

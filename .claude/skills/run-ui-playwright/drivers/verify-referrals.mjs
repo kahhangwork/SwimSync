@@ -94,9 +94,9 @@ function seed() {
         referral_discount_value=10, referral_reward_expiry_days=14 WHERE id='${T}'`);
   // An OWNED Group class + an 8×$40 Group product ($320, 10% ⇒ pays $288).
   sql(`INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-        location_name, price_per_lesson, tenant_id, category_id)
+        location_id, price_per_lesson, tenant_id, category_id)
        SELECT '${CLASS}', co.id, 'Referral Sat', 'saturday', '09:00', '10:00',
-              'Test Pool', 40, '${T}', '${GROUP_CAT}'
+              '71000000-0000-0000-0000-000000000001', 40, '${T}', '${GROUP_CAT}'
        FROM coaches co JOIN profiles pr ON pr.id = co.profile_id
        WHERE pr.email = 'coach@swimsync.test'`);
   sql(`INSERT INTO package_products (id, tenant_id, name, category_id, lesson_count,

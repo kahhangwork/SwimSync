@@ -51,10 +51,15 @@ BEGIN
    WHERE pr.email = 'coach@swimsync.test';
 
   -- Saturday, because the loop below walks the previous month's Saturdays.
+  -- The location the class sits at (contract: classes.location_id FK), in v_tenant.
+  INSERT INTO locations (id, tenant_id, name)
+  VALUES ('fb000000-0000-0000-0000-0000000010c1', v_tenant, 'Trial Pool')
+  ON CONFLICT (id) DO NOTHING;
+
   INSERT INTO classes (id, coach_id, tenant_id, title, day_of_week,
-                       start_time, end_time, location_name, price_per_lesson, category_id)
+                       start_time, end_time, location_id, price_per_lesson, category_id)
   VALUES (v_class, v_coach, v_tenant, 'Trial Onboarding Class', 'saturday',
-          '14:00', '15:00', 'Test Pool', 40,
+          '14:00', '15:00', 'fb000000-0000-0000-0000-0000000010c1', 40,
           (SELECT cc.id FROM class_categories cc
             WHERE cc.tenant_id = v_tenant
               AND lower(trim(cc.name)) = 'default group'))

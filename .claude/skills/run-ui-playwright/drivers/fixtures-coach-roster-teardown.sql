@@ -73,6 +73,9 @@ DELETE FROM students WHERE id IN ('c7000000-0000-0000-0000-00000000000e',
 DELETE FROM classes WHERE id IN ('c7000000-0000-0000-0000-00000000000a',
                                  'c7000000-0000-0000-0000-00000000000b');
 
+-- The location both classes referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations WHERE id IN ('c7000000-0000-0000-0000-0000000010c1');
+
 -- ── The two coaches, and their accounts ──────────────────────────────────
 DELETE FROM coach_payout_items WHERE payout_id IN (
   SELECT p.id FROM coach_payouts p JOIN coaches c ON c.id = p.coach_id

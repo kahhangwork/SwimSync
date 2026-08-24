@@ -133,12 +133,18 @@ SELECT 'd0000000-0000-0000-0000-0000000000b2', 'Late Joiner', 'assigned', c.tena
 --
 -- The old fixture pinned this to 2026-07-16 and needed "no Sunday since", true
 -- for three days in July 2026. Derived from the anchor, it holds any day.
+-- Both Guard classes sit at this location (contract: classes.location_id FK).
+-- coach@swimsync.test is the seed tenant, so the location is seeded there too.
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('d0000000-0000-0000-0000-0000000010c1','70000000-0000-0000-0000-000000000001','Guard Pool')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO classes (id, coach_id, tenant_id, title, day_of_week,
-                     start_time, end_time, location_name, price_per_lesson, category_id)
+                     start_time, end_time, location_id, price_per_lesson, category_id)
 SELECT 'd0000000-0000-0000-0000-0000000000e1',
        co.id, co.tenant_id, 'Guard Newbies',
        lower(to_char(d.d_firstlesson, 'FMDay'))::day_of_week,
-       '09:00', '10:00', 'Test Pool', 40,
+       '09:00', '10:00', 'd0000000-0000-0000-0000-0000000010c1', 40,
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = co.tenant_id
            AND lower(trim(cc.name)) = 'default group')
@@ -158,11 +164,11 @@ SELECT 'd0000000-0000-0000-0000-0000000000b3', 'Newjoiner Guard', 'assigned', c.
 -- fixture leaned on Ana Win having no marks, which is not available here
 -- because Ana Guard is deliberately marked on the out-of-window lesson.
 INSERT INTO classes (id, coach_id, tenant_id, title, day_of_week,
-                     start_time, end_time, location_name, price_per_lesson, category_id)
+                     start_time, end_time, location_id, price_per_lesson, category_id)
 SELECT 'd0000000-0000-0000-0000-0000000000e2',
        co.id, co.tenant_id, 'Guard Waiting',
        lower(to_char(d.d_lastlesson, 'FMDay'))::day_of_week,
-       '11:00', '12:00', 'Test Pool', 40,
+       '11:00', '12:00', 'd0000000-0000-0000-0000-0000000010c1', 40,
        (SELECT cc.id FROM class_categories cc
          WHERE cc.tenant_id = co.tenant_id
            AND lower(trim(cc.name)) = 'default group')

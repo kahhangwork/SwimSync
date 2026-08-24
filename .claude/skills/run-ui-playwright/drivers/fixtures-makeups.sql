@@ -37,12 +37,18 @@ ON CONFLICT ON CONSTRAINT parent_tenants_parent_id_tenant_id_key DO NOTHING;
 -- gotoAuthed URL is the reliable route, the verify-attendance-guard pattern).
 -- Home is cheaper than host ($20 vs $25) so a wrongly-host-priced make-up
 -- line would be visibly wrong. tenant_id comes from class_tenant_fill.
+-- The location both classes sit at (contract: classes.location_id FK).
+-- coach c0000000-…-001 is the seed coach, so the location is seeded in its tenant.
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('7e0c1a55-0000-0000-0000-0000000010c1','70000000-0000-0000-0000-000000000001','Makeup Pool')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO classes (
   id, coach_id, title, day_of_week, start_time, end_time,
-  location_name, price_per_lesson, category_id
+  location_id, price_per_lesson, category_id
 )
 SELECT v.id, co.id, v.title, v.dow::day_of_week, v.t1::time, v.t2::time,
-       'Test Pool', v.price, '7c000000-0000-0000-0000-000000000002'
+       '7e0c1a55-0000-0000-0000-0000000010c1', v.price, '7c000000-0000-0000-0000-000000000002'
 FROM coaches co,
      (VALUES
        ('7e0c1a55-0000-0000-0000-000000000001'::uuid, 'Makeup Home Sunday',

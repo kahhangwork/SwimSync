@@ -18,6 +18,10 @@ DELETE FROM billing_periods
 DELETE FROM classes
  WHERE id = 'ab000000-1111-0000-0000-000000000001';
 
+-- The location the class referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations
+ WHERE id = 'ab000000-1111-0000-0000-0000000010c1';
+
 DELETE FROM class_categories
  WHERE tenant_id = 'ab000000-0000-0000-0000-000000000001';
 

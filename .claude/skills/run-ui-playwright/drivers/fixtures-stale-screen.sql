@@ -43,15 +43,20 @@ SELECT
   )[EXTRACT(DOW FROM today)::int + 1]::day_of_week AS today_dow
 FROM t;
 
+-- The location both classes sit at (contract: classes.location_id FK).
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('e1000000-0000-0000-0000-0000000010c1','70000000-0000-0000-0000-000000000001','Stale Pool')
+ON CONFLICT (id) DO NOTHING;
+
 -- ── The class, on today's weekday, owned by the seed coach ─────────────────
 INSERT INTO classes (
   id, coach_id, title, day_of_week, start_time, end_time,
-  location_name, price_per_lesson, category_id, tenant_id, is_active
+  location_id, price_per_lesson, category_id, tenant_id, is_active
 )
 SELECT
   'e1000000-0000-0000-0000-0000000000c1',
   co.id, 'Stale Screen Club', ss.today_dow, '08:45', '09:30',
-  'Tanglin View', 30.00,
+  'e1000000-0000-0000-0000-0000000010c1', 30.00,
   '7c000000-0000-0000-0000-000000000002',
   '70000000-0000-0000-0000-000000000001', true
 FROM coaches co, ss
@@ -63,12 +68,12 @@ WHERE co.profile_id = 'c0000000-0000-0000-0000-000000000001';
 -- One class cannot express that.
 INSERT INTO classes (
   id, coach_id, title, day_of_week, start_time, end_time,
-  location_name, price_per_lesson, category_id, tenant_id, is_active
+  location_id, price_per_lesson, category_id, tenant_id, is_active
 )
 SELECT
   'e1000000-0000-0000-0000-0000000000c2',
   co.id, 'Stale Screen Second', ss.today_dow, '09:30', '10:15',
-  'Tanglin View', 30.00,
+  'e1000000-0000-0000-0000-0000000010c1', 30.00,
   '7c000000-0000-0000-0000-000000000002',
   '70000000-0000-0000-0000-000000000001', true
 FROM coaches co, ss

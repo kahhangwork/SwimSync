@@ -60,6 +60,8 @@ DELETE FROM tenant_levels
 -- class creation, so it is deleted explicitly rather than trusted to cascade.
 DELETE FROM class_rates WHERE class_id = 'a6000000-0000-0000-0000-0000000000c0'::uuid;
 DELETE FROM classes     WHERE id       = 'a6000000-0000-0000-0000-0000000000c0'::uuid;
+-- The location the class referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations   WHERE id       = 'a6000000-0000-0000-0000-0000000010c1'::uuid;
 
 -- The parent last: parent_tenants and parents hang off the profile, and the
 -- auth user cascades to both.

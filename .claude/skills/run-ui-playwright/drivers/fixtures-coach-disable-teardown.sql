@@ -58,6 +58,9 @@ DELETE FROM students WHERE id IN ('dcaa0000-0000-0000-0000-0000000000e1',
 DELETE FROM classes WHERE id IN ('dcaa0000-0000-0000-0000-0000000000aa',
                                  'dcaa0000-0000-0000-0000-0000000000ab');
 
+-- The location both classes referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations WHERE id IN ('dcaa0000-0000-0000-0000-0000000010c1');
+
 -- ── The two coaches, and their accounts ─────────────────────────────────────
 DELETE FROM coach_payout_items WHERE payout_id IN (
   SELECT p.id FROM coach_payouts p JOIN coaches c ON c.id = p.coach_id

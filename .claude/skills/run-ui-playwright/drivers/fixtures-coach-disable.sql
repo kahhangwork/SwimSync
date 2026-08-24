@@ -72,12 +72,17 @@ SELECT c.id, v.amt, 60, '2026-01-01', 'main'::coach_rate_role
     WHERE r.coach_id = c.id AND r.role = 'main');
 
 -- ── The classes: target's (to be handed over) and the replacement's ─────────
+-- The location both classes sit at (contract: classes.location_id FK).
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('dcaa0000-0000-0000-0000-0000000010c1','70000000-0000-0000-0000-000000000001','DisableCov Pool')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO classes (
   id, coach_id, title, day_of_week, start_time, end_time,
-  location_name, price_per_lesson, category_id, tenant_id, is_active
+  location_id, price_per_lesson, category_id, tenant_id, is_active
 )
 SELECT v.id, co.id, v.title, dc.class_dow, v.st::time, v.et::time,
-       'DisableCov Pool', 40.00,
+       'dcaa0000-0000-0000-0000-0000000010c1', 40.00,
        '7c000000-0000-0000-0000-000000000002',
        '70000000-0000-0000-0000-000000000001', TRUE
   FROM dc,

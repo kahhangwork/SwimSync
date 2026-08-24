@@ -61,6 +61,9 @@ DELETE FROM class_rates WHERE class_id IN ('ca1c1a55-0000-0000-0000-000000000001
 DELETE FROM classes WHERE id IN ('ca1c1a55-0000-0000-0000-000000000001',
                                  'ca1c1a55-0000-0000-0000-000000000002');
 
+-- The location the classes referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations WHERE id IN ('ca1c1a55-0000-0000-0000-0000000010c1');
+
 -- The parent and their account.
 DELETE FROM parent_tenants WHERE parent_id IN (SELECT id FROM parents WHERE profile_id = 'ca100000-0000-0000-0000-0000000000d1');
 DELETE FROM parents        WHERE profile_id = 'ca100000-0000-0000-0000-0000000000d1';

@@ -35,8 +35,13 @@
 
 -- ---- Three classes in the seed tenant ----
 -- The seed tenant's admin (coach@swimsync.test) is who the driver signs in as.
+-- The location the classes sit at (contract: classes.location_id FK).
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('c9000000-0000-0000-0000-0000000010c1','70000000-0000-0000-0000-000000000001','ClsRetire Pool')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time,
-                     end_time, location_name, price_per_lesson, category_id)
+                     end_time, location_id, price_per_lesson, category_id)
 SELECT
   ids.id,
   '70000000-0000-0000-0000-000000000001',
@@ -44,7 +49,7 @@ SELECT
      JOIN profiles p ON p.id = c.profile_id
     WHERE p.email = 'coach@swimsync.test'),
   ids.title,
-  'wednesday', '16:00', '17:00', 'ClsRetire Pool', 30,
+  'wednesday', '16:00', '17:00', 'c9000000-0000-0000-0000-0000000010c1', 30,
   (SELECT id FROM class_categories
     WHERE tenant_id = '70000000-0000-0000-0000-000000000001'
     ORDER BY name LIMIT 1)

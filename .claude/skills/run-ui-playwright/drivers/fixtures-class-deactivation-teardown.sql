@@ -51,6 +51,9 @@ DELETE FROM classes
               'c9000000-0000-0000-0000-0000000000e2',
               'c9000000-0000-0000-0000-0000000000e3');
 
+-- The location the classes referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations WHERE id IN ('c9000000-0000-0000-0000-0000000010c1');
+
 -- The audit rows deactivate_class()/reactivate_class() wrote for those classes.
 -- entity_id is the class, which no longer exists, so these would otherwise be
 -- unattributable clutter in a table nothing reads yet.

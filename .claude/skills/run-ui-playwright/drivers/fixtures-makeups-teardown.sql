@@ -40,6 +40,10 @@ DELETE FROM class_rates
 DELETE FROM classes
  WHERE id::text LIKE '7e0c1a55-%';
 
+-- The location the classes referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations
+ WHERE id = '7e0c1a55-0000-0000-0000-0000000010c1';
+
 DELETE FROM audit_log WHERE actor_id = '7e000000-0000-0000-0000-0000000000d1';
 DELETE FROM auth.users WHERE id = '7e000000-0000-0000-0000-0000000000d1';
 

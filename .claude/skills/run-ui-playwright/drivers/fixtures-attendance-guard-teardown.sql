@@ -67,6 +67,8 @@ DELETE FROM class_rates WHERE class_id IN ('d0000000-0000-0000-0000-0000000000e1
                                            'd0000000-0000-0000-0000-0000000000e2');
 DELETE FROM classes     WHERE id       IN ('d0000000-0000-0000-0000-0000000000e1',
                                            'd0000000-0000-0000-0000-0000000000e2');
+-- The location both classes referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations   WHERE id       IN ('d0000000-0000-0000-0000-0000000010c1');
 
 -- 4. Audit rows AUTHORED BY the fixture parent must go before the profile does:
 --    audit_log.actor_id is NOT NULL and NO ACTION, so it can be neither

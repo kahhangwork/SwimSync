@@ -32,14 +32,19 @@ INSERT INTO auth.users (
   NOW(), NOW(), '', '', '', ''
 ) ON CONFLICT (id) DO NOTHING;
 
+-- ---- The location the classes sit at (contract: classes.location_id FK) ----
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('ca1c1a55-0000-0000-0000-0000000010c1','70000000-0000-0000-0000-000000000001','Calendar Pool')
+ON CONFLICT (id) DO NOTHING;
+
 -- ---- Two overlapping classes on TODAY's weekday (SGT) ----
 INSERT INTO classes (
   id, coach_id, title, day_of_week, start_time, end_time,
-  location_name, price_per_lesson, category_id, capacity, colour
+  location_id, price_per_lesson, category_id, capacity, colour
 )
 SELECT v.id, co.id, v.title,
        lower(trim(to_char((now() AT TIME ZONE 'Asia/Singapore')::date, 'FMDay')))::day_of_week,
-       v.t1::time, v.t2::time, 'Calendar Pool', 25.00,
+       v.t1::time, v.t2::time, 'ca1c1a55-0000-0000-0000-0000000010c1', 25.00,
        '7c000000-0000-0000-0000-000000000002', v.cap, v.colour
 FROM coaches co,
      (VALUES

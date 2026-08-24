@@ -78,10 +78,15 @@ BEGIN
     RAISE EXCEPTION 'no class category for tenant % — categories are mandatory since §8.11', v_tenant;
   END IF;
 
+  -- The location the class sits at (contract: classes.location_id FK), in v_tenant.
+  INSERT INTO locations (id, tenant_id, name)
+  VALUES ('a6000000-0000-0000-0000-0000000010c1', v_tenant, 'AdmGeo Pool')
+  ON CONFLICT (id) DO NOTHING;
+
   INSERT INTO classes (id, coach_id, title, day_of_week, start_time, end_time,
-                       location_name, price_per_lesson, is_active, tenant_id, category_id)
+                       location_id, price_per_lesson, is_active, tenant_id, category_id)
   VALUES (v_class, v_coach, v_title, v_dow::day_of_week, '14:00', '15:00',
-          'AdmGeo Pool', 40.00, TRUE, v_tenant, v_cat)
+          'a6000000-0000-0000-0000-0000000010c1', 40.00, TRUE, v_tenant, v_cat)
   ON CONFLICT (id) DO NOTHING;
 
   v_dow_num := CASE v_dow

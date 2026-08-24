@@ -26,6 +26,10 @@ DELETE FROM class_rates
 DELETE FROM classes
  WHERE id = 'c5000000-0000-0000-0000-0000000000C1';
 
+-- The location the class referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations
+ WHERE id = 'c5000000-0000-0000-0000-0000000010c1';
+
 -- Students carry level_id, so they go before the level.
 DELETE FROM students
  WHERE full_name LIKE 'ClsRoster %';

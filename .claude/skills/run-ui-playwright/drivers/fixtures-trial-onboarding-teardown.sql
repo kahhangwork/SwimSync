@@ -94,6 +94,8 @@ BEGIN
   -- reports a class left behind.
   DELETE FROM class_rates WHERE class_id = v_class;
   DELETE FROM classes     WHERE id       = v_class;
+  -- The location the class referenced (FK is ON DELETE RESTRICT — after classes).
+  DELETE FROM locations   WHERE id       = 'fb000000-0000-0000-0000-0000000010c1';
 
   RAISE NOTICE 'torn down trial-onboarding for billing month %',
     to_char(v_month, 'YYYY-MM');

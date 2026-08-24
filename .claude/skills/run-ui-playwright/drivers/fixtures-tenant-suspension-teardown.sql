@@ -60,6 +60,10 @@ DELETE FROM students WHERE id IN ('e6aa0000-0000-0000-0000-0000000000e1',
 DELETE FROM classes WHERE id IN ('e6aa0000-0000-0000-0000-0000000000aa',
                                  'e6aa0000-0000-0000-0000-0000000000ab');
 
+-- Both locations the classes referenced (FK is ON DELETE RESTRICT — after classes).
+DELETE FROM locations WHERE id IN ('e6aa0000-0000-0000-0000-0000000010c1',
+                                   'e6aa0000-0000-0000-0000-0000000010c2');
+
 -- ── The people, then the tenant ─────────────────────────────────────────────
 DELETE FROM parent_tenants WHERE parent_id IN (
   SELECT id FROM parents WHERE profile_id = 'e6aa0000-0000-0000-0000-000000000003');

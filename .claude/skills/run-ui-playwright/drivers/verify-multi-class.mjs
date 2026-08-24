@@ -275,8 +275,11 @@ function sqlAsExpectError(profileId, q) {
     // A non-schedule edit must NOT be refused — this is the check that would
     // catch someone widening the classes trigger onto is_active, which would
     // give reactivate_class() a refusal it must never have.
+    // colour is a non-schedule attribute (location_name was dropped by the
+    // location contract migration, 20260824000200) — same purpose: an edit that
+    // does not touch day/time must not be refused by the schedule-clash trigger.
     const renameErr = sqlExpectError(
-      `UPDATE classes SET location_name = 'MultiCls Pool 2'
+      `UPDATE classes SET colour = 'sky'
         WHERE id = 'c6000000-0000-0000-0000-00000000000b'`
     );
     check(
@@ -285,7 +288,7 @@ function sqlAsExpectError(profileId, q) {
       renameErr ? renameErr.slice(0, 160) : ""
     );
     sql(
-      `UPDATE classes SET location_name = 'MultiCls Pool'
+      `UPDATE classes SET colour = NULL
         WHERE id = 'c6000000-0000-0000-0000-00000000000b'`
     );
 

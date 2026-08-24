@@ -30,11 +30,16 @@
 
 -- ---- The classes. Own classes, so no other fixture's children can land in
 -- ---- them and change what the chips say.
+-- The location all three classes sit at (contract: classes.location_id FK).
+INSERT INTO locations (id, tenant_id, name) VALUES
+  ('c6000000-0000-0000-0000-0000000010c1','70000000-0000-0000-0000-000000000001','MultiCls Pool')
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO classes (id, tenant_id, coach_id, title, day_of_week, start_time,
-                     end_time, location_name, price_per_lesson, category_id,
+                     end_time, location_id, price_per_lesson, category_id,
                      is_active)
 SELECT v.id, '70000000-0000-0000-0000-000000000001', co.id, v.title,
-       v.dow::day_of_week, v.st::time, v.et::time, 'MultiCls Pool', 40.00,
+       v.dow::day_of_week, v.st::time, v.et::time, 'c6000000-0000-0000-0000-0000000010c1', 40.00,
        '7c000000-0000-0000-0000-000000000002', TRUE
   FROM (VALUES
     ('c6000000-0000-0000-0000-00000000000a'::uuid,'MultiCls Monday','monday','17:00','18:00'),
