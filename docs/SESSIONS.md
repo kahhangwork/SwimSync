@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.86** | 2026-08-23 | Partial-payment CLOSED: re-correcting a FOLDED-and-debited note stays refused (`CN002`) → *Deliberately not doing*; docs-only | §7.206–§7.207 · BACKLOG |
 | **8.85** | 2026-08-23 | Tenant-admin invite link lasts 24h (email says so): auth `mailer_otp_exp` 3600→86400 on prod via Management API; app-only `34db287` | §7.210 · PRD §4.4 |
 | **8.84** | 2026-08-23 | Partial-payment follow-ups: pending-debit auto-unwind, charges panel + write-off, offboard guard (`20260822000200`) | §7.207–§7.209 · PRD §5.6 · DEPLOYMENT §11.40 |
 | **8.83** | 2026-08-22 | Partial-payment via `debit_balance`: void-on-paid no longer reopens; the drawn value folds onto the next invoice as an "Adjustment" line (`20260822000100`, engine v27) | §7.206 · PRD §5.6 · DEPLOYMENT §11.39 |

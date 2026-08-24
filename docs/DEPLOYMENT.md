@@ -839,3 +839,21 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     + a pre-commit senior review caught a draft-adjustment wrong-number (a `final` figure that could still move) and
     a stale-response race before they shipped. **Dormant on prod:** no sealed month carries a settlement/rated coach
     yet, and no owner has opened the page — first real figures appear the first time an owner views a billed month.
+
+42. **Deploy record (2026-08-24): location entity (EXPAND phase) — FULL sequence IN ORDER (§11.9 avoided).**
+    (PRD §7.24; `docs/plans/LOCATION_ENTITY_PLAN.md`; §8.88.) Migration `20260824000100`: new `locations` table (RLS,
+    grants, archive + cross-tenant guards), `classes.location_id` FK, backfill (prod's one Buona Vista location),
+    bidirectional sync trigger, `set_class_terms` DROP+CREATE to 12-arg (`p_location_id` last). **Engine UNCHANGED**
+    (`core.ts` untouched). App change: admin `/locations` page + nav + class form/list; mobile coach filters + parent
+    address/notes. Cross-check (Step 2): the apps `.select("locations(…)")`, call `set_class_terms(p_location_id)`, and
+    read/write `locations` — all migration-dependent, so the migration is a HARD PREDECESSOR. Sequence: (1) `supabase
+    db push` — `20260824000100` remote filled, **0 pending** (pgdelta cert trace alongside `Finished`, harmless; the
+    `.hold` CONTRACT migration correctly SKIPPED — "file name must match pattern"). (2) **Remote grant dump** — new
+    12-arg `set_class_terms` `REVOKE ALL FROM PUBLIC` + `GRANT authenticated`, `locations` `authenticated`+`service_role`,
+    **no `anon`** (§7.39). (3) ── GATE: 0 pending + grants clean, no engine dep ── (4) apps → `main` LAST (`git push
+    …:main`, `9fd867e..4727381`, Vercel). (5) **Post-deploy proof:** `admin.swimsync.sg/locations` → **200** while a
+    bogus route → **404** (the new route resolves; a 200 alone proves nothing, the 404 contrast is the proof, §7.51);
+    parent app 200. Rollback: committed + rehearsed DOWN (`20260824000100_..._DOWN.sql`, UP→DOWN→UP clean, restores the
+    11-arg fn, anon-revoke included). **CONTRACT (column drop) NOT deployed** — held as `..._contract.sql.hold`, lands
+    LAST after a fixture sweep (~50 pgTAP + seed.sql + `disable_coach`, §7.211). **Dormant on prod:** one backfilled
+    location, no admin has opened the page — real the day a second location is added.

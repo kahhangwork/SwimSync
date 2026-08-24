@@ -3323,3 +3323,33 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     the same endpoint with GET, or the dashboard (Authentication → Email → OTP expiry). The invite email's
     "expires 24 hours" copy (`inviteEmail.ts`) is COUPLED to this value — change both together or the email lies.
     Set to 86400 (24h) 2026-08-23. (§8.85.)
+
+211. **Dropping a column breaks every SECURITY DEFINER function BODY that writes it and every `SELECT t.* INTO rec`
+    that later reads a field of it — NOT just the client `.select()` lists.** The §7.123/§7.145 family covers dropped
+    *signatures* and app `.select()` 400s; this is the other half. When the location-entity CONTRACT migration drops
+    `classes.location_name`, `set_class_terms`'s body (which `UPDATE classes SET location_name = …`) breaks, and
+    `disable_coach` — which does `SELECT c.* INTO v_class` then passes `v_class.location_name` positionally — throws
+    `record "v_class" has no field "location_name"` at RUNTIME (plpgsql binds record fields at execution, so it
+    compiles clean and fails only when that branch runs). A fable senior review caught it pre-merge. So an
+    expand/contract column-drop sweep must grep function **bodies** and **record-field reads**
+    (`grep -rn location_name supabase/migrations`), not only client `.select()` strings — and redefine every writer
+    in the same migration. (2026-08-24, §8.88, the held `..._contract.sql.hold`.)
+
+212. **A PostgREST embedded-to-one join hidden by RLS returns `null`, not an error — a policy/grant gap ships as
+    silently blank UI, invisible in testing.** When a screen reads `classes.select("…, locations(name)")`, a missing
+    SELECT policy or grant on the joined `locations` table does NOT raise `permission denied` — the embed just comes
+    back `location: null` and the field renders empty. So the mobile/admin location displays could have shipped blank
+    for coaches or parents with nothing in the logs. Same silence family as §7.16/§7.125 but a distinct client-side
+    shape. Cover it by asserting the embedded join is **non-null as the coach role AND as the parent role** in pgTAP
+    (`locations.test.sql` does), and keep the joined table's policy + GRANT in the same migration. (2026-08-24, §8.88.)
+
+213. **An expand/contract sync trigger for a column→FK promotion must choose its direction by WHAT CHANGED (OLD vs
+    NEW), not by "is the FK set" — and be created AFTER the backfill, not before.** Promoting `classes.location_name`
+    to a `locations` FK used a bidirectional trigger so both the old app (writes name) and new app (writes id) work
+    through the deploy window. Two traps a review caught: (1) keying direction on `NEW.location_id IS NOT NULL` is
+    wrong because after the backfill EVERY row has a non-NULL id, so an old-app rename (name changed, id unchanged)
+    goes down the mirror path and is SILENTLY REVERTED — key on `NEW.location_id IS NOT DISTINCT FROM OLD.location_id
+    AND NEW.location_name IS DISTINCT FROM OLD.location_name` instead. (2) creating the trigger BEFORE the backfill
+    makes the backfill's `UPDATE … SET location_id` fire the mirror path and rewrite every row's free-text columns
+    (trimmed name, MIN address) at expand time — breaking the DOWN's "columns untouched" guarantee; create the
+    trigger AFTER the backfill so only the FK-guard fires there. (2026-08-24, §8.88.)

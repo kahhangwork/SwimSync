@@ -71,6 +71,7 @@ _pgTAP DB tests — `supabase/tests/*.test.sql` (run by `supabase test db`):_
 | `student_tenant_pin.test.sql` (6) | a parent or admin **cannot move a child to another business** (§8a), while ordinary edits and the platform admin's RPC still work |
 | `document_name_snapshot.test.sql` (7) | renaming a child does not rewrite an issued invoice or an immutable credit note; the note carries the name from the item it credits |
 | `tenant_levels.test.sql` (9) | per-business level ladders: RLS is **enabled** (not merely written), cross-tenant writes refused, a student cannot take another business's level, deleting a level unlevels rather than deletes |
+| `locations.test.sql` (18) | per-business location entity: RLS enabled + tenant isolation, parent sees its locations & stranger sees none, cross-tenant FK refused, archive blocked while an active class uses it but allowed with only retired ones, `RESTRICT` backstop, partial-unique name reuse, the bidirectional sync trigger BOTH ways (name→id create, id→name mirror), and an old-app rename re-resolving rather than reverting (§7.213) |
 | `level_skills.test.sql` (11) | the skills taught at a level: order preserved, no duplicate skill within one level (ignoring case/whitespace), the tenant boundary, `CASCADE` on the level but `SET NULL` on the student, and the fix to the level-name constraint |
 | `platform_overview.test.sql` (24) | the platform admin's overview RPCs: FOUR caller shapes get zero rows (anon-equivalent, parent, coach, **and a tenant admin — even for their own tenant**), counts never leak across the tenant boundary, and `last_attendance_date` is **NULL, not a date and not 0**, for a business that has never marked anything |
 | `parent_address.test.sql` (8) | a family maintains their own address only; `postal_code` is TEXT so leading zeros survive; `profile_id` cannot be reassigned |
@@ -801,6 +802,16 @@ name from the database. ⚠ It **mutates state and is not re-runnable alone**: a
 teardown before a second hand-run. Log in as `coach@swimsync.test`, not the seed
 superadmin — the platform admin is refused every single-business page by design (PRD §4.4)
 and renders zero rows, which reads exactly like a broken query;
+`verify-locations.mjs` (no fixture — hermetic, runs on seed) drives the admin **Locations**
+page for the UI-only concerns pgTAP and the unit tests cannot see: the page renders, create /
+duplicate-refused / remove-archives actually work through the modal, the list renders in
+sort_order with the address shown, and the **class form's Location `<select>` is wired to the
+entity** (a nested-select §7.28 bug typechecks clean and renders an empty dropdown). Every
+location it makes carries the `LocDrv ` prefix and is archived off on exit, so it is
+self-healing (the `verify-levels.mjs` shape). 6 checks, admin-only. The filter *derivation* and
+the archive-while-active refusal are covered by `lib/locationOptions.test.ts` (vitest) /
+`lib/locationFilter.test.ts` (jest) and `locations.test.sql` instead.
+
 `verify-levels-table.mjs` (+ `fixtures-levels-table.sql` and its `-teardown.sql`) pins the
 Swimming Levels table's **column geometry** — it MEASURES each `th`'s rect against its
 column's `td` and fails if they diverge by more than 2px. Written because §7.54's bug was

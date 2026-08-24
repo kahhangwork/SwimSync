@@ -1,12 +1,14 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-24 — **Owner-only accounting page SHIPPED + DEPLOYED** (§8.87, PRD §7.23,
-`20260823000100`). An owner-gated accrual P&L per closed month — Revenue / Outstanding / Wages / Net, with a
-revenue breakdown; wages WITHHELD (not a partial sum) when payouts are unrun. Two new SECURITY DEFINER RPCs
-(`is_tenant_owner` gate), admin `/accounting` page. Live on prod, grant dump clean, DORMANT (no owner has
-viewed it). `/plan-review` + senior review caught three wrong-number bugs pre-ship._
+_Last updated: 2026-08-24 — **Location entity SHIPPED + DEPLOYED (expand phase)** (§8.88, PRD §7.24,
+`20260824000100`). Free-text `classes.location_name` promoted to a per-tenant `locations` entity
+(name/address/notes) referenced by FK — admin `/locations` CRUD, class-form picker, admin + coach filters,
+parent child-detail address/notes. Delete = archive (DB-enforced). Live on prod, grant dump clean, DORMANT
+(one backfilled location). The column-drop CONTRACT migration is written + PROVEN but HELD as `.hold` (needs a
+fixture sweep — §7.211). `/plan-with-confidence` → `/plan-review` (fable) → build → `/commit-review` (fable
+senior review, caught 3 pre-ship bugs) → `/deploy`._
 
-_Previously, 2026-08-23 (§8.86) — Partial-payment CLOSED: the FOLDED re-correction refused → *Deliberately not doing* (`CN002` stays). Docs-only, behaviour unchanged._
+_Previously, 2026-08-24 (§8.87) — Owner-only accounting page SHIPPED + DEPLOYED: owner-gated accrual P&L per closed month (Revenue / Outstanding / Wages / Net)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -199,6 +201,10 @@ first-firing trigger is what to watch for.
   never fired on real data. Prod is a rate-less solo coach, so Wages=0/Net=Revenue is the only branch reachable
   today; the wages-coverage branches go live the day a second, rated coach exists. First real figures: the first
   time the owner views a billed month.
+- **Location entity (§8.88, PRD §7.24)** — LIVE on prod but **one backfilled location, no admin has opened the
+  page**. The archive guard, cross-tenant guard, the coach/admin filters (shown only at >1 location), and the
+  bidirectional sync trigger's Direction-B (old-app rename) have never fired on real data. First firing: the
+  admin adds a second location. The column-drop CONTRACT stays held until its fixture sweep (§7.211).
 
 ### Prohibitions — these live nowhere else
 
@@ -328,6 +334,29 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.88 (2026-08-24) — Location entity (expand phase): free-text location → per-tenant entity; SHIPPED + DEPLOYED
+
+**A location is now a managed entity, not free text on each class** (PRD §7.24, `20260824000100`,
+DEPLOYMENT §11.42). Admin → **Locations** CRUD (name/address/notes, archive-on-delete, DB-enforced); the class
+form picks from it; the admin Classes list + calendar/lessons and the **coach app** filter by it; the
+**parent** child detail shows the location's address + notes. FK `classes.location_id`, RLS, archive +
+cross-tenant guards, a bidirectional sync trigger, `set_class_terms`→12-arg. Engine unchanged (`core.ts` never
+read location).
+
+**Expand/contract, entity as the single source of truth.** The app only ever writes `location_id`; the sync
+trigger mirrors the free-text columns through the deploy window, so the **CONTRACT migration** (drops
+`location_name`/`location_address`) needs no further app change — but it is **HELD** as `..._contract.sql.hold`
+and lands LAST after a fixture sweep (~50 pgTAP + `seed.sql` + `disable_coach`, §7.211). Its full un-hold
+checklist is in the `.hold` header.
+
+**Built via** `/plan-with-confidence` → `/plan-review` (fable) → build → `/commit-review` (fable senior review)
+→ `/deploy`. The reviews caught 3 pre-ship bugs (RED-proven): the sync trigger reverting old-app renames and
+the backfill rewriting the free-text columns (§7.213), and `disable_coach` breaking at contract time (§7.211).
+Verified: pgTAP 1446, admin vitest 539, app jest 404, Deno 236×2 (expand + contract schemas), typechecks,
+`verify-locations` driver 6/6. Reasoning graduated to PRD §7.24, GOTCHAS §7.211–213, DEPLOYMENT §11.42,
+TESTING §5, `docs/plans/LOCATION_ENTITY_PLAN.md`. **Dormant on prod:** one backfilled location, no admin has
+opened the page — real the day a second location is added.
+
 ## 8.87 (2026-08-24) — Owner-only accounting page: accrual P&L per closed month; SHIPPED + DEPLOYED
 
 **The highest-value ready backlog item is built and live** (PRD §7.23, `20260823000100`, DEPLOYMENT §11.41).
@@ -347,18 +376,6 @@ later draft. Verified: pgTAP 38, admin vitest 532, typecheck, live UI drive (own
 blocked). Reasoning graduated to PRD §7.23, the migration comments, DEPLOYMENT §11.41, TESTING §5,
 `docs/plans/ACCOUNTING_PAGE_PLAN.md`. **Dormant on prod:** no owner has opened it — first real figures appear
 the first time an owner views a billed month.
-
-## 8.86 (2026-08-23) — Partial-payment CLOSED: the FOLDED re-correction refused → *Deliberately not doing*; DOCS-ONLY
-
-**The last open partial-payment follow-up was refused with the user, closing the area.** Seamlessly
-re-correcting a voided-and-debited note once its debit has already been **FOLDED** onto a later invoice (or
-written off) will keep returning **`CN002`**. Rationale: it is a **safe loud failure — no silent misbill**,
-deeply dormant (**0** credit notes on prod), triggered only by a *third* mistake on the *same* invoice, and
-`INVOICE_RUNBOOK.md` already has the manual path (credit note on the adjustment invoice). Reversing a
-folded/settled charge is the multi-flip state machine (M) — not worth building on anticipation. Decision
-recorded in `BACKLOG.md` → *Deliberately not doing* (§7.206–§7.207, `partial_payment_followups.test.sql` pins
-both arms). **No code, no migration, no engine change; behaviour unchanged** (the refusal already shipped in
-§8.83/§8.84).
 
 ## 9. Next steps (pick with the user)
 
@@ -422,17 +439,21 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 
 ### THE NEXT BUILD — no rework-critical head; a flat value pool
 
-**This session (§8.87) shipped the owner-only accounting page** — the highest-value ready M, now built +
-deployed (PRD §7.23). **That was the one clearly-ranked head; nothing rework-critical remains.** **No migration
-is in flight** (§7.55); latest applied is `20260823000100` (accounting RPCs, §8.87), on prod, 0 pending.
+**This session (§8.88) shipped the location entity (expand)** — the last value-pool item that carried any edge
+(it fed *Maps*); now built + deployed (PRD §7.24). **Nothing rework-critical remains, and no edges between what's
+left.** **One held migration:** the location **CONTRACT** (`..._contract.sql.hold`) drops the free-text columns
+and lands LAST after its fixture sweep (§7.211) — that is the one queued backend follow-up. Otherwise no
+migration is in flight (§7.55); latest applied is `20260824000100` (locations expand, §8.88), on prod, 0 pending.
 
 What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value (no edges between them):
-- **The value pool** — *A location entity* → *Maps* (soft edge: do location first if Maps is wanted; prod is
-  one location so low value), plus the Wave C S-pool (better filtering/search, family-status scan,
-  student-between-businesses, email-confirmation copy, tick-off swim skills).
-- **Two parked retrofit-tax choices** (not free while parked): *Split co-admin permissions* (yes eventually —
-  the accounting page needed none, being owner-gated not co-admin-scoped), and the *location entity*.
-- Settled decisions (revenue **ACCRUAL** now *realised* · reminders **MANUAL** · multi-language **REFUSED**):
+- **The value pool** — *Maps* (now builds directly on `locations.address`, no rework), plus the Wave C S-pool
+  (better filtering/search, family-status scan, student-between-businesses, email-confirmation copy, tick-off
+  swim skills).
+- **One parked retrofit-tax choice** (not free while parked): *Split co-admin permissions* (yes eventually —
+  neither accounting nor locations needed it; the Locations page is admin-managed, not co-admin-scoped).
+- The **location contract sweep** (drop the free-text columns) — mechanical but ~50 fixtures + `seed.sql` +
+  `disable_coach`; do it as its own db-branch change, prove green on the contract schema, then un-hold.
+- Settled decisions (revenue **ACCRUAL** *realised* · reminders **MANUAL** · multi-language **REFUSED**):
   `BACKLOG.md`.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
@@ -466,11 +487,13 @@ What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value (no
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**The migration queue is EMPTY.** The latest applied is `20260823000100` (accounting RPCs, §8.87);
-production confirmed caught up 2026-08-24 via `supabase migration list --linked`, **0 pending**.
-**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending. **§11.41 is the
-freshest worked example of the FULL sequence done IN ORDER** — two NEW read-only functions needing a remote
-grant dump → GATE → apps to `main` LAST, verifying the auth-gated page by grepping its NEW route chunk (§8.64's
+**One migration is HELD, none else in flight.** The latest applied is `20260824000100` (locations expand, §8.88);
+production confirmed caught up 2026-08-24 via `supabase migration list --linked`, **0 pending**. The location
+**CONTRACT** (`20260824000200_..._contract.sql.hold`) is written + proven but held out of the applied set (its
+`.hold` suffix makes `db push`/`db reset` skip it) — un-hold only after the fixture sweep (§7.211).
+**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending. **§11.42 is the
+freshest worked example of the FULL sequence done IN ORDER** — a new table + a DROP+CREATE function signature
+needing a remote grant dump → GATE → apps to `main` LAST, proving the new auth-gated route by 200-vs-404 (§8.64's
 technique for §11.25's gap), with a committed rehearsed DOWN. §11.40/§11.39/§11.37 are earlier full-sequence examples; **§11.38 records
 the §11.9 ordering mistake recurring** (recovered by reverting the app files only, landing the backend,
 re-applying apps last). §11.36 is the same-signature contrast (no grant dump needed, §11.32 pattern). §11.39/§11.37 are earlier full-sequence examples; **§11.38 records
