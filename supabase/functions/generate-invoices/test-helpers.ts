@@ -129,6 +129,9 @@ export type Scenario = {
   coachProfileId: string;
   tenantId: string;
   classId: string;
+  /** The scenario's location. Classes reference `locations` by FK — a test that
+   *  adds its own class sets location_id to this (never free text). */
+  locationId: string;
   /** The scenario's "Default Group" — the category classId is in. */
   categoryId: string;
   /** "Default Private" — a DIFFERENT category, which classId2 uses. Lets a
@@ -350,6 +353,17 @@ export async function newScenario(
   const categoryId2 = (cats ?? []).find((c) => c.name === "Default Private")!
     .id as string;
 
+  // The scenario's own location. Classes reference a `locations` entity by FK
+  // (20260824000100); a class is set by location_id, never free text. Writing
+  // location_id (not location_name) is forward-compatible: it works on the expand
+  // schema and survives the contract migration that drops the free-text columns.
+  const { data: loc } = await db
+    .from("locations")
+    .insert({ tenant_id: tenantId, name: "Test Pool" })
+    .select("id")
+    .single();
+  const locationId = loc!.id as string;
+
   // Class owned by the coach
   const { data: cls } = await db
     .from("classes")
@@ -359,7 +373,7 @@ export async function newScenario(
       day_of_week: dayOfWeek,
       start_time: "10:00",
       end_time: "11:00",
-      location_name: "Test Pool",
+      location_id: locationId,
       price_per_lesson: price,
       category_id: categoryId,
     })
@@ -422,7 +436,7 @@ export async function newScenario(
         day_of_week: "sunday",
         start_time: "10:00",
         end_time: "11:00",
-        location_name: "Test Pool",
+        location_id: locationId,
         price_per_lesson: opts.secondClass.price ?? price,
         // A DIFFERENT category from class 1, deliberately. Class 2 exists so a
         // test can put a lesson outside a scoped package — that used to be
@@ -892,6 +906,7 @@ export async function newScenario(
     coachProfileId,
     tenantId,
     classId,
+    locationId,
     categoryId,
     categoryId2,
     parentId,

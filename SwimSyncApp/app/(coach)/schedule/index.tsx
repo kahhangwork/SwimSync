@@ -50,6 +50,7 @@ import {
   lessonDatesInRange,
 } from "@/lib/scheduleWeek";
 import { bucketWeek } from "@/lib/scheduleBuckets";
+import { locationChips } from "@/lib/locationFilter";
 import {
   parseAssignments,
   assignmentsByLesson,
@@ -90,7 +91,8 @@ const CLASS_SELECT = `
         day_of_week,
         start_time,
         end_time,
-        location_name,
+        location_id,
+        locations(name),
         student_class_enrolments(student_id, is_active, enrolled_at, unenrolled_at)
       `;
 
@@ -103,6 +105,7 @@ type WeekLesson = {
   endTime: string;
   title: string;
   location: string;
+  locationId: string | null;
   sessionId: string | null;
   progress: LessonProgress;
   summary: string;
@@ -304,6 +307,10 @@ export default function ScheduleScreen() {
   /** FLOOR-scoped and week-INDEPENDENT. See the comment on loadData. */
   const [needsMarking, setNeedsMarking] = useState<BacklogItem[]>([]);
   const [weekLessons, setWeekLessons] = useState<WeekLesson[]>([]);
+  // "" = all locations. Filters the WEEK buckets only — NEEDS MARKING stays
+  // floor-scoped and ignores it, the same way it ignores the week selector, so a
+  // straggler at another location is never hidden.
+  const [locationFilter, setLocationFilter] = useState<string>("");
   const [floor, setFloor] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
@@ -674,7 +681,8 @@ export default function ScheduleScreen() {
           startTime: cls.start_time,
           endTime: cls.end_time,
           title: cls.title,
-          location: cls.location_name,
+          location: cls.locations?.name ?? "—",
+          locationId: cls.location_id ?? null,
           sessionId: sess?.id ?? null,
           // Past -> ended; future -> not; today -> ask the clock, keyed to the
           // class's END time because a coach marks at the end of a lesson.
@@ -858,8 +866,22 @@ export default function ScheduleScreen() {
   const needsKeys = new Set(
     visibleNeedsMarking.map((i) => `${i.class_id}:${i.date}`)
   );
+  // Distinct locations across the week's lessons, for the filter chips.
+  const scheduleLocationOpts = React.useMemo(
+    () => locationChips(weekLessons.map((l) => ({ id: l.locationId, name: l.location }))),
+    [weekLessons]
+  );
+
+  // Clamp to "all" when the selected location has no lessons this week — else the
+  // chips disappear (options ≤ 1) while the filter renders the week empty with no
+  // control to clear it.
+  const effLocationFilter = scheduleLocationOpts.some((o) => o.id === locationFilter)
+    ? locationFilter
+    : "";
   const buckets = bucketWeek(
-    weekLessons.filter((l) => !needsKeys.has(`${l.classId}:${l.date}`)),
+    weekLessons
+      .filter((l) => !needsKeys.has(`${l.classId}:${l.date}`))
+      .filter((l) => !effLocationFilter || l.locationId === effLocationFilter),
     todayDate
   );
   const todayLessons = showsTodaySection ? buckets.today : [];
@@ -944,6 +966,39 @@ export default function ScheduleScreen() {
             />
           </TouchableOpacity>
         </View>
+
+        {/* Location filter — only when this coach's week spans more than one.
+            Filters the week's sections; NEEDS MARKING deliberately ignores it. */}
+        {scheduleLocationOpts.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="gap-2 pb-1"
+            className="mb-4 -mx-1 px-1"
+          >
+            {[{ id: "", name: "All locations" }, ...scheduleLocationOpts].map((opt) => {
+              const active = effLocationFilter === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id || "all"}
+                  onPress={() => setLocationFilter(opt.id)}
+                  activeOpacity={0.8}
+                  className={`rounded-full px-4 py-1.5 ${
+                    active ? "bg-sky-600" : "bg-white border border-gray-200"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-medium ${
+                      active ? "text-white" : "text-gray-600"
+                    }`}
+                  >
+                    {opt.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
 
         {/* One tap back to the present. Marking a straggler correctly returns
             the coach to that past week, which is right for the straggler and

@@ -13,6 +13,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
 import { todayInSg, dayOfWeekOf } from "@/lib/lessonDates";
 import { groupByWeekday, weekdayLabel } from "@/lib/weekOrder";
+import { locationChips } from "@/lib/locationFilter";
 import Card from "@/components/Card";
 
 type CoachClass = {
@@ -21,6 +22,7 @@ type CoachClass = {
   day_of_week: string;
   start_time: string;
   end_time: string;
+  location_id: string;
   location_name: string;
   price_per_lesson: number;
   student_count: number;
@@ -38,14 +40,36 @@ export default function ClassesScreen() {
   const session = useAppStore((s) => s.session);
   const [classes, setClasses] = useState<CoachClass[]>([]);
   const [loading, setLoading] = useState(true);
+  // "" = all locations. A coach who teaches at one location never sees the chips.
+  const [locationFilter, setLocationFilter] = useState<string>("");
+
+  // Distinct locations across this coach's classes, for the filter chips.
+  const locationOpts = React.useMemo(
+    () => locationChips(classes.map((c) => ({ id: c.location_id, name: c.location_name }))),
+    [classes]
+  );
+
+  // Clamp to "all" when the selected location is no longer among the options
+  // (e.g. its last class was removed) — otherwise the chips vanish while the
+  // filter keeps hiding every row with no control to clear it.
+  const effLocationFilter = locationOpts.some((o) => o.id === locationFilter)
+    ? locationFilter
+    : "";
+  const shown = React.useMemo(
+    () =>
+      effLocationFilter
+        ? classes.filter((c) => c.location_id === effLocationFilter)
+        : classes,
+    [classes, effLocationFilter]
+  );
 
   // Today's weekday, in Singapore, read ONCE and passed in as a value. The
   // grouping helper cannot read a clock at all (lib/weekOrder.ts) — the same
   // shape lib/timeOfDay.ts forced after §7.7.
   const todayDow = dayOfWeekOf(todayInSg());
   const groups = React.useMemo(
-    () => groupByWeekday(classes, (c) => c.day_of_week, todayDow),
-    [classes, todayDow]
+    () => groupByWeekday(shown, (c) => c.day_of_week, todayDow),
+    [shown, todayDow]
   );
 
   const loadClasses = useCallback(async () => {
@@ -71,7 +95,8 @@ export default function ClassesScreen() {
         day_of_week,
         start_time,
         end_time,
-        location_name,
+        location_id,
+        locations(name),
         price_per_lesson,
         student_class_enrolments(id, is_active)
       `)
@@ -87,7 +112,8 @@ export default function ClassesScreen() {
         day_of_week: cls.day_of_week,
         start_time: cls.start_time,
         end_time: cls.end_time,
-        location_name: cls.location_name,
+        location_id: cls.location_id,
+        location_name: cls.locations?.name ?? "—",
         price_per_lesson: Number(cls.price_per_lesson),
         student_count: (cls.student_class_enrolments ?? []).filter(
           (e: any) => e.is_active
@@ -116,6 +142,37 @@ export default function ClassesScreen() {
             All assigned classes
           </Text>
         </View>
+
+        {locationOpts.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="gap-2 pb-1"
+            className="mb-4 -mx-1 px-1"
+          >
+            {[{ id: "", name: "All locations" }, ...locationOpts].map((opt) => {
+              const active = effLocationFilter === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id || "all"}
+                  onPress={() => setLocationFilter(opt.id)}
+                  activeOpacity={0.8}
+                  className={`rounded-full px-4 py-1.5 ${
+                    active ? "bg-sky-600" : "bg-white border border-gray-200"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-medium ${
+                      active ? "text-white" : "text-gray-600"
+                    }`}
+                  >
+                    {opt.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
 
         {loading ? (
           <View className="items-center py-16">

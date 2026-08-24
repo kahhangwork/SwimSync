@@ -47,6 +47,7 @@ import {
   CalendarDays,
   ListChecks,
   Calculator,
+  MapPin,
 } from "lucide-react";
 
 /** A page's audience. `tenant` = shows ONE business. `platform` = cross-tenant. */
@@ -69,6 +70,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/students",     label: "Students",             icon: Users,           scope: "tenant"   },
   { href: "/claims",       label: "Parent Requests",      icon: UserCheck,       scope: "tenant"   },
   { href: "/levels",       label: "Levels",               icon: Waves,           scope: "tenant"   },
+  { href: "/locations",    label: "Locations",            icon: MapPin,          scope: "tenant"   },
   { href: "/parents",      label: "Parents",              icon: UsersRound,      scope: "tenant"   },
   { href: "/attendance",   label: "Attendance Log",       icon: CalendarCheck,   scope: "tenant"   },
   { href: "/calendar",     label: "Calendar",             icon: CalendarDays,    scope: "tenant"   },
@@ -180,7 +182,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   // history. Marking moved front-and-centre to /lessons on 2026-08-19; the log
   // is what you consult, not where you work.
   { id: "log",        label: "Log",        hrefs: ["/attendance", "/history"] },
-  { id: "settings",   label: "Settings",   hrefs: ["/levels", "/coaches", "/admins"] },
+  { id: "settings",   label: "Settings",   hrefs: ["/levels", "/locations", "/coaches", "/admins"] },
 ];
 
 export type GroupedNav = {

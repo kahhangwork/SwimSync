@@ -142,7 +142,7 @@ export default function LessonPage() {
           supabase.auth.getSession(),
           supabase
             .from("classes")
-            .select("id, title, day_of_week, start_time, end_time, location_name, coach_id, category_id, colour, capacity, is_active, deactivated_at, class_categories(default_capacity)")
+            .select("id, title, day_of_week, start_time, end_time, location_id, locations(name), coach_id, category_id, colour, capacity, is_active, deactivated_at, class_categories(default_capacity)")
             .eq("id", classId)
             .maybeSingle(),
           supabase.from("lesson_sessions").select("id, cancelled_at, cancellation_reason").eq("class_id", classId).eq("session_date", date).maybeSingle(),
@@ -182,7 +182,7 @@ export default function LessonPage() {
         day_of_week: c.day_of_week,
         start_time: c.start_time,
         end_time: c.end_time,
-        location_name: c.location_name ?? "",
+        location_name: c.locations?.name ?? "",
         coach_id: c.coach_id,
         category_id: c.category_id,
         colour: c.colour ?? null,

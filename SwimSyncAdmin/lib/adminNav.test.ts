@@ -43,8 +43,9 @@ describe("navFor", () => {
     // deliberately: NAV also drives RequiresTenant's route gate, so a page added
     // here without being thought about is a page gated by accident rather than
     // on purpose.
-    expect(hrefs).toHaveLength(23);
+    expect(hrefs).toHaveLength(24);
     expect(hrefs).toContain("/accounting");
+    expect(hrefs).toContain("/locations");
     expect(hrefs).toContain("/calendar");
     expect(hrefs).toContain("/lessons");
     expect(hrefs).toContain("/history");

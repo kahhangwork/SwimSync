@@ -134,7 +134,7 @@ export default function ParentHomeScreen() {
                 day_of_week,
                 start_time,
                 end_time,
-                location_name,
+                locations(name),
                 coaches(
                   profiles(full_name)
                 )
@@ -170,7 +170,7 @@ export default function ParentHomeScreen() {
               coach_name: cls?.coaches?.profiles?.full_name ?? null,
               day: cls?.day_of_week ?? null,
               time: `${formatTime(cls.start_time)} – ${formatTime(cls.end_time)}`,
-              location: cls?.location_name ?? null,
+              location: cls?.locations?.name ?? null,
             };
           })
           .sort(

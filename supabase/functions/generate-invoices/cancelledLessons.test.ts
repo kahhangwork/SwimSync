@@ -79,7 +79,7 @@ async function addHomeClass(s: Scenario, dayOfWeek = "sunday"): Promise<string> 
       day_of_week: dayOfWeek,
       start_time: "10:00",
       end_time: "11:00",
-      location_name: "Test Pool",
+      location_id: s.locationId,
       price_per_lesson: 30,
       category_id: s.categoryId,
     })

@@ -155,7 +155,7 @@ export default function ClassRosterScreen() {
         day_of_week,
         start_time,
         end_time,
-        location_name,
+        locations(name),
         student_class_enrolments(
           is_active,
           enrolled_at,
@@ -177,7 +177,9 @@ export default function ClassRosterScreen() {
       day_of_week: cls.day_of_week,
       start_time: cls.start_time,
       end_time: cls.end_time,
-      location_name: cls.location_name,
+      // PostgREST returns a to-one embed as an object; the generated types widen
+      // it to an array, so cast rather than index.
+      location_name: (cls.locations as any)?.name ?? "—",
     });
 
     const activeStudents: Student[] = (cls.student_class_enrolments ?? [])

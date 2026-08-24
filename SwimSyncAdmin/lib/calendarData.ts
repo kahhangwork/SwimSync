@@ -39,7 +39,7 @@ export async function loadCalendarData(range: DateRange): Promise<CalendarLoad> 
       supabase
         .from("classes")
         .select(
-          "id, title, day_of_week, start_time, end_time, location_name, coach_id, colour, capacity, is_active, deactivated_at, class_categories(default_capacity)"
+          "id, title, day_of_week, start_time, end_time, location_id, locations(name), coach_id, colour, capacity, is_active, deactivated_at, class_categories(default_capacity)"
         ),
       supabase.from("coaches").select("id, profiles(full_name)"),
       supabase.from("class_rates").select("class_id, effective_from, paid_coach_id"),
@@ -124,7 +124,7 @@ export async function loadCalendarData(range: DateRange): Promise<CalendarLoad> 
     day_of_week: c.day_of_week as DayOfWeek,
     start_time: c.start_time,
     end_time: c.end_time,
-    location_name: c.location_name ?? "",
+    location_name: c.locations?.name ?? "",
     coach_id: c.coach_id,
     colour: c.colour ?? null,
     capacity: c.capacity ?? null,

@@ -1,10 +1,14 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-23 — **An owner-only accounting page SHIPPED** (PRD §7.23,
-`20260823000100`): the highest-value ready M is built — an owner-gated accrual P&L per closed month
-(Revenue / Outstanding / Wages / Net). Struck from the re-rank findings, the *Later* pool, and its own
-section. The queue's flat value pool loses its one clearly-ranked head; what remains has no edge — pick
-by value (location entity, the Wave C S-pool, Later)._
+_Last updated: 2026-08-24 — **A location entity BUILT** (PRD §7.24, `20260824000100`, on branch,
+pending deploy): `classes.location_name` promoted to a per-tenant `locations` table (admin CRUD,
+class-form picker, admin + coach filters, parent address/notes). Struck from its own section and the
+value pool; the column-drop CONTRACT migration is written + proven but HELD (needs a fixture sweep).
+What remains in the queue: the Wave C S-pool and Later (Maps now builds on `locations.address`, no
+rework). Pick by value — no edge between them._
+
+_Previously, 2026-08-23 — **An owner-only accounting page SHIPPED** (PRD §7.23,
+`20260823000100`): an owner-gated accrual P&L per closed month (Revenue / Outstanding / Wages / Net)._
 
 _Previously, 2026-08-23 — **Partial-payment CLOSED** (§8.86): the last follow-up — re-correcting a
 debited note once its debit has **FOLDED** — is **REFUSED** with the user (`CN002` stays; safe, dormant,
@@ -1253,19 +1257,20 @@ Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). Both foll
 Cosmetic, not filed separately: the coach Schedule's collapsed COMING UP day summary still counts a
 cancelled lesson in its "N lessons"; the card inside is struck.
 
-### A location entity (venue) — **M** — **Later** (demoted 2026-08-22: production is one location) `[raised 2026-08-19 while building the admin calendar]`
-Promote `classes.location_name` (free text) to a `locations` table the class references, so the
-calendar, Lessons list and a future Maps link filter and group by a real venue.
+### ~~A location entity (venue)~~ — **M** — **BUILT 2026-08-24** (PRD §7.24, on branch, pending deploy)
+Promoted `classes.location_name` (free text) to a per-tenant `locations` table (name/address/notes)
+the class references by FK. Admin → **Locations** CRUD (owner/co-admin), the class form picks from it,
+the Classes list + calendar/lessons filter by it, the coach app filters by it, and the parent child
+detail shows the address + notes. Delete = **archive** (a location an active class uses can't be
+removed; retired classes keep it; names reusable). `20260824000100_locations_entity_expand.sql` +
+`locations.test.sql`; expand/contract, entity is the single source of truth.
 
-**Why:** the calendar's Location filter (PRD §7.22) is built on *distinct `location_name` values*,
-which works for one business at one pool but fragments the moment "Clementi" and "Clementi SC" both
-exist. A multi-venue business (the OClass reference the user showed) wants columns per venue in the
-day view, not a dropdown over strings.
+**Column-drop deferred:** the CONTRACT migration (`..._contract.sql.hold`) that drops the free-text
+`location_name`/`location_address` columns is written + proven but HELD — it lands LAST at deploy and
+needs a fixture sweep (~50 pgTAP files + `seed.sql` + `disable_coach()` still insert/read the columns).
+Until then the columns survive as a trigger-maintained mirror, so nothing drifts.
 
-**Notes:** the filter and the Maps item (`location_address`) are the two consumers; an expand/
-contract migration (add table + FK, backfill from distinct names, keep the text column until both
-apps read the FK). Per-venue columns in the day view are the UI half. Not urgent: production is one
-location.
+**Maps** (below) now builds directly on `locations.address` — no rework, the free-text dependency is gone.
 
 ### ~~An owner-only accounting page~~ — **M** — **SHIPPED 2026-08-23** (PRD §7.23)
 An owner-gated accrual P&L, one closed month at a time: **Revenue** (net_amount −

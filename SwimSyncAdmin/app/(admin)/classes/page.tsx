@@ -22,6 +22,7 @@ import {
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
 import { PackageChip } from "@/components/PackageChip";
 import { CLASS_COLOURS, colourFor } from "@/lib/classColours";
+import { locationFilterOptions, formLocationOptions } from "@/lib/locationOptions";
 
 type ClassRow = {
   id: string;
@@ -31,7 +32,11 @@ type ClassRow = {
   day_of_week: string;
   start_time: string;
   end_time: string;
+  /** The location's name, read from the joined `locations` entity (not the
+   *  soon-to-be-dropped free-text column). */
   location_name: string;
+  /** FK into `locations`. Every class has one (backfilled + kept NOT NULL). */
+  location_id: string;
   price_per_lesson: number;
   category_id: string | null;
   /** Max students for THIS class; NULL = the category default (below), NULL
@@ -52,6 +57,11 @@ type ClassRow = {
    *  attached rather than being a bare state. */
   deactivated_at: string | null;
 };
+
+/** A pickable/filterable location. `archived_at` is carried so the form can
+ *  show a reactivated class's archived location, labelled, without offering it
+ *  as a NEW choice (RISK 6). */
+type LocationOpt = { id: string; name: string; address: string | null; archived_at: string | null };
 
 type Coach = {
   id: string;
@@ -149,7 +159,7 @@ export default function ClassesPage() {
   const [day, setDay] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [location, setLocation] = useState("");
+  const [locationId, setLocationId] = useState("");
   const [rate, setRate] = useState("");
   const [original, setOriginal] = useState<{ price: number; coachId: string }>({
     price: NaN,
@@ -165,6 +175,12 @@ export default function ClassesPage() {
     { id: string; name: string; default_capacity: number | null }[]
   >([]);
   const [categoryId, setCategoryId] = useState("");
+  // Every location for this business, INCLUDING archived. The form picker needs
+  // an archived one to represent a reactivated class's current value (RISK 6),
+  // and the name lookup covers retired classes sitting on an archived location.
+  const [locations, setLocations] = useState<LocationOpt[]>([]);
+  // The location dropdown in the list toolbar; "" = all locations.
+  const [locationFilter, setLocationFilter] = useState("");
   // Capacity + colour are informational (calendar "x/y" count and card colour),
   // not effective-dated and not money, so they travel with category_id: the
   // same plain UPDATE beside set_class_terms, never inside it.
@@ -213,6 +229,7 @@ export default function ClassesPage() {
     loadClasses();
     loadCoaches();
     loadCategories();
+    loadLocations();
     loadRoster();
   }, []);
 
@@ -304,6 +321,17 @@ export default function ClassesPage() {
     setCategories(data ?? []);
   }
 
+  // Every location for the business (RLS-scoped), archived included — see the
+  // `locations` state note. Ordered the way the picker shows them.
+  async function loadLocations() {
+    const { data } = await supabase
+      .from("locations")
+      .select("id, name, address, archived_at")
+      .order("sort_order")
+      .order("name");
+    setLocations((data ?? []) as LocationOpt[]);
+  }
+
   // ⚠ RETIRED CLASSES ARE LOADED, AND THAT IS LOAD-BEARING, NOT COSMETIC.
   // This used to be `.eq("is_active", true)`. Since the invoice engine stopped
   // skipping inactive classes, one of them CAN block a billing month — and the
@@ -318,7 +346,7 @@ export default function ClassesPage() {
     const { data } = await supabase
       .from("classes")
       .select(
-        "id, coach_id, title, day_of_week, start_time, end_time, location_name, price_per_lesson, category_id, capacity, colour, is_active, deactivated_at, coaches(profiles(full_name)), class_categories(default_capacity), student_class_enrolments(id, is_active)"
+        "id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id, capacity, colour, is_active, deactivated_at, coaches(profiles(full_name)), locations(name), class_categories(default_capacity), student_class_enrolments(id, is_active)"
       )
       .order("day_of_week")
       .order("start_time");
@@ -332,7 +360,9 @@ export default function ClassesPage() {
         day_of_week: c.day_of_week,
         start_time: c.start_time,
         end_time: c.end_time,
-        location_name: c.location_name,
+        // From the joined entity, not the free-text column (dropped in contract).
+        location_name: c.locations?.name ?? "—",
+        location_id: c.location_id,
         price_per_lesson: Number(c.price_per_lesson),
         category_id: c.category_id ?? null,
         capacity: c.capacity ?? null,
@@ -471,7 +501,7 @@ export default function ClassesPage() {
     setDay("");
     setStartTime("");
     setEndTime("");
-    setLocation("");
+    setLocationId("");
     setRate("");
     setCategoryId("");
     setCapacity("");
@@ -488,7 +518,7 @@ export default function ClassesPage() {
     setDay(cls.day_of_week);
     setStartTime(cls.start_time.slice(0, 5)); // "HH:MM:SS" → "HH:MM" for <input type="time">
     setEndTime(cls.end_time.slice(0, 5));
-    setLocation(cls.location_name);
+    setLocationId(cls.location_id);
     setRate(String(cls.price_per_lesson));
     setCategoryId(cls.category_id ?? "");
     setCapacity(cls.capacity == null ? "" : String(cls.capacity));
@@ -499,8 +529,15 @@ export default function ClassesPage() {
   }
 
   async function handleSubmit() {
-    if (!title || !coachId || !day || !startTime || !endTime || !location || !rate) {
+    if (!title || !coachId || !day || !startTime || !endTime || !locationId || !rate) {
       setSaveError("Please fill in all fields.");
+      return;
+    }
+    // The picked location supplies the name/address the free-text columns still
+    // require through the expand window (RISK 1 — send both so the two agree).
+    const picked = locations.find((l) => l.id === locationId);
+    if (!picked) {
+      setSaveError("Please choose a location.");
       return;
     }
     // Checked separately so the message names the field. category_id is NOT
@@ -526,7 +563,10 @@ export default function ClassesPage() {
       day_of_week: day,
       start_time: startTime,
       end_time: endTime,
-      location_name: location,
+      // Only the FK — the DB sync trigger mirrors the free-text location_name /
+      // location_address from the entity, so this insert never names the columns
+      // the contract migration drops (RISK 1b, write side).
+      location_id: locationId,
       price_per_lesson: parseFloat(rate),
       category_id: categoryId,
       capacity: capacityValue,
@@ -547,7 +587,7 @@ export default function ClassesPage() {
           p_day_of_week: day,
           p_start_time: startTime,
           p_end_time: endTime,
-          p_location_name: location,
+          p_location_name: picked.name,
           p_price_per_lesson: parseFloat(rate),
           p_coach_id: coachId,
           // A correction rewrites history (there was never a period at the old
@@ -555,6 +595,8 @@ export default function ClassesPage() {
           // money actually moved — see moneyChanged.
           p_effective_from: correctInPlace ? null : todayInSg(),
           p_correct_in_place: correctInPlace,
+          p_location_address: picked.address,
+          p_location_id: locationId,
         })
       : await supabase.from("classes").insert({ ...payload, is_active: true });
 
@@ -701,11 +743,24 @@ export default function ClassesPage() {
     await loadClasses();
   }
 
+  // Clamp a stale location filter (its classes gone after a reload) to "all", so
+  // it never hides every row with the dropdown showing no matching option.
+  const locationFilterActive =
+    locationFilter !== "" && classes.some((c) => c.location_id === locationFilter);
+
   const filtered = classes.filter(
     (c) =>
       (showRetired || c.is_active) &&
+      (!locationFilterActive || c.location_id === locationFilter) &&
       (c.title.toLowerCase().includes(search.toLowerCase()) ||
         c.coach_name.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  // Both derivations are pure and unit-tested in lib/locationOptions.ts.
+  const locationOptions = useMemo(() => locationFilterOptions(classes), [classes]);
+  const pickerOptions = useMemo(
+    () => formLocationOptions(locations, locationId),
+    [locations, locationId]
   );
 
   // One roster per class, derived once. The badge's "+N" and the drawer's
@@ -773,6 +828,21 @@ export default function ClassesPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full max-w-sm rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
         />
+        {locationOptions.length > 1 && (
+          <select
+            aria-label="Location"
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value)}
+            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+          >
+            <option value="">All locations</option>
+            {locationOptions.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        )}
         {/* Always offered, even at zero, so the answer to "where did that class
             go?" is on the page rather than in someone's memory. */}
         <label className="inline-flex items-center gap-2 text-sm text-gray-600">
@@ -1466,12 +1536,31 @@ export default function ClassesPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field
-              label="Location"
-              placeholder="e.g. Buona Vista SC"
-              value={location}
-              onChange={setLocation}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Location <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+              >
+                <option value="">Choose a location…</option>
+                {pickerOptions.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                    {l.archived_at ? " (archived)" : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Manage the list on the{" "}
+                <a href="/locations" className="text-sky-600 hover:underline">
+                  Locations
+                </a>{" "}
+                page.
+              </p>
+            </div>
             <Field
               label="Rate per Lesson (S$)"
               placeholder="40"

@@ -522,7 +522,7 @@ proves DOB insufficient.)*
 | **Students per class** | Each class can have multiple students |
 | **Classes per student** | One fixed weekly class per student in MVP |
 
-**Class definition includes:** title/name, day of week, start time, end time, location name and/or address, class price per lesson. Superadmin can create, edit classes, and amend pricing when needed.
+**Class definition includes:** title/name, day of week, start time, end time, **location** (chosen from the business's managed locations, §7.24), class price per lesson. Superadmin can create, edit classes, and amend pricing when needed.
 
 ### 5.4 Attendance Rules
 
@@ -797,7 +797,7 @@ SwimSync shall allow superadmin to manage classes.
 
 - Create and edit classes
 - Set weekday, start time, and end time
-- Set location name and optional address
+- Choose the location from the business's managed locations (§7.24)
 - Set class price per lesson
 - Set class active/inactive status
 - Assign a coach to a class
@@ -2609,9 +2609,8 @@ SwimSync shall show the tenant admin **every lesson of every coach** on one cale
 admin can see at a glance which class at a given time has a free slot for a make-up.
 
 - **Admin panel → Calendar** (`/calendar`): **Day / Week / Month / Agenda** views, **Today**,
-  ‹ ›, a **Location** filter (the distinct `location_name` values of the business's classes —
-  there is no location entity yet, see BACKLOG) and a **Coach** filter (who *teaches* the
-  lesson, i.e. the substitute when there is one).
+  ‹ ›, a **Location** filter (the business's managed locations, §7.24) and a **Coach** filter
+  (who *teaches* the lesson, i.e. the substitute when there is one).
 - **What a lesson is.** The weekday pattern of every class ∪ every existing `lesson_sessions`
   row in the range (so extra lessons show and future lessons show before anyone marks them), minus
   dates on/after a retired class's SGT retirement date. **The calendar never creates a lesson
@@ -2677,6 +2676,31 @@ payouts to see*, not a number) whenever a rated coach has no payout run for the 
 because a partial wage sum would silently overstate Net. A month whose payouts are still
 **draft** shows the figure with a *may change* note. A business with no rated coach (the
 private-coach case) shows Wages S$0 and Net = Revenue.
+
+---
+
+### 7.24 Locations *(implemented 2026-08-24)*
+
+A business's locations are a **managed entity**, not free text on each class. Admin →
+**Locations** is a CRUD list (like Levels §7.15): each location has a **name** (unique per
+business), an optional **address**, optional **notes** (parking, which gate), and a sort
+order. Every class is set to one location from this list on the class form, rather than a
+typist re-inventing "Clementi" vs "Clementi SC".
+
+**Where it shows.** The admin **Classes** list, **Calendar** and **Lessons** all filter by
+location; the **coach app** filters their classes and week by location (a chip row that
+appears only when they teach at more than one). A **parent** sees the location **name,
+address and notes** on their child's detail — so they know where to go — but does not filter
+(their classes are almost always at one place).
+
+**Delete means archive.** A location an **active** class still uses cannot be removed (the
+database refuses it, not just the page); removing one only **retired** classes hold
+**archives** it — gone from the list and every picker, but kept so those retired classes keep
+a valid location and reactivating one never breaks. An archived name can be reused.
+
+**Required.** Every class has a location (there is no "unassigned"), so a business creates at
+least one before its first class. Migrated from the previous free-text `location_name`, which
+is retained as an internal mirror during roll-out.
 
 ---
 

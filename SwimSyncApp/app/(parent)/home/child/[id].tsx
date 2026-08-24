@@ -41,6 +41,10 @@ type ChildDetail = {
     day: string | null;
     time: string | null;
     location: string | null;
+    /** The location's street address + notes, shown so a parent knows where to
+     *  go and any access detail (parking, which gate). From the entity. */
+    location_address: string | null;
+    location_notes: string | null;
   }[];
   outstanding_amount: number;
   credit_balance: number;
@@ -106,7 +110,7 @@ export default function ChildProfileScreen() {
             day_of_week,
             start_time,
             end_time,
-            location_name,
+            locations(name, address, notes),
             coaches(
               profiles(full_name)
             )
@@ -129,7 +133,9 @@ export default function ChildProfileScreen() {
           coach_name: cls?.coaches?.profiles?.full_name ?? null,
           day: cls?.day_of_week ?? null,
           time: `${formatTime(cls.start_time)} – ${formatTime(cls.end_time)}`,
-          location: cls?.location_name ?? null,
+          location: cls?.locations?.name ?? null,
+          location_address: cls?.locations?.address ?? null,
+          location_notes: cls?.locations?.notes ?? null,
         };
       });
 
@@ -338,6 +344,12 @@ export default function ChildProfileScreen() {
                   <Row label="Day"      value={capitalize(c.day)} />
                   <Row label="Time"     value={c.time ?? "—"} />
                   <Row label="Location" value={c.location ?? "—"} />
+                  {c.location_address ? (
+                    <Row label="Address" value={c.location_address} />
+                  ) : null}
+                  {c.location_notes ? (
+                    <Row label="Getting there" value={c.location_notes} />
+                  ) : null}
                 </View>
               ))}
             </View>
