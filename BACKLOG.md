@@ -1257,7 +1257,7 @@ Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). Both foll
 Cosmetic, not filed separately: the coach Schedule's collapsed COMING UP day summary still counts a
 cancelled lesson in its "N lessons"; the card inside is struck.
 
-### ~~A location entity (venue)~~ — **M** — **BUILT 2026-08-24** (PRD §7.24, on branch, pending deploy)
+### ~~A location entity (venue)~~ — **M** — **SHIPPED + DEPLOYED 2026-08-24** (PRD §7.24, §8.88, `20260824000100`)
 Promoted `classes.location_name` (free text) to a per-tenant `locations` table (name/address/notes)
 the class references by FK. Admin → **Locations** CRUD (owner/co-admin), the class form picks from it,
 the Classes list + calendar/lessons filter by it, the coach app filters by it, and the parent child
@@ -1271,6 +1271,24 @@ needs a fixture sweep (~50 pgTAP files + `seed.sql` + `disable_coach()` still in
 Until then the columns survive as a trigger-maintained mirror, so nothing drifts.
 
 **Maps** (below) now builds directly on `locations.address` — no rework, the free-text dependency is gone.
+
+### Location contract sweep — drop the free-text columns — **S** `[raised 2026-08-24 while shipping the location entity, §8.88]`
+Un-hold `20260824000200_locations_entity_contract.sql.hold`: it sets `classes.location_id` NOT NULL and
+drops `classes.location_name` / `classes.location_address`. Written + proven locally already; the blocker is a
+mechanical fixture sweep, so this is deferred, not designed.
+
+**Why:** the free-text columns are now dead weight — the app only writes `location_id`, and the sync trigger
+keeps them as a mirror. Dropping them removes the drift surface and the trigger. Not urgent (nothing reads them
+today), but they should not linger indefinitely.
+
+**Notes:** dropping the columns breaks every INSERT/read that still names them — as of ship: `seed.sql`,
+~50 pgTAP fixtures (`grep -rln location_name supabase/tests`), and **`disable_coach()`** which does
+`SELECT c.* INTO v_class` then reads `v_class.location_name` (a runtime break, not a compile one — §7.211).
+Do it as its own `db/…` branch: adapt those inserts to `location_id`, redefine `disable_coach` inside the
+contract migration, drop `locations.test.sql`'s two expand-only cases, prove `supabase test db` + Deno green on
+the contract schema, THEN rename `.hold`→`.sql` and deploy it LAST. The full checklist is in the `.hold` header.
+Sync-trigger direction + ordering lessons: §7.213. Bidirectional trigger means the sweep can be prepared and
+verified ahead of the deploy.
 
 ### ~~An owner-only accounting page~~ — **M** — **SHIPPED 2026-08-23** (PRD §7.23)
 An owner-gated accrual P&L, one closed month at a time: **Revenue** (net_amount −
