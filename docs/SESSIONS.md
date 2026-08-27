@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.88** | 2026-08-24 | Location entity EXPAND: free-text class location → per-tenant `locations` entity (FK, admin CRUD, filters, parent address view); `20260824000100` | §7.211–§7.213 · PRD §7.24 · DEPLOYMENT §11.42 · plans/LOCATION_ENTITY_PLAN.md |
 | **8.87** | 2026-08-24 | Owner-only accounting page: accrual P&L per closed month (Revenue/Outstanding/Wages/Net), owner-gated, wages withheld when payouts unrun (`20260823000100`) | PRD §7.23 · DEPLOYMENT §11.41 · plans/ACCOUNTING_PAGE_PLAN.md |
 | **8.86** | 2026-08-23 | Partial-payment CLOSED: re-correcting a FOLDED-and-debited note stays refused (`CN002`) → *Deliberately not doing*; docs-only | §7.206–§7.207 · BACKLOG |
 | **8.85** | 2026-08-23 | Tenant-admin invite link lasts 24h (email says so): auth `mailer_otp_exp` 3600→86400 on prod via Management API; app-only `34db287` | §7.210 · PRD §4.4 |

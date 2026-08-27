@@ -1,12 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-24 — **Location entity CONTRACT SHIPPED + DEPLOYED** (§8.89, PRD §7.24, `20260824000200`).
-The free-text `classes.location_name`/`location_address` columns are DROPPED on prod; `location_id` is NOT NULL,
-the sync trigger is gone, `disable_coach` redefined to stop reading them. Fixture sweep: 51 pgTAP + `seed.sql` +
-14 UI driver fixtures/teardowns + 3 drivers — the `.hold` checklist had missed the UI fixtures, CI caught it
-(§7.214). One-way contract, no app/engine change. Verified pgTAP 1442 · Deno 236×2 · roundtrip · CI green._
+_Last updated: 2026-08-27 — **3 nightly UI drivers repaired, no product regression** (§8.90, commit
+`be34398`, on main). `ui-drivers.yml` was red 08-24..27: `class-edit` (typed into the removed free-text
+location field), `platform-admin-scope` (page-count pin 22→24 for Accounting+Locations), `cancel-lesson`
+(a "Sep"/"Sept" ICU mismatch, §7.215 — a calendar coincidence with the location deploy, NOT its fallout).
+All three verified green locally; `tenant-provisioning` was a one-night 08-26 flake._
 
-_Previously, 2026-08-24 (§8.88) — Location entity EXPAND: free-text location promoted to a per-tenant `locations` entity (FK, admin CRUD, filters, parent address view)._
+_Previously, 2026-08-24 (§8.89) — Location entity CONTRACT: dropped the free-text `location_name`/`location_address` columns on prod; `location_id` NOT NULL, one-way, no app/engine change._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -332,6 +332,23 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.90 (2026-08-27) — Nightly UI drivers repaired: 3 stale assertions, no product regression
+
+**The `ui-drivers.yml` sweep was red 2026-08-24..27; triage found NO product bug** — three stale driver
+assertions, fixed and verified green against the real UI (commit `be34398`, on main; driver-only, `.claude/`).
+
+- **`cancel-lesson`** (15/17→17/17): the coach-app COMING UP day-header regex was built from Node's en-US short
+  month `"Sep"`, but the browser renders September `"Sept"` — anchored `Sep$` stopped matching the first nightly
+  whose `today+7` crossed into September (08-24), which merely *looked* like location-deploy fallout. Now
+  prefix-matches weekday+month. Full trap: **§7.215**.
+- **`class-edit`** (timeout→5/5): filled the removed free-text location field; §8.88 replaced it with a dropdown.
+  Now selects the location `<select>`.
+- **`platform-admin-scope`** (31/32→32/32): sidebar page-count pin 22→24 for Accounting (§8.87) + Locations
+  (§8.88); `adminNav.ts` is the source of truth. The §7.178 designed-to-redden pin, bumped three nights late again.
+
+`tenant-provisioning` failed only 08-26 (passed 08-24/08-25 on identical code) — a one-night `waitForTimeout`
+flake, left alone. No PRD/BACKLOG movement (no behaviour change). Reasoning graduated to **§7.215**.
+
 ## 8.89 (2026-08-24) — Location entity CONTRACT: dropped the free-text columns on prod; SHIPPED + DEPLOYED
 
 **The one-way column drop landed LAST** (PRD §7.24, `20260824000200`, DEPLOYMENT §43). Un-held the CONTRACT
@@ -349,29 +366,6 @@ EXPAND schema. Swept those too (explicit location row → id, teardown deletes i
 
 Verified on the contract schema: pgTAP 1442 (1446−4 — `locations.test.sql` dropped its 2 expand-only sync cases),
 Deno 236×2, roundtrip both passes, CI green. Reasoning graduated to GOTCHAS §7.214, DEPLOYMENT §43.
-
-## 8.88 (2026-08-24) — Location entity (expand phase): free-text location → per-tenant entity; SHIPPED + DEPLOYED
-
-**A location is now a managed entity, not free text on each class** (PRD §7.24, `20260824000100`,
-DEPLOYMENT §11.42). Admin → **Locations** CRUD (name/address/notes, archive-on-delete, DB-enforced); the class
-form picks from it; the admin Classes list + calendar/lessons and the **coach app** filter by it; the
-**parent** child detail shows the location's address + notes. FK `classes.location_id`, RLS, archive +
-cross-tenant guards, a bidirectional sync trigger, `set_class_terms`→12-arg. Engine unchanged (`core.ts` never
-read location).
-
-**Expand/contract, entity as the single source of truth.** The app only ever writes `location_id`; the sync
-trigger mirrors the free-text columns through the deploy window, so the **CONTRACT migration** (drops
-`location_name`/`location_address`) needs no further app change — but it is **HELD** as `..._contract.sql.hold`
-and lands LAST after a fixture sweep (~50 pgTAP + `seed.sql` + `disable_coach`, §7.211). Its full un-hold
-checklist is in the `.hold` header.
-
-**Built via** `/plan-with-confidence` → `/plan-review` (fable) → build → `/commit-review` (fable senior review)
-→ `/deploy`. The reviews caught 3 pre-ship bugs (RED-proven): the sync trigger reverting old-app renames and
-the backfill rewriting the free-text columns (§7.213), and `disable_coach` breaking at contract time (§7.211).
-Verified: pgTAP 1446, admin vitest 539, app jest 404, Deno 236×2 (expand + contract schemas), typechecks,
-`verify-locations` driver 6/6. Reasoning graduated to PRD §7.24, GOTCHAS §7.211–213, DEPLOYMENT §11.42,
-TESTING §5, `docs/plans/LOCATION_ENTITY_PLAN.md`. **Dormant on prod:** one backfilled location, no admin has
-opened the page — real the day a second location is added.
 
 ## 9. Next steps (pick with the user)
 
@@ -414,10 +408,12 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-21:** the 08-20 *scheduled* run died in **1m24s** (before any driver ran — infra, not
-code; the "dies before checkout" rule below); a **manual dispatch on 08-21 01:30 SGT was GREEN** (1h17m) —
-the first green since 08-14. A new driver joined the sweep today (`verify-cancel-lesson`, 17 checks, passed
-locally against the real UI) — if 08-22 reddens on it, its name is new, so triage it as new.
+**State on 2026-08-27:** the 08-24..27 *scheduled* runs were red — triaged (§8.90) as **3 stale driver
+assertions, no product bug**, all fixed on main (`be34398`): `class-edit`, `platform-admin-scope` (pin 22→24),
+and `cancel-lesson` (the "Sep"/"Sept" ICU trap, **§7.215**). `tenant-provisioning` reddened only 08-26 (a
+one-night `waitForTimeout` flake, untouched). The next scheduled run (08-27 night) should confirm green — if
+`tenant-provisioning` reddens again, it is the flake, not these three; if any of the three reddens, that is a
+new regression. **A manual `gh workflow run ui-drivers.yml` confirms green in ~1h20m without waiting.**
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.

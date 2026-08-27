@@ -3365,3 +3365,17 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     teardown DELETEs it AFTER the classes (ON DELETE RESTRICT) — and translate any driver that UPDATEs the dropped
     column into another non-schedule attribute (`colour`, a palette key). `grep -rln location_name .claude` is the
     fact the checklist should have named. (2026-08-24, §8.89.)
+
+215. **A UI driver that builds a date-header regex from Node's `toLocaleDateString` will silently stop matching
+    the app's rendering the month it disagrees — and for September it DOES: Node's en-US short month is "Sep",
+    the browser's CLDR is "Sept".** `verify-cancel-lesson.mjs` anchored the coach-app COMING UP day header as
+    `^${weekday},? ${day} ${month}$` with `month` from `toLocaleDateString(...,{month:"short"})`. Node (v25 ICU)
+    emits "Sep"; the Expo-web app (browser ICU/CLDR) renders "Sept", so the anchored `Sep$` failed, `headerCount`
+    fell to 0, the day was never expanded and the card never entered the DOM — **two checks red from one string**,
+    and the driver read as a coach-app regression when the feature was fine (every DB assertion passed). It went
+    red on the 2026-08-24..27 nightlies — the first runs whose `today+7` crossed into September — which made it
+    look like fallout from the location deploy that shipped 08-24, a pure calendar coincidence. The trap is
+    general: **the driver (Node) and the app (browser) can format the same date differently**; September is just
+    the case that bites in en-US. Fix: match weekday and month as PREFIXES (`${weekday}\w*`, `${month}\w*`) so
+    "Sep"/"Sept" and "Thu"/"Thursday" both pass, rather than trusting Node's string to equal the app's. Same
+    calendar-assumption family as §7.122. (2026-08-27.)
