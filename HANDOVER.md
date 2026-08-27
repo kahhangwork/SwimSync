@@ -437,9 +437,9 @@ migration, and no edges between what's left.** No migration is in flight (§7.55
 `20260824000200` (locations contract, §8.89), on prod, 0 pending.
 
 What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value (no edges between them):
-- **The value pool** — *Maps* (now builds directly on `locations.address`, no rework), plus the Wave C S-pool
-  (better filtering/search, family-status scan, student-between-businesses, email-confirmation copy, tick-off
-  swim skills).
+- **The value pool** — the Wave C S-pool (better filtering/search, family-status scan,
+  student-between-businesses, email-confirmation copy, tick-off swim skills). *(Maps was deferred to
+  `BACKLOG.md` → Later on 2026-08-27 — user's call; it builds cleanly on `locations.address` whenever picked up.)*
 - **One parked retrofit-tax choice** (not free while parked): *Split co-admin permissions* (yes eventually —
   neither accounting nor locations needed it; the Locations page is admin-managed, not co-admin-scoped).
 - Settled decisions (revenue **ACCRUAL** *realised* · reminders **MANUAL** · multi-language **REFUSED**):

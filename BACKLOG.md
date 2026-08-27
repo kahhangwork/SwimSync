@@ -1,6 +1,10 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-24 — **The location entity SHIPPED + DEPLOYED, expand AND contract** (PRD §7.24,
+_Last updated: 2026-08-27 — **Maps integration DEFERRED to *Later*** (user's call): it is out of the
+current pick-now pool. It still builds cleanly on `locations.address` whenever it's picked up — no rework —
+but production is one location, so it waits. What remains pick-now: the Wave C S-pool. Pick by value._
+
+_Previously, 2026-08-24 — **The location entity SHIPPED + DEPLOYED, expand AND contract** (PRD §7.24,
 `20260824000100`+`…200`, §8.88/§8.89): `classes.location_name` promoted to a per-tenant `locations` table,
 then the free-text columns DROPPED on prod (one-way contract). Struck from its own section and the value pool.
 What remains in the queue: the Wave C S-pool and Later (Maps now builds on `locations.address`, no rework).
@@ -408,13 +412,28 @@ edge. The pass produced three durable findings, recorded so they are not re-deri
   2026-08-23** (PRD §7.23, `20260823000100`): owner-gated accrual P&L per closed month — Revenue /
   Outstanding / Wages / Net, wages withheld when payouts are unrun. Built exactly as the decision predicted
   (accrual, `is_tenant_owner()`, no capability model). Zero rework, as called.
-- **One soft edge in the value pool: *A location entity* → *Maps integration*.** Maps reads
-  `location_address`; built on the free-text `location_name` it gets reworked onto the FK later. If either
-  is wanted, do the location entity first. Both stay low-priority (prod is one location).
+- ~~**One soft edge in the value pool: *A location entity* → *Maps integration*.**~~ **RESOLVED
+  2026-08-27** — the location entity SHIPPED (§8.88/§8.89), so the edge is gone; *Maps* now builds directly
+  on `locations.address` with no rework and was **deferred to *Later*** (prod is one location).
 - **Two retrofit-tax deferrals are CHOICES, not free — surfaced so they don't drift silently.**
   *Split co-admin permissions* (every ungated admin surface built meanwhile is one to retrofit — user's
   call is "yes eventually, not now") and *A location entity* (cheap now at 2 consumers, dearer per
   venue-aware screen). Neither is due today; both accrue cost while parked.
+
+#### Current pick-now order (set 2026-08-27 with the user)
+
+No rework edges between these — this is a **value/effort** ranking the user chose, not a rework-cost one:
+the two S quick-wins first, the M feature last. Full item bodies are in the themed sections cited.
+
+1. **Better filtering and search** (S) — search across admin tables + per-table filters (only *search*
+   and the non-Attendance filters remain; sorting shipped). Reuse `SwimSyncAdmin/lib/tableSort.ts`.
+   Full item: *Admin and operations → Better filtering and search*.
+2. **Moving a student between businesses leaves two loose ends** (S) — `reassign_student_tenant()` writes
+   no `parent_tenants` row (parent unjoined at the new tenant) and strands credit at the old one, both
+   silent. Correctness fix at a confusing moment. Full item: *Admin and operations*.
+3. **Tick off swimming skills per child** (M) — coach marks which of a level's skills a child passed;
+   parent watches progress. Needs its own `student_skill_progress` table + policy (no widening of
+   `students_update`) and two decisions (level-change history; binary vs graded). Full item: *Coach workflow*.
 
 Everything else in *Wave C*'s S pool and *Later* has **no edge** — pick by value.
 
@@ -442,9 +461,10 @@ click-through queue stops scaling.
 4. ~~Attendance edit history view~~ — DONE 2026-08-17 (the Change History page).
 5. ~~Export to CSV~~ — DONE 2026-08-17.
 
-**Wave C is exhausted bar the lower-value S pool, no order:** Maps deep link, Better
-filtering/search, Moving a student between businesses (two silent loose ends), the
-family-status client-side scan, Email-confirmation copy, Tick off swimming skills (M).
+**Wave C is exhausted bar the lower-value S pool.** As of 2026-08-27 the top three are ranked in
+*Current pick-now order* above (Better filtering/search → Moving a student between businesses → Tick off
+swimming skills). Still unranked in the pool: the family-status client-side scan, Email-confirmation copy.
+*(Maps deep link → **Later**, deferred 2026-08-27 — production is one location.)*
 
 ### Wave D — latent traps: cheap now, silently worse later
 
@@ -502,7 +522,9 @@ family-status client-side scan, Email-confirmation copy, Tick off swimming skill
 **Split co-admin permissions (M)** — *yes eventually*; the accounting page did not wait
 on it (and shipping it added no gated surface — it is owner-gated, not co-admin-scoped). **A location entity / venue (M — *demoted here 2026-08-22*)** — production is one
 location, so promoting `classes.location_name` to a `locations` table only pays off for a
-multi-venue business; full item under *Admin and operations*. Household split billing (M — *needs a credit-splitting
+multi-venue business; full item under *Admin and operations*. **Maps integration (S — *deferred here
+2026-08-27*)** — tap a class location to open the platform maps app; builds directly on `locations.address`,
+no new data, no rework, but parked because production is one location (full item below). Household split billing (M — *needs a credit-splitting
 rule*), Auto PayNow detection (L — *the CSV-import M is the 10% worth doing first*),
 In-app payment gateway (L), Native store builds (M — *deferred; not spending the $99 yet*)
 → Push notifications (M — *blocked by it*), Check the logo for brand collisions (S —
@@ -1150,8 +1172,11 @@ with no new personal data and no regulatory question at all.
 name *and* the same birthday at one business. That has never happened, and the identity
 index would refuse the second one loudly rather than silently confusing them.
 
-### Maps integration — **S** `[MVP-excluded]`
+### Maps integration — **S** — _deferred to **Later** 2026-08-27_ `[MVP-excluded]`
 Tap a class location to open it in Maps.
+
+**Parked 2026-08-27 (user's call):** genuinely cheap and useful, but production is one location, so it
+waits behind higher-value work. No rework debt from waiting — it builds directly on `locations.address`.
 
 **Why:** small, cheap, and genuinely useful the first time a parent drives to a new
 pool. `classes.location_address` is already captured and currently just renders as text.
