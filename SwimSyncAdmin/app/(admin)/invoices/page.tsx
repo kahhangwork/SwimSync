@@ -21,6 +21,16 @@ import { payNowProxyWarning } from "@/lib/paynow";
 import { settlementPayload } from "@/lib/settlementPayload";
 import { buildReminderMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { ReminderQueue } from "./ReminderQueue";
+import { ilikeContains } from "@/lib/tableSearch";
+import { useDebouncedValue } from "@/components/useDebouncedValue";
+
+/** PostgREST caps every fetch at max_rows (1000); this many back means the list
+ *  is (probably) truncated and search is how to reach past it (⚠ RISK 3). */
+const ROW_LIMIT = 1000;
+
+/** The one column the scoped search targets — pushed into the DB as a bound
+ *  `.ilike`, so it reaches every invoice, not just the first 1000. */
+type SearchField = "parent" | "student";
 
 type InvoiceRow = {
   id: string;
@@ -110,6 +120,13 @@ export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState<SearchField>("parent");
+  const debouncedSearch = useDebouncedValue(search);
+  const [capped, setCapped] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Only the newest loadInvoices() may write state — an old term's slow response
+  // must not overwrite a newer one.
+  const invoiceSeq = useRef(0);
   const [statusFilter, setStatusFilter] = useState("All");
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
@@ -186,9 +203,14 @@ export default function InvoicesPage() {
   const coverageRequest = useRef(0);
 
   useEffect(() => {
-    loadInvoices();
     loadTenant();
   }, []);
+
+  // Runs on mount, and again whenever the scoped search changes.
+  useEffect(() => {
+    loadInvoices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, searchField]);
 
   /**
    * Resolve who is signed in and which business they bill for, then read that
@@ -703,13 +725,49 @@ export default function InvoicesPage() {
   }
 
   async function loadInvoices() {
+    const seq = ++invoiceSeq.current;
     setLoading(true);
-    const { data } = await supabase
+    const term = search.trim();
+
+    // PARENT search is a clean DB pushdown (invoice → ONE parent, so !inner
+    // narrows nothing wrong). STUDENT search is deliberately NOT pushed: an
+    // invoice has MANY items, and a `.ilike` on the invoice_items embed filters
+    // the returned items too — collapsing a multi-child invoice's student list
+    // to just the searched child, which would then misstate the WhatsApp
+    // reminder and CSV (a financial communication). So the items embed stays
+    // plain and student search runs client-side over the fetched set (bounded by
+    // the cap banner, like Classes/Packages).
+    const parentEmbed =
+      term !== "" && searchField === "parent"
+        ? "parents!inner(profiles!inner(full_name, phone))"
+        : "parents(profiles(full_name, phone))";
+
+    let query = supabase
       .from("invoices")
       .select(
-        "id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, parents(profiles(full_name, phone)), invoice_items(student_name, students(full_name))"
+        `id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, ${parentEmbed}, invoice_items(student_name, students(full_name))`
       )
-      .order("generated_at", { ascending: false });
+      .order("generated_at", { ascending: false })
+      .limit(ROW_LIMIT);
+
+    if (term !== "" && searchField === "parent") {
+      // Bound `.ilike`, so punctuation in a name is literal.
+      query = query.ilike("parents.profiles.full_name", ilikeContains(term));
+    }
+
+    const { data, error } = await query;
+    if (seq !== invoiceSeq.current) return;
+    // Surfaced, never swallowed: an empty table on a failed search reads as
+    // "no invoices", the silent wrong answer this change exists to kill.
+    if (error) {
+      setLoadError(error.message);
+      setInvoices([]);
+      setCapped(false);
+      setLoading(false);
+      return;
+    }
+    setLoadError(null);
+    setCapped((data ?? []).length >= ROW_LIMIT);
 
     setInvoices(
       (data ?? []).map((inv: any) => {
@@ -794,16 +852,21 @@ export default function InvoicesPage() {
     );
   }
 
+  // Parent search runs in the DB (past the cap). STUDENT search runs HERE, over
+  // the fetched set, because pushing it would corrupt the multi-child item list
+  // (see loadInvoices) — bounded by the cap banner. The status filter also
+  // refines here: "Claimed" is a derived state reading two columns.
+  const studentTerm = searchField === "student" ? search.trim() : "";
   const filtered = invoices.filter((inv) => {
-    const matchSearch =
-      inv.parent_name.toLowerCase().includes(search.toLowerCase()) ||
-      inv.student_names.toLowerCase().includes(search.toLowerCase());
+    const matchStudent =
+      studentTerm === "" ||
+      inv.student_names.toLowerCase().includes(studentTerm.toLowerCase());
     const matchStatus =
       statusFilter === "All" ||
       (statusFilter === "Claimed"
         ? inv.status === "outstanding" && inv.paid_claimed_at !== null
         : inv.status.toLowerCase() === statusFilter.toLowerCase());
-    return matchSearch && matchStatus;
+    return matchStudent && matchStatus;
   });
 
   const sort = useTableSort<InvoiceRow>({
@@ -1439,13 +1502,26 @@ export default function InvoicesPage() {
       </Modal>
 
       <div className="flex flex-wrap gap-3 mb-4">
-        <input
-          type="text"
-          placeholder="Search by parent or student..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400 w-56"
-        />
+        {/* Scoped search — the dropdown picks the column the term is pushed into,
+            so it reaches every invoice in the DB, not the first 1000 (⚠ RISK 3). */}
+        <div className="flex overflow-hidden rounded-xl border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-sky-400">
+          <select
+            value={searchField}
+            onChange={(e) => setSearchField(e.target.value as SearchField)}
+            className="border-r border-gray-200 bg-gray-50 px-2 py-2.5 text-sm text-gray-600 focus:outline-none"
+            aria-label="Search by"
+          >
+            <option value="parent">Parent</option>
+            <option value="student">Student</option>
+          </select>
+          <input
+            type="text"
+            placeholder={searchField === "student" ? "Search student name…" : "Search parent name…"}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-52 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none"
+          />
+        </div>
         <div className="flex gap-1.5">
           {STATUS_FILTERS.map((f) => (
             <button
@@ -1506,6 +1582,23 @@ export default function InvoicesPage() {
           if (inv) handleWhatsApp(inv, businessName);
         }}
       />
+
+      {loadError && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Could not load the invoices: {loadError}. The list below is incomplete
+          — do not read it as the full set.
+        </div>
+      )}
+
+      {!loading && !loadError && capped && (
+        <p className="mb-3 text-sm text-amber-700">
+          Showing the first {ROW_LIMIT}{" "}
+          {searchField === "parent" && search.trim() ? "matches" : "invoices"}.{" "}
+          {searchField === "parent" && search.trim()
+            ? "Refine your search to narrow them."
+            : "Search by parent to reach invoices past this limit."}
+        </p>
+      )}
 
       <Table>
         <Thead>

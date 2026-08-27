@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Download } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { exportCsv, type CsvColumn } from "@/lib/csv";
@@ -19,6 +19,16 @@ import {
   creditNoteVoidView,
   voidConfirmMessage,
 } from "@/lib/creditNoteVoidState";
+import { ilikeContains } from "@/lib/tableSearch";
+import { useDebouncedValue } from "@/components/useDebouncedValue";
+
+/** PostgREST caps every fetch at max_rows (1000); this many back means the list
+ *  is (probably) truncated and search is how to reach past it (⚠ RISK 3). */
+const ROW_LIMIT = 1000;
+
+/** The one column the scoped search targets — pushed into the DB as a bound
+ *  `.ilike` so it reaches every note, not just the first 1000. */
+type SearchField = "student" | "parent" | "reference";
 
 type CreditNoteRow = {
   id: string;
@@ -72,6 +82,12 @@ export default function CreditNotesPage() {
   const [notes, setNotes] = useState<CreditNoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState<SearchField>("student");
+  const debouncedSearch = useDebouncedValue(search);
+  const [capped, setCapped] = useState(false);
+  // Only the newest loadNotes() may write — an old term's slow response must not
+  // overwrite a newer one.
+  const noteSeq = useRef(0);
   const [statusFilter, setStatusFilter] = useState("All");
   const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
     new Map()
@@ -102,7 +118,8 @@ export default function CreditNotesPage() {
     supabase
       .rpc("student_package_coverage")
       .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
-    async function load() {
+    // The viewer's OWN role/tenant, loaded once — email authority keys on it.
+    (async () => {
       const { data: auth } = await supabase.auth.getUser();
       if (auth?.user) {
         const { data: profile } = await supabase
@@ -116,53 +133,87 @@ export default function CreditNotesPage() {
           adminDisabled: profile?.admin_disabled_at != null,
         });
       }
+    })();
+  }, []);
 
+  // Runs on mount, and again whenever the scoped search changes.
+  useEffect(() => {
+    loadNotes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, searchField]);
+
+  async function loadNotes() {
+    const seq = ++noteSeq.current;
+    const term = search.trim();
+
+    // ⚠ !inner ONLY on the embed being SEARCHED (parent). A filter on a plain
+    // (left) embed returns every note with a null embed — the silent wrong
+    // answer. Student and Reference are BASE columns, so they need no embed
+    // change. Left plain otherwise, so the default list keeps notes whose parent
+    // account has since gone.
+    const parentEmbed =
+      term !== "" && searchField === "parent"
+        ? "parents!inner(profiles!inner(full_name))"
+        : "parents(profiles(full_name))";
+
+    let query = supabase
+      .from("credit_notes")
       // ⚠ RISK 2 — credit_applications comes back as an EMBED, not a second query.
-      // It was `supabase.from("credit_applications").select("credit_note_id")` with no
-      // filter, no limit and no error check: an error or a db-max-rows truncation made
-      // `has_applications` false on every row, so Resend rendered for part-spent notes
-      // — silently turning off the guard whose whole purpose is the case `status`
-      // cannot see. As an embed it is scoped to the notes actually loaded, costs no
-      // extra round trip, and shares this query's error handling.
-      const { data, error } = await supabase
-        .from("credit_notes")
-        .select(
-          "id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, email_sent_at, tenant_id, credit_applications(credit_note_id, reversed_at), students(id, full_name), parents(profiles(full_name))"
-        )
-        .order("issued_at", { ascending: false });
+      // With no filter/limit/error-check it made `has_applications` false on every
+      // row (a db-max-rows truncation), silently disarming the part-spent guard.
+      // As an embed it is scoped to the notes loaded and shares this error path.
+      .select(
+        `id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, email_sent_at, tenant_id, credit_applications(credit_note_id, reversed_at), students(id, full_name), ${parentEmbed}`
+      )
+      .order("issued_at", { ascending: false })
+      .limit(ROW_LIMIT);
 
-      if (error) {
-        // Surfaced, not defaulted to "nothing is applied" — see ⚠ RISK 2 above.
-        setLoadError(`Could not load credit notes: ${error.message}`);
-        setLoading(false);
-        return;
+    // Scoped, in the DB. Student and Reference are base columns; Parent rides the
+    // profiles embed. Bound `.ilike`, so a `, ( )` in a name is literal.
+    if (term !== "") {
+      if (searchField === "parent") {
+        query = query.ilike("parents.profiles.full_name", ilikeContains(term));
+      } else if (searchField === "reference") {
+        query = query.ilike("reference_number", ilikeContains(term));
+      } else {
+        query = query.ilike("student_name", ilikeContains(term));
       }
-
-      setNotes(
-        (data ?? []).map((cn: any) => ({
-          id: cn.id,
-          reference_number: cn.reference_number,
-          student_id: cn.students?.id ?? "",
-          student_name: cn.student_name ?? cn.students?.full_name ?? "—",
-          parent_name: cn.parents?.profiles?.full_name ?? "—",
-          amount: Number(cn.amount),
-          reason: cn.reason,
-          linked_invoice_id: cn.applied_to_invoice_id,
-          created_at: cn.issued_at?.split("T")[0] ?? "—",
-          status: cn.status,
-          email_sent_at: cn.email_sent_at ?? null,
-          tenant_id: cn.tenant_id,
-          applied_to_invoice_id: cn.applied_to_invoice_id ?? null,
-          has_applications: (cn.credit_applications ?? []).some(
-            (a: { reversed_at: string | null }) => a.reversed_at === null
-          ),
-        }))
-      );
-      setLoading(false);
     }
 
-    load();
-  }, []);
+    const { data, error } = await query;
+    if (seq !== noteSeq.current) return;
+
+    if (error) {
+      // Surfaced, not defaulted to "nothing is applied" — see ⚠ RISK 2 above.
+      setLoadError(`Could not load credit notes: ${error.message}`);
+      setLoading(false);
+      return;
+    }
+    setLoadError(null);
+    setCapped((data ?? []).length >= ROW_LIMIT);
+
+    setNotes(
+      (data ?? []).map((cn: any) => ({
+        id: cn.id,
+        reference_number: cn.reference_number,
+        student_id: cn.students?.id ?? "",
+        student_name: cn.student_name ?? cn.students?.full_name ?? "—",
+        parent_name: cn.parents?.profiles?.full_name ?? "—",
+        amount: Number(cn.amount),
+        reason: cn.reason,
+        linked_invoice_id: cn.applied_to_invoice_id,
+        created_at: cn.issued_at?.split("T")[0] ?? "—",
+        status: cn.status,
+        email_sent_at: cn.email_sent_at ?? null,
+        tenant_id: cn.tenant_id,
+        applied_to_invoice_id: cn.applied_to_invoice_id ?? null,
+        has_applications: (cn.credit_applications ?? []).some(
+          (a: { reversed_at: string | null }) => a.reversed_at === null
+        ),
+      }))
+    );
+    setLoading(false);
+  }
 
   // Resend one note's notification. The edge function re-checks authority and
   // refuses an applied note on its own; this only stops a doomed press.
@@ -278,14 +329,11 @@ export default function CreditNotesPage() {
     setVoidReason("");
   }
 
+  // Search moved into the DB (scoped, past the 1000-row cap); the status filter
+  // refines the fetched set here.
   const filtered = notes.filter((cn) => {
-    const matchSearch =
-      cn.student_name.toLowerCase().includes(search.toLowerCase()) ||
-      cn.parent_name.toLowerCase().includes(search.toLowerCase()) ||
-      cn.reference_number.toLowerCase().includes(search.toLowerCase());
     const label = creditNoteStatusLabel(cn.status);
-    const matchStatus = statusFilter === "All" || label === statusFilter;
-    return matchSearch && matchStatus;
+    return statusFilter === "All" || label === statusFilter;
   });
 
   const sort = useTableSort<CreditNoteRow>({
@@ -326,13 +374,33 @@ export default function CreditNotesPage() {
       )}
 
       <div className="flex flex-wrap gap-3 mb-4">
-        <input
-          type="text"
-          placeholder="Search by student, parent or ref..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400 w-64"
-        />
+        {/* Scoped search — the dropdown picks the column the term is pushed into,
+            so it reaches every note in the DB, not the first 1000 (⚠ RISK 3). */}
+        <div className="flex overflow-hidden rounded-xl border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-sky-400">
+          <select
+            value={searchField}
+            onChange={(e) => setSearchField(e.target.value as SearchField)}
+            className="border-r border-gray-200 bg-gray-50 px-2 py-2.5 text-sm text-gray-600 focus:outline-none"
+            aria-label="Search by"
+          >
+            <option value="student">Student</option>
+            <option value="parent">Parent</option>
+            <option value="reference">Reference</option>
+          </select>
+          <input
+            type="text"
+            placeholder={
+              searchField === "parent"
+                ? "Search parent name…"
+                : searchField === "reference"
+                ? "Search reference…"
+                : "Search student name…"
+            }
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-52 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none"
+          />
+        </div>
         <div className="flex gap-1.5">
           {STATUS_FILTERS.map((f) => (
             <button
@@ -363,6 +431,16 @@ export default function CreditNotesPage() {
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
           {exportNotice}
         </div>
+      )}
+
+      {!loading && capped && (
+        <p className="mb-3 text-sm text-amber-700">
+          Showing the first {ROW_LIMIT}{" "}
+          {search.trim() ? "matches" : "credit notes"}.{" "}
+          {search.trim()
+            ? "Refine your search to narrow them."
+            : "Search to find a specific one."}
+        </p>
       )}
 
       <Table>

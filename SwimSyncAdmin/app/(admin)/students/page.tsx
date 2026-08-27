@@ -29,6 +29,18 @@ import {
 } from "@/lib/packageCoverage";
 import { formatTime } from "@/lib/utils";
 import { Drawer } from "@/components/Drawer";
+import { ilikeContains } from "@/lib/tableSearch";
+import { useDebouncedValue } from "@/components/useDebouncedValue";
+
+/** PostgREST caps every fetch at max_rows (1000). Fetching this many means the
+ *  query was (probably) truncated, so search is the way to reach past it —
+ *  ⚠ RISK 3 / WAVE_C_SPOOL_PLAN.md Piece 1. */
+const ROW_LIMIT = 1000;
+
+/** Which column the scoped search box targets — one field at a time, so the
+ *  term is a bound `.ilike` parameter reaching the whole table in the DB rather
+ *  than a client filter over the first 1000 rows. */
+type SearchField = "student" | "parent";
 
 type StudentRow = {
   id: string;
@@ -90,6 +102,17 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState<SearchField>("student");
+  // The search runs in the DATABASE, so each change of the term is a round trip
+  // — debounced so typing a name is one query, not one per keystroke.
+  const debouncedSearch = useDebouncedValue(search);
+  // True when the last fetch came back at the cap, so the list is (probably)
+  // truncated — the banner then tells the admin to search rather than scroll.
+  const [capped, setCapped] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Only the latest load() may write state: a slow response to an old term must
+  // not overwrite the newest one (the attendance page's guard, as a counter).
+  const loadSeq = useRef(0);
   const [statusFilter, setStatusFilter] = useState("All");
   // `cls` is set only for mode "remove", and it is WHICH class — a child may be
   // in several, so "remove from class" is not a question the student id can
@@ -411,11 +434,17 @@ export default function StudentsPage() {
   }
 
   useEffect(() => {
-    load();
     loadLevels();
     loadPackages();
     loadClasses();
   }, []);
+
+  // Runs on mount, and again whenever the scoped search changes. The dropdown +
+  // debounced term are the only inputs the DB query reads.
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, searchField]);
 
   async function loadLevels() {
     // RLS scopes this to the caller's own business. Ordered by sort_order, not
@@ -780,18 +809,50 @@ export default function StudentsPage() {
   }
 
   async function load() {
-    const { data } = await supabase
+    const seq = ++loadSeq.current;
+    const term = search.trim();
+
+    // ⚠ THE EMBED IS !inner ONLY WHILE SEARCHING BY PARENT. A plain (left) embed
+    // does NOT let a filter on `parent_students.parents.profiles.full_name`
+    // restrict the student rows — it returns every student with a null embed, a
+    // silently WRONG answer (the plan's own worse-than-the-cap trap). !inner
+    // makes the filter a real join. It also drops parentless children, which is
+    // CORRECT for a parent-name search: a child with no parent cannot match one.
+    // Left plain otherwise, so the default list keeps parentless children.
+    // NOTE: while searching by parent, the embed is narrowed to the MATCHING
+    // parent, so a two-parent child shows (and `parent_id` tracks) the searched
+    // parent — intended for a parent search. Row actions are unaffected: the
+    // Contact modal re-reads all parents fresh, and Invite only shows for a
+    // child with NO parent (which a parent search cannot return).
+    const searchingParent = term !== "" && searchField === "parent";
+    const parentEmbed = searchingParent
+      ? "parent_students!inner(parents!inner(id, profiles!inner(full_name)))"
+      : "parent_students(parents(id, profiles(full_name)))";
+
+    let query = supabase
       .from("students")
       .select(`
         id, full_name, date_of_birth, level_id, assignment_status, is_active, inactivated_at,
         tenant_levels(id, label),
-        parent_students(parents(id, profiles(full_name))),
+        ${parentEmbed},
         student_class_enrolments(
           is_active,
           classes(id, title, day_of_week, start_time, coaches(profiles(full_name)))
         )
       `)
-      .order("full_name");
+      .order("full_name")
+      .limit(ROW_LIMIT);
+
+    // Scoped, in the DB: one column per field, as a bound `.ilike` parameter, so
+    // a `, ( )` in a name is data, never grammar (`lib/tableSearch.ts`).
+    if (term !== "") {
+      query =
+        searchField === "parent"
+          ? query.ilike("parent_students.parents.profiles.full_name", ilikeContains(term))
+          : query.ilike("full_name", ilikeContains(term));
+    }
+
+    const { data, error } = await query;
 
     // Lessons per child, for duplicate detection: a merge must keep the row
     // holding the history, and merge_students() refuses the other direction
@@ -801,6 +862,20 @@ export default function StudentsPage() {
     for (const a of (att ?? []) as { student_id: string }[]) {
       lessonCount.set(a.student_id, (lessonCount.get(a.student_id) ?? 0) + 1);
     }
+
+    // A newer search has overtaken this one — drop the response rather than
+    // repaint the table with a stale term's rows.
+    if (seq !== loadSeq.current) return;
+    // Surfaced, not swallowed: a failed search would otherwise empty the table
+    // and read as "no students" — the silent wrong answer this change kills.
+    if (error) {
+      setLoadError(error.message);
+      setCapped(false);
+      setLoading(false);
+      return;
+    }
+    setLoadError(null);
+    setCapped((data ?? []).length >= ROW_LIMIT);
 
     setStudents(
       (data ?? []).map((s: any) => {
@@ -867,15 +942,15 @@ export default function StudentsPage() {
   // candidate list. No TS re-derivation.
   const runningLow = (s: StudentRow) => covMap.get(s.id)?.low === true;
 
+  // Search is applied in the DATABASE now (scoped, past the 1000-row cap), so it
+  // is gone from here — these are the refinements over whatever the fetch
+  // returned (the matched set when searching, else the first 1000).
   const filtered = students.filter((s) => {
-    const matchSearch =
-      s.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      s.parent_name.toLowerCase().includes(search.toLowerCase());
     const label = statusLabel(s);
     const matchStatus = statusFilter === "All" || label === statusFilter;
     const matchLow = !lowOnly || runningLow(s);
     const matchUnclaimed = !unclaimedOnly || isUnclaimed(s);
-    return matchSearch && matchStatus && matchLow && matchUnclaimed;
+    return matchStatus && matchLow && matchUnclaimed;
   });
 
   // Derived on read, never stored: nothing would maintain a "possible
@@ -949,13 +1024,27 @@ export default function StudentsPage() {
       />
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input
-          type="text"
-          placeholder="Search by student or parent..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400 w-64"
-        />
+        {/* Scoped search: the dropdown picks the ONE column the term is pushed
+            into, so it reaches the whole table in the DB instead of filtering
+            the first 1000 rows in the browser (⚠ RISK 3). */}
+        <div className="flex overflow-hidden rounded-xl border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-sky-400">
+          <select
+            value={searchField}
+            onChange={(e) => setSearchField(e.target.value as SearchField)}
+            className="border-r border-gray-200 bg-gray-50 px-2 py-2.5 text-sm text-gray-600 focus:outline-none"
+            aria-label="Search by"
+          >
+            <option value="student">Student</option>
+            <option value="parent">Parent</option>
+          </select>
+          <input
+            type="text"
+            placeholder={searchField === "parent" ? "Search parent name…" : "Search student name…"}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-56 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none"
+          />
+        </div>
         <div className="flex gap-1.5">
           {STATUS_FILTERS.map((f) => (
             <button
@@ -1064,6 +1153,23 @@ export default function StudentsPage() {
             ))}
           </div>
         </div>
+      )}
+
+      {loadError && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Could not load the students: {loadError}. The table below is incomplete
+          — do not read it as the full list.
+        </div>
+      )}
+
+      {!loading && !loadError && capped && (
+        <p className="mb-3 text-sm text-amber-700">
+          Showing the first {ROW_LIMIT}{" "}
+          {search.trim() ? "matches" : "students"}.{" "}
+          {search.trim()
+            ? "Refine your search to narrow them."
+            : "Use the search box to find a specific student."}
+        </p>
       )}
 
       <Table>

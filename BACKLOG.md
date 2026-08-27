@@ -1,8 +1,14 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-27 — **Maps integration DEFERRED to *Later*** (user's call): it is out of the
+_Last updated: 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED** (`docs/plans/WAVE_C_SPOOL_PLAN.md`):
+scoped DB search on the high-traffic admin tables (Piece 1), the family-status search pushdown (Piece 2),
+and the move-student RPC's two loose ends — which also fixed a live production bug for levelled students
+(Piece 3, migration `20260827000100`). All struck in their sections. **Remaining pick-now: Piece 4 (swim
+skills, M) and Piece 5 (email-confirmation copy, S).**_
+
+_Previously, 2026-08-27 — **Maps integration DEFERRED to *Later*** (user's call): it is out of the
 current pick-now pool. It still builds cleanly on `locations.address` whenever it's picked up — no rework —
-but production is one location, so it waits. What remains pick-now: the Wave C S-pool. Pick by value._
+but production is one location, so it waits._
 
 _Previously, 2026-08-24 — **The location entity SHIPPED + DEPLOYED, expand AND contract** (PRD §7.24,
 `20260824000100`+`…200`, §8.88/§8.89): `classes.location_name` promoted to a per-tenant `locations` table,
@@ -422,18 +428,16 @@ edge. The pass produced three durable findings, recorded so they are not re-deri
 
 #### Current pick-now order (set 2026-08-27 with the user)
 
-No rework edges between these — this is a **value/effort** ranking the user chose, not a rework-cost one:
-the two S quick-wins first, the M feature last. Full item bodies are in the themed sections cited.
+No rework edges between these — a **value/effort** ranking the user chose. **Pieces 1–3 SHIPPED
+2026-08-28** (Better filtering/search, Moving-a-student loose ends, and the family-status scan; all struck
+in their sections below). What remains of `docs/plans/WAVE_C_SPOOL_PLAN.md`:
 
-1. **Better filtering and search** (S) — search across admin tables + per-table filters (only *search*
-   and the non-Attendance filters remain; sorting shipped). Reuse `SwimSyncAdmin/lib/tableSort.ts`.
-   Full item: *Admin and operations → Better filtering and search*.
-2. **Moving a student between businesses leaves two loose ends** (S) — `reassign_student_tenant()` writes
-   no `parent_tenants` row (parent unjoined at the new tenant) and strands credit at the old one, both
-   silent. Correctness fix at a confusing moment. Full item: *Admin and operations*.
-3. **Tick off swimming skills per child** (M) — coach marks which of a level's skills a child passed;
-   parent watches progress. Needs its own `student_skill_progress` table + policy (no widening of
-   `students_update`) and two decisions (level-change history; binary vs graded). Full item: *Coach workflow*.
+1. **Tick off swimming skills per child** (M, Piece 4) — coach marks which of a level's skills a child
+   passed; parent watches progress. Needs its own `student_skill_progress` table + policy (no widening of
+   `students_update`) and the settled decisions (graded, per-tenant scale; top-grade = done; keep records
+   on level change). Full item: *Coach workflow*. **Authors a migration** — one in flight (§7.55).
+2. **Email-confirmation copy** (S, Piece 5) — a branded confirmation template; **do NOT switch email
+   confirmation ON** (it stranded web parents once). Full item below.
 
 > **/plan-review 2026-08-27:** every pool item's body carries inline `⚠ RISK n MITIGATION`
 > steps. **The sequenced plan — two-pass reviewed and fact-checked against code — is
@@ -472,9 +476,9 @@ click-through queue stops scaling.
 4. ~~Attendance edit history view~~ — DONE 2026-08-17 (the Change History page).
 5. ~~Export to CSV~~ — DONE 2026-08-17.
 
-**Wave C is exhausted bar the lower-value S pool.** As of 2026-08-27 the top three are ranked in
-*Current pick-now order* above (Better filtering/search → Moving a student between businesses → Tick off
-swimming skills). Still unranked in the pool: the family-status client-side scan, Email-confirmation copy.
+**Wave C is exhausted bar the lower-value S pool.** **Pieces 1–3 of the S-pool SHIPPED 2026-08-28**
+(Better filtering/search, family-status scan, Moving-a-student loose ends). What remains: **Tick off
+swimming skills** (Piece 4, M) and **Email-confirmation copy** (Piece 5, S) — see *Current pick-now order*.
 *(Maps deep link → **Later**, deferred 2026-08-27 — production is one location.)*
 
 ### Wave D — latent traps: cheap now, silently worse later
@@ -1356,76 +1360,30 @@ table (the additive path the shipped design deliberately left open —
 `docs/ARCHITECTURE.md` §6). Don't add enum roles for this (same reasoning as the owner
 column: permanent, string-audited everywhere, can't express one-owner-per-tenant).
 
-### The family-status search scans every membership client-side — **S**
-`handleFamilySearch` on the Platform page fetches **all** `parent_tenants` rows and filters
-in the browser.
+### ~~The family-status search scans every membership client-side~~ — **S** — **DONE 2026-08-28**
+`handleFamilySearch` now pushes the term into the query — a sanitised `.or()` matching name OR email over
+`!inner` embeds — so it reaches every membership in the DB instead of the silently-capped first 1000
+(Piece 2 of `docs/plans/WAVE_C_SPOOL_PLAN.md`). No new RPC needed: the pushdown expressed it, so RISK 4's
+grant steps never applied. The durable part is the `.or()`-grammar escaping (`orValue` in
+`SwimSyncAdmin/lib/tableSearch.ts`), verified against the live DB — a `%`, comma, or bracket in a name
+matches literally, never injects and never over-matches (the single-backslash form did over-match; the
+value is double-quoted and the wildcard backslash doubled so it survives PostgREST's unquoting).
 
-**Why:** PostgREST caps every response at `max_rows = 1000` (`config.toml`) and does so
-**silently** — no error, just fewer rows. So the search quietly stops finding families once
-the platform passes a thousand memberships, and the failure looks like "that family isn't on
-SwimSync" rather than like a bug. It is the same ceiling `platform_tenant_overview()` was
-added to avoid; this is the one client-side scan left on that page.
+### ~~Moving a student between businesses leaves two loose ends~~ — **S** — **DONE 2026-08-28**
+`reassign_student_tenant()` (migration `20260827000100`, Piece 3) now closes both ends:
 
-**Notes:** found 2026-07-19 while rebuilding the page around the RPC. Deliberately left
-working rather than extended — the fix is a server-side search (an RPC taking the query
-string, or a `.ilike` filter pushed into the query instead of `.filter()` in JS), which is
-its own piece of work. Harmless at today's scale; the reason to record it is that the failure
-mode is invisible.
+- **It clears `level_id` on the move** — which ALSO fixed a **live production bug**: the old body left
+  the level pointing at tenant A's ladder, so `trg_student_level_tenant` rejected *every* move of a
+  levelled student. Tenant A's vocabulary means nothing at B, so the child lands unlevelled and B's admin
+  re-levels them.
+- **It writes each linked parent's `parent_tenants` membership at the destination** — insert-if-missing,
+  reactivate-if-offboarded, `ON CONFLICT DO NOTHING` (race-safe, §7.57-clean). Handles 0..N parents.
 
-**⚠ RISK 4 MITIGATIONS** *(/plan-review 2026-08-27, ranked #4 — one page, one platform admin,
-but the data is cross-tenant)*:
-- **Step (only if the RPC fallback is taken — the plan prefers the `.ilike` pushdown, no new
-  function):** gate the new search inside the function body the way `platform_tenant_overview()`
-  does (platform-admin check in the function, not only in RLS), grant EXECUTE to
-  `authenticated` only — `anon` gets nothing (§7.82/§7.85) — and remember a new function is
-  callable by NOBODY until its own migration grants it (§7.87).
-- **Assertion:** parity with the client filter it replaces — same case-insensitive substring
-  semantics, pinned by a vitest running old filter and new query shape against the same fixtures.
-
-### Moving a student between businesses leaves two loose ends — **S**
-`reassign_student_tenant()` moves the student but not everything attached to them.
-
-**Why:** the platform admin's student-rescue tool (PRD §4.4) is the remedy when a parent
-joins with the wrong join code — so it runs at exactly the moment a family is confused,
-and it currently leaves them in a state nobody is told about.
-
-**Notes:** found 2026-07-19 while auditing the money paths; **not a data-loss bug**, but
-both ends are silent, which is the problem.
-
-- **The parent is never joined to the new business.** The RPC updates
-  `students.tenant_id` and closes enrolments, but writes no `parent_tenants` row — and
-  that row is what the add-child picker and the parent's billing grouping rely on. The
-  child lives at tenant B while the parent has no membership there.
-- **Credit is stranded, silently.** Balances are per `(parent, tenant)`. If the family
-  held credit at A and their only child leaves, it becomes unspendable. That is *correct*
-  by the never-crosses-businesses rule (PRD §5.6) — the failure is that nothing warns the
-  admin before the move.
-
-**This is for the mistake case only.** A genuine migration between businesses is a
-different flow and needs no code: the old business marks the family inactive, the new one
-gives them its join code, and the child is added there as a new record. History stays with
-the business that taught it, which is the isolation working correctly. Don't conflate the
-two by making the rescue tool "move everything".
-
-**⚠ RISK 1 MITIGATIONS** *(/plan-review 2026-08-27 — ranked RISKIEST of the pool: it edits the
-cross-tenant boundary and touches money, fires at the exact moment a family is confused, and its
-first real firing is in production by construction — the tool is dormant locally too)*:
-- **Step:** keep the RPC signature `(uuid, uuid)` — same-signature `CREATE OR REPLACE`, no grant
-  dump needed (§11.32). If a signature change is unavoidable, run
-  `grep -rn '\.rpc(' SwimSyncApp SwimSyncAdmin` FIRST and walk every caller (§7.123).
-- **FACT (2nd-pass review, verified against code): the RPC is broken in production TODAY for any
-  levelled student** — `trg_student_level_tenant` raises on a tenant change while `level_id` is
-  set, and the RPC never clears it. The fix (null the level on move) is Piece 3 step 0 of the plan.
-- **Step (corrected):** the §7.57 `BEFORE INSERT` fear was REFUTED — the only trigger on
-  `parent_tenants` is the `BEFORE UPDATE` offboard guard. The real cases the insert must handle:
-  the parent is **0..N parents** (many-to-many, possibly zero), and an exists-but-**INACTIVE**
-  membership at B must be reactivated, not skipped. Full steps + pgTAP cases: the plan file.
-- **Assertion (pgTAP, proven RED without the fix, §7.25):** membership row written at B ·
-  isolation at A intact · stranded-credit warning fires only when a balance actually exists.
-- **Prohibition:** the credit warning is ADVISORY — do NOT move credit (never crosses businesses,
-  PRD §5.6) and do NOT grow this rescue tool toward "move everything" (the paragraph above).
-- **Step:** exercise the whole flow once in the local UI (Platform page) before deploying —
-  no production firing may be the first firing. Then migration → apps, via `/deploy`.
+Same signature, so no grant dump (§11.32). The stranded-credit case (credit never crosses businesses,
+PRD §5.6) is a **client-side advisory dialog** on the Platform page — the tool does not move credit, and
+does not grow toward "move everything" (that genuine-migration flow needs no code: mark inactive at A,
+new join code at B). pgTAP `reassign_student_tenant.test.sql` — 13 checks, RED-proven against the old
+body (6 fail). **Still dormant on prod** — exercise once in the local UI before its first real firing.
 
 ### ~~Export to Excel / CSV~~ — **S** — **DONE 2026-08-17**
 Shipped all three at once (invoices, credit notes, attendance), not invoices-only as the
@@ -1439,31 +1397,19 @@ truncated (keyed on the unfiltered fetch count, not the filtered view — a clie
 shrinks a capped 1000 rows to 50 does not make the export complete). Excel unit is dollars,
 exported raw for summing; UTF-8 BOM for unicode names. Both safeguards graduate to §7.
 
-### Better filtering and search — **S** `[Phase 2]`
-Search across the admin tables, and per-table filters beyond Attendance.
-
-**Why:** fine at 17 students, painful at 100. Filing this as a scale problem, not a
-today problem.
-
-**Notes:** **partly shipped 2026-07-26** — every column on all 22 tables is now sortable
-and Attendance gained class and date-range filters (PRD §14.3, §14.4). What remains is
-*search*, and filters on the other tables. The sorting rules live in
-`SwimSyncAdmin/lib/tableSort.ts`; reuse them rather than writing a second comparison — the
-hard-won parts are that blanks stay last in **both** directions, that sorting is
-numeric-aware, and that columns sort by what is **on screen** rather than what the row
-stores. Attendance's filter deliberately keys on class **id, not title**, because two
-classes can share a name.
-
-**⚠ RISK 3 MITIGATIONS** *(/plan-review 2026-08-27, ranked #3 of the pool — the failure mode is
-a silent wrong answer across every admin table)*:
-- **Step:** push search into the query (`.ilike` or an RPC) — PostgREST's `max_rows = 1000` cap
-  is SILENT, so a client-side search over a truncated fetch answers "not found" for a row that
-  exists. If any search must run client-side, key a completeness check on the UNFILTERED fetch
-  count and refuse when capped (the CSV cap-block pattern, already graduated to §7).
-- **Prohibition:** no `.filter()`-in-JS search over a fetched list, and every new filter keys on
-  **id, never display title** (the Attendance precedent above).
-- **Assertion:** shipped sorting is regression-pinned — the `tableSort.ts` vitest count is
-  unchanged before/after; reuse its comparisons, never write a second one.
+### ~~Better filtering and search~~ — **S** `[Phase 2]` — **DONE 2026-08-28**
+Scoped DB search shipped on the high-cardinality admin tables — **Students, Invoices, Credit Notes,
+Attendance** (Piece 1). A field dropdown picks ONE column, so the term is a bound `.ilike` reaching the
+whole table past PostgREST's **silent** `max_rows = 1000` cap; a joined column rides an **`!inner`** embed
+(proven against the live DB that a plain/left embed returns the silent-wrong-answer null embeds — the
+"worse than the cap" trap). **Classes and Packages kept client-side search + an explicit cap banner** —
+their data is bounded well under 1000, so DB-pushdown there is pure downside (adds latency, narrows the
+location dropdown). One deliberate exception: **invoices *student* search stays client-side** — pushing it
+would filter the multi-child `invoice_items` embed and misstate the WhatsApp reminder + CSV (a financial
+communication); parent search is the clean to-one pushdown. Shared helper `SwimSyncAdmin/lib/tableSearch.ts`
+(`ilikeContains` + `orValue`/`orIlike` + `matchesAnyField`); `tableSort.ts` comparisons reused unchanged.
+Every filter keys on **id, never title**. Two shipped from the same pass: **sorting** (2026-07-26) and
+now **search**.
 
 ### ~~More polished dashboards~~ — **RETIRED 2026-08-16** `[Phase 2]`
 Richer metrics on the admin dashboard. **Retired with the user 2026-08-16** — the item's own

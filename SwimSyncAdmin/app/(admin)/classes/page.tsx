@@ -24,6 +24,12 @@ import { PackageChip } from "@/components/PackageChip";
 import { CLASS_COLOURS, colourFor } from "@/lib/classColours";
 import { locationFilterOptions, formLocationOptions } from "@/lib/locationOptions";
 
+/** PostgREST caps every fetch at max_rows (1000). Classes never approach it, so
+ *  search here stays client-side (correct over a bounded list) — but the cap is
+ *  made explicit + surfaced, so a business that somehow exceeds it is TOLD the
+ *  list is truncated rather than searching a silent slice (⚠ RISK 3). */
+const ROW_LIMIT = 1000;
+
 type ClassRow = {
   id: string;
   title: string;
@@ -127,6 +133,9 @@ export default function ClassesPage() {
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // True when the fetch came back at the cap, so the client-side search is over
+  // a truncated slice — the banner then says so.
+  const [capped, setCapped] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -349,8 +358,10 @@ export default function ClassesPage() {
         "id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id, capacity, colour, is_active, deactivated_at, coaches(profiles(full_name)), locations(name), class_categories(default_capacity), student_class_enrolments(id, is_active)"
       )
       .order("day_of_week")
-      .order("start_time");
+      .order("start_time")
+      .limit(ROW_LIMIT);
 
+    setCapped((data ?? []).length >= ROW_LIMIT);
     setClasses(
       (data ?? []).map((c: any) => ({
         id: c.id,
@@ -868,6 +879,13 @@ export default function ClassesPage() {
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {retireError}
         </div>
+      )}
+
+      {!loading && capped && (
+        <p className="mb-3 text-sm text-amber-700">
+          Showing the first {ROW_LIMIT} classes — the list is truncated. This is
+          not expected; contact support if you see it.
+        </p>
       )}
 
       <Table>

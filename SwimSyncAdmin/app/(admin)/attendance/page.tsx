@@ -30,6 +30,8 @@ import {
   type ClassShadowRow,
   type AbsenceRow,
 } from "@/lib/lessonAttribution";
+import { ilikeContains } from "@/lib/tableSearch";
+import { useDebouncedValue } from "@/components/useDebouncedValue";
 
 type AttendanceRow = {
   id: string;
@@ -101,6 +103,10 @@ export default function AttendancePage() {
   const [mkSuccess, setMkSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // The student search now runs in the DB (against the already-!inner students
+  // embed), so it reaches every row in the date range, not the first 1000.
+  // Debounced, because each change is a round trip that also re-attributes.
+  const debouncedSearch = useDebouncedValue(search);
   const [coachFilter, setCoachFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [classFilter, setClassFilter] = useState("All");
@@ -244,6 +250,10 @@ export default function AttendancePage() {
 
       if (dateFrom) query = query.gte("lesson_sessions.session_date", dateFrom);
       if (dateTo) query = query.lte("lesson_sessions.session_date", dateTo);
+      // Scoped student search, pushed into the DB via the !inner students embed
+      // — a bound `.ilike`, so a `, ( )` in a name is literal (lib/tableSearch).
+      const term = search.trim();
+      if (term) query = query.ilike("students.full_name", ilikeContains(term));
 
       const { data, error } = await query;
       if (cancelled) return;
@@ -418,12 +428,12 @@ export default function AttendancePage() {
     return () => {
       cancelled = true;
     };
-  }, [dateFrom, dateTo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo, debouncedSearch]);
 
+  // Student search moved into the DB (above); these are the client refinements
+  // over whatever the fetch returned.
   const filtered = rows.filter((a) => {
-    const matchSearch = a.student_name
-      .toLowerCase()
-      .includes(search.toLowerCase());
     // Keyed by id, main OR shadow — the option values are ids now, so two
     // coaches sharing a name no longer collapse into one filter (RISK 9).
     const matchCoach =
@@ -434,7 +444,7 @@ export default function AttendancePage() {
     // By id, not by title: two classes can share a name, and the whole reason
     // to filter by class is to be sure you are looking at exactly one of them.
     const matchClass = classFilter === "All" || a.class_id === classFilter;
-    return matchSearch && matchCoach && matchStatus && matchClass;
+    return matchCoach && matchStatus && matchClass;
   });
 
   const visible = sort.apply(filtered);

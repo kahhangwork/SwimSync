@@ -8,6 +8,12 @@ import { Modal } from "@/components/Modal";
 import { formatSgDate, toSgDate } from "@/lib/lessonDates";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
 import { PackageChip } from "@/components/PackageChip";
+import { ilikeContains, orIlike } from "@/lib/tableSearch";
+import { totalFamilyCredit } from "@/lib/moveStudentWarning";
+
+/** PostgREST caps every fetch at max_rows (1000); a search must be pushed into
+ *  the DB or it only sees the first 1000 memberships (⚠ RISK 3). */
+const ROW_LIMIT = 1000;
 
 /**
  * Platform admin — cross-tenant operations, for SwimSync itself.
@@ -110,6 +116,19 @@ export default function PlatformPage() {
   );
   const [moving, setMoving] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // The advisory credit warning before a cross-business move (Piece 3). Set when
+  // the family holds credit at the OLD business (or that could not be checked);
+  // confirming calls doMove(). `moveNonce` remounts the per-row picker so it
+  // resets to "Choose…" after a move or a cancel (it is uncontrolled).
+  const [pendingMove, setPendingMove] = useState<{
+    studentId: string;
+    tenantId: string;
+    studentName: string;
+    oldTenantName: string;
+    credit: number;
+    checkFailed: boolean;
+  } | null>(null);
+  const [moveNonce, setMoveNonce] = useState(0);
   const [stranded, setStranded] = useState<StrandedParent[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -398,33 +417,53 @@ export default function PlatformPage() {
   // would invite the platform admin to reason about it.
   async function handleFamilySearch() {
     setFamMessage(null);
-    if (!famSearch.trim()) {
+    const term = famSearch.trim();
+    if (!term) {
       setFamilies([]);
       return;
     }
-    const { data } = await supabase
+    // ⚠ RISK 3 — this used to fetch EVERY parent_tenants row and filter in JS,
+    // which silently searched only the first 1000 memberships. The term is now
+    // pushed into the DB: match the parent's name OR email through the profiles
+    // embed. BOTH embeds are !inner — over a plain (left) embed the .or() would
+    // not restrict the memberships, returning every one with a null embed (the
+    // silent wrong answer). The term is sanitised for the .or() grammar by
+    // orIlike (lib/tableSearch), so a comma or brackets in a name is data, never
+    // structure, and can never change the query.
+    const { data, error } = await supabase
       .from("parent_tenants")
       .select(
-        "parent_id, tenant_id, is_active, tenants(display_name), parents(profile_id, profiles(full_name, email))"
-      );
+        "parent_id, tenant_id, is_active, tenants(display_name), parents!inner(profile_id, profiles!inner(full_name, email))"
+      )
+      .or(orIlike(["full_name", "email"], term), {
+        referencedTable: "parents.profiles",
+      })
+      .limit(ROW_LIMIT);
 
-    const rows = (data ?? []) as any[];
-    const q = famSearch.trim().toLowerCase();
-    const matching = rows.filter((r) => {
-      const p = r.parents?.profiles ?? {};
-      return (
-        (p.full_name ?? "").toLowerCase().includes(q) ||
-        (p.email ?? "").toLowerCase().includes(q)
-      );
-    });
+    if (error) {
+      setFamilies([]);
+      setFamMessage(`Could not search families: ${error.message}`);
+      return;
+    }
+    const matching = (data ?? []) as any[];
 
-    const { data: kids } = await supabase
+    // Bounded by the matched memberships (the .in list), so this second query is
+    // not a fresh unbounded fetch. The sentinel keeps `.in([])` from matching
+    // everything when there are no matches.
+    const { data: kids, error: kidsErr } = await supabase
       .from("parent_students")
       .select("parent_id, students(full_name, is_active, tenant_id)")
       .in(
         "parent_id",
         matching.length ? matching.map((r) => r.parent_id) : ["00000000-0000-0000-0000-000000000000"]
       );
+    // Surfaced, not swallowed: a failed children read would otherwise render
+    // every matched family as "none" — a wrong answer that looks like data.
+    if (kidsErr) {
+      setFamMessage(
+        `Found ${matching.length} famil${matching.length === 1 ? "y" : "ies"}, but their children could not be loaded — try again.`,
+      );
+    }
 
     setFamilies(
       matching.map((r) => ({
@@ -438,6 +477,8 @@ export default function PlatformPage() {
       }))
     );
     if (matching.length === 0) setFamMessage("No families matched.");
+    else if (matching.length >= ROW_LIMIT)
+      setFamMessage(`Showing the first ${ROW_LIMIT} matches — refine your search.`);
   }
 
   async function handleSearch() {
@@ -449,7 +490,9 @@ export default function PlatformPage() {
     const { data } = await supabase
       .from("students")
       .select("id, full_name, tenant_id, assignment_status, is_active")
-      .ilike("full_name", `%${search.trim()}%`)
+      // ilikeContains escapes the LIKE wildcards so a name with a literal % or _
+      // matches itself — consistent with the scoped search (lib/tableSearch).
+      .ilike("full_name", ilikeContains(search))
       .limit(25);
     setStudents((data ?? []) as StudentRow[]);
     // Payment-method chips. Under a platform admin the RPC returns EVERY
@@ -460,7 +503,64 @@ export default function PlatformPage() {
       .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
   }
 
+  // Advisory gate: credit never crosses businesses (PRD §5.6), so a family with
+  // credit at the OLD business would strand it. Check the balance FIRST and
+  // prompt; a zero balance (the common case) moves straight through.
   async function handleMove(studentId: string, tenantId: string) {
+    // Disable this row's picker for the whole credit check, so a second
+    // selection cannot overwrite the pending move mid-flight.
+    setMoving(studentId);
+    const student = students.find((s) => s.id === studentId);
+    const oldTenantId = student?.tenant_id ?? null;
+    const oldTenantName =
+      tenants.find((t) => t.tenant_id === oldTenantId)?.display_name ??
+      "the old business";
+
+    let credit = 0;
+    let checkFailed = false;
+    if (oldTenantId) {
+      // ⚠ RISK (fable): sum EVERY linked parent's credit, not just one — a child
+      // can have two parents. The balance table is platform-admin readable.
+      const { data: links, error: linkErr } = await supabase
+        .from("parent_students")
+        .select("parent_id")
+        .eq("student_id", studentId);
+      // A failed link read must fail TOWARD prompting: skipping it silently
+      // would drop the warning in exactly the case we cannot verify.
+      if (linkErr) checkFailed = true;
+      const parentIds = (links ?? []).map((l: any) => l.parent_id);
+      if (!checkFailed && parentIds.length > 0) {
+        const { data: bal, error: balErr } = await supabase
+          .from("parent_tenant_balances")
+          .select("credit_balance")
+          .eq("tenant_id", oldTenantId)
+          .in("parent_id", parentIds);
+        if (balErr) checkFailed = true;
+        else credit = totalFamilyCredit((bal ?? []) as any[]);
+      }
+    }
+
+    setMoving(null);
+    // Warn when there IS credit, or when the check could not run (fail toward
+    // prompting — an advisory that silently skips is worse than one shown twice).
+    if (credit > 0 || checkFailed) {
+      setPendingMove({
+        studentId,
+        tenantId,
+        studentName: student?.full_name ?? "this child",
+        oldTenantName,
+        credit,
+        checkFailed,
+      });
+      // The picker keeps its chosen value; the dialog owns the next step, and
+      // both its buttons bump moveNonce to reset it.
+      return;
+    }
+    await doMove(studentId, tenantId);
+  }
+
+  async function doMove(studentId: string, tenantId: string) {
+    setPendingMove(null);
     setMoving(studentId);
     setMessage(null);
     const { error } = await supabase.rpc("reassign_student_tenant", {
@@ -468,6 +568,7 @@ export default function PlatformPage() {
       p_tenant_id: tenantId,
     });
     setMoving(null);
+    setMoveNonce((n) => n + 1); // reset the per-row picker
     if (error) {
       setMessage(`Could not move: ${error.message}`);
       return;
@@ -1133,6 +1234,7 @@ export default function PlatformPage() {
                   <Td>{s.is_active ? "Active" : "Inactive"}</Td>
                   <Td>
                     <select
+                      key={`move-${s.id}-${moveNonce}`}
                       defaultValue=""
                       disabled={moving === s.id}
                       onChange={(e) =>
@@ -1158,6 +1260,58 @@ export default function PlatformPage() {
           </Table>
         )}
       </div>
+
+      {/* ── Advisory: the family's credit does NOT move (Piece 3) ───────────── */}
+      <Modal
+        title="Credit stays with the old business"
+        open={pendingMove !== null}
+        onClose={() => {
+          setPendingMove(null);
+          setMoveNonce((n) => n + 1); // reset the picker on cancel too
+        }}
+      >
+        {pendingMove && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              {pendingMove.checkFailed ? (
+                <>
+                  Couldn&apos;t check whether{" "}
+                  <strong>{pendingMove.studentName}</strong>&apos;s family holds
+                  credit at <strong>{pendingMove.oldTenantName}</strong>. Credit
+                  never moves between businesses (PRD §5.6), so any they have
+                  there would become unspendable after the move.
+                </>
+              ) : (
+                <>
+                  <strong>{pendingMove.studentName}</strong>&apos;s family holds{" "}
+                  <strong>S${pendingMove.credit.toFixed(2)}</strong> in credit at{" "}
+                  <strong>{pendingMove.oldTenantName}</strong>. Credit never moves
+                  between businesses (PRD §5.6), so it will become{" "}
+                  <strong>unspendable</strong> once the child is moved. Settle or
+                  spend it first if you can.
+                </>
+              )}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => doMove(pendingMove.studentId, pendingMove.tenantId)}
+                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Move anyway
+              </button>
+              <button
+                onClick={() => {
+                  setPendingMove(null);
+                  setMoveNonce((n) => n + 1);
+                }}
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* ── Family status across businesses ──────────────────────────────────
           Read-only on purpose. Whether a family is a customer of a business is

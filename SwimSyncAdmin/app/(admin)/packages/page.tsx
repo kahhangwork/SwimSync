@@ -30,6 +30,13 @@ import { defaultConfirmStart, pickOfferProduct } from "@/lib/packageOffers";
 import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { WhatsAppQueue, type WaQueueRow } from "@/components/WhatsAppQueue";
 import { discountLabel } from "@/lib/referralDiscount";
+import { matchesAnyField } from "@/lib/tableSearch";
+
+/** PostgREST caps every fetch at max_rows (1000). Purchases never approach it,
+ *  so the "Who holds one" search stays client-side (correct over a bounded
+ *  list) — the cap is made explicit + surfaced so a truncated fetch is never a
+ *  silent slice (⚠ RISK 3). */
+const ROW_LIMIT = 1000;
 
 type Category = {
   id: string;
@@ -142,6 +149,9 @@ export default function PackagesPage() {
   const [tenantDefaultProduct, setTenantDefaultProduct] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // "Who holds one" search + the truncation flag for its fetch.
+  const [heldSearch, setHeldSearch] = useState("");
+  const [capped, setCapped] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Category form
@@ -245,7 +255,8 @@ export default function PackagesPage() {
           "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, requested_at, start_date, expires_on, holiday_extension_days, cancel_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
         )
         .order("status")
-        .order("requested_at", { ascending: false }),
+        .order("requested_at", { ascending: false })
+        .limit(ROW_LIMIT),
       supabase.rpc("package_live_balances"),
       supabase
         .from("parent_tenants")
@@ -301,6 +312,8 @@ export default function PackagesPage() {
         ).length,
       }))
     );
+
+    setCapped((purRes.data ?? []).length >= ROW_LIMIT);
 
     // Live balances by package id — the RPC's number, never recomputed here.
     const liveById = new Map<string, any>(
@@ -897,6 +910,16 @@ export default function PackagesPage() {
   const held = purchases.filter(
     (p) => p.status !== "pending" && !(p.status === "cancelled" && p.superseded_by)
   );
+  // The search narrows the DISPLAY only — `held` stays the base so "nobody holds
+  // one" and "nothing matched your search" can be told apart. Client-side over a
+  // bounded list; a blank term matches everyone (`matchesAnyField`).
+  const heldMatches = held.filter((p) =>
+    matchesAnyField(p, heldSearch, [
+      (r) => r.parent_name,
+      (r) => r.name,
+      (r) => r.reference_number,
+    ])
+  );
 
   // Oldest request first: this queue is work waiting on the admin, and the
   // parent who has been waiting longest is the one to serve next.
@@ -916,7 +939,7 @@ export default function PackagesPage() {
     key: "parent_name",
     accessors: { remaining: (p) => p.live_lessons_remaining },
   });
-  const visibleHeld = heldSort.apply(held);
+  const visibleHeld = heldSort.apply(heldMatches);
   const activeProducts = products.filter((p) => p.is_active);
   return (
     <div>
@@ -1248,19 +1271,38 @@ export default function PackagesPage() {
 
       {/* ── Held packages ─────────────────────────────────────────────────── */}
       <div className="mb-8">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-sm font-bold text-gray-900">Who holds one</h2>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {held.length > 0 && (
+              <input
+                type="text"
+                placeholder="Search parent, package or ref…"
+                value={heldSearch}
+                onChange={(e) => setHeldSearch(e.target.value)}
+                className="w-56 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              />
+            )}
             <Button variant="outline" onClick={() => setSaleModal(true)}>
               Record a sale
             </Button>
           </div>
         </div>
+        {!loading && capped && (
+          <p className="mb-3 text-sm text-amber-700">
+            Showing the first {ROW_LIMIT} packages — the list is truncated. This
+            is not expected; contact support if you see it.
+          </p>
+        )}
         {loading ? (
           <p className="text-sm text-gray-500">Loading…</p>
         ) : held.length === 0 ? (
           <p className="text-sm text-gray-400">
             Nobody holds a package yet.
+          </p>
+        ) : heldMatches.length === 0 ? (
+          <p className="text-sm text-gray-400">
+            No held package matches &ldquo;{heldSearch}&rdquo;.
           </p>
         ) : (
           <Table>

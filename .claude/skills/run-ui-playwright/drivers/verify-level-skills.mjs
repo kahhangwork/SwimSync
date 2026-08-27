@@ -87,7 +87,11 @@ try {
   // Place a student on the level so the app screens have something to show.
   await page.goto(`${ADMIN}/students`, { waitUntil: "networkidle" });
   await page.waitForTimeout(2000);
-  await page.locator("select").nth(2).selectOption({ label: "Toddler 1" });
+  // Scoped to the table: the Students toolbar now carries a scoped-search
+  // field <select> (Wave C Piece 1), so a bare `select` nth() would target it
+  // instead of a per-row Level dropdown. `table select` counts only the row
+  // dropdowns, restoring the original target regardless of toolbar controls.
+  await page.locator("table select").nth(2).selectOption({ label: "Toddler 1" });
   await page.waitForTimeout(2000);
 
   console.log("\n[coach] the curriculum is available poolside");

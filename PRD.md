@@ -363,7 +363,15 @@ support rather than daily operation.
 - **Parents who registered but never entered a join code** — they belong to no business, so
   nobody else can see them
 - **Move a student to another business** — the remedy when a parent joins with the
-  wrong code
+  wrong code. *(Loose ends closed 2026-08-28.)* The move now also **joins every linked
+  parent to the new business** (writing the `parent_tenants` membership the add-child
+  picker and billing grouping rely on — reactivating a previously-offboarded one), and
+  **clears the child's level** (a business's level ladder is its own, so the child lands
+  unlevelled for the new admin to re-level — this also fixed a bug where a *levelled*
+  child could not be moved at all). Credit does **not** move (it never crosses businesses,
+  §5.6); if the family holds credit at the old business the admin sees an **advisory
+  warning** before confirming, because that credit becomes unspendable. This stays the
+  *mistake* remedy only — it does not migrate a family wholesale.
 - **Reassign a business's owner** *(implemented 2026-08-13)* — hand ownership to another
   of its **live** admins (a deactivated or cross-tenant target is refused), from the
   Businesses table. This is deliberately the **only** transfer path: the tenant owner has
@@ -3341,6 +3349,17 @@ The following section provides a screen-by-screen reference for each SwimSync us
   weekdays sort in week order rather than alphabetically, and it is stable, so a second
   key keeps the first one's grouping. Columns sort by **what is on screen** — a status by
   its label, an amount by its number — not by what the row stores underneath.
+- **Scoped search on the high-traffic tables** *(implemented 2026-08-28)* — Students,
+  Invoices, Credit Notes and Attendance carry a **field-scoped** search: a small dropdown
+  picks the one column to search (Student / Parent / Reference), and the term is pushed
+  into the **database** rather than filtered in the browser, so it reaches the whole table
+  instead of the first ~1000 rows PostgREST returns (that cap is **silent** — a browser
+  search over it answers "not found" for a row that exists). A search on a joined name
+  (the parent behind an invoice) rides an inner join so non-matches are excluded, never
+  returned blank. The platform admin's cross-business **family search** works the same way.
+  Classes and Packages, whose lists are small, keep an instant in-browser search but now
+  show a banner if a fetch is ever truncated. Every filter keys on **id, not title**, so
+  two classes sharing a name stay distinct.
 - **Change History** *(implemented 2026-08-17)* — a read-only `/history` page surfacing the
   `audit_log` trail so a disputed charge can be answered without SQL: who changed what, and
   when. One global list filtered by entity type and a date range (both applied in the database
