@@ -35,7 +35,9 @@ await page.getByPlaceholder("e.g. Saturday Beginners").fill("Temp Class");
 await page.locator("select").first().selectOption({ index: 1 }); // pick the coach
 await page.locator('input[type="time"]').first().fill("10:00");
 await page.locator('input[type="time"]').last().fill("11:00");
-await page.getByPlaceholder("e.g. Buona Vista SC").fill("Somewhere");
+// Location is a dropdown since the location entity (§8.88) — it was a free-text
+// field ("e.g. Buona Vista SC") until then. Pick the first real location.
+await page.locator("select").filter({ has: page.locator('option', { hasText: "Choose a location" }) }).selectOption({ index: 1 });
 await page.getByPlaceholder("40").fill("40");
 await page.getByRole("button", { name: /Create Class/i }).click();
 await page.waitForTimeout(800);

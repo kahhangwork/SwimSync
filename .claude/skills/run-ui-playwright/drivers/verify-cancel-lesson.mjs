@@ -127,7 +127,15 @@ try {
   // and assert it matched before pressing (a `tap()` on an empty locator
   // throws and would silently shrink this driver's denominator, §7.100).
   const sgOpts = (o) => new Date(`${nextWeek}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Singapore", ...o });
-  const dayHeader = new RegExp(`^${sgOpts({ weekday: "short" })},? ${sgOpts({ day: "numeric" })} ${sgOpts({ month: "short" })}$`);
+  // The coach app renders month labels from the BROWSER's CLDR data, which for
+  // September is "Sept" (4 letters); Node's en-US short month here is "Sep" (3).
+  // An anchored `Sep$` silently stopped matching, so headerCount fell to 0, the
+  // expand was skipped and the card never entered the DOM — two checks red for
+  // the price of one string. This drove the driver red 2026-08-24..27, the first
+  // nightlies whose today+7 crossed into September (a calendar coincidence with
+  // the location deploy the same day, NOT its cause). Match the weekday and month
+  // as PREFIXES so "Sep"/"Sept" (and "Thu"/"Thursday") both agree. §7.122 family.
+  const dayHeader = new RegExp(`^${sgOpts({ weekday: "short" })}\\w*,? ${sgOpts({ day: "numeric" })} ${sgOpts({ month: "short" })}\\w*$`);
   const header = coach.getByText(dayHeader);
   const headerCount = await header.count();
   check(`coach app: next week's COMING UP lists the fixture's day (${dayHeader})`, headerCount === 1, `matched ${headerCount}`);

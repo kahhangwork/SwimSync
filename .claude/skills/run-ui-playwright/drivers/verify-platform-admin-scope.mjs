@@ -125,6 +125,10 @@ try {
   // (Families/Billing/Scheduling/Log/Settings since 2026-08-19), so a collapsed group hides its child
   // <a>s from the DOM. Expand every group first, then the full inventory is back
   // and the exact-count guard still means what it always did.
+  // 22 → 24 (2026-08-27) for Accounting (§8.87) and Locations (§8.88), which
+  // landed 08-19/08-24; the nightly went red here on 08-24 exactly as designed,
+  // three nights before this bump (the §7.178 lesson again — bump it the morning
+  // after, not three sweeps late).
   await page.evaluate(() => {
     document
       .querySelectorAll('aside button[data-testid^="navgroup-"]')
@@ -138,7 +142,7 @@ try {
       a.getAttribute("href")
     )
   );
-  check("sidebar shows the 22 business pages", tenantLinks.length === 22,
+  check("sidebar shows the 24 business pages", tenantLinks.length === 24,
     `${tenantLinks.length}: ${JSON.stringify(tenantLinks)}`);
   check("sidebar does NOT show Platform", !tenantLinks.includes("/platform"));
 
