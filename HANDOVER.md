@@ -1,12 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-27 — **3 nightly UI drivers repaired, no product regression** (§8.90, commit
-`be34398`, on main). `ui-drivers.yml` was red 08-24..27: `class-edit` (typed into the removed free-text
-location field), `platform-admin-scope` (page-count pin 22→24 for Accounting+Locations), `cancel-lesson`
-(a "Sep"/"Sept" ICU mismatch, §7.215 — a calendar coincidence with the location deploy, NOT its fallout).
-All three verified green locally; `tenant-provisioning` was a one-night 08-26 flake._
+_Last updated: 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED + DEPLOYED** (§8.91, commits `828368c`+`a638983`,
+on main): **scoped DB search** on the high-traffic admin tables (Students/Invoices/Credit Notes/Attendance), the
+platform **family-search pushdown**, and the **move-student RPC's two loose ends** — which also fixed a LIVE prod
+bug for levelled students (migration `20260827000100`). Verified live via served-bundle grep. Pieces 4–5 remain._
 
-_Previously, 2026-08-24 (§8.89) — Location entity CONTRACT: dropped the free-text `location_name`/`location_address` columns on prod; `location_id` NOT NULL, one-way, no app/engine change._
+_Previously, 2026-08-27 (§8.90) — 3 nightly UI drivers repaired, no product regression (the §7.215 "Sep"/"Sept" ICU trap)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -203,6 +202,12 @@ first-firing trigger is what to watch for.
   dropped, §8.89). Still **one backfilled location, no admin has opened the page**: the archive guard,
   cross-tenant guard, and the coach/admin filters (shown only at >1 location) have never fired on real data.
   First firing: the admin adds a second location.
+- **Move-student new arms (§8.91, `20260827000100`)** — the RPC's level-clear, the parent-membership write, and
+  the credit-warning dialog have **never fired on prod** (no cross-business move since). Don't rediscover as
+  broken; exercise one real move before the first real one. First firing: a family entered the wrong join code.
+- **Scoped search past the 1000-row cap (§8.91)** — every table is under the cap on prod, so the DB pushdown,
+  the `!inner` narrowing (§7.216) and the cap banners are all unexercised at scale; correct today by coincidence
+  of size. First firing: any admin table crosses ~1000 rows.
 
 ### Prohibitions — these live nowhere else
 
@@ -332,6 +337,29 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.91 (2026-08-28) — Wave C S-pool Pieces 1–3: scoped search, family-search pushdown, move-student loose ends
+
+**Shipped + deployed the first three S-pool items** (`docs/plans/WAVE_C_SPOOL_PLAN.md`); PRD §4.4/§14 + BACKLOG
+moved in the same push. All green: pgTAP 1455, admin vitest 557, build clean; migration on prod, apps last (§11.44).
+
+- **Piece 1 — scoped DB search** on Students, Invoices, Credit Notes, Attendance: a field dropdown picks ONE
+  column, pushed as a bound `.ilike` past PostgREST's silent 1000-row cap. A joined column must ride an `!inner`
+  embed — a plain embed returns the silent-wrong-answer null embeds (**§7.216**). Classes/Packages kept client
+  search + a cap banner (bounded data); invoices STUDENT search is deliberately client-side (a to-many embed
+  narrows and would misstate the WhatsApp/CSV — §7.216). Shared `lib/tableSearch.ts` + `components/useDebouncedValue`.
+- **Piece 2 — family search** pushed into the DB via a sanitised `.or()` (**§7.217** — the wildcard backslash
+  must be DOUBLED to survive PostgREST's unquoting, or `%` matches everyone).
+- **Piece 3 — the move RPC** (`20260827000100`, same signature): clears `level_id` — fixing a **LIVE prod bug**,
+  the old body threw on every levelled-student move (**§7.218**) — and writes each parent's `parent_tenants`
+  membership at the destination; a client-side advisory credit dialog warns before a move strands credit. pgTAP 13,
+  RED-proven.
+
+**A fable pre-commit review caught 12 items; the load-bearing fixes:** the invoices-student embed corruption
+(→ client-side), the `.or()` over-match (→ doubled backslash), two fail-open error paths, unswallowed query errors.
+
+**Not done, deliberately:** Pieces 4 (swim skills, M — authors a migration) and 5 (email copy, S) remain (BACKLOG).
+The move tool is DORMANT on prod — its new arms have never fired; exercise one real move before they do.
+
 ## 8.90 (2026-08-27) — Nightly UI drivers repaired: 3 stale assertions, no product regression
 
 **The `ui-drivers.yml` sweep was red 2026-08-24..27; triage found NO product bug** — three stale driver
@@ -349,23 +377,7 @@ assertions, fixed and verified green against the real UI (commit `be34398`, on m
 `tenant-provisioning` failed only 08-26 (passed 08-24/08-25 on identical code) — a one-night `waitForTimeout`
 flake, left alone. No PRD/BACKLOG movement (no behaviour change). Reasoning graduated to **§7.215**.
 
-## 8.89 (2026-08-24) — Location entity CONTRACT: dropped the free-text columns on prod; SHIPPED + DEPLOYED
-
-**The one-way column drop landed LAST** (PRD §7.24, `20260824000200`, DEPLOYMENT §43). Un-held the CONTRACT
-migration after its fixture sweep: `classes.location_id` NOT NULL, `location_name`/`location_address` DROPPED, the
-expand sync trigger dropped, and `disable_coach` redefined **in the same migration** to stop reading the dropped
-record fields (§7.211). No app/engine change — the apps already read `location_id` + `locations(name/address)` and
-`core.ts` never read location, so the migration was the ONLY prod step (grants persist, no dump — §11.32).
-
-**The fixture sweep — and the gap the `.hold` checklist missed.** 51 pgTAP fixtures + `seed.sql` swept to
-`location_id` (a Default-location-per-tenant block mirroring the Default-Group pattern). CI then went red on
-`check-fixture-roundtrip`: the 14 UI driver fixtures + teardowns + 3 `verify-*.mjs` drivers ALSO named the dropped
-column — a surface the checklist listed nowhere, and one already LEAKING a `locations` row past teardown on the
-EXPAND schema. Swept those too (explicit location row → id, teardown deletes it AFTER the classes; a driver's
-`location_name` UPDATE → `colour`). Full lesson: **§7.214**.
-
-Verified on the contract schema: pgTAP 1442 (1446−4 — `locations.test.sql` dropped its 2 expand-only sync cases),
-Deno 236×2, roundtrip both passes, CI green. Reasoning graduated to GOTCHAS §7.214, DEPLOYMENT §43.
+_(§8.89 demoted to a ledger row in `docs/SESSIONS.md` — location-entity CONTRACT phase.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -408,12 +420,13 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-27:** the 08-24..27 *scheduled* runs were red — triaged (§8.90) as **3 stale driver
-assertions, no product bug**, all fixed on main (`be34398`): `class-edit`, `platform-admin-scope` (pin 22→24),
-and `cancel-lesson` (the "Sep"/"Sept" ICU trap, **§7.215**). `tenant-provisioning` reddened only 08-26 (a
-one-night `waitForTimeout` flake, untouched). The next scheduled run (08-27 night) should confirm green — if
-`tenant-provisioning` reddens again, it is the flake, not these three; if any of the three reddens, that is a
-new regression. **A manual `gh workflow run ui-drivers.yml` confirms green in ~1h20m without waiting.**
+**State on 2026-08-28:** the 08-24..27 driver reds were fixed 2026-08-27 (§8.90). This session (§8.91) changed
+ONE driver — `verify-level-skills`'s `/students` level-picker selector moved to `table select` because the new
+scoped-search toolbar `<select>` shifted its bare position index; verified locally + the fixture-roundtrip CI
+guard is green. **Watch the first scheduled sweep after this deploy** — if `verify-level-skills` reddens it is
+that selector, and if any *invoices/credit-notes/students/platform* driver reddens it is the scoped-search change.
+`tenant-provisioning` remains a known one-night `waitForTimeout` flake. **A manual `gh workflow run
+ui-drivers.yml` confirms green in ~1h20m without waiting.**
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -429,21 +442,21 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — no rework-critical head; a flat value pool
+### THE NEXT BUILD — two S-pool items left, no edges
 
-**The location entity is now fully shipped — expand (§8.88) AND contract (§8.89), both deployed** (PRD §7.24). It
-was the last value-pool item that carried any edge (it fed *Maps*). **Nothing rework-critical remains, no held
-migration, and no edges between what's left.** No migration is in flight (§7.55); latest applied is
-`20260824000200` (locations contract, §8.89), on prod, 0 pending.
+**Wave C S-pool Pieces 1–3 shipped this session (§8.91).** What remains of `docs/plans/WAVE_C_SPOOL_PLAN.md`:
+- **Piece 4 — tick-off swim skills** (M): a coach grades a child against a level's skills; graded, per-tenant
+  scale, top-grade = done, records kept on level change (decisions settled in the plan). **AUTHORS A MIGRATION**
+  (`student_skill_progress` + a cross-tenant-consistency trigger like §7.218/§7.216's shape) — so it is the next
+  thing that touches the schema; one in flight only (§7.55). No widening of `students_update`.
+- **Piece 5 — email-confirmation copy** (S): a branded template; **do NOT switch email confirmation ON** (it
+  stranded web parents once). Apps/config only.
 
-What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value (no edges between them):
-- **The value pool** — the Wave C S-pool (better filtering/search, family-status scan,
-  student-between-businesses, email-confirmation copy, tick-off swim skills). *(Maps was deferred to
-  `BACKLOG.md` → Later on 2026-08-27 — user's call; it builds cleanly on `locations.address` whenever picked up.)*
-- **One parked retrofit-tax choice** (not free while parked): *Split co-admin permissions* (yes eventually —
-  neither accounting nor locations needed it; the Locations page is admin-managed, not co-admin-scoped).
-- Settled decisions (revenue **ACCRUAL** *realised* · reminders **MANUAL** · multi-language **REFUSED**):
-  `BACKLOG.md`.
+No edges between them — pick by value. Other parked items (Split co-admin permissions; settled ACCRUAL/MANUAL/
+multi-language decisions; Maps → *Later*) live in `BACKLOG.md`.
+
+**No migration is HELD or in flight.** Latest applied is `20260827000100` (reassign-student loose ends, §8.91),
+on prod, 0 pending.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers
@@ -476,12 +489,11 @@ What's left is a flat, decision-gated pool in `BACKLOG.md` — pick by value (no
   **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
-**No migration is HELD or in flight.** The latest applied is `20260824000200` (locations contract, §8.89);
-production confirmed caught up 2026-08-24 via `supabase migration list --linked`, **0 pending**. The `.hold` is
-gone — the contract shipped.
-**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending. **§43 is the
-freshest worked example of the CONTRACT half** — a one-way column DROP with NO grant dump and NO app deploy
-(same-signature `CREATE OR REPLACE`, §11.32). **§11.42 is the freshest FULL sequence done IN ORDER** — a new table
+**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending. (Migration state
+is stated once above under *THE NEXT BUILD*: latest `20260827000100`, 0 pending.) **§11.44 is the freshest worked
+example** — a same-signature `CREATE OR REPLACE` (no grant dump, §11.32) FIRST, apps to `main` LAST, verified by
+grepping the served bundle (§7.31). **§43 is the freshest CONTRACT half** — a one-way column DROP with no grant
+dump and no app deploy. **§11.42 is the freshest FULL sequence done IN ORDER** — a new table
 + a DROP+CREATE function signature needing a remote grant dump → GATE → apps to `main` LAST, proving the new
 auth-gated route by 200-vs-404 (§8.64's technique for §11.25's gap), with a committed rehearsed DOWN. §11.40/§11.39/§11.37 are earlier full-sequence examples; **§11.38 records
 the §11.9 ordering mistake recurring** (recovered by reverting the app files only, landing the backend,

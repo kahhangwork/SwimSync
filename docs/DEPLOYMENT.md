@@ -870,3 +870,18 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     "apps LAST" rule is moot with no app change). Verified pre-deploy: `supabase test db` 1442, Deno 236×2, full
     `check-fixture-roundtrip` (both passes), CI green. **One-way contract** — recovery is re-expand from the entity,
     not a DOWN. **Dormant on prod:** one location.
+
+44. **Deploy record (2026-08-28): Wave C S-pool Pieces 1–3 — migration FIRST, apps to `main` LAST (§7.60 honoured).**
+    (Wave C S-pool, `docs/plans/WAVE_C_SPOOL_PLAN.md`; §8.91.) Backend: `20260827000100_reassign_student_tenant_
+    loose_ends.sql` — one **same-signature** `CREATE OR REPLACE` of `reassign_student_tenant(uuid,uuid)` (clears
+    `level_id`, writes each parent's `parent_tenants` membership). Apps: scoped DB search + the move-student credit
+    dialog (7 admin pages + 3 new lib/component files). Sequence: (1) `supabase db push` — `20260827000100` remote
+    filled, **0 pending** (pgdelta cert trace alongside `Finished`, harmless, §7.30 — seen ~6× now). (2) **No grant
+    dump** — same-signature `CREATE OR REPLACE`, ACLs persist, no new object/privilege (§11.32 pattern). (3) **Apps
+    to `main` LAST** — `git push …:main` (fast-forward), Vercel rebuilt both. **Verified the deploy CARRIES the change,
+    not just a 200** (§7.31): grepped the served admin bundles — `students` chunk has `Search parent name`/`Refine
+    your search`, `platform` chunk has `Credit stays with the old business`/`Move anyway`/`Could not search families`.
+    ⚠ curl the chunk with `--compressed`, encode the `(admin)` parens as `%28admin%29`, and pipe to grep (a JS chunk
+    holds NUL bytes that truncate a bash `$( )` capture). CI green. **Rollback:** committed DOWN restores the prior
+    RPC body (`supabase/rollback/20260827000100_..._DOWN.sql`) — but re-introduces the levelled-student bug, so only
+    for the membership logic. **Dormant on prod:** no cross-business move has fired the new arms yet (§8.91).

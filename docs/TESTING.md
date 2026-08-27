@@ -1025,6 +1025,20 @@ and a final assertion that counts rather than tests presence (§7.118).
   `verify-schedule-week` on a hand-run**: both put their lesson on the same weekday last week,
   and leaving this fixture in place scores that driver 20/21. The sweep resets per driver.
 
+### Wave C S-pool — scoped search + move-student (2026-08-28)
+
+- **`reassign_student_tenant.test.sql` (13)** — the platform rescue RPC's two closed ends: a LEVELLED
+  student moves and lands unlevelled (RED against the old body by construction — it threw on the level
+  trigger), each linked parent gets a membership at the destination (0/2-parent + inactive-reactivation
+  cases), and isolation at the old business holds. 6 of 13 fail on the pre-fix body — the RED proof (§7.218).
+- **`tableSearch.test.ts` + `moveStudentWarning.test.ts` (vitest)** — the search helpers (`ilikeContains`,
+  `orIlike` incl. hostile-term cases, `matchesAnyField`) and the credit sum. ⚠ These assert the `.or()`
+  string SHAPE only; the wildcard-escaping bug (§7.217) and the `!inner` requirement (§7.216) are DB
+  behaviours a vitest cannot see — both were proven with a live-DB probe, not a unit test.
+- **`verify-level-skills.mjs`** — its `/students` level-picker selector moved from `page.locator("select").nth(2)`
+  to `table select` nth(2): the new scoped-search toolbar `<select>` shifted the bare position index. A
+  position-based selector over a page whose toolbar can grow a control is the recurring driver trap.
+
 See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---

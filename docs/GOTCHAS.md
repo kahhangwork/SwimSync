@@ -3379,3 +3379,34 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     the case that bites in en-US. Fix: match weekday and month as PREFIXES (`${weekday}\w*`, `${month}\w*`) so
     "Sep"/"Sept" and "Thu"/"Thursday" both pass, rather than trusting Node's string to equal the app's. Same
     calendar-assumption family as §7.122. (2026-08-27.)
+
+216. **A PostgREST filter on an EMBEDDED column restricts the parent rows ONLY when the embed is `!inner` — over a
+    plain (left) embed it returns EVERY parent row with the embed nulled, a silent wrong answer worse than the cap.**
+    Scoped admin search (Wave C Piece 1) pushes a term into the DB as `.ilike("parent_students.parents.profiles.
+    full_name", …)` to reach past `max_rows=1000` (§7.70). Verified against the live DB: over a PLAIN embed the query
+    returned all three students — one matched, two with `parents:null`/`[]`; over `parent_students!inner(parents!inner
+    (profiles!inner(…)))` it returned only the real match, and a BASE-column search still found the parentless child.
+    So make the embed `!inner` **only while that field is the active search** (a permanent `!inner` would drop
+    parentless/unlinked rows from the default list); a base column needs no embed change. **Corollary — a to-MANY
+    embed NARROWS too:** `.ilike("invoice_items.student_name", …)` over `invoice_items!inner` strips the non-matching
+    items from each returned invoice, so a multi-child invoice's derived student list collapses to the searched child
+    and then MISSTATES the WhatsApp reminder + CSV. Push a to-many search only where the display does not depend on the
+    full set; invoices keep STUDENT search client-side for exactly this (parent search is a to-ONE embed and pushes
+    cleanly). Sibling of §7's "PostgREST returns null for the ENTIRE select when one embed fails". (2026-08-28, §8.91.)
+
+217. **In a PostgREST `.or()` quoted value, a single-backslash wildcard escape (`\%`) still matches EVERYTHING — the
+    backslash must be DOUBLED (`\\%`) to survive the parser's unquoting.** The scoped family search (Piece 2) builds
+    `full_name.ilike."*<term>*"` and double-quotes the value so `,()` in a name stay literal. But PostgREST unescapes
+    `\x`→`x` inside a quoted value BEFORE the `*`→`%` mapping, so `\%` unescapes back to a bare `%` wildcard and a
+    search for a literal "%" matches every row. Verified against the live DB: `"*\%*"` matched every profile; `"*\\%*"`
+    matched none (literal). Escape wildcards as `\\`+char (`orValue`, `SwimSyncAdmin/lib/tableSearch.ts`). The unit
+    test asserts the string SHAPE only, so it cannot catch this — the DB probe is the proof. (2026-08-28, §8.91.)
+
+218. **A `SECURITY DEFINER` RPC does NOT skip triggers, so changing `tenant_id` while a cross-tenant FK (`level_id`)
+    is still set trips the tenant-guard trigger — this SHIPPED a live production bug.** `reassign_student_tenant()`
+    updated `students.tenant_id` without clearing `level_id`, so `trg_student_level_tenant` (fires on `UPDATE OF
+    level_id, tenant_id`) saw the level still pointing at the OLD tenant's ladder and raised `check_violation` — every
+    move of a LEVELLED student failed in prod, silently, from the day levels shipped. SECURITY DEFINER changes the
+    ROLE (bypassing RLS), never trigger firing. Fix: clear the cross-tenant FK in the SAME update (the old tenant's
+    vocabulary is meaningless at the new one). Whenever an RPC moves a row across the tenant boundary, null every
+    cross-tenant FK it carries. (2026-08-28, §8.91.)
