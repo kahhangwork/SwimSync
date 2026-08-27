@@ -435,6 +435,17 @@ the two S quick-wins first, the M feature last. Full item bodies are in the them
    parent watches progress. Needs its own `student_skill_progress` table + policy (no widening of
    `students_update`) and two decisions (level-change history; binary vs graded). Full item: *Coach workflow*.
 
+> **/plan-review 2026-08-27:** every pool item's body carries inline `⚠ RISK n MITIGATION`
+> steps. **The sequenced plan — two-pass reviewed and fact-checked against code — is
+> `docs/plans/WAVE_C_SPOOL_PLAN.md`; where a block below and the plan disagree, the plan wins**
+> (its second pass refuted one claim below and found facts these blocks lack).
+> **Pre-commit gate for whichever item ships** (a box that can't be ticked is a blocker, not a caveat):
+> - [ ] New tests proven RED without the fix (§7.25) — the two highest-value boxes are this one and the next
+> - [ ] Schema/privileges touched → policy + matching GRANT in the SAME migration (§7.87), `supabase test db` green, remote grant dump budgeted (§7.39/§7.89)
+> - [ ] RPC signature changed → `grep -rn '\.rpc(' SwimSyncApp SwimSyncAdmin` run and every caller checked (§7.123)
+> - [ ] No `.filter()`-in-JS search over a fetch that can hit `max_rows = 1000`
+> - [ ] `/deploy` before any backend push (migrations first, apps to `main` last)
+
 Everything else in *Wave C*'s S pool and *Later* has **no edge** — pick by value.
 
 ### Wave B — the one genuine internal chain — **EXHAUSTED bar the cron-gated tail**
@@ -617,6 +628,22 @@ out of a text blob. What makes it an M rather than an S:
   actually assess.
 - Watch the read cost: a roster of six children each with six skills is 36 rows, so fetch
   it per class rather than per student.
+
+**⚠ RISK 2 MITIGATIONS** *(/plan-review 2026-08-27, ranked #2 of the pool: the only item with a
+NEW table + a NEW coach-facing write surface)*:
+- **Step 0 — DONE 2026-08-27: both decisions settled with the user** — GRADED, on a per-tenant
+  custom scale (seeded 3-stage default), top grade = done; level change KEEPS records and shows
+  the current level. Recorded in `docs/plans/WAVE_C_SPOOL_PLAN.md` — do not re-ask.
+- **Step:** the `student_skill_progress` migration carries its policy AND the matching GRANT in
+  the same file (§7.87), extends `table_grants.test.sql`'s whitelist deliberately, and budgets
+  the remote grant dump after deploy (§7.39/§7.89, `docs/DEPLOYMENT.md` §11.7).
+- **Assertion (pgTAP, proven RED first, §7.25):** a coach can write a row only for a child in a
+  class they teach · cross-tenant write refused · parent is read-only. Choose the authorization
+  predicate deliberately (`coach_owns_class`-shaped vs `coach_serves_student`-shaped — per-student
+  is arguably right *here*, unlike §3's `close_student_enrolment` rule) and record why.
+- **Prohibition (restating the bullet above so it survives skimming):** do NOT widen
+  `students_update` — this table exists precisely so that grant is never touched.
+- **Step:** migration authored in the ROOT checkout on a `db/…` branch, one in flight (§7.55).
 
 ### ~~Convert a trial into an enrolled student~~ — **S** — **DONE 2026-08-17**
 Shipped: the *past — needs marking* list on the Trials page carries a **Convert to enrolled**
@@ -1345,6 +1372,16 @@ string, or a `.ilike` filter pushed into the query instead of `.filter()` in JS)
 its own piece of work. Harmless at today's scale; the reason to record it is that the failure
 mode is invisible.
 
+**⚠ RISK 4 MITIGATIONS** *(/plan-review 2026-08-27, ranked #4 — one page, one platform admin,
+but the data is cross-tenant)*:
+- **Step (only if the RPC fallback is taken — the plan prefers the `.ilike` pushdown, no new
+  function):** gate the new search inside the function body the way `platform_tenant_overview()`
+  does (platform-admin check in the function, not only in RLS), grant EXECUTE to
+  `authenticated` only — `anon` gets nothing (§7.82/§7.85) — and remember a new function is
+  callable by NOBODY until its own migration grants it (§7.87).
+- **Assertion:** parity with the client filter it replaces — same case-insensitive substring
+  semantics, pinned by a vitest running old filter and new query shape against the same fixtures.
+
 ### Moving a student between businesses leaves two loose ends — **S**
 `reassign_student_tenant()` moves the student but not everything attached to them.
 
@@ -1369,6 +1406,26 @@ different flow and needs no code: the old business marks the family inactive, th
 gives them its join code, and the child is added there as a new record. History stays with
 the business that taught it, which is the isolation working correctly. Don't conflate the
 two by making the rescue tool "move everything".
+
+**⚠ RISK 1 MITIGATIONS** *(/plan-review 2026-08-27 — ranked RISKIEST of the pool: it edits the
+cross-tenant boundary and touches money, fires at the exact moment a family is confused, and its
+first real firing is in production by construction — the tool is dormant locally too)*:
+- **Step:** keep the RPC signature `(uuid, uuid)` — same-signature `CREATE OR REPLACE`, no grant
+  dump needed (§11.32). If a signature change is unavoidable, run
+  `grep -rn '\.rpc(' SwimSyncApp SwimSyncAdmin` FIRST and walk every caller (§7.123).
+- **FACT (2nd-pass review, verified against code): the RPC is broken in production TODAY for any
+  levelled student** — `trg_student_level_tenant` raises on a tenant change while `level_id` is
+  set, and the RPC never clears it. The fix (null the level on move) is Piece 3 step 0 of the plan.
+- **Step (corrected):** the §7.57 `BEFORE INSERT` fear was REFUTED — the only trigger on
+  `parent_tenants` is the `BEFORE UPDATE` offboard guard. The real cases the insert must handle:
+  the parent is **0..N parents** (many-to-many, possibly zero), and an exists-but-**INACTIVE**
+  membership at B must be reactivated, not skipped. Full steps + pgTAP cases: the plan file.
+- **Assertion (pgTAP, proven RED without the fix, §7.25):** membership row written at B ·
+  isolation at A intact · stranded-credit warning fires only when a balance actually exists.
+- **Prohibition:** the credit warning is ADVISORY — do NOT move credit (never crosses businesses,
+  PRD §5.6) and do NOT grow this rescue tool toward "move everything" (the paragraph above).
+- **Step:** exercise the whole flow once in the local UI (Platform page) before deploying —
+  no production firing may be the first firing. Then migration → apps, via `/deploy`.
 
 ### ~~Export to Excel / CSV~~ — **S** — **DONE 2026-08-17**
 Shipped all three at once (invoices, credit notes, attendance), not invoices-only as the
@@ -1396,6 +1453,17 @@ hard-won parts are that blanks stay last in **both** directions, that sorting is
 numeric-aware, and that columns sort by what is **on screen** rather than what the row
 stores. Attendance's filter deliberately keys on class **id, not title**, because two
 classes can share a name.
+
+**⚠ RISK 3 MITIGATIONS** *(/plan-review 2026-08-27, ranked #3 of the pool — the failure mode is
+a silent wrong answer across every admin table)*:
+- **Step:** push search into the query (`.ilike` or an RPC) — PostgREST's `max_rows = 1000` cap
+  is SILENT, so a client-side search over a truncated fetch answers "not found" for a row that
+  exists. If any search must run client-side, key a completeness check on the UNFILTERED fetch
+  count and refuse when capped (the CSV cap-block pattern, already graduated to §7).
+- **Prohibition:** no `.filter()`-in-JS search over a fetched list, and every new filter keys on
+  **id, never display title** (the Attendance precedent above).
+- **Assertion:** shipped sorting is regression-pinned — the `tableSort.ts` vitest count is
+  unchanged before/after; reuse its comparisons, never write a second one.
 
 ### ~~More polished dashboards~~ — **RETIRED 2026-08-16** `[Phase 2]`
 Richer metrics on the admin dashboard. **Retired with the user 2026-08-16** — the item's own
@@ -1638,6 +1706,13 @@ self-registering parent isn't sent one. Only matters if confirmation is ever tur
 **Notes:** confirmation was turned off deliberately (it stranded web parents on a "check
 your email" step). The branded template pattern exists at
 `supabase/templates/recovery.html` if this is ever needed.
+
+**⚠ RISK 5 MITIGATION** *(/plan-review 2026-08-27, ranked LAST — the copy is cosmetic; the only
+real risk is the toggle sitting next to it)*:
+- **Prohibition:** do NOT switch email confirmation ON to test templates — it stranded web
+  parents once, which is exactly why it is off. Render templates the `recovery.html` way, locally.
+- **Assertion:** after the work, the auth config still has confirmation OFF (check the dashboard
+  setting, not memory).
 
 ---
 
