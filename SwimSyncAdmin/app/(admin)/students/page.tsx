@@ -31,6 +31,13 @@ import { formatTime } from "@/lib/utils";
 import { Drawer } from "@/components/Drawer";
 import { ilikeContains } from "@/lib/tableSearch";
 import { useDebouncedValue } from "@/components/useDebouncedValue";
+import { AssessmentGrid } from "@/components/AssessmentGrid";
+import { todayInSg } from "@/lib/lessonDates";
+import type {
+  GradeLevel as SkillGradeLevel,
+  Level as SkillLevel,
+  RosterStudent,
+} from "@/lib/assessment";
 
 /** PostgREST caps every fetch at max_rows (1000). Fetching this many means the
  *  query was (probably) truncated, so search is the way to reach past it —
@@ -335,6 +342,18 @@ export default function StudentsPage() {
   }
 
   const [levels, setLevels] = useState<{ id: string; label: string }[]>([]);
+
+  // ── Grade skills, for ONE child (the Assessment tab does whole classes) ────
+  // This is the one-off correction: a child was mis-graded, or joined after the
+  // class was assessed. The round machinery still applies — `since` is today, so
+  // a grade from a previous round shows greyed and dated exactly as it does in
+  // the class grid, and a correction made here reads as fresh.
+  const [gradingFor, setGradingFor] = useState<StudentRow | null>(null);
+  const [gradeLevels, setGradeLevels] = useState<SkillLevel[]>([]);
+  const [gradeScale, setGradeScale] = useState<SkillGradeLevel[]>([]);
+  const [gradeRoster, setGradeRoster] = useState<RosterStudent[]>([]);
+  const [gradeLoading, setGradeLoading] = useState(false);
+  const [gradeError, setGradeError] = useState<string | null>(null);
   const [savingLevelFor, setSavingLevelFor] = useState<string | null>(null);
   const [levelError, setLevelError] = useState<string | null>(null);
 
@@ -456,6 +475,58 @@ export default function StudentsPage() {
       .order("sort_order")
       .order("label");
     setLevels(data ?? []);
+  }
+
+  // Fetches everything the grid needs for ONE child. Kept separate from
+  // loadLevels() above, which deliberately reads only id + label for the inline
+  // dropdown — the grid additionally needs each level's skills and the tenant's
+  // grade scale, and loading those on every Students page render would be a
+  // per-row cost paid by the many admins who never grade from here.
+  async function openGrading(student: StudentRow) {
+    setGradingFor(student);
+    setGradeLoading(true);
+    setGradeError(null);
+
+    const [levelsRes, scaleRes, progRes] = await Promise.all([
+      supabase
+        .from("tenant_levels")
+        .select("id, label, sort_order, tenant_level_skills(id, label, sort_order)")
+        .order("sort_order"),
+      supabase.from("skill_grade_levels").select("id, rank, label").order("rank"),
+      supabase
+        .from("student_skill_progress")
+        .select("student_id, skill_id, grade_level_id, graded_at")
+        .eq("student_id", student.id),
+    ]);
+
+    const failed = levelsRes.error || scaleRes.error || progRes.error;
+    if (failed) {
+      // Surfaced, not swallowed: an empty grid that is really a failed query
+      // reads as "this child has no skills", which would invite re-grading work
+      // that already exists.
+      setGradeError(failed.message);
+      setGradeLoading(false);
+      return;
+    }
+
+    setGradeLevels(
+      (levelsRes.data ?? []).map((l: any) => ({
+        id: l.id,
+        label: l.label,
+        sort_order: l.sort_order,
+        skills: l.tenant_level_skills ?? [],
+      }))
+    );
+    setGradeScale((scaleRes.data ?? []) as SkillGradeLevel[]);
+    setGradeRoster([
+      {
+        id: student.id,
+        full_name: student.full_name,
+        level_id: student.level_id,
+        progress: (progRes.data ?? []) as any,
+      },
+    ]);
+    setGradeLoading(false);
   }
 
   async function setLevel(student: StudentRow, levelId: string | null) {
@@ -1378,6 +1449,21 @@ export default function StudentsPage() {
                 >
                   Rename
                 </button>
+                {/* The one-off correction. Whole classes are graded on the
+                    Assessment tab; this is for the child who joined late or was
+                    mis-graded. The drawer closes FIRST so the modal is never
+                    stacked on top of it — the order every other action here
+                    uses. */}
+                <button
+                  onClick={() => {
+                    const s = drawerFor;
+                    setDrawerFor(null);
+                    void openGrading(s);
+                  }}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Grade skills
+                </button>
                 {drawerFor.is_active && (
                   <button
                     onClick={() => {
@@ -1446,6 +1532,46 @@ export default function StudentsPage() {
           </div>
         )}
       </Drawer>
+
+      {/* ── Grade ONE child's skills ────────────────────────────────────────
+          The same grid the Assessment tab uses, in compact mode: no paint
+          toolbar, because there is no run of children to paint across. Sharing
+          the component is deliberate — two implementations of "what does this
+          grade mean" would eventually disagree, and only one of them would be
+          the one the assessor trusts. */}
+      <Modal
+        title={gradingFor ? `Grade ${gradingFor.full_name}` : "Grade skills"}
+        open={gradingFor !== null}
+        onClose={() => {
+          setGradingFor(null);
+          setGradeError(null);
+        }}
+      >
+        {gradeError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            Could not load this child&apos;s skills: {gradeError}. Close and try
+            again — an empty list here is a failed query, not an ungraded child.
+          </div>
+        ) : gradeLoading ? (
+          <p className="py-6 text-center text-sm text-gray-400">Loading…</p>
+        ) : tenantId && gradingFor ? (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Click a grade to cycle it. Changes save straight away. Grades from
+              before today show greyed with the date they were given.
+            </p>
+            <AssessmentGrid
+              tenantId={tenantId}
+              roster={gradeRoster}
+              levels={gradeLevels}
+              scale={gradeScale}
+              since={todayInSg()}
+              compact
+              onReload={() => openGrading(gradingFor)}
+            />
+          </div>
+        ) : null}
+      </Modal>
 
       {/* ── Add a student whose parent hasn't registered ────────────────────
           For a child already attending weekly. A TRIAL is the coach's job —

@@ -38,12 +38,19 @@ describe("navFor", () => {
     // (2026-07-26) + Make-ups (2026-08-02) + Admins (2026-08-06) + Lesson
     // Coaches (2026-08-11) + Holidays (2026-08-15) + Referrals (2026-08-15)
     // + Calendar + Lessons (2026-08-19) + Accounting (2026-08-23, owner-gated
-    // in the PAGE, not by nav scope).
+    // in the PAGE, not by nav scope) + Assessment (2026-08-29).
     // The count is asserted
     // deliberately: NAV also drives RequiresTenant's route gate, so a page added
     // here without being thought about is a page gated by accident rather than
     // on purpose.
-    expect(hrefs).toHaveLength(24);
+    //
+    // /assessment was thought about: it is a TENANT page. It reads and writes
+    // this business's children, so a platform admin — who belongs to no business
+    // — must not see it, exactly like every other row here. It also has a
+    // dynamic child route (/assessment/[classId]) which inherits the scope by
+    // scopeForPath()'s prefix rule; that is asserted below.
+    expect(hrefs).toHaveLength(25);
+    expect(hrefs).toContain("/assessment");
     expect(hrefs).toContain("/accounting");
     expect(hrefs).toContain("/locations");
     expect(hrefs).toContain("/calendar");
@@ -114,6 +121,10 @@ describe("scopeForPath", () => {
     // unknown-path branch and be gated by accident of URL shape.
     expect(scopeForPath("/classes/abc-123")).toBe("tenant");
     expect(scopeForPath("/students/abc-123/edit")).toBe("tenant");
+    // The Assessment tab's grid lives at /assessment/<classId> and writes
+    // grades. It inherits "tenant" from the /assessment entry rather than
+    // relying on the fail-closed default, so the gate is by declaration.
+    expect(scopeForPath("/assessment/abc-123")).toBe("tenant");
   });
 
   it("FAILS CLOSED on an unknown path", () => {

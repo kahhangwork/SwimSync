@@ -48,6 +48,7 @@ import {
   ListChecks,
   Calculator,
   MapPin,
+  ClipboardCheck,
 } from "lucide-react";
 
 /** A page's audience. `tenant` = shows ONE business. `platform` = cross-tenant. */
@@ -69,6 +70,7 @@ export const NAV: readonly NavItem[] = [
   { href: "/classes",      label: "Classes",              icon: Layers,          scope: "tenant"   },
   { href: "/students",     label: "Students",             icon: Users,           scope: "tenant"   },
   { href: "/claims",       label: "Parent Requests",      icon: UserCheck,       scope: "tenant"   },
+  { href: "/assessment",   label: "Assessment",           icon: ClipboardCheck,  scope: "tenant"   },
   { href: "/levels",       label: "Levels",               icon: Waves,           scope: "tenant"   },
   { href: "/locations",    label: "Locations",            icon: MapPin,          scope: "tenant"   },
   { href: "/parents",      label: "Parents",              icon: UsersRound,      scope: "tenant"   },
@@ -171,6 +173,11 @@ export const TOP_LEVEL_HREFS: readonly string[] = [
   "/classes",
   "/calendar",
   "/lessons",
+  // Top-level rather than under Settings, where /levels sits. Levels are setup —
+  // the curriculum, edited once in a while. Assessment is WORK: an admin tours
+  // every class doing it, and burying the tour behind a group header costs a
+  // click on every class.
+  "/assessment",
 ];
 
 /** Task-based groups. See HANDOVER §3 for why the dormant pages sit here. */
