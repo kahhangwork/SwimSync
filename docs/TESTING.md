@@ -813,6 +813,25 @@ self-healing (the `verify-levels.mjs` shape). 6 checks, admin-only. The filter *
 the archive-while-active refusal are covered by `lib/locationOptions.test.ts` (vitest) /
 `lib/locationFilter.test.ts` (jest) and `locations.test.sql` instead.
 
+`verify-assessment.mjs` (+ `fixtures-assessment.sql` / `-teardown.sql`) drives the admin
+**Assessment** tab — 27 checks, admin-only. **It runs at 390×844, and the viewport is a CHECK,
+not a setting:** production's one real assessor is a private coach whose grading surface was the
+phone app that §8.93 made read-only, so an Assessment tab that is unusable on a phone has
+regressed the only person who uses it — and no unit test can see that. It earned this on its first
+run, catching a sticky name column that sat on top of the first grade cell and made the first
+skill of every row untappable. It also found §7.222 (the panel-wide `w-64` sidebar), which
+**no horizontal-overflow assertion can catch** — the page does not scroll, the content is squeezed.
+
+Most of its checks are ways the skipped-child failure could return: a child graded 90 days ago
+must count **zero** for the round and be offered **no** promotion; an unlevelled child must not
+read as assessed (0 of 0 is vacuously complete, §7.219); the grid must split by level, because a
+class carries none. **Its sharpest check paints the STALE child's row with the grades they already
+held** — nothing changes but `graded_at`, and the row goes from 0/2-no-promotion to
+2/2-with-promotion, which proves the `20260829000100` trigger fix end to end through the real UI
+rather than only in pgTAP. Its fixture must backdate under a **disabled trigger** for the same
+reason the pgTAP suite does (§7.220). The pure logic is `lib/assessment.test.ts` (vitest), whose
+vacuity and freshness blocks are RED-proven against the obvious implementation.
+
 `verify-levels-table.mjs` (+ `fixtures-levels-table.sql` and its `-teardown.sql`) pins the
 Swimming Levels table's **column geometry** — it MEASURES each `th`'s rect against its
 column's `td` and fails if they diverge by more than 2px. Written because §7.54's bug was

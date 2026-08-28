@@ -1,12 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-28 — **Wave C S-pool Piece 4 SHIPPED + DEPLOYED** (§8.92, commit `d0fb3b0`, on main):
-per-child **swim-skill grading** — coaches grade each child against their level's skills on a per-tenant scale,
-parents watch progress, admins edit the scale (migration `20260828000100`, PRD §7.15, DEPLOYMENT §11.45).
-Verified live via served-bundle grep (`Tap to grade`). **Only Piece 5 (email copy, S) remains of the S-pool.**_
+_Last updated: 2026-08-29 — **Grading is ADMIN-ONLY and has an Assessment tab — BUILT, NOT DEPLOYED** (§8.93,
+branch `db/grading-admin-only`, 3 commits, nothing on `main`). Migration `20260829000100` narrows the write
+policy and fixes `graded_at`; `/assessment` grades a whole class per level, with a round date so old grades
+cannot pass for today's. **The deploy is the next action — §9.** (PRD §7.15, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`.)_
 
-_Previously, 2026-08-28 (§8.91) — Wave C Pieces 1–3: scoped DB search, family-search pushdown, and the
-move-student RPC's two loose ends (which fixed a LIVE prod bug for levelled students, `20260827000100`)._
+_Previously, 2026-08-28 (§8.92) — per-child swim-skill grading shipped and deployed (`20260828000100`), which
+this session's work then narrowed to admins._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -209,10 +209,11 @@ first-firing trigger is what to watch for.
 - **Scoped search past the 1000-row cap (§8.91)** — every table is under the cap on prod, so the DB pushdown,
   the `!inner` narrowing (§7.216) and the cap banners are all unexercised at scale; correct today by coincidence
   of size. First firing: any admin table crosses ~1000 rows.
-- **Swim-skill grading (§8.92, `20260828000100`, PRD §7.15)** — LIVE on prod but **no child graded yet**: the
-  coach-write path, the cross-tenant + keep-records `RESTRICT` guards, and the `merge_students` skill-progress
-  move have never fired on real data (the scale is seeded, but every child is ungraded). First firing: the first
-  coach taps *Grade*. A rate-less solo coach still IS a coach here — grading needs no second coach to become real.
+- **Swim-skill grading (§8.92/§8.93, PRD §7.15)** — LIVE on prod but **no child graded yet**, so the
+  cross-tenant + keep-records `RESTRICT` guards and the `merge_students` skill-progress move have never fired
+  (the scale is seeded; every child is ungraded). That zero is now **load-bearing, not just trivia**: §8.93's
+  admin-only narrowing is lossless *because* of it, and §9 turns it into a gate to run before deploying.
+  First firing: the first admin grades a child on the Assessment tab.
 
 ### Prohibitions — these live nowhere else
 
@@ -342,6 +343,32 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.93 (2026-08-29) — Grading becomes ADMIN-ONLY, and gains an Assessment tab (BUILT, **NOT DEPLOYED**)
+
+**All local gates green; nothing is on `main` and nothing is on prod.** Three commits on branch
+`db/grading-admin-only`: `5c79e43` (migration + pgTAP), `1d9c2ea` (coach app read-only), `adf2e6d` (the
+admin surface). pgTAP 1488, admin vitest 620, app jest 420, both typechecks + `next build` clean, fixture
+roundtrip 26/26, `verify-assessment.mjs` 27/27. Plan, decisions and the walked gate:
+**`docs/plans/GRADING_ADMIN_ONLY_PLAN.md`**. Behaviour: **PRD §7.15**.
+
+- **What changed** — the write policy narrowed to `can_admin_tenant` (the coach arm dropped, enforced in the
+  DB, not just hidden); the coach's grade screen became read-only (*Grade* → *Skills*); a new **Assessment**
+  tab does whole classes; the Students drawer does one child.
+- **The migration also fixes `graded_at`**, which the round mechanism rests on: the old trigger stamped only
+  when the grade CHANGED, so re-confirming a child at the grade they already hold — the commonest act of an
+  assessment day — left them reading "never assessed". Stamp condition is now the contrapositive (stamp
+  unless a bare `student_id` repoint), preserving `merge_students`' contract.
+- **Scope grew with the user during planning**: they asked for an assessment-DAY tool, not the drawer modal
+  the BACKLOG had scoped. Four product decisions and the rejected alternatives (a stored `assessment_rounds`
+  entity; per-skill grade history) are in the plan's §1.
+- **A `/plan-review` (fable) found 8 risks; three changed the build** — the vacuous-completeness bug
+  (**§7.219**), a pgTAP assertion that *could not be written as specified* (**§7.220**), and the round
+  resetting at midnight. All folded into the plan beside their steps and ticked in its gate.
+- **Its driver caught a real bug on first run** (the sticky name column made the first skill untappable on a
+  phone — fixed) and a second, panel-wide one left deliberately unfixed: **§7.222**, the `w-64` sidebar, now
+  a `BACKLOG.md` item. Assessment is the first admin surface meant for poolside use, so it now matters.
+- **Not done** — the deploy. See §9.
+
 ## 8.92 (2026-08-28) — Wave C S-pool Piece 4: per-child swim-skill grading (SHIPPED + DEPLOYED)
 
 **Shipped + deployed the last building item of the S-pool** (`docs/plans/WAVE_C_SPOOL_PLAN.md`); PRD §7.15 +
@@ -361,30 +388,7 @@ migration on prod, grant dump clean, apps last (DEPLOYMENT §11.45). Migration `
 - **Not done, deliberately** — Piece 5 (email-confirmation copy, S) is the only S-pool item left. Grading is
   **DORMANT on prod** (no child graded yet); exercise one grade to see its first firing.
 
-## 8.91 (2026-08-28) — Wave C S-pool Pieces 1–3: scoped search, family-search pushdown, move-student loose ends
-
-**Shipped + deployed the first three S-pool items** (`docs/plans/WAVE_C_SPOOL_PLAN.md`); PRD §4.4/§14 + BACKLOG
-moved in the same push. All green: pgTAP 1455, admin vitest 557, build clean; migration on prod, apps last (§11.44).
-
-- **Piece 1 — scoped DB search** on Students, Invoices, Credit Notes, Attendance: a field dropdown picks ONE
-  column, pushed as a bound `.ilike` past PostgREST's silent 1000-row cap. A joined column must ride an `!inner`
-  embed — a plain embed returns the silent-wrong-answer null embeds (**§7.216**). Classes/Packages kept client
-  search + a cap banner (bounded data); invoices STUDENT search is deliberately client-side (a to-many embed
-  narrows and would misstate the WhatsApp/CSV — §7.216). Shared `lib/tableSearch.ts` + `components/useDebouncedValue`.
-- **Piece 2 — family search** pushed into the DB via a sanitised `.or()` (**§7.217** — the wildcard backslash
-  must be DOUBLED to survive PostgREST's unquoting, or `%` matches everyone).
-- **Piece 3 — the move RPC** (`20260827000100`, same signature): clears `level_id` — fixing a **LIVE prod bug**,
-  the old body threw on every levelled-student move (**§7.218**) — and writes each parent's `parent_tenants`
-  membership at the destination; a client-side advisory credit dialog warns before a move strands credit. pgTAP 13,
-  RED-proven.
-
-**A fable pre-commit review caught 12 items; the load-bearing fixes:** the invoices-student embed corruption
-(→ client-side), the `.or()` over-match (→ doubled backslash), two fail-open error paths, unswallowed query errors.
-
-**Not done, deliberately:** Pieces 4 (swim skills, M — authors a migration) and 5 (email copy, S) remain (BACKLOG).
-The move tool is DORMANT on prod — its new arms have never fired; exercise one real move before they do.
-
-_(§8.90 demoted to a ledger row in `docs/SESSIONS.md` — nightly UI-driver repairs, no product change.)_
+_(§8.91 demoted to a ledger row in `docs/SESSIONS.md` — Wave C S-pool Pieces 1–3.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -451,20 +455,29 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 
 ### THE NEXT BUILD — pick-now list is in `BACKLOG.md`
 
-**Top pick (set 2026-08-28, the session after Piece 4 shipped): make swim-skill grading ADMIN-ONLY** (M) —
-the user wants only tenant admins to grade children, not coaches. It's not a one-line policy flip: grading
-lives only in the coach app today, so it moves the whole surface (narrow the write policy → drop the coach
-grade UI → add an admin grading surface on the Students Actions drawer). **Full scope, already worked out, is
-the FIRST item in `BACKLOG.md` → Current pick-now order** — don't re-derive it. Grading is DORMANT on prod, so
-the policy flip strands no data.
+**FIRST, AND BEFORE ANY OTHER WORK: deploy §8.93.** It is built, fully green and sitting on branch
+`db/grading-admin-only` — three commits, nothing merged. Until it lands, prod still lets **coaches** grade,
+and the admin Assessment tab does not exist. Run **`/deploy`**; the sequence is migration `20260829000100`
+to prod **FIRST**, then merge to `main` (which is the app deploy, §7.60), then grep the served bundle for
+`Assessing since` (§7.31 — a 200 proves nothing).
 
-Then: **Piece 5 — email-confirmation copy** (S) — a branded template following `supabase/templates/recovery.html`;
+> **One GATE must be run before `db push`, and it has not been:**
+> `SELECT count(*) FROM student_skill_progress;` **against prod must return 0.**
+> Three claims rest on it — that the policy narrowing strands no coach's work, that re-attributing
+> `graded_by` to "who last confirmed" loses nothing, and that no data migration is needed. **If it is
+> non-zero, STOP** and settle the `graded_by` history question first: the migration deploys before the apps,
+> so any existing coach-attributed rows would have their original grader permanently overwritten by the first
+> assessment day. Everything else about the window is safe (a live coach's tap gets 42501 and the app's
+> existing rollback + toast handles it). The full walked gate is in `docs/plans/GRADING_ADMIN_ONLY_PLAN.md` §7.
+
+**Then: Piece 5 — email-confirmation copy** (S) — a branded template following `supabase/templates/recovery.html`;
 **do NOT switch email confirmation ON** (it stranded web parents once — assert `enable_confirmations = false`
 stays, in `config.toml` AND the hosted project). Apps/config only. After it the S-pool is exhausted; other
-parked items live in `BACKLOG.md`.
+parked items live in `BACKLOG.md` — including the new **admin sidebar breakpoint** (S, §7.222), which is worth
+doing soon *because* Assessment is meant to be used on a phone.
 
-**No migration is HELD or in flight.** Latest applied is `20260828000100` (swim-skill grading, §8.92),
-on prod, 0 pending. Piece 5 authors none.
+**One migration is IN FLIGHT and unapplied to prod:** `20260829000100` (grading admin-only, §8.93), with a
+rehearsed DOWN in `supabase/rollback/`. Latest applied on prod is still `20260828000100`. Piece 5 authors none.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers
@@ -498,16 +511,15 @@ on prod, 0 pending. Piece 5 authors none.
   — byte-identical driver, identical failure, suspect exonerated in one run.
 
 **Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending. (Migration state
-is stated once above under *THE NEXT BUILD*: latest `20260827000100`, 0 pending.) **§11.44 is the freshest worked
+is stated once above under *THE NEXT BUILD*.) **§11.44 is the freshest worked
 example** — a same-signature `CREATE OR REPLACE` (no grant dump, §11.32) FIRST, apps to `main` LAST, verified by
-grepping the served bundle (§7.31). **§43 is the freshest CONTRACT half** — a one-way column DROP with no grant
+grepping the served bundle (§7.31). **§11.43 is the freshest CONTRACT half** — a one-way column DROP with no grant
 dump and no app deploy. **§11.42 is the freshest FULL sequence done IN ORDER** — a new table
 + a DROP+CREATE function signature needing a remote grant dump → GATE → apps to `main` LAST, proving the new
-auth-gated route by 200-vs-404 (§8.64's technique for §11.25's gap), with a committed rehearsed DOWN. §11.40/§11.39/§11.37 are earlier full-sequence examples; **§11.38 records
-the §11.9 ordering mistake recurring** (recovered by reverting the app files only, landing the backend,
-re-applying apps last). §11.36 is the same-signature contrast (no grant dump needed, §11.32 pattern). §11.39/§11.37 are earlier full-sequence examples; **§11.38 records
-the §11.9 ordering mistake recurring** (recovered by reverting the app files only, landing the backend,
-re-applying apps last). §11.36 is the same-signature contrast (no grant dump needed, §11.32 pattern).
+auth-gated route by 200-vs-404 (§8.64's technique for §11.25's gap), with a committed rehearsed DOWN.
+§11.40/§11.39/§11.37 are earlier full-sequence examples; **§11.38 records the §11.9 ordering mistake recurring**
+(recovered by reverting the app files only, landing the backend, re-applying apps last). §11.36 is the
+same-signature contrast (no grant dump needed, §11.32 pattern).
 **§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
 **expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract
 migration LAST (held back by a `.hold` rename until the apps stopped reading the dropped columns);

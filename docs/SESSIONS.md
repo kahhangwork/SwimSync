@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.91** | 2026-08-28 | Wave C S-pool 1–3: scoped DB search, family-search pushdown, move-student RPC (fixed a LIVE prod bug), `20260827000100` | §7.216–§7.218 · PRD §4.4/§14 |
 | **8.90** | 2026-08-27 | 3 nightly UI drivers repaired, no product regression: cancel-lesson "Sep"/"Sept" ICU trap, class-edit location dropdown, platform page-count pin 22→24; driver-only `be34398` | §7.215 |
 | **8.89** | 2026-08-24 | Location entity CONTRACT: dropped free-text `location_name`/`location_address` on prod (one-way), `location_id` NOT NULL, sync trigger dropped, `disable_coach` redefined same-migration; `20260824000200` | §7.211 · §7.214 · PRD §7.24 · DEPLOYMENT §43 |
 | **8.88** | 2026-08-24 | Location entity EXPAND: free-text class location → per-tenant `locations` entity (FK, admin CRUD, filters, parent address view); `20260824000100` | §7.211–§7.213 · PRD §7.24 · DEPLOYMENT §11.42 · plans/LOCATION_ENTITY_PLAN.md |

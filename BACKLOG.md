@@ -1,8 +1,10 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-28 — **Wave C S-pool Piece 4 SHIPPED** (`docs/plans/WAVE_C_SPOOL_PLAN.md`,
-migration `20260828000100`, PRD §7.15): per-child swim-skill grading — coach grades, parent watches,
-admin edits the per-tenant scale. Pieces 1–3 shipped earlier the same day. **Remaining pick-now: Piece 5
+_Last updated: 2026-08-29 — **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
+suites green, **not yet deployed** (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD
+§7.15). Struck from the pick-now list. **One new item added, found by its driver:** the admin sidebar
+has no breakpoint, so every admin page is unusable on a phone (§7.222) — which now matters, because
+Assessment is the first admin surface meant for poolside use. **Remaining pick-now: Piece 5
 (email-confirmation copy, S) — the last S-pool item.**_
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
@@ -436,34 +438,34 @@ No rework edges between these — a **value/effort** ranking the user chose. **P
 on 2026-08-28**: swim-skill grading, migration `20260828000100`). All struck in their sections below.
 The pick-now list now:
 
-1. **Make swim-skill grading ADMIN-ONLY — move it off the coach app** (M) — the user's call
-   (2026-08-28), the session AFTER Piece 4 shipped. Today (Piece 4, `20260828000100`, PRD §7.15) a
-   coach who serves a child grades them; the user wants **only tenant admins** to grade. Grading
-   currently lives ONLY in the coach app, so this is not a one-line policy flip — it moves the whole
-   surface. **Why:** grading is an administrative record the business owner controls, not a per-coach
-   act; the coach app should stay attendance-only. **Notes — the change set, already scoped:**
-   - **Migration** (new file, one in flight §7.55): `DROP POLICY student_skill_progress_write; CREATE
-     POLICY … FOR ALL USING/WITH CHECK (can_admin_tenant(tenant_id))` — drop the `coach_serves_student`
-     predicate. **No grant change** (policy narrowing only, same grants — §11.32, no grant dump).
-     Update the `COMMENT ON TABLE student_skill_progress` (it says "coach who serves the child (or an
-     admin)"). The SELECT policy can stay as-is (staff read is harmless; no coach UI reads it after this).
-   - **pgTAP** (`skill_progress.test.sql`): flip the writer from the coach to the admin in the
-     grade/upsert/cross-tenant blocks (graded_by becomes the admin's id), and change the coach test to
-     **a coach who SERVES the child is now REFUSED (42501)** — that assertion is the §7.25 RED proof
-     against today's deployed policy (a serving coach currently succeeds). Parent-read-only unchanged.
-   - **Coach app** — DELETE `app/(coach)/classes/[id]/grade.tsx` and REVERT the roster "Grade" button
-     (`app/(coach)/classes/[id]/roster.tsx`, the `bg-sky-50` Pressable added by Piece 4). Coaches keep
-     the read-only "What <level> covers" expansion they always had.
-   - **Admin app** — ADD grading. Home: the Students page per-row **Actions drawer** (`app/(admin)/
-     students/page.tsx` already has `drawerFor` and sets `level_id` inline) → a "Grade skills" modal.
-     Port the tap-to-cycle logic; dual-home `lib/skillProgress.ts` into `SwimSyncAdmin/lib` (byte-
-     identical twin like `studentStatus.ts`/`packageCoverage.ts`, §6) + its jest→vitest test. The pure
-     helpers (`summariseSkillProgress`, `cycleGrade`) are unchanged.
-   - **Parent app** — UNCHANGED (still shows grades read-only on the child profile).
-   - **Deploy** — migration → apps, via `/deploy` (§7.60). Grading is DORMANT on prod (no child graded
-     yet, HANDOVER §3), so no data migration is needed — the policy flip strands nothing.
+1. ~~**Make swim-skill grading ADMIN-ONLY**~~ — **BUILT 2026-08-29, NOT YET DEPLOYED**
+   (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD §7.15). It grew well past the
+   scope sketched here: the user asked for an **Assessment tab** built for an assessment DAY, so the
+   change is a whole new admin surface, not a drawer modal. Shipped: the write policy narrowed to
+   `can_admin_tenant`, the coach screen made read-only, `/assessment` (index + per-class grid grouped
+   by level, cycle + paint entry, inline level promotion), the Students-drawer one-off, and
+   `verify-assessment.mjs` (27 checks, mobile viewport). **Deploy via `/deploy` when ready** —
+   migration to prod FIRST, and the RISK-8 gate (`SELECT count(*) FROM student_skill_progress` on
+   prod must return 0) is unrun.
 2. **Email-confirmation copy** (S, Piece 5) — a branded confirmation template; **do NOT switch email
    confirmation ON** (it stranded web parents once). Full item below.
+3. **The admin sidebar has no breakpoint — every admin page is unusable on a phone** — **S**
+   `[found by verify-assessment.mjs, 2026-08-29]`
+   `components/Sidebar.tsx` is a hard `w-64` (256px) at every width, and `app/(admin)/layout.tsx`
+   adds `p-8`, so at 390px portrait a page gets ~70px of content. Give the sidebar a breakpoint —
+   collapsed behind a hamburger below `md`, unchanged above it.
+
+   **Why:** it did not matter while the admin panel was a desktop tool, and it matters now. The
+   **Assessment** tab (PRD §7.15) is the first admin surface meant to be used standing at a pool,
+   and production's one real assessor is a private coach who lost their phone-based grading screen
+   when grading moved off the coach app. Usable in landscape and on a tablet; cramped in portrait.
+
+   **Notes:** found by `verify-assessment.mjs`, which runs at 390×844 deliberately — and note that
+   **no horizontal-overflow assertion catches this**: the page does not scroll sideways, the content
+   is simply squeezed, so the check passes while the screen is unusable. A page-level fix is the
+   wrong shape; the sidebar is the thing that needs the breakpoint, and fixing it there fixes every
+   admin page at once. Deliberately NOT bundled into the grading release — it changes every admin
+   page and would have ridden along unreviewed. §7.222.
 
 > **/plan-review 2026-08-27:** every pool item's body carries inline `⚠ RISK n MITIGATION`
 > steps. **The sequenced plan — two-pass reviewed and fact-checked against code — is

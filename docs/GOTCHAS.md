@@ -3410,3 +3410,47 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     ROLE (bypassing RLS), never trigger firing. Fix: clear the cross-tenant FK in the SAME update (the old tenant's
     vocabulary is meaningless at the new one). Whenever an RPC moves a row across the tenant boundary, null every
     cross-tenant FK it carries. (2026-08-28, §8.91.)
+
+219. **A completeness count over an EMPTY list is vacuously COMPLETE — `done === total` is true at `0 === 0`, and it
+    reports "finished" for exactly the records nobody can act on.** The Assessment tab (§8.93) tells an assessor which
+    children are still to grade. A child with no level, or on a level with no skills yet, has zero gradeable skills —
+    so the natural `freshCount === total` marked them **fully assessed** and sent the assessor straight past them,
+    inside the tool built to stop children being skipped. The twin is worse: "every skill is at the top grade" is also
+    vacuously true over `[]`, so the same child was offered a **promotion out of a level they are not in**. Both are
+    now explicit refusals (`!noSkills && …`), the empty case is rendered as its OWN state ("Needs a level") rather
+    than folded into done or outstanding, and vitest pins both — RED-proven against the obvious implementation.
+    **The general rule: before writing `done === total`, ask what the predicate means when the list is empty**, and
+    make the empty case a distinguishable third answer rather than a silent yes. Cousin of §7.100 (a driver that
+    skips itself on a date condition and reports PASS). (2026-08-29, §8.93.)
+
+220. **A `NOW()`-stamping trigger cannot be tested for "the timestamp advanced" inside a pgTAP transaction — and the
+    naive test passes against the unfixed code.** `NOW()` is the TRANSACTION timestamp and the whole suite runs in one
+    `BEGIN…ROLLBACK` (§7.16), so a row inserted and then re-written in the same test both read `NOW()`: comparing them
+    can never observe an advance, and the assertion is green with or without the fix. Backdating the fixture with a
+    plain `UPDATE` does not rescue it either — the very trigger under test clobbers the backdate on the way in. The
+    only way to make the RED proof observable is to plant the old timestamp under a disabled trigger:
+    `ALTER TABLE … DISABLE TRIGGER <name>; UPDATE … SET graded_at = NOW() - interval '90 days'; ALTER TABLE … ENABLE
+    TRIGGER <name>;`. Worked examples: `skill_progress.test.sql`, `student_merge.test.sql`, and
+    `drivers/fixtures-assessment.sql` (which needs the same trick, for the same reason, to seed a stale row).
+    **Corollary:** once a trigger stamps on every non-exempt write, a future `service_role` backfill correcting that
+    column will be clobbered too — such a fix must `DISABLE TRIGGER` as well, which is recorded in the migration's own
+    comment because nothing structural can enforce it. (2026-08-29, §8.93.)
+
+221. **An `ON CONFLICT DO UPDATE` array upsert REFUSES THE WHOLE STATEMENT if the array names one conflict key twice**
+    ("cannot affect row a second time"), so batching an optimistic UI's gesture must DEDUPE before it sends. The
+    Assessment grid's paint mode collects a stroke and flushes it as a single request; a finger crossing one cell
+    twice — routine — would otherwise fail every cell in the stroke while the screen already showed them all painted.
+    Two consequences worth carrying: **(a)** the failure is atomic, so a failed batch must restore the WHOLE-stroke
+    snapshot and refetch, never just the last cell — local state is no longer evidence of what the server holds;
+    **(b)** a "clear" action is a DELETE, not an upsert, so it cannot ride in the batch at all — the Assessment grid
+    therefore has a named prohibition that **paint mode never paints "not set"**, because a half-succeeding
+    upsert+delete pair is worse than a second click. (2026-08-29, §8.93.)
+
+222. **The admin panel's sidebar is a hard `w-64` with no breakpoint, so EVERY admin page has ~70px of content at
+    390px portrait.** Found by `verify-assessment.mjs`, which runs at a phone viewport deliberately. It is
+    pre-existing and panel-wide (`components/Sidebar.tsx`, `app/(admin)/layout.tsx`'s `p-8`), not a property of any
+    one page, and no horizontal-overflow assertion catches it — the page does not scroll sideways, the content is
+    simply squeezed. It matters now because the Assessment tab is the first admin surface intended for phone use
+    poolside (grading left the mobile app in §8.93). Usable in landscape and on a tablet; cramped in portrait.
+    **A page-level fix is the wrong shape** — the sidebar is the thing that needs a breakpoint. Filed in `BACKLOG.md`.
+    (2026-08-29, §8.93.)

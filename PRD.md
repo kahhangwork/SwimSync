@@ -1872,31 +1872,36 @@ that way and orders them; any progression rule lives in the level's **note**, in
 business's own words. Imposing a tier-and-progression model would force every other
 tenant into one school's shape.
 
-#### Grading a child's skills *(implemented 2026-08-28)*
+#### Grading a child's skills *(implemented 2026-08-28; became admin-only 2026-08-29)*
 
 The list above describes what a level teaches; **grading** records how far a child has got
-with it. A coach opens a child on the roster, taps **Grade**, and gives each of the level's
-skills a grade — so the coach sees "Ethan: 4 of 6 at Mastered" and the parent watches
-progress accumulate on the child's profile.
+with it — so the parent watches progress accumulate on the child's profile and the business
+can answer "is this child ready to move up?".
 
 **Graded, on the business's own scale.** Grades are not a bare passed/not-passed tick but a
 per-business **grade scale** — seeded *Developing / Competent / Mastered*, and the admin
 renames the labels or adds rungs on the Levels page. A skill counts as **done** when it
 holds the **top** grade — and "done" is computed, never stored, so adding a higher grade
-re-opens every skill that was done at the old top. Tapping a skill cycles it through the
-scale and back to ungraded, so a mistap is always recoverable.
+re-opens every skill that was done at the old top.
 
 **Who does what:**
 
 | | |
 |---|---|
 | Edits the grade scale | The business's **admin** (Levels page) |
-| Grades a child's skills | The child's **coach** (any child on a roster of theirs), or the **admin** |
-| Sees the grades | The child's **coach**, their **parent** (read-only), and the **admin** |
+| Grades a child's skills | The business's **admin**, and nobody else |
+| Sees the grades | The child's **coach** (roster → *Skills*, read-only), their **parent** (read-only), and the **admin** |
 
-The coach's write path is **narrow**: a dedicated `student_skill_progress` table, never a
-widening of their access to the student record — grading a child must not become a way to
-edit their name or date of birth (the §7.15 reasoning, now load-bearing rather than
+**Grading is an administrative record, not a per-coach act** *(2026-08-29)*. It shipped in
+the coach app and moved a day later, at the business owner's decision: a grade determines
+whether a child moves up a level, which the business owns. The coach app keeps the
+read-only view — a coach mid-lesson still wants to know where a child is — and the
+restriction is enforced in the **database**, not merely by hiding the UI, so "admin-only"
+is a guarantee rather than a convention.
+
+The write path is **narrow**: a dedicated `student_skill_progress` table, never a widening
+of anyone's access to the student record — grading a child must not become a way to edit
+their name or date of birth (the §7.15 reasoning, now load-bearing rather than
 hypothetical). A grade may only reference the child's **own** business's skills and grades,
 enforced in the database.
 
@@ -1904,6 +1909,40 @@ enforced in the database.
 deletes what they earned; the screens simply show the current level's skills. For the same
 reason, a skill or grade a child has been graded against **cannot be deleted** (the Levels
 page says so plainly) — tidying the curriculum must not erase a child's history.
+
+#### Assessment day — the Assessment tab *(implemented 2026-08-29)*
+
+Grading in practice is not a daily chore but a **periodic event**: every few months an
+admin tours every class and grades each child. The **Assessment** tab is built for that
+tour. It lists the active classes — today's first — with what is still outstanding in each,
+and opens each one as a grid: a row per child, a column per skill.
+
+**A class has no level of its own,** because a level belongs to a *child*; so a real roster
+is ragged, and the grid is a stack of per-level tables rather than one wide matrix.
+Children with no level yet appear in their own group and are counted **separately** from
+both done and outstanding — they are work for whoever sets levels, not for the assessor.
+
+**"Assessing since" is the round.** This is the feature's whole reason for existing: a
+child graded *Competent* in June looks exactly like one graded *Competent* this morning, so
+an assessor reading a full row skips them. Grades older than the round's start date are
+therefore shown **greyed and dated**, and count zero toward the round. The date defaults to
+today, is editable for a tour that spans days, and follows the assessor from class to
+class. Deliberately **not** a stored "assessment round" record — the date the assessor sets
+is the round, and a second entity would add a mode to open and close for no gain.
+
+**Entering grades.** Clicking a grade cycles it (ungraded → lowest → … → top → ungraded),
+so a mistap is always recoverable. For a run of children earning the same grade there is
+**paint**: arm a grade once, then click. Changes save immediately — there is no Save button
+and nothing to lose by closing the tab.
+
+**Moving a child up.** When every skill of a child's level is at the top grade **and every
+one of those grades is from this round**, the grid offers *Move up to <next level>*. The
+freshness condition is deliberate: promoting off months-old grades would move a child
+nobody has looked at today. A child promoted mid-tour is marked *Promoted this round* so
+they are not mistaken for one still to assess.
+
+A single child can also be graded from the **Students** page's Actions drawer — the same
+grid, for the one-off correction rather than the tour.
 
 *(This replaces the original fixed beginner/intermediate/advanced field, which was never
 populated: parents stopped choosing an ability in §5.1, and nothing else ever wrote it.

@@ -347,30 +347,60 @@ picked up automatically.
 
 ---
 
-## 7. Pre-commit gate
+## 7. Pre-commit gate — WALKED 2026-08-29
 
-A box that cannot be ticked is a **blocker, not a caveat**. The two highest-value boxes are the
-first two.
+A box that cannot be ticked is a **blocker, not a caveat**. All local boxes are ticked; the two
+remaining are the deploy, which is the user's call.
 
-- [ ] **RISK 1** — `roundProgress()` counts a `total === 0` child as NOT assessed, and
-      `canPromote()` returns false for one. Both proven RED against a naive `fresh === total`.
-- [ ] **RISK 3** — the `graded_at` tests use the `DISABLE TRIGGER` backdate fixture, and the
-      re-confirm assertion is proven RED against the old trigger body.
-- [ ] **RISK 2** — index and grid both take `?since`; one `isFreshGrade` call serves both,
-      pinned by a vitest case.
-- [ ] **RISK 4** — `dedupeStroke()` tested on a double-crossed cell; stroke errors restore the
-      whole-stroke snapshot **and** refetch; Paint mode cannot paint "not set".
-- [ ] **RISK 5** — the trigger uses the contrapositive form; the `DISABLE TRIGGER` prohibition
-      is written into the migration comment.
-- [ ] **RISK 6** — `verify-assessment.mjs` passes at 390×844 including a tap and a paint.
-- [ ] **RISK 7** — a just-promoted child reads "promoted this round"; `canPromote()` requires
-      fresh top-rank grades.
-- [ ] **RISK 8** — `SELECT count(*) FROM student_skill_progress` on prod returned **0** before
-      `db push`; `student_merge.test.sql` asserts `moved_skill_progress` and preserved
-      `graded_by`.
-- [ ] New tests proven RED without the fix (§7.25) · `supabase test db` green · both typechecks clean
+- [x] **RISK 1** — `roundProgress()` counts a `total === 0` child as NOT assessed, and
+      `canPromote()` returns false for one. **RED-proven**: reverting to `freshCount === total`
+      and `every(c => c.done)` fails 6 assertions. Graduated to **§7.219**.
+- [x] **RISK 3** — the `graded_at` tests use the `DISABLE TRIGGER` backdate fixture, and the
+      re-confirm assertion is **RED against the old trigger body** (verified by applying the DOWN
+      file: tests 13, 27, 28 redden, then the UP re-applied). Graduated to **§7.220**.
+- [x] **RISK 2** — index and grid both take `?since`; one `isFreshGrade` call serves both.
+      `verify-assessment.mjs` asserts the date survives the navigation.
+- [x] **RISK 4** — `dedupeStroke()` tested on a double-crossed cell; stroke errors restore the
+      whole-stroke snapshot **and** refetch; paint cannot paint "not set". Graduated to **§7.221**.
+- [x] **RISK 5** — the trigger uses the contrapositive form; the `DISABLE TRIGGER` prohibition is
+      in the migration comment. pgTAP pins that a bare repoint still preserves `graded_by`.
+- [x] **RISK 6** — `verify-assessment.mjs` passes 27/27 at 390×844 including a tap and a paint.
+      **It caught a real bug on its first run**: the sticky name column overlaid the first grade
+      cell, making the first skill of every row untappable on a phone. Sticky now starts at `sm`.
+      A second, panel-wide finding is filed rather than fixed here — **§7.222**, the `w-64`
+      sidebar; see §9 below.
+- [x] **RISK 7** — a just-promoted child reads "Promoted this round"; `canPromote()` requires
+      fresh top-rank grades. The driver's sharpest check proves it: re-confirming the stale
+      child's *existing* grades takes the row from 0/2-no-promotion to 2/2-with-promotion, so
+      only `graded_at` changed.
+- [x] **RISK 8 (test half)** — `student_merge.test.sql` asserts `moved_skill_progress` **and**
+      preserved `graded_by`/`graded_at` over a real merge.
+- [x] New tests proven RED without the fix (§7.25) · pgTAP **1488** green · admin vitest **620** ·
+      app jest **420** · both typechecks clean · `next build` clean · fixture roundtrip **26/26**
+- [ ] **RISK 8 (prod half)** — `SELECT count(*) FROM student_skill_progress` on prod returns **0**
+      before `db push`. **Not yet run — this is the gate on the migration.**
 - [ ] `/deploy` run: migration to prod FIRST, `migration list --linked` read, apps to `main` LAST,
       served-bundle grep for `Assessing since`
+
+## 8. What was built, as landed
+
+Three commits on `db/grading-admin-only`, deliberately split so the migration can reach prod
+before the apps reach `main` (§7.60):
+
+| Commit | What |
+|---|---|
+| `5c79e43` | Migration + rollback + pgTAP (admin-only policy, `graded_at` fix, merge assertions) |
+| `1d9c2ea` | Coach app: the skills screen becomes read-only, button renamed Grade → Skills |
+| `adf2e6d` | Admin: `/assessment` index + grid, `AssessmentGrid`, `assessment.ts`, the Students drawer, `verify-assessment.mjs` + fixtures |
+
+## 9. Open, and deliberately not decided here
+
+**The admin sidebar is `w-64` at every width (§7.222).** At 390px portrait that leaves ~70px of
+content, so the Assessment grid — the first admin surface meant for a phone — is cramped, though
+it is fine in landscape and on a tablet. This is **pre-existing and panel-wide**, not a property
+of this feature: fixing it means giving `components/Sidebar.tsx` a breakpoint and a hamburger,
+which changes every admin page and would be an unreviewed change riding along in a grading
+release. Filed in `BACKLOG.md` as its own item.
 
 ---
 
