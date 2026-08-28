@@ -1,11 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED + DEPLOYED** (§8.91, commits `828368c`+`a638983`,
-on main): **scoped DB search** on the high-traffic admin tables (Students/Invoices/Credit Notes/Attendance), the
-platform **family-search pushdown**, and the **move-student RPC's two loose ends** — which also fixed a LIVE prod
-bug for levelled students (migration `20260827000100`). Verified live via served-bundle grep. Pieces 4–5 remain._
+_Last updated: 2026-08-28 — **Wave C S-pool Piece 4 SHIPPED + DEPLOYED** (§8.92, commit `d0fb3b0`, on main):
+per-child **swim-skill grading** — coaches grade each child against their level's skills on a per-tenant scale,
+parents watch progress, admins edit the scale (migration `20260828000100`, PRD §7.15, DEPLOYMENT §11.45).
+Verified live via served-bundle grep (`Tap to grade`). **Only Piece 5 (email copy, S) remains of the S-pool.**_
 
-_Previously, 2026-08-27 (§8.90) — 3 nightly UI drivers repaired, no product regression (the §7.215 "Sep"/"Sept" ICU trap)._
+_Previously, 2026-08-28 (§8.91) — Wave C Pieces 1–3: scoped DB search, family-search pushdown, and the
+move-student RPC's two loose ends (which fixed a LIVE prod bug for levelled students, `20260827000100`)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -208,6 +209,10 @@ first-firing trigger is what to watch for.
 - **Scoped search past the 1000-row cap (§8.91)** — every table is under the cap on prod, so the DB pushdown,
   the `!inner` narrowing (§7.216) and the cap banners are all unexercised at scale; correct today by coincidence
   of size. First firing: any admin table crosses ~1000 rows.
+- **Swim-skill grading (§8.92, `20260828000100`, PRD §7.15)** — LIVE on prod but **no child graded yet**: the
+  coach-write path, the cross-tenant + keep-records `RESTRICT` guards, and the `merge_students` skill-progress
+  move have never fired on real data (the scale is seeded, but every child is ungraded). First firing: the first
+  coach taps *Grade*. A rate-less solo coach still IS a coach here — grading needs no second coach to become real.
 
 ### Prohibitions — these live nowhere else
 
@@ -337,6 +342,25 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.92 (2026-08-28) — Wave C S-pool Piece 4: per-child swim-skill grading (SHIPPED + DEPLOYED)
+
+**Shipped + deployed the last building item of the S-pool** (`docs/plans/WAVE_C_SPOOL_PLAN.md`); PRD §7.15 +
+BACKLOG moved in the same push. All green: pgTAP 1478, app jest 420, admin vitest 565, both typecheck clean;
+migration on prod, grant dump clean, apps last (DEPLOYMENT §11.45). Migration `20260828000100`, commit `d0fb3b0`.
+
+- **What it does** — a coach grades each child against their level's skills (roster → *Grade* → tap-to-cycle);
+  the parent sees "n of m at <top grade>" + per-skill grades; the admin edits the per-tenant grade scale on the
+  Levels page. "Done" = the **top rank**, computed at read time (adding a higher grade re-opens a skill).
+- **Schema** — `skill_grade_levels` (seeded Developing/Competent/Mastered, backfill + trigger on `tenants`) and
+  `student_skill_progress` (`UNIQUE (student_id, skill_id)` upsert key; `skill_id`/`grade_level_id` `ON DELETE
+  RESTRICT` = keep-records made structural; `student_id` CASCADEs). A BEFORE trigger enforces cross-tenant
+  consistency and stamps `graded_by/graded_at` only when the grade changes (so a merge repoint preserves them).
+  Coach-write predicate is per-STUDENT (`coach_serves_student`), deliberately — reasoning in the migration.
+- **`merge_students` was taught to move the new rows** — its §7.46 cascade tripwire fired the moment the CASCADE
+  FK landed (the suite went red as designed); the teaching is folded into the same migration, DOWN rehearsed.
+- **Not done, deliberately** — Piece 5 (email-confirmation copy, S) is the only S-pool item left. Grading is
+  **DORMANT on prod** (no child graded yet); exercise one grade to see its first firing.
+
 ## 8.91 (2026-08-28) — Wave C S-pool Pieces 1–3: scoped search, family-search pushdown, move-student loose ends
 
 **Shipped + deployed the first three S-pool items** (`docs/plans/WAVE_C_SPOOL_PLAN.md`); PRD §4.4/§14 + BACKLOG
@@ -360,24 +384,7 @@ moved in the same push. All green: pgTAP 1455, admin vitest 557, build clean; mi
 **Not done, deliberately:** Pieces 4 (swim skills, M — authors a migration) and 5 (email copy, S) remain (BACKLOG).
 The move tool is DORMANT on prod — its new arms have never fired; exercise one real move before they do.
 
-## 8.90 (2026-08-27) — Nightly UI drivers repaired: 3 stale assertions, no product regression
-
-**The `ui-drivers.yml` sweep was red 2026-08-24..27; triage found NO product bug** — three stale driver
-assertions, fixed and verified green against the real UI (commit `be34398`, on main; driver-only, `.claude/`).
-
-- **`cancel-lesson`** (15/17→17/17): the coach-app COMING UP day-header regex was built from Node's en-US short
-  month `"Sep"`, but the browser renders September `"Sept"` — anchored `Sep$` stopped matching the first nightly
-  whose `today+7` crossed into September (08-24), which merely *looked* like location-deploy fallout. Now
-  prefix-matches weekday+month. Full trap: **§7.215**.
-- **`class-edit`** (timeout→5/5): filled the removed free-text location field; §8.88 replaced it with a dropdown.
-  Now selects the location `<select>`.
-- **`platform-admin-scope`** (31/32→32/32): sidebar page-count pin 22→24 for Accounting (§8.87) + Locations
-  (§8.88); `adminNav.ts` is the source of truth. The §7.178 designed-to-redden pin, bumped three nights late again.
-
-`tenant-provisioning` failed only 08-26 (passed 08-24/08-25 on identical code) — a one-night `waitForTimeout`
-flake, left alone. No PRD/BACKLOG movement (no behaviour change). Reasoning graduated to **§7.215**.
-
-_(§8.89 demoted to a ledger row in `docs/SESSIONS.md` — location-entity CONTRACT phase.)_
+_(§8.90 demoted to a ledger row in `docs/SESSIONS.md` — nightly UI-driver repairs, no product change.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -420,13 +427,13 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-28:** the 08-24..27 driver reds were fixed 2026-08-27 (§8.90). This session (§8.91) changed
-ONE driver — `verify-level-skills`'s `/students` level-picker selector moved to `table select` because the new
-scoped-search toolbar `<select>` shifted its bare position index; verified locally + the fixture-roundtrip CI
-guard is green. **Watch the first scheduled sweep after this deploy** — if `verify-level-skills` reddens it is
-that selector, and if any *invoices/credit-notes/students/platform* driver reddens it is the scoped-search change.
-`tenant-provisioning` remains a known one-night `waitForTimeout` flake. **A manual `gh workflow run
-ui-drivers.yml` confirms green in ~1h20m without waiting.**
+**State on 2026-08-28:** the 08-24..27 driver reds were fixed 2026-08-27 (§8.90, now a SESSIONS row). Piece 4
+(§8.92) added a **"Grading scale"** button to the admin Levels page (next to *Add level*) — the levels drivers
+(`verify-levels`, `verify-levels-table`, `verify-level-skills`) select buttons by **accessible name**, so the
+additive button should not shift them; NO driver was changed this session. **Watch the first scheduled sweep
+after this deploy** — a levels-driver red is the likeliest surprise and would be that button. `tenant-provisioning`
+remains a known one-night `waitForTimeout` flake. **A manual `gh workflow run ui-drivers.yml` confirms green in
+~1h20m without waiting** — no local UI-driver run was done this session (name-based selectors judged safe).
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -442,21 +449,19 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — two S-pool items left, no edges
+### THE NEXT BUILD — one S-pool item left
 
-**Wave C S-pool Pieces 1–3 shipped this session (§8.91).** What remains of `docs/plans/WAVE_C_SPOOL_PLAN.md`:
-- **Piece 4 — tick-off swim skills** (M): a coach grades a child against a level's skills; graded, per-tenant
-  scale, top-grade = done, records kept on level change (decisions settled in the plan). **AUTHORS A MIGRATION**
-  (`student_skill_progress` + a cross-tenant-consistency trigger like §7.218/§7.216's shape) — so it is the next
-  thing that touches the schema; one in flight only (§7.55). No widening of `students_update`.
-- **Piece 5 — email-confirmation copy** (S): a branded template; **do NOT switch email confirmation ON** (it
-  stranded web parents once). Apps/config only.
+**Wave C S-pool Pieces 1–4 all shipped (Pieces 1–3 §8.91, Piece 4 §8.92).** What remains of
+`docs/plans/WAVE_C_SPOOL_PLAN.md`:
+- **Piece 5 — email-confirmation copy** (S): a branded template following `supabase/templates/recovery.html`;
+  **do NOT switch email confirmation ON** (it stranded web parents once — assert `enable_confirmations = false`
+  stays, in `config.toml` AND the hosted project). Apps/config only — no migration, no engine.
 
-No edges between them — pick by value. Other parked items (Split co-admin permissions; settled ACCRUAL/MANUAL/
+After Piece 5 the S-pool is exhausted. Other parked items (Split co-admin permissions; settled ACCRUAL/MANUAL/
 multi-language decisions; Maps → *Later*) live in `BACKLOG.md`.
 
-**No migration is HELD or in flight.** Latest applied is `20260827000100` (reassign-student loose ends, §8.91),
-on prod, 0 pending.
+**No migration is HELD or in flight.** Latest applied is `20260828000100` (swim-skill grading, §8.92),
+on prod, 0 pending. Piece 5 authors none.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

@@ -885,3 +885,18 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     holds NUL bytes that truncate a bash `$( )` capture). CI green. **Rollback:** committed DOWN restores the prior
     RPC body (`supabase/rollback/20260827000100_..._DOWN.sql`) — but re-introduces the levelled-student bug, so only
     for the membership logic. **Dormant on prod:** no cross-business move has fired the new arms yet (§8.91).
+
+45. **Deploy record (2026-08-28): Wave C Piece 4 — swim-skill grading — migration FIRST (grant dump), apps LAST.**
+    (Wave C S-pool, `docs/plans/WAVE_C_SPOOL_PLAN.md`; §8.92.) Backend: `20260828000100_swim_skill_progress.sql` —
+    NEW tables `skill_grade_levels` + `student_skill_progress` (RLS + grants + a cross-tenant trigger + a seed
+    trigger on `tenants`) and a **DROP+CREATE** of `merge_students` (its cascade tripwire fired — the new CASCADE FK;
+    §7.46 shape). Apps: coach grade screen + parent grades + admin scale editor. Sequence: (1) `supabase db push` —
+    `20260828000100` remote filled, **0 pending** (pgdelta cert trace alongside `Finished`, harmless, §7.30). (2)
+    **Grant dump TAKEN** — new objects/privileges, so `supabase db dump --linked` (§7.39/§11.7): no `anon` anywhere,
+    both tables `authenticated`+`service_role`, `merge_students`→`authenticated`, the two trigger functions `REVOKE
+    ALL FROM PUBLIC` with no client grant (correct — triggers fire as owner). (3) **Apps to `main` LAST** — `git push
+    …:main` (fast-forward `9f38416..d0fb3b0`), Vercel rebuilt both. **Verified the deploy CARRIES the change** (§7.31):
+    the served `swimsync.sg` app bundle has `Tap to grade` (found attempt 1 — Vercel build beat the poll). CI green.
+    **Rollback:** committed + **rehearsed** DOWN (`supabase/rollback/20260828000100_..._DOWN.sql`, UP→DOWN→`student_
+    merge` 20/20 on the restored body→UP), restores the prior `merge_students` body; dropping the tables discards
+    grades, which is the correct meaning of rolling this back. **Dormant on prod:** no child graded yet (§8.92).
