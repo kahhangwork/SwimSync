@@ -24,7 +24,7 @@
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(20);
+SELECT plan(23);
 
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('4e211111-0000-0000-0000-000000000001','merge-a','MERGE Business A','SWIM-MRGA'),
@@ -124,6 +124,38 @@ VALUES ('4e211111-0000-0000-0000-000000000001','4e299999-0000-0000-0000-00000000
 INSERT INTO student_settlements (tenant_id, student_id, settled_through, kind, amount, recorded_by)
 VALUES ('4e211111-0000-0000-0000-000000000001','4e299999-0000-0000-0000-000000000002',
         '2026-07-31','paid_outside', 40.00,'4e200000-0000-0000-0000-0000000000a1');
+
+-- ── A FOURTH cascading attachment: the duplicate's earned skill grade ───────
+-- student_skill_progress (20260828000100) CASCADES from students, so it is
+-- exactly the shape this file exists to protect: a row that would vanish
+-- silently on a naive delete. The merge was taught to move it in the same
+-- migration; nothing here asserted that until 20260829000100, which is the gap
+-- this fixture closes — the trigger-shaped emulation in skill_progress.test.sql
+-- proves the STAMP rule, and this proves the MERGE actually honours it.
+INSERT INTO tenant_levels (id, tenant_id, label, sort_order) VALUES
+  ('4e2aaaa0-0000-0000-0000-000000000001','4e211111-0000-0000-0000-000000000001','MERGE Level 1', 1);
+
+INSERT INTO tenant_level_skills (id, level_id, label, sort_order) VALUES
+  ('4e2bbbb0-0000-0000-0000-000000000001','4e2aaaa0-0000-0000-0000-000000000001','MERGE Skill One', 1);
+
+INSERT INTO student_skill_progress (tenant_id, student_id, skill_id, grade_level_id)
+VALUES ('4e211111-0000-0000-0000-000000000001','4e299999-0000-0000-0000-000000000002',
+        '4e2bbbb0-0000-0000-0000-000000000001',
+        (SELECT id FROM skill_grade_levels
+          WHERE tenant_id='4e211111-0000-0000-0000-000000000001' AND rank=2));
+
+-- Backdate and attribute it to the COACH, under a disabled trigger — the same
+-- technique skill_progress.test.sql uses, and for the same reason: NOW() is the
+-- transaction timestamp, so a stamp that survived and one that was rewritten
+-- are indistinguishable unless the original is planted in the past. Attributing
+-- it to the coach (not the admin who runs the merge) is what makes the
+-- preservation assertion able to fail.
+ALTER TABLE student_skill_progress DISABLE TRIGGER trg_skill_progress_tenant;
+UPDATE student_skill_progress
+   SET graded_at = NOW() - interval '90 days',
+       graded_by = '4e200000-0000-0000-0000-0000000000c1'
+ WHERE student_id = '4e299999-0000-0000-0000-000000000002';
+ALTER TABLE student_skill_progress ENABLE TRIGGER trg_skill_progress_tenant;
 
 -- An invoice covering the "invoiced duplicate".
 INSERT INTO invoices (id, parent_id, billing_month, gross_amount, credit_applied, net_amount, tenant_id)
@@ -249,10 +281,11 @@ SET LOCAL ROLE authenticated;
 
 -- ══ The merge itself ══════════════════════════════════════════════════════
 SELECT is(
-  (SELECT (moved_parent_links, moved_trial_bookings, moved_settlements)
+  (SELECT (moved_parent_links, moved_trial_bookings, moved_settlements, moved_skill_progress)
      FROM merge_students('4e299999-0000-0000-0000-000000000001',
                          '4e299999-0000-0000-0000-000000000002')),
-  (1, 1, 1), 'the merge reports moving the link, the booking and the settlement');
+  (1, 1, 1, 1),
+  'the merge reports moving the link, the booking, the settlement and the skill grade');
 
 SELECT is(
   (SELECT count(*)::INT FROM parent_students
@@ -268,6 +301,27 @@ SELECT is(
   (SELECT count(*)::INT FROM student_settlements
     WHERE student_id = '4e299999-0000-0000-0000-000000000001'),
   1, 'the settlement moved to the survivor');
+
+-- ⚠ THE EARNED GRADE MOVED, AND KEPT ITS ATTRIBUTION. The move alone is not the
+-- contract: a merge that carried the row across but re-stamped it would report
+-- success while quietly rewriting who taught the child and when. The trigger's
+-- repoint exemption (20260829000100) is what prevents that, and these two
+-- assertions are what would fail if a future edit widened the stamp condition.
+SELECT is(
+  (SELECT count(*)::INT FROM student_skill_progress
+    WHERE student_id = '4e299999-0000-0000-0000-000000000001'),
+  1, 'the earned skill grade moved to the survivor');
+
+SELECT ok(
+  (SELECT graded_at < NOW() - interval '89 days' FROM student_skill_progress
+    WHERE student_id = '4e299999-0000-0000-0000-000000000001'),
+  '⚠ the merge PRESERVED graded_at — it did not re-stamp the record to merge time');
+
+SELECT is(
+  (SELECT graded_by FROM student_skill_progress
+    WHERE student_id = '4e299999-0000-0000-0000-000000000001'),
+  '4e200000-0000-0000-0000-0000000000c1'::uuid,
+  '⚠ the merge PRESERVED the original grader — not the admin who ran the merge');
 
 -- 15-16. ⚠ NOTHING WAS DESTROYED. The counts are global on purpose: a row that
 --        moved is still there, a row that cascaded is not.
