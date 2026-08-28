@@ -449,16 +449,19 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — one S-pool item left
+### THE NEXT BUILD — pick-now list is in `BACKLOG.md`
 
-**Wave C S-pool Pieces 1–4 all shipped (Pieces 1–3 §8.91, Piece 4 §8.92).** What remains of
-`docs/plans/WAVE_C_SPOOL_PLAN.md`:
-- **Piece 5 — email-confirmation copy** (S): a branded template following `supabase/templates/recovery.html`;
-  **do NOT switch email confirmation ON** (it stranded web parents once — assert `enable_confirmations = false`
-  stays, in `config.toml` AND the hosted project). Apps/config only — no migration, no engine.
+**Top pick (set 2026-08-28, the session after Piece 4 shipped): make swim-skill grading ADMIN-ONLY** (M) —
+the user wants only tenant admins to grade children, not coaches. It's not a one-line policy flip: grading
+lives only in the coach app today, so it moves the whole surface (narrow the write policy → drop the coach
+grade UI → add an admin grading surface on the Students Actions drawer). **Full scope, already worked out, is
+the FIRST item in `BACKLOG.md` → Current pick-now order** — don't re-derive it. Grading is DORMANT on prod, so
+the policy flip strands no data.
 
-After Piece 5 the S-pool is exhausted. Other parked items (Split co-admin permissions; settled ACCRUAL/MANUAL/
-multi-language decisions; Maps → *Later*) live in `BACKLOG.md`.
+Then: **Piece 5 — email-confirmation copy** (S) — a branded template following `supabase/templates/recovery.html`;
+**do NOT switch email confirmation ON** (it stranded web parents once — assert `enable_confirmations = false`
+stays, in `config.toml` AND the hosted project). Apps/config only. After it the S-pool is exhausted; other
+parked items live in `BACKLOG.md`.
 
 **No migration is HELD or in flight.** Latest applied is `20260828000100` (swim-skill grading, §8.92),
 on prod, 0 pending. Piece 5 authors none.

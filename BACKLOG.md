@@ -434,9 +434,35 @@ edge. The pass produced three durable findings, recorded so they are not re-deri
 No rework edges between these — a **value/effort** ranking the user chose. **Pieces 1–4 SHIPPED**
 (Pieces 1–3 on 2026-08-28: filtering/search, move-student loose ends, family-status scan; **Piece 4
 on 2026-08-28**: swim-skill grading, migration `20260828000100`). All struck in their sections below.
-What remains of `docs/plans/WAVE_C_SPOOL_PLAN.md`:
+The pick-now list now:
 
-1. **Email-confirmation copy** (S, Piece 5) — a branded confirmation template; **do NOT switch email
+1. **Make swim-skill grading ADMIN-ONLY — move it off the coach app** (M) — the user's call
+   (2026-08-28), the session AFTER Piece 4 shipped. Today (Piece 4, `20260828000100`, PRD §7.15) a
+   coach who serves a child grades them; the user wants **only tenant admins** to grade. Grading
+   currently lives ONLY in the coach app, so this is not a one-line policy flip — it moves the whole
+   surface. **Why:** grading is an administrative record the business owner controls, not a per-coach
+   act; the coach app should stay attendance-only. **Notes — the change set, already scoped:**
+   - **Migration** (new file, one in flight §7.55): `DROP POLICY student_skill_progress_write; CREATE
+     POLICY … FOR ALL USING/WITH CHECK (can_admin_tenant(tenant_id))` — drop the `coach_serves_student`
+     predicate. **No grant change** (policy narrowing only, same grants — §11.32, no grant dump).
+     Update the `COMMENT ON TABLE student_skill_progress` (it says "coach who serves the child (or an
+     admin)"). The SELECT policy can stay as-is (staff read is harmless; no coach UI reads it after this).
+   - **pgTAP** (`skill_progress.test.sql`): flip the writer from the coach to the admin in the
+     grade/upsert/cross-tenant blocks (graded_by becomes the admin's id), and change the coach test to
+     **a coach who SERVES the child is now REFUSED (42501)** — that assertion is the §7.25 RED proof
+     against today's deployed policy (a serving coach currently succeeds). Parent-read-only unchanged.
+   - **Coach app** — DELETE `app/(coach)/classes/[id]/grade.tsx` and REVERT the roster "Grade" button
+     (`app/(coach)/classes/[id]/roster.tsx`, the `bg-sky-50` Pressable added by Piece 4). Coaches keep
+     the read-only "What <level> covers" expansion they always had.
+   - **Admin app** — ADD grading. Home: the Students page per-row **Actions drawer** (`app/(admin)/
+     students/page.tsx` already has `drawerFor` and sets `level_id` inline) → a "Grade skills" modal.
+     Port the tap-to-cycle logic; dual-home `lib/skillProgress.ts` into `SwimSyncAdmin/lib` (byte-
+     identical twin like `studentStatus.ts`/`packageCoverage.ts`, §6) + its jest→vitest test. The pure
+     helpers (`summariseSkillProgress`, `cycleGrade`) are unchanged.
+   - **Parent app** — UNCHANGED (still shows grades read-only on the child profile).
+   - **Deploy** — migration → apps, via `/deploy` (§7.60). Grading is DORMANT on prod (no child graded
+     yet, HANDOVER §3), so no data migration is needed — the policy flip strands nothing.
+2. **Email-confirmation copy** (S, Piece 5) — a branded confirmation template; **do NOT switch email
    confirmation ON** (it stranded web parents once). Full item below.
 
 > **/plan-review 2026-08-27:** every pool item's body carries inline `⚠ RISK n MITIGATION`
