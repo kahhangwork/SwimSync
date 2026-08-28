@@ -22,6 +22,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { describeLevelRemoval } from "@/lib/studentCounts";
+import { nextRank, describeDeleteError, type GradeLevel } from "@/lib/skillScale";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 
@@ -60,13 +61,22 @@ export default function LevelsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Level | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [newSkill, setNewSkill] = useState("");
   const [skillBusy, setSkillBusy] = useState(false);
   const [skillError, setSkillError] = useState<string | null>(null);
 
+  // ── The tenant's grade scale (skill_grade_levels) ────────────────────────
+  const [gradeScale, setGradeScale] = useState<GradeLevel[]>([]);
+  const [scaleOpen, setScaleOpen] = useState(false);
+  const [newGrade, setNewGrade] = useState("");
+  const [scaleBusy, setScaleBusy] = useState(false);
+  const [scaleError, setScaleError] = useState<string | null>(null);
+
   useEffect(() => {
     load();
+    loadScale();
   }, []);
 
   async function load() {
@@ -180,14 +190,95 @@ export default function LevelsPage() {
 
   async function remove(l: Level) {
     setBusy(true);
+    setRemoveError(null);
     const { error: err } = await supabase.from("tenant_levels").delete().eq("id", l.id);
     setBusy(false);
-    setRemoving(null);
     if (err) {
-      setError("Could not remove that level.");
+      // Keep the dialog OPEN so the reason is visible — a level a child has
+      // been graded against is refused by the database (FK 23503), and that is
+      // the keep-records feature, not a fault.
+      setRemoveError(describeDeleteError(err, "level"));
       return;
     }
+    setRemoving(null);
     load();
+  }
+
+  // ── Grade scale (skill_grade_levels) ────────────────────────────────────────
+  async function loadScale() {
+    // RLS scopes this to the caller's own business.
+    const { data } = await supabase
+      .from("skill_grade_levels")
+      .select("id, rank, label")
+      .order("rank");
+    setGradeScale((data ?? []) as GradeLevel[]);
+  }
+
+  async function addGrade() {
+    const trimmed = newGrade.trim();
+    if (!trimmed) return;
+    setScaleBusy(true);
+    setScaleError(null);
+    const { error: err } = await supabase.from("skill_grade_levels").insert({
+      label: trimmed,
+      rank: nextRank(gradeScale),
+      // The caller's own business — RLS refuses any other value; this is what
+      // satisfies the WITH CHECK (same pattern as the level insert).
+      tenant_id: (
+        await supabase
+          .from("profiles")
+          .select("tenant_id")
+          .eq("id", (await supabase.auth.getUser()).data.user?.id)
+          .single()
+      ).data?.tenant_id,
+    });
+    setScaleBusy(false);
+    if (err) {
+      setScaleError(
+        err.code === "23505"
+          ? `You already have a grade called "${trimmed}".`
+          : "Could not add that grade."
+      );
+      return;
+    }
+    setNewGrade("");
+    loadScale();
+  }
+
+  async function renameGrade(g: GradeLevel, label: string) {
+    const trimmed = label.trim();
+    if (!trimmed || trimmed === g.label) return;
+    setScaleBusy(true);
+    setScaleError(null);
+    const { error: err } = await supabase
+      .from("skill_grade_levels")
+      .update({ label: trimmed })
+      .eq("id", g.id);
+    setScaleBusy(false);
+    if (err) {
+      setScaleError(
+        err.code === "23505"
+          ? `You already have a grade called "${trimmed}".`
+          : "Could not rename that grade."
+      );
+      return;
+    }
+    loadScale();
+  }
+
+  async function removeGrade(g: GradeLevel) {
+    setScaleBusy(true);
+    setScaleError(null);
+    const { error: err } = await supabase
+      .from("skill_grade_levels")
+      .delete()
+      .eq("id", g.id);
+    setScaleBusy(false);
+    if (err) {
+      setScaleError(describeDeleteError(err, "grade"));
+      return;
+    }
+    loadScale();
   }
 
   // ── Skills ────────────────────────────────────────────────────────────────
@@ -228,7 +319,9 @@ export default function LevelsPage() {
       .eq("id", skill.id);
     setSkillBusy(false);
     if (err) {
-      setSkillError("Could not remove that skill.");
+      // 23503 = a child has been graded on this skill; the record is kept and
+      // the delete is refused. Any other error is a generic failure.
+      setSkillError(describeDeleteError(err, "skill"));
       return;
     }
     load();
@@ -268,9 +361,24 @@ export default function LevelsPage() {
         subtitle="Your own level ladder. Students are placed on it from the Students page."
       />
 
-      <div className="mb-4">
+      <div className="mb-4 flex gap-2">
         <Button onClick={openCreate}>Add level</Button>
+        <Button variant="outline" onClick={() => { setScaleError(null); setScaleOpen(true); }}>
+          Grading scale
+        </Button>
       </div>
+
+      {/* A one-line hint at what the scale is for, shown only once a scale
+          exists (it always does — seeded per business). */}
+      {gradeScale.length > 0 ? (
+        <p className="mb-4 text-xs text-gray-500">
+          Coaches grade each child&rsquo;s skills on your{" "}
+          <span className="font-medium text-gray-700">
+            {gradeScale.map((g) => g.label).join(" → ")}
+          </span>{" "}
+          scale. The top grade counts a skill as done.
+        </p>
+      ) : null}
 
       {loading ? (
         <p className="text-sm text-gray-500">Loading…</p>
@@ -349,7 +457,7 @@ export default function LevelsPage() {
                       <Button variant="outline" onClick={() => openEdit(l)}>
                         Edit
                       </Button>
-                      <Button variant="outline" onClick={() => setRemoving(l)}>
+                      <Button variant="outline" onClick={() => { setRemoveError(null); setRemoving(l); }}>
                         Remove
                       </Button>
                     </div>
@@ -510,6 +618,7 @@ export default function LevelsPage() {
             ? describeLevelRemoval(removing.student_count, removing.inactive_count)
             : null}
         </p>
+        {removeError && <p className="mt-3 text-sm text-red-600">{removeError}</p>}
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" onClick={() => setRemoving(null)} disabled={busy}>
             Cancel
@@ -517,6 +626,77 @@ export default function LevelsPage() {
           <Button onClick={() => removing && remove(removing)} disabled={busy} variant="danger">
             {busy ? "Removing…" : "Remove"}
           </Button>
+        </div>
+      </Modal>
+
+      {/* ── Grade scale editor ──────────────────────────────────────────────
+          Hosted here rather than on a new route, deliberately: same audience,
+          same data family, and a new page would trip verify-platform-admin-
+          scope.mjs's 24-page pin. Minimal by design — rename freely, add a
+          grade; a grade a child holds cannot be deleted (the FK refuses, and
+          removeGrade surfaces that as a friendly line). */}
+      <Modal open={scaleOpen} onClose={() => setScaleOpen(false)} title="Grading scale">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            The scale coaches grade each child&rsquo;s skills against, lowest
+            first. The <span className="font-medium">top</span> grade counts a
+            skill as done. Rename freely; a grade a child has been given
+            can&rsquo;t be removed — their records are kept.
+          </p>
+
+          {gradeScale.length === 0 ? (
+            <p className="text-sm text-gray-400">No grades yet.</p>
+          ) : (
+            <ol className="space-y-2">
+              {gradeScale.map((g, i) => (
+                <li key={g.id} className="flex items-center gap-2">
+                  <span className="w-5 text-right text-xs text-gray-400">{i + 1}.</span>
+                  {/* Rename on blur or Enter — a curriculum's grade names are
+                      edited rarely, so an explicit save button is overkill. */}
+                  <input
+                    defaultValue={g.label}
+                    onBlur={(e) => renameGrade(g, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    }}
+                    disabled={scaleBusy}
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                  />
+                  <button
+                    onClick={() => removeGrade(g)}
+                    disabled={scaleBusy}
+                    className="px-1 text-gray-400 hover:text-red-600 disabled:opacity-30"
+                    aria-label="Remove grade"
+                  >
+                    &times;
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          <div className="flex gap-2">
+            <input
+              value={newGrade}
+              onChange={(e) => setNewGrade(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addGrade();
+              }}
+              placeholder="Expert"
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            />
+            <Button onClick={addGrade} disabled={scaleBusy || !newGrade.trim()}>
+              Add grade
+            </Button>
+          </div>
+
+          {scaleError && <p className="text-sm text-red-600">{scaleError}</p>}
+
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setScaleOpen(false)}>
+              Done
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

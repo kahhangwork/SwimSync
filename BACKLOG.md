@@ -1,10 +1,13 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED** (`docs/plans/WAVE_C_SPOOL_PLAN.md`):
-scoped DB search on the high-traffic admin tables (Piece 1), the family-status search pushdown (Piece 2),
-and the move-student RPC's two loose ends — which also fixed a live production bug for levelled students
-(Piece 3, migration `20260827000100`). All struck in their sections. **Remaining pick-now: Piece 4 (swim
-skills, M) and Piece 5 (email-confirmation copy, S).**_
+_Last updated: 2026-08-28 — **Wave C S-pool Piece 4 SHIPPED** (`docs/plans/WAVE_C_SPOOL_PLAN.md`,
+migration `20260828000100`, PRD §7.15): per-child swim-skill grading — coach grades, parent watches,
+admin edits the per-tenant scale. Pieces 1–3 shipped earlier the same day. **Remaining pick-now: Piece 5
+(email-confirmation copy, S) — the last S-pool item.**_
+
+_Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
+tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
+which also fixed a live production bug for levelled students (Piece 3, migration `20260827000100`)._
 
 _Previously, 2026-08-27 — **Maps integration DEFERRED to *Later*** (user's call): it is out of the
 current pick-now pool. It still builds cleanly on `locations.address` whenever it's picked up — no rework —
@@ -428,15 +431,12 @@ edge. The pass produced three durable findings, recorded so they are not re-deri
 
 #### Current pick-now order (set 2026-08-27 with the user)
 
-No rework edges between these — a **value/effort** ranking the user chose. **Pieces 1–3 SHIPPED
-2026-08-28** (Better filtering/search, Moving-a-student loose ends, and the family-status scan; all struck
-in their sections below). What remains of `docs/plans/WAVE_C_SPOOL_PLAN.md`:
+No rework edges between these — a **value/effort** ranking the user chose. **Pieces 1–4 SHIPPED**
+(Pieces 1–3 on 2026-08-28: filtering/search, move-student loose ends, family-status scan; **Piece 4
+on 2026-08-28**: swim-skill grading, migration `20260828000100`). All struck in their sections below.
+What remains of `docs/plans/WAVE_C_SPOOL_PLAN.md`:
 
-1. **Tick off swimming skills per child** (M, Piece 4) — coach marks which of a level's skills a child
-   passed; parent watches progress. Needs its own `student_skill_progress` table + policy (no widening of
-   `students_update`) and the settled decisions (graded, per-tenant scale; top-grade = done; keep records
-   on level change). Full item: *Coach workflow*. **Authors a migration** — one in flight (§7.55).
-2. **Email-confirmation copy** (S, Piece 5) — a branded confirmation template; **do NOT switch email
+1. **Email-confirmation copy** (S, Piece 5) — a branded confirmation template; **do NOT switch email
    confirmation ON** (it stranded web parents once). Full item below.
 
 > **/plan-review 2026-08-27:** every pool item's body carries inline `⚠ RISK n MITIGATION`
@@ -607,7 +607,16 @@ coach by construction. A school whose private coach is away wants the make-up ta
 and cleanup) or a per-lesson coach override. Deliberately deferred from the guest-pass
 work: real complexity, no requester yet.
 
-### Tick off swimming skills per child — **M**
+### ~~Tick off swimming skills per child~~ — **M** — **DONE 2026-08-28**
+Shipped (Piece 4, migration `20260828000100`, PRD §7.15): a coach grades each child against
+their level's skills on a per-tenant scale (seeded Developing/Competent/Mastered); the parent's
+child view shows "n of m at <top grade>" + per-skill grades; the admin edits the scale on the
+Levels page. New `skill_grade_levels` + `student_skill_progress` tables, coach-write /
+parent-read / admin-scale policies, a cross-tenant-consistency trigger, and `merge_students`
+taught to move the new rows. "Done" = the top rank, computed. Records survive a level change.
+
+<details><summary>Original item (kept for the reasoning)</summary>
+
 Mark which of a level's skills a child has passed, so a coach can see "Ethan has 4 of 6
 for Toddler 2" and a parent can watch progress accumulate.
 
@@ -648,6 +657,8 @@ NEW table + a NEW coach-facing write surface)*:
 - **Prohibition (restating the bullet above so it survives skimming):** do NOT widen
   `students_update` — this table exists precisely so that grant is never touched.
 - **Step:** migration authored in the ROOT checkout on a `db/…` branch, one in flight (§7.55).
+
+</details>
 
 ### ~~Convert a trial into an enrolled student~~ — **S** — **DONE 2026-08-17**
 Shipped: the *past — needs marking* list on the Trials page carries a **Convert to enrolled**

@@ -172,8 +172,8 @@ SELECT is(
     WHERE persona = 'member' AND n > 0),
   'attendance, class_categories, classes, coaches, invoice_items, invoices, '
   'lesson_sessions, locations, parent_students, parent_tenants, parents, profiles, '
-  'student_class_enrolments, students, tenant_levels, tenants',
-  'control: a real member of the business sees their own family across 16 tables');
+  'skill_grade_levels, student_class_enrolments, students, tenant_levels, tenants',
+  'control: a real member of the business sees their own family across 17 tables');
 
 -- ── 2. THE SWEEP. The stranger sees nothing but their own two rows. ──────────
 -- `profiles` and `parents` are the two rows the auth trigger creates for them

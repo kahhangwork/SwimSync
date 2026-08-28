@@ -727,6 +727,19 @@ export default function ClassRosterScreen() {
                     );
                   })()}
                 </View>
+                {/* Grade this child against their level's skills. A direct leaf
+                    <Text> inside the Pressable — RN-web swallows the tap
+                    otherwise (§7.10-adjacent). */}
+                <Pressable
+                  onPress={() =>
+                    router.push(
+                      `/(coach)/classes/${id}/grade?studentId=${student.id}`
+                    )
+                  }
+                  className="px-2.5 py-1.5 rounded-lg bg-sky-50 border border-sky-200"
+                >
+                  <Text className="text-xs font-semibold text-sky-600">Grade</Text>
+                </Pressable>
                 {/* A child who has stopped coming keeps this class permanently
                     "incomplete" — every lesson expects a mark for them — and
                     that now blocks invoicing outright. This is the in-app way

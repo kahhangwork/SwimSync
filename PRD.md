@@ -1872,12 +1872,38 @@ that way and orders them; any progression rule lives in the level's **note**, in
 business's own words. Imposing a tier-and-progression model would force every other
 tenant into one school's shape.
 
-*(Deliberately not built: **ticking skills off per child.** These describe the LEVEL, not
-any student's progress against it. Per-child tracking is a real feature — it needs coach
-write access to students, which they deliberately do not have, a marking UI, and a
-decision about what happens to those records when a child changes level. Filed in
-`BACKLOG.md`. The skills are stored as rows rather than prose precisely so that feature
-would not have to migrate a curriculum out of a text blob.)*
+#### Grading a child's skills *(implemented 2026-08-28)*
+
+The list above describes what a level teaches; **grading** records how far a child has got
+with it. A coach opens a child on the roster, taps **Grade**, and gives each of the level's
+skills a grade — so the coach sees "Ethan: 4 of 6 at Mastered" and the parent watches
+progress accumulate on the child's profile.
+
+**Graded, on the business's own scale.** Grades are not a bare passed/not-passed tick but a
+per-business **grade scale** — seeded *Developing / Competent / Mastered*, and the admin
+renames the labels or adds rungs on the Levels page. A skill counts as **done** when it
+holds the **top** grade — and "done" is computed, never stored, so adding a higher grade
+re-opens every skill that was done at the old top. Tapping a skill cycles it through the
+scale and back to ungraded, so a mistap is always recoverable.
+
+**Who does what:**
+
+| | |
+|---|---|
+| Edits the grade scale | The business's **admin** (Levels page) |
+| Grades a child's skills | The child's **coach** (any child on a roster of theirs), or the **admin** |
+| Sees the grades | The child's **coach**, their **parent** (read-only), and the **admin** |
+
+The coach's write path is **narrow**: a dedicated `student_skill_progress` table, never a
+widening of their access to the student record — grading a child must not become a way to
+edit their name or date of birth (the §7.15 reasoning, now load-bearing rather than
+hypothetical). A grade may only reference the child's **own** business's skills and grades,
+enforced in the database.
+
+**Records survive a level change.** Moving a child up a level — or back down — never
+deletes what they earned; the screens simply show the current level's skills. For the same
+reason, a skill or grade a child has been graded against **cannot be deleted** (the Levels
+page says so plainly) — tidying the curriculum must not erase a child's history.
 
 *(This replaces the original fixed beginner/intermediate/advanced field, which was never
 populated: parents stopped choosing an ability in §5.1, and nothing else ever wrote it.

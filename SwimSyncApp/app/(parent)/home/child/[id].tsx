@@ -19,6 +19,11 @@ import {
   describeCoverage,
   type StudentCoverage,
 } from "@/lib/packageCoverage";
+import {
+  summariseSkillProgress,
+  type GradeLevel,
+  type LevelSkill,
+} from "@/lib/skillProgress";
 
 type ChildDetail = {
   id: string;
@@ -27,7 +32,12 @@ type ChildDetail = {
   gender: string | null;
   level_label: string | null;
   level_note: string | null;
-  level_skills: string[];
+  /** Skills of the CURRENT level, with ids so grades can be paired to them. */
+  level_skills: LevelSkill[];
+  /** skill_id → grade_level_id, this child's grades on the current level. */
+  skill_grades: Record<string, string>;
+  /** The business's grade scale, for the "n of m at <top>" computation. */
+  scale: GradeLevel[];
   notes: string | null;
   // "inactive" was dropped from the enum — activity is its own axis now
   // (students.is_active), so a departed child must not read "Unassigned".
@@ -100,7 +110,8 @@ export default function ChildProfileScreen() {
         full_name,
         date_of_birth,
         gender,
-        tenant_levels(label, note, tenant_level_skills(label, sort_order)),
+        tenant_id,
+        tenant_levels(label, note, tenant_level_skills(id, label, sort_order)),
         notes,
         assignment_status,
         is_active,
@@ -174,6 +185,22 @@ export default function ChildProfileScreen() {
       );
     }
 
+    // The business's grade scale and this child's grades. Scoped to the CHILD's
+    // tenant, not the parent's — a parent with children at two businesses would
+    // otherwise pull both scales and their ranks would collide. Read-only here;
+    // the coach does the grading.
+    const [{ data: scaleRows }, { data: progressRows }] = await Promise.all([
+      supabase
+        .from("skill_grade_levels")
+        .select("id, rank, label")
+        .eq("tenant_id", (student as any).tenant_id)
+        .order("rank"),
+      supabase
+        .from("student_skill_progress")
+        .select("skill_id, grade_level_id")
+        .eq("student_id", id),
+    ]);
+
     setChild({
       id: student.id,
       full_name: student.full_name,
@@ -183,12 +210,15 @@ export default function ChildProfileScreen() {
       // !inner hint. Read off tenant_levels, not off the student (§7.28).
       level_label: (student as any).tenant_levels?.label ?? null,
       level_note: (student as any).tenant_levels?.note ?? null,
-      // Sorted here, not in the query: PostgREST cannot order an embedded
-      // resource, so ordering server-side would silently do nothing and the
-      // curriculum would render in whatever order rows came back.
-      level_skills: [...((student as any).tenant_levels?.tenant_level_skills ?? [])]
-        .sort((a: any, b: any) => a.sort_order - b.sort_order)
-        .map((sk: any) => sk.label),
+      // Kept unsorted here — summariseSkillProgress orders by sort_order/label at
+      // render. Carry the id so grades can be paired to each skill.
+      level_skills: ((student as any).tenant_levels?.tenant_level_skills ?? []).map(
+        (sk: any) => ({ id: sk.id, label: sk.label, sort_order: sk.sort_order })
+      ),
+      skill_grades: Object.fromEntries(
+        ((progressRows as any[]) ?? []).map((p) => [p.skill_id, p.grade_level_id])
+      ),
+      scale: (scaleRows as GradeLevel[]) ?? [],
       notes: student.notes,
       assignment_status: student.assignment_status,
       is_active: student.is_active,
@@ -297,30 +327,72 @@ export default function ChildProfileScreen() {
             "what is my child working towards?", which it could not answer at
             all before. Read-only: the business's admin owns the curriculum. */}
         {child.level_label && (child.level_skills.length > 0 || child.level_note) ? (
-          <Card>
-            <Text className="text-base font-bold text-gray-900 mb-1">
-              {child.level_label}
-            </Text>
-            {child.level_note ? (
-              <Text className="text-xs italic text-gray-500 mb-3">
-                {child.level_note}
-              </Text>
-            ) : (
-              <View className="mb-3" />
-            )}
-            {child.level_skills.length > 0 ? (
-              <View className="gap-2">
-                {child.level_skills.map((skill, i) => (
-                  <View key={`${skill}-${i}`} className="flex-row gap-2.5">
-                    <Text className="text-sky-500 font-semibold text-sm w-4">
-                      {i + 1}
+          (() => {
+            // The child's progress against the current level, paired and counted.
+            const summary = summariseSkillProgress(
+              child.level_skills,
+              Object.entries(child.skill_grades).map(([skill_id, grade_level_id]) => ({
+                skill_id,
+                grade_level_id,
+              })),
+              child.scale
+            );
+            return (
+              <Card>
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-base font-bold text-gray-900">
+                    {child.level_label}
+                  </Text>
+                  {/* The headline: how many skills are at the top grade. Only
+                      shown once a scale exists and there is something to count. */}
+                  {summary.total > 0 && summary.topGradeLabel ? (
+                    <Text className="text-xs font-semibold text-gray-500">
+                      {summary.doneCount} of {summary.total} at {summary.topGradeLabel}
                     </Text>
-                    <Text className="text-sm text-gray-700 flex-1">{skill}</Text>
+                  ) : null}
+                </View>
+                {child.level_note ? (
+                  <Text className="text-xs italic text-gray-500 mb-3">
+                    {child.level_note}
+                  </Text>
+                ) : (
+                  <View className="mb-3" />
+                )}
+                {summary.skills.length > 0 ? (
+                  <View className="gap-2">
+                    {summary.skills.map((sk, i) => (
+                      <View key={sk.id} className="flex-row items-center gap-2.5">
+                        <Text className="text-sky-500 font-semibold text-sm w-4">
+                          {i + 1}
+                        </Text>
+                        <Text className="text-sm text-gray-700 flex-1">{sk.label}</Text>
+                        {/* The grade the coach recorded, or nothing yet. */}
+                        {sk.grade ? (
+                          <View
+                            className={
+                              "px-2.5 py-1 rounded-full " +
+                              (sk.done ? "bg-green-100" : "bg-sky-100")
+                            }
+                          >
+                            <Text
+                              className={
+                                "text-xs font-semibold " +
+                                (sk.done ? "text-green-700" : "text-sky-700")
+                              }
+                            >
+                              {sk.grade.label}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text className="text-xs text-gray-300">Not yet graded</Text>
+                        )}
+                      </View>
+                    ))}
                   </View>
-                ))}
-              </View>
-            ) : null}
-          </Card>
+                ) : null}
+              </Card>
+            );
+          })()
         ) : null}
 
         {/* Assignment / Class info */}
