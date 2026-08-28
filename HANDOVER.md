@@ -1,9 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-29 — **Grading is ADMIN-ONLY and has an Assessment tab — BUILT, NOT DEPLOYED** (§8.93,
-branch `db/grading-admin-only`, 3 commits, nothing on `main`). Migration `20260829000100` narrows the write
-policy and fixes `graded_at`; `/assessment` grades a whole class per level, with a round date so old grades
-cannot pass for today's. **The deploy is the next action — §9.** (PRD §7.15, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`.)_
+_Last updated: 2026-08-29 — **Grading is ADMIN-ONLY and has an Assessment tab — SHIPPED + DEPLOYED** (§8.93,
+`20260829000100` on prod, apps on `main`, DEPLOYMENT §11.46). The write policy narrows to tenant admins and
+`graded_at` now tracks re-confirmation; `/assessment` grades a whole class per level, with a round date so old
+grades cannot pass for today's. Verified by served-bundle grep both ways. (PRD §7.15,
+`docs/plans/GRADING_ADMIN_ONLY_PLAN.md`.)_
 
 _Previously, 2026-08-28 (§8.92) — per-child swim-skill grading shipped and deployed (`20260828000100`), which
 this session's work then narrowed to admins._
@@ -209,7 +210,7 @@ first-firing trigger is what to watch for.
 - **Scoped search past the 1000-row cap (§8.91)** — every table is under the cap on prod, so the DB pushdown,
   the `!inner` narrowing (§7.216) and the cap banners are all unexercised at scale; correct today by coincidence
   of size. First firing: any admin table crosses ~1000 rows.
-- **Swim-skill grading (§8.92/§8.93, PRD §7.15)** — LIVE on prod but **no child graded yet**, so the
+- **Swim-skill grading (§8.92/§8.93, PRD §7.15)** — LIVE on prod, ADMIN-ONLY since §8.93, and **no child graded yet**, so the
   cross-tenant + keep-records `RESTRICT` guards and the `merge_students` skill-progress move have never fired
   (the scale is seeded; every child is ungraded). That zero is now **load-bearing, not just trivia**: §8.93's
   admin-only narrowing is lossless *because* of it, and §9 turns it into a gate to run before deploying.
@@ -343,13 +344,13 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
-## 8.93 (2026-08-29) — Grading becomes ADMIN-ONLY, and gains an Assessment tab (BUILT, **NOT DEPLOYED**)
+## 8.93 (2026-08-29) — Grading becomes ADMIN-ONLY, and gains an Assessment tab (SHIPPED + DEPLOYED)
 
-**All local gates green; nothing is on `main` and nothing is on prod.** Three commits on branch
-`db/grading-admin-only`: `5c79e43` (migration + pgTAP), `1d9c2ea` (coach app read-only), `adf2e6d` (the
-admin surface). pgTAP 1488, admin vitest 620, app jest 420, both typechecks + `next build` clean, fixture
-roundtrip 26/26, `verify-assessment.mjs` 27/27. Plan, decisions and the walked gate:
-**`docs/plans/GRADING_ADMIN_ONLY_PLAN.md`**. Behaviour: **PRD §7.15**.
+**Migration on prod, apps on `main`, verified both ways** (DEPLOYMENT §11.46). Four commits, deliberately
+split so the migration reached prod before the apps reached `main`: `5c79e43` (migration + pgTAP),
+`1d9c2ea` (coach read-only), `adf2e6d` (admin surface), `3d413ce` (docs). pgTAP 1488, admin vitest 620,
+app jest 420, both typechecks + `next build` clean, fixture roundtrip 26/26, `verify-assessment.mjs` 27/27.
+Plan, decisions and the walked gate: **`docs/plans/GRADING_ADMIN_ONLY_PLAN.md`**. Behaviour: **PRD §7.15**.
 
 - **What changed** — the write policy narrowed to `can_admin_tenant` (the coach arm dropped, enforced in the
   DB, not just hidden); the coach's grade screen became read-only (*Grade* → *Skills*); a new **Assessment**
@@ -365,9 +366,13 @@ roundtrip 26/26, `verify-assessment.mjs` 27/27. Plan, decisions and the walked g
   (**§7.219**), a pgTAP assertion that *could not be written as specified* (**§7.220**), and the round
   resetting at midnight. All folded into the plan beside their steps and ticked in its gate.
 - **Its driver caught a real bug on first run** (the sticky name column made the first skill untappable on a
-  phone — fixed) and a second, panel-wide one left deliberately unfixed: **§7.222**, the `w-64` sidebar, now
-  a `BACKLOG.md` item. Assessment is the first admin surface meant for poolside use, so it now matters.
-- **Not done** — the deploy. See §9.
+  phone — fixed) and a second, panel-wide one: **§7.222**, the `w-64` sidebar. That one is **REFUSED, not
+  filed** — the user's boundary: the admin panel is desktop/tablet by intent, only the coach app might go
+  mobile. `BACKLOG.md` → *Deliberately not doing*.
+- **Verifying the deploy needed a new technique, now recorded** (§11.46): a client-auth-gated App Router page
+  serves a shell containing none of its own strings, so the old login-bundle grep finds nothing and looks like
+  a failed deploy. `curl -H "RSC: 1" <route>` names the real chunk. The Expo app gave the stronger **two-sided**
+  proof — new string present, both old ones absent.
 
 ## 8.92 (2026-08-28) — Wave C S-pool Piece 4: per-child swim-skill grading (SHIPPED + DEPLOYED)
 
@@ -455,29 +460,19 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 
 ### THE NEXT BUILD — pick-now list is in `BACKLOG.md`
 
-**FIRST, AND BEFORE ANY OTHER WORK: deploy §8.93.** It is built, fully green and sitting on branch
-`db/grading-admin-only` — three commits, nothing merged. Until it lands, prod still lets **coaches** grade,
-and the admin Assessment tab does not exist. Run **`/deploy`**; the sequence is migration `20260829000100`
-to prod **FIRST**, then merge to `main` (which is the app deploy, §7.60), then grep the served bundle for
-`Assessing since` (§7.31 — a 200 proves nothing).
+**Top pick: Piece 5 — email-confirmation copy** (S) — a branded template following
+`supabase/templates/recovery.html`; **do NOT switch email confirmation ON** (it stranded web parents once —
+assert `enable_confirmations = false` stays, in `config.toml` AND the hosted project). Apps/config only, no
+migration. After it the S-pool is exhausted; other parked items live in `BACKLOG.md`.
 
-> **One GATE must be run before `db push`, and it has not been:**
-> `SELECT count(*) FROM student_skill_progress;` **against prod must return 0.**
-> Three claims rest on it — that the policy narrowing strands no coach's work, that re-attributing
-> `graded_by` to "who last confirmed" loses nothing, and that no data migration is needed. **If it is
-> non-zero, STOP** and settle the `graded_by` history question first: the migration deploys before the apps,
-> so any existing coach-attributed rows would have their original grader permanently overwritten by the first
-> assessment day. Everything else about the window is safe (a live coach's tap gets 42501 and the app's
-> existing rollback + toast handles it). The full walked gate is in `docs/plans/GRADING_ADMIN_ONLY_PLAN.md` §7.
+> **The one thing worth doing on prod before building anything: exercise the Assessment tab once.** Grading is
+> still DORMANT (0 rows the moment it deployed), so the round mechanism, the promotion rule and the whole
+> admin write path have never fired on real data. **Open Admin → Assessment, grade one child, and re-confirm
+> one grade** — the re-confirmation is the arm most worth seeing work, because it is the one `20260829000100`
+> exists to fix and the one no coach ever exercised.
 
-**Then: Piece 5 — email-confirmation copy** (S) — a branded template following `supabase/templates/recovery.html`;
-**do NOT switch email confirmation ON** (it stranded web parents once — assert `enable_confirmations = false`
-stays, in `config.toml` AND the hosted project). Apps/config only. After it the S-pool is exhausted; other
-parked items live in `BACKLOG.md` — including the new **admin sidebar breakpoint** (S, §7.222), which is worth
-doing soon *because* Assessment is meant to be used on a phone.
-
-**One migration is IN FLIGHT and unapplied to prod:** `20260829000100` (grading admin-only, §8.93), with a
-rehearsed DOWN in `supabase/rollback/`. Latest applied on prod is still `20260828000100`. Piece 5 authors none.
+**No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), on prod,
+0 pending, with a rehearsed DOWN in `supabase/rollback/`. Piece 5 authors none.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

@@ -449,23 +449,8 @@ The pick-now list now:
    prod must return 0) is unrun.
 2. **Email-confirmation copy** (S, Piece 5) — a branded confirmation template; **do NOT switch email
    confirmation ON** (it stranded web parents once). Full item below.
-3. **The admin sidebar has no breakpoint — every admin page is unusable on a phone** — **S**
-   `[found by verify-assessment.mjs, 2026-08-29]`
-   `components/Sidebar.tsx` is a hard `w-64` (256px) at every width, and `app/(admin)/layout.tsx`
-   adds `p-8`, so at 390px portrait a page gets ~70px of content. Give the sidebar a breakpoint —
-   collapsed behind a hamburger below `md`, unchanged above it.
-
-   **Why:** it did not matter while the admin panel was a desktop tool, and it matters now. The
-   **Assessment** tab (PRD §7.15) is the first admin surface meant to be used standing at a pool,
-   and production's one real assessor is a private coach who lost their phone-based grading screen
-   when grading moved off the coach app. Usable in landscape and on a tablet; cramped in portrait.
-
-   **Notes:** found by `verify-assessment.mjs`, which runs at 390×844 deliberately — and note that
-   **no horizontal-overflow assertion catches this**: the page does not scroll sideways, the content
-   is simply squeezed, so the check passes while the screen is unusable. A page-level fix is the
-   wrong shape; the sidebar is the thing that needs the breakpoint, and fixing it there fixes every
-   admin page at once. Deliberately NOT bundled into the grading release — it changes every admin
-   page and would have ridden along unreviewed. §7.222.
+*(A third candidate — giving the admin sidebar a mobile breakpoint — was raised and **REFUSED** the
+same day. See* **Deliberately not doing** *below.)*
 
 > **/plan-review 2026-08-27:** every pool item's body carries inline `⚠ RISK n MITIGATION`
 > steps. **The sequenced plan — two-pass reviewed and fact-checked against code — is
@@ -1707,6 +1692,7 @@ Kept so the reasoning doesn't get re-litigated.
 
 | Idea | Why not |
 |---|---|
+| **A mobile breakpoint for the admin sidebar** | Raised and **REFUSED the same day, 2026-08-29, with the user.** `components/Sidebar.tsx` is a hard `w-64` at every width (plus the layout's `p-8`), so at 390px portrait any admin page gets ~70px of content — found by `verify-assessment.mjs`, which runs at a phone viewport deliberately (§7.222). The refusal is a **product boundary, not a cost judgement**: *"the admin page will most likely only be used landscape and on a tablet. I don't intend on making the admin webapp a mobile app, only the coach app might become a mobile app."* So the admin panel is a desktop/tablet surface by intent, and portrait-phone width is not a case it needs to serve. **This settles the worry that motivated it** — the Assessment tab (PRD §7.15) was thought to need phone width because grading left the coach app; it does not, because assessment is done on a tablet. **Revisit only if** the admin panel itself is ever targeted at phones — not merely if another admin page feels cramped. **Do not "fix" this page-by-page:** a per-page workaround would spread the problem across the panel while leaving the sidebar as it is. |
 | **Multi-language support** | Refused 2026-08-16 with the user: low value for the customer base being sought, English-only is enough, and it was accruing retrofit tax while sitting unranked. English-only was already an explicit MVP call (§8.1) and is a reasonable long-term answer for Singapore. **Revisit only if** a real tenant asks for Mandarin (grandparents doing pickup is the one honest trigger) — a "not yet", not a "never". |
 | **More polished dashboards** | Retired 2026-08-16. Vaguest item in the backlog, no specific pain behind it, kept only because the PRD named it. Its own standing note was "delete if a real question replaces it", and none did. The concrete money question it gestured at is served by *An owner-only accounting page*. Revisit only if a specific metric someone actually asks for replaces "polish the dashboard". |
 | **A blanket `anon` revoke via default privileges** | **Done 2026-08-04 (`20260804000400`) — this row is kept only so the two earlier refusals are not re-litigated as though nothing changed.** Declined 2026-07-21 and again earlier on 2026-08-04, both times on the grounds that it would lock a future function that legitimately needs `anon`. That objection had already expired on 2026-08-02, when `public-invoice` established the standing rule (`docs/ARCHITECTURE.md` §6) that anything public is served by an **edge function, never an anon RPC** — so the case being protected was one the architecture forbids. Doing it also revealed that the statement everyone had in mind (`… IN SCHEMA public REVOKE … FROM PUBLIC`) **succeeds and does nothing** (§7.85), meaning both refusals were declining something that would not have worked anyway. |

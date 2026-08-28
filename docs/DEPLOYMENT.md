@@ -900,3 +900,36 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     **Rollback:** committed + **rehearsed** DOWN (`supabase/rollback/20260828000100_..._DOWN.sql`, UP→DOWN→`student_
     merge` 20/20 on the restored body→UP), restores the prior `merge_students` body; dropping the tables discards
     grades, which is the correct meaning of rolling this back. **Dormant on prod:** no child graded yet (§8.92).
+
+46. **Deploy record (2026-08-29): grading becomes ADMIN-ONLY + the Assessment tab — migration FIRST, apps LAST.**
+    (`docs/plans/GRADING_ADMIN_ONLY_PLAN.md`; §8.93.) Backend: `20260829000100_grading_admin_only.sql` — a
+    **DROP+CREATE of one POLICY** (`student_skill_progress_write` loses its `coach_serves_student` arm) plus a
+    **same-signature `CREATE OR REPLACE`** of `enforce_skill_progress_tenant()` (the `graded_at` stamp condition).
+    Apps: coach grade screen → read-only; new admin `/assessment` index + `[classId]` grid; Students drawer.
+    **Committed in THREE pieces on purpose** so the migration commit (`5c79e43`, no app files) could reach `main`
+    and prod before the app commits did — the cleanest form of §7.60 yet used here.
+    Sequence: (1) `git push origin 5c79e43:main` — migration commit only; Vercel rebuilt identical app code.
+    (2) `supabase db push` — `20260829000100` remote filled, **0 pending** (pgdelta cert trace alongside
+    `Finished`, harmless, §7.30 — ~7× now). (3) **Grant dump TAKEN even though none was strictly required** —
+    `supabase db dump --linked` confirmed the prod policy really reads `can_admin_tenant("tenant_id")` with **no**
+    coach arm, the trigger body carries the new contrapositive condition, `REVOKE ALL ON FUNCTION
+    enforce_skill_progress_tenant() FROM PUBLIC`, and `student_skill_progress` grants are **unchanged**
+    (`authenticated` SELECT/INSERT/DELETE/UPDATE + `service_role` ALL). **A policy carries no ACL**, so this was
+    not a §11.32 "same-signature" argument — it is the stronger one, and the dump is what turned "should be
+    unchanged" into "is unchanged". (4) **Apps to `main` LAST** — `git push …:main` (fast-forward
+    `5c79e43..3d413ce`).
+    ⚠ **Verifying an App-Router route needed a NEW technique — the old one silently proves nothing.** The
+    admin panel client-side-auth-gates every page, so `/assessment` serves a ~10 KB shell with **none** of the
+    page's strings in the HTML, and the chunks the shell references do not include the route's own code. A
+    login-page bundle grep (the §11.45 method) therefore finds nothing and looks like a failed deploy. **The
+    working method:** `curl -H "RSC: 1" <route>` returns the flight payload, which names
+    `static/chunks/app/(admin)/assessment/page-<hash>.js`; fetch that and grep it. Confirmed `Assessing since`,
+    `Grade each child against`, `need a level`, and the sidebar's `Assessment`/`/assessment` in
+    `app/(admin)/layout-<hash>.js`. Route existence was corroborated 200-vs-404 against `/not-a-real-page`.
+    The Expo app gave the stronger **two-sided** proof: `Grades are set by an admin` **present** and both
+    `Tap to grade` / `Tap a skill to cycle` **absent** — a new string alone cannot show the old path is gone.
+    **Rollback:** committed + **rehearsed** DOWN (`supabase/rollback/20260829000100_..._DOWN.sql`) —
+    UP→DOWN→UP with `pg_get_functiondef()` and the policy expression **byte-identical** both ways, and the suite
+    RED (6 assertions) under the rolled-back schema, green again after. Touches no data. **Precondition that was
+    checked, not assumed:** `SELECT count(*) FROM student_skill_progress` on prod returned **0**, which is what
+    makes the narrowing and the `graded_by` re-attribution lossless. **Dormant on prod:** still no child graded.

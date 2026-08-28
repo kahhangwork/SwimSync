@@ -3452,5 +3452,11 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     one page, and no horizontal-overflow assertion catches it — the page does not scroll sideways, the content is
     simply squeezed. It matters now because the Assessment tab is the first admin surface intended for phone use
     poolside (grading left the mobile app in §8.93). Usable in landscape and on a tablet; cramped in portrait.
-    **A page-level fix is the wrong shape** — the sidebar is the thing that needs a breakpoint. Filed in `BACKLOG.md`.
-    (2026-08-29, §8.93.)
+    **RESOLVED THE SAME DAY, AND NOT BY FIXING IT: the admin panel is a desktop/tablet surface BY INTENT** — the
+    user's call, *"I don't intend on making the admin webapp a mobile app, only the coach app might become a mobile
+    app"* — so portrait-phone width is not a case it has to serve, and Assessment is done on a tablet. **So this is
+    not a latent bug waiting to be fixed; it is a boundary.** Two things still follow from it: **(a) do not "fix" it
+    page-by-page** — a per-page workaround spreads the problem across the panel while leaving the sidebar as it is;
+    and **(b) the measurement lesson stands regardless** — no horizontal-overflow assertion can catch a squeezed
+    layout, so if you ever *do* care about a narrow viewport, assert on the content column's width, not on
+    `scrollWidth`. `BACKLOG.md` → *Deliberately not doing* holds the decision. (2026-08-29, §8.93.)
