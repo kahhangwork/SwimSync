@@ -727,8 +727,11 @@ export default function ClassRosterScreen() {
                     );
                   })()}
                 </View>
-                {/* Grade this child against their level's skills. A direct leaf
-                    <Text> inside the Pressable — RN-web swallows the tap
+                {/* VIEW this child's skill grades. Read-only since
+                    20260829000100 — grading moved to the admin panel's
+                    Assessment tab, so the label says Skills, not Grade: the
+                    coach is looking something up, not recording it. A direct
+                    leaf <Text> inside the Pressable — RN-web swallows the tap
                     otherwise (§7.10-adjacent). */}
                 <Pressable
                   onPress={() =>
@@ -738,7 +741,7 @@ export default function ClassRosterScreen() {
                   }
                   className="px-2.5 py-1.5 rounded-lg bg-sky-50 border border-sky-200"
                 >
-                  <Text className="text-xs font-semibold text-sky-600">Grade</Text>
+                  <Text className="text-xs font-semibold text-sky-600">Skills</Text>
                 </Pressable>
                 {/* A child who has stopped coming keeps this class permanently
                     "incomplete" — every lesson expects a mark for them — and

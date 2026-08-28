@@ -1,17 +1,21 @@
-// Coach grades one child against the skills of their CURRENT level.
+// The coach VIEWS one child's grades against the skills of their CURRENT level.
 //
-// Reached from the class roster ("Grade"). A dedicated screen, not an inline
-// roster expansion, because grading is a focused write task and the roster is
-// otherwise read-only — mixing the two invites a mis-tap on a screen the coach
-// scans quickly.
+// READ-ONLY SINCE 20260829000100, AND THAT IS THE POINT OF THE SCREEN.
+// Grading moved to the admin panel's Assessment tab: it is an administrative
+// record the business controls, not a per-coach act. The database enforces it —
+// student_skill_progress' write policy is admin-only — so this screen could not
+// write even if it tried. What remains is genuinely useful: a coach mid-lesson
+// wants to know where a child is, and that answer lives here.
 //
-// The grade cycle and the n-of-m summary are pure (lib/skillProgress.ts, tested
-// in jest). This screen is the thin shell: fetch, render, persist. "Done" = the
-// top grade, computed every render, never stored — adding a higher grade
+// The screen is therefore a pure reader. There is deliberately no tap handler,
+// no optimistic state and no Toast, because there is no write that could fail.
+// If grading ever returns to the coach app, restore the write path from git
+// history rather than re-deriving it — the upsert carried an onConflict key
+// (student_id, skill_id) that is easy to get wrong.
+//
+// The n-of-m summary is pure (lib/skillProgress.ts, tested in jest). "Done" =
+// the top grade, computed every render, never stored — adding a higher grade
 // re-opens a skill (mirrors the migration).
-//
-// EVERY failure surfaces via Toast, never Alert.alert — that is a silent no-op
-// on RN-web (CLAUDE.md). Writes are optimistic and roll back on error.
 
 import React, { useState, useCallback } from "react";
 import {
@@ -21,16 +25,13 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
-  Pressable,
 } from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import Card from "@/components/Card";
-import { useAppStore } from "@/store/useAppStore";
 import {
   summariseSkillProgress,
-  cycleGrade,
   type GradeLevel,
   type LevelSkill,
 } from "@/lib/skillProgress";
@@ -42,9 +43,8 @@ type StudentInfo = {
   level_note: string | null;
 };
 
-export default function GradeStudentScreen() {
-  const { id, studentId } = useLocalSearchParams<{ id: string; studentId: string }>();
-  const showToast = useAppStore((s) => s.showToast);
+export default function StudentSkillsScreen() {
+  const { studentId } = useLocalSearchParams<{ id: string; studentId: string }>();
 
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState<StudentInfo | null>(null);
@@ -52,7 +52,6 @@ export default function GradeStudentScreen() {
   const [scale, setScale] = useState<GradeLevel[]>([]);
   // skill_id → grade_level_id for every graded skill.
   const [grades, setGrades] = useState<Record<string, string>>({});
-  const [savingSkill, setSavingSkill] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -118,45 +117,6 @@ export default function GradeStudentScreen() {
     }, [loadData])
   );
 
-  async function onTapSkill(skillId: string) {
-    if (!student || savingSkill) return;
-    const currentGradeId = grades[skillId] ?? null;
-    const current = currentGradeId ? scale.find((g) => g.id === currentGradeId) ?? null : null;
-    const next = cycleGrade(current, scale);
-
-    // Optimistic: reflect the tap immediately, then persist.
-    const prevGrades = grades;
-    setGrades((g) => {
-      const copy = { ...g };
-      if (next) copy[skillId] = next.id;
-      else delete copy[skillId];
-      return copy;
-    });
-    setSavingSkill(skillId);
-
-    const { error } = next
-      ? await supabase.from("student_skill_progress").upsert(
-          {
-            tenant_id: student.tenant_id,
-            student_id: studentId,
-            skill_id: skillId,
-            grade_level_id: next.id,
-          },
-          { onConflict: "student_id,skill_id" }
-        )
-      : await supabase
-          .from("student_skill_progress")
-          .delete()
-          .eq("student_id", studentId)
-          .eq("skill_id", skillId);
-
-    setSavingSkill(null);
-    if (error) {
-      setGrades(prevGrades); // roll back the optimistic change
-      showToast("Could not save that grade. Try again.", "error");
-    }
-  }
-
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-sky-50 items-center justify-center">
@@ -180,7 +140,7 @@ export default function GradeStudentScreen() {
         </TouchableOpacity>
         <View className="flex-1">
           <Text className="text-lg font-bold text-gray-900">
-            {student?.full_name ?? "Grade skills"}
+            {student?.full_name ?? "Skills"}
           </Text>
           {student?.level_label ? (
             <Text className="text-xs text-gray-500">
@@ -229,51 +189,43 @@ export default function GradeStudentScreen() {
             {student.level_note ? (
               <Text className="text-xs italic text-gray-500 mb-3">{student.level_note}</Text>
             ) : null}
+            {/* Says WHY there is nothing to tap. Without this the screen reads
+                as broken to a coach who graded here last month. */}
             <Text className="text-xs text-gray-500 mb-3">
-              Tap a skill to cycle its grade
-              {scale.length > 0 ? ` (${scale.map((g) => g.label).join(" → ")} → not set)` : ""}.
+              Grades are set by an admin
+              {scale.length > 0 ? ` (${scale.map((g) => g.label).join(" → ")})` : ""}.
             </Text>
             <View className="gap-2">
               {summary.skills.map((sk, i) => (
-                <Pressable key={sk.id} onPress={() => onTapSkill(sk.id)}>
-                  <Card>
-                    <View className="flex-row items-center gap-3">
-                      <Text className="text-xs text-sky-500 font-semibold w-4">{i + 1}</Text>
-                      <Text className="text-sm text-gray-800 flex-1">{sk.label}</Text>
-                      {/* The grade chip. A direct leaf <Text> so RN-web fires
-                          the parent Pressable's onPress. */}
-                      <View
+                <Card key={sk.id}>
+                  <View className="flex-row items-center gap-3">
+                    <Text className="text-xs text-sky-500 font-semibold w-4">{i + 1}</Text>
+                    <Text className="text-sm text-gray-800 flex-1">{sk.label}</Text>
+                    <View
+                      className={
+                        "px-3 py-1.5 rounded-full " +
+                        (sk.done
+                          ? "bg-green-100"
+                          : sk.grade
+                          ? "bg-sky-100"
+                          : "bg-gray-100")
+                      }
+                    >
+                      <Text
                         className={
-                          "px-3 py-1.5 rounded-full " +
-                          (savingSkill === sk.id
-                            ? "bg-gray-100"
-                            : sk.done
-                            ? "bg-green-100"
+                          "text-xs font-semibold " +
+                          (sk.done
+                            ? "text-green-700"
                             : sk.grade
-                            ? "bg-sky-100"
-                            : "bg-gray-100")
+                            ? "text-sky-700"
+                            : "text-gray-400")
                         }
                       >
-                        <Text
-                          className={
-                            "text-xs font-semibold " +
-                            (sk.done
-                              ? "text-green-700"
-                              : sk.grade
-                              ? "text-sky-700"
-                              : "text-gray-400")
-                          }
-                        >
-                          {savingSkill === sk.id
-                            ? "Saving…"
-                            : sk.grade
-                            ? sk.grade.label
-                            : "Tap to grade"}
-                        </Text>
-                      </View>
+                        {sk.grade ? sk.grade.label : "Not yet graded"}
+                      </Text>
                     </View>
-                  </Card>
-                </Pressable>
+                  </View>
+                </Card>
               ))}
             </View>
           </>
