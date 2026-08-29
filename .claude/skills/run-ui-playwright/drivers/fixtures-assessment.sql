@@ -76,19 +76,37 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- ---- All four onto the seed's active Saturday class ----
-INSERT INTO student_class_enrolments (student_id, class_id, is_active)
-SELECT v.student_id, '2ce0a523-6239-434b-b622-efc54091fc7a'::uuid, TRUE
-  FROM (VALUES
-    ('12200000-0000-0000-0000-000000000001'::uuid),
-    ('12200000-0000-0000-0000-000000000002'::uuid),
-    ('12200000-0000-0000-0000-000000000003'::uuid),
-    ('12200000-0000-0000-0000-000000000004'::uuid)
-  ) AS v(student_id)
- WHERE NOT EXISTS (
-   SELECT 1 FROM student_class_enrolments e
-    WHERE e.student_id = v.student_id
-      AND e.class_id = '2ce0a523-6239-434b-b622-efc54091fc7a'::uuid
- );
+-- ⚠ NEVER HARDCODE THE SEED CLASS'S ID. `supabase/seed.sql`'s classes INSERT
+-- names no `id`, so Postgres mints a FRESH uuid on every `db reset`. This block
+-- held a literal '2ce0a523-…' captured from the one database the fixture was
+-- authored against: it loaded there forever and failed on the first reset,
+-- with `cross-tenant enrolment refused: … class … is in tenant <NULL>` — a
+-- message that reads like a tenancy bug and is really a missing row. §7.224.
+-- Resolve by title; the ORDER BY is load-bearing (an unordered LIMIT 1 is §7.73).
+DO $$
+DECLARE
+  v_class uuid;
+BEGIN
+  SELECT id INTO v_class FROM classes
+   WHERE title = 'Saturday Beginners' ORDER BY created_at, id LIMIT 1;
+  IF v_class IS NULL THEN
+    RAISE EXCEPTION 'seed class "Saturday Beginners" is missing — is the database seeded?';
+  END IF;
+
+  INSERT INTO student_class_enrolments (student_id, class_id, is_active)
+  SELECT v.student_id, v_class, TRUE
+    FROM (VALUES
+      ('12200000-0000-0000-0000-000000000001'::uuid),
+      ('12200000-0000-0000-0000-000000000002'::uuid),
+      ('12200000-0000-0000-0000-000000000003'::uuid),
+      ('12200000-0000-0000-0000-000000000004'::uuid)
+    ) AS v(student_id)
+   WHERE NOT EXISTS (
+     SELECT 1 FROM student_class_enrolments e
+      WHERE e.student_id = v.student_id
+        AND e.class_id = v_class
+   );
+END $$;
 
 -- ---- Grades ----
 -- The stale child at the TOP rank on BOTH skills, so "looks finished" is real:

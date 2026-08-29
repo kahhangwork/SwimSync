@@ -129,6 +129,11 @@ try {
   // landed 08-19/08-24; the nightly went red here on 08-24 exactly as designed,
   // three nights before this bump (the §7.178 lesson again — bump it the morning
   // after, not three sweeps late).
+  // 24 → 25 (2026-08-30) for Assessment (§8.93, landed 08-29). ⚠ TWO PINS GUARD
+  // THIS ONE FACT and §8.93 moved only one of them: `adminNav.test.ts:52` already
+  // said 25 and was green in CI the whole time this driver was stale. A vitest
+  // pin passing is therefore NOT evidence that this one is current — when you add
+  // a sidebar page, grep for BOTH. (§8.95.)
   await page.evaluate(() => {
     document
       .querySelectorAll('aside button[data-testid^="navgroup-"]')
@@ -142,7 +147,7 @@ try {
       a.getAttribute("href")
     )
   );
-  check("sidebar shows the 24 business pages", tenantLinks.length === 24,
+  check("sidebar shows the 25 business pages", tenantLinks.length === 25,
     `${tenantLinks.length}: ${JSON.stringify(tenantLinks)}`);
   check("sidebar does NOT show Platform", !tenantLinks.includes("/platform"));
 

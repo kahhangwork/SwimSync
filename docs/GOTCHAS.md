@@ -3476,3 +3476,42 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     quotes the old string because it is an account of what was grepped on a given day; rewriting it to match
     today's code falsifies the record, and the next person re-verifying that deploy would be checking a string
     that was never served. (2026-08-29, §8.94.)
+
+224. **NEVER hardcode a seed row's id in a fixture — `supabase/seed.sql` names no `id` on its `classes` INSERT, so
+    Postgres mints a FRESH uuid on every `db reset`.** `fixtures-assessment.sql` carried a literal
+    `'2ce0a523-…'` for the seed's *Saturday Beginners*, captured from the one database it was authored against.
+    It loaded there forever and failed on the **first reset** — so the driver passed 27/27 the day it was written
+    and could never have passed in CI. Resolve by a stable identity instead:
+    `SELECT id INTO v FROM classes WHERE title = 'Saturday Beginners' ORDER BY created_at, id LIMIT 1;` with a
+    `RAISE EXCEPTION` when it comes back NULL — the `ORDER BY` is load-bearing (§7.73), and the exception is what
+    turns a silent no-op into a message that names the cause. **The error it actually produces names the wrong
+    subsystem**: `cross-tenant enrolment refused: … class … is in tenant <NULL>` reads as a tenancy bug, because
+    the trigger looked up a class that is not there and compared against NULL. A `<NULL>` tenant in that message
+    means a MISSING ROW, not a tenancy fault — check the id exists before you go near the tenancy code.
+    ⚠ **`check-fixture-roundtrip.sh` STRUCTURALLY CANNOT CATCH THIS, and passed 26/26 twice on the day it was
+    broken.** That script snapshots row counts, loads, tears down, and proves the counts return — it never resets,
+    so it happily loaded this fixture against a database that still held yesterday's class row. It tests
+    load/teardown SYMMETRY, not seed-independence. **The only thing that catches a reset-fragile fixture is a
+    reset-first run** — `run-all-drivers.sh`, which resets per driver, or CI. So a fixture whose header says
+    *"do NOT run `supabase db reset`"* (this one did) has never been proven against the thing that will run it.
+    A repo-wide scan found this was the ONLY fixture with a non-convention hardcoded uuid; every other one either
+    creates its rows with `…-0000-0000-…` literals it owns, or looks them up. (2026-08-30, §8.95.)
+
+225. **A driver must never RESTATE a date its fixture computes from `now()` — ask the database what it
+    inserted.** `verify-trial-visibility.mjs` asserted `/\d{1,2}\s+Aug/` against a trial the fixture books on the
+    **strictly next Saturday in SGT**. Those two facts agree for about three weeks a month and disagree in the
+    last one: it went red on **2026-08-30**, a Sunday whose next Saturday is 5 Sep. Nothing changed in the
+    product, nothing changed in the fixture, and no code was edited — **the calendar moved**, which is the
+    §7.122 question ("which weekday did the run actually see?") arriving through a month boundary rather than a
+    weekday one. The repair is not a better regex, it is deleting the second copy: the driver already had a
+    `sql()` helper, so it now reads `to_char(session_date,'FMDD')`/`'Mon'` off the row the fixture wrote and
+    builds the pattern from that. Keep `\w*` on the month — 'Sep' and 'Sept' must both pass (§8.90's ICU trap).
+    ⚠ **The distinguishing question when auditing for this is whether the FIXTURE's date is absolute or
+    relative, not whether the DRIVER's assertion looks hardcoded.** A repo-wide scan turned up two more
+    hardcoded dates that are entirely safe — `verify-bulk-setall`'s `11 Jul` and `verify-class-students`'
+    `4 May 2026` — because their fixtures insert literal `'2026-07-04'` / `'2026-05-04 12:00:00+08'`, so the
+    assertion cannot drift. Only a `now()`-derived fixture makes a hardcoded assertion a time bomb, and only
+    `trial-visibility` had one. **This is the third instance in one day of one failure shape: a fact written down
+    twice drifts.** §7.223 was a copy string in a page and in a driver; §7.224 a seed id in the seed and in a
+    fixture; this is a date in a fixture and in a driver. In each the fix was to keep ONE copy and derive the
+    other. (2026-08-30, §8.95.)

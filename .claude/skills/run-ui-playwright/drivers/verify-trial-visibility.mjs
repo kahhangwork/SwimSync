@@ -58,10 +58,25 @@ check(
   /Trial lesson booked/i.test(text),
   "before this the card said the admin would assign them soon — which was false"
 );
+// ⚠ NEVER HARDCODE THE MONTH HERE. The fixture books the strictly-NEXT
+// Saturday in SGT, so in the last week of most months that Saturday falls in
+// the NEXT month. This assertion read /\d{1,2}\s+Aug/ and went red on
+// 2026-08-30 — a Sunday, whose next Saturday is 5 Sep. "August" was never the
+// fact being tested; "whatever month the fixture landed in" was. So ASK THE
+// DATABASE what it inserted rather than restating its date maths here: two
+// copies of the same calculation is the thing that drifts (§7.225).
+// The \w* is §8.90's ICU trap — 'Sep' and 'Sept' must both pass.
+const [trialDay, trialMon] = sql(`
+  SELECT to_char(session_date,'FMDD') || '|' || to_char(session_date,'Mon')
+    FROM trial_bookings
+   WHERE student_id = '7d099999-0000-0000-0000-000000000001'
+   ORDER BY session_date DESC LIMIT 1`).split("|");
+
 check(
   "...and WHEN, with the class named",
-  /Saturday Beginners/i.test(text) && /\d{1,2}\s+Aug/i.test(text),
-  "the only question a family actually has about a trial"
+  /Saturday Beginners/i.test(text) &&
+    new RegExp(`${trialDay}\\s+${trialMon}\\w*`, "i").test(text),
+  `the only question a family actually has about a trial — expected "${trialDay} ${trialMon}"`
 );
 check(
   "the misleading 'will assign your child soon' is gone for that child",
