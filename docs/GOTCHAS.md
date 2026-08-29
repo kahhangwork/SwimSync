@@ -3460,3 +3460,19 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     and **(b) the measurement lesson stands regardless** — no horizontal-overflow assertion can catch a squeezed
     layout, so if you ever *do* care about a narrow viewport, assert on the content column's width, not on
     `scrollWidth`. `BACKLOG.md` → *Deliberately not doing* holds the decision. (2026-08-29, §8.93.)
+
+223. **A UI copy change silently breaks any Playwright driver asserting that string — and PLURALISING A VERB is
+    the case a substring regex misses.** `verify-assessment.mjs`'s highest-value check tested `/need a level/i`;
+    the fix that made the badge read "1 child **needs** a level" does not match it, because the literal requires
+    `need` immediately followed by ` a level`. A one-word grammar fix would have reddened the nightly sweep on a
+    check about something else entirely, and §8.65's rule then applies — the red names the driver, not the copy,
+    so the triage starts in the wrong place. **Before changing any user-visible string, grep the whole repo for
+    it** (`grep -rn "<string>" . --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git`): this one
+    had **four** call sites, not the one that prompted the fix — two pages with the same bug, the driver, and
+    `docs/DEPLOYMENT.md`'s record of a served-bundle grep. Two rules follow. **(a) Write the driver's regex to
+    tolerate the inflection it is not asserting** — `/needs? a level/` — because the check exists to prove
+    unlevelled children are *surfaced*, not to police grammar; a check that fails on a legitimate copy edit is a
+    check that will be edited out. **(b) A deploy record is NOT a call site to update.** DEPLOYMENT §11.46 still
+    quotes the old string because it is an account of what was grepped on a given day; rewriting it to match
+    today's code falsifies the record, and the next person re-verifying that deploy would be checking a string
+    that was never served. (2026-08-29, §8.94.)

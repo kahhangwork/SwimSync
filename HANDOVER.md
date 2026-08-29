@@ -1,13 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-29 — **Grading is ADMIN-ONLY and has an Assessment tab — SHIPPED + DEPLOYED** (§8.93,
-`20260829000100` on prod, apps on `main`, DEPLOYMENT §11.46). The write policy narrows to tenant admins and
-`graded_at` now tracks re-confirmation; `/assessment` grades a whole class per level, with a round date so old
-grades cannot pass for today's. Verified by served-bundle grep both ways. (PRD §7.15,
-`docs/plans/GRADING_ADMIN_ONLY_PLAN.md`.)_
+_Last updated: 2026-08-29 — **Grading is EXERCISED on prod; it is no longer dormant** (§8.94). Four of five
+guards confirmed on real data — admin-only writes, the vacuity guard, the round mechanism, the promotion gate;
+re-confirmation waits for the first real round. One copy bug found and shipped (`ccb60be`, §7.223)._
 
-_Previously, 2026-08-28 (§8.92) — per-child swim-skill grading shipped and deployed (`20260828000100`), which
-this session's work then narrowed to admins._
+_Previously, 2026-08-29 (§8.93) — grading became ADMIN-ONLY with an Assessment tab, `20260829000100` on prod._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -210,11 +207,11 @@ first-firing trigger is what to watch for.
 - **Scoped search past the 1000-row cap (§8.91)** — every table is under the cap on prod, so the DB pushdown,
   the `!inner` narrowing (§7.216) and the cap banners are all unexercised at scale; correct today by coincidence
   of size. First firing: any admin table crosses ~1000 rows.
-- **Swim-skill grading (§8.92/§8.93, PRD §7.15)** — LIVE on prod, ADMIN-ONLY since §8.93, and **no child graded yet**, so the
-  cross-tenant + keep-records `RESTRICT` guards and the `merge_students` skill-progress move have never fired
-  (the scale is seeded; every child is ungraded). That zero is now **load-bearing, not just trivia**: §8.93's
-  admin-only narrowing is lossless *because* of it, and §9 turns it into a gate to run before deploying.
-  First firing: the first admin grades a child on the Assessment tab.
+- **Swim-skill grading (§8.92/§8.93, PRD §7.15)** — **no longer dormant.** Exercised on prod 2026-08-29 (§8.94,
+  the plan's §11): the round mechanism, the vacuity guard and the promotion gate have all fired on real data.
+  Still unexercised: the cross-tenant + keep-records `RESTRICT` guards, the `merge_students` skill-progress move,
+  and **re-confirmation advancing `graded_at`** — that last needs a grade OLDER than the round start, so it
+  cannot be seen until the first genuine round (~3 months). pgTAP holds it (§7.220).
 
 ### Prohibitions — these live nowhere else
 
@@ -344,6 +341,24 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.94 (2026-08-29) — The Assessment tab is exercised on prod; a copy bug found and shipped
+
+**No feature shipped — one fix, and a dormant guard made real.** §8.93 deployed grading DORMANT hours earlier
+on the same day; this session graded two children in *Tanglin View Sun 845am*. **What each arm proved, and the
+reusable technique for observing a round mechanism on the day you grade, are in the plan's §11.** Commit
+`ccb60be`; admin vitest 620, typecheck + `next build` clean, fixtures 26/26.
+
+- **Four of five arms confirmed on real data** — admin-only writes (the coach app's *Skills* screen refuses),
+  the vacuity guard (§7.219), the round mechanism, the promotion gate. The fifth, **re-confirmation advancing
+  `graded_at`** — the thing `20260829000100` exists to fix — **cannot be seen on prod yet, and that is not a
+  gap**: it needs a grade older than the round start. pgTAP holds it (§7.220); first real round in ~3 months.
+- **`ccb60be`** — both Assessment surfaces rendered *"1 need a level"*, a count interpolated into a fixed
+  plural. The driver's regex had to move with the copy or the nightly sweep would have reddened on a check
+  about something else. **§7.223** is the durable half, and it generalises past this one string.
+- **The plan's pre-commit gate had two boxes unticked that had in fact been done** at the §8.93 deploy
+  (the prod-half `count(*)`, and `/deploy` itself). Ticked, pointing at §11.46. A gate left half-ticked
+  reads as work outstanding to the next session.
+
 ## 8.93 (2026-08-29) — Grading becomes ADMIN-ONLY, and gains an Assessment tab (SHIPPED + DEPLOYED)
 
 **Migration on prod, apps on `main`, verified both ways** (DEPLOYMENT §11.46). Four commits, deliberately
@@ -374,26 +389,7 @@ Plan, decisions and the walked gate: **`docs/plans/GRADING_ADMIN_ONLY_PLAN.md`**
   a failed deploy. `curl -H "RSC: 1" <route>` names the real chunk. The Expo app gave the stronger **two-sided**
   proof — new string present, both old ones absent.
 
-## 8.92 (2026-08-28) — Wave C S-pool Piece 4: per-child swim-skill grading (SHIPPED + DEPLOYED)
-
-**Shipped + deployed the last building item of the S-pool** (`docs/plans/WAVE_C_SPOOL_PLAN.md`); PRD §7.15 +
-BACKLOG moved in the same push. All green: pgTAP 1478, app jest 420, admin vitest 565, both typecheck clean;
-migration on prod, grant dump clean, apps last (DEPLOYMENT §11.45). Migration `20260828000100`, commit `d0fb3b0`.
-
-- **What it does** — a coach grades each child against their level's skills (roster → *Grade* → tap-to-cycle);
-  the parent sees "n of m at <top grade>" + per-skill grades; the admin edits the per-tenant grade scale on the
-  Levels page. "Done" = the **top rank**, computed at read time (adding a higher grade re-opens a skill).
-- **Schema** — `skill_grade_levels` (seeded Developing/Competent/Mastered, backfill + trigger on `tenants`) and
-  `student_skill_progress` (`UNIQUE (student_id, skill_id)` upsert key; `skill_id`/`grade_level_id` `ON DELETE
-  RESTRICT` = keep-records made structural; `student_id` CASCADEs). A BEFORE trigger enforces cross-tenant
-  consistency and stamps `graded_by/graded_at` only when the grade changes (so a merge repoint preserves them).
-  Coach-write predicate is per-STUDENT (`coach_serves_student`), deliberately — reasoning in the migration.
-- **`merge_students` was taught to move the new rows** — its §7.46 cascade tripwire fired the moment the CASCADE
-  FK landed (the suite went red as designed); the teaching is folded into the same migration, DOWN rehearsed.
-- **Not done, deliberately** — Piece 5 (email-confirmation copy, S) is the only S-pool item left. Grading is
-  **DORMANT on prod** (no child graded yet); exercise one grade to see its first firing.
-
-_(§8.91 demoted to a ledger row in `docs/SESSIONS.md` — Wave C S-pool Pieces 1–3.)_
+_(§8.92 demoted to a ledger row in `docs/SESSIONS.md` — Wave C S-pool Piece 4, grading as first built.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -436,13 +432,15 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-28:** the 08-24..27 driver reds were fixed 2026-08-27 (§8.90, now a SESSIONS row). Piece 4
-(§8.92) added a **"Grading scale"** button to the admin Levels page (next to *Add level*) — the levels drivers
-(`verify-levels`, `verify-levels-table`, `verify-level-skills`) select buttons by **accessible name**, so the
-additive button should not shift them; NO driver was changed this session. **Watch the first scheduled sweep
-after this deploy** — a levels-driver red is the likeliest surprise and would be that button. `tenant-provisioning`
-remains a known one-night `waitForTimeout` flake. **A manual `gh workflow run ui-drivers.yml` confirms green in
-~1h20m without waiting** — no local UI-driver run was done this session (name-based selectors judged safe).
+**State on 2026-08-29 — TWO deploys landed since the last sweep was read, and NEITHER has been seen by one.**
+§8.93 added the whole `/assessment` surface plus a *Grading scale* button on the Levels page; §8.94 then edited
+**`verify-assessment.mjs` itself** (its `need a level` regexes, §7.223). So there are two distinct suspects if the
+next sweep reddens, and they point at different files: a **levels** red is §8.93's button (those drivers select by
+accessible name, so it should not shift them), and an **assessment** red is §8.94's regex — check that one against
+the copy in `app/(admin)/assessment/page.tsx` before anything else. `verify-assessment` has never run in CI, only
+locally at 27/27. `tenant-provisioning` remains a known one-night `waitForTimeout` flake. **A manual
+`gh workflow run ui-drivers.yml` confirms green in ~1h20m without waiting** — worth doing rather than waiting,
+given two unswept deploys.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -464,12 +462,6 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 `supabase/templates/recovery.html`; **do NOT switch email confirmation ON** (it stranded web parents once —
 assert `enable_confirmations = false` stays, in `config.toml` AND the hosted project). Apps/config only, no
 migration. After it the S-pool is exhausted; other parked items live in `BACKLOG.md`.
-
-> **The one thing worth doing on prod before building anything: exercise the Assessment tab once.** Grading is
-> still DORMANT (0 rows the moment it deployed), so the round mechanism, the promotion rule and the whole
-> admin write path have never fired on real data. **Open Admin → Assessment, grade one child, and re-confirm
-> one grade** — the re-confirmation is the arm most worth seeing work, because it is the one `20260829000100`
-> exists to fix and the one no coach ever exercised.
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), on prod,
 0 pending, with a rehearsed DOWN in `supabase/rollback/`. Piece 5 authors none.

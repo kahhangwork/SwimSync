@@ -377,10 +377,12 @@ remaining are the deploy, which is the user's call.
       preserved `graded_by`/`graded_at` over a real merge.
 - [x] New tests proven RED without the fix (§7.25) · pgTAP **1488** green · admin vitest **620** ·
       app jest **420** · both typechecks clean · `next build` clean · fixture roundtrip **26/26**
-- [ ] **RISK 8 (prod half)** — `SELECT count(*) FROM student_skill_progress` on prod returns **0**
-      before `db push`. **Not yet run — this is the gate on the migration.**
-- [ ] `/deploy` run: migration to prod FIRST, `migration list --linked` read, apps to `main` LAST,
-      served-bundle grep for `Assessing since`
+- [x] **RISK 8 (prod half)** — `SELECT count(*) FROM student_skill_progress` on prod returned **0**
+      before `db push`, so no existing `graded_by` was reinterpreted. (DEPLOYMENT §11.46.)
+- [x] `/deploy` run 2026-08-29: migration to prod FIRST, `migration list --linked` read, apps to
+      `main` LAST, served bundle grepped by the RSC-chunk method (§11.46).
+
+**The gate is fully walked.** Everything below §8 is what happened after it.
 
 ## 8. What was built, as landed
 
@@ -404,7 +406,7 @@ release. Filed in `BACKLOG.md` as its own item.
 
 ---
 
-## 8. Durable findings to graduate at `/update-docs`
+## 10. Durable findings to graduate at `/update-docs`
 
 These outlive this plan and belong in `docs/GOTCHAS.md` §7 (append the next number, never
 renumber), because `/session-start` mandates reading §7 every session:
@@ -418,3 +420,40 @@ renumber), because `/session-start` mandates reading §7 every session:
    (RISK 3.)
 3. **An `ON CONFLICT` array upsert refuses the whole statement if the array names one key
    twice** — batching an optimistic UI's gesture must dedupe before it sends. (RISK 4a.)
+
+---
+
+## 11. Exercised on prod — 2026-08-29, the same day it deployed
+
+Grading shipped **DORMANT** (0 rows), so every guard in §7 was proven locally and none had
+fired on real data. It has now been exercised: two children graded in *Tanglin View Sun
+845am*, one class of five. Four arms confirmed, one deferred.
+
+| Arm | How it was seen | Result |
+|---|---|---|
+| The write policy is admin-only | Coach app → a class → **Skills**: renamed, and tapping a grade does nothing | ✓ |
+| The vacuity guard (§7.219) | *TestClass* reports its unlevelled child apart — `1 child needs a level`, `0 of 1 assessed`, never "done" | ✓ |
+| The round mechanism reads `graded_at` | Same grades at two `?since` values | ✓ |
+| Promotion requires FRESH top grades | Same grades at two `?since` values | ✓ |
+| Re-confirmation advances `graded_at` | — | **deferred** |
+
+**The technique, which is the reusable part: set "Assessing since" to a FUTURE date.** On the
+day you grade, everything is fresh, so nothing distinguishes "fresh" from "graded at all" and
+neither the stale rendering nor the promotion gate can be observed. Dating the round to
+*tomorrow* makes today's grades stale without touching a single grade — the class flipped from
+`9 of 9 skills · 2 of 2 children done` to `0 of 9 · 0 of 2` with every cell greyed and dated,
+and a child holding five Mastered grades **lost** his `Move up to BackStroke →` button while the
+grades themselves did not move. That isolates freshness as the only variable, which is exactly
+what the gate claims to test. The input has no `max` and `since` is presentation-only (URL, no
+write), so this costs nothing and can be undone by retyping the date.
+
+**Why the re-confirmation arm could not be closed here, and that is fine.** It needs a grade
+*older* than the round start, and prod's grades are all from the day it deployed — the
+future-date trick cannot help, because re-confirming still writes today, which is still stale
+against tomorrow. It stays covered by pgTAP (`skill_progress.test.sql`, RED-proven against the
+old trigger body — §7.220) and will be visible on real data at the first genuine round in ~3
+months, as a stale date clearing on a child re-confirmed at the grade they already hold.
+
+**One bug found and shipped the same day** (`ccb60be`): both surfaces interpolated a count into
+a fixed plural and rendered *"1 need a level"*. Fixing user-visible copy that a driver asserts on
+is its own trap — **§7.223**.

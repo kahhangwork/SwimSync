@@ -932,4 +932,6 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     UP→DOWN→UP with `pg_get_functiondef()` and the policy expression **byte-identical** both ways, and the suite
     RED (6 assertions) under the rolled-back schema, green again after. Touches no data. **Precondition that was
     checked, not assumed:** `SELECT count(*) FROM student_skill_progress` on prod returned **0**, which is what
-    makes the narrowing and the `graded_by` re-attribution lossless. **Dormant on prod:** still no child graded.
+    makes the narrowing and the `graded_by` re-attribution lossless. ~~**Dormant on prod:** still no child graded.~~
+    **No longer dormant, same day** — exercised on prod 2026-08-29 (§8.94, the plan's §11): two children graded,
+    four of five arms confirmed on real data. A copy fix (`ccb60be`) followed as an app-only push, no backend.
