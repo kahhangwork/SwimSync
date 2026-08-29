@@ -309,7 +309,7 @@ export default function AssessmentIndexPage() {
                         folding them into either bucket is how they get missed. */}
                     {r.blocked > 0 ? (
                       <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
-                        {r.blocked} need a level
+                        {r.blocked} {r.blocked === 1 ? "child needs" : "children need"} a level
                       </span>
                     ) : null}
                   </Td>

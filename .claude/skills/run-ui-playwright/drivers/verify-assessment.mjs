@@ -72,8 +72,8 @@ try {
   // apart — not folded into done, and not silently into outstanding either.
   check(
     "children with no level are surfaced as needing one",
-    /need a level/i.test(text),
-    text.match(/\d+ need a level/)?.[0] ?? "(not surfaced)"
+    /needs? a level/i.test(text),
+    text.match(/\d+ (?:child needs|children need) a level/)?.[0] ?? "(not surfaced)"
   );
 
   // ── 2. Into the class grid ────────────────────────────────────────────────

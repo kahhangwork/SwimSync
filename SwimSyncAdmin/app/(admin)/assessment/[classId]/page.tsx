@@ -201,7 +201,9 @@ export default function AssessClassPage() {
                 <>
                   {" · "}
                   <span className="font-semibold text-gray-600">
-                    {progress.blockedStudents} need a level
+                    {progress.blockedStudents}{" "}
+                    {progress.blockedStudents === 1 ? "child needs" : "children need"}{" "}
+                    a level
                   </span>
                 </>
               ) : null}
