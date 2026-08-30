@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-29 — **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
+_Last updated: 2026-08-30 — **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
 suites green, **not yet deployed** (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD
 §7.15). Struck from the pick-now list. **One new item added, found by its driver:** the admin sidebar
 has no breakpoint, so every admin page is unusable on a phone (§7.222) — which now matters, because
@@ -1584,6 +1584,30 @@ nothing else will notice it.
 alignment and text assertion still passes, so width is a human-judgement signal, not a
 pass/fail one. Do not "fix" this by adding a width assertion to the driver; fix the two
 pages' column classes. The threshold in the driver is 80px and is arbitrary.
+
+### Simulate a FUTURE date against the driver suite — **S** `[from the 2026-08-30 sweep]`
+A committed script that pins `session_window_start()` to a chosen month's floor, runs the
+drivers against it, and reports which reddened — so a window-fragile fixture is found before
+the 1st, not after.
+
+**Why:** two drivers were two days from breaking and nothing would have told us. A fixture
+pinned to dates that fall out of the marking window fails **silently** — an empty
+needs-marking backlog is a valid screen, not an error — so the suite goes red on a date
+nobody changed anything on, and the triage starts by looking for a code change that does not
+exist. The throwaway version found and proved both breaks in about fifteen minutes (§7.226).
+
+**Notes:** the mechanism is four lines — `CREATE OR REPLACE FUNCTION session_window_start()
+RETURNS date … SELECT DATE '<floor>'`, applied AFTER `supabase db reset` (which wipes it, so
+it is self-cleaning). Take a **calendar date** and derive the floor from it, not a floor;
+reuse `run-all-drivers.sh`'s `fixture_for()` rather than passing fixtures by hand — doing that
+from memory is what produced a false failure during the original run. **Two real limits, and
+they are why this was deferred rather than built.** (1) It only moves the SERVER floor, not
+`now()` and not the browser clock, so it is blind to the other date-rot shape — it would NOT
+have caught §7.225's hardcoded month. (2) It cannot validate a fixture whose dates are
+*correctly* derived: overriding the floor without moving `now()` makes fixture and floor
+disagree by construction, which is exactly what happened once `fixtures-unmarked-lessons.sql`
+was fixed. A true time machine needs `libfaketime` on the Postgres container plus the
+Playwright clock moved together — much bigger, and not obviously worth it.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`

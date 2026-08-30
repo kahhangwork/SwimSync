@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-29 — **Grading is EXERCISED on prod; it is no longer dormant** (§8.94). Four of five
-guards confirmed on real data — admin-only writes, the vacuity guard, the round mechanism, the promotion gate;
-re-confirmation waits for the first real round. One copy bug found and shipped (`ccb60be`, §7.223)._
+_Last updated: 2026-08-30 — **First full local driver sweep since §8.93: 50/50 green after five fixes**
+(§8.95). Three reds found by the sweep, two more defused before firing on 1 Sep. **The NIGHTLY is still red
+on `verify-assessment` for an unrelated UTC/SGT reason that local runs do not reproduce — §9 has the evidence.**_
 
-_Previously, 2026-08-29 (§8.93) — grading became ADMIN-ONLY with an Assessment tab, `20260829000100` on prod._
+_Previously, 2026-08-29 (§8.94) — the Assessment tab was exercised on prod; grading stopped being dormant._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -341,6 +341,28 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.95 (2026-08-30) — A reset-first driver sweep: 50/50 green, and a fuse defused two days early
+
+**Five driver/fixture fixes, no product change.** `ccb60be`, `1526efe`, `4cd226a`. Every fix re-run on a
+**freshly reset** database; `check-fixture-roundtrip` 26/26. **All five are one shape — a fact written down
+twice, drifting — and all five are graduated: §7.223, §7.224, §7.225, §7.226.**
+
+- **Three reds the sweep found** — `verify-assessment`'s fixture hardcoded a seed uuid the reset regenerates
+  (§7.224); `verify-platform-admin-scope`'s page pin said 24 and `/assessment` made it 25; `verify-trial-visibility`
+  asserted a hardcoded `Aug` against a date computed from `now()` (§7.225).
+- **Two more were found by AUDIT, not by failure, and were two days from firing.** `verify-bulk-setall` and
+  `verify-unmarked-lessons` froze their browser clock at 15 Jul against a July fixture; `markable_floor` moves to
+  1 Aug on 2026-09-01 and both would have gone red on a day nobody touched them. Proven by pinning
+  `session_window_start()`, then fixed by deriving the dates. **§7.226 carries the two non-obvious constraints**
+  (why "last month" and not "the last few days"; why the enrolment date is load-bearing).
+- **`check-fixture-roundtrip.sh` cannot catch a reset-fragile fixture** — it never resets, and passed 26/26
+  twice on the day one was broken. The load-bearing half of §7.224.
+- **Deliberately NOT built:** the future-date simulator, deferred by the user after its two real limits were
+  spelled out. Now a `BACKLOG.md` item with the mechanism and both limits, so it is not re-derived.
+- **Scanned for siblings of each fix; none systemic** — one fixture had a non-convention uuid, one driver pinned
+  the sidebar count, one fixture had an absolute session date. The other hardcoded dates are safe, and §7.226
+  records why the audit question is *"is the FIXTURE's date relative?"*, not *"does the assertion look hardcoded?"*
+
 ## 8.94 (2026-08-29) — The Assessment tab is exercised on prod; a copy bug found and shipped
 
 **No feature shipped — one fix, and a dormant guard made real.** §8.93 deployed grading DORMANT hours earlier
@@ -359,37 +381,7 @@ reusable technique for observing a round mechanism on the day you grade, are in 
   (the prod-half `count(*)`, and `/deploy` itself). Ticked, pointing at §11.46. A gate left half-ticked
   reads as work outstanding to the next session.
 
-## 8.93 (2026-08-29) — Grading becomes ADMIN-ONLY, and gains an Assessment tab (SHIPPED + DEPLOYED)
-
-**Migration on prod, apps on `main`, verified both ways** (DEPLOYMENT §11.46). Four commits, deliberately
-split so the migration reached prod before the apps reached `main`: `5c79e43` (migration + pgTAP),
-`1d9c2ea` (coach read-only), `adf2e6d` (admin surface), `3d413ce` (docs). pgTAP 1488, admin vitest 620,
-app jest 420, both typechecks + `next build` clean, fixture roundtrip 26/26, `verify-assessment.mjs` 27/27.
-Plan, decisions and the walked gate: **`docs/plans/GRADING_ADMIN_ONLY_PLAN.md`**. Behaviour: **PRD §7.15**.
-
-- **What changed** — the write policy narrowed to `can_admin_tenant` (the coach arm dropped, enforced in the
-  DB, not just hidden); the coach's grade screen became read-only (*Grade* → *Skills*); a new **Assessment**
-  tab does whole classes; the Students drawer does one child.
-- **The migration also fixes `graded_at`**, which the round mechanism rests on: the old trigger stamped only
-  when the grade CHANGED, so re-confirming a child at the grade they already hold — the commonest act of an
-  assessment day — left them reading "never assessed". Stamp condition is now the contrapositive (stamp
-  unless a bare `student_id` repoint), preserving `merge_students`' contract.
-- **Scope grew with the user during planning**: they asked for an assessment-DAY tool, not the drawer modal
-  the BACKLOG had scoped. Four product decisions and the rejected alternatives (a stored `assessment_rounds`
-  entity; per-skill grade history) are in the plan's §1.
-- **A `/plan-review` (fable) found 8 risks; three changed the build** — the vacuous-completeness bug
-  (**§7.219**), a pgTAP assertion that *could not be written as specified* (**§7.220**), and the round
-  resetting at midnight. All folded into the plan beside their steps and ticked in its gate.
-- **Its driver caught a real bug on first run** (the sticky name column made the first skill untappable on a
-  phone — fixed) and a second, panel-wide one: **§7.222**, the `w-64` sidebar. That one is **REFUSED, not
-  filed** — the user's boundary: the admin panel is desktop/tablet by intent, only the coach app might go
-  mobile. `BACKLOG.md` → *Deliberately not doing*.
-- **Verifying the deploy needed a new technique, now recorded** (§11.46): a client-auth-gated App Router page
-  serves a shell containing none of its own strings, so the old login-bundle grep finds nothing and looks like
-  a failed deploy. `curl -H "RSC: 1" <route>` names the real chunk. The Expo app gave the stronger **two-sided**
-  proof — new string present, both old ones absent.
-
-_(§8.92 demoted to a ledger row in `docs/SESSIONS.md` — Wave C S-pool Piece 4, grading as first built.)_
+_(§8.93 demoted to a ledger row in `docs/SESSIONS.md` — grading admin-only + the Assessment tab.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -432,18 +424,27 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-29 — TWO deploys landed since the last sweep was read, and NEITHER has been seen by one.**
-§8.93 added the whole `/assessment` surface plus a *Grading scale* button on the Levels page; §8.94 then edited
-**`verify-assessment.mjs` itself** (its `need a level` regexes, §7.223). So there are two distinct suspects if the
-next sweep reddens, and they point at different files: a **levels** red is §8.93's button (those drivers select by
-accessible name, so it should not shift them), and an **assessment** red is §8.94's regex — check that one against
-the copy in `app/(admin)/assessment/page.tsx` before anything else. `verify-assessment` has never run in CI, only
-locally at 27/27. `tenant-provisioning` remains a known one-night `waitForTimeout` flake. **A manual
-`gh workflow run ui-drivers.yml` confirms green in ~1h20m without waiting** — worth doing rather than waiting,
-given two unswept deploys.
+**State on 2026-08-30 — the LOCAL sweep is 50/50 green (§8.95). The NIGHTLY is still RED, and the two are
+not measuring the same thing.** Run `33278795124` (2026-08-29 22:31 UTC) failed **2 of 50**:
+`tenant-provisioning` 5/8 (the known one-night `waitForTimeout` flake) and **`verify-assessment` 21/27**, which
+is a genuine open bug and **the first thing to pick up**.
+
+> **⚠ I could not reproduce the assessment red locally, and the reason is the whole clue.** It fails on checks
+> like *"a child graded today counts toward this round"*, with today's grades rendering **stale** (`Developing·
+> 29 Aug`, `0/2`). The run's wall clock was **06:31 SGT on 30 Aug** — inside the UTC-16:00–24:00 window where
+> the UTC and SGT dates disagree. Two facts consistent with that, both checked: `verify-assessment.mjs` is the
+> **only** driver that does not pin `timezoneId: "Asia/Singapore"`, and `isFreshGrade` parses
+> `` `${since}T00:00:00` `` with **no zone suffix**, so the round boundary is the *viewer's device* midnight.
+> **This is a HYPOTHESIS, not a root cause** — `TZ=UTC` alone still passes 27/27, because at 16:00 SGT the two
+> dates agree; the failure needs the disagreement window as well. **Reproduce by running inside UTC 16:00–24:00,
+> or by faking the clock into it, BEFORE changing anything.** If it holds, the driver fix (pin the timezone) and
+> the product question (should a round boundary depend on the device's zone at all? §7.7's axis) are separate
+> decisions — the second one matters beyond the test.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
+**One more, learned 2026-08-30:** `check-fixture-roundtrip.sh` run straight after a UI driver reports
+failures that are just the driver's own UI writes — reset before believing it.
 
 > **Before triaging any red, read §7.108** — a driver dying on `page.goto(admin/login)` with a
 > 30s `networkidle` timeout is a cold Next.js compile, not rot and not a product bug; `curl`
@@ -458,7 +459,11 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 
 ### THE NEXT BUILD — pick-now list is in `BACKLOG.md`
 
-**Top pick: Piece 5 — email-confirmation copy** (S) — a branded template following
+**First: triage the nightly's `verify-assessment` red** — the evidence and the reproduction condition are in
+*The nightly sweep* above. It is a real bug, it is one day old, and §8.65's rule applies: a sweep left red stops
+being an alarm. Do it before starting a feature.
+
+**Then, top pick: Piece 5 — email-confirmation copy** (S) — a branded template following
 `supabase/templates/recovery.html`; **do NOT switch email confirmation ON** (it stranded web parents once —
 assert `enable_confirmations = false` stays, in `config.toml` AND the hosted project). Apps/config only, no
 migration. After it the S-pool is exhausted; other parked items live in `BACKLOG.md`.
