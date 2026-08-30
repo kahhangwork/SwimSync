@@ -543,6 +543,25 @@ swimming skills** (Piece 4, M) and **Email-confirmation copy** (Piece 5, S) — 
   §11, which already held it (restated in §3 it was a fourth copy that drifts). Prohibitions + the
   verified-vs-specified table kept intact, as the item specified. HANDOVER back under the 45 KB budget.
 
+- **30 ledger rows in `docs/SESSIONS.md` are still over the 200-char cap** — **M**. Three were
+  compressed on 2026-08-30 (§8.36/§8.37/§8.38: 1432/1344/1368 → 197/181/199); the rest are all
+  August, largest **1204** (§8.34). **Why:** a ledger row is a *pointer*, and an oversized one is a
+  narrative that duplicates the graduated copy, then goes stale and competes with it — the exact
+  failure that took §8 to 49% of a 3,972-line file. The rows were written when reasoning was not
+  being graduated, so their length is the symptom, not the disease.
+  **Notes — this is NOT a text-trimming job, and doing it as one loses facts.** The rule is
+  trace-before-cutting: an oversized row is a row whose reasoning never got a home, so each fact
+  must be found in `docs/` *before* its sentence is deleted. All three rows done on 2026-08-30
+  turned up facts with **no pointer anywhere** — the widened engine scan (already §7.109, never
+  cited), Postgres firing same-timing triggers in alphabetical name order, and "ask the code for a
+  call-site list, never inherit one" (both `docs/plans/WAVE_1_PLAN.md`). Expect ~10–15 min per row,
+  more where a fact needs a new §7 written. **Never delete a row** — they are cited by number from
+  applied migrations and `core.ts`, so a missing row is a dangling reference; only the prose inside
+  it shrinks. **Verify every pointer resolves before writing it**: §8.38 cited §7.108 for a
+  `SECURITY DEFINER` lesson §7.108 does not contain, and carried its full narrative *because* the
+  delegation it claimed was never checked. Measure with
+  `awk '/^\| \*\*8/ && length($0)>200' docs/SESSIONS.md | wc -l`.
+
 ### Later — big features carrying their own dependencies
 
 ~~**An owner-only accounting page (M — *absorbs Revenue reporting*)**~~ — **SHIPPED 2026-08-23**
