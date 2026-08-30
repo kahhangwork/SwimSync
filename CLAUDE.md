@@ -82,8 +82,11 @@ touching an unfamiliar subsystem.
   compare times take a plain number so they cannot read a clock at all. (§7.7)
 - **A THIRD axis: comparing an SGT date to a `timestamptz` through a zoneless
   `` `${date}T00:00:00` ``** puts the boundary at the *viewer's* midnight. Spell the offset —
-  `+08:00` — or use `toSgDate()`. To DISPLAY a `timestamptz`, `formatSgDate(toSgDate(x))`, never a
-  bare `toLocaleDateString`. (§7.227 — shipped live in the assessment round.)
+  `+08:00` — or use `toSgDate()`. (§7.227 — shipped live in the assessment round.)
+- **To DISPLAY any date, `formatSgStamp(x, opts)`** — it pins Asia/Singapore, takes a `timestamptz`
+  or a `YYYY-MM-DD`, and degrades instead of throwing. **Never "harden" `toSgDate()` to match it**:
+  34 call sites compare its output *lexically*, so a degrade there turns a crash into a silently
+  wrong attendance backlog. Display and logic are different helpers on purpose. (§7.229, §7.230.)
 
 **Billing — the guards are load-bearing, not friction**
 - **Never add an override** to the unmarked-attendance block or the completed-month guard.

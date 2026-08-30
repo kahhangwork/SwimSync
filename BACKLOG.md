@@ -543,39 +543,6 @@ swimming skills** (Piece 4, M) and **Email-confirmation copy** (Piece 5, S) — 
   §11, which already held it (restated in §3 it was a fourth copy that drifts). Prohibitions + the
   verified-vs-specified table kept intact, as the item specified. HANDOVER back under the 45 KB budget.
 
-- **Ten `timestamptz` columns still render in the DEVICE's timezone, not Singapore's** — **S**.
-  Found by the §7.227 audit and deliberately left out of that fix's scope (the nightly red was the round
-  BOUNDARY; these are display only, and no driver asserts any of them). `new Date(col).toLocaleDateString("en-SG")`
-  with no `timeZone` shows the viewer's calendar date for a Singapore instant, so anything stamped between
-  00:00 and 08:00 SGT renders as the previous day west of Singapore:
-  `invoices/page.tsx` ×3 (`paid_claimed_at`, `reminded_at` ×2), `referrals/page.tsx` ×4 (`created_at`,
-  `converted_at`, `earned_at`, `expires_at`), `packages/page.tsx` ×2 (`requested_at`), and
-  `WhatsAppQueue.tsx` ×1 (`openedStamp`). Every one is a single-line `toLocaleDateString("en-SG")` with no
-  options, so `grep -nE 'toLocale(Date)?String' | grep -v timeZone` finds them all. The fix is mechanical — `formatSgDate(toSgDate(col), …)`, the pair
-  `lib/lessonDates.ts` already exports and which callers cannot opt out of — or an explicit
-  `timeZone: "Asia/Singapore"` in the options, which is how `history/page.tsx`'s `formatWhen()` already does it.
-  **Latent, not live:** prod's users are all in Singapore, so nobody sees a wrong date today; it becomes real
-  the first time an admin works from another timezone. **`expires_at` on a referral reward is the one that
-  costs money** — a day's difference there is a person's deadline, not a label. Worth doing as one sweep with
-  a lint-shaped guard, since a tenth site will otherwise be added the same way.
-
-- **`toSgDate()` THROWS on a malformed timestamp where a plain `toLocaleDateString` degraded** — **S**.
-  Raised by the §7.227 review and deliberately left out of that fix. `toSgDate(iso)` is
-  `todayInSg(new Date(iso))`, and `Intl.DateTimeFormat().formatToParts(Invalid Date)` raises
-  `RangeError: Invalid time value` — which in React takes down the whole subtree, where
-  `new Date(bad).toLocaleDateString()` merely rendered the string `"Invalid Date"` in one cell. Both apps
-  export it and **~20 call sites** pass a `timestamptz` column straight in (`calendarLessons.ts`,
-  `classCoverage.ts`, `coachDisableImpact.ts`, `classes`/`platform`/`lessons` pages, the coach schedule and
-  roster screens, the parent Attendance screen).
-  **Unreachable today, which is why it was not fixed under a bug fix:** every column fed to it is
-  `NOT NULL timestamptz` serialised by PostgREST, so it cannot be malformed without the database already
-  being wrong. It is a *robustness* change to a shared helper, not a defect with a repro.
-  The fix mirrors what `formatSgDate` in the same file already does — it guards `Number.isNaN` and returns
-  its input rather than throwing — so `toSgDate` returning the raw string on an unparseable input would make
-  the pair consistent and let the existing `formatSgDate` guard carry it through to a visible-but-harmless
-  label. **Touches `SwimSyncAdmin/lib/lessonDates.ts` AND `SwimSyncApp/lib/lessonDates.ts`** (they are
-  parallel copies), so it needs both test suites.
-
 ### Later — big features carrying their own dependencies
 
 ~~**An owner-only accounting page (M — *absorbs Revenue reporting*)**~~ — **SHIPPED 2026-08-23**
@@ -1786,3 +1753,4 @@ Kept so the reasoning doesn't get re-litigated.
 | **Coach-assisted assignment workflow** (a coach assigns students to their own classes, not just the superadmin) | Refused 2026-08-21 with the user, alongside parent self-enrolment. **Class assignment stays a superadmin action** — the two candidate ways to remove the admin from the loop, letting the *parent* pick and letting the *coach* pick, were both rejected, so this is a deliberate single point of control, not an oversight. The onboarding bottleneck it named is real but is answered by better admin tooling, not by delegating the decision. This was previously "the only sanctioned route at this bottleneck" once parent self-enrol was refused; that framing is now void — neither route is sanctioned. Revisit only if a real second-coach tenant makes admin-only assignment genuinely painful, and even then the question is *coach-assisted* (coach proposes, admin confirms), not coach-authoritative. |
 | **Cancelling TODAY's (or a past) lesson from the admin panel** | Refused 2026-08-22 with the user, closing the last advance-cancel follow-up. Advance-cancel is deliberately *advance only* — `cancel_lesson`'s `p_date <= today_sg()` refusal. A lesson happening today or already past is the **coach's** call, marked `cancelled_rain`/`cancelled_coach`, and the admin can already set that same mark from the lesson page (PRD §7.6, §7.22). A second admin route to call off today's lesson would duplicate the coach's path and buy nothing — worse, the two surfaces would then have to agree on a lesson whose roster may already exist. **Revisit only if** a real admin needs to call off a lesson *that morning, before the coach has touched it*; the one-line change is relaxing that date refusal, and it stays refused until someone actually asks. |
 | **A CI gate on documentation size** (`scripts/check-doc-budget.sh` — byte budget on `HANDOVER.md`, line cap on `CLAUDE.md`, wired into `repo-invariants`) | Built, proven to fail correctly on a one-byte growth, and **reverted the same day** at the user's call (`cb70808` holds it; `6013082` removed it). The case *for* is strong and is recorded in **§7.119**: instruction alone has now failed twice, taking `HANDOVER.md` to 290 KB and then to 91 KB, and the repo already uses exactly this pattern for a rule that kept being forgotten (`check-teardowns.sh`, whose own header says *"A note in a document does not catch that; a failing build does."*). The case *against* won on two counts, both fair: **failing a build on a documentation byte-count is disproportionate** when the same push carries a billing fix, and the ratchet as built was seeded at the file's *exact* current size, so the next session's first legitimate §9 addition would have reddened CI with no headroom at all. What replaced it: the same limits as **countable rules** in `/update-docs` — ledger row ≤200 chars, ≤1 `_Previously,_`, ≤45,000 bytes — measured at the **start** of Step 5 rather than asked as a Final-check question, which is the specific failure the old rule had (five consecutive sessions answered it and waived it). **If `HANDOVER.md` regrows a third time, restore the script from `cb70808` rather than re-wording the rule a fourth time** — that escalation is written into `/update-docs`'s Final check, so it does not depend on anyone remembering this row. |
+| **Making `toSgDate()` degrade instead of throw** (a NaN guard on the shared date primitive, so a malformed value renders a label rather than taking down a React subtree) | Planned 2026-08-30, and **refused by `/plan-review` before it was written**. The kindness is real but aimed at the wrong function: `toSgDate` has **34 call sites and they are overwhelmingly LOGIC** — the coach's unmarked-attendance backlog compares its output lexically, as do class coverage and the assessment round boundary. A raw string returned there flows to `parseDate` → `NaN` → an empty expected-lesson list, and the screen says *"nothing expected"*: coverage looks complete, a billing month is quietly blocked, and **nothing throws, so nothing is noticed**. A loud crash traded for a silent wrong answer. The display need was real and got its own front door instead — `formatSgStamp()`, which degrades and never throws. **Full reasoning and the standing prohibition: §7.229.** |

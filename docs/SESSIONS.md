@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.96** | 2026-08-30 | The nightly's assessment red was a PRODUCT bug: the round used the VIEWER's midnight, not Singapore's | §7.227 · PRD §7.15 · BACKLOG |
 | **8.95** | 2026-08-30 | Reset-first driver sweep: 50/50 green after five driver/fixture fixes; two 1 Sep time bombs defused | §7.223–§7.226 · BACKLOG |
 | **8.94** | 2026-08-29 | Assessment tab exercised on prod, grading no longer dormant; one copy/driver-regex fix `ccb60be` | §7.223 · plans/GRADING_ADMIN_ONLY_PLAN.md §11 |
 | **8.93** | 2026-08-29 | Grading becomes ADMIN-ONLY + an Assessment tab, `20260829000100` | `GRADING_ADMIN_ONLY_PLAN.md` · PRD §7.15 · §7.219–§7.222 · §11.46 |

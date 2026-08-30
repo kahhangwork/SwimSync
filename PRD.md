@@ -60,6 +60,15 @@ SwimSync supports four user types *(implemented — the original three, with `su
 > architecture should support multiple coaches" — was met and then exceeded: SwimSync is
 > multi-tenant, so it supports multiple coaches **and** multiple independent businesses.*
 
+> *(implemented 2026-08-30)* **Every date the product displays is the SINGAPORE date of that
+> moment, never the viewing device's.** The businesses are in Singapore, so a lesson date, an
+> invoice stamp or a reward's expiry means the same day to an admin travelling as it does to
+> one at the pool. Anything stamped between 00:00 and 08:00 SGT would otherwise read a day
+> early west of Singapore. Latent until then — every user is currently in Singapore, where
+> the two agree — so the rule is held by a test that scans the source rather than by anything
+> a reader could notice (§7.229, §7.230). The spec had been silent on this axis; §7.227 is
+> what that silence cost on the one surface where it reached a product rule.
+
 ### Key Purposes
 
 - Allow parents to create accounts and add their children's profiles in SwimSync

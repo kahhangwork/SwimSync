@@ -1092,3 +1092,24 @@ and a final assertion that counts rather than tests presence (§7.118).
 See LOCAL_DEV_GUIDE §"Running the tests".
 
 ---
+
+### SGT-correct date display (2026-08-30)
+
+**`lib/sgDisplay.drift.test.ts` — in BOTH apps, 4 checks each, and it scans BOTH apps' source
+either way.** A structural guard, not a unit test: it reads real `.ts`/`.tsx` files and fails any
+`toLocale{Date,Time}String` call that (a) omits `timeZone`, or (b) pins `timeZone: "UTC"` outside
+`lessonDates.ts`. Rule (b) is the one worth keeping: presence of `timeZone` is not correctness —
+UTC on a `timestamptz` passes a naive check while rendering the wrong date 8 hours out of 24
+(§7.227's bug with a green light over it). It also pins the two `lessonDates.ts` copies
+byte-identical apart from line 3 (the TWIN FILE pointer) — that file is the foundation of the whole
+date system and was the ONLY shared copy with no identity test, carrying just a "Keep in sync"
+comment. A fourth check asserts the scanner finds call sites **at all**, so a parser bug cannot
+empty the list and turn the other three into no-ops. The allowlist is pinned by file **and content
+snippet**, never file-level; its parser traps are §7.230.
+
+**`lib/lessonDates.test.ts` — five `formatSgStamp` cases, in both apps**, each asserted across five
+zones via `process.env.TZ` (the pattern those files already used): a 23:30 SGT and an 02:15 SGT
+`timestamptz`, a single-digit day (`"05/08/2026"` — pinning the ICU default the fix claims to match
+byte-for-byte), a bare `"YYYY-MM-DD"`, and the degrade-not-throw case, which also asserts
+`toSgDate()` still **throws** on the same input (§7.229). RED-proven: given the buggy body all five
+fail.

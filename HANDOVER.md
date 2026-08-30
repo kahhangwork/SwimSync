@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-30 — **BOTH nightly reds are fixed.** `verify-assessment` was a PRODUCT bug (§8.96,
-§7.227 — the round used the viewer's midnight); `verify-tenant-provisioning` was a DRIVER bug hiding seven
-unrun checks (§8.97, §7.228). **Tonight's sweep is the confirmation — neither is proven on CI yet.**_
+_Last updated: 2026-08-30 — **Every displayed date is now Singapore's, held by a source-scanning guard**
+(§8.98, §7.229/§7.230). Latent bug, byte-identical output, so nothing visibly changed. **The two nightly reds
+fixed yesterday are STILL unconfirmed on CI — no sweep has run since.**_
 
-_Previously, 2026-08-30 (§8.96) — the assessment round boundary fixed; reproduced by a timezone, not a clock._
+_Previously, 2026-08-30 (§8.97) — the tenant-provisioning driver's `waitForTimeout` hid seven unrun checks._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -341,6 +341,29 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.98 (2026-08-30) — A displayed date is Singapore's, not the viewer's
+
+**One fix, one guard, shipped and pushed.** `317175c`. 15 sites — 10 admin `timestamptz` renders,
+5 SwimSyncApp `formatDate` helpers — moved to a new **display-only** `formatSgStamp()`. Output is
+**byte-identical in SGT**, so nothing changed for anyone using it today; that is also why nobody could
+see the bug. **Everything durable is in §7.229, §7.230, PRD §1 and `docs/TESTING.md`.** Plan and its
+walked gate: `docs/plans/SGT_DISPLAY_PLAN.md`.
+
+- **`/plan-review` (fable) reversed the plan's first step before it was written**, and that is the
+  session's most valuable half hour. The plan proposed making `toSgDate()` degrade instead of throw;
+  the primitive has **34 call sites and they are mostly LOGIC**, so the kindness would have traded a
+  loud crash for a silent wrong answer in the coach's attendance backlog. §7.229 · `BACKLOG.md`
+  → *Deliberately not doing*.
+- **Enumerating the scanner's reds before fixing anything caught three parser bugs review had not** —
+  including an allowlist window that reached into the neighbouring function and silently exempted two
+  real offenders. §7.230 has all four traps. **An allowlist that matches by proximity is not one.**
+- **The repo's own deploy check does not apply here and was not faked.** §7.31/§7.51 say to grep the
+  served bundle for a user-visible string only the new build has; this change deliberately adds none,
+  so no such string exists. CI plus four RED-proven guards is what stands behind it instead.
+- **Deliberately NOT done:** pinning `timezoneId` in any driver (§7.227's standing prohibition — the
+  grep found no driver asserting a rendered date, so nothing needed it), and the logic half of the
+  `toSgDate` item, refused above.
+
 ## 8.97 (2026-08-30) — The nightly's OTHER red: a driver bug that hid seven unrun checks
 
 **One driver fixed, no product change.** `0b239db`. `verify-tenant-provisioning` 15/15 — normally, on a
@@ -361,27 +384,7 @@ screenshots and nobody had ever opened them.**
   markup for a test, restoring a path that only matters with `RESEND_API_KEY` set. `BACKLOG.md`
   → *Deliberately not doing*.
 
-_(§8.95 demoted to a ledger row in `docs/SESSIONS.md` — the reset-first driver sweep.)_
-
-## 8.96 (2026-08-30) — The nightly's assessment red was a PRODUCT bug, not a driver one
-
-**One fix, shipped and green.** `b2bcb2d`. `verify-assessment` 27/27 under Pacific/Midway, Asia/Singapore and
-UTC (was 21/27 under Midway); admin vitest 621, typecheck + `next build` clean, fixtures 26/26. CI green.
-**Everything durable is in §7.227** — the defect, both of its directions, the reproduction technique and the
-two prohibitions. PRD §7 now states the round boundary; the spec had been silent on the axis.
-
-- **The assessment round used the VIEWER's midnight, not Singapore's**, so grades entered in the first hours
-  of the SGT day read as a previous round's — the assessor told to re-grade children they had just graded.
-  §7.7's axis on a surface nobody had connected to it. East of Singapore it fails the opposite way.
-- **§9's triage note was wrong twice, and both cost time** (corrected in §7.227): `verify-assessment` is not
-  *"the only driver that does not pin `timezoneId`"* — **43 of the 50 do not** — and the reproduction is a
-  **timezone, not a clock**. `TZ=Pacific/Midway` reproduced 21/27 at 16:20 SGT with no faking, where the
-  note called for a UTC 16:00–24:00 window or `clock.install()`.
-- **Two review findings filed rather than fixed**, both with their reasoning in `BACKLOG.md`: ten
-  `timestamptz` renders still showing the device's date, and `toSgDate()` throwing where the call it
-  replaced degraded. Neither is reachable on prod data; both are one-line traps for the next caller.
-- **Deliberately NOT done: pinning `timezoneId` in the driver.** The unpinned driver on a UTC runner is what
-  caught the bug; every SGT-local run passed 27/27 through it. §7.227 records that as a prohibition.
+_(§8.96 demoted to a ledger row in `docs/SESSIONS.md` — the assessment round boundary.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -424,17 +427,17 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-30 — BOTH of the last nightly's reds are FIXED, and NEITHER is confirmed on CI yet.**
-Run `33278795124` failed 2 of 50: `verify-assessment` 21/27 was a real product bug (§8.96, §7.227) and
-`verify-tenant-provisioning` 5/8 was a driver bug (§8.97, §7.228) — **not** the "one-night `waitForTimeout`
-flake" this section called it for two nights, and not the *timing-only* story either: `5/8` was seven checks
-that never ran.
+**State on 2026-08-30 — the two reds fixed on 2026-08-30 are STILL UNCONFIRMED. No sweep has run since
+they landed**, so the newest run (`33278795124`) is the two-red one and says nothing about the fixes.
+`verify-assessment` 21/27 was a real product bug (§8.96, §7.227); `verify-tenant-provisioning` 5/8 was a driver
+bug (§8.97, §7.228) — **not** the "one-night `waitForTimeout` flake" this section called it for two nights, and
+not timing-only either: `5/8` was seven checks that never ran.
 
-**⚠ Tonight's sweep is the whole confirmation, and it tests the two differently.** The assessment fix only
-gets exercised in the UTC/SGT disagreement window, which the ~22:30 UTC start sits inside — so a green there
-is real evidence. The provisioning fix is exercised on every run. **Read the run, not this paragraph**, and
-if either is still red, `gh run download <id> -n ui-driver-run` FIRST (§7.228) — the screenshots settled the
-last one in a single look after two wrong hypotheses.
+**⚠ The next sweep is the whole confirmation, and it tests the two differently.** The assessment fix is only
+exercised in the UTC/SGT disagreement window, which the ~22:30 UTC start sits inside — so a green there is real
+evidence. The provisioning fix is exercised on every run. **Read the run, not this paragraph**, and if either is
+still red, `gh run download <id> -n ui-driver-run` FIRST (§7.228) — the screenshots settled the last one in a
+single look after two wrong hypotheses.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -457,10 +460,10 @@ failures that are just the driver's own UI writes — reset before believing it.
 
 ### THE NEXT BUILD — pick-now list is in `BACKLOG.md`
 
-**First: read tonight's nightly** — both fixes are unconfirmed on CI (see *The nightly sweep* above). That
-is a five-minute check, not a task, and §8.65's rule is why it comes first: a sweep nobody reads stops being
-an alarm. **Two reds in one week were each mis-labelled in this very section** before anyone looked at the
-evidence, so re-read the run rather than this paragraph.
+**First: read the next nightly** — both of yesterday's fixes are still unconfirmed on CI, and no sweep has run
+since (see *The nightly sweep* above). That is a five-minute check, not a task, and §8.65's rule is why it comes
+first: a sweep nobody reads stops being an alarm. **Two reds in one week were each mis-labelled in this very
+section** before anyone looked at the evidence.
 
 **Then, top pick: Piece 5 — email-confirmation copy** (S) — a branded template following
 `supabase/templates/recovery.html`; **do NOT switch email confirmation ON** (it stranded web parents once —

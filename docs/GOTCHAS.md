@@ -3613,3 +3613,39 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     ⚠ **When auditing for the dead-attribute shape:** `grep -o 'getAttribute("data-[a-z-]*"' drivers/*.mjs`,
     then grep the app for each name. One other driver uses one (`data-status`, `verify-admin-lesson-detail`)
     and it is real. (2026-08-30.)
+
+229. **`toSgDate()` THROWS on a malformed value ON PURPOSE — display and logic need DIFFERENT helpers, and
+    "hardening" the shared one is how a loud crash becomes a silently wrong answer.** `lessonDates.ts` has
+    **34 `toSgDate()` call sites, and they are overwhelmingly LOGIC, not display**: `attendanceCompleteness.ts`
+    converts `enrolled_at`/`unenrolled_at` and compares them **lexically** to build the coach's unmarked-attendance
+    backlog; `classCoverage.ts` builds `from`/`until` bounds; `AssessmentGrid.tsx` feeds `isFreshGrade`'s round
+    boundary (§7.227's own mechanism). A 2026-08-30 plan proposed the obvious kindness — return the raw input
+    instead of throwing, so a bad value renders `"Invalid Date"` in a cell rather than taking down a React
+    subtree. **`/plan-review` caught it before it was written.** The raw string flows into `parseDate` → `NaN` →
+    `expectedLessonDates` returns `[]`, and the screen says **"nothing expected"**: coverage looks complete,
+    grades misclassify, a billing month is quietly blocked with no visible reason. Nothing throws, so nothing is
+    noticed. ⚠ **PROHIBITION: never add a NaN guard, a try/catch, or any degrade path to `toSgDate`,
+    `todayInSg`, or `parseDate`.** A date primitive that guesses is worse than one that stops. The display need
+    is real, so it got its own front door: **`formatSgStamp(iso, opts)`** — degrades, never throws, DISPLAY ONLY,
+    correct for a `timestamptz` **and** a bare `"YYYY-MM-DD"` (the date string round-trips because UTC midnight is
+    08:00 SGT the same day, and Singapore is east of Greenwich so it never wraps). Use it for every rendered date;
+    `formatSgDate` still takes a `"YYYY-MM-DD"` you already hold. (2026-08-30.)
+
+230. **A source-scanning guard is only as good as its PARSER, and all three of its ways to lie are silent** —
+    learned building `sgDisplay.drift.test.ts` (both apps), which stops an eleventh zoneless date render being
+    added. Every one of these was found by **enumerating and classifying the reds before fixing anything**, not
+    by reading the scanner:
+    ⚠ **Blanking a comment must PRESERVE LENGTH.** Dropping line-comment characters instead of overwriting them
+    with spaces shifted every match after the first `//` in a file, which made the scanner accuse
+    `history/page.tsx` — the one file that was already **correct** — while the real offenders sat unreported.
+    ⚠ **A template literal's `${…}` is CODE, not text.** Blanking whole backtick strings hid a real call site
+    rendering a date inside a `title={…}` template. Blank the literal segments; step over the substitutions.
+    ⚠ **An allowlist matched by PROXIMITY is not an allowlist.** The receiver expression sits *before* the
+    `.toLocale…` token, so the snippet has to be matched against preceding source — and a flat 400-character
+    window reached into the **neighbouring function** and silently exempted two genuine offenders. Bound the
+    window to the enclosing block. Pin every entry to file **and** content snippet, never file-level.
+    ⚠ **Presence of an option is not correctness.** `timeZone: "UTC"` on a `timestamptz` satisfies a naive
+    "has `timeZone`" check while rendering the wrong date 8 hours out of 24 — §7.227's bug with a green light
+    over it. The guard rejects UTC too, except where the `Date` was itself built as UTC. **And add a vacuity
+    test**: assert the scanner finds call sites at all, or a parser bug empties the list and every assertion
+    passes forever. (2026-08-30.)
