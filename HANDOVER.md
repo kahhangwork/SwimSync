@@ -215,7 +215,8 @@ first-firing trigger is what to watch for.
   not by data**, and the only entry here that is meant to stay that way: `enable_confirmations` is false because
   turning it on stranded web parents. It has never been sent and **cannot be** without the flag (§7.232), so the
   usual "first firing" line does not apply — there is no trigger to wait for, only a decision nobody should make
-  casually. `authEmailConfig.drift.test.ts` holds the local flag down; the hosted one is a manual check.
+  casually. `authEmailConfig.drift.test.ts` holds the local flag down; the hosted one is confirmed off by
+  `GET /auth/v1/settings` (`mailer_autoconfirm: true` — inverted, see §7.232).
 
 ### Prohibitions — these live nowhere else
 
@@ -361,9 +362,11 @@ exhausted.** Everything durable is in §7.231, §7.232, `docs/TESTING.md` and `B
   false reds proven green. The first draft had a false red on the toggle line itself and an invisible hole
   in a Go conditional.
 - **Deliberately NOT done:** confirmation never switched on, and no `supabase config push` — it carries the
-  whole local config surface, the stranding toggle included. **The hosted template + flag remain a MANUAL
-  dashboard step**; no CLI can read them back to verify. No app code changed, so the `main` push deployed
+  whole local config surface, the stranding toggle included. No app code changed, so the `main` push deployed
   nothing user-visible.
+- **Confirmed OFF on prod after the dashboard paste** — `GET /auth/v1/settings` returns
+  `"mailer_autoconfirm": true`, and **that inversion is the trap: `true` means confirmations are OFF**
+  (§7.232 has the command). The hosted **template body** still has no read-back.
 
 ## 8.98 (2026-08-30) — A displayed date is Singapore's, not the viewer's
 

@@ -3685,6 +3685,12 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     already proven in production** — `confirmation.html`'s markup is byte-identical to `recovery.html`, only the
     copy differs — plus an offline substitution render. State that limit out loud wherever the work is recorded;
     a dormant template described as "verified" is how the first real send becomes the first real test.
-    ⚠ **The hosted half cannot be verified from the CLI at all:** `supabase config` has only `push`, no pull, so
-    the cloud project's template and its confirmation flag are a manual dashboard check — and a `config push`
-    would carry the whole local config surface, the stranding toggle included. (2026-08-30.)
+    ⚠ **The hosted FLAG can be read back; the hosted TEMPLATE cannot.** `supabase config` has only `push`, no
+    pull — but GoTrue serves its own settings, so one unauthenticated GET answers the question that matters:
+    `curl -s https://<ref>.supabase.co/auth/v1/settings -H "apikey: <anon>"`. ⚠⚠ **The field is INVERTED and
+    the inversion is the trap: `"mailer_autoconfirm": true` means confirmations are OFF** (auto-confirm the
+    user, send nothing). `true` is the safe state — the exact opposite reading of `config.toml`'s
+    `enable_confirmations = false`, so anyone who sees `mailer_autoconfirm: false` and concludes "off" has it
+    backwards. Confirmed `true` on prod 2026-08-30. The **template body** still has no read-back and stays a
+    dashboard check, and a `config push` would still carry the whole local config surface, toggle included.
+    (2026-08-30.)
