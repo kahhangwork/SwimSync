@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { formatSgStamp } from "@/lib/lessonDates";
 import {
   View,
   Text,
@@ -94,7 +95,7 @@ function formatBillingMonth(ym: string): string {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-SG", {
+  return formatSgStamp(dateStr, {
     day: "numeric",
     month: "short",
     year: "numeric",

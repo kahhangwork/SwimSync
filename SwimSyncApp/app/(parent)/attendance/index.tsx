@@ -17,6 +17,7 @@ import {
   expectedLessonDates,
   formatSgDate,
   type DayOfWeek,
+  formatSgStamp,
 } from "@/lib/lessonDates";
 import {
   computeUpcomingLessons,
@@ -85,8 +86,7 @@ function matchesFilter(status: DbStatus, filter: FilterOption): boolean {
 }
 
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("en-SG", {
+  return formatSgStamp(dateStr, {
     day: "numeric",
     month: "short",
     year: "numeric",

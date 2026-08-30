@@ -6,6 +6,7 @@ import {
   todayInSg,
   toSgDate,
   formatSgDate,
+  formatSgStamp,
   dayOfWeekOf,
   expectedLessonDates,
   monthBounds,
@@ -297,5 +298,72 @@ describe("previousBillingMonth", () => {
   it("returns an empty string for a malformed date rather than guessing", () => {
     expect(previousBillingMonth("nonsense")).toBe("");
     expect(previousBillingMonth("2026-13")).toBe("");
+  });
+});
+
+describe("formatSgStamp", () => {
+  // The §7.227 axis on a DISPLAY surface: a timestamptz rendered through a
+  // zoneless toLocaleDateString shows the VIEWER's calendar date, so anything
+  // stamped between 00:00 and 08:00 SGT reads as the previous day west of
+  // Singapore. Five zones, pinned deterministically — §7.227 records that the
+  // pin belongs here and not in a one-off `TZ=… npm test`.
+  const ZONES = [
+    "Asia/Singapore",
+    "UTC",
+    "America/New_York",
+    "Pacific/Midway",
+    "Pacific/Auckland",
+  ];
+
+  const DMY: Intl.DateTimeFormatOptions = {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  };
+
+  function inEveryZone(assert: () => void): void {
+    const original = process.env.TZ;
+    for (const tz of ZONES) {
+      process.env.TZ = tz;
+      assert();
+    }
+    process.env.TZ = original;
+  }
+
+  it("shows the Singapore date of a timestamptz, in every zone", () => {
+    // 23:30 SGT — the same instant is still the PREVIOUS day in UTC.
+    inEveryZone(() =>
+      expect(formatSgStamp("2026-08-30T23:30:00+08:00", DMY)).toBe("30/08/2026")
+    );
+  });
+
+  it("shows the Singapore date of an early-morning timestamptz, in every zone", () => {
+    // 02:15 SGT — this is the one a zoneless render gets wrong, by a day.
+    inEveryZone(() =>
+      expect(formatSgStamp("2026-08-30T02:15:00+08:00", DMY)).toBe("30/08/2026")
+    );
+  });
+
+  it("pads a single-digit day, matching the en-SG default it replaced", () => {
+    // Guards the claim that this fix is byte-identical in SGT: the default
+    // toLocaleDateString("en-SG") renders "05/08/2026", not "5/8/2026". That is
+    // an ICU default, and defaults move between runtimes — so pin it.
+    inEveryZone(() =>
+      expect(formatSgStamp("2026-08-05T10:00:00+08:00", DMY)).toBe("05/08/2026")
+    );
+  });
+
+  it("accepts a bare YYYY-MM-DD and does not shift it", () => {
+    // The App's formatDate helpers are fed BOTH shapes through one function.
+    // A date string round-trips: UTC midnight is 08:00 SGT the same day.
+    inEveryZone(() => expect(formatSgStamp("2026-08-30")).toBe("Sun, 30 Aug"));
+  });
+
+  it("degrades to its input on an unparseable value rather than throwing", () => {
+    // DISPLAY ONLY. toSgDate() still throws on the same input, on purpose —
+    // 34 call sites compare its output lexically, where a raw string would be a
+    // silently wrong answer instead of a visible one.
+    inEveryZone(() => expect(formatSgStamp("not-a-date")).toBe("not-a-date"));
+    expect(() => toSgDate("not-a-date")).toThrow();
   });
 });

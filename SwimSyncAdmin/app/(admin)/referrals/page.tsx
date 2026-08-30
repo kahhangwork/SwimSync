@@ -12,6 +12,7 @@
 // on the Packages page and uses preview_package_price (RISK 7).
 
 import { useEffect, useState } from "react";
+import { formatSgStamp } from "@/lib/lessonDates";
 import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td } from "@/components/Table";
@@ -19,6 +20,16 @@ import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { discountLabel, type DiscountType } from "@/lib/referralDiscount";
+
+// The Singapore calendar date of a timestamptz, in the dd/mm/yyyy shape this
+// page has always shown. `formatSgStamp` pins Asia/Singapore; the bare
+// `toLocaleDateString("en-SG")` it replaced rendered the VIEWER's date, a day
+// early west of Singapore for anything stamped before 08:00 SGT.
+const DMY: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+};
 
 type Settings = {
   referral_enabled: boolean;
@@ -316,13 +327,13 @@ export default function ReferralsPage() {
                 <Tr key={r.id}>
                   <Td>{r.referrer}</Td>
                   <Td>{r.referee}</Td>
-                  <Td>{new Date(r.created_at).toLocaleDateString("en-SG")}</Td>
+                  <Td>{formatSgStamp(r.created_at, DMY)}</Td>
                   <Td>
                     <StatusBadge status={r.status === "converted" ? "Converted"
                       : r.status === "void" ? `Void${r.void_reason ? ` · ${r.void_reason}` : ""}`
                       : "Pending"} />
                   </Td>
-                  <Td>{r.converted_at ? new Date(r.converted_at).toLocaleDateString("en-SG") : "—"}</Td>
+                  <Td>{r.converted_at ? formatSgStamp(r.converted_at, DMY) : "—"}</Td>
                 </Tr>
               ))}
             </Tbody>
@@ -349,8 +360,8 @@ export default function ReferralsPage() {
                     <Td>{r.kind === "referee_first" ? "Friend's first"
                        : r.kind === "referrer" ? "Referrer" : "Manual"}</Td>
                     <Td><StatusBadge status={st[0].toUpperCase() + st.slice(1)} /></Td>
-                    <Td>{new Date(r.earned_at).toLocaleDateString("en-SG")}</Td>
-                    <Td>{r.expires_at ? new Date(r.expires_at).toLocaleDateString("en-SG") : "never"}</Td>
+                    <Td>{formatSgStamp(r.earned_at, DMY)}</Td>
+                    <Td>{r.expires_at ? formatSgStamp(r.expires_at, DMY) : "never"}</Td>
                     <Td>
                       {(r.status === "available" || r.status === "reserved") && (
                         <Button variant="ghost" onClick={() => voidReward(r.id)} disabled={busy}>

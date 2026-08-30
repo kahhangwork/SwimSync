@@ -90,6 +90,27 @@ export function formatSgDate(
   return new Date(ms).toLocaleDateString("en-SG", { ...opts, timeZone: "UTC" });
 }
 
+/**
+ * A timestamptz (or a "YYYY-MM-DD") shown as its Singapore calendar date.
+ *
+ * DISPLAY ONLY — never feed the result back into date logic. It degrades to the
+ * raw input on an unparseable value rather than throwing, because a bad string in
+ * a table cell is visible and harmless, where the same string inside a comparison
+ * is a wrong answer nobody sees. `toSgDate()` deliberately still throws: 34 call
+ * sites compare its output lexically. Do NOT "fix" that one to match this one.
+ *
+ * Correct for BOTH input shapes: a "YYYY-MM-DD" round-trips because UTC midnight
+ * is 08:00 SGT the same day, and Singapore is east of Greenwich so it never wraps.
+ */
+export function formatSgStamp(
+  iso: string,
+  opts?: Intl.DateTimeFormatOptions
+): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return formatSgDate(todayInSg(d), opts);
+}
+
 const DAY_NAMES: DayOfWeek[] = [
   "sunday",
   "monday",

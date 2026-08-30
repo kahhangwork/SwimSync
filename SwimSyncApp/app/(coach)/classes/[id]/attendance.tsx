@@ -24,7 +24,7 @@ import {
   isShowingDate,
   type ResolvedSession,
 } from "@/lib/attendanceSession";
-import { toSgDate, todayInSg, type DayOfWeek } from "@/lib/lessonDates";
+import { toSgDate, todayInSg, type DayOfWeek, formatSgStamp } from "@/lib/lessonDates";
 import {
   lessonRole,
   canMark,
@@ -100,7 +100,7 @@ function fromDBStatus(status: DBStatus): { top: TopStatus; sub: string | null } 
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-SG", {
+  return formatSgStamp(dateStr, {
     weekday: "short",
     day: "numeric",
     month: "short",

@@ -10,7 +10,7 @@ import {
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
-import { ageFromDob } from "@/lib/lessonDates";
+import { ageFromDob, formatSgStamp } from "@/lib/lessonDates";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
@@ -76,8 +76,7 @@ function capitalize(str: string | null): string {
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "—";
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("en-SG", {
+  return formatSgStamp(dateStr, {
     day: "numeric",
     month: "long",
     year: "numeric",

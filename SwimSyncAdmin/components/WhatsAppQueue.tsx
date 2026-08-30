@@ -12,10 +12,21 @@
 // the caller's business — invoices persist a reminded_at, offers do not.
 
 import { useEffect, useMemo, useState } from "react";
+import { formatSgStamp } from "@/lib/lessonDates";
 import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { checkSgPhone } from "@/lib/sgPhone";
+
+// The Singapore calendar date of a timestamptz, in the dd/mm/yyyy shape this
+// page has always shown. `formatSgStamp` pins Asia/Singapore; the bare
+// `toLocaleDateString("en-SG")` it replaced rendered the VIEWER's date, a day
+// early west of Singapore for anything stamped before 08:00 SGT.
+const DMY: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+};
 
 export interface WaQueueRow {
   id: string;
@@ -99,7 +110,7 @@ export function WhatsAppQueue({
               <div className="text-[11px] text-gray-400">
                 {r.meta}
                 {r.openedStamp &&
-                  ` · chat opened ${new Date(r.openedStamp).toLocaleDateString("en-SG")}`}
+                  ` · chat opened ${formatSgStamp(r.openedStamp, DMY)}`}
               </div>
             </div>
             {openedIds.has(r.id) ? (

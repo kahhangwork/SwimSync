@@ -8,6 +8,7 @@ import {
   todayInSg,
   monthBounds,
   formatSgDate,
+  formatSgStamp,
   previousBillingMonth,
 } from "@/lib/lessonDates";
 import { computeClassCoverage, type ClassCoverage } from "@/lib/classCoverage";
@@ -23,6 +24,16 @@ import { buildReminderMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { ReminderQueue } from "./ReminderQueue";
 import { ilikeContains } from "@/lib/tableSearch";
 import { useDebouncedValue } from "@/components/useDebouncedValue";
+
+// The Singapore calendar date of a timestamptz, in the dd/mm/yyyy shape this
+// page has always shown. `formatSgStamp` pins Asia/Singapore; the bare
+// `toLocaleDateString("en-SG")` it replaced rendered the VIEWER's date, a day
+// early west of Singapore for anything stamped before 08:00 SGT.
+const DMY: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+};
 
 /** PostgREST caps every fetch at max_rows (1000); this many back means the list
  *  is (probably) truncated and search is how to reach past it (⚠ RISK 3). */
@@ -1663,7 +1674,7 @@ export default function InvoicesPage() {
                       title="The parent tapped 'I've paid' — check your bank, then Mark Paid"
                     >
                       parent says paid{" "}
-                      {new Date(inv.paid_claimed_at).toLocaleDateString("en-SG")}
+                      {formatSgStamp(inv.paid_claimed_at, DMY)}
                     </div>
                   )}
                 </Td>
@@ -1690,7 +1701,7 @@ export default function InvoicesPage() {
                           onClick={() => handleWhatsApp(inv, businessName)}
                           title={
                             inv.reminded_at
-                              ? `Chat opened ${new Date(inv.reminded_at).toLocaleDateString("en-SG")}`
+                              ? `Chat opened ${formatSgStamp(inv.reminded_at, DMY)}`
                               : "Open a pre-filled WhatsApp chat"
                           }
                         >
@@ -1723,7 +1734,7 @@ export default function InvoicesPage() {
                   {inv.status === "outstanding" && inv.reminded_at && (
                     <div className="text-[10px] text-gray-400 mt-0.5">
                       chat opened{" "}
-                      {new Date(inv.reminded_at).toLocaleDateString("en-SG")}
+                      {formatSgStamp(inv.reminded_at, DMY)}
                     </div>
                   )}
                 </Td>

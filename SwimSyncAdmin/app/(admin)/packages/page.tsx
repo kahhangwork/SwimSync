@@ -25,12 +25,22 @@ import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Tabl
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
-import { todayInSg } from "@/lib/lessonDates";
+import { todayInSg, formatSgStamp } from "@/lib/lessonDates";
 import { defaultConfirmStart, pickOfferProduct } from "@/lib/packageOffers";
 import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { WhatsAppQueue, type WaQueueRow } from "@/components/WhatsAppQueue";
 import { discountLabel } from "@/lib/referralDiscount";
 import { matchesAnyField } from "@/lib/tableSearch";
+
+// The Singapore calendar date of a timestamptz, in the dd/mm/yyyy shape this
+// page has always shown. `formatSgStamp` pins Asia/Singapore; the bare
+// `toLocaleDateString("en-SG")` it replaced rendered the VIEWER's date, a day
+// early west of Singapore for anything stamped before 08:00 SGT.
+const DMY: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+};
 
 /** PostgREST caps every fetch at max_rows (1000). Purchases never approach it,
  *  so the "Who holds one" search stays client-side (correct over a bounded
@@ -1027,7 +1037,7 @@ export default function PackagesPage() {
                     )}
                   </Td>
                   <Td className="text-gray-500">
-                    {new Date(p.requested_at).toLocaleDateString("en-SG")}
+                    {formatSgStamp(p.requested_at, DMY)}
                   </Td>
                   <Td>
                     <div className="flex gap-2">
@@ -1066,7 +1076,7 @@ export default function PackagesPage() {
                     </Td>
                     <Td className="text-gray-500">{money(p.total_value)}</Td>
                     <Td className="text-gray-400">
-                      {new Date(p.requested_at).toLocaleDateString("en-SG")}
+                      {formatSgStamp(p.requested_at, DMY)}
                     </Td>
                     <Td className="text-xs text-gray-400">
                       cancelled — a newer request replaced it
