@@ -3538,3 +3538,37 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `/date=2026-07-11/` — a driver asserting a URL. And a fixture whose dates are correctly derived can no longer
     be validated by the floor-override trick, because overriding the floor without moving `now()` makes the two
     disagree by construction; test those against the real clock. (2026-08-30, §8.95.)
+
+227. **A Singapore calendar date compared against a `timestamptz` through a ZONELESS `T00:00:00` puts the
+    boundary at the VIEWER's midnight, not Singapore's** — §7.7's axis, reached through a surface nobody had
+    connected to it. `isFreshGrade(gradedAt, since)` in `SwimSyncAdmin/lib/assessment.ts` decides whether a
+    grade belongs to the current assessment round. `since` is a Singapore date (`todayInSg()`, or the date the
+    assessor typed); `gradedAt` is `NOW()` stamped by Postgres. The comparison parsed `` `${since}T00:00:00` ``
+    with no zone, so west of Singapore the boundary lands LATER than the SGT day it names and grades made in the
+    first hours of the Singapore day read as a PREVIOUS round's — the assessor is told to re-grade children they
+    just graded, inside the tool built to stop children being skipped. Fix: `` `${since}T00:00:00+08:00` ``
+    (Singapore is +08:00 year-round, no DST). Found by the nightly sweep on 2026-08-29 at 22:42Z = 06:42 SGT the
+    next morning: `verify-assessment` 21/27, six checks red.
+    ⚠ **THE REPRODUCTION IS A TIMEZONE, NOT A CLOCK — this is the reusable half.** The condition was written up
+    as *"run inside UTC 16:00–24:00, or fake the clock into it"*, which is one INSTANCE of the real condition:
+    **the device's calendar date differs from Singapore's.** A far-western zone satisfies that at almost any hour
+    — `TZ=Pacific/Midway` (UTC−11) does for 19 hours a day — so `TZ=Pacific/Midway node verify-assessment.mjs`
+    reproduced 21/27 with the identical six checks and the identical `· 29 Aug` text, at 16:20 SGT, with no clock
+    faking and no stack surgery. **Reach for a zone before reaching for `clock.install()`** (which cannot fake a
+    server timestamp anyway — §7.226). A `TZ=UTC` run alone proves nothing: at 16:00 SGT the two dates agree.
+    ⚠ **DO NOT "FIX" THIS BY PINNING `timezoneId` IN THE DRIVER.** The triage note called `verify-assessment`
+    *"the only driver that does not pin `timezoneId: Asia/Singapore`"* and read that as the defect. **It is not
+    true — 43 of the 50 drivers do not pin it** — and it has the causation backwards: the UNPINNED driver on a
+    UTC runner is precisely what caught a real product bug that every SGT-local run passed 27/27 through. The
+    unpinned default is an asset; pinning it would have hidden the defect and shipped it to any admin grading
+    from outside Singapore.
+    ⚠ **The display half is the same axis and needs the house helpers.** `new Date(ts).toLocaleDateString("en-SG",
+    …)` on a `timestamptz` with no `timeZone` renders the DEVICE's date — which is why the failing output read
+    `· 29 Aug` for a grade made on 30 Aug SGT. `toSgDate()` then `formatSgDate()` (`lib/lessonDates.ts`) are the
+    zone-correct pair and cannot be opted out of.
+    ⚠ **The driver is TIME-DEPENDENT coverage; the deterministic pin belongs in vitest.** On a UTC runner the
+    disagreement window is only 8 hours a day, so the driver would have gone green again by itself on the next
+    night's run — an alarm that silences itself. `assessment.test.ts` now asserts the boundary across five zones
+    via `process.env.TZ`, the `lessonDates.test.ts` / `tableSort.test.ts` pattern. **The old test that looked
+    like it pinned the boundary did not**: it passed `"2026-09-01T00:00:00"`, a zoneless literal the database
+    never produces, so both sides moved together and every zone agreed. (2026-08-30.)

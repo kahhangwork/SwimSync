@@ -47,6 +47,10 @@ import {
   type StudentRow,
   type StrokeCell,
 } from "@/lib/assessment";
+// A grade's date is SINGAPORE's, never the viewing device's — same axis as
+// isFreshGrade's boundary. toSgDate() takes the timestamptz to the SGT calendar
+// date; formatSgDate() renders that date and pins UTC so it cannot drift back.
+import { toSgDate, formatSgDate } from "@/lib/lessonDates";
 
 /** How long the clicking must stop before a paint stroke is sent. */
 const STROKE_IDLE_MS = 350;
@@ -424,13 +428,14 @@ export function AssessmentGrid({
                                 disabled={busy}
                                 title={
                                   cell.gradedAt
-                                    ? `Last graded ${new Date(
-                                        cell.gradedAt
-                                      ).toLocaleDateString("en-SG", {
-                                        day: "numeric",
-                                        month: "short",
-                                        year: "numeric",
-                                      })}`
+                                    ? `Last graded ${formatSgDate(
+                                        toSgDate(cell.gradedAt),
+                                        {
+                                          day: "numeric",
+                                          month: "short",
+                                          year: "numeric",
+                                        }
+                                      )}`
                                     : "Not yet graded"
                                 }
                                 className={
@@ -451,10 +456,10 @@ export function AssessmentGrid({
                                 {cell.grade && !cell.fresh && cell.gradedAt ? (
                                   <span className="ml-1 font-normal">
                                     ·{" "}
-                                    {new Date(cell.gradedAt).toLocaleDateString(
-                                      "en-SG",
-                                      { day: "numeric", month: "short" }
-                                    )}
+                                    {formatSgDate(toSgDate(cell.gradedAt), {
+                                      day: "numeric",
+                                      month: "short",
+                                    })}
                                   </span>
                                 ) : null}
                               </button>

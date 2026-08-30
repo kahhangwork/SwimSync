@@ -1929,6 +1929,11 @@ therefore shown **greyed and dated**, and count zero toward the round. The date 
 today, is editable for a tour that spans days, and follows the assessor from class to
 class. Deliberately **not** a stored "assessment round" record — the date the assessor sets
 is the round, and a second entity would add a mode to open and close for no gain.
+**The round begins at SINGAPORE midnight on that date, not the viewing device's** — the
+business is in Singapore and its assessment day is a Singapore day, so an admin grading from
+another timezone sees the same round as one grading in the pool hall *(clarified 2026-08-30;
+the spec had been silent on the axis and the implementation had resolved it the other way —
+§7.227)*.
 
 **Entering grades.** Clicking a grade cycles it (ungraded → lowest → … → top → ungraded),
 so a mistap is always recoverable. For a run of children earning the same grade there is

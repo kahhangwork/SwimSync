@@ -88,7 +88,46 @@ describe("isFreshGrade", () => {
     expect(isFreshGrade("not a date", SINCE)).toBe(false);
   });
   it("includes a grade recorded at the very start of the start day", () => {
-    expect(isFreshGrade("2026-09-01T00:00:00", SINCE)).toBe(true);
+    // Singapore midnight, spelled out. A zoneless literal here would be read in
+    // the device's zone and so would not pin the boundary at all.
+    expect(isFreshGrade("2026-09-01T00:00:00+08:00", SINCE)).toBe(true);
+  });
+
+  // ── THE ROUND BOUNDARY IS SINGAPORE MIDNIGHT, NOT THE DEVICE'S ─────────────
+  // `since` is a Singapore calendar date (todayInSg(), or the date the assessor
+  // typed). `graded_at` is a timestamptz — NOW() on the server. Comparing them
+  // through a ZONELESS `${since}T00:00:00` means "midnight wherever this browser
+  // happens to be", so west of Singapore the boundary lands LATER than the SGT
+  // day it names, and grades made in the first hours of the Singapore day read
+  // as a previous round's.
+  //
+  // That is not hypothetical: it reddened the nightly sweep on 2026-08-29, whose
+  // runner is UTC and whose clock was 22:42Z — 06:42 the next morning in
+  // Singapore. Six checks failed with today's grades rendering stale. §7.7's
+  // axis, on a surface nobody had connected to it.
+  it("puts the round boundary at SINGAPORE midnight, in every device zone", () => {
+    const original = process.env.TZ;
+    // 2026-08-29T22:42Z is 2026-08-30 06:42 in Singapore: graded TODAY.
+    const gradedEarlySgMorning = "2026-08-29T22:42:00Z";
+    for (const tz of [
+      "UTC",
+      "Asia/Singapore",
+      "America/New_York",
+      "Pacific/Midway",
+      "Pacific/Auckland",
+    ]) {
+      process.env.TZ = tz;
+      expect(isFreshGrade(gradedEarlySgMorning, "2026-08-30")).toBe(true);
+      // ⚠ NOT belt-and-braces — this line catches the OPPOSITE failure, and is
+      // the reason Pacific/Auckland is in the list. 15:59:59Z is one second
+      // before Singapore midnight, so it belongs to the PREVIOUS round. East of
+      // Singapore the zoneless boundary lands EARLY rather than late, and the
+      // old code returned true here under Auckland alone — a pre-round grade
+      // silently counted as this round's. Deleting this assertion would leave
+      // half the bug untested and "call everything fresh" a passing fix.
+      expect(isFreshGrade("2026-08-29T15:59:59Z", "2026-08-30")).toBe(false);
+    }
+    process.env.TZ = original;
   });
 });
 

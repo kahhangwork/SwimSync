@@ -543,6 +543,39 @@ swimming skills** (Piece 4, M) and **Email-confirmation copy** (Piece 5, S) — 
   §11, which already held it (restated in §3 it was a fourth copy that drifts). Prohibitions + the
   verified-vs-specified table kept intact, as the item specified. HANDOVER back under the 45 KB budget.
 
+- **Ten `timestamptz` columns still render in the DEVICE's timezone, not Singapore's** — **S**.
+  Found by the §7.227 audit and deliberately left out of that fix's scope (the nightly red was the round
+  BOUNDARY; these are display only, and no driver asserts any of them). `new Date(col).toLocaleDateString("en-SG")`
+  with no `timeZone` shows the viewer's calendar date for a Singapore instant, so anything stamped between
+  00:00 and 08:00 SGT renders as the previous day west of Singapore:
+  `invoices/page.tsx` ×3 (`paid_claimed_at`, `reminded_at` ×2), `referrals/page.tsx` ×4 (`created_at`,
+  `converted_at`, `earned_at`, `expires_at`), `packages/page.tsx` ×2 (`requested_at`), and
+  `WhatsAppQueue.tsx` ×1 (`openedStamp`). Every one is a single-line `toLocaleDateString("en-SG")` with no
+  options, so `grep -nE 'toLocale(Date)?String' | grep -v timeZone` finds them all. The fix is mechanical — `formatSgDate(toSgDate(col), …)`, the pair
+  `lib/lessonDates.ts` already exports and which callers cannot opt out of — or an explicit
+  `timeZone: "Asia/Singapore"` in the options, which is how `history/page.tsx`'s `formatWhen()` already does it.
+  **Latent, not live:** prod's users are all in Singapore, so nobody sees a wrong date today; it becomes real
+  the first time an admin works from another timezone. **`expires_at` on a referral reward is the one that
+  costs money** — a day's difference there is a person's deadline, not a label. Worth doing as one sweep with
+  a lint-shaped guard, since a tenth site will otherwise be added the same way.
+
+- **`toSgDate()` THROWS on a malformed timestamp where a plain `toLocaleDateString` degraded** — **S**.
+  Raised by the §7.227 review and deliberately left out of that fix. `toSgDate(iso)` is
+  `todayInSg(new Date(iso))`, and `Intl.DateTimeFormat().formatToParts(Invalid Date)` raises
+  `RangeError: Invalid time value` — which in React takes down the whole subtree, where
+  `new Date(bad).toLocaleDateString()` merely rendered the string `"Invalid Date"` in one cell. Both apps
+  export it and **~20 call sites** pass a `timestamptz` column straight in (`calendarLessons.ts`,
+  `classCoverage.ts`, `coachDisableImpact.ts`, `classes`/`platform`/`lessons` pages, the coach schedule and
+  roster screens, the parent Attendance screen).
+  **Unreachable today, which is why it was not fixed under a bug fix:** every column fed to it is
+  `NOT NULL timestamptz` serialised by PostgREST, so it cannot be malformed without the database already
+  being wrong. It is a *robustness* change to a shared helper, not a defect with a repro.
+  The fix mirrors what `formatSgDate` in the same file already does — it guards `Number.isNaN` and returns
+  its input rather than throwing — so `toSgDate` returning the raw string on an unparseable input would make
+  the pair consistent and let the existing `formatSgDate` guard carry it through to a visible-but-harmless
+  label. **Touches `SwimSyncAdmin/lib/lessonDates.ts` AND `SwimSyncApp/lib/lessonDates.ts`** (they are
+  parallel copies), so it needs both test suites.
+
 ### Later — big features carrying their own dependencies
 
 ~~**An owner-only accounting page (M — *absorbs Revenue reporting*)**~~ — **SHIPPED 2026-08-23**

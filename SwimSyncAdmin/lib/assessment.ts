@@ -94,15 +94,31 @@ export type LevelGroup = {
   rows: StudentRow[];
 };
 
-/** Is this grade from the current round? A missing timestamp is never fresh. */
+/**
+ * Is this grade from the current round? A missing timestamp is never fresh.
+ *
+ * ⚠ THE BOUNDARY IS SINGAPORE MIDNIGHT, AND THE SUFFIX IS LOAD-BEARING.
+ * `since` is a Singapore calendar date — `todayInSg()`, or the date the assessor
+ * typed into "Assessing since". `gradedAt` is a timestamptz stamped by the
+ * server. A ZONELESS `${since}T00:00:00` means "midnight wherever this browser
+ * is", which west of Singapore lands LATER than the SGT day it names: grades
+ * made in the first hours of the Singapore day then read as a previous round's,
+ * and the assessor is told to re-grade children they just graded.
+ *
+ * That reddened the nightly sweep on 2026-08-29 (UTC runner, 22:42Z = 06:42 the
+ * next morning SGT). It is §7.7's axis — a date derived in SGT compared against
+ * an instant parsed in the device's zone — reached through a surface nobody had
+ * connected to it. `assessment.test.ts` pins it across five zones.
+ */
 export function isFreshGrade(
   gradedAt: string | null | undefined,
   since: string
 ): boolean {
   if (!gradedAt) return false;
   const t = Date.parse(gradedAt);
-  // `since` is a date string (YYYY-MM-DD) meaning "from the start of that day".
-  const from = Date.parse(`${since}T00:00:00`);
+  // `since` is a date string (YYYY-MM-DD) meaning "from the start of that day
+  // IN SINGAPORE". Singapore is +08:00 year-round and has no DST.
+  const from = Date.parse(`${since}T00:00:00+08:00`);
   if (Number.isNaN(t) || Number.isNaN(from)) return false;
   return t >= from;
 }
