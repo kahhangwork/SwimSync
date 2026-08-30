@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-30 — **The nightly's `verify-assessment` red was a PRODUCT bug and is FIXED**
-(§8.96, `b2bcb2d`): the assessment round used the viewer's midnight, not Singapore's. Reproduced by a
-TIMEZONE, not a clock — §7.227. **One nightly red remains: `verify-tenant-provisioning`, untriaged (§9).**_
+_Last updated: 2026-08-30 — **BOTH nightly reds are fixed.** `verify-assessment` was a PRODUCT bug (§8.96,
+§7.227 — the round used the viewer's midnight); `verify-tenant-provisioning` was a DRIVER bug hiding seven
+unrun checks (§8.97, §7.228). **Tonight's sweep is the confirmation — neither is proven on CI yet.**_
 
-_Previously, 2026-08-30 (§8.95) — first full local driver sweep since §8.93: 50/50 green after five fixes._
+_Previously, 2026-08-30 (§8.96) — the assessment round boundary fixed; reproduced by a timezone, not a clock._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.227** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.228** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -341,6 +341,28 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.97 (2026-08-30) — The nightly's OTHER red: a driver bug that hid seven unrun checks
+
+**One driver fixed, no product change.** `0b239db`. `verify-tenant-provisioning` 15/15 — normally, on a
+freshly reset DB, and with an injected **8 s** delay on the provision route (3.2× the wait it replaced);
+fixtures 26/26. **All six traps are in §7.228**, led by the one worth the most: **the nightly uploads
+screenshots and nobody had ever opened them.**
+
+- **It was a DRIVER bug — the opposite of §8.96.** The business was created correctly on both red nights;
+  a flat `waitForTimeout(2500)` read the page before the API round trip returned. Reproduced before fixing
+  by shortening the sleep to 200 ms locally: 5/8, the identical three failures and identical details.
+- **`5/8` was never a small failure — it was SEVEN unrun checks**, including the sign-in the file's own
+  header calls load-bearing. A dead fallback (an attribute rendered nowhere in the app) had been silently
+  disabling them. The driver now states its precondition and says out loud when it skips.
+- **Two wrong hypotheses came before the screenshot, and both are recorded in §7.228** because each cost
+  real time: a lying detail string that prints the failure case as `sent`, and reading total wall time as
+  runner speed (47 s local vs 49 s CI is 15 checks against 8, not parity).
+- **Deliberately NOT done: adding `data-tenant-id` to the platform row** to revive the fallback — product
+  markup for a test, restoring a path that only matters with `RESEND_API_KEY` set. `BACKLOG.md`
+  → *Deliberately not doing*.
+
+_(§8.95 demoted to a ledger row in `docs/SESSIONS.md` — the reset-first driver sweep.)_
+
 ## 8.96 (2026-08-30) — The nightly's assessment red was a PRODUCT bug, not a driver one
 
 **One fix, shipped and green.** `b2bcb2d`. `verify-assessment` 27/27 under Pacific/Midway, Asia/Singapore and
@@ -360,30 +382,6 @@ two prohibitions. PRD §7 now states the round boundary; the spec had been silen
   replaced degraded. Neither is reachable on prod data; both are one-line traps for the next caller.
 - **Deliberately NOT done: pinning `timezoneId` in the driver.** The unpinned driver on a UTC runner is what
   caught the bug; every SGT-local run passed 27/27 through it. §7.227 records that as a prohibition.
-
-## 8.95 (2026-08-30) — A reset-first driver sweep: 50/50 green, and a fuse defused two days early
-
-**Five driver/fixture fixes, no product change.** `ccb60be`, `1526efe`, `4cd226a`. Every fix re-run on a
-**freshly reset** database; `check-fixture-roundtrip` 26/26. **All five are one shape — a fact written down
-twice, drifting — and all five are graduated: §7.223, §7.224, §7.225, §7.226.**
-
-- **Three reds the sweep found** — `verify-assessment`'s fixture hardcoded a seed uuid the reset regenerates
-  (§7.224); `verify-platform-admin-scope`'s page pin said 24 and `/assessment` made it 25; `verify-trial-visibility`
-  asserted a hardcoded `Aug` against a date computed from `now()` (§7.225).
-- **Two more were found by AUDIT, not by failure, and were two days from firing.** `verify-bulk-setall` and
-  `verify-unmarked-lessons` froze their browser clock at 15 Jul against a July fixture; `markable_floor` moves to
-  1 Aug on 2026-09-01 and both would have gone red on a day nobody touched them. Proven by pinning
-  `session_window_start()`, then fixed by deriving the dates. **§7.226 carries the two non-obvious constraints**
-  (why "last month" and not "the last few days"; why the enrolment date is load-bearing).
-- **`check-fixture-roundtrip.sh` cannot catch a reset-fragile fixture** — it never resets, and passed 26/26
-  twice on the day one was broken. The load-bearing half of §7.224.
-- **Deliberately NOT built:** the future-date simulator, deferred by the user after its two real limits were
-  spelled out. Now a `BACKLOG.md` item with the mechanism and both limits, so it is not re-derived.
-- **Scanned for siblings of each fix; none systemic** — one fixture had a non-convention uuid, one driver pinned
-  the sidebar count, one fixture had an absolute session date. The other hardcoded dates are safe, and §7.226
-  records why the audit question is *"is the FIXTURE's date relative?"*, not *"does the assertion look hardcoded?"*
-
-_(§8.94 demoted to a ledger row in `docs/SESSIONS.md` — the Assessment tab exercised on prod.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -426,20 +424,17 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-30 — the LOCAL sweep is 50/50 green (§8.95), and the assessment red is FIXED (§8.96).**
-The last nightly, `33278795124`, failed 2 of 50. **`verify-assessment` 21/27 was a real product bug and is
-shipped** — §7.227 has the whole of it, including why the reproduction is a *timezone* rather than a clock,
-and why the driver must NOT be pinned to `Asia/Singapore` to "fix" it. **Tonight's run is the confirmation:
-it starts ~22:30 UTC, inside the disagreement window, so it exercises the fix in the condition that caught it.**
+**State on 2026-08-30 — BOTH of the last nightly's reds are FIXED, and NEITHER is confirmed on CI yet.**
+Run `33278795124` failed 2 of 50: `verify-assessment` 21/27 was a real product bug (§8.96, §7.227) and
+`verify-tenant-provisioning` 5/8 was a driver bug (§8.97, §7.228) — **not** the "one-night `waitForTimeout`
+flake" this section called it for two nights, and not the *timing-only* story either: `5/8` was seven checks
+that never ran.
 
-**⚠ `verify-tenant-provisioning` 5/8 is STILL OPEN, and it is not what this section used to call it.** It was
-recorded as *"the known one-night `waitForTimeout` flake"*; it is not — **identical 5/8 on two consecutive
-nights** (`33278795124`, `33229758941`), and the failures do not look like a timeout. *"delivery outcome is
-stated explicitly (warning+link, or sent)"* fails **while showing `sent`**, and *"an invite link is available
-to follow"* fails with it — the shape of a driver that expects the no-email-configured branch while CI has
-working delivery, i.e. §7.73's family rather than a flake. **`the business is created` also fails while the
-business demonstrably exists** (its join code and row both render), so triage that check separately.
-**Not yet investigated beyond reading the log** — start there, not from the flake theory.
+**⚠ Tonight's sweep is the whole confirmation, and it tests the two differently.** The assessment fix only
+gets exercised in the UTC/SGT disagreement window, which the ~22:30 UTC start sits inside — so a green there
+is real evidence. The provisioning fix is exercised on every run. **Read the run, not this paragraph**, and
+if either is still red, `gh run download <id> -n ui-driver-run` FIRST (§7.228) — the screenshots settled the
+last one in a single look after two wrong hypotheses.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -462,10 +457,10 @@ failures that are just the driver's own UI writes — reset before believing it.
 
 ### THE NEXT BUILD — pick-now list is in `BACKLOG.md`
 
-**First: triage `verify-tenant-provisioning` 5/8** — the evidence and the reason it is not a flake are in
-*The nightly sweep* above. §8.65's rule applies: a sweep left red stops being an alarm, and this one has now
-been red for two nights while the louder failure beside it took the attention. Do it before starting a feature.
-**Then confirm tonight's nightly cleared the assessment fix** (§8.96) rather than assuming it.
+**First: read tonight's nightly** — both fixes are unconfirmed on CI (see *The nightly sweep* above). That
+is a five-minute check, not a task, and §8.65's rule is why it comes first: a sweep nobody reads stops being
+an alarm. **Two reds in one week were each mis-labelled in this very section** before anyone looked at the
+evidence, so re-read the run rather than this paragraph.
 
 **Then, top pick: Piece 5 — email-confirmation copy** (S) — a branded template following
 `supabase/templates/recovery.html`; **do NOT switch email confirmation ON** (it stranded web parents once —
