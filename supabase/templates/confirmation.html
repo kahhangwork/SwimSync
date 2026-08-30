@@ -1,0 +1,66 @@
+<!--
+  SwimSync — signup confirmation email
+  Cloud: paste this into Supabase dashboard → Authentication → Email Templates → "Confirm signup".
+  Local/CLI: referenced from supabase/config.toml [auth.email.template.confirmation].
+  Supabase template vars available here: {{ .ConfirmationURL }} {{ .SiteURL }} {{ .Email }} {{ .Token }}
+  Keep it inline-CSS + no external assets (email clients strip <style>/remote resources).
+  The sky header is a PLAIN TEXT wordmark on purpose — see brand/README.md: an SVG does
+  not render in most email clients and a hosted PNG adds a blocked-image failure mode.
+
+  ⚠ THIS TEMPLATE IS DORMANT, AND THAT IS THE POINT.
+  `enable_confirmations` is false in both config.toml and the hosted project, so this
+  email is never sent. Confirmation was switched OFF deliberately: it stranded parents
+  registering on the web, who tapped the link, landed in a second browser tab, and left
+  the original tab sitting on "check your email" forever. This file exists so that the
+  day confirmation is ever wanted, the copy is already right and the toggle is the only
+  decision left. Pasting this into the dashboard is NOT a reason to flip that toggle —
+  the two live on the same dashboard page, which is exactly the trap.
+  Guarded by SwimSyncAdmin/lib/authEmailConfig.drift.test.ts.
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="440" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <tr>
+          <td style="background:#0ea5e9;padding:24px 32px;">
+            <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.3px;">SwimSync</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px;">
+            <h1 style="margin:0 0 12px;font-size:20px;color:#0f172a;">Confirm your email</h1>
+            <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">
+              Thanks for signing up to SwimSync with <strong>{{ .Email }}</strong>.
+              Tap the button below to confirm this address and finish setting up your account.
+            </p>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+              <tr>
+                <td style="border-radius:8px;background:#0ea5e9;">
+                  <a href="{{ .ConfirmationURL }}"
+                     style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">
+                    Confirm email
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#94a3b8;">
+              If the button doesn't work, copy and paste this link into your browser:
+            </p>
+            <p style="margin:0 0 24px;font-size:13px;line-height:1.6;word-break:break-all;">
+              <a href="{{ .ConfirmationURL }}" style="color:#0ea5e9;">{{ .ConfirmationURL }}</a>
+            </p>
+            <p style="margin:0;font-size:13px;line-height:1.6;color:#94a3b8;">
+              Didn't sign up? You can safely ignore this email — the address stays
+              unconfirmed and nobody can sign in with it.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid #eef2f6;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">SwimSync · Swim attendance &amp; billing</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

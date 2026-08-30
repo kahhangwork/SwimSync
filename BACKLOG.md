@@ -4,8 +4,9 @@ _Last updated: 2026-08-30 — **Grading is ADMIN-ONLY, and there is an Assessmen
 suites green, **not yet deployed** (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD
 §7.15). Struck from the pick-now list. **One new item added, found by its driver:** the admin sidebar
 has no breakpoint, so every admin page is unusable on a phone (§7.222) — which now matters, because
-Assessment is the first admin surface meant for poolside use. **Remaining pick-now: Piece 5
-(email-confirmation copy, S) — the last S-pool item.**_
+Assessment is the first admin surface meant for poolside use. **Piece 5 (email-confirmation copy)
+SHIPPED 2026-08-30 — the S-pool is now EXHAUSTED.** It is dormant by design: the template is written
+and wired, confirmation stays OFF, and a CI guard now holds that toggle down._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -447,8 +448,9 @@ The pick-now list now:
    `verify-assessment.mjs` (27 checks, mobile viewport). **Deploy via `/deploy` when ready** —
    migration to prod FIRST, and the RISK-8 gate (`SELECT count(*) FROM student_skill_progress` on
    prod must return 0) is unrun.
-2. **Email-confirmation copy** (S, Piece 5) — a branded confirmation template; **do NOT switch email
-   confirmation ON** (it stranded web parents once). Full item below.
+2. ~~**Email-confirmation copy**~~ (S, Piece 5) — **SHIPPED 2026-08-30**, dormant by design;
+   confirmation stays OFF and is now held there by a CI guard. Full item below.
+   **The S-pool is now exhausted.**
 *(A third candidate — giving the admin sidebar a mobile breakpoint — was raised and **REFUSED** the
 same day. See* **Deliberately not doing** *below.)*
 
@@ -491,7 +493,7 @@ click-through queue stops scaling.
 
 **Wave C is exhausted bar the lower-value S pool.** **Pieces 1–3 of the S-pool SHIPPED 2026-08-28**
 (Better filtering/search, family-status scan, Moving-a-student loose ends). What remains: **Tick off
-swimming skills** (Piece 4, M) and **Email-confirmation copy** (Piece 5, S) — see *Current pick-now order*.
+swimming skills** (Piece 4, M) and ~~**Email-confirmation copy**~~ (Piece 5, S, shipped 2026-08-30) — see *Current pick-now order*.
 *(Maps deep link → **Later**, deferred 2026-08-27 — production is one location.)*
 
 ### Wave D — latent traps: cheap now, silently worse later
@@ -1710,22 +1712,25 @@ cleanup, on any environment, hits every one of these again.
   *was* proven end to end on 2026-07-25 and then the evidence was tidied away, and today's
   zero must not be re-read as "the path has never been exercised."
 
-### Email confirmation copy and templates — **S** `[handover]`
-Confirmation emails still use Supabase defaults.
+### ~~Email confirmation copy and templates~~ — **S** — **DONE 2026-08-30**
+Shipped: `supabase/templates/confirmation.html`, wired at
+`[auth.email.template.confirmation]`. Its markup is byte-identical to the
+production-proven `recovery.html`; only the copy differs. **Still DORMANT and meant to
+stay that way** — `enable_confirmations` is false, so the email is never sent; this
+exists so that turning confirmation on some day is one decision rather than a scramble.
 
-**Why:** cosmetic today because **email confirmation is intentionally OFF** — a
-self-registering parent isn't sent one. Only matters if confirmation is ever turned on.
+**The prohibition was honoured and still stands:** confirmation was never switched on to
+test. There is no way to make GoTrue emit this template without the flag (`generateLink`
+mints without sending; `resend` needs an unconfirmed user), so it was rendered offline and
+diffed against `recovery.html` instead. **It has never been sent through the live auth
+path** — do not read this row as evidence that it has.
 
-**Notes:** confirmation was turned off deliberately (it stranded web parents on a "check
-your email" step). The branded template pattern exists at
-`supabase/templates/recovery.html` if this is ever needed.
-
-**⚠ RISK 5 MITIGATION** *(/plan-review 2026-08-27, ranked LAST — the copy is cosmetic; the only
-real risk is the toggle sitting next to it)*:
-- **Prohibition:** do NOT switch email confirmation ON to test templates — it stranded web
-  parents once, which is exactly why it is off. Render templates the `recovery.html` way, locally.
-- **Assertion:** after the work, the auth config still has confirmation OFF (check the dashboard
-  setting, not memory).
+**What replaced the "check the dashboard, not memory" assertion:** a standing guard,
+`SwimSyncAdmin/lib/authEmailConfig.drift.test.ts` (7 checks, in CI), which fails if
+`enable_confirmations` leaves `false` or if either branded template loses its wiring.
+The plan noted no structural guard existed over that toggle; now one does. The **hosted
+project's** setting still has no guard — `supabase config` has only `push`, no pull — so
+that half remains a manual dashboard check.
 
 ---
 

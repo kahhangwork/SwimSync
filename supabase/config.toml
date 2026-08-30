@@ -300,6 +300,16 @@ otp_expiry = 86400
 subject = "Reset your SwimSync password"
 content_path = "./supabase/templates/recovery.html"
 
+# Branded signup-confirmation email (SwimSync). On cloud, the same HTML is pasted
+# into Authentication → Email Templates → "Confirm signup". Applies locally via Mailpit.
+# DORMANT ON PURPOSE: `enable_confirmations` above is false, so this is never sent.
+# The template is ready so that turning confirmation on is one decision, not a
+# scramble — but do NOT turn it on to test this. It stranded web parents once, which
+# is why it is off. Guarded by SwimSyncAdmin/lib/authEmailConfig.drift.test.ts.
+[auth.email.template.confirmation]
+subject = "Confirm your SwimSync email"
+content_path = "./supabase/templates/confirmation.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
