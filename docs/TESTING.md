@@ -1113,3 +1113,31 @@ zones via `process.env.TZ` (the pattern those files already used): a 23:30 SGT a
 byte-for-byte), a bare `"YYYY-MM-DD"`, and the degrade-not-throw case, which also asserts
 `toSgDate()` still **throws** on the same input (§7.229). RED-proven: given the buggy body all five
 fail.
+
+---
+
+### Auth email config (2026-08-30)
+
+**`SwimSyncAdmin/lib/authEmailConfig.drift.test.ts` — 7 checks.** The second structural guard of
+this shape (after `sgDisplay.drift.test.ts`): it reads `supabase/config.toml` and the two branded
+templates it points at, none of which any app test could previously see. It exists for **one**
+assertion — `enable_confirmations` must stay `false` — because signup confirmation stranded web
+parents once and nothing else holds that toggle down: it sits on the same dashboard page as the
+email templates, and `supabase config push` would carry a local flip to production. The other six
+stop a branded template becoming a non-template (a renamed file leaves `content_path` dangling and
+Supabase silently sends its stock default), reject vars outside the Supabase set, and reject
+external assets — `<style>`, `<link>`, remote `src` — which email clients strip.
+
+It reads TOML with a small **section-aware** parser: `enable_confirmations = false` appears under
+both `[auth.email]` and `[auth.sms]`, and only the first is the stranding toggle.
+
+**Both directions were proven, which is the point** (§7.231): each check mutated RED, *and* the two
+plausible FALSE reds proven to stay green — an inline `# comment` beside the toggle, and a
+legitimate `{{ .Data.x }}` dotted path. Two holes the first draft had: a var inside `{{ if .Emial }}`
+was invisible to the naive regex, and both templates' own header comments describe the
+external-asset rule, so a scan that reads comments flags the warning as the offence (1 hit raw,
+0 stripped, in both files).
+
+**Known limit, deliberate:** the guard covers the LOCAL config only. The hosted project's template
+and flag cannot be read from the CLI — `supabase config` has only `push`, no pull — so that half
+stays a manual dashboard check (§7.232).

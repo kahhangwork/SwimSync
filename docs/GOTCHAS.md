@@ -3649,3 +3649,42 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     over it. The guard rejects UTC too, except where the `Date` was itself built as UTC. **And add a vacuity
     test**: assert the scanner finds call sites at all, or a parser bug empties the list and every assertion
     passes forever. (2026-08-30.)
+
+231. **A guard lies in TWO directions, and testing it only one way proves half of it.** §7.230 is about a
+    scanner's *parser*; this is about its *verdicts*. Every guard has a false RED (it fires when nothing is
+    wrong) and an invisible HOLE (it stays green when something is), and the RED-proof ritual of §7.25 only
+    ever exercises the second. Found building `authEmailConfig.drift.test.ts`, where both were live in the
+    first draft:
+    ⚠ **The false red lands on the line most likely to be EDITED.** The guard compared a raw TOML value, so
+    `enable_confirmations = false # do not change` failed the test **while the value was still false**, with a
+    message that read as though the toggle had been flipped. The single most safety-critical assertion in the
+    file would have cried wolf at the person doing the sensible thing. §8.65 is the cost of that: a red nobody
+    believes stops being an alarm. **Strip inline comments quote-aware, before unquoting.**
+    ⚠ **The hole hides where the pattern's ANCHOR does not appear.** `/\{\{\s*\.(\w+)/` reads Go template vars
+    but a conditional opens `{{ if .Emial }}` — no dot after the braces, so the scan captured **nothing** and a
+    typo'd var was invisible. Conversely `{{ .Data.foo }}` captured **both** `Data` and `foo`, arming a false
+    red the moment anyone used a legitimate dotted path. **Find the enclosing constructs first, then the roots
+    inside them** (`(?<![\w.])\.(\w+)`).
+    ⚠ **A file that DOCUMENTS the rule it is scanned for trips its own guard.** Both email templates warn, in
+    their header comment, that "email clients strip `<style>`" — so a no-external-assets scan that reads
+    comments flags the sentence warning against the thing as the thing. Proven: 1 hit raw, 0 stripped, in both
+    files. **Strip comments before scanning**, and note that this bites hardest on well-documented files.
+    ⚠ **So: for every assertion, mutate BOTH ways** — break it and watch it redden, then make the benign edit a
+    maintainer would plausibly make and watch it stay green. The second half is not optional; it is the half
+    that decides whether anyone still trusts the guard in six months. (2026-08-30.)
+
+232. **A Supabase AUTH email template cannot be rendered through the live path without its own feature flag —
+    there is no admin backdoor.** Discovered brand-building `confirmation.html` while `enable_confirmations`
+    stayed deliberately false (it stranded web parents; see `BACKLOG.md` → the shipped email-confirmation item).
+    Every route was checked and none emits it: **`auth.admin.generateLink()` mints a link and sends NOTHING**
+    (which is exactly why SwimSync's own invite paths pair it with a hand-built Resend email —
+    `SwimSyncAdmin/lib/inviteEmail.ts`); `auth.resend({type:'signup'})` needs an already-unconfirmed user, which
+    needs the flag; `admin.createUser()` does not send. So the only way to see the email GoTrue would actually
+    build is to turn the flag on, which is the one thing forbidden. ⚠ **Do not read "the template shipped" as
+    "the template was sent."** What stands in for an end-to-end render is a **structural diff against a template
+    already proven in production** — `confirmation.html`'s markup is byte-identical to `recovery.html`, only the
+    copy differs — plus an offline substitution render. State that limit out loud wherever the work is recorded;
+    a dormant template described as "verified" is how the first real send becomes the first real test.
+    ⚠ **The hosted half cannot be verified from the CLI at all:** `supabase config` has only `push`, no pull, so
+    the cloud project's template and its confirmation flag are a manual dashboard check — and a `config push`
+    would carry the whole local config surface, the stranding toggle included. (2026-08-30.)

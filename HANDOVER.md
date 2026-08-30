@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-30 — **Every displayed date is now Singapore's, held by a source-scanning guard**
-(§8.98, §7.229/§7.230). Latent bug, byte-identical output, so nothing visibly changed. **The two nightly reds
-fixed yesterday are STILL unconfirmed on CI — no sweep has run since.**_
+_Last updated: 2026-08-30 — **The signup-confirmation email is branded, and the toggle beside it is
+now pinned by CI** (§8.99, §7.231/§7.232). Dormant by design: the email is never sent. The S-pool is
+EXHAUSTED. **Both 2026-08-30 nightly fixes are STILL unconfirmed — no sweep has run since they landed.**_
 
-_Previously, 2026-08-30 (§8.97) — the tenant-provisioning driver's `waitForTimeout` hid seven unrun checks._
+_Previously, 2026-08-30 (§8.98) — every displayed date is Singapore's, held by a source-scanning guard._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -207,11 +207,15 @@ first-firing trigger is what to watch for.
 - **Scoped search past the 1000-row cap (§8.91)** — every table is under the cap on prod, so the DB pushdown,
   the `!inner` narrowing (§7.216) and the cap banners are all unexercised at scale; correct today by coincidence
   of size. First firing: any admin table crosses ~1000 rows.
-- **Swim-skill grading (§8.92/§8.93, PRD §7.15)** — **no longer dormant.** Exercised on prod 2026-08-29 (§8.94,
-  the plan's §11): the round mechanism, the vacuity guard and the promotion gate have all fired on real data.
-  Still unexercised: the cross-tenant + keep-records `RESTRICT` guards, the `merge_students` skill-progress move,
-  and **re-confirmation advancing `graded_at`** — that last needs a grade OLDER than the round start, so it
-  cannot be seen until the first genuine round (~3 months). pgTAP holds it (§7.220).
+- **Swim-skill grading (§8.92/§8.93, PRD §7.15)** — **no longer dormant**, exercised on prod 2026-08-29 (§8.94).
+  Still unexercised: the cross-tenant + keep-records `RESTRICT` guards, `merge_students`' skill-progress move, and
+  **re-confirmation advancing `graded_at`** — that last needs a grade OLDER than the round start, so it cannot be
+  seen until the first genuine round (~3 months). pgTAP holds it (§7.220).
+- **The branded signup-confirmation email (§8.99, `supabase/templates/confirmation.html`)** — dormant **by design,
+  not by data**, and the only entry here that is meant to stay that way: `enable_confirmations` is false because
+  turning it on stranded web parents. It has never been sent and **cannot be** without the flag (§7.232), so the
+  usual "first firing" line does not apply — there is no trigger to wait for, only a decision nobody should make
+  casually. `authEmailConfig.drift.test.ts` holds the local flag down; the hosted one is a manual check.
 
 ### Prohibitions — these live nowhere else
 
@@ -341,6 +345,26 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.99 (2026-08-30) — A branded confirmation email that is never sent, and a toggle that now has a guard
+
+**One template, one config block, one CI guard.** `4556888`. `supabase/templates/confirmation.html` +
+`[auth.email.template.confirmation]`, replacing Supabase's stock plain-text default. **The S-pool is now
+exhausted.** Everything durable is in §7.231, §7.232, `docs/TESTING.md` and `BACKLOG.md`.
+
+- **The template ships WITHOUT the flag, and that is the whole design.** `enable_confirmations` stays false —
+  it stranded web parents once. The real hazard was never the copy but the toggle sitting beside it on the
+  same dashboard page; the plan called that vigilance-only with no structural guard. Now there is one.
+- **It has NEVER been sent through the live auth path, and cannot be** (§7.232). Structural diff against the
+  production-proven `recovery.html` — byte-identical markup, copy-only difference — plus an offline render
+  stands in for an end-to-end test. Don't upgrade that to "verified" later.
+- **Both failure directions of the guard were proven** (§7.231): each check RED, *and* the two plausible
+  false reds proven green. The first draft had a false red on the toggle line itself and an invisible hole
+  in a Go conditional.
+- **Deliberately NOT done:** confirmation never switched on, and no `supabase config push` — it carries the
+  whole local config surface, the stranding toggle included. **The hosted template + flag remain a MANUAL
+  dashboard step**; no CLI can read them back to verify. No app code changed, so the `main` push deployed
+  nothing user-visible.
+
 ## 8.98 (2026-08-30) — A displayed date is Singapore's, not the viewer's
 
 **One fix, one guard, shipped and pushed.** `317175c`. 15 sites — 10 admin `timestamptz` renders,
@@ -364,27 +388,7 @@ walked gate: `docs/plans/SGT_DISPLAY_PLAN.md`.
   grep found no driver asserting a rendered date, so nothing needed it), and the logic half of the
   `toSgDate` item, refused above.
 
-## 8.97 (2026-08-30) — The nightly's OTHER red: a driver bug that hid seven unrun checks
-
-**One driver fixed, no product change.** `0b239db`. `verify-tenant-provisioning` 15/15 — normally, on a
-freshly reset DB, and with an injected **8 s** delay on the provision route (3.2× the wait it replaced);
-fixtures 26/26. **All six traps are in §7.228**, led by the one worth the most: **the nightly uploads
-screenshots and nobody had ever opened them.**
-
-- **It was a DRIVER bug — the opposite of §8.96.** The business was created correctly on both red nights;
-  a flat `waitForTimeout(2500)` read the page before the API round trip returned. Reproduced before fixing
-  by shortening the sleep to 200 ms locally: 5/8, the identical three failures and identical details.
-- **`5/8` was never a small failure — it was SEVEN unrun checks**, including the sign-in the file's own
-  header calls load-bearing. A dead fallback (an attribute rendered nowhere in the app) had been silently
-  disabling them. The driver now states its precondition and says out loud when it skips.
-- **Two wrong hypotheses came before the screenshot, and both are recorded in §7.228** because each cost
-  real time: a lying detail string that prints the failure case as `sent`, and reading total wall time as
-  runner speed (47 s local vs 49 s CI is 15 checks against 8, not parity).
-- **Deliberately NOT done: adding `data-tenant-id` to the platform row** to revive the fallback — product
-  markup for a test, restoring a path that only matters with `RESEND_API_KEY` set. `BACKLOG.md`
-  → *Deliberately not doing*.
-
-_(§8.96 demoted to a ledger row in `docs/SESSIONS.md` — the assessment round boundary.)_
+_(§8.97 demoted to a ledger row in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -427,8 +431,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-30 — the two reds fixed on 2026-08-30 are STILL UNCONFIRMED. No sweep has run since
-they landed**, so the newest run (`33278795124`) is the two-red one and says nothing about the fixes.
+**State on 2026-08-30 (re-checked at session close) — the two reds fixed on 2026-08-30 are STILL UNCONFIRMED.
+No sweep has run since they landed**, so the newest run is still `33278795124`, the two-red one, and it says
+nothing about either fix.
 `verify-assessment` 21/27 was a real product bug (§8.96, §7.227); `verify-tenant-provisioning` 5/8 was a driver
 bug (§8.97, §7.228) — **not** the "one-night `waitForTimeout` flake" this section called it for two nights, and
 not timing-only either: `5/8` was seven checks that never ran.
@@ -458,20 +463,22 @@ failures that are just the driver's own UI writes — reset before believing it.
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — pick-now list is in `BACKLOG.md`
+### THE NEXT BUILD — the S-pool is EXHAUSTED; pick from `BACKLOG.md`
 
-**First: read the next nightly** — both of yesterday's fixes are still unconfirmed on CI, and no sweep has run
-since (see *The nightly sweep* above). That is a five-minute check, not a task, and §8.65's rule is why it comes
-first: a sweep nobody reads stops being an alarm. **Two reds in one week were each mis-labelled in this very
-section** before anyone looked at the evidence.
+**First: read the next nightly.** Two fixes from 2026-08-30 are still unconfirmed and **no sweep has run since
+they landed** — re-verified 2026-08-30 (newest is still `33278795124`, the two-red one). Five-minute check, not
+a task, and §8.65 is why it is first: a sweep nobody reads stops being an alarm. **Two reds in one week were each
+mis-labelled in this very section** before anyone looked at the evidence.
 
-**Then, top pick: Piece 5 — email-confirmation copy** (S) — a branded template following
-`supabase/templates/recovery.html`; **do NOT switch email confirmation ON** (it stranded web parents once —
-assert `enable_confirmations = false` stays, in `config.toml` AND the hosted project). Apps/config only, no
-migration. After it the S-pool is exhausted; other parked items live in `BACKLOG.md`.
+**Then: there is no queued top pick.** Piece 5 shipped (§8.99) and with it the Wave C S-pool is empty. The next
+item is a genuine choice from `BACKLOG.md` — pick by value; the remaining pool has no rework edges. **Do not
+re-derive the queue here**; that is what `BACKLOG.md` is for, and restating it is how the two drift.
 
-**No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), on prod,
-0 pending, with a rehearsed DOWN in `supabase/rollback/`. Piece 5 authors none.
+**No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), **on prod
+— re-confirmed 2026-08-30 by `supabase migration list --linked`, `remote` column filled** — 0 pending, rehearsed
+DOWN in `supabase/rollback/`. §8.99 authored none. *(That check corrected a live trap: `BACKLOG.md`'s pick-now
+item 1 had said "NOT YET DEPLOYED, deploy via `/deploy` when ready" for a migration already on prod and already
+exercised there. Fixed the same day. **The linked migration list is the fact; a prose status is a hint.**)*
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

@@ -439,15 +439,16 @@ No rework edges between these — a **value/effort** ranking the user chose. **P
 on 2026-08-28**: swim-skill grading, migration `20260828000100`). All struck in their sections below.
 The pick-now list now:
 
-1. ~~**Make swim-skill grading ADMIN-ONLY**~~ — **BUILT 2026-08-29, NOT YET DEPLOYED**
-   (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD §7.15). It grew well past the
-   scope sketched here: the user asked for an **Assessment tab** built for an assessment DAY, so the
-   change is a whole new admin surface, not a drawer modal. Shipped: the write policy narrowed to
-   `can_admin_tenant`, the coach screen made read-only, `/assessment` (index + per-class grid grouped
-   by level, cycle + paint entry, inline level promotion), the Students-drawer one-off, and
-   `verify-assessment.mjs` (27 checks, mobile viewport). **Deploy via `/deploy` when ready** —
-   migration to prod FIRST, and the RISK-8 gate (`SELECT count(*) FROM student_skill_progress` on
-   prod must return 0) is unrun.
+1. ~~**Make swim-skill grading ADMIN-ONLY**~~ — **SHIPPED AND DEPLOYED** (`20260829000100`,
+   `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD §7.15). It grew well past the scope sketched here:
+   the user asked for an **Assessment tab** built for an assessment DAY, so the change is a whole new
+   admin surface, not a drawer modal. Shipped: the write policy narrowed to `can_admin_tenant`, the
+   coach screen made read-only, `/assessment` (index + per-class grid grouped by level, cycle + paint
+   entry, inline level promotion), the Students-drawer one-off, and `verify-assessment.mjs` (27 checks,
+   mobile viewport). **This row said "NOT YET DEPLOYED" until 2026-08-30, when
+   `supabase migration list --linked` showed `20260829000100` with its `remote` column filled** — it
+   went to prod on 2026-08-29 and was exercised there the same day (§8.94). The pre-deploy RISK-8 gate
+   (`student_skill_progress` count = 0) is moot: the table now holds real grades.
 2. ~~**Email-confirmation copy**~~ (S, Piece 5) — **SHIPPED 2026-08-30**, dormant by design;
    confirmation stays OFF and is now held there by a CI guard. Full item below.
    **The S-pool is now exhausted.**
