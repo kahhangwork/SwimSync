@@ -3515,3 +3515,26 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     twice drifts.** §7.223 was a copy string in a page and in a driver; §7.224 a seed id in the seed and in a
     fixture; this is a date in a fixture and in a driver. In each the fix was to keep ONE copy and derive the
     other. (2026-08-30, §8.95.)
+
+226. **A Playwright `clock.install()` CANNOT fake `markable_floor` — it is client-side, and the floor is Postgres
+    reading the real clock.** `verify-bulk-setall` and `verify-unmarked-lessons` froze their browsers at 15 Jul
+    2026 against a fixture with lessons on 4 and 11 Jul, and the comment in one of them claimed the fake was what
+    made it *"keep working whatever today's real date is"*. **Exactly backwards.** Freezing the client pins one
+    end of a comparison whose other end keeps moving: the backlog's lower bound is `markable_floor` = the 1st of
+    LAST month, so on 2026-09-01 those July lessons drop out of the needs-marking window. Both drivers were
+    proven to break by pinning `session_window_start()` to `2026-08-01` and re-running — 10/10 → 9/10 and
+    12/12 → 10/12, with a control at `2026-07-01` passing, so the floor was the only variable. **The failure is
+    invisible in a screenshot**: an empty backlog is a normal screen, not an error.
+    ⚠ **THE FIX IS "LAST MONTH", NOT "THE LAST FEW DAYS", AND THE REASON IS A SECOND CONSTRAINT.** The obvious
+    repair — derive the two most recent Saturdays — passes every coach check and fails every ADMIN one, because
+    that fixture also drives the invoice-generation block and **a billing month must have ENDED to be billable**
+    (PRD §7.7); the most recent Saturday is usually in the unfinished current month. The last two Saturdays of
+    the PREVIOUS month satisfy both at once: that month is over, and `markable_floor` IS its 1st. It is also safe
+    by arithmetic — the last Saturday of any month is the 22nd or later, so minus seven is still the same month.
+    ⚠ **Also watch the ENROLMENT date.** The backlog's bound is `max(server floor, earliest enrolment)`, so
+    back-dating the enrolment "to be safe" drags EXTRA unmarked Saturdays into the list and "the backlog clears"
+    can never pass. It must sit just before the marked lesson (here `missing_sat - 10`).
+    ⚠ **When auditing for this, grep ISO dates too, not just month names.** A month-name scan missed
+    `/date=2026-07-11/` — a driver asserting a URL. And a fixture whose dates are correctly derived can no longer
+    be validated by the floor-override trick, because overriding the floor without moving `now()` makes the two
+    disagree by construction; test those against the real clock. (2026-08-30, §8.95.)

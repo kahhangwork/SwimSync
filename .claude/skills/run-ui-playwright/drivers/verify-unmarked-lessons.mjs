@@ -11,18 +11,55 @@
 //   cd SwimSyncAdmin && npm run dev          # :3000
 //   cd SwimSyncApp   && npx expo start --web # :8081
 //
-// The fixture leaves Sat 11 Jul 2026 unmarked (Sat 4 Jul is fully marked) and
-// pins enrolment to 1 Jul. Both browsers run with a FAKED clock at 15 Jul 2026
-// so this keeps working whatever today's real date is — the backlog window is
-// "since the previous month", so a real clock would make it rot immediately.
+// The fixture leaves the MOST RECENT past Saturday unmarked (the one before it
+// is fully marked). No date is written down here; all four labels are derived
+// from the row the fixture wrote.
+//
+// ⚠ THE COMMENT THAT USED TO BE HERE HAD IT EXACTLY BACKWARDS. It read: "Both
+// browsers run with a FAKED clock at 15 Jul 2026 so this keeps working whatever
+// today's real date is — a real clock would make it rot immediately." The fake
+// is what made it rot. `clock.install` is CLIENT-side; the backlog's lower bound
+// is `markable_floor`, which Postgres computes from the REAL clock as the 1st of
+// last month. Freezing the client pins one end of a comparison whose other end
+// keeps moving, so a July fixture was guaranteed to fall out of the window on
+// 2026-09-01 — silently, since an empty backlog renders as a normal screen.
+// Simulated before the fix: 12/12 at a 2026-07-01 floor, 10/12 at 2026-08-01.
+// §7.226.
+//
+// The fake is KEPT, because pinning the weekday is what makes the run identical
+// on any day — but it is derived: the Wednesday after the missing Saturday.
 //
 // Run order matters: the admin gap check runs BEFORE the coach fixes the gap.
 import os from "node:os";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { launch, loginExpo, loginAdmin, tap, dumpText } from "./lib.mjs";
 
-// Wed 15 Jul 2026, 12:00 SGT. July's Saturdays so far: the 4th and the 11th.
-const TODAY_SGT = new Date("2026-07-15T04:00:00Z");
+const sql = (q) =>
+  execSync(
+    `docker exec -i supabase_db_SwimSync psql -U postgres -tAc ${JSON.stringify(
+      q.replace(/\s+/g, " ").trim()
+    )}`,
+    { encoding: "utf8" }
+  ).trim();
+
+// Every label this driver asserts on, derived from the one row the fixture wrote.
+// 'Dy, FMDD Mon' matches how the app renders a dated backlog row ("Sat, 4 Jul").
+const [missingIso, MISSING, MARKED_ROW, NEXT_1, NEXT_2] = sql(`
+  SELECT to_char(ls.session_date + 7,'YYYY-MM-DD')
+      || '|' || to_char(ls.session_date + 7,'FMDD Mon')
+      || '|' || to_char(ls.session_date,    'Dy, FMDD Mon')
+      || '|' || to_char(ls.session_date + 14,'FMDD Mon')
+      || '|' || to_char(ls.session_date + 21,'FMDD Mon')
+    FROM lesson_sessions ls
+    JOIN classes c ON c.id = ls.class_id
+   WHERE c.title = 'Saturday Beginners'
+   ORDER BY ls.session_date DESC LIMIT 1`).split("|");
+
+// The Wednesday after the missing Saturday, so NEXT_1/NEXT_2 stay in the future.
+const TODAY_SGT = new Date(`${missingIso}T04:00:00Z`);
+TODAY_SGT.setUTCDate(TODAY_SGT.getUTCDate() + 4);
+console.log(`scenario: missing "${MISSING}", marked "${MARKED_ROW}", future "${NEXT_1}"/"${NEXT_2}"`);
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (name) => path.join(SHOT, name);
@@ -61,15 +98,16 @@ await admin.screenshot({ path: shot("admin-modal-gap.png"), fullPage: true });
 
 check("Admin modal warns lessons are unmarked", /no attendance marked/i.test(adminText));
 check("Admin modal reports 1 of 2 lessons marked", /1 of 2 lessons marked/.test(adminText));
-check("Admin modal names the missing date", /Missing:.*11 Jul/.test(adminText));
+check("Admin modal names the missing date", new RegExp(`Missing:.*${MISSING}`).test(adminText));
 // "Generate anyway" existed briefly before §8a made unmarked attendance a HARD
 // block with no override (an override can only produce a permanent underbill).
 // Its ABSENCE is now the product rule this modal must obey — asserting its
 // presence was rot from the pre-hard-block era (repaired 2026-08-05).
 check("No 'Generate anyway' override exists — the block is hard (§8a)",
   !/Generate anyway/i.test(adminText));
-// Today is 15 Jul: the 18th and 25th are future and must not be called missing.
-check("Future Saturdays are not reported as gaps", !/18 Jul|25 Jul/.test(adminText));
+// The next two Saturdays are future and must not be called missing.
+check("Future Saturdays are not reported as gaps",
+  !new RegExp(`${NEXT_1}|${NEXT_2}`).test(adminText));
 
 // ── 2. Coach sees the forgotten lesson ───────────────────────────────────────
 const coachCtx = await browser.newContext({
@@ -87,14 +125,15 @@ await coach.waitForTimeout(3000);
 let text = await dumpText(coach);
 await coach.screenshot({ path: shot("coach-today-backlog.png"), fullPage: true });
 check("Schedule lists one unmarked lesson", /NEEDS MARKING \(1\)/i.test(text));
-check("Backlog names the forgotten Saturday", /11 Jul/.test(text));
-check("Backlog omits the already-marked Saturday", !/Sat, 4 Jul/.test(text));
+check("Backlog names the forgotten Saturday", new RegExp(MISSING).test(text));
+check("Backlog omits the already-marked Saturday", !new RegExp(MARKED_ROW).test(text));
 
 // ── 3. Coach marks it from the backlog (the route that didn't exist before) ──
-await tap(coach.getByText("11 Jul").first(), "backlog row");
+await tap(coach.getByText(MISSING).first(), "backlog row");
 await coach.waitForTimeout(3000);
 text = await dumpText(coach);
-check("Backlog opens attendance at that date", /date=2026-07-11/.test(coach.url()));
+check("Backlog opens attendance at that date",
+  new RegExp(`date=${missingIso}`).test(coach.url()), coach.url());
 check("Enrolled students are listed", /Ana Tan/.test(text) && /Ben Tan/.test(text));
 
 const present = coach.getByText("Present");

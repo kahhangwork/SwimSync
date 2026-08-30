@@ -12,13 +12,49 @@
 //     < .claude/skills/run-ui-playwright/drivers/fixtures-unmarked-lessons.sql
 //   cd SwimSyncApp && npx expo start --web   # :8081
 //
-// The fixture enrols Ana Tan + Ben Tan in "Saturday Beginners" and leaves Sat 11
-// Jul 2026 unmarked. Clock is faked at 15 Jul 2026 so the backlog row is reachable.
+// The fixture enrols Ana Tan + Ben Tan in "Saturday Beginners" and leaves the
+// MOST RECENT past Saturday unmarked. Nothing here states that date: it is read
+// back off the row the fixture wrote, and the gap is exactly seven days later.
+//
+// ⚠ THIS USED TO SAY 15 Jul 2026, AND THAT IS A BUG THAT FIRES ON A CALENDAR.
+// The clock fake is client-side only — it cannot fake `markable_floor`, which
+// Postgres computes from the real clock as the 1st of LAST month. A frozen July
+// client and a marching server floor agree until the floor passes the fixture's
+// lessons, then the needs-marking backlog empties and every check here fails on
+// a screen that looks perfectly normal. Simulated before the fix: 10/10 at a
+// 2026-07-01 floor, 9/10 at 2026-08-01. §7.226.
+//
+// The fake is still needed — it pins the WEEKDAY so the run is identical on any
+// day — but it is now DERIVED: the Wednesday after the missing Saturday, which
+// keeps the next Saturday in the future so "must not be called missing" still
+// means something.
 import os from "node:os";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { launch, loginExpo, tap, dumpText } from "./lib.mjs";
 
-const TODAY_SGT = new Date("2026-07-15T04:00:00Z");
+const sql = (q) =>
+  execSync(
+    `docker exec -i supabase_db_SwimSync psql -U postgres -tAc ${JSON.stringify(
+      q.replace(/\s+/g, " ").trim()
+    )}`,
+    { encoding: "utf8" }
+  ).trim();
+
+// The one row the fixture wrote is the single source of truth for the scenario.
+const [markedIso, missingIso, missingLabel] = sql(`
+  SELECT to_char(ls.session_date,'YYYY-MM-DD')
+      || '|' || to_char(ls.session_date + 7,'YYYY-MM-DD')
+      || '|' || to_char(ls.session_date + 7,'FMDD Mon')
+    FROM lesson_sessions ls
+    JOIN classes c ON c.id = ls.class_id
+   WHERE c.title = 'Saturday Beginners'
+   ORDER BY ls.session_date DESC LIMIT 1`).split("|");
+
+// The Wednesday after the missing Saturday.
+const TODAY_SGT = new Date(`${missingIso}T04:00:00Z`);
+TODAY_SGT.setUTCDate(TODAY_SGT.getUTCDate() + 4);
+console.log(`scenario: marked ${markedIso}, missing ${missingIso} ("${missingLabel}")`);
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (name) => path.join(SHOT, name);
 
@@ -48,17 +84,17 @@ coach.on("dialog", (d) => {
 await loginExpo(coach, "coach@swimsync.test", "password123");
 await coach.waitForTimeout(3000);
 
-async function openJul11() {
+async function openMissingSaturday() {
   await coach.goto("http://localhost:8081/schedule");
   await coach.waitForTimeout(4000);
-  await tap(coach.getByText("11 Jul").first(), "backlog row → 11 Jul");
+  await tap(coach.getByText(missingLabel).first(), `backlog row → ${missingLabel}`);
   await coach.waitForTimeout(3000);
 }
 
 // ── 1. Confirm path: mark one student, then Set all → guard fires ─────────────
-await openJul11();
+await openMissingSaturday();
 let text = await dumpText(coach);
-check("Attendance opened at 11 Jul with both students", /Ana Tan/.test(text) && /Ben Tan/.test(text));
+check(`Attendance opened at ${missingLabel} with both students`, /Ana Tan/.test(text) && /Ben Tan/.test(text));
 check("Both students start unmarked", (text.match(/Not yet marked/g) || []).length === 2);
 
 // mark the first student's row Present manually
@@ -83,7 +119,7 @@ check("After confirm, both rows are Cancelled (Coach)", !/Not yet marked/.test(t
 
 // ── 2. No-confirm path: fresh screen, one tap, no dialog ─────────────────────
 // Navigate away WITHOUT saving, so 11 Jul reloads clean from the DB.
-await openJul11();
+await openMissingSaturday();
 text = await dumpText(coach);
 check("Reopened 11 Jul is fresh again (nothing was saved)",
   (text.match(/Not yet marked/g) || []).length === 2);
@@ -108,7 +144,7 @@ await coach.waitForTimeout(4000);
 await coach.goto("http://localhost:8081/schedule");
 await coach.waitForTimeout(4000);
 text = await dumpText(coach);
-check("After bulk save, 11 Jul clears the unmarked backlog", !/NEEDS MARKING/i.test(text));
+check(`After bulk save, ${missingLabel} clears the unmarked backlog`, !/NEEDS MARKING/i.test(text));
 
 await browser.close();
 

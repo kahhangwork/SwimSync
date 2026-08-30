@@ -1,6 +1,48 @@
--- Verification scenario: a July 2026 Saturday that was never marked.
--- Today is 2026-07-15, so July's Saturdays so far are the 4th and 11th.
--- We mark the 4th fully and leave the 11th with no session row at all.
+-- Verification scenario: a recent Saturday that was never marked.
+--
+--   marked_sat  = the Saturday BEFORE last — session exists, both children marked
+--   missing_sat = the most recent past Saturday — NO session row at all
+--
+-- ⚠ THESE DATES ARE DERIVED AND MUST STAY DERIVED. Until 2026-08-30 they read
+-- '2026-07-04' and '11 July', written on 2026-07-15 and correct for six weeks.
+-- An absolute lesson date dies when the MARKING WINDOW moves past it:
+-- markable_floor is the 1st of LAST month, so these lessons would have dropped
+-- out of the needs-marking backlog on 2026-09-01 — silently, because an empty
+-- backlog is a valid screen, not an error. Confirmed by simulation before the
+-- fix (§7.226). Both Saturdays here sit within 14 days of today, so they are
+-- inside the window BY CONSTRUCTION, at any date this ever runs.
+--
+-- The formula is the house one (see fixtures-trial-visibility.sql): the most
+-- recent Saturday STRICTLY before today, in SGT — never CURRENT_DATE (§7.7),
+-- and the `= 6` arm is what stops "today" counting as its own last Saturday.
+--
+-- The drivers derive everything else from the marked row (missing = marked + 7),
+-- so this file is the ONLY place the scenario's dates are stated.
+
+-- The scenario's ONE statement of its dates. A TEMP view, so it lives exactly as
+-- long as this psql session and leaves nothing behind for the teardown to find.
+-- missing_sat = the LAST Saturday of the PREVIOUS calendar month.
+--
+-- ⚠ "THE MOST RECENT SATURDAY" IS WRONG HERE, and the driver proves it: this
+-- fixture also feeds the invoice-generation block, and a billing month must have
+-- ENDED before it can be billed (PRD §7.7). The most recent Saturday is usually
+-- in the CURRENT month, which has not finished, so the admin half of
+-- verify-unmarked-lessons fails on a completely different code path. Last month
+-- satisfies both constraints at once: it has ended, AND markable_floor is the
+-- 1st of last month, so its Saturdays are always inside the marking window.
+--
+-- marked_sat = missing_sat - 7 is always in the same month: the last Saturday of
+-- any month falls on the 22nd or later, so minus seven is the 15th or later.
+CREATE TEMP VIEW fixture_dates AS
+WITH d AS (
+  SELECT (date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore')::date)::date - 1)
+           AS last_day_prev_month
+)
+SELECT (
+  d.last_day_prev_month
+    - ((EXTRACT(DOW FROM d.last_day_prev_month)::int + 1) % 7)
+) AS missing_sat
+FROM d;
 
 -- Parent auth user (the handle_new_user trigger creates profiles + parents)
 INSERT INTO auth.users (
@@ -40,7 +82,13 @@ SELECT p.id, s.id FROM p CROSS JOIN s;
 -- fixture could make an unrelated billing test refuse for a reason that had
 -- nothing to do with the code under test.
 INSERT INTO student_class_enrolments (student_id, class_id, enrolled_at, is_active)
-SELECT st.id, c.id, '2026-07-01T02:00:00Z', true
+SELECT st.id, c.id,
+       -- 3 days before marked_sat, matching the original 1 Jul / 4 Jul spacing.
+       -- ⚠ NOT EARLIER. The backlog's lower bound is max(server floor, earliest
+       -- enrolment), so an enrolment further back drags EXTRA unmarked Saturdays
+       -- into the needs-marking list and the "backlog clears" check can never
+       -- pass. Exactly two Saturdays may be in window: marked_sat and missing_sat.
+       ((SELECT missing_sat FROM fixture_dates) - 10)::timestamptz, true
 FROM students st
 JOIN parent_students ps ON ps.student_id = st.id
 JOIN parents pa        ON pa.id = ps.parent_id
@@ -58,7 +106,8 @@ WHERE c.title = 'Saturday Beginners'
 -- children.
 WITH sess AS (
   INSERT INTO lesson_sessions (class_id, session_date, status)
-  SELECT id, '2026-07-04', 'completed' FROM classes WHERE title = 'Saturday Beginners'
+  SELECT c.id, (SELECT missing_sat FROM fixture_dates) - 7, 'completed'
+    FROM classes c WHERE c.title = 'Saturday Beginners'
   RETURNING id
 )
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by, marked_at)
@@ -70,7 +119,7 @@ JOIN parents pa        ON pa.id = ps.parent_id
 WHERE pa.profile_id = 'b0000000-0000-0000-0000-000000000001'
   AND st.full_name IN ('Ana Tan', 'Ben Tan');
 
--- Saturday 11 July: DELIBERATELY ABSENT. No lesson_sessions row, no attendance.
+-- missing_sat: DELIBERATELY ABSENT. No lesson_sessions row, no attendance.
 -- This is the lesson the coach forgot, and the whole point of the feature.
 
 -- A third child who is NOT assigned to any class — the state a parent lands in
