@@ -446,7 +446,10 @@ collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't resta
 **One more, learned 2026-08-30:** `check-fixture-roundtrip.sh` run straight after a UI driver reports
 failures that are just the driver's own UI writes — reset before believing it.
 
-> **Before triaging any red, read §7.108** — a driver dying on `page.goto(admin/login)` with a
+> **FIRST, download the run's screenshots — `gh run download <id> -n ui-driver-run -D <dir>`.** They are
+> already being collected and were never once opened; on 2026-08-30 a two-night red that had survived two
+> wrong hypotheses was settled in one look by a button still reading *"Creating…"* (§7.228). **Then read
+> §7.108** — a driver dying on `page.goto(admin/login)` with a
 > 30s `networkidle` timeout is a cold Next.js compile, not rot and not a product bug; `curl`
 > the route and re-run first. **Then ask which weekday the run actually saw** (§7.122), and
 > whether the driver takes an ordinal over a list it does not own (§7.75, §7.101) or skips

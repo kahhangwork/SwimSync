@@ -9,6 +9,9 @@
 // whole path rather than checking the database.
 //
 // Setup: supabase running + seed; cd SwimSyncAdmin && npm run dev
+// PRECONDITION: RESEND_API_KEY must be UNSET (neither CI nor a local stack sets
+// it). With a key set the invite link is emailed instead of shown, and the last
+// SEVEN checks cannot run — the driver says so and fails rather than skipping.
 import os from "node:os";
 import path from "node:path";
 import { launch, loginAdmin } from "./lib.mjs";
@@ -52,25 +55,58 @@ await page.screenshot({ path: shot("prov-email-mismatch.png"), fullPage: true })
 // ── 2. Provision for real ────────────────────────────────────────────────────
 await emailInputs.nth(1).fill(ADMIN_EMAIL);
 await page.getByRole("button", { name: /Create & invite/i }).click();
-await page.waitForTimeout(2500);
 
-const bodyAfter = await page.innerText("body");
-check("the business is created", bodyAfter.includes(BIZ));
+// ⚠ WAIT FOR THE OUTCOME, NEVER FOR A DURATION. This was `waitForTimeout(2500)`
+// and it went red on the nightly of 2026-08-29 (5/8) while passing locally at
+// 15/15: provisioning is an API-route round trip that also mints an auth invite
+// link, and on a cold CI runner the route's first compile alone outlasts the
+// budget. The run's own screenshot showed the button still reading "Creating…".
+// A fixed sleep turns a slow machine into a fake product failure — and here it
+// cost the SEVEN checks below, which are the ones this driver exists for.
+await page
+  .waitForFunction(
+    (biz) => {
+      const t = document.body.innerText;
+      return (
+        t.includes(`${biz} is set up`) ||
+        /Could not create|Could not invite|already administers|already in use/i.test(t)
+      );
+    },
+    BIZ,
+    { timeout: 30000 }
+  )
+  .catch(() => {});
+
+// ⚠ READ THE PANEL, NOT THE PAGE. Everything below used to match against the
+// whole body, which also contains the businesses TABLE — including the seed's
+// own join code. That is why the join-code check PASSED on the red run while
+// reporting `SWIM-TEST`: a seed row the driver does not own, asserted as if it
+// were the new business's code (§7.75, §7.101). Scoping to the success panel
+// makes a missing panel fail every check that depends on it, together.
+const panelText = await page
+  .locator(`xpath=//h3[contains(., "${BIZ} is set up")]/..`)
+  .innerText()
+  .catch(() => "");
+
+check("the business is created", panelText.includes(BIZ), panelText ? "panel shown" : "no success panel");
 
 // The join code is the ONLY route into a business, so it must be shown at the
 // moment of creation.
-const codeMatch = bodyAfter.match(/SWIM-[A-Z2-9]{4}/);
+const codeMatch = panelText.match(/SWIM-[A-Z2-9]{4}/);
 check("a join code is shown on creation", Boolean(codeMatch), codeMatch?.[0] ?? "none found");
 
 // Without RESEND_API_KEY the email cannot send — and because the email IS the
 // deliverable here, that must surface as a warning with a copyable link rather
 // than a green success. (With a key set, this flips to the "sent to" branch.)
-const noKey = /No invite email was sent/i.test(bodyAfter);
-const sentOk = /An invite to set a password was sent/i.test(bodyAfter);
+const noKey = /No invite email was sent/i.test(panelText);
+const sentOk = /An invite to set a password was sent/i.test(panelText);
 check(
   "delivery outcome is stated explicitly (warning+link, or sent)",
   noKey || sentOk,
-  noKey ? "warned + link shown" : "sent"
+  // Say what was actually seen. This used to print "sent" whenever the no-key
+  // branch was absent — including on failure, where nothing had been sent at
+  // all — which is what sent the first triage of this red down the wrong path.
+  noKey ? "warned + link shown" : sentOk ? "sent" : "NEITHER — no outcome rendered"
 );
 await page.screenshot({ path: shot("prov-created.png"), fullPage: true });
 
@@ -87,32 +123,33 @@ check("its status is 'invited' before they sign in", /invited/i.test(rowText));
 check("a Resend action is offered while invited", /Resend/i.test(rowText));
 
 // ── 4. Grab the invite link and accept it ───────────────────────────────────
-// The link is only surfaced in the UI when sending failed; when a key IS set we
-// mint a fresh one over the API instead, so this driver works either way.
-const linkFromUi = bodyAfter.match(/http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s"<]+/);
-let inviteLink = linkFromUi?.[0] ?? null;
+// The link is surfaced in the UI ONLY when sending failed — with a key set the
+// route deliberately returns `inviteLink: null`, because a link that was emailed
+// should not also be printed on a screen.
+//
+// ⚠ THIS DRIVER THEREFORE REQUIRES `RESEND_API_KEY` TO BE UNSET, and says so
+// out loud rather than quietly skipping. It used to claim it "works either way"
+// via a fallback that minted a fresh link over /api/resend-invite — but that
+// fallback read `data-tenant-id` off the table row, an attribute that exists
+// NOWHERE in the admin panel, so `tenantId` was always null, the fetch never
+// ran, and `inviteLink` stayed null. The seven checks below — including the one
+// this file's own header calls load-bearing, that the invited owner can SIGN IN
+// — were skipped silently whenever the link was missing for ANY reason. That is
+// §7.100's shape: a driver quietly not asserting the thing it exists to assert.
+// Neither CI nor a local stack sets the key, so the precondition costs nothing;
+// what it buys is a loud, named failure instead of a short green run.
+const linkFromUi = panelText.match(/http:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s"<]+/);
+const inviteLink = linkFromUi?.[0] ?? null;
 
-if (!inviteLink) {
-  const token = await page.evaluate(async () => {
-    const raw = Object.keys(localStorage).find((k) => k.includes("auth-token"));
-    return JSON.parse(localStorage.getItem(raw)).access_token;
-  });
-  const tenantId = await page.evaluate(async (biz) => {
-    const rows = [...document.querySelectorAll("tr")];
-    const r = rows.find((x) => x.innerText.includes(biz));
-    return r ? r.getAttribute("data-tenant-id") : null;
-  }, BIZ);
-  if (tenantId) {
-    const res = await fetch("http://localhost:3000/api/resend-invite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ tenantId }),
-    });
-    inviteLink = (await res.json()).inviteLink;
-  }
-}
-
-check("an invite link is available to follow", Boolean(inviteLink));
+check(
+  "an invite link is available to follow",
+  Boolean(inviteLink),
+  inviteLink
+    ? "from the warning panel"
+    : panelText
+    ? "panel shown but no link — is RESEND_API_KEY set? this driver needs it UNSET"
+    : "no success panel at all, so nothing to read a link from"
+);
 
 if (inviteLink) {
   // The redirect must land on /accept-invite. If the URL is missing from
@@ -179,6 +216,18 @@ if (inviteLink) {
   check("the platform row now reads 'active'", /active/i.test(rowNow) && !/invited/i.test(rowNow), rowNow.slice(0, 120));
 
   await ctx.close();
+} else {
+  // Say the quiet part. Without this the run reports "5/8" and a reader has to
+  // know that a full pass is FIFTEEN to notice that the seven checks this file
+  // exists for — accept the invite, set a password, sign in, land in the right
+  // business — never executed at all. A shrinking denominator is not a signal
+  // anyone reads (§7.100).
+  console.log(
+    "\n  ⚠ SKIPPED the 7 checks after this one — no invite link, so the " +
+      "accept-invite → set-password → SIGN-IN path was never exercised. " +
+      `That path is why this driver exists. A full pass is ${results.length + 7}; ` +
+      `this run only ever reached ${results.length} — read it as unverified, not as a partial pass.`
+  );
 }
 
 const failed = results.filter((r) => !r.pass).length;

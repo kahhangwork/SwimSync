@@ -3572,3 +3572,44 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     via `process.env.TZ`, the `lessonDates.test.ts` / `tableSort.test.ts` pattern. **The old test that looked
     like it pinned the boundary did not**: it passed `"2026-09-01T00:00:00"`, a zoneless literal the database
     never produces, so both sides moved together and every zone agreed. (2026-08-30.)
+
+228. **The nightly uploads its SCREENSHOTS, and nobody had ever opened them — do that FIRST when a UI driver
+    reddens.** `gh run download <run-id> -n ui-driver-run -D <dir>` pulls every driver's log *and* its
+    `shots-<driver>/` PNGs. `verify-tenant-provisioning` was red for two nights and cost two wrong hypotheses
+    (below); the artifact settled it in one look, because `prov-created.png` showed the submit button still
+    reading **"Creating…"**. The page state at the moment of failure is a fact, and it is already being
+    collected — reading a log and theorising while an authoritative screenshot sits unopened is the expensive
+    way round. **Run this before forming any hypothesis about a driver red.**
+    ⚠ **THE CAUSE: a fixed `waitForTimeout` after an action that round-trips an API route.** The driver clicked
+    *Create & invite*, slept a flat 2500 ms, then read the page. Provisioning is a Next API route that also
+    mints an auth invite link, and on a cold CI runner it had not returned. **A fixed sleep converts a slower
+    machine into a fake PRODUCT failure.** Fix: wait for the OUTCOME — `page.waitForFunction` on the success
+    panel *or* any error copy, generous timeout — never for a duration. Proven both ways: shortening the sleep
+    to 200 ms locally reproduced the CI signature exactly (5/8, same three failures, same `SWIM-TEST` and
+    `sent` details), and after the fix an injected **8 s** delay on the route still passes 15/15.
+    ⚠ **DO NOT READ TOTAL WALL TIME AS RUNNER SPEED — this is what made the first diagnosis wrong.** Local
+    took 47 s, CI 49 s, which looks like "the runner is not slower" and was used to *rule out* timing. It is
+    a trap: CI ran **8 checks** and local ran **15**, because the red bailed out of a block containing ~11 s
+    of sleeps plus a second browser context. **Compare like segments, or compare nothing** — a driver whose
+    runtime is dominated by fixed sleeps has a near-constant wall time that says nothing about the machine.
+    ⚠ **A whole-body regex can PASS on a row the driver does not own.** *"a join code is shown on creation"*
+    matched `/SWIM-[A-Z2-9]{4}/` against `innerText("body")` — which includes the businesses TABLE — so it
+    reported **PASS `SWIM-TEST`**, the *seed's* code, on a run where no business had been created and no panel
+    existed (§7.75, §7.101). Scope an assertion to the element the action produced, so a missing panel fails
+    every dependent check together instead of one of them passing on someone else's data.
+    ⚠ **A detail string must not print the failure case as a success branch.** The delivery check logged
+    `noKey ? "warned + link shown" : "sent"`, so it printed **`— sent`** whenever the no-key branch was absent
+    — *including on failure, where nothing was sent*. That single word is what produced the first wrong theory
+    ("CI has a working RESEND key"); CI sets no such key at all. Print what was actually observed, and give the
+    neither-branch case its own words.
+    ⚠ **A fallback that reads an attribute the app never renders is DEAD CODE that silently disables the
+    driver.** The recovery path claimed the driver "works either way" by minting a link over
+    `/api/resend-invite`, keyed on `data-tenant-id` from the table row — **an attribute that exists nowhere in
+    the admin panel**. So `tenantId` was always null and the fetch never ran, which is why a slow response
+    cost **seven** checks rather than three: everything after it sat inside `if (inviteLink)`, including the
+    sign-in assertion this driver's own header calls load-bearing (§7.100's shape). Replaced with a named
+    precondition (`RESEND_API_KEY` must be UNSET) and a loud skip notice, because **a shrinking denominator is
+    not a signal anyone reads** — 5/8 looks like a small failure and was in fact seven unrun checks.
+    ⚠ **When auditing for the dead-attribute shape:** `grep -o 'getAttribute("data-[a-z-]*"' drivers/*.mjs`,
+    then grep the app for each name. One other driver uses one (`data-status`, `verify-admin-lesson-detail`)
+    and it is real. (2026-08-30.)

@@ -503,7 +503,11 @@ and applying the naive `hasPaynowId` hide turned the disclosure check red;
 `verify-tenant-provisioning.mjs` drives creating a business end to end across the platform
 panel and a second browser context - mismatched confirmation email refused, join code shown,
 the delivery outcome stated explicitly, `invited` -> accept -> **the new admin signs in** ->
-`active` (15 checks; the sign-in is the load-bearing one, per 7.19);
+`active` (15 checks; the sign-in is the load-bearing one, per 7.19).
+⚠ **It needs `RESEND_API_KEY` UNSET** — with a key the invite link is emailed rather than shown, and the
+last seven checks cannot run; the driver now says that and fails instead of skipping. **A short run is the
+thing to notice here: `5/8` is not a small failure, it is seven unrun checks** (§7.228, which also carries
+why its waits are outcome-based and why its assertions are scoped to the success panel);
 `verify-invoice-controls.mjs` drives the admin invoice controls — it MEASURES the toggle's
 track and knob rects from the DOM (§7.34) **in rem, not pixels** (§7.193 — the admin root
 font-size shrinks with viewport width) in both states and asserts the knob stays inside the
