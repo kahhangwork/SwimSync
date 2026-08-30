@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-30 — **First full local driver sweep since §8.93: 50/50 green after five fixes**
-(§8.95). Three reds found by the sweep, two more defused before firing on 1 Sep. **The NIGHTLY is still red
-on `verify-assessment` for an unrelated UTC/SGT reason that local runs do not reproduce — §9 has the evidence.**_
+_Last updated: 2026-08-30 — **The nightly's `verify-assessment` red was a PRODUCT bug and is FIXED**
+(§8.96, `b2bcb2d`): the assessment round used the viewer's midnight, not Singapore's. Reproduced by a
+TIMEZONE, not a clock — §7.227. **One nightly red remains: `verify-tenant-provisioning`, untriaged (§9).**_
 
-_Previously, 2026-08-29 (§8.94) — the Assessment tab was exercised on prod; grading stopped being dormant._
+_Previously, 2026-08-30 (§8.95) — first full local driver sweep since §8.93: 50/50 green after five fixes._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.209** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.227** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -341,6 +341,26 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.96 (2026-08-30) — The nightly's assessment red was a PRODUCT bug, not a driver one
+
+**One fix, shipped and green.** `b2bcb2d`. `verify-assessment` 27/27 under Pacific/Midway, Asia/Singapore and
+UTC (was 21/27 under Midway); admin vitest 621, typecheck + `next build` clean, fixtures 26/26. CI green.
+**Everything durable is in §7.227** — the defect, both of its directions, the reproduction technique and the
+two prohibitions. PRD §7 now states the round boundary; the spec had been silent on the axis.
+
+- **The assessment round used the VIEWER's midnight, not Singapore's**, so grades entered in the first hours
+  of the SGT day read as a previous round's — the assessor told to re-grade children they had just graded.
+  §7.7's axis on a surface nobody had connected to it. East of Singapore it fails the opposite way.
+- **§9's triage note was wrong twice, and both cost time** (corrected in §7.227): `verify-assessment` is not
+  *"the only driver that does not pin `timezoneId`"* — **43 of the 50 do not** — and the reproduction is a
+  **timezone, not a clock**. `TZ=Pacific/Midway` reproduced 21/27 at 16:20 SGT with no faking, where the
+  note called for a UTC 16:00–24:00 window or `clock.install()`.
+- **Two review findings filed rather than fixed**, both with their reasoning in `BACKLOG.md`: ten
+  `timestamptz` renders still showing the device's date, and `toSgDate()` throwing where the call it
+  replaced degraded. Neither is reachable on prod data; both are one-line traps for the next caller.
+- **Deliberately NOT done: pinning `timezoneId` in the driver.** The unpinned driver on a UTC runner is what
+  caught the bug; every SGT-local run passed 27/27 through it. §7.227 records that as a prohibition.
+
 ## 8.95 (2026-08-30) — A reset-first driver sweep: 50/50 green, and a fuse defused two days early
 
 **Five driver/fixture fixes, no product change.** `ccb60be`, `1526efe`, `4cd226a`. Every fix re-run on a
@@ -363,25 +383,7 @@ twice, drifting — and all five are graduated: §7.223, §7.224, §7.225, §7.2
   the sidebar count, one fixture had an absolute session date. The other hardcoded dates are safe, and §7.226
   records why the audit question is *"is the FIXTURE's date relative?"*, not *"does the assertion look hardcoded?"*
 
-## 8.94 (2026-08-29) — The Assessment tab is exercised on prod; a copy bug found and shipped
-
-**No feature shipped — one fix, and a dormant guard made real.** §8.93 deployed grading DORMANT hours earlier
-on the same day; this session graded two children in *Tanglin View Sun 845am*. **What each arm proved, and the
-reusable technique for observing a round mechanism on the day you grade, are in the plan's §11.** Commit
-`ccb60be`; admin vitest 620, typecheck + `next build` clean, fixtures 26/26.
-
-- **Four of five arms confirmed on real data** — admin-only writes (the coach app's *Skills* screen refuses),
-  the vacuity guard (§7.219), the round mechanism, the promotion gate. The fifth, **re-confirmation advancing
-  `graded_at`** — the thing `20260829000100` exists to fix — **cannot be seen on prod yet, and that is not a
-  gap**: it needs a grade older than the round start. pgTAP holds it (§7.220); first real round in ~3 months.
-- **`ccb60be`** — both Assessment surfaces rendered *"1 need a level"*, a count interpolated into a fixed
-  plural. The driver's regex had to move with the copy or the nightly sweep would have reddened on a check
-  about something else. **§7.223** is the durable half, and it generalises past this one string.
-- **The plan's pre-commit gate had two boxes unticked that had in fact been done** at the §8.93 deploy
-  (the prod-half `count(*)`, and `/deploy` itself). Ticked, pointing at §11.46. A gate left half-ticked
-  reads as work outstanding to the next session.
-
-_(§8.93 demoted to a ledger row in `docs/SESSIONS.md` — grading admin-only + the Assessment tab.)_
+_(§8.94 demoted to a ledger row in `docs/SESSIONS.md` — the Assessment tab exercised on prod.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -424,22 +426,20 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-30 — the LOCAL sweep is 50/50 green (§8.95). The NIGHTLY is still RED, and the two are
-not measuring the same thing.** Run `33278795124` (2026-08-29 22:31 UTC) failed **2 of 50**:
-`tenant-provisioning` 5/8 (the known one-night `waitForTimeout` flake) and **`verify-assessment` 21/27**, which
-is a genuine open bug and **the first thing to pick up**.
+**State on 2026-08-30 — the LOCAL sweep is 50/50 green (§8.95), and the assessment red is FIXED (§8.96).**
+The last nightly, `33278795124`, failed 2 of 50. **`verify-assessment` 21/27 was a real product bug and is
+shipped** — §7.227 has the whole of it, including why the reproduction is a *timezone* rather than a clock,
+and why the driver must NOT be pinned to `Asia/Singapore` to "fix" it. **Tonight's run is the confirmation:
+it starts ~22:30 UTC, inside the disagreement window, so it exercises the fix in the condition that caught it.**
 
-> **⚠ I could not reproduce the assessment red locally, and the reason is the whole clue.** It fails on checks
-> like *"a child graded today counts toward this round"*, with today's grades rendering **stale** (`Developing·
-> 29 Aug`, `0/2`). The run's wall clock was **06:31 SGT on 30 Aug** — inside the UTC-16:00–24:00 window where
-> the UTC and SGT dates disagree. Two facts consistent with that, both checked: `verify-assessment.mjs` is the
-> **only** driver that does not pin `timezoneId: "Asia/Singapore"`, and `isFreshGrade` parses
-> `` `${since}T00:00:00` `` with **no zone suffix**, so the round boundary is the *viewer's device* midnight.
-> **This is a HYPOTHESIS, not a root cause** — `TZ=UTC` alone still passes 27/27, because at 16:00 SGT the two
-> dates agree; the failure needs the disagreement window as well. **Reproduce by running inside UTC 16:00–24:00,
-> or by faking the clock into it, BEFORE changing anything.** If it holds, the driver fix (pin the timezone) and
-> the product question (should a round boundary depend on the device's zone at all? §7.7's axis) are separate
-> decisions — the second one matters beyond the test.
+**⚠ `verify-tenant-provisioning` 5/8 is STILL OPEN, and it is not what this section used to call it.** It was
+recorded as *"the known one-night `waitForTimeout` flake"*; it is not — **identical 5/8 on two consecutive
+nights** (`33278795124`, `33229758941`), and the failures do not look like a timeout. *"delivery outcome is
+stated explicitly (warning+link, or sent)"* fails **while showing `sent`**, and *"an invite link is available
+to follow"* fails with it — the shape of a driver that expects the no-email-configured branch while CI has
+working delivery, i.e. §7.73's family rather than a flake. **`the business is created` also fails while the
+business demonstrably exists** (its join code and row both render), so triage that check separately.
+**Not yet investigated beyond reading the log** — start there, not from the flake theory.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -459,9 +459,10 @@ failures that are just the driver's own UI writes — reset before believing it.
 
 ### THE NEXT BUILD — pick-now list is in `BACKLOG.md`
 
-**First: triage the nightly's `verify-assessment` red** — the evidence and the reproduction condition are in
-*The nightly sweep* above. It is a real bug, it is one day old, and §8.65's rule applies: a sweep left red stops
-being an alarm. Do it before starting a feature.
+**First: triage `verify-tenant-provisioning` 5/8** — the evidence and the reason it is not a flake are in
+*The nightly sweep* above. §8.65's rule applies: a sweep left red stops being an alarm, and this one has now
+been red for two nights while the louder failure beside it took the attention. Do it before starting a feature.
+**Then confirm tonight's nightly cleared the assessment fix** (§8.96) rather than assuming it.
 
 **Then, top pick: Piece 5 — email-confirmation copy** (S) — a branded template following
 `supabase/templates/recovery.html`; **do NOT switch email confirmation ON** (it stranded web parents once —

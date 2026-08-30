@@ -832,6 +832,18 @@ rather than only in pgTAP. Its fixture must backdate under a **disabled trigger*
 reason the pgTAP suite does (§7.220). The pure logic is `lib/assessment.test.ts` (vitest), whose
 vacuity and freshness blocks are RED-proven against the obvious implementation.
 
+⚠ **This driver's result depends on the machine's TIMEZONE, and that is deliberate — do not pin it.**
+Like 43 of the 50 drivers it sets no `timezoneId`, so the browser inherits the runner's zone. On
+2026-08-30 that is what caught a real product bug (§7.227, §8.96): the round boundary was the
+*viewer's* midnight, so six checks reddened on the UTC nightly while every SGT-local run passed
+27/27. **Pinning `Asia/Singapore` here would hide that whole class of defect.** The consequence to
+know when hand-running: **a green run in Singapore proves less than a green run elsewhere.** To
+exercise the zone axis on demand, run it from a far-western zone —
+`TZ=Pacific/Midway node verify-assessment.mjs` — which puts the device's date a day behind
+Singapore's for 19 hours out of 24, and needs no clock faking. The deterministic version of the
+same assertion lives in `lib/assessment.test.ts`, which pins the boundary across five zones in both
+directions; the driver is time-dependent coverage and would have gone green by itself the next night.
+
 `verify-levels-table.mjs` (+ `fixtures-levels-table.sql` and its `-teardown.sql`) pins the
 Swimming Levels table's **column geometry** — it MEASURES each `th`'s rect against its
 column's `td` and fails if they diverge by more than 2px. Written because §7.54's bug was

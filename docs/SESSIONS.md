@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.94** | 2026-08-29 | Assessment tab exercised on prod, grading no longer dormant; one copy/driver-regex fix `ccb60be` | §7.223 · plans/GRADING_ADMIN_ONLY_PLAN.md §11 |
 | **8.93** | 2026-08-29 | Grading becomes ADMIN-ONLY + an Assessment tab, `20260829000100` | `GRADING_ADMIN_ONLY_PLAN.md` · PRD §7.15 · §7.219–§7.222 · §11.46 |
 | **8.92** | 2026-08-28 | Wave C S-pool 4: per-child swim-skill grading, coach-graded, `20260828000100` | `docs/plans/WAVE_C_SPOOL_PLAN.md` · PRD §7.15 |
 | **8.91** | 2026-08-28 | Wave C S-pool 1–3: scoped DB search, family-search pushdown, move-student RPC (fixed a LIVE prod bug), `20260827000100` | §7.216–§7.218 · PRD §4.4/§14 |

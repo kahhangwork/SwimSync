@@ -80,6 +80,10 @@ touching an unfamiliar subsystem.
 - **`getHours()` is the same bug on a different axis**, and it was live until 2026-07-26.
   Time of day comes from `nowMinutesInSg()` (`SwimSyncApp/lib/timeOfDay.ts`); functions that
   compare times take a plain number so they cannot read a clock at all. (§7.7)
+- **A THIRD axis: comparing an SGT date to a `timestamptz` through a zoneless
+  `` `${date}T00:00:00` ``** puts the boundary at the *viewer's* midnight. Spell the offset —
+  `+08:00` — or use `toSgDate()`. To DISPLAY a `timestamptz`, `formatSgDate(toSgDate(x))`, never a
+  bare `toLocaleDateString`. (§7.227 — shipped live in the assessment round.)
 
 **Billing — the guards are load-bearing, not friction**
 - **Never add an override** to the unmarked-attendance block or the completed-month guard.
