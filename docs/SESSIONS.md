@@ -29,6 +29,7 @@ standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.98** | 2026-08-30 | Every displayed date is Singapore's: 15 sites → a display-only `formatSgStamp()`, held by a source-scanning guard | §7.229, §7.230 · plans/SGT_DISPLAY_PLAN.md |
 | **8.97** | 2026-08-30 | The nightly's OTHER red was a DRIVER bug: a flat `waitForTimeout` read the page before the API returned, hiding seven unrun checks | §7.228 · BACKLOG |
 | **8.96** | 2026-08-30 | The nightly's assessment red was a PRODUCT bug: the round used the VIEWER's midnight, not Singapore's | §7.227 · PRD §7.15 · BACKLOG |
 | **8.95** | 2026-08-30 | Reset-first driver sweep: 50/50 green after five driver/fixture fixes; two 1 Sep time bombs defused | §7.223–§7.226 · BACKLOG |

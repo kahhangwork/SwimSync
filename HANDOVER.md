@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-08-30 — **The signup-confirmation email is branded, and the toggle beside it is
-now pinned by CI** (§8.99, §7.231/§7.232). Dormant by design: the email is never sent. The S-pool is
-EXHAUSTED. **Both 2026-08-30 nightly fixes are STILL unconfirmed — no sweep has run since they landed.**_
+_Last updated: 2026-09-09 — **The SwimSyncAdmin refactor is planned and started** (§8.100).
+`docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md` is the whole of it; Stage 0a is committed on
+`refactor/students-decomposition`. **The nightly has been RED every night since 2026-09-04, untriaged.**_
 
-_Previously, 2026-08-30 (§8.98) — every displayed date is Singapore's, held by a source-scanning guard._
+_Previously, 2026-08-30 (§8.99) — a branded signup-confirmation email that is never sent, and a toggle pinned by CI._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -346,6 +346,28 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.100 (2026-09-09) — The admin app's decomposition, planned and begun
+
+**A plan and one deletion. No behaviour changed.** `docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md`
+is the home for all of it — 12 stages, the nine feature slices with line anchors, and the reasoning.
+Branch `refactor/students-decomposition`, NOT merged.
+
+- **`students/page.tsx` is 2,284 lines / 98 KB — the largest file in the repo**, one component with
+  68 `useState` and 29 inline supabase calls. Five pages (students, packages, invoices, classes,
+  platform) are 9,155 lines, **43% of all admin page code**.
+- **The shape settled with the user:** feature-scoped tiers,
+  `app/(admin)/students/{ui,domain,dao}/` + `constants.ts` + `types.ts`. `dao/` splits three ways by
+  FAILURE MODE — `.repo` (`.from()`), `.rpc` (Postgres functions), `.api` (`fetch` to `app/api/`).
+  **The domain tier may orchestrate an rpc, never replace one** — that is how an override lands on a
+  billing guard.
+- **`lib/` already IS the app-tier** — 57 modules, 51 tests; the page imports 13. Only 2 may move
+  (`duplicateStudents`, `rosterDuplicates`); the rest are shared or drift-pinned to SwimSyncApp.
+- **Tiers are feature-scoped, not top-level, for a REASON:** `sgDisplay.drift.test.ts` scans a fixed
+  `SCAN_DIRS`, so a new top-level folder would silently narrow that guard rather than fail. Candidate
+  gotcha — see the plan §12.
+- **Deliberately NOT done:** the Stage 0b boundary test (user chose to hand over first), any code
+  move, and the package-settings extraction (a behaviour change → `BACKLOG.md`).
+
 ## 8.99 (2026-08-30) — A branded confirmation email that is never sent, and a toggle that now has a guard
 
 **One template, one config block, one CI guard.** `4556888`. `supabase/templates/confirmation.html` +
@@ -368,30 +390,7 @@ exhausted.** Everything durable is in §7.231, §7.232, `docs/TESTING.md` and `B
   `"mailer_autoconfirm": true`, and **that inversion is the trap: `true` means confirmations are OFF**
   (§7.232 has the command). The hosted **template body** still has no read-back.
 
-## 8.98 (2026-08-30) — A displayed date is Singapore's, not the viewer's
-
-**One fix, one guard, shipped and pushed.** `317175c`. 15 sites — 10 admin `timestamptz` renders,
-5 SwimSyncApp `formatDate` helpers — moved to a new **display-only** `formatSgStamp()`. Output is
-**byte-identical in SGT**, so nothing changed for anyone using it today; that is also why nobody could
-see the bug. **Everything durable is in §7.229, §7.230, PRD §1 and `docs/TESTING.md`.** Plan and its
-walked gate: `docs/plans/SGT_DISPLAY_PLAN.md`.
-
-- **`/plan-review` (fable) reversed the plan's first step before it was written**, and that is the
-  session's most valuable half hour. The plan proposed making `toSgDate()` degrade instead of throw;
-  the primitive has **34 call sites and they are mostly LOGIC**, so the kindness would have traded a
-  loud crash for a silent wrong answer in the coach's attendance backlog. §7.229 · `BACKLOG.md`
-  → *Deliberately not doing*.
-- **Enumerating the scanner's reds before fixing anything caught three parser bugs review had not** —
-  including an allowlist window that reached into the neighbouring function and silently exempted two
-  real offenders. §7.230 has all four traps. **An allowlist that matches by proximity is not one.**
-- **The repo's own deploy check does not apply here and was not faked.** §7.31/§7.51 say to grep the
-  served bundle for a user-visible string only the new build has; this change deliberately adds none,
-  so no such string exists. CI plus four RED-proven guards is what stands behind it instead.
-- **Deliberately NOT done:** pinning `timezoneId` in any driver (§7.227's standing prohibition — the
-  grep found no driver asserting a rendered date, so nothing needed it), and the logic half of the
-  `toSgDate` item, refused above.
-
-_(§8.97 demoted to a ledger row in `docs/SESSIONS.md`.)_
+_(§8.98 demoted to a ledger row in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -434,18 +433,13 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-08-30 (re-checked at session close) — the two reds fixed on 2026-08-30 are STILL UNCONFIRMED.
-No sweep has run since they landed**, so the newest run is still `33278795124`, the two-red one, and it says
-nothing about either fix.
-`verify-assessment` 21/27 was a real product bug (§8.96, §7.227); `verify-tenant-provisioning` 5/8 was a driver
-bug (§8.97, §7.228) — **not** the "one-night `waitForTimeout` flake" this section called it for two nights, and
-not timing-only either: `5/8` was seven checks that never ran.
+**State on 2026-09-09.** Run `34286144530` (2026-09-08) **confirms both 2026-08-30 fixes**:
+`verify-assessment` 27/27 and `verify-tenant-provisioning` green. That question is closed.
 
-**⚠ The next sweep is the whole confirmation, and it tests the two differently.** The assessment fix is only
-exercised in the UTC/SGT disagreement window, which the ~22:30 UTC start sits inside — so a green there is real
-evidence. The provisioning fix is exercised on every run. **Read the run, not this paragraph**, and if either is
-still red, `gh run download <id> -n ui-driver-run` FIRST (§7.228) — the screenshots settled the last one in a
-single look after two wrong hypotheses.
+**⚠ The sweep has been RED every night since 2026-09-04, and nobody has triaged any of it.**
+`unmarked-lessons` **8/12** three nights running (09-06/07/08); before that `coach-disable` (09-05)
+and `trials` (09-04). A rotating red is §8.65's exact failure mode — **triage the day it reddens**.
+Start with `gh run download 34286144530 -n ui-driver-run` (§7.228), not a hypothesis.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -465,6 +459,30 @@ failures that are just the driver's own UI writes — reset before believing it.
 > unordered-`LIMIT 1` fixture bug and contains **no calendar content**, so for a
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
+
+### IN FLIGHT — the admin refactor (branch `refactor/students-decomposition`)
+
+**Read `docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md` and resume at Stage 0b.** It carries the
+staging, the slice map and every constraint; do not re-derive them here.
+
+| Stage | State |
+|---|---|
+| 0a — delete dead `constants/` | ✅ `23c3e2b` |
+| **0b — `tierBoundaries.drift.test.ts`, 4 checks proven RED** | **← resume here** |
+| 1 — `constants.ts` + `types.ts` | pending |
+| 2–3 — the `dao/` tier | pending |
+| 4–11 — nine feature slices, then `page.tsx` | pending |
+
+**One decision is open, and it blocks Stage 0b:** the boundary test is red on day one, because
+`page.tsx` violates checks 3 and 4 on 29 lines. Either ship it now with a **shrinking allowlist**
+(the `sgDisplay.drift.test.ts` pattern — pinned by file AND content snippet, never file-level), or
+defer it to Stage 11. Recommended: the allowlist, so the rule exists while code is moving.
+
+**The gate at every stage:** `cd SwimSyncAdmin && npm run typecheck && npm test` — green or revert.
+Baseline 2026-09-09: **56 files / 637 tests**. Nothing here changes behaviour, so §7.31's
+served-bundle grep cannot apply (§8.98's situation); the four drivers touching Students
+(`student-identity`, `class-students`, `parent-claim`, `assessment`) are the wiring net — **run each
+at the end of its own slice, not once at the end.**
 
 ### THE NEXT BUILD — the S-pool is EXHAUSTED; pick from `BACKLOG.md`
 

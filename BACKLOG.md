@@ -499,6 +499,14 @@ swimming skills** (Piece 4, M) and ~~**Email-confirmation copy**~~ (Piece 5, S, 
 
 ### Wave D — latent traps: cheap now, silently worse later
 
+- **Package settings live on the STUDENTS page** — **S** `[found 2026-09-09, §8.100]`
+  `loadPackages` / `saveThreshold` / `saveExpiryDays` in `students/page.tsx` are tenant-level
+  **package** configuration (low-balance threshold, reward expiry days) rendered on the Students
+  screen. They belong on Admin → Packages. Deliberately NOT folded into the decomposition refactor:
+  moving a control between pages is a **behaviour change**, and that plan preserves behaviour
+  exactly. Do it after the refactor, when the code is already extracted into
+  `students/domain/` and the move is a file rename plus a nav change.
+
 - ~~**A PayNow ID that can't build a QR**~~ — **DONE 2026-08-18** (§8.68). Advisory warning at
   the admin save (`SwimSyncAdmin/lib/paynow.ts`, mirrors `buildPayNowPayload`'s mobile check);
   a UEN has no checksum so only the mobile shape is verifiable, which is all the real builder checks.
