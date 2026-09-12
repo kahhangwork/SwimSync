@@ -86,7 +86,11 @@ await loginAdmin(admin, "coach@swimsync.test", "password123");
 async function openCoverageModal() {
   await admin.goto("http://localhost:3000/invoices");
   await admin.waitForTimeout(2500);
-  await admin.fill('input[type="month"]', "2026-07");
+  // The billing month must TRACK the fixture, which derives its dates from now()
+  // (fixtures-unmarked-lessons.sql:38). This read a hardcoded "2026-07" and so
+  // checked the wrong month once the real calendar left July — red every night
+  // from 2026-09-01 (§7.73). missingIso is already derived from the fixture row.
+  await admin.fill('input[type="month"]', missingIso.slice(0, 7));
   await admin.waitForTimeout(500);
   await admin.getByRole("button", { name: /Generate Invoices/i }).click();
   await admin.waitForTimeout(3000);

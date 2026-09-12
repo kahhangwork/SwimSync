@@ -106,9 +106,22 @@ check(
   /Trials? coming up/i.test(text),
   "both coach screens already queried trial_bookings — nothing was ever rendered"
 );
+// SAME FIX AS THE PARENT SIDE ABOVE — this copy was missed on 2026-08-30 and
+// kept a hardcoded /Aug/. The guest is student ...0002, booked the strictly-next
+// Saturday, so its month drifts exactly like the parent's child's. Asking the DB
+// is the only non-drifting form (§7.225); the frozen "Aug" passed only because an
+// unrelated August session date still showed in the roster list — a green for the
+// wrong reason, which would have masked the guest's date vanishing entirely.
+const [guestDay, guestMon] = sql(`
+  SELECT to_char(session_date,'FMDD') || '|' || to_char(session_date,'Mon')
+    FROM trial_bookings
+   WHERE student_id = '7d099999-0000-0000-0000-000000000002'
+   ORDER BY session_date DESC LIMIT 1`).split("|");
 check(
   "...naming the guest and the date",
-  /Trialvis Guest/i.test(text) && /\d{1,2}\s+Aug/i.test(text)
+  /Trialvis Guest/i.test(text) &&
+    new RegExp(`${guestDay}\\s+${guestMon}\\w*`, "i").test(text),
+  `expected "${guestDay} ${guestMon}" next to the guest`
 );
 check(
   "the guest is NOT listed among the enrolled students",

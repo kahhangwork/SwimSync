@@ -96,7 +96,12 @@ const todaySg = new Date().toLocaleDateString("en-CA", {
 });
 let targetIdx = -1;
 for (let i = 1; i < dateValues.length; i++) {
-  if (dateValues[i] && dateValues[i] <= todaySg) targetIdx = i;
+  // STRICTLY before today: on the class's own weekday the most recent lesson
+  // `<= today` is TODAY's lesson, which the coach app files under TODAY, not
+  // NEEDS MARKING — so the NEEDS-MARKING walk below found nothing and crashed
+  // on every Saturday-SGT nightly (§7.122). A strictly-past lesson always lands
+  // under NEEDS MARKING, and today's not-yet-taught lesson has not "fallen due".
+  if (dateValues[i] && dateValues[i] < todaySg) targetIdx = i;
 }
 // A FAILURE, NOT A SKIP — and that distinction is the point of §7.100. The
 // picker offers three weeks BACK (`trials/page.tsx` datesFor: shift(-21)), so a
@@ -180,8 +185,14 @@ await page.screenshot({ path: shot("trials-03-roster.png"), fullPage: true });
 // Press it, and prove it lands on the GUEST'S lesson rather than some other
 // weekday date with nobody on it — the failure a target picked from the
 // unfiltered weekday list would produce.
+// The DATED roster button ("Mark Attendance — Sat, 5 Sept 2026"), never a bare
+// "Mark Attendance": the Schedule tab stays MOUNTED underneath (§7.98) and its
+// TODAY card carries its own plain "Mark Attendance" for a DIFFERENT date with
+// no guest on it. A bare `.first()` picked that one once the booking moved off
+// today, opening the wrong lesson — the exact "some other weekday date with
+// nobody on it" this check exists to catch. The trailing year disambiguates.
 await tap(
-  page.getByText(/Mark Attendance/i).first(),
+  page.getByText(/Mark Attendance[\s\S]*\d{4}/i).first(),
   "roster → Mark Attendance"
 );
 await page.waitForTimeout(2500);
