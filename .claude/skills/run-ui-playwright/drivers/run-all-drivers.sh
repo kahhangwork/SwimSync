@@ -89,6 +89,9 @@ fixture_for() {
     # builds (pay-driver-parent@swimsync.test, INV-2026-9901). A second fixture
     # would be a second copy of the same rows to keep in step.
     parent-pay-claim) echo "fixtures-payment-collection.sql" ;;
+    # smoke-app opens the parent's child, invoice and public invoice page once
+    # each; the same fixture already holds all three with known ids.
+    smoke-app) echo "fixtures-payment-collection.sql" ;;
     # schedule-week needs two classes running today plus ONE unmarked lesson a
     # week back — which fixtures-stale-screen.sql already builds, and builds
     # weekday-agnostically (it derives the class weekday from today).

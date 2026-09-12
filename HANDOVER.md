@@ -1,8 +1,8 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-12 — **The Students decomposition SHIPPED — all 12 stages on `main` (§8.100) — and the
-nightly's two reds are FIXED (§8.101).** The feature-tier method is now a playbook for five more admin pages
-(`BACKLOG.md` → Foundations); the driver fixes await the next nightly to confirm green._
+_Last updated: 2026-09-13 — **The feature-tier rollout now covers EVERY page in both apps on three tracks**
+(playbook §7: 7 full, 8 lite batches, 2 fence commits; smoke driver first). 2026-09-12: the Students
+decomposition SHIPPED (§8.100), the nightly's two reds FIXED (§8.101) — awaiting the next nightly to confirm._
 
 _Previously, 2026-08-30 (§8.99) — a branded signup-confirmation email that is never sent, and a toggle pinned by CI._
 
@@ -453,23 +453,26 @@ failures that are just the driver's own UI writes — reset before believing it.
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### The admin refactor SHIPPED — the method is now a playbook
+### The feature-tier rollout — EVERY page, three tracks, smoke driver first
 
 **Students is done (§8.100), all 12 stages on `main`.** `docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`
-is the reusable method for both apps; `STUDENTS_PAGE_REFACTOR_PLAN.md` stays as the worked example. The next
-four pages (`packages`/`invoices`/`classes`/`platform`, then `lessons`) are queued in `BACKLOG.md` →
-Foundations — **one at a time, and not until the previous has survived a nightly sweep** (the pattern can
-still change). Tiers stay feature-scoped, never top-level, or the source-scanning guards stop covering them
-(§7.233).
+is the method for both apps; `STUDENTS_PAGE_REFACTOR_PLAN.md` the worked example. **Decided 2026-09-13: the
+end state is every page and screen on the same shape** — playbook §7 scales the ceremony (7 giants take the
+full 12 stages one per nightly; 34 mid-size pages take a 3-commit lite track in 8 batches, one nightly per
+batch; 15 small pages take a fence-only commit per app). **The order is the smoke driver (`BACKLOG.md` →
+Foundations, S) → lite batch Admin L-A → `packages` (full) → alternate.** One unit in flight at a time. Tiers
+stay feature-scoped, never top-level, or the source-scanning guards stop covering them (§7.233); in the coach
+app they live under `SwimSyncApp/features/` and jest's `testMatch` must gain it in the same commit.
 
 ### THE NEXT BUILD — pick the refactor rollout OR a `BACKLOG.md` item by value
 
 **First: read the next nightly** to confirm the §8.101 driver fixes went green — five-minute check, and §8.65
 is why it is first: a sweep nobody reads stops being an alarm.
 
-**Then, the top pick is a genuine choice.** The feature-tier rollout (§8.100) has four more admin pages queued
-(`BACKLOG.md` → Foundations); the Wave C S-pool is empty and the remaining pool has no rework edges. **Do not
-re-derive the queue here** — that is what `BACKLOG.md` is for, and restating it is how the two drift.
+**Then, the top pick is a genuine choice.** The feature-tier rollout (§8.100, now every page — playbook §7)
+starts with the smoke driver (`BACKLOG.md` → Foundations); the Wave C S-pool is empty and the remaining pool
+has no rework edges. **Do not re-derive the queue here** — that is what `BACKLOG.md` is for, and restating it
+is how the two drift.
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), **on prod
 — re-confirmed 2026-08-30 by `supabase migration list --linked`, `remote` column filled** — 0 pending, rehearsed

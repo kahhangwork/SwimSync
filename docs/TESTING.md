@@ -434,8 +434,19 @@ bug. Hardened 2026-08-03 after a bad heuristic wrongly filed it as assertion-les
 carries `detail` on every check, records a crash as a **failed check**, closes the browser
 in `finally`, and **exits non-zero on a run that asserted nothing**. All three guards
 proven by mutation;
-`smoke-admin-screens.mjs` drives the admin attendance/students/dashboard pages at
-runtime (checks the deep joins resolve — no NaN, no empty tables);
+`verify-smoke-admin.mjs` + `verify-smoke-app.mjs` (added 2026-09-13, playbook §7.3) open **every**
+route in each app once — 32 admin routes as tenant admin / platform admin / logged out; every app
+screen as coach / parent / logged out — and assert the page's own `<h1>` (admin, exact) or a
+screen-unique literal (app), plus no `pageerror` and no `console.error` while it loaded (failed
+request URLs attached). The app twin reaches nested-stack screens by PRESSING from the landing tab,
+not by deep link: the root layout's session restore replaces a deep link with the landing tab, so the
+target is mounted-but-hidden (lib.mjs, `includeHidden`) and its buttons are unpressable — a one-read
+render assertion on such a screen was green, then red, with no change. No content assertions: they are the net for the pages **no other driver
+opens** (seven admin pages and most small app screens on the 2026-09-12 map), and the once-per-batch
+gate of the feature-tier lite track. `smoke-app` reuses `fixtures-payment-collection.sql`; the admin
+one runs on bare seed. They replaced `smoke-admin-screens.mjs` (four routes, no exit code — it
+could not fail, so it never ran in the nightly). First run found one product wart on
+`/profile/contact` (two `eq.undefined` queries before the session restores) — fixed the same day;
 `verify-bulk-setall.mjs` (+ reuses `fixtures-unmarked-lessons.sql`) drives the bulk
 "Set all" menu — the RN-web dropdown renders, the confirm guard fires only when a student
 is already marked, and a bulk save persists `cancelled_rain` to the DB;

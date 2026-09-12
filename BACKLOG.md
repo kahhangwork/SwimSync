@@ -1,8 +1,9 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-12 — **The Students decomposition shipped (§8.100); the feature-tier method is now the
-playbook for five more admin pages** (added under *Foundations*), the driver-port fix filed, and the
-package-settings move marked ripe. Earlier: **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
+_Last updated: 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps, on three tracks**
+(full / lite / fence — playbook §7), 17 units, smoke driver first; the *Foundations* item rewritten and a
+**Smoke drivers** item added. On 2026-09-12: the Students decomposition shipped (§8.100), the driver-port
+fix filed, and the package-settings move marked ripe. Earlier: **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
 suites green, **not yet deployed** (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD
 §7.15). Struck from the pick-now list. **One new item added, found by its driver:** the admin sidebar
 has no breakpoint, so every admin page is unusable on a phone (§7.222) — which now matters, because
@@ -1530,24 +1531,50 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### Feature-tier decomposition of the remaining big admin pages — **M each** `[from the Students pilot 2026-09-12]`
+### Feature-tier decomposition of EVERY page, both apps — **17 units, ~15 sessions** `[from the Students pilot 2026-09-12; scope widened 2026-09-13]`
 Students (`page.tsx`, was 2,284 lines) was decomposed into `ui/`/`domain/`/`dao/` tiers over 12
-stages (§8.100, closed out). The same method applies to the other five giants: `packages` (2,014),
-`invoices` (1,748), `classes` (1,714), `platform` (1,395), `lessons/[classId]/[date]` (912) — together
-with Students, **9,155 lines / 43% of all admin page code**. The coach app's big screens are in the
-queue too.
+stages (§8.100, closed out). **Decided 2026-09-13: the end state is every page and screen in both apps
+on the same shape** — not only the giants. The ceremony scales with size (playbook §7), the shape and the
+boundary test do not:
 
-**Why:** these are the files every future change to those areas pays a tax on — one component, dozens
-of `useState`, inline supabase calls with no seam to test. The pilot proved the tax is payable with
-zero behaviour change.
+- **Full track** (the existing 12 stages, one page per nightly) — the 7 giants: admin `packages` (2,014),
+  `invoices` (1,748), `classes` (1,714), `platform` (1,395), `lessons/[classId]/[date]` (912); coach app
+  `schedule/index` (1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905). ~11,100 lines.
+- **Lite track** (3 commits per page, batched 3–5 pages / ≤2,500 lines, drivers once per batch, one nightly
+  per batch) — 21 admin pages + 13 app screens in the 250–900 range, ~16,200 lines. Eight suggested batches
+  by driver net are in playbook §7.1.
+- **Fence track** (no folders required; the page must pass "no client, no `lib/`"; one commit per app) —
+  15 small pages/screens, ~2,600 lines.
+
+**Why:** the giants are the files every change pays a tax on. The rest are cheap individually, but a
+codebase that is half one shape and half another is a codebase where the boundary test guards half of it.
+The pilot proved the tax is payable with zero behaviour change; the lite track is that proof at lower
+ceremony.
 
 **Notes:** the method is written down once for both apps — `docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`
-(the coach app differs: Expo Router routes every file under `app/`, and jest only matches `lib/`).
-**Do one page at a time, and not until the previous one has survived a nightly sweep** — the pattern can
-still change. Tiers stay feature-scoped (under the page's folder), never new top-level folders, or the
-source-scanning guards silently stop covering them (§7.233). The dao three-way split and its
-"orchestrate an rpc, never replace one" rule graduate to `docs/ARCHITECTURE.md` §6 once a **second** page
-confirms them.
+(§7 for the tracks and the order; the coach app differs: tiers go under `SwimSyncApp/features/`, and jest's
+`testMatch` and both `sgDisplay.drift` twins must gain that folder in the same commit). **Order:** the smoke
+drivers (shipped 2026-09-13), then one lite batch (Admin L-A, "people"), then `packages` (full), then alternate. Never
+two units in flight; each survives a nightly before the next starts. Tiers stay feature-scoped, never
+new top-level folders (§7.233). The dao three-way split and its "orchestrate an rpc, never replace one" rule
+graduate to `docs/ARCHITECTURE.md` §6 once a **second** full page confirms them.
+
+### ~~Smoke drivers — open every route once, assert it rendered~~ — **SHIPPED 2026-09-13**
+`verify-smoke-admin.mjs` (64 checks) + `verify-smoke-app.mjs` (73 checks, reuses `fixtures-payment-collection.sql`),
+both green through `run-all-drivers.sh`; `docs/TESTING.md` §5 describes them. First run found the `/profile/contact`
+`eq.undefined` 400s (fixed) and filed the two items above. Original entry, for the reasoning:
+
+`verify-smoke-admin.mjs` (+ an app twin by role): log in, `goto` every route, assert the page heading is
+present and the console logged no error. **The route → driver map on 2026-09-12 shows 7 admin pages
+opened by NO driver** (`credit-notes`, `holidays`, `accounting`, `history`, `accept-invite`,
+`reset-password`, `forgot-password`) and most small app screens likewise.
+
+**Why:** the lite and fence tracks batch their driver run to once per batch — a batch whose net is "none"
+has no net. This is the cheapest possible one, and it is also the first thing that would have caught a
+page that crashes on mount for every role at once.
+
+**Notes:** a heading assertion, not a content one — the specialised drivers own content. Add it to
+`run-all-drivers.sh`'s nightly set the day it exists. **Do not start a lite batch before this lands.**
 
 ### No UI driver covers Merge or Rename on the admin Students page — **S** `[from the Students pilot 2026-09-12]`
 Both actions live behind the Actions drawer; both were verified by hand at Stages 5 and 6 of the
@@ -1563,6 +1590,26 @@ row; merge on the class-students fixture → assert the pair count drops), or tw
 **Notes:** the class-students fixture yields 15 duplicate pairs (same-DOB siblings), so the merge step
 needs no fixture of its own. Rename needs `rename_student()` to refuse a duplicate — assert the refusal
 sentence, not only the happy path.
+
+### NativeWind throws on every web page load — **S** `[found by verify-smoke-app 2026-09-13]`
+Every load of the Expo app on web raises an uncaught `Cannot manually set color scheme, as dark mode is
+type 'media'. Please use StyleSheet.setFlag('darkMode', 'class')` — NativeWind 4's own dark-mode probe;
+nothing in `SwimSyncApp/` sets a colour scheme. The render is unaffected, and the smoke driver
+allowlists that exact message (`IGNORED_ERRORS`) so it can still fail on any other throw.
+
+**Why:** an uncaught exception on every page load is noise that hides a real one, and it is one line in
+`tailwind.config.js` (`darkMode: "class"`) or a NativeWind upgrade away. Verify on web AND native before
+calling it fixed — the throw is web-only, the config is shared. Then delete the allowlist entry.
+
+### A session-less deep link to `/register` or `/forgot-password` bounces to `/login` — **S** `[found by verify-smoke-app 2026-09-13]`
+`app/_layout.tsx` replaces every session-less load outside `PUBLIC_PATHS` (`/welcome`, `/invoice`,
+`/package`) with `/login`. So `swimsync.sg/register` — the link a coach would naturally send a new
+family — lands on Sign In, whose *Register* link then works. Same for `/forgot-password`.
+
+**Why:** the first thing a new parent is sent should open. The fix is two entries in `PUBLIC_PATHS`,
+but that list carries a warning that widening it widens the auth gate — read it, and keep
+`/reset-password` and `/accept-invite` OUT (they need the token session). The smoke driver reaches
+both screens by pressing the login page's links; once these are public, switch it to deep links.
 
 ### Driver ports are hardcoded in three drivers — **S** `[from the Students pilot 2026-09-12]`
 `active-inactive` (3000/8081), `levels` and `level-skills` (8081) hardcode ports instead of reading
