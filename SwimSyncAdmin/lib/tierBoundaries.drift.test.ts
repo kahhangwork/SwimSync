@@ -49,14 +49,12 @@ type Allowed = { file: string; contains: string; why: string };
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [];
 
-/** Check 4 — `@/lib/*` imports still on `page.tsx`. */
-const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  // Transitional: until domain/ exists the page calls dao/ directly. Each slice
-  // (Stages 4–10) routes its calls through domain/; the import goes at Stage 10.
-  { file: PAGE, contains: "./dao/students.repo", why: "Stages 4–10: page -> domain -> dao" },
-  { file: PAGE, contains: "./dao/students.rpc", why: "Stages 4–10: page -> domain -> dao" },
-  { file: PAGE, contains: "@/lib/studentCounts", why: "Stage 4: domain/ (slice 1)" },
-];
+/**
+ * Check 4 — imports on `page.tsx` outside its own tiers. Started at 11 lib
+ * imports (plus 3 transitional dao/ pins) on 2026-09-12 and reached ZERO at
+ * Stage 11 the same day. Keep it empty: page.tsx is composition.
+ */
+const ALLOWED_PAGE_IMPORTS: Allowed[] = [];
 
 // ─────────────────────────────────────────────────────────────────────────────
 
