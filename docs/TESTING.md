@@ -1146,13 +1146,38 @@ stays a manual dashboard check (§7.232).
 
 ### Feature-tier boundaries (admin refactor, 2026-09-12)
 
-**`SwimSyncAdmin/lib/tierBoundaries.drift.test.ts` — 4 checks.** The third structural guard of the
-`sgDisplay.drift.test.ts` shape, and the boundary rule for the Students decomposition: it scans
-`app/(admin)/students/{ui,domain,dao}/` and asserts the tier contract — `ui/` holds no `.from()`/
-`.rpc()`/`fetch`, the domain tier may orchestrate an rpc but never replace one, `dao/` is the only
-place the supabase client is reached. `SwimSyncAdmin` has no ESLint on purpose (§10 *Deliberately not
-doing*); this is how the one rule that matters is enforced, in the idiom the repo already uses. Pinned
-by a **shrinking allowlist** — file AND content snippet, never file-level — for the 29 pre-existing
-violations, so the rule exists while code is still moving. The tiers are feature-scoped (under
-`students/`) precisely so this and `sgDisplay.drift.test.ts` keep scanning them; a new top-level folder
-would silently narrow both (§7.233).
+**`SwimSyncAdmin/lib/tierBoundaries.drift.test.ts` — 6 tests, 4 checks.** The third structural guard of
+the `sgDisplay.drift.test.ts` shape, and the boundary rule for every feature decomposed by
+`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`. It scans `SCOPE_DIRS` (today: `app/(admin)/students`)
+and asserts the tier contract: (1) `ui/` never imports `dao/`; (2) `dao/` never imports React, `ui/` or
+`@/components`; (3) nothing outside `dao/` uses the supabase client or calls `fetch(`; (4) the page file
+imports only its own tiers, React, Next and `@/components/*` — never `@/lib/*`. `SwimSyncAdmin` has no
+ESLint on purpose (§10 *Deliberately not doing*); this is how the one rule that matters is enforced, in
+the idiom the repo already uses. Each check was proven RED by breaking it on purpose (§7.25).
+
+**Both allowlists are EMPTY and must stay so.** Checks 3 and 4 started with 29 and 14 pinned violations
+(file AND content snippet, never file-level) and a sixth test that fails on any entry which no longer
+matches — the ledger could only shrink. Check 3 reached zero at Stage 3 (§7.235), check 4 at Stage 11.
+Converting the next page (`packages/`) re-opens them: append its folder to `SCOPE_DIRS`, pin its
+violations, and shrink again. **Never add an entry outside a Stage 0b.**
+
+**The tiers are feature-scoped (under `students/`)** precisely so this and `sgDisplay.drift.test.ts` keep
+scanning them; a new top-level folder would silently narrow both (§7.233). The coach app is the case
+where that bites: Expo Router routes every file under `app/`, so its tiers must live in
+`SwimSyncApp/features/`, and **both** `sgDisplay` twins' `SCAN_DIRS` plus jest's `testMatch` (which only
+sees `lib/`) must widen in the same commit (playbook §1).
+
+**`app/(admin)/students/domain/*.test.ts` — 3 files.** `studentRows.test.ts` (11 characterisation tests
+pinning the row → `StudentRow` mapping, the §7.28 nesting reads, `statusLabel` and the filters) plus
+`duplicateStudents.test.ts` and `rosterDuplicates.test.ts`, which moved from `lib/` with their modules.
+Characterisation tests, not proofs — the behaviour pre-dates them, so §7.25 cannot apply; their headers say so.
+
+**Which UI drivers actually exercise the admin Students page** (verified by running each after the slice
+it covers, and all of them after Stage 11 — §7.236 is why this list exists): `contact-details` (Actions
+drawer → Contact modal in both modes, the claim lock, **Add student**), `active-inactive` (Set inactive and
+the sibling choice), `multi-class` (class chips, add-to-class, remove), `parent-claim` (invite/claim
+outcome), `levels` and `level-skills` (the inline level picker), `class-students` (roster ↔ Students).
+`verify-assessment` covers the shared `AssessmentGrid`, not this page's grading modal. **`verify-student-
+identity` is a coach-app driver and never opens the page.** Merge and Rename have no driver (BACKLOG).
+`active-inactive`, `levels` and `level-skills` hardcode ports and need a port-substituted copy to run
+against a worktree (playbook §4).

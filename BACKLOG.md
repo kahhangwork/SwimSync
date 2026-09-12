@@ -1549,6 +1549,21 @@ source-scanning guards silently stop covering them (§7.233). The dao three-way 
 "orchestrate an rpc, never replace one" rule graduate to `docs/ARCHITECTURE.md` §6 once a **second** page
 confirms them.
 
+### No UI driver covers Merge or Rename on the admin Students page — **S** `[from the Students pilot 2026-09-12]`
+Both actions live behind the Actions drawer; both were verified by hand at Stages 5 and 6 of the
+decomposition (Review & merge → Merge them: 15 pairs → 10 on the class-students fixture). No driver
+opens either modal. `verify-student-identity` is a coach-app driver, not an admin one (§7.236).
+
+**Why:** the refactor's wiring net for those two slices is a screenshot in a commit message. The next
+page in the rollout (`packages/`) should not inherit that habit, and a merge that silently stops working
+is the kind of thing only a driver notices. Either a `verify-students-admin.mjs` (rename → assert the
+row; merge on the class-students fixture → assert the pair count drops), or two steps appended to
+`verify-contact-details.mjs`, which already sits on the page with the right login.
+
+**Notes:** the class-students fixture yields 15 duplicate pairs (same-DOB siblings), so the merge step
+needs no fixture of its own. Rename needs `rename_student()` to refuse a duplicate — assert the refusal
+sentence, not only the happy path.
+
 ### Driver ports are hardcoded in three drivers — **S** `[from the Students pilot 2026-09-12]`
 `active-inactive` (3000/8081), `levels` and `level-skills` (8081) hardcode ports instead of reading
 `ADMIN_URL`/`EXPO_URL` like the rest, so they cannot run against a worktree without a port-substituted

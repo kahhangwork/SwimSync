@@ -3718,3 +3718,25 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     each from the fixture row. Weekday-dependent drivers carry a THIRD trap: a booking `<= today` lands on TODAY
     on the class's own weekday, which the app files under TODAY, not NEEDS MARKING (§7.122); book strictly-past.
     (2026-09-12, nightly triage.)
+235. **A `lib/` helper that takes the supabase client AS AN ARGUMENT is still a network reach from the caller —
+    moving every `.from()` and `.rpc()` off a page does not get the client off it.** After Stages 2–3 of the
+    Students decomposition had moved all 23 direct calls into `dao/`, `page.tsx` still imported `@/lib/supabase`
+    for three `lib/studentStatus` helpers (`familyActiveChildren(supabase, …)` and friends) that call `db.rpc()`
+    themselves. The tier rule is "only `dao/` touches the client", and a page handing the client to a helper
+    breaks it just as surely as calling `.from()`. Fix: bind such helpers in `dao/<feature>.rpc.ts`
+    (`export const familyActiveChildren = (id) => studentStatus.familyActiveChildren(supabase, id)`) — the lib
+    module does not move (it is drift-pinned to SwimSyncApp), the client leaves the page, and the check-3 ledger
+    hit zero at Stage 3 instead of Stage 11. The coach app's screens will hit this harder: most of their reads
+    already go through client-taking `lib/` helpers. (`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md` §1.
+    2026-09-12.)
+
+236. **Grep a UI driver for the page's URL before crediting it with coverage — a driver's NAME says what it
+    tests, not WHERE.** The Students refactor plan's coverage table credited `verify-student-identity` with
+    rename, merge and add-unclaimed on the admin Students page. It is a coach-app (Expo) driver: it never opens
+    `/students` at all. The drivers that do were `contact-details`, `active-inactive`, `multi-class`,
+    `parent-claim`, `levels`, `level-skills` and `class-students`, and NO driver covers Merge or Rename on that
+    page (both were verified by hand, and a driver is queued in `BACKLOG.md`). Found only because each slice
+    was verified by running its "covering" driver and reading what it clicked. Rule:
+    `grep -lE '/<route>"' drivers/verify-*.mjs` is the coverage map; a table written from memory is a guess.
+    Companion: three of those drivers hardcode ports and need a port-substituted copy to run against a
+    worktree (BACKLOG). (2026-09-12.)

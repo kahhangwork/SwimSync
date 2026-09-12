@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.228** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.236** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -35,6 +35,7 @@ there is no second index to go through.
 | **Running two sessions at once without clashing** | **`docs/WORKTREES.md`** | — |
 | How to bill a month | `INVOICE_RUNBOOK.md` | — |
 | The design/plan behind a shipped feature | `docs/design/`, `docs/plans/` | — |
+| **How to decompose an oversized page or screen** | **`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`** | worked example: `docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md` |
 
 > **Section numbers did not change when the files did.** `§7.41` still means gotcha 41 —
 > it now lives in `docs/GOTCHAS.md`. This matters because **781 references** cite them by
@@ -378,6 +379,11 @@ in every case.
   once a second page confirms it.
 - **Deliberately NOT done:** moving package settings off the page (a behaviour change → `BACKLOG.md`, now ripe);
   ESLint; relocating `lib/`.
+- **Two corrections the pilot surfaced, graduated at close (§7.235, §7.236):** a `lib/` helper that takes the
+  client is still a network reach (bind it in `dao/`), and the plan's driver coverage table was wrong —
+  `verify-student-identity` never opens the admin Students page. The real driver net is in `docs/TESTING.md` §5;
+  **Merge and Rename have no driver at all** (BACKLOG). Every slice was verified by running its real drivers on
+  the worktree, and all eight again on the finished page.
 
 _(§8.99 demoted to a ledger row in `docs/SESSIONS.md`.)_
 

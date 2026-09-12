@@ -54,6 +54,7 @@ document when the task touches it; don't read them all up front.
 | What's live, and how? | `docs/DEPLOYMENT.md` (§11) |
 | What shipped in an older session (`§8a`, `§8.n`)? | `docs/SESSIONS.md` |
 | **Working in a worktree / two sessions at once** | **`docs/WORKTREES.md`** |
+| **Decomposing an oversized page or screen (both apps)** | **`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`** |
 | How do I bill a month? | `INVOICE_RUNBOOK.md` |
 
 **Section numbers are permanent identifiers.** `§7.41` means gotcha 41 wherever it lives —
