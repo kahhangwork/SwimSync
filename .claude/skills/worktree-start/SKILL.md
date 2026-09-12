@@ -208,7 +208,9 @@ plus the always-shared files.
 
 That last section is why a worktree can safely be forbidden from editing the living
 documents: findings are **collected here and written later, from `main`**. `/worktree-close`
-extracts it before the worktree is removed.
+copies this file to **`docs/handoff/<name>.md` and pushes it to `main`** before the worktree
+is removed; `/update-docs` reads and deletes it. Keep the section current as you go — it is
+the only thing that crosses to the root session.
 
 ---
 

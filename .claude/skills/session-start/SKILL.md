@@ -69,6 +69,8 @@ Tell the user, in a few lines:
 - **Anything stale or contradictory** you noticed — a PRD line describing something unbuilt,
   a §9 "next step" that already shipped, a backlog item that now exists, a ledger pointer
   that leads nowhere. Surfacing drift at the start is cheap; it is expensive later.
+- **`ls docs/handoff/`** — a file there is a closed worktree's graduate list that
+  `/update-docs` has not yet consumed. Name it. It is the first thing `/update-docs` reads.
 
 If the user already said what they want to work on, go straight to it. The reading above
 exists to do that work *well*, not to delay it.

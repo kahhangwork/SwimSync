@@ -124,7 +124,24 @@ leaving up.
 cat <worktree>/WORKTREE.md
 ```
 
-Copy its *"To graduate at session close"* section into your reply to the user, verbatim, and
+**Write it to a TRACKED file and push it to `main` — a chat message is not a hand-off.**
+Before 2026-09-12 this step said "copy it into your reply"; the root session cannot read
+your reply, so the list reached it only if the user pasted it. Now:
+
+```bash
+mkdir -p docs/handoff
+cp <worktree>/WORKTREE.md docs/handoff/<worktree-name>.md       # the whole brief; the graduate section is what matters
+# add anything the session turned up that never reached WORKTREE.md, then:
+git add docs/handoff/<worktree-name>.md
+git commit -m "handoff(<worktree-name>): graduate list for /update-docs"
+git push origin <branch>:main        # the user runs this if the sandbox refuses it
+```
+
+That file is the artefact. **`/update-docs` (Step 0) consumes it and `git rm`s it in the
+same commit** — so a file still in `docs/handoff/` on `main` means an ungraduated list, and
+`/session-start` and `/session-close` both flag one. Nothing depends on anyone remembering.
+
+Also copy the *"To graduate at session close"* section into your reply to the user, and
 add anything the session turned up that never made it into the file. Then check the list is
 actually complete — walk the session and ask:
 

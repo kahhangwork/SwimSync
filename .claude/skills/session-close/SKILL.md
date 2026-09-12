@@ -37,6 +37,14 @@ behaviour, a bug fix, a new gotcha — and `HANDOVER.md` has no entry for it, **
 
 If the session only read code and changed nothing, say so and skip to step 5.
 
+```bash
+ls docs/handoff/ 2>/dev/null
+```
+
+**A file here is a closed worktree's graduate list that no `/update-docs` has consumed.**
+Do not close over it: run `/update-docs` (its Step 0 reads and removes it), or tell the user
+by name which worktree's findings are still sitting there.
+
 ## 2. Nothing uncommitted, nothing unpushed
 
 ```bash

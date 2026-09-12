@@ -50,6 +50,21 @@ not a skipped step. Prefer deleting a stale line to adding a new one.
 
 ---
 
+## Step 0 — Consume any hand-off files FIRST
+
+```bash
+ls docs/handoff/ 2>/dev/null
+```
+
+Each `docs/handoff/<worktree>.md` is a closed worktree's graduate list, pushed to `main` by
+`/worktree-close` because its session could not write the living documents itself. Read
+every one now. Its items go through Steps 2–6 exactly like your own session's findings —
+each to its permanent home, with the worktree named as provenance. **Then `git rm` the file
+in the same commit as the documents it fed** (Step 7). A hand-off file that survives the
+commit is a list nobody graduated; `/session-start` and `/session-close` both flag it.
+
+If the directory is empty or absent, say so in one line and move on.
+
 ## Step 1 — Establish what actually happened
 
 Don't work from memory of the conversation alone; it over-weights whatever happened
@@ -165,8 +180,9 @@ Update the `_Last updated:` date if you changed anything.
 **Do this BEFORE writing anything into `HANDOVER.md` §8.** It is the whole discipline;
 the rest of Step 5 is bookkeeping once this is done.
 
-Every durable thing the session produced gets a permanent home **outside** the session
-log. Walk the list and place each one:
+Every durable thing the session produced — **and every item in a `docs/handoff/` file
+(Step 0)** — gets a permanent home **outside** the session log. Walk the list and place
+each one:
 
 | What you found | Where it goes |
 |---|---|

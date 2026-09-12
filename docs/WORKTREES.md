@@ -284,8 +284,12 @@ worktree has to be finished with before `/update-docs` runs.
    ```
    Verify: `SELECT count(*) … WHERE full_name LIKE 'wt-<name>-%'` → expect 0.
 3. **Release the ports** — `pkill -f "next dev"`, `pkill -f "expo start"`.
-4. **Copy your `WORKTREE.md` "graduate" list into your reply, in full** — it is about to
-   become unreachable, and it is the hand-off artefact for step 6.
+4. **Write the graduate list to `docs/handoff/<name>.md`, commit, push to `main`** — a
+   copy of `WORKTREE.md` plus anything the session turned up since. This is the hand-off
+   artefact for step 6, and the only one: a chat message does not reach the root session.
+   `/update-docs` Step 0 reads the file and `git rm`s it in the same commit as the documents
+   it fed; `/session-start` and `/session-close` both flag a file left behind. (Also paste the
+   section into your reply, for the user.)
 5. **`ExitWorktree`** with `keep` (more work queued here — then
    `git fetch && git merge --ff-only origin/main` so it does not start stale) or `remove`
    (merged and done; confirm with `git merge-base --is-ancestor <branch> origin/main`
