@@ -8,7 +8,6 @@ import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Tabl
 import { formatActiveStudents } from "@/lib/studentCounts";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
-import { findDuplicatePairs, type DupPair } from "@/lib/duplicateStudents";
 import {
   describeCandidate,
   partitionCandidates,
@@ -42,6 +41,9 @@ import { useStudentStatus } from "./domain/useStudentStatus";
 import { RenameModal } from "./ui/RenameModal";
 import { AddClassModal } from "./ui/AddClassModal";
 import { StatusChangeModal } from "./ui/StatusChangeModal";
+import { useMerge } from "./domain/useMerge";
+import { DuplicateBanner } from "./ui/DuplicateBanner";
+import { MergeModal } from "./ui/MergeModal";
 
 /** "monday" → "Mon". The chip has room for a weekday and a time, not both in
  *  full, and the day is what an admin scans for. */
@@ -72,32 +74,8 @@ export default function StudentsPage() {
   const rename = useRename(load);
   const addClass = useAddClass(load);
   const status = useStudentStatus(load);
-  const [merging, setMerging] = useState<DupPair | null>(null);
-  const [mergeBusy, setMergeBusy] = useState(false);
-  const [mergeError, setMergeError] = useState<string | null>(null);
-
-  /**
-   * Fold the emptied duplicate into the row holding the history.
-   *
-   * All the safety lives in merge_students(): it refuses when both rows carry
-   * attendance, when the direction is wrong, when money is already documented
-   * against the duplicate, and when an unknown cascading foreign key has
-   * appeared that it has not been taught to move. So this handler does not
-   * re-check any of that — it surfaces the refusal verbatim, because those
-   * messages are written for the admin to act on.
-   */
-  async function doMerge(pair: DupPair) {
-    setMergeBusy(true);
-    setMergeError(null);
-    const { error } = await rpc.mergeStudents(pair.survivor.id, pair.duplicate.id);
-    setMergeBusy(false);
-    if (error) {
-      setMergeError(error.message);
-      return;
-    }
-    setMerging(null);
-    await load();
-  }
+  // Slice 2 — duplicate pairs are derived from the list on every render.
+  const merge = useMerge(students, load);
 
   // The per-row Actions drawer — one button holds Invite/Contact/Rename/Inactive
   // so the row keeps only the inline glance-and-set controls (Decision 10).
@@ -593,25 +571,6 @@ export default function StudentsPage() {
     matchesFilters(s, { statusFilter, lowOnly, unclaimedOnly }, runningLow)
   );
 
-  // Derived on read, never stored: nothing would maintain a "possible
-  // duplicate" flag, and a stored value nothing maintains is not a fact
-  // (§7.37). A business has a few dozen students, so this is cheap.
-  const dupPairs = findDuplicatePairs(
-    students.map((s) => ({
-      id: s.id,
-      full_name: s.full_name,
-      date_of_birth: s.date_of_birth,
-      // The parent's IDENTITY, not just whether there is one: two rows under
-      // the same family is the commonest duplicate, and a boolean hid it.
-      parentId: s.parent_id,
-      lessons: s.lessons,
-      // A child who has left is never flagged as a duplicate — the banner has
-      // no dismiss, so a pair the admin has already retired would be permanent
-      // noise. Reported from production 2026-07-26.
-      isActive: s.is_active,
-    }))
-  );
-
   const sort = useTableSort<StudentRow>({
     key: "full_name",
     accessors: {
@@ -681,48 +640,7 @@ export default function StudentsPage() {
         onExpiryDays={saveExpiryDays}
       />
 
-      {/* ── Two rows that look like the same child ───────────────────────────
-          The claim flow stops NEW duplicates. This is for the ones already
-          here — every child added before it shipped, and every child a parent
-          created by answering "no, that's a different child". Without this
-          nothing in the app ever mentions that a duplicate exists. */}
-      {dupPairs.length > 0 && (
-        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-800">
-            {dupPairs.length === 1
-              ? "Two records may be the same child"
-              : `${dupPairs.length} pairs of records may be the same child`}
-          </p>
-          <div className="mt-2 space-y-2">
-            {dupPairs.map((p) => (
-              <div
-                key={`${p.survivor.id}:${p.duplicate.id}`}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2"
-              >
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">{p.survivor.full_name}</span>{" "}
-                  ({p.survivor.lessons} lesson
-                  {p.survivor.lessons === 1 ? "" : "s"}) and{" "}
-                  <span className="font-medium">{p.duplicate.full_name}</span>{" "}
-                  ({p.duplicate.lessons} lesson
-                  {p.duplicate.lessons === 1 ? "" : "s"})
-                </p>
-                {p.needsHuman ? (
-                  // merge_students() refuses this outright. Say so here rather
-                  // than offering a button that only produces an error.
-                  <span className="text-xs font-medium text-red-700">
-                    Both have lessons recorded — sort this one out by hand
-                  </span>
-                ) : (
-                  <Button variant="outline" onClick={() => setMerging(p)}>
-                    Review &amp; merge
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <DuplicateBanner pairs={merge.dupPairs} onReview={merge.review} />
 
       <ListNotices
         loading={loading}
@@ -1487,86 +1405,7 @@ export default function StudentsPage() {
 
       <AddClassModal addClass={addClass} />
 
-      {/* ── Merge: the one action that repoints a child's records ─────────── */}
-      <Modal
-        open={merging !== null}
-        onClose={() => {
-          setMerging(null);
-          setMergeError(null);
-        }}
-        title="Merge these two records?"
-      >
-        {merging && (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-gray-200 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Kept
-              </p>
-              <p className="mt-1 font-medium text-gray-900">
-                {merging.survivor.full_name}
-              </p>
-              <p className="text-sm text-gray-500">
-                {merging.survivor.lessons} lesson
-                {merging.survivor.lessons === 1 ? "" : "s"} recorded
-                {merging.survivor.date_of_birth
-                  ? ` · born ${merging.survivor.date_of_birth}`
-                  : " · no date of birth"}
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-gray-200 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                Deleted
-              </p>
-              <p className="mt-1 font-medium text-gray-900">
-                {merging.duplicate.full_name}
-              </p>
-              <p className="text-sm text-gray-500">
-                {merging.duplicate.lessons} lesson
-                {merging.duplicate.lessons === 1 ? "" : "s"} recorded
-                {merging.duplicate.date_of_birth
-                  ? ` · born ${merging.duplicate.date_of_birth}`
-                  : " · no date of birth"}
-              </p>
-            </div>
-
-            <p className="text-sm text-gray-600">
-              The parent account, any trial bookings and any settlements move
-              across to the record being kept, along with a date of birth or
-              gender it is missing. Nothing already recorded on the kept record
-              is overwritten. This cannot be undone.
-            </p>
-
-            {merging.eitherWay && (
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Neither record has any lessons, so it does not matter much which
-                survives — but check the spelling of the name you are keeping.
-              </p>
-            )}
-
-            {mergeError && (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {mergeError}
-              </p>
-            )}
-
-            <div className="flex gap-2">
-              <Button disabled={mergeBusy} onClick={() => doMerge(merging)}>
-                {mergeBusy ? "Merging…" : "Merge them"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setMerging(null);
-                  setMergeError(null);
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <MergeModal merge={merge} />
     </div>
   );
 }
