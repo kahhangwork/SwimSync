@@ -1,8 +1,8 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-09 — **The SwimSyncAdmin refactor is planned and started** (§8.100).
-`docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md` is the whole of it; Stage 0a is committed on
-`refactor/students-decomposition`. **The nightly has been RED every night since 2026-09-04, untriaged.**_
+_Last updated: 2026-09-12 — **The Students decomposition SHIPPED — all 12 stages on `main` (§8.100) — and the
+nightly's two reds are FIXED (§8.101).** The feature-tier method is now a playbook for five more admin pages
+(`BACKLOG.md` → Foundations); the driver fixes await the next nightly to confirm green._
 
 _Previously, 2026-08-30 (§8.99) — a branded signup-confirmation email that is never sent, and a toggle pinned by CI._
 
@@ -346,51 +346,40 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
-## 8.100 (2026-09-09) — The admin app's decomposition, planned and begun
+## 8.101 (2026-09-12) — The nightly's two reds were both DRIVER date-rot, not product bugs
 
-**A plan and one deletion. No behaviour changed.** `docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md`
-is the home for all of it — 12 stages, the nine feature slices with line anchors, and the reasoning.
-Branch `refactor/students-decomposition`, NOT merged.
+**Triaged from the run's own screenshots, fixed, proven red→green on the live stack.** `7667643`, driver-only.
+Both were calendar assumptions that held until the real date moved past them (§7.234); the product was correct
+in every case.
 
-- **`students/page.tsx` is 2,284 lines / 98 KB — the largest file in the repo**, one component with
-  68 `useState` and 29 inline supabase calls. Five pages (students, packages, invoices, classes,
-  platform) are 9,155 lines, **43% of all admin page code**.
-- **The shape settled with the user:** feature-scoped tiers,
-  `app/(admin)/students/{ui,domain,dao}/` + `constants.ts` + `types.ts`. `dao/` splits three ways by
-  FAILURE MODE — `.repo` (`.from()`), `.rpc` (Postgres functions), `.api` (`fetch` to `app/api/`).
-  **The domain tier may orchestrate an rpc, never replace one** — that is how an override lands on a
-  billing guard.
-- **`lib/` already IS the app-tier** — 57 modules, 51 tests; the page imports 13. Only 2 may move
-  (`duplicateStudents`, `rosterDuplicates`); the rest are shared or drift-pinned to SwimSyncApp.
-- **Tiers are feature-scoped, not top-level, for a REASON:** `sgDisplay.drift.test.ts` scans a fixed
-  `SCAN_DIRS`, so a new top-level folder would silently narrow that guard rather than fail. Candidate
-  gotcha — see the plan §12.
-- **Deliberately NOT done:** the Stage 0b boundary test (user chose to hand over first), any code
-  move, and the package-settings extraction (a behaviour change → `BACKLOG.md`).
+- **`unmarked-lessons` (8/12 → 12/12)** hardcoded the admin billing month to `"2026-07"` while its fixture was
+  changed on 2026-08-30 to derive dates from `now()` — so it checked the wrong month, red every night from Sept 1.
+- **`trials` (crash → 16/16)** booked the most-recent lesson `<= today`; on a Saturday-SGT nightly that is TODAY,
+  which the app files under TODAY not NEEDS MARKING (§7.122). Booking strictly-past fixed it — and exposed a
+  latent §7.98 bug: the roster-open tap grabbed the mounted Schedule tab's plain "Mark Attendance".
+- **`trial-visibility` was green for the WRONG reason** — a hardcoded `/Aug/` matching an unrelated session date,
+  not the guest's trial; derived from the DB to match the parent-side fix that had missed this copy. Still 11/11.
+- **Deliberately NOT done:** no product change, no migration, no app deploy. The fix awaits the next nightly;
+  CI was not force-triggered (user's call).
 
-## 8.99 (2026-08-30) — A branded confirmation email that is never sent, and a toggle that now has a guard
+## 8.100 (2026-09-12) — The admin app's Students-page decomposition, COMPLETE
 
-**One template, one config block, one CI guard.** `4556888`. `supabase/templates/confirmation.html` +
-`[auth.email.template.confirmation]`, replacing Supabase's stock plain-text default. **The S-pool is now
-exhausted.** Everything durable is in §7.231, §7.232, `docs/TESTING.md` and `BACKLOG.md`.
+**All 12 stages landed on `main`; zero behaviour change; the method is now a playbook.**
+`docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md` is the closed-out worked example and
+`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md` the reusable method for both apps.
 
-- **The template ships WITHOUT the flag, and that is the whole design.** `enable_confirmations` stays false —
-  it stranded web parents once. The real hazard was never the copy but the toggle sitting beside it on the
-  same dashboard page; the plan called that vigilance-only with no structural guard. Now there is one.
-- **It has NEVER been sent through the live auth path, and cannot be** (§7.232). Structural diff against the
-  production-proven `recovery.html` — byte-identical markup, copy-only difference — plus an offline render
-  stands in for an end-to-end test. Don't upgrade that to "verified" later.
-- **Both failure directions of the guard were proven** (§7.231): each check RED, *and* the two plausible
-  false reds proven green. The first draft had a false red on the toggle line itself and an invisible hole
-  in a Go conditional.
-- **Deliberately NOT done:** confirmation never switched on, and no `supabase config push` — it carries the
-  whole local config surface, the stranding toggle included. No app code changed, so the `main` push deployed
-  nothing user-visible.
-- **Confirmed OFF on prod after the dashboard paste** — `GET /auth/v1/settings` returns
-  `"mailer_autoconfirm": true`, and **that inversion is the trap: `true` means confirmations are OFF**
-  (§7.232 has the command). The hosted **template body** still has no read-back.
+- **`students/page.tsx` (2,284 lines) is now composition** over `ui/` (components), `domain/` (hooks/logic) and
+  `dao/` (data, split three ways by failure mode — `.repo`/`.rpc`/`.api`), plus `constants.ts`/`types.ts` — all
+  feature-scoped under `students/`, never top-level, so the source-scanning guards keep covering them (§7.233).
+- **`tierBoundaries.drift.test.ts` enforces the tier contract** (a shrinking allowlist; `docs/TESTING.md` §5).
+  The domain tier may orchestrate an rpc, never replace one — that is how an override lands on a billing guard.
+- **The rollout is queued** for `packages`/`invoices`/`classes`/`platform`/`lessons` (`BACKLOG.md` → Foundations),
+  one page at a time, each after a nightly sweep. The dao three-way split graduates to `docs/ARCHITECTURE.md`
+  once a second page confirms it.
+- **Deliberately NOT done:** moving package settings off the page (a behaviour change → `BACKLOG.md`, now ripe);
+  ESLint; relocating `lib/`.
 
-_(§8.98 demoted to a ledger row in `docs/SESSIONS.md`.)_
+_(§8.99 demoted to a ledger row in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -433,13 +422,11 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-09.** Run `34286144530` (2026-09-08) **confirms both 2026-08-30 fixes**:
-`verify-assessment` 27/27 and `verify-tenant-provisioning` green. That question is closed.
-
-**⚠ The sweep has been RED every night since 2026-09-04, and nobody has triaged any of it.**
-`unmarked-lessons` **8/12** three nights running (09-06/07/08); before that `coach-disable` (09-05)
-and `trials` (09-04). A rotating red is §8.65's exact failure mode — **triage the day it reddens**.
-Start with `gh run download 34286144530 -n ui-driver-run` (§7.228), not a hypothesis.
+**State on 2026-09-12.** The two-red streak is TRIAGED and FIXED (§8.101, `7667643`): `unmarked-lessons`
+(8/12) and `trials` (crash) were both driver date-rot — reproduced locally, fixed, proven red→green, and a
+third driver (`trial-visibility`) that was green for the wrong reason was hardened. **Not yet confirmed in
+CI** — the fix awaits the next scheduled nightly; re-read the run, don't trust this line (§8.65). Start any
+new red with `gh run download <id> -n ui-driver-run` and the screenshots (§7.228), not a hypothesis.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -460,40 +447,23 @@ failures that are just the driver's own UI writes — reset before believing it.
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### IN FLIGHT — the admin refactor (branch `refactor/students-decomposition`)
+### The admin refactor SHIPPED — the method is now a playbook
 
-**Read `docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md` and resume at Stage 0b.** It carries the
-staging, the slice map and every constraint; do not re-derive them here.
+**Students is done (§8.100), all 12 stages on `main`.** `docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`
+is the reusable method for both apps; `STUDENTS_PAGE_REFACTOR_PLAN.md` stays as the worked example. The next
+four pages (`packages`/`invoices`/`classes`/`platform`, then `lessons`) are queued in `BACKLOG.md` →
+Foundations — **one at a time, and not until the previous has survived a nightly sweep** (the pattern can
+still change). Tiers stay feature-scoped, never top-level, or the source-scanning guards stop covering them
+(§7.233).
 
-| Stage | State |
-|---|---|
-| 0a — delete dead `constants/` | ✅ `23c3e2b` |
-| **0b — `tierBoundaries.drift.test.ts`, 4 checks proven RED** | **← resume here** |
-| 1 — `constants.ts` + `types.ts` | pending |
-| 2–3 — the `dao/` tier | pending |
-| 4–11 — nine feature slices, then `page.tsx` | pending |
+### THE NEXT BUILD — pick the refactor rollout OR a `BACKLOG.md` item by value
 
-**One decision is open, and it blocks Stage 0b:** the boundary test is red on day one, because
-`page.tsx` violates checks 3 and 4 on 29 lines. Either ship it now with a **shrinking allowlist**
-(the `sgDisplay.drift.test.ts` pattern — pinned by file AND content snippet, never file-level), or
-defer it to Stage 11. Recommended: the allowlist, so the rule exists while code is moving.
+**First: read the next nightly** to confirm the §8.101 driver fixes went green — five-minute check, and §8.65
+is why it is first: a sweep nobody reads stops being an alarm.
 
-**The gate at every stage:** `cd SwimSyncAdmin && npm run typecheck && npm test` — green or revert.
-Baseline 2026-09-09: **56 files / 637 tests**. Nothing here changes behaviour, so §7.31's
-served-bundle grep cannot apply (§8.98's situation); the four drivers touching Students
-(`student-identity`, `class-students`, `parent-claim`, `assessment`) are the wiring net — **run each
-at the end of its own slice, not once at the end.**
-
-### THE NEXT BUILD — the S-pool is EXHAUSTED; pick from `BACKLOG.md`
-
-**First: read the next nightly.** Two fixes from 2026-08-30 are still unconfirmed and **no sweep has run since
-they landed** — re-verified 2026-08-30 (newest is still `33278795124`, the two-red one). Five-minute check, not
-a task, and §8.65 is why it is first: a sweep nobody reads stops being an alarm. **Two reds in one week were each
-mis-labelled in this very section** before anyone looked at the evidence.
-
-**Then: there is no queued top pick.** Piece 5 shipped (§8.99) and with it the Wave C S-pool is empty. The next
-item is a genuine choice from `BACKLOG.md` — pick by value; the remaining pool has no rework edges. **Do not
-re-derive the queue here**; that is what `BACKLOG.md` is for, and restating it is how the two drift.
+**Then, the top pick is a genuine choice.** The feature-tier rollout (§8.100) has four more admin pages queued
+(`BACKLOG.md` → Foundations); the Wave C S-pool is empty and the remaining pool has no rework edges. **Do not
+re-derive the queue here** — that is what `BACKLOG.md` is for, and restating it is how the two drift.
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), **on prod
 — re-confirmed 2026-08-30 by `supabase migration list --linked`, `remote` column filled** — 0 pending, rehearsed

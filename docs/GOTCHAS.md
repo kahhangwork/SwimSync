@@ -3694,3 +3694,27 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     backwards. Confirmed `true` on prod 2026-08-30. The **template body** still has no read-back and stays a
     dashboard check, and a `config push` would still carry the whole local config surface, toggle included.
     (2026-08-30.)
+
+233. **A source-scanning guard silently NARROWS when code moves to a new top-level folder — it does not fail,
+    it just stops looking.** `SwimSyncAdmin` has no ESLint; structural rules (a tier's boundaries, the
+    SGT-display helper, the auth-email flags) are enforced by vitest source-scanning tests with a fixed path
+    list. Move a file OUT of the scanned set and the rule still passes — now proving nothing about the moved
+    code. This is why the Students refactor put its tiers UNDER `app/(admin)/students/` (feature-scoped) rather
+    than in new top-level `ui/`/`domain/`/`dao/` folders: the existing `sgDisplay.drift.test.ts` scan is
+    inherited for free instead of being quietly defeated. When you add a guard OR relocate code, ask what each
+    scanning test's path list still covers. `tierBoundaries.drift.test.ts` is the pattern — a shrinking
+    allowlist pinned by file AND content snippet, never file-level. (2026-09-12, the admin refactor.)
+
+234. **Making a fixture now()-derived is only HALF the fix — the PAIRED DRIVER's own hardcoded dates rot the
+    same day, and a hardcoded month can stay GREEN by matching UNRELATED dated data (green for the wrong
+    reason).** `fixtures-unmarked-lessons.sql` was made to derive its dates from now() on 2026-08-30, but
+    `verify-unmarked-lessons.mjs` still filled the admin billing-month picker with a hardcoded "2026-07" — red
+    every night from 2026-09-01, once the derived data left July. Worse: `verify-trial-visibility.mjs` asserted
+    `/\d{1,2}\s+Aug/` on the coach panel and stayed green in September, because it was matching an unrelated
+    August session date elsewhere on the page, not the guest's trial — masking whether the date rendered at all.
+    The parent-side copy of that same assertion HAD been derived from the DB; the coach-side copy was missed
+    (§7.225's two-copies-drift, arriving through a driver not a fixture). Rule: when a fixture goes now()-derived,
+    grep the WHOLE driver for every date literal — form-fills AND assertions, on BOTH role-sides — and derive
+    each from the fixture row. Weekday-dependent drivers carry a THIRD trap: a booking `<= today` lands on TODAY
+    on the class's own weekday, which the app files under TODAY, not NEEDS MARKING (§7.122); book strictly-past.
+    (2026-09-12, nightly triage.)

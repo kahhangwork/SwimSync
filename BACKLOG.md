@@ -1,6 +1,8 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-08-30 — **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
+_Last updated: 2026-09-12 — **The Students decomposition shipped (§8.100); the feature-tier method is now the
+playbook for five more admin pages** (added under *Foundations*), the driver-port fix filed, and the
+package-settings move marked ripe. Earlier: **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
 suites green, **not yet deployed** (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD
 §7.15). Struck from the pick-now list. **One new item added, found by its driver:** the admin sidebar
 has no breakpoint, so every admin page is unusable on a phone (§7.222) — which now matters, because
@@ -503,9 +505,10 @@ swimming skills** (Piece 4, M) and ~~**Email-confirmation copy**~~ (Piece 5, S, 
   `loadPackages` / `saveThreshold` / `saveExpiryDays` in `students/page.tsx` are tenant-level
   **package** configuration (low-balance threshold, reward expiry days) rendered on the Students
   screen. They belong on Admin → Packages. Deliberately NOT folded into the decomposition refactor:
-  moving a control between pages is a **behaviour change**, and that plan preserves behaviour
-  exactly. Do it after the refactor, when the code is already extracted into
-  `students/domain/` and the move is a file rename plus a nav change.
+  moving a control between pages is a **behaviour change**, and that plan preserved behaviour
+  exactly. **Now RIPE:** the refactor shipped (§8.100), so the logic already lives in
+  `students/domain/usePackageSettings.ts` and its modal in `students/ui/` — the move is a file
+  relocation to `packages/` plus a nav change, not a rewrite.
 
 - ~~**A PayNow ID that can't build a QR**~~ — **DONE 2026-08-18** (§8.68). Advisory warning at
   the admin save (`SwimSyncAdmin/lib/paynow.ts`, mirrors `buildPayNowPayload`'s mobile check);
@@ -1526,6 +1529,36 @@ real tenant asks — that is the one honest reason, and nobody has.
 
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
+
+### Feature-tier decomposition of the remaining big admin pages — **M each** `[from the Students pilot 2026-09-12]`
+Students (`page.tsx`, was 2,284 lines) was decomposed into `ui/`/`domain/`/`dao/` tiers over 12
+stages (§8.100, closed out). The same method applies to the other five giants: `packages` (2,014),
+`invoices` (1,748), `classes` (1,714), `platform` (1,395), `lessons/[classId]/[date]` (912) — together
+with Students, **9,155 lines / 43% of all admin page code**. The coach app's big screens are in the
+queue too.
+
+**Why:** these are the files every future change to those areas pays a tax on — one component, dozens
+of `useState`, inline supabase calls with no seam to test. The pilot proved the tax is payable with
+zero behaviour change.
+
+**Notes:** the method is written down once for both apps — `docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`
+(the coach app differs: Expo Router routes every file under `app/`, and jest only matches `lib/`).
+**Do one page at a time, and not until the previous one has survived a nightly sweep** — the pattern can
+still change. Tiers stay feature-scoped (under the page's folder), never new top-level folders, or the
+source-scanning guards silently stop covering them (§7.233). The dao three-way split and its
+"orchestrate an rpc, never replace one" rule graduate to `docs/ARCHITECTURE.md` §6 once a **second** page
+confirms them.
+
+### Driver ports are hardcoded in three drivers — **S** `[from the Students pilot 2026-09-12]`
+`active-inactive` (3000/8081), `levels` and `level-skills` (8081) hardcode ports instead of reading
+`ADMIN_URL`/`EXPO_URL` like the rest, so they cannot run against a worktree without a port-substituted
+copy.
+
+**Why:** a worktree runs on non-default ports (`docs/WORKTREES.md`); a driver that ignores them aims at
+whatever is on :3000/:8081 — possibly a sibling, possibly nothing. Small and mechanical.
+
+**Notes:** `drivers/lib.mjs` already reads both env vars; the fix is to route these three through it and
+never hardcode a port again. Pairs with the future-date driver item below (both are driver-suite hygiene).
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the

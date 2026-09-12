@@ -1141,3 +1141,18 @@ external-asset rule, so a scan that reads comments flags the warning as the offe
 **Known limit, deliberate:** the guard covers the LOCAL config only. The hosted project's template
 and flag cannot be read from the CLI — `supabase config` has only `push`, no pull — so that half
 stays a manual dashboard check (§7.232).
+
+---
+
+### Feature-tier boundaries (admin refactor, 2026-09-12)
+
+**`SwimSyncAdmin/lib/tierBoundaries.drift.test.ts` — 4 checks.** The third structural guard of the
+`sgDisplay.drift.test.ts` shape, and the boundary rule for the Students decomposition: it scans
+`app/(admin)/students/{ui,domain,dao}/` and asserts the tier contract — `ui/` holds no `.from()`/
+`.rpc()`/`fetch`, the domain tier may orchestrate an rpc but never replace one, `dao/` is the only
+place the supabase client is reached. `SwimSyncAdmin` has no ESLint on purpose (§10 *Deliberately not
+doing*); this is how the one rule that matters is enforced, in the idiom the repo already uses. Pinned
+by a **shrinking allowlist** — file AND content snippet, never file-level — for the 29 pre-existing
+violations, so the rule exists while code is still moving. The tiers are feature-scoped (under
+`students/`) precisely so this and `sgDisplay.drift.test.ts` keep scanning them; a new top-level folder
+would silently narrow both (§7.233).
