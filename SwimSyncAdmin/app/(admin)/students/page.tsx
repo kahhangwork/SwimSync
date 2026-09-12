@@ -38,67 +38,12 @@ import type {
   Level as SkillLevel,
   RosterStudent,
 } from "@/lib/assessment";
-
-/** PostgREST caps every fetch at max_rows (1000). Fetching this many means the
- *  query was (probably) truncated, so search is the way to reach past it —
- *  ⚠ RISK 3 / WAVE_C_SPOOL_PLAN.md Piece 1. */
-const ROW_LIMIT = 1000;
-
-/** Which column the scoped search box targets — one field at a time, so the
- *  term is a bound `.ilike` parameter reaching the whole table in the DB rather
- *  than a client filter over the first 1000 rows. */
-type SearchField = "student" | "parent";
-
-type StudentRow = {
-  id: string;
-  full_name: string;
-  date_of_birth: string | null;
-  level_id: string | null;
-  level_label: string | null;
-  assignment_status: string;
-  is_active: boolean;
-  inactivated_at: string | null;
-  parent_id: string | null;
-  parent_name: string;
-  /** EVERY active enrolment. Since Wave 2 (`20260811000100`) a child may hold
-   *  several, and this page is the one surface that owns the many-to-many:
-   *  adding a class, and removing ONE of them. */
-  classes: EnrolledClass[];
-  /** The FIRST class's title and coach, kept only as sort keys so the Class and
-   *  Coach columns still sort (§8.19). Never rendered — the cells render
-   *  `classes`. A child in two classes sorts by their earliest in the week,
-   *  which is the only ordering that is stable as classes are added. */
-  class_title: string | null;
-  coach_name: string | null;
-  /** Attendance rows. Decides which of a duplicate pair must survive a merge. */
-  lessons: number;
-};
-
-type EnrolledClass = {
-  id: string;
-  title: string;
-  coach_name: string | null;
-  day: string | null;
-  /** Pre-formatted "5:00pm" — the chip has no room for a range. */
-  start: string | null;
-};
+import { ROW_LIMIT, WEEKDAY_ORDER, STATUS_FILTERS } from "./constants";
+import type { SearchField, StudentRow, EnrolledClass } from "./types";
 
 /** "monday" → "Mon". The chip has room for a weekday and a time, not both in
  *  full, and the day is what an admin scans for. */
 const capitalizeDay = (d: string) => d.charAt(0).toUpperCase() + d.slice(1, 3);
-
-/** Monday-first. Orders a child's chips the way their week runs. */
-const WEEKDAY_ORDER = [
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-  "sunday",
-];
-
-const STATUS_FILTERS = ["All", "Assigned", "Unassigned", "Inactive"];
 
 // A child added by a coach before their parent registered. Derived from the
 // ABSENCE of a parent_students row rather than a stored flag — the join table
