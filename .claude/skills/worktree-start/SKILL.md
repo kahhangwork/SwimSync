@@ -114,10 +114,15 @@ a driver dies on a missing login field and it reads exactly like "my change brok
 
 ```bash
 WT=.claude/worktrees/<name>
-cp SwimSyncAdmin/.env.local $WT/SwimSyncAdmin/
-cp SwimSyncApp/.env         $WT/SwimSyncApp/
+cp SwimSyncAdmin/.env.local      $WT/SwimSyncAdmin/
+cp SwimSyncApp/.env              $WT/SwimSyncApp/
+cp supabase/functions/.env       $WT/supabase/functions/     # gitignored too — `functions serve` dies without it
 grep -c '127.0.0.1:54321' $WT/SwimSyncApp/.env    # MUST be ≥1
 ```
+
+Three env files, not two: `supabase functions serve --env-file supabase/functions/.env` from
+the worktree fails with `ENOENT` until the third is copied (2026-09-12), and the drivers'
+preflight then reports "edge functions not served".
 
 **Check that grep.** Copying a cloud-pointed env into a worktree aims your drivers at
 **production**.
@@ -125,17 +130,38 @@ grep -c '127.0.0.1:54321' $WT/SwimSyncApp/.env    # MUST be ≥1
 ```bash
 cd $WT/SwimSyncAdmin && npm install
 cd $WT/SwimSyncApp   && npm install
+cd $WT/.claude/skills/run-ui-playwright/drivers && npm install    # playwright-core — the drivers dir has its own package.json
 ```
+
+Three installs, not two. Run them in the background — the app's takes minutes — and do
+DB-free work meanwhile.
 
 **Claim a non-default port** if a sibling may hold 3000 / 8081:
 
 ```bash
-npm run dev -- -p 3100          # admin
-npx expo start --port 8082      # app
+npm run dev -- -p 3100                       # admin
+CI=1 npx expo start --web --port 8082        # app — CI=1 stops it waiting on a keypress in a background shell
+supabase functions serve --env-file supabase/functions/.env --no-verify-jwt   # only ONE of these can run per stack
 ```
+
+**Three drivers hardcode `localhost:3000` / `8081`** (`active-inactive`, `levels`,
+`level-skills` — BACKLOG) and will aim at the sibling's servers. Run those through a
+port-substituted copy, deleted before commit (`FEATURE_TIER_REFACTOR_PLAYBOOK.md` §4).
 
 `drivers/lib.mjs` already reads `ADMIN_URL` / `EXPO_URL`, so **no driver needs editing** —
 and do not edit it; it is shared with every worktree.
+
+**The shared database has ONE owner at a time, and ownership is a sentence, not a state.**
+Write in the brief which session owns it. Do not run a driver (each one `db reset`s) until
+the user has said the DB is yours; say plainly when you are done with it, so it can go back.
+**While a driver runs against your dev server, do not edit the files it serves** — Next
+hot-reloads a half-applied cut straight into the test. Prepare the next stage's new files
+(nothing imports them yet) while you wait; touch the page after.
+
+**Inside a worktree session the sandbox refuses** `git -C <root> …`, `git push … :main`, and
+any compound shell line it cannot prove is not git (a `$var` before `sed`, a `docker` format
+string, a heredoc that mentions git). Keep shell lines plain and single-purpose; put
+multi-step edits in a script file and run that.
 
 **Do NOT give the worktree its own database** by editing `project_id` or the ports.
 `config.toml` is **tracked**: per-folder values are one `git add -A` from being committed and

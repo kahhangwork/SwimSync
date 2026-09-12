@@ -42,7 +42,10 @@ _Last updated: 2026-07-26_
         │                                /update-docs — it carries the graduate
         │                                list out before the worktree is destroyed
         ▼
-  /update-docs                        ← once, near the end, FROM THE ROOT on main
+  /update-docs                        ← ONCE, near the end, FROM THE ROOT on main —
+        │                                by whichever session holds the root. A worktree
+        │                                session hands over its graduate list, or runs a
+        │                                scoped pass AFTER the root's has landed
         │
         ▼
   /session-close                      ← last thing. Then close the terminal.
@@ -92,7 +95,10 @@ Run `/update-docs` *before* it.
 **④ `/worktree-close` runs BEFORE `/update-docs`, not after.** `WORKTREE.md` is gitignored,
 so it dies with the worktree — and it holds the *graduate list*, the findings that still have
 to reach `docs/GOTCHAS.md`, `BACKLOG.md`, the plan and the PRD. `/worktree-close` carries
-that list out; `/update-docs` then writes it, **from the root checkout on `main`**, because no
+that list out; `/update-docs` then writes it, **from the root checkout on `main`** — by ONE
+session: the root session if it is live (it will already have written the session entry from
+your commits), else you, after `ExitWorktree` and `git pull --ff-only`, writing only what its
+pass missed (`docs/WORKTREES.md` Phase 6) — because no
 worktree edits the living documents. Reverse the two and you are documenting from a list that
 no longer exists.
 

@@ -13,10 +13,25 @@ PRD. And the living documents are written from the **root checkout on `main`**, 
 worktree. So the sequence is:
 
 ```
-/worktree-close  →  /update-docs (from the root)  →  /session-close
+/worktree-close  →  /update-docs (ONE pass, from the root on main)  →  /session-close
 ```
 
 Settle the worktree after the documentation pass and the list is already gone.
+
+**With two sessions live, `/update-docs` has ONE writer.** `HANDOVER.md` is one file; two
+sessions editing it at once conflict on the push. What actually happened on 2026-09-12: the
+worktree pushed 14 commits to `main` one at a time; the ROOT session's `/update-docs` then
+wrote §8.100 for that work *from the commits alone*; the worktree session, back in the root
+afterwards, ran a **scoped** pass that wrote only the graduate-list items §8.100 had not
+carried (two gotchas, a backlog item, a corrected TESTING entry). So:
+
+1. Hand the graduate list (step 4) to the user in full — it is the artefact.
+2. If the root session is still live, **it runs `/update-docs`** and this list goes into that
+   pass. Do not race it.
+3. If you run it yourself, do so only after `ExitWorktree`, from the root, on `main`, with
+   `git status` clean and `git pull --ff-only` done — the root may be sitting on the
+   sibling's branch (it was: `fix/nightly-driver-date-drift`). Then write ONLY what the
+   earlier pass missed: grep each destination for each item first.
 
 > **`/session-close` §5 also mentions settling a worktree.** That is the fallback for a
 > session that never ran this skill. If you are here, this skill owns it — `/session-close`
@@ -37,7 +52,17 @@ git log --oneline origin/main..HEAD         # must be empty
 
 **If either is non-empty, stop.** Ship it with `/commit-review` first — it carries the change
 to `main` (`git push origin <branch>:main`, fast-forward only) and fast-forwards the root
-checkout. Do not "just remove the worktree" — `ExitWorktree` will refuse anyway, which is the
+checkout. **Two things the sandbox refuses from inside a worktree session**, both seen
+2026-09-12: the push to `main` itself (the auto-mode classifier calls it a production deploy —
+Vercel builds from `main`), and any `git -C <root> …`. Hand both to the user as one line each:
+
+```
+! git -C /Users/kahhang/Documents/Code/SwimSync/.claude/worktrees/<name> push origin <branch>:main
+! git -C /Users/kahhang/Documents/Code/SwimSync merge --ff-only origin/main
+```
+
+A push per change is still the rule — batch three or four commits into one push only when
+the user is away, and say so. Do not "just remove the worktree" — `ExitWorktree` will refuse anyway, which is the
 behaviour working as intended.
 
 **Anything in the working tree that is not yours** — the user's editor, a sibling — say whose
@@ -59,6 +84,11 @@ Every fixture has one — CI enforces it (`drivers/check-teardowns.sh`). Each te
 with a SELECT that prints **0** for what it removed and **1** for each seed identity that had
 to survive. **Read that output**; a non-zero means the teardown is incomplete, not that the
 check is wrong.
+
+**If your session owned the shared DB for driver runs**, say so explicitly when you hand it
+back — the sibling is waiting on that sentence. `run-all-drivers.sh` resets the database per
+driver, so what you leave behind is the LAST driver's fixture: run that one's teardown
+(`fixtures-<last>-teardown.sql`) and read its zeros.
 
 Then confirm your own prefix is gone:
 
@@ -126,6 +156,14 @@ in step 6. Carrying the list out of the worktree is all that happens here.
   uncommitted or unmerged work — that refusal is a safety property. If it fires, go back to
   step 1 rather than reaching for `discard_changes`.
 
+  **Except for this false positive, seen 2026-09-12:** the tool compares the branch against the
+  LOCAL `main` the worktree was created from, not `origin/main`. If the root checkout has not
+  been fast-forwarded (or is on a sibling's branch), every commit you pushed shows as "N
+  commits … removing will discard this work". They are not lost. The check is the line above:
+  `git merge-base --is-ancestor <branch> origin/main && echo merged`. If that prints `merged`
+  and `git log origin/main..HEAD` is empty, tell the user exactly that, get a yes, and
+  re-invoke with `discard_changes: true`. The root catches up on its next `git pull --ff-only`.
+
 A merged worktree left lying around is the one that quietly rots: it drifts behind `main`,
 and its next occupant branches from a stale base.
 
@@ -144,5 +182,10 @@ Tell the user, plainly:
 - What you left in the shared database, if anything, and under what prefix.
 - The worktree's disposition: kept (and fast-forwarded) or removed.
 
-Then run **`/update-docs` from the root checkout on `main`** and write the graduate list into
-its destinations. Finish with **`/session-close`**.
+Then the documentation pass — **one of**:
+
+- the root session is live → it runs `/update-docs`; give it the graduate list and stop here;
+- you are the only session left → `git status` clean, `git checkout main && git pull --ff-only`,
+  then `/update-docs`, writing only what is not already in each document.
+
+Finish with **`/session-close`**.

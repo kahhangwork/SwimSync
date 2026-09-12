@@ -284,16 +284,29 @@ worktree has to be finished with before `/update-docs` runs.
    ```
    Verify: `SELECT count(*) … WHERE full_name LIKE 'wt-<name>-%'` → expect 0.
 3. **Release the ports** — `pkill -f "next dev"`, `pkill -f "expo start"`.
-4. **Copy your `WORKTREE.md` "graduate" list somewhere you can still read it** — it is
-   about to become unreachable.
+4. **Copy your `WORKTREE.md` "graduate" list into your reply, in full** — it is about to
+   become unreachable, and it is the hand-off artefact for step 6.
 5. **`ExitWorktree`** with `keep` (more work queued here — then
    `git fetch && git merge --ff-only origin/main` so it does not start stale) or `remove`
-   (merged and done; confirm with
-   `git merge-base --is-ancestor <branch> origin/main` first).
-6. **Now, from the root checkout on `main`, run `/update-docs`** — and write the graduate
-   list into `docs/GOTCHAS.md`, `BACKLOG.md`, the plan's §10 and the PRD, then the session
-   entry. This is the only place the living documents are written.
+   (merged and done; confirm with `git merge-base --is-ancestor <branch> origin/main`
+   first). **`remove` compares against the LOCAL base branch:** if the root `main` is behind
+   `origin/main` — or checked out on the sibling's branch — it reports your pushed commits as
+   "unmerged" and refuses. `merge-base` above is the truth; with the user's yes, re-invoke with
+   `discard_changes: true`. From inside the worktree you cannot fast-forward the root (the
+   sandbox refuses `git -C <root>`); the user can, with one line.
+6. **`/update-docs` — ONE pass, from the root checkout on `main`.** Who runs it:
+   - the **root session, if it is live** — it writes the session entry from the commits and
+     folds in your graduate list. Hand the list over and stop. (2026-09-12: the root session's
+     pass already carried §8.100 for the worktree's 14 commits before the worktree had closed.)
+   - **you, only afterwards** — once `git status` is clean and the root is on `main` and
+     pulled. Write only what the earlier pass missed: grep each destination for each item
+     first. Two sessions writing `HANDOVER.md` at once conflict on the push.
 7. **`/session-close`** to shut the shared environment down.
+
+**The DB hand-off is explicit, both ways.** The session that owns the database says so; the
+worktree asks before its first driver run (each run `db reset`s), and says "I am done with the
+DB" the moment its last driver finishes — the sibling is blocked until that sentence. What a
+driver sweep leaves behind is the last driver's fixture: run that teardown.
 
 A merged worktree left lying around is the one that quietly rots: it drifts behind `main`,
 and its next occupant branches from a stale base.
