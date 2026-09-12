@@ -8,7 +8,6 @@ import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Tabl
 import { formatActiveStudents } from "@/lib/studentCounts";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
-import type { FamilyChild } from "@/lib/studentStatus";
 import { findDuplicatePairs, type DupPair } from "@/lib/duplicateStudents";
 import {
   describeCandidate,
@@ -29,7 +28,7 @@ import type {
   Level as SkillLevel,
   RosterStudent,
 } from "@/lib/assessment";
-import type { SearchField, StudentRow, EnrolledClass } from "./types";
+import type { SearchField, StudentRow } from "./types";
 import * as repo from "./dao/students.repo";
 import * as rpc from "./dao/students.rpc";
 import * as api from "./dao/students.api";
@@ -37,6 +36,12 @@ import { useStudentList } from "./domain/useStudentList";
 import { statusLabel, isUnclaimed, matchesFilters } from "./domain/studentRows";
 import { StudentToolbar } from "./ui/StudentToolbar";
 import { ListNotices } from "./ui/ListNotices";
+import { useRename } from "./domain/useRename";
+import { useAddClass } from "./domain/useAddClass";
+import { useStudentStatus } from "./domain/useStudentStatus";
+import { RenameModal } from "./ui/RenameModal";
+import { AddClassModal } from "./ui/AddClassModal";
+import { StatusChangeModal } from "./ui/StatusChangeModal";
 
 /** "monday" → "Mon". The chip has room for a weekday and a time, not both in
  *  full, and the day is what an admin scans for. */
@@ -62,21 +67,11 @@ export default function StudentsPage() {
     setUnclaimedOnly,
     load,
   } = useStudentList();
-  // `cls` is set only for mode "remove", and it is WHICH class — a child may be
-  // in several, so "remove from class" is not a question the student id can
-  // answer on its own.
-  const [pending, setPending] = useState<{
-    student: StudentRow;
-    mode: "remove" | "inactive";
-    cls?: EnrolledClass;
-  } | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  // Siblings are READ before anything is written, so the admin confirms a named
-  // set rather than a count that could change underneath them — and the set
-  // they confirm is exactly what gets written.
-  const [family, setFamily] = useState<FamilyChild[]>([]);
-  const [takeSiblings, setTakeSiblings] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  // Slices 3, 4, 5 — rename, add-to-class, inactive/remove. Each hook takes
+  // load() so its write refetches the table exactly as the inline code did.
+  const rename = useRename(load);
+  const addClass = useAddClass(load);
+  const status = useStudentStatus(load);
   const [merging, setMerging] = useState<DupPair | null>(null);
   const [mergeBusy, setMergeBusy] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
@@ -104,23 +99,6 @@ export default function StudentsPage() {
     await load();
   }
 
-  // ── Rename a child ────────────────────────────────────────────────────────
-  // The admin's only sanctioned way to set a child's name. It goes through
-  // rename_student(), NEVER a raw `.update({ full_name })` (see
-  // handleSaveContact's three-key-payload note: a stray full_name rewrites a
-  // child's identity or trips students_identity_uniq). The RPC derives the
-  // tenant from the row, and refuses a name that would duplicate an active
-  // child's (name + DOB) — including the NULL-DOB case the unique index cannot
-  // see — surfacing a friendly message either way.
-  //
-  // ⚠ DELIBERATELY NOT FROZEN UNDER A PENDING CLAIM, unlike the contact modal.
-  // A contact edit is frozen because `student_claims.match_reason` was
-  // snapshotted against those details; a NAME change does not invalidate
-  // match_reason, so a pending claim has nothing to be made stale by. Two
-  // writers to full_name now exist (this and the parent's own app edit,
-  // PRD §7.4) — that is fine: both pass the uniqueness index and both are
-  // audited, so last-writer-wins is legible, not corrupting. Do not add a lock.
-  const [renameFor, setRenameFor] = useState<StudentRow | null>(null);
   // The per-row Actions drawer — one button holds Invite/Contact/Rename/Inactive
   // so the row keeps only the inline glance-and-set controls (Decision 10).
   const [drawerFor, setDrawerFor] = useState<StudentRow | null>(null);
@@ -150,123 +128,6 @@ export default function StudentsPage() {
       cancelled = true;
     };
   }, [drawerFor?.parent_id]);
-  const [renameName, setRenameName] = useState("");
-  const [renameBusy, setRenameBusy] = useState(false);
-  const [renameError, setRenameError] = useState<string | null>(null);
-
-  function openRename(student: StudentRow) {
-    setRenameFor(student);
-    setRenameName(student.full_name);
-    setRenameError(null);
-  }
-
-  async function handleRename() {
-    if (!renameFor) return;
-    const name = renameName.trim();
-    if (name === "") {
-      setRenameError("Enter a name.");
-      return;
-    }
-    setRenameBusy(true);
-    setRenameError(null);
-    const { error } = await rpc.renameStudent(renameFor.id, name);
-    setRenameBusy(false);
-    if (error) {
-      // The RPC's messages are written for the admin (empty name, a name that
-      // is already registered) — surfaced verbatim, not reworded.
-      setRenameError(error.message);
-      return;
-    }
-    setRenameFor(null);
-    await load();
-  }
-
-  // ── Add a class to a child who already has one ────────────────────────────
-  // The Unassigned page still owns FIRST assignment; this is the second and
-  // third. Both write the same row, and neither validates the schedule itself:
-  // enforce_enrolment_schedule() refuses a retired class and a time clash, and
-  // its messages are written for the admin, so they are surfaced verbatim.
-  const [addClassFor, setAddClassFor] = useState<StudentRow | null>(null);
-  const [addClassChoice, setAddClassChoice] = useState("");
-  const [addClassBusy, setAddClassBusy] = useState(false);
-  const [addClassError, setAddClassError] = useState<string | null>(null);
-
-  function openAddClass(student: StudentRow) {
-    setAddClassFor(student);
-    setAddClassChoice("");
-    setAddClassError(null);
-    loadClasses();
-  }
-
-  async function handleAddClass() {
-    if (!addClassFor || !addClassChoice) return;
-    setAddClassBusy(true);
-    setAddClassError(null);
-
-    const { error } = await repo.insertEnrolment(addClassFor.id, addClassChoice);
-
-    if (!error) {
-      // Only ever moves TOWARD assigned. close_student_enrolment() owns the
-      // other direction, and only when the last class goes.
-      await repo.markAssigned(addClassFor.id);
-    }
-
-    setAddClassBusy(false);
-    if (error) {
-      setAddClassError(error.message);
-      return;
-    }
-    setAddClassFor(null);
-    await load();
-  }
-
-  async function openInactive(student: StudentRow) {
-    setTakeSiblings(false);
-    setFamily([]);
-    setPending({ student, mode: "inactive" });
-    const { children } = await rpc.familyActiveChildren(student.id);
-    setFamily(children);
-  }
-
-  const siblings = family.filter((c) => !c.is_self);
-  // True when this action leaves the family with no active children here — the
-  // point at which the family itself becomes inactive. Not a second question:
-  // it is a consequence, so the modal states it rather than asking.
-  const lastActive =
-    family.length > 0 && (siblings.length === 0 || takeSiblings);
-
-  async function handleStatusChange(
-    student: StudentRow,
-    mode: "remove" | "inactive",
-    cls?: EnrolledClass
-  ) {
-    // "Set inactive" still ends EVERY enrolment — that is the point of it, and
-    // set_students_active() owns that path. "Remove" is per class and cannot
-    // proceed without one; the RPC refuses a NULL anyway, but failing here
-    // keeps the reason in the admin's language.
-    if (mode === "remove" && !cls) {
-      setActionError("Which class? Press the × on the class to remove.");
-      return;
-    }
-    setBusyId(student.id);
-    setActionError(null);
-    const ids =
-      mode === "inactive" && takeSiblings
-        ? family.map((c) => c.student_id)
-        : [student.id];
-    const { error } =
-      mode === "inactive"
-        ? await rpc.setStudentsActive(ids, false)
-        : await rpc.removeFromClass(student.id, cls!.id);
-    setBusyId(null);
-    setPending(null);
-    if (error) {
-      setActionError(`Could not update ${student.full_name}: ${error}`);
-      return;
-    }
-    await load();
-  }
-
   const [levels, setLevels] = useState<{ id: string; label: string }[]>([]);
 
   // ── Grade skills, for ONE child (the Assessment tab does whole classes) ────
@@ -302,9 +163,6 @@ export default function StudentsPage() {
   // `addConfirmed` arms the second, "Add anyway" click once they have been shown.
   const [addDupCandidates, setAddDupCandidates] = useState<RosterCandidate[]>([]);
   const [addConfirmed, setAddConfirmed] = useState(false);
-  const [classOptions, setClassOptions] = useState<
-    { id: string; title: string }[]
-  >([]);
   const [inviting, setInviting] = useState<StudentRow | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -358,7 +216,7 @@ export default function StudentsPage() {
   useEffect(() => {
     loadLevels();
     loadPackages();
-    loadClasses();
+    addClass.loadClasses();
   }, []);
 
   async function loadLevels() {
@@ -433,11 +291,6 @@ export default function StudentsPage() {
       return;
     }
     load();
-  }
-
-  async function loadClasses() {
-    const { data } = await repo.fetchActiveClasses();
-    setClassOptions((data ?? []) as { id: string; title: string }[]);
   }
 
   // ⚠ RISK 6: any edit to the identifying fields re-arms the check — a warning
@@ -1001,7 +854,7 @@ export default function StudentsPage() {
                 <Td>
                   <button
                     onClick={() => setDrawerFor(s)}
-                    disabled={busyId === s.id}
+                    disabled={status.busyId === s.id}
                     className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                   >
                     Actions
@@ -1078,7 +931,7 @@ export default function StudentsPage() {
                   onClick={() => {
                     const s = drawerFor;
                     setDrawerFor(null);
-                    openRename(s);
+                    rename.openRename(s);
                   }}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
                 >
@@ -1104,7 +957,7 @@ export default function StudentsPage() {
                     onClick={() => {
                       const s = drawerFor;
                       setDrawerFor(null);
-                      openInactive(s);
+                      status.openInactive(s);
                     }}
                     className="w-full rounded-lg border border-red-200 px-3 py-2 text-left text-sm font-semibold text-red-600 hover:bg-red-50"
                   >
@@ -1141,7 +994,7 @@ export default function StudentsPage() {
                           onClick={() => {
                             const s = drawerFor;
                             setDrawerFor(null);
-                            setPending({ student: s, mode: "remove", cls: c });
+                            status.openRemove(s, c);
                           }}
                           aria-label={`Remove ${drawerFor.full_name} from ${c.title}`}
                           className="rounded-lg border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
@@ -1155,7 +1008,7 @@ export default function StudentsPage() {
                     onClick={() => {
                       const s = drawerFor;
                       setDrawerFor(null);
-                      openAddClass(s);
+                      addClass.openAddClass(s);
                     }}
                     className="w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-left text-sm font-semibold text-sky-700 hover:bg-sky-100"
                   >
@@ -1248,7 +1101,7 @@ export default function StudentsPage() {
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
               <option value="">Choose a class…</option>
-              {classOptions.map((c) => (
+              {addClass.classOptions.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.title}
                 </option>
@@ -1544,39 +1397,7 @@ export default function StudentsPage() {
 
       {/* ── Rename a child ──────────────────────────────────────────────────
           Not frozen under a pending claim — see openRename's note. */}
-      <Modal
-        title={`Rename ${renameFor?.full_name ?? ""}`}
-        open={renameFor !== null}
-        onClose={() => setRenameFor(null)}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Set this child&apos;s name — for example, replacing a coach&apos;s
-            placeholder with the full name their parent provided. This changes
-            the name shown across SwimSync. Invoices already issued keep the name
-            they were billed under.
-          </p>
-          <label className="block">
-            <span className="text-xs font-semibold text-gray-600">
-              Child&apos;s name
-            </span>
-            <input
-              value={renameName}
-              onChange={(e) => setRenameName(e.target.value)}
-              placeholder="Anya Rahman"
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          </label>
-          {renameError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              {renameError}
-            </p>
-          )}
-          <Button className="w-full" disabled={renameBusy} onClick={handleRename}>
-            {renameBusy ? "Saving…" : "Save name"}
-          </Button>
-        </div>
-      </Modal>
+      <RenameModal rename={rename} />
 
       {/* ── Invite the parent of an unclaimed child ─────────────────────────
           The happy path for a child a coach added. Unlike self-registration
@@ -1662,177 +1483,9 @@ export default function StudentsPage() {
         </div>
       </Modal>
 
-      <Modal
-        title={
-          pending?.mode === "inactive"
-            ? `Set ${pending.student.full_name} inactive?`
-            : `Remove ${pending?.student.full_name} from ${pending?.cls?.title}?`
-        }
-        open={pending !== null}
-        onClose={() => setPending(null)}
-      >
-        {pending && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              {pending.mode === "inactive"
-                ? "They stop appearing on rosters and stop counting toward attendance. EVERY active class enrolment is closed at the same time."
-                : `They come off this class's roster only. ${
-                    (pending.student.classes.length ?? 0) > 1
-                      ? "Their other classes are untouched."
-                      : "This is their only class, so they return to Unassigned for you to place elsewhere."
-                  } The enrolment is closed, not deleted.`}
-            </p>
-            {/* Siblings are a CHOICE — the admin may be removing one child
-                while the others keep attending. Only shown when there are any. */}
-            {pending.mode === "inactive" && siblings.length > 0 && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
-                <p className="text-sm font-medium text-amber-900">
-                  {siblings.length === 1
-                    ? `${siblings[0].full_name} is also in this family.`
-                    : `${siblings.map((c) => c.full_name).join(", ")} are also in this family.`}
-                </p>
-                <label className="flex items-start gap-2 text-sm text-amber-900">
-                  <input
-                    type="radio"
-                    className="mt-1"
-                    checked={!takeSiblings}
-                    onChange={() => setTakeSiblings(false)}
-                  />
-                  <span>
-                    Just {pending.student.full_name}
-                    {siblings.length === 1
-                      ? ` — ${siblings[0].full_name} keeps attending`
-                      : " — the others keep attending"}
-                  </span>
-                </label>
-                <label className="flex items-start gap-2 text-sm text-amber-900">
-                  <input
-                    type="radio"
-                    className="mt-1"
-                    checked={takeSiblings}
-                    onChange={() => setTakeSiblings(true)}
-                  />
-                  <span>All {family.length} children in this family</span>
-                </label>
-              </div>
-            )}
+      <StatusChangeModal status={status} />
 
-            {/* The family outcome is a CONSEQUENCE, not a question — a family
-                with no active children here is no longer a customer here. So it
-                is stated, not asked. */}
-            {pending.mode === "inactive" && lastActive && (
-              <p className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
-                That leaves no active children, so{" "}
-                <strong>{pending.student.parent_name}</strong> will be marked
-                inactive at this business too. They can rejoin any time with your
-                join code.
-              </p>
-            )}
-
-            <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-              Attendance and billing history are kept, and lessons they have
-              already attended this month will still be invoiced. Any credit
-              balance is untouched.
-            </p>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setPending(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="flex-1"
-                disabled={busyId !== null}
-                onClick={() =>
-                  handleStatusChange(pending.student, pending.mode, pending.cls)
-                }
-              >
-                {pending.mode === "inactive" ? "Set inactive" : "Remove"}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {actionError && (
-        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {actionError}
-        </p>
-      )}
-
-      {/* ── Add a class ─────────────────────────────────────────────────────
-          Deliberately thin. Every rule about WHICH classes may be combined
-          lives in enforce_enrolment_schedule(), so this form does not
-          pre-filter by weekday or time: a filtered list that disagreed with
-          the trigger would be a second, quieter rule (§7.32 — the picker is an
-          affordance, the trigger is the guard). What it does do is show the
-          refusal verbatim, because those sentences name the clashing class. */}
-      <Modal
-        title={`Add a class for ${addClassFor?.full_name ?? ""}`}
-        open={addClassFor !== null}
-        onClose={() => setAddClassFor(null)}
-      >
-        {addClassFor && (
-          <div className="space-y-4">
-            {addClassFor.classes.length > 0 && (
-              <p className="text-sm text-gray-600">
-                Already in{" "}
-                <strong>
-                  {addClassFor.classes.map((c) => c.title).join(", ")}
-                </strong>
-                . This adds another — it does not move them.
-              </p>
-            )}
-            <label className="block text-sm font-medium text-gray-700">
-              Class
-              <select
-                value={addClassChoice}
-                onChange={(e) => setAddClassChoice(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="">Choose a class…</option>
-                {classOptions
-                  .filter(
-                    (c) => !addClassFor.classes.some((ec) => ec.id === c.id)
-                  )
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-              An enrolled child is expected at this class <strong>every week</strong>,
-              and an unmarked lesson blocks invoicing for the whole business. For a
-              one-off visit, book a make-up instead.
-            </p>
-            {addClassError && (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {addClassError}
-              </p>
-            )}
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setAddClassFor(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="flex-1"
-                disabled={addClassBusy || !addClassChoice}
-                onClick={handleAddClass}
-              >
-                {addClassBusy ? "Adding…" : "Add class"}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <AddClassModal addClass={addClass} />
 
       {/* ── Merge: the one action that repoints a child's records ─────────── */}
       <Modal
