@@ -238,23 +238,23 @@ Fowler's discipline, and the reason this plan is a list of small steps rather th
 **commit after each, and never let two behaviour-preserving moves ride together.** If step *n*
 reddens the suite, the cause is unambiguous.
 
-| Stage | Work | Risk | Est. |
-|---|---|---|---|
-| **0a** | Delete dead `constants/` | none | 2 min |
-| **0b** | `tierBoundaries.drift.test.ts`, all 4 checks proven RED | none | 1 h |
-| **1** | Extract `constants.ts` + `types.ts` (lines 45–106) | none | 20 min |
-| **2** | `dao/students.repo.ts` — the 18 `.from()` calls, no logic | low | 1.5 h |
-| **3** | `dao/students.rpc.ts` + `dao/students.api.ts` | low | 45 min |
-| **4** | Slice 1 — list, search, filters → `domain/` + `ui/` | med | 1.5 h |
-| **5** | Slices 3, 4, 5 — rename, add-to-class, status (small, similar) | low | 1.5 h |
-| **6** | Slice 2 — merge duplicates | med | 1 h |
-| **7** | Slice 7 — add student + dup check | med | 1.5 h |
-| **8** | Slice 8 — contact & parent invite (the only `fetch`) | med | 1.5 h |
-| **9** | Slice 6 — grading & levels | med | 1.5 h |
-| **10** | Slice 9 — referral drawer | low | 45 min |
-| **11** | `page.tsx` down to composition; widen boundary test | low | 45 min |
+| Stage | Work | Risk | Est. | Done |
+|---|---|---|---|---|
+| **0a** | Delete dead `constants/` | none | 2 min | ✅ `23c3e2b` |
+| **0b** | `tierBoundaries.drift.test.ts`, all 4 checks proven RED | none | 1 h | ✅ `0d0c1d2` |
+| **1** | Extract `constants.ts` + `types.ts` (lines 45–106) | none | 20 min | ✅ `ca9233b` |
+| **2** | `dao/students.repo.ts` — the 18 `.from()` calls, no logic | low | 1.5 h | ✅ `ce25514` |
+| **3** | `dao/students.rpc.ts` + `dao/students.api.ts` | low | 45 min | ✅ `f29c842` |
+| **4** | Slice 1 — list, search, filters → `domain/` + `ui/` | med | 1.5 h | ✅ `948fab6` |
+| **5** | Slices 3, 4, 5 — rename, add-to-class, status (small, similar) | low | 1.5 h | ✅ `77318d3` |
+| **6** | Slice 2 — merge duplicates | med | 1 h | ✅ `755297e` |
+| **7** | Slice 7 — add student + dup check | med | 1.5 h | ✅ `b5a9423` |
+| **8** | Slice 8 — contact & parent invite (the only `fetch`) | med | 1.5 h | ✅ `ee781e9` |
+| **9** | Slice 6 — grading & levels | med | 1.5 h | ✅ `a231340` |
+| **10** | Slice 9 — referral drawer | low | 45 min | ✅ `89ac919` (+ package settings, extracted in place) |
+| **11** | `page.tsx` down to composition; widen boundary test | low | 45 min | ✅ `2005b61` |
 
-**Total: roughly 2–3 focused days.** Stage 1 is deliberately first and deliberately trivial —
+**Total: roughly 2–3 focused days** — _actual: all twelve stages landed in one session on 2026-09-12; `page.tsx` 2,284 → 165 lines, 29 files, zero `useState` on the page, both boundary ledgers at zero._ Stage 1 is deliberately first and deliberately trivial —
 it is ~60 of 2,284 lines (**2.6%**) and will not make the file readable. Its value is that it
 settles the folder convention on zero-risk lines before anything else moves.
 
@@ -283,12 +283,21 @@ What does exist:
 |---|---|
 | `npm test` — 637 tests | The `lib/` logic the page imports. Green baseline 2026-09-09 |
 | `npm run typecheck` | Every extraction's wiring — the main defence during moves |
-| `verify-student-identity` | Rename, merge, add-unclaimed (slices 2, 3, 7) |
-| `verify-class-students` | Add-to-class, roster (slice 4) |
-| `verify-parent-claim` | Contact, claiming, invite (slice 8) |
-| `verify-assessment` | Grading, levels (slice 6) |
+| `verify-contact-details` | Actions drawer → Contact modal (both modes, the claim lock), **Add student** (slices 7, 8, 9) |
+| `verify-active-inactive` | Actions drawer → Set inactive, the sibling choice (slice 5). ⚠ hardcodes `localhost:3000` / `8081` |
+| `verify-multi-class` | Class chips, add-to-class, remove (slices 1, 4, 5) |
+| `verify-parent-claim` | Invite / claim outcome as seen on the Students page (slice 8) |
+| `verify-levels`, `verify-level-skills` | The inline level picker, levels ↔ grading (slice 6). ⚠ both hardcode Expo `8081` |
+| `verify-class-students` | Roster ↔ Students consistency (slice 4) |
+| `verify-assessment` | The shared `AssessmentGrid` — NOT this page's grading modal |
 
-All four drivers were **green in the 2026-09-08 nightly** (`34286144530`).
+> **Corrected 2026-09-12.** The table above originally credited `verify-student-identity` with
+> rename, merge and add-unclaimed. **It is a coach-app (Expo) driver and never opens the admin
+> Students page.** No driver exercises **Merge** or **Rename** on this page at all; both were
+> verified by hand at Stages 5 and 6 (Review & merge → Merge them, 15 pairs → 10). Candidate
+> BACKLOG item: a `verify-students-admin` driver for merge + rename, or steps added to
+> `verify-contact-details`. Every driver listed was run against the worktree after its slice
+> landed, and all of them again after Stage 11.
 
 > **Run the relevant driver at the end of its own slice, not once at the end of the refactor.**
 > The drivers are the only thing covering the *wiring*; batching them destroys the property
@@ -361,6 +370,19 @@ The point of a pilot is that the pattern can still change.
 
 To be filled in as the work lands. Candidates already known:
 
+- **A `lib/` helper that takes the supabase client as an argument is still a network reach.**
+  `familyActiveChildren(supabase, …)` and friends kept `@/lib/supabase` on the page after every
+  `.from()`/`.rpc()` had moved. Bind them in `dao/*.rpc.ts` (they call `db.rpc`), and the client
+  leaves the page. Pattern for the other seven pages.
+- **The check-3 ledger reached zero at Stage 3, not Stage 11**, because the dao tier is the only
+  thing check 3 measures. The check-4 ledger (lib imports on the page) is the one that tracks the
+  slices, and it needed one transitional pin: `page.tsx` calling `dao/` directly until `domain/`
+  existed (Stages 4–10).
+- **Three drivers hardcode ports** (`active-inactive` → 3000/8081, `levels` and `level-skills` →
+  8081) and so cannot run against a worktree without a port-substituted copy. Candidate gotcha
+  (§7.233+) and a `drivers/lib.mjs` fix: read `ADMIN_URL`/`EXPO_URL` everywhere.
+- **Plan §8's driver ↔ slice map was wrong** — see the correction there. The lesson generalises:
+  grep the driver for the page's URL before crediting it with coverage.
 - The `SCAN_DIRS` hazard — a new top-level folder silently narrows a source-scanning guard
   rather than failing. Likely a **new gotcha** (§7.233+), since it generalises well beyond
   this refactor.
