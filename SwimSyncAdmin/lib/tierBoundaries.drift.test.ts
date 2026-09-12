@@ -57,8 +57,6 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: PAGE, contains: "./dao/students.rpc", why: "Stages 4–10: page -> domain -> dao" },
   { file: PAGE, contains: "@/lib/studentCounts", why: "Stage 4: domain/ (slice 1)" },
   { file: PAGE, contains: "@/lib/packageCoverage", why: "Stage 4: domain/ (slice 1)" },
-  { file: PAGE, contains: "@/lib/lessonDates", why: "Stage 4: domain/ (slice 1)" },
-  { file: PAGE, contains: "@/lib/assessment", why: "Stage 9: domain/ (slice 6)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
