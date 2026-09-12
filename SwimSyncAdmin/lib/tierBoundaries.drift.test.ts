@@ -44,30 +44,18 @@ const PAGE = "app/(admin)/students/page.tsx";
 type Allowed = { file: string; contains: string; why: string };
 
 /**
- * Check 3 — data-access lines still outside `dao/`. One entry per call shape;
- * a snippet may cover several identical lines (the `referrals` count runs twice).
+ * Check 3 — data-access lines still outside `dao/`. Started at 29 lines on
+ * 2026-09-12 and reached ZERO at Stage 3 the same day. Keep it empty.
  */
-const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: PAGE, contains: 'import { supabase } from "@/lib/supabase"', why: "Stage 3: leaves with the last rpc/auth call" },
-  { file: PAGE, contains: 'supabase.rpc("merge_students"', why: "Stage 3: dao/students.rpc.ts" },
-  { file: PAGE, contains: 'supabase.rpc("rename_student"', why: "Stage 3: dao/students.rpc.ts" },
-  { file: PAGE, contains: 'supabase.rpc("student_package_coverage")', why: "Stage 3: dao/students.rpc.ts" },
-  { file: PAGE, contains: 'supabase.rpc("find_roster_duplicates"', why: "Stage 3: dao/students.rpc.ts" },
-  { file: PAGE, contains: 'supabase.rpc("add_unclaimed_student"', why: "Stage 3: dao/students.rpc.ts" },
-  { file: PAGE, contains: "supabase.auth.getSession()", why: "Stage 3: dao/students.api.ts" },
-  { file: PAGE, contains: 'fetch("/api/invite-parent"', why: "Stage 3: dao/students.api.ts" },
-  // The client handed to a shared lib/ helper. Still a network reach from page.tsx.
-  { file: PAGE, contains: "familyActiveChildren(supabase", why: "Stage 5: domain/ (slice 5)" },
-  { file: PAGE, contains: "setStudentsActive(supabase", why: "Stage 5: domain/ (slice 5)" },
-  { file: PAGE, contains: "removeFromClass(supabase", why: "Stage 5: domain/ (slice 5)" },
-];
+const ALLOWED_DATA_ACCESS: Allowed[] = [];
 
 /** Check 4 — `@/lib/*` imports still on `page.tsx`. */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: PAGE, contains: "@/lib/supabase", why: "Stage 3: dao/" },
   // Transitional: until domain/ exists the page calls dao/ directly. Each slice
   // (Stages 4–10) routes its calls through domain/; the import goes at Stage 10.
   { file: PAGE, contains: "./dao/students.repo", why: "Stages 4–10: page -> domain -> dao" },
+  { file: PAGE, contains: "./dao/students.rpc", why: "Stages 4–10: page -> domain -> dao" },
+  { file: PAGE, contains: "./dao/students.api", why: "Stage 8: page -> domain -> dao" },
   { file: PAGE, contains: "@/lib/studentCounts", why: "Stage 4: domain/ (slice 1)" },
   { file: PAGE, contains: "@/lib/studentStatus", why: "Stage 5: domain/ (slice 5)" },
   { file: PAGE, contains: "@/lib/duplicateStudents", why: "Stage 6: moves INTO domain/ (slice 2)" },

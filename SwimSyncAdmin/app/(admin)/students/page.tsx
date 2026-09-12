@@ -2,19 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { formatActiveStudents } from "@/lib/studentCounts";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
-import {
-  removeFromClass,
-  setStudentsActive,
-  familyActiveChildren,
-  type FamilyChild,
-} from "@/lib/studentStatus";
+import type { FamilyChild } from "@/lib/studentStatus";
 import { findDuplicatePairs, type DupPair } from "@/lib/duplicateStudents";
 import {
   describeCandidate,
@@ -40,6 +34,8 @@ import type {
 import { ROW_LIMIT, WEEKDAY_ORDER, STATUS_FILTERS } from "./constants";
 import type { SearchField, StudentRow, EnrolledClass } from "./types";
 import * as repo from "./dao/students.repo";
+import * as rpc from "./dao/students.rpc";
+import * as api from "./dao/students.api";
 
 /** "monday" → "Mon". The chip has room for a weekday and a time, not both in
  *  full, and the day is what an admin scans for. */
@@ -98,10 +94,7 @@ export default function StudentsPage() {
   async function doMerge(pair: DupPair) {
     setMergeBusy(true);
     setMergeError(null);
-    const { error } = await supabase.rpc("merge_students", {
-      p_survivor_id: pair.survivor.id,
-      p_duplicate_id: pair.duplicate.id,
-    });
+    const { error } = await rpc.mergeStudents(pair.survivor.id, pair.duplicate.id);
     setMergeBusy(false);
     if (error) {
       setMergeError(error.message);
@@ -176,10 +169,7 @@ export default function StudentsPage() {
     }
     setRenameBusy(true);
     setRenameError(null);
-    const { error } = await supabase.rpc("rename_student", {
-      p_student_id: renameFor.id,
-      p_new_name: name,
-    });
+    const { error } = await rpc.renameStudent(renameFor.id, name);
     setRenameBusy(false);
     if (error) {
       // The RPC's messages are written for the admin (empty name, a name that
@@ -234,7 +224,7 @@ export default function StudentsPage() {
     setTakeSiblings(false);
     setFamily([]);
     setPending({ student, mode: "inactive" });
-    const { children } = await familyActiveChildren(supabase, student.id);
+    const { children } = await rpc.familyActiveChildren(student.id);
     setFamily(children);
   }
 
@@ -266,8 +256,8 @@ export default function StudentsPage() {
         : [student.id];
     const { error } =
       mode === "inactive"
-        ? await setStudentsActive(supabase, ids, false)
-        : await removeFromClass(supabase, student.id, cls!.id);
+        ? await rpc.setStudentsActive(ids, false)
+        : await rpc.removeFromClass(student.id, cls!.id);
     setBusyId(null);
     setPending(null);
     if (error) {
@@ -353,7 +343,7 @@ export default function StudentsPage() {
     // code summed package_live_balances() by parent here, which said "10 left"
     // beside a child whose class the package could never pay for, and counted
     // date-expired packages too.
-    const { data: cov } = await supabase.rpc("student_package_coverage");
+    const { data: cov } = await rpc.fetchPackageCoverage();
     setCovMap(coverageByStudent(cov ?? []));
   }
 
@@ -505,7 +495,7 @@ export default function StudentsPage() {
     // share a parent phone, which is why this is a prompt, not a refusal.
     if (!addConfirmed) {
       try {
-        const { data, error } = await supabase.rpc("find_roster_duplicates", {
+        const { data, error } = await rpc.findRosterDuplicates({
           p_tenant_id: tenantId,
           p_full_name: name,
           p_phone: addPhone.trim() || null,
@@ -531,7 +521,7 @@ export default function StudentsPage() {
     // trial path. Enrolment is dated from now, so lessons taught BEFORE today
     // are not expected of them (and so are neither blocked nor billed) — the
     // coach back-dates on the attendance screen if those need capturing.
-    const { error } = await supabase.rpc("add_unclaimed_student", {
+    const { error } = await rpc.addUnclaimedStudent({
       p_class_id: addClassId,
       p_full_name: name,
       p_kind: "ongoing",
@@ -723,24 +713,9 @@ export default function StudentsPage() {
     setInviteResult(null);
     setInviteSent(false);
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
     try {
-      const res = await fetch("/api/invite-parent", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token ?? ""}`,
-        },
-        body: JSON.stringify({
-          student_id: inviting.id,
-          email: inviteEmail.trim(),
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
+      const { ok, json } = await api.inviteParent(inviting.id, inviteEmail.trim());
+      if (!ok) {
         setInviteResult(`Error: ${json.error ?? "invite failed"}`);
       } else if (json.emailed) {
         setInviteResult(
