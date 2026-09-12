@@ -21,9 +21,7 @@ import {
   coverageByStudent,
   type StudentCoverage,
 } from "@/lib/packageCoverage";
-import { formatTime } from "@/lib/utils";
 import { Drawer } from "@/components/Drawer";
-import { useDebouncedValue } from "@/components/useDebouncedValue";
 import { AssessmentGrid } from "@/components/AssessmentGrid";
 import { todayInSg } from "@/lib/lessonDates";
 import type {
@@ -31,37 +29,39 @@ import type {
   Level as SkillLevel,
   RosterStudent,
 } from "@/lib/assessment";
-import { ROW_LIMIT, WEEKDAY_ORDER, STATUS_FILTERS } from "./constants";
 import type { SearchField, StudentRow, EnrolledClass } from "./types";
 import * as repo from "./dao/students.repo";
 import * as rpc from "./dao/students.rpc";
 import * as api from "./dao/students.api";
+import { useStudentList } from "./domain/useStudentList";
+import { statusLabel, isUnclaimed, matchesFilters } from "./domain/studentRows";
+import { StudentToolbar } from "./ui/StudentToolbar";
+import { ListNotices } from "./ui/ListNotices";
 
 /** "monday" → "Mon". The chip has room for a weekday and a time, not both in
  *  full, and the day is what an admin scans for. */
 const capitalizeDay = (d: string) => d.charAt(0).toUpperCase() + d.slice(1, 3);
 
-// A child added by a coach before their parent registered. Derived from the
-// ABSENCE of a parent_students row rather than a stored flag — the join table
-// is the fact, and a flag beside it would only ever go stale.
-const isUnclaimed = (s: { parent_id: string | null }) => s.parent_id === null;
-
 export default function StudentsPage() {
-  const [students, setStudents] = useState<StudentRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [searchField, setSearchField] = useState<SearchField>("student");
-  // The search runs in the DATABASE, so each change of the term is a round trip
-  // — debounced so typing a name is one query, not one per keystroke.
-  const debouncedSearch = useDebouncedValue(search);
-  // True when the last fetch came back at the cap, so the list is (probably)
-  // truncated — the banner then tells the admin to search rather than scroll.
-  const [capped, setCapped] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  // Only the latest load() may write state: a slow response to an old term must
-  // not overwrite the newest one (the attendance page's guard, as a counter).
-  const loadSeq = useRef(0);
-  const [statusFilter, setStatusFilter] = useState("All");
+  // Slice 1: the list, the scoped search, the filters, and load() — which every
+  // write handler below still awaits, exactly as before.
+  const {
+    students,
+    loading,
+    loadError,
+    capped,
+    search,
+    setSearch,
+    searchField,
+    setSearchField,
+    statusFilter,
+    setStatusFilter,
+    lowOnly,
+    setLowOnly,
+    unclaimedOnly,
+    setUnclaimedOnly,
+    load,
+  } = useStudentList();
   // `cls` is set only for mode "remove", and it is WHICH class — a child may be
   // in several, so "remove from class" is not a question the student id can
   // answer on its own.
@@ -283,15 +283,6 @@ export default function StudentsPage() {
   const [savingLevelFor, setSavingLevelFor] = useState<string | null>(null);
   const [levelError, setLevelError] = useState<string | null>(null);
 
-  // ── "Running low" package filter ──────────────────────────────────────────
-  // Families whose LIVE package balance (stored minus attended-but-uninvoiced
-  // draws — package_live_balances(), the single derivation, never recomputed
-  // here) is at or below the business's own threshold. The threshold is
-  // per-tenant (tenants.low_package_lessons): what counts as "running low" is
-  // the business's call, not a constant SwimSync picks for everyone.
-  // Families with NO package are never "running low" — they are ad-hoc.
-  const [lowOnly, setLowOnly] = useState(false);
-  const [unclaimedOnly, setUnclaimedOnly] = useState(false);
   // ── Add a student whose parent has not registered ─────────────────────────
   // The other half of PRD §7.17: the coach's walk-in form handles a TRIAL (one
   // lesson, marked on the spot), and this handles the ONGOING case — a child
@@ -369,13 +360,6 @@ export default function StudentsPage() {
     loadPackages();
     loadClasses();
   }, []);
-
-  // Runs on mount, and again whenever the scoped search changes. The dropdown +
-  // debounced term are the only inputs the DB query reads.
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, searchField]);
 
   async function loadLevels() {
     // RLS scopes this to the caller's own business. Ordered by sort_order, not
@@ -744,98 +728,6 @@ export default function StudentsPage() {
     setInviteBusy(false);
   }
 
-  async function load() {
-    const seq = ++loadSeq.current;
-    const term = search.trim();
-
-    // The embed shape and the scoped `.ilike` live with the query
-    // (dao/students.repo.ts, fetchStudents) — read its comment before touching
-    // either.
-    const { data, error } = await repo.fetchStudents(term, searchField);
-
-    // Lessons per child, for duplicate detection: a merge must keep the row
-    // holding the history, and merge_students() refuses the other direction
-    // outright — so offering it would be offering a refusal.
-    const { data: att } = await repo.fetchAttendanceStudentIds();
-    const lessonCount = new Map<string, number>();
-    for (const a of (att ?? []) as { student_id: string }[]) {
-      lessonCount.set(a.student_id, (lessonCount.get(a.student_id) ?? 0) + 1);
-    }
-
-    // A newer search has overtaken this one — drop the response rather than
-    // repaint the table with a stale term's rows.
-    if (seq !== loadSeq.current) return;
-    // Surfaced, not swallowed: a failed search would otherwise empty the table
-    // and read as "no students" — the silent wrong answer this change kills.
-    if (error) {
-      setLoadError(error.message);
-      setCapped(false);
-      setLoading(false);
-      return;
-    }
-    setLoadError(null);
-    setCapped((data ?? []).length >= ROW_LIMIT);
-
-    setStudents(
-      (data ?? []).map((s: any) => {
-        // ALL of them, weekday-ordered — not `.find()`. The chips are the only
-        // place the admin can see that a child is in more than one class, so a
-        // first-match read here would hide the state this whole wave creates.
-        const classes: EnrolledClass[] = (s.student_class_enrolments ?? [])
-          .filter((e: any) => e.is_active && e.classes)
-          .map((e: any) => ({
-            id: e.classes.id,
-            title: e.classes.title,
-            coach_name: e.classes.coaches?.profiles?.full_name ?? null,
-            day: e.classes.day_of_week ?? null,
-            start: e.classes.start_time
-              ? formatTime(e.classes.start_time)
-              : null,
-          }))
-          .sort(
-            (a: EnrolledClass, b: EnrolledClass) =>
-              WEEKDAY_ORDER.indexOf(a.day ?? "") -
-                WEEKDAY_ORDER.indexOf(b.day ?? "") ||
-              (a.start ?? "").localeCompare(b.start ?? "")
-          );
-        return {
-          id: s.id,
-          full_name: s.full_name,
-          date_of_birth: s.date_of_birth,
-          level_id: s.level_id,
-          // Read off the JOINED tenant_levels row, not off the student — the
-          // select is `any`, so the wrong nesting level typechecks and renders
-          // every student unlevelled (§7.28).
-          level_label: s.tenant_levels?.label ?? null,
-          // Two INDEPENDENT axes now. This used to collapse them —
-          // `s.is_active ? s.assignment_status : "inactive"` — which is exactly
-          // the ambiguity the active/inactive work removed: a child can be
-          // active but unassigned (a new signup awaiting a class).
-          assignment_status: s.assignment_status,
-          is_active: s.is_active,
-          inactivated_at: s.inactivated_at,
-          parent_id: s.parent_students?.[0]?.parents?.id ?? null,
-          parent_name:
-            s.parent_students?.[0]?.parents?.profiles?.full_name ?? "—",
-          classes,
-          // Sort keys only — see the type. First in weekday order.
-          class_title: classes[0]?.title ?? null,
-          coach_name: classes[0]?.coach_name ?? null,
-          lessons: lessonCount.get(s.id) ?? 0,
-        };
-      })
-    );
-    setLoading(false);
-  }
-
-  // Activity is the outer question ("still a customer?"), assignment the inner
-  // one ("in a class?"). An inactive child's assignment is not interesting.
-  const statusLabel = (s: StudentRow) => {
-    if (!s.is_active) return "Inactive";
-    if (s.assignment_status === "assigned") return "Assigned";
-    return "Unassigned";
-  };
-
   // ⚠ RISK 10 — "running low" is now the SQL `low` verdict (lessons OR expiry,
   // minus families with an open row), so this filter AGREES with Generate-all's
   // candidate list. No TS re-derivation.
@@ -844,13 +736,9 @@ export default function StudentsPage() {
   // Search is applied in the DATABASE now (scoped, past the 1000-row cap), so it
   // is gone from here — these are the refinements over whatever the fetch
   // returned (the matched set when searching, else the first 1000).
-  const filtered = students.filter((s) => {
-    const label = statusLabel(s);
-    const matchStatus = statusFilter === "All" || label === statusFilter;
-    const matchLow = !lowOnly || runningLow(s);
-    const matchUnclaimed = !unclaimedOnly || isUnclaimed(s);
-    return matchStatus && matchLow && matchUnclaimed;
-  });
+  const filtered = students.filter((s) =>
+    matchesFilters(s, { statusFilter, lowOnly, unclaimedOnly }, runningLow)
+  );
 
   // Derived on read, never stored: nothing would maintain a "possible
   // duplicate" flag, and a stored value nothing maintains is not a fact
@@ -922,94 +810,23 @@ export default function StudentsPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        {/* Scoped search: the dropdown picks the ONE column the term is pushed
-            into, so it reaches the whole table in the DB instead of filtering
-            the first 1000 rows in the browser (⚠ RISK 3). */}
-        <div className="flex overflow-hidden rounded-xl border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-sky-400">
-          <select
-            value={searchField}
-            onChange={(e) => setSearchField(e.target.value as SearchField)}
-            className="border-r border-gray-200 bg-gray-50 px-2 py-2.5 text-sm text-gray-600 focus:outline-none"
-            aria-label="Search by"
-          >
-            <option value="student">Student</option>
-            <option value="parent">Parent</option>
-          </select>
-          <input
-            type="text"
-            placeholder={searchField === "parent" ? "Search parent name…" : "Search student name…"}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-56 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none"
-          />
-        </div>
-        <div className="flex gap-1.5">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
-              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-                statusFilter === f
-                  ? "bg-sky-500 text-white"
-                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Only offered when there ARE any: a permanently-visible filter that
-              always returns nothing reads as a broken feature. */}
-          {unclaimedCount > 0 && (
-            <button
-              onClick={() => setUnclaimedOnly(!unclaimedOnly)}
-              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-                unclaimedOnly
-                  ? "bg-amber-500 text-white"
-                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-              }`}
-              title="Children a coach added before the family registered. Their billable lessons cannot be invoiced, and they hold the billing month open until the parent is invited or the money is recorded as settled."
-            >
-              No parent account ({unclaimedCount})
-            </button>
-          )}
-          <button
-            onClick={() => setLowOnly(!lowOnly)}
-            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-              lowOnly
-                ? "bg-amber-500 text-white"
-                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-            }`}
-            title="Families whose prepaid package is nearly used up — time to remind them to renew. Counts lessons attended but not yet invoiced."
-          >
-            Package running low
-          </button>
-          {lowOnly && (
-            <label className="flex items-center gap-1.5 text-xs text-gray-600">
-              at
-              <input
-                value={threshold}
-                onChange={(e) => saveThreshold(e.target.value)}
-                inputMode="numeric"
-                className="w-12 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-xs"
-                aria-label="Low-package threshold in lessons"
-              />
-              lessons or fewer, or expiring within
-              <input
-                value={expiryDays}
-                onChange={(e) => saveExpiryDays(e.target.value)}
-                inputMode="numeric"
-                className="w-12 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-xs"
-                aria-label="Expiry warning window in days"
-              />
-              days
-            </label>
-          )}
-        </div>
-      </div>
+      <StudentToolbar
+        search={search}
+        onSearch={setSearch}
+        searchField={searchField}
+        onSearchField={setSearchField}
+        statusFilter={statusFilter}
+        onStatusFilter={setStatusFilter}
+        unclaimedCount={unclaimedCount}
+        unclaimedOnly={unclaimedOnly}
+        onToggleUnclaimed={() => setUnclaimedOnly(!unclaimedOnly)}
+        lowOnly={lowOnly}
+        onToggleLow={() => setLowOnly(!lowOnly)}
+        threshold={threshold}
+        onThreshold={saveThreshold}
+        expiryDays={expiryDays}
+        onExpiryDays={saveExpiryDays}
+      />
 
       {/* ── Two rows that look like the same child ───────────────────────────
           The claim flow stops NEW duplicates. This is for the ones already
@@ -1054,22 +871,12 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {loadError && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          Could not load the students: {loadError}. The table below is incomplete
-          — do not read it as the full list.
-        </div>
-      )}
-
-      {!loading && !loadError && capped && (
-        <p className="mb-3 text-sm text-amber-700">
-          Showing the first {ROW_LIMIT}{" "}
-          {search.trim() ? "matches" : "students"}.{" "}
-          {search.trim()
-            ? "Refine your search to narrow them."
-            : "Use the search box to find a specific student."}
-        </p>
-      )}
+      <ListNotices
+        loading={loading}
+        loadError={loadError}
+        capped={capped}
+        searching={search.trim() !== ""}
+      />
 
       <Table>
         <Thead>

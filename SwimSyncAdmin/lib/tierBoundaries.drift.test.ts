@@ -62,7 +62,6 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: PAGE, contains: "@/lib/rosterDuplicates", why: "Stage 7: moves INTO domain/ (slice 7)" },
   { file: PAGE, contains: "@/lib/sgPhone", why: "Stage 8: domain/ (slice 8)" },
   { file: PAGE, contains: "@/lib/packageCoverage", why: "Stage 4: domain/ (slice 1)" },
-  { file: PAGE, contains: "@/lib/utils", why: "Stage 5: ui/ (slice 4)" },
   { file: PAGE, contains: "@/lib/lessonDates", why: "Stage 4: domain/ (slice 1)" },
   { file: PAGE, contains: "@/lib/assessment", why: "Stage 9: domain/ (slice 6)" },
 ];
