@@ -48,27 +48,14 @@ type Allowed = { file: string; contains: string; why: string };
  * a snippet may cover several identical lines (the `referrals` count runs twice).
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: PAGE, contains: 'import { supabase } from "@/lib/supabase"', why: "Stage 2: moves to dao/" },
+  { file: PAGE, contains: 'import { supabase } from "@/lib/supabase"', why: "Stage 3: leaves with the last rpc/auth call" },
   { file: PAGE, contains: 'supabase.rpc("merge_students"', why: "Stage 3: dao/students.rpc.ts" },
-  { file: PAGE, contains: 'supabase.from("referrals").select("id", { count: "exact", head: true })', why: "Stage 2: dao/students.repo.ts (x2)" },
   { file: PAGE, contains: 'supabase.rpc("rename_student"', why: "Stage 3: dao/students.rpc.ts" },
-  { file: PAGE, contains: 'supabase.from("student_class_enrolments").insert(', why: "Stage 2: dao/students.repo.ts" },
-  { file: PAGE, contains: "supabase.auth.getUser()", why: "Stage 2: dao/students.repo.ts" },
   { file: PAGE, contains: 'supabase.rpc("student_package_coverage")', why: "Stage 3: dao/students.rpc.ts" },
-  { file: PAGE, contains: 'supabase.from("skill_grade_levels")', why: "Stage 2: dao/students.repo.ts" },
   { file: PAGE, contains: 'supabase.rpc("find_roster_duplicates"', why: "Stage 3: dao/students.rpc.ts" },
   { file: PAGE, contains: 'supabase.rpc("add_unclaimed_student"', why: "Stage 3: dao/students.rpc.ts" },
   { file: PAGE, contains: "supabase.auth.getSession()", why: "Stage 3: dao/students.api.ts" },
   { file: PAGE, contains: 'fetch("/api/invite-parent"', why: "Stage 3: dao/students.api.ts" },
-  { file: PAGE, contains: 'supabase.from("attendance").select("student_id")', why: "Stage 2: dao/students.repo.ts" },
-  // Multi-line builder chains, pinned by the table the chain opens on.
-  { file: PAGE, contains: 'supabase .from("students")', why: "Stage 2: dao/students.repo.ts (x5)" },
-  { file: PAGE, contains: 'supabase .from("profiles")', why: "Stage 2: dao/students.repo.ts" },
-  { file: PAGE, contains: 'supabase .from("tenants")', why: "Stage 2: dao/students.repo.ts (x2, package settings)" },
-  { file: PAGE, contains: 'supabase .from("tenant_levels")', why: "Stage 2: dao/students.repo.ts (x2)" },
-  { file: PAGE, contains: 'supabase .from("student_skill_progress")', why: "Stage 2: dao/students.repo.ts" },
-  { file: PAGE, contains: 'supabase .from("classes")', why: "Stage 2: dao/students.repo.ts" },
-  { file: PAGE, contains: 'supabase .from("student_claims")', why: "Stage 2: dao/students.repo.ts" },
   // The client handed to a shared lib/ helper. Still a network reach from page.tsx.
   { file: PAGE, contains: "familyActiveChildren(supabase", why: "Stage 5: domain/ (slice 5)" },
   { file: PAGE, contains: "setStudentsActive(supabase", why: "Stage 5: domain/ (slice 5)" },
@@ -77,7 +64,10 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
 
 /** Check 4 — `@/lib/*` imports still on `page.tsx`. */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: PAGE, contains: "@/lib/supabase", why: "Stage 2: dao/" },
+  { file: PAGE, contains: "@/lib/supabase", why: "Stage 3: dao/" },
+  // Transitional: until domain/ exists the page calls dao/ directly. Each slice
+  // (Stages 4–10) routes its calls through domain/; the import goes at Stage 10.
+  { file: PAGE, contains: "./dao/students.repo", why: "Stages 4–10: page -> domain -> dao" },
   { file: PAGE, contains: "@/lib/studentCounts", why: "Stage 4: domain/ (slice 1)" },
   { file: PAGE, contains: "@/lib/studentStatus", why: "Stage 5: domain/ (slice 5)" },
   { file: PAGE, contains: "@/lib/duplicateStudents", why: "Stage 6: moves INTO domain/ (slice 2)" },
@@ -85,7 +75,6 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: PAGE, contains: "@/lib/sgPhone", why: "Stage 8: domain/ (slice 8)" },
   { file: PAGE, contains: "@/lib/packageCoverage", why: "Stage 4: domain/ (slice 1)" },
   { file: PAGE, contains: "@/lib/utils", why: "Stage 5: ui/ (slice 4)" },
-  { file: PAGE, contains: "@/lib/tableSearch", why: "Stage 4: domain/ (slice 1)" },
   { file: PAGE, contains: "@/lib/lessonDates", why: "Stage 4: domain/ (slice 1)" },
   { file: PAGE, contains: "@/lib/assessment", why: "Stage 9: domain/ (slice 6)" },
 ];

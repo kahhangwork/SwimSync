@@ -29,7 +29,6 @@ import {
 } from "@/lib/packageCoverage";
 import { formatTime } from "@/lib/utils";
 import { Drawer } from "@/components/Drawer";
-import { ilikeContains } from "@/lib/tableSearch";
 import { useDebouncedValue } from "@/components/useDebouncedValue";
 import { AssessmentGrid } from "@/components/AssessmentGrid";
 import { todayInSg } from "@/lib/lessonDates";
@@ -40,6 +39,7 @@ import type {
 } from "@/lib/assessment";
 import { ROW_LIMIT, WEEKDAY_ORDER, STATUS_FILTERS } from "./constants";
 import type { SearchField, StudentRow, EnrolledClass } from "./types";
+import * as repo from "./dao/students.repo";
 
 /** "monday" → "Mon". The chip has room for a weekday and a time, not both in
  *  full, and the day is what an admin scans for. */
@@ -144,10 +144,8 @@ export default function StudentsPage() {
     let cancelled = false;
     (async () => {
       const [refereeRes, referrerRes] = await Promise.all([
-        supabase.from("referrals").select("id", { count: "exact", head: true })
-          .eq("referee_parent_id", pid),
-        supabase.from("referrals").select("id", { count: "exact", head: true })
-          .eq("referrer_parent_id", pid).eq("status", "converted"),
+        repo.countReferredBy(pid),
+        repo.countConvertedReferrals(pid),
       ]);
       if (cancelled) return;
       setDrawerReferral({
@@ -215,19 +213,12 @@ export default function StudentsPage() {
     setAddClassBusy(true);
     setAddClassError(null);
 
-    const { error } = await supabase.from("student_class_enrolments").insert({
-      student_id: addClassFor.id,
-      class_id: addClassChoice,
-      is_active: true,
-    });
+    const { error } = await repo.insertEnrolment(addClassFor.id, addClassChoice);
 
     if (!error) {
       // Only ever moves TOWARD assigned. close_student_enrolment() owns the
       // other direction, and only when the last class goes.
-      await supabase
-        .from("students")
-        .update({ assignment_status: "assigned" })
-        .eq("id", addClassFor.id);
+      await repo.markAssigned(addClassFor.id);
     }
 
     setAddClassBusy(false);
@@ -349,16 +340,8 @@ export default function StudentsPage() {
   );
 
   async function loadPackages() {
-    const { data: userRes } = await supabase.auth.getUser();
-    const { data: prof } = await supabase
-      .from("profiles")
-      // !tenant_id disambiguates: tenants also references profiles via
-      // owner_profile_id (20260806000100), so a bare embed is refused.
-      .select(
-        "tenant_id, tenants!tenant_id(low_package_lessons, package_expiry_warning_days)"
-      )
-      .eq("id", userRes.user?.id)
-      .single();
+    const { data: userRes } = await repo.getCurrentUser();
+    const { data: prof } = await repo.fetchTenantPackageSettings(userRes.user?.id);
     setTenantId((prof as any)?.tenant_id ?? null);
     const stored = (prof as any)?.tenants?.low_package_lessons;
     if (stored !== null && stored !== undefined) setThreshold(String(stored));
@@ -380,10 +363,7 @@ export default function StudentsPage() {
     if (value.trim() === "" || !Number.isInteger(Number(value)) || Number(value) < 0)
       return;
     if (!tenantId) return;
-    await supabase
-      .from("tenants")
-      .update({ low_package_lessons: Number(value) })
-      .eq("id", tenantId);
+    await repo.updateLowPackageLessons(tenantId, Number(value));
   }
 
   async function saveExpiryDays(value: string) {
@@ -391,10 +371,7 @@ export default function StudentsPage() {
     if (value.trim() === "" || !Number.isInteger(Number(value)) || Number(value) < 0)
       return;
     if (!tenantId) return;
-    await supabase
-      .from("tenants")
-      .update({ package_expiry_warning_days: Number(value) })
-      .eq("id", tenantId);
+    await repo.updatePackageExpiryDays(tenantId, Number(value));
   }
 
   useEffect(() => {
@@ -414,11 +391,7 @@ export default function StudentsPage() {
     // RLS scopes this to the caller's own business. Ordered by sort_order, not
     // by label — a ladder sorted alphabetically puts "Advanced" above
     // "Beginner", which is why sort_order exists at all.
-    const { data } = await supabase
-      .from("tenant_levels")
-      .select("id, label")
-      .order("sort_order")
-      .order("label");
+    const { data } = await repo.fetchLevels();
     setLevels(data ?? []);
   }
 
@@ -433,15 +406,9 @@ export default function StudentsPage() {
     setGradeError(null);
 
     const [levelsRes, scaleRes, progRes] = await Promise.all([
-      supabase
-        .from("tenant_levels")
-        .select("id, label, sort_order, tenant_level_skills(id, label, sort_order)")
-        .order("sort_order"),
-      supabase.from("skill_grade_levels").select("id, rank, label").order("rank"),
-      supabase
-        .from("student_skill_progress")
-        .select("student_id, skill_id, grade_level_id, graded_at")
-        .eq("student_id", student.id),
+      repo.fetchLevelsWithSkills(),
+      repo.fetchGradeScale(),
+      repo.fetchSkillProgress(student.id),
     ]);
 
     const failed = levelsRes.error || scaleRes.error || progRes.error;
@@ -477,10 +444,7 @@ export default function StudentsPage() {
   async function setLevel(student: StudentRow, levelId: string | null) {
     setSavingLevelFor(student.id);
     setLevelError(null);
-    const { error } = await supabase
-      .from("students")
-      .update({ level_id: levelId })
-      .eq("id", student.id);
+    const { error } = await repo.updateStudentLevel(student.id, levelId);
     setSavingLevelFor(null);
 
     if (error) {
@@ -498,12 +462,7 @@ export default function StudentsPage() {
   }
 
   async function loadClasses() {
-    // RLS already scopes a tenant_admin to their own business's classes.
-    const { data } = await supabase
-      .from("classes")
-      .select("id, title")
-      .eq("is_active", true)
-      .order("title");
+    const { data } = await repo.fetchActiveClasses();
     setClassOptions((data ?? []) as { id: string; title: string }[]);
   }
 
@@ -654,14 +613,7 @@ export default function StudentsPage() {
     // It also means the mode below is decided by a FRESH read, so a child
     // claimed while the list sat on screen opens read-only rather than
     // offering an edit that no longer makes sense.
-    const { data, error } = await supabase
-      .from("students")
-      .select(
-        `provisional_contact_name, provisional_contact_phone, provisional_contact_email,
-         parent_students(parents(id, profiles(full_name, email, phone)))`
-      )
-      .eq("id", student.id)
-      .single();
+    const { data, error } = await repo.fetchStudentContact(student.id);
 
     // A newer open has overtaken this one — drop the response on the floor
     // rather than painting it under another child's name.
@@ -710,11 +662,7 @@ export default function StudentsPage() {
     // justification that is silently false. Nothing else in the product can
     // unlink a parent from a child except that flow's own undo (§7.47), so a
     // wrong link is expensive. Resolve the claim first.
-    const { count, error: claimError } = await supabase
-      .from("student_claims")
-      .select("id", { count: "exact", head: true })
-      .eq("student_id", student.id)
-      .eq("status", "pending");
+    const { count, error: claimError } = await repo.countPendingClaims(student.id);
 
     if (contactRequestFor.current !== student.id) return;
 
@@ -749,14 +697,11 @@ export default function StudentsPage() {
     //
     // blankToNull mirrors the creation path's NULLIF(trim(...), '') so a
     // cleared field becomes NULL, not '' — see lib/sgPhone.ts.
-    const { error } = await supabase
-      .from("students")
-      .update({
-        provisional_contact_name: blankToNull(contactName),
-        provisional_contact_phone: blankToNull(contactPhone),
-        provisional_contact_email: blankToNull(contactEmail),
-      })
-      .eq("id", contactFor.id);
+    const { error } = await repo.updateStudentContact(contactFor.id, {
+      provisional_contact_name: blankToNull(contactName),
+      provisional_contact_phone: blankToNull(contactPhone),
+      provisional_contact_email: blankToNull(contactEmail),
+    });
 
     setContactBusy(false);
     if (error) {
@@ -828,52 +773,15 @@ export default function StudentsPage() {
     const seq = ++loadSeq.current;
     const term = search.trim();
 
-    // ⚠ THE EMBED IS !inner ONLY WHILE SEARCHING BY PARENT. A plain (left) embed
-    // does NOT let a filter on `parent_students.parents.profiles.full_name`
-    // restrict the student rows — it returns every student with a null embed, a
-    // silently WRONG answer (the plan's own worse-than-the-cap trap). !inner
-    // makes the filter a real join. It also drops parentless children, which is
-    // CORRECT for a parent-name search: a child with no parent cannot match one.
-    // Left plain otherwise, so the default list keeps parentless children.
-    // NOTE: while searching by parent, the embed is narrowed to the MATCHING
-    // parent, so a two-parent child shows (and `parent_id` tracks) the searched
-    // parent — intended for a parent search. Row actions are unaffected: the
-    // Contact modal re-reads all parents fresh, and Invite only shows for a
-    // child with NO parent (which a parent search cannot return).
-    const searchingParent = term !== "" && searchField === "parent";
-    const parentEmbed = searchingParent
-      ? "parent_students!inner(parents!inner(id, profiles!inner(full_name)))"
-      : "parent_students(parents(id, profiles(full_name)))";
-
-    let query = supabase
-      .from("students")
-      .select(`
-        id, full_name, date_of_birth, level_id, assignment_status, is_active, inactivated_at,
-        tenant_levels(id, label),
-        ${parentEmbed},
-        student_class_enrolments(
-          is_active,
-          classes(id, title, day_of_week, start_time, coaches(profiles(full_name)))
-        )
-      `)
-      .order("full_name")
-      .limit(ROW_LIMIT);
-
-    // Scoped, in the DB: one column per field, as a bound `.ilike` parameter, so
-    // a `, ( )` in a name is data, never grammar (`lib/tableSearch.ts`).
-    if (term !== "") {
-      query =
-        searchField === "parent"
-          ? query.ilike("parent_students.parents.profiles.full_name", ilikeContains(term))
-          : query.ilike("full_name", ilikeContains(term));
-    }
-
-    const { data, error } = await query;
+    // The embed shape and the scoped `.ilike` live with the query
+    // (dao/students.repo.ts, fetchStudents) — read its comment before touching
+    // either.
+    const { data, error } = await repo.fetchStudents(term, searchField);
 
     // Lessons per child, for duplicate detection: a merge must keep the row
     // holding the history, and merge_students() refuses the other direction
     // outright — so offering it would be offering a refusal.
-    const { data: att } = await supabase.from("attendance").select("student_id");
+    const { data: att } = await repo.fetchAttendanceStudentIds();
     const lessonCount = new Map<string, number>();
     for (const a of (att ?? []) as { student_id: string }[]) {
       lessonCount.set(a.student_id, (lessonCount.get(a.student_id) ?? 0) + 1);
