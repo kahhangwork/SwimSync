@@ -50,6 +50,11 @@ export default function ContactDetailsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // On a hard reload of this screen the session is still restoring, so
+      // the id is undefined: querying with it fired two `eq.undefined` 400s
+      // (found by verify-smoke-app.mjs, 2026-09-13). The effect re-runs when
+      // the id arrives, so waiting is the whole fix.
+      if (!session?.id) return;
       let cancelled = false;
       (async () => {
         const [{ data }, { data: prof }] = await Promise.all([
