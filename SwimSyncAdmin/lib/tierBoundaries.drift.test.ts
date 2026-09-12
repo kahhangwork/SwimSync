@@ -55,9 +55,7 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // (Stages 4–10) routes its calls through domain/; the import goes at Stage 10.
   { file: PAGE, contains: "./dao/students.repo", why: "Stages 4–10: page -> domain -> dao" },
   { file: PAGE, contains: "./dao/students.rpc", why: "Stages 4–10: page -> domain -> dao" },
-  { file: PAGE, contains: "./dao/students.api", why: "Stage 8: page -> domain -> dao" },
   { file: PAGE, contains: "@/lib/studentCounts", why: "Stage 4: domain/ (slice 1)" },
-  { file: PAGE, contains: "@/lib/sgPhone", why: "Stage 8: domain/ (slice 8)" },
   { file: PAGE, contains: "@/lib/packageCoverage", why: "Stage 4: domain/ (slice 1)" },
   { file: PAGE, contains: "@/lib/lessonDates", why: "Stage 4: domain/ (slice 1)" },
   { file: PAGE, contains: "@/lib/assessment", why: "Stage 9: domain/ (slice 6)" },

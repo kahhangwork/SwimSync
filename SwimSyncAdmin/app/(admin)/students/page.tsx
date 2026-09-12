@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { formatActiveStudents } from "@/lib/studentCounts";
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
-import { checkSgPhone, checkEmail, blankToNull } from "@/lib/sgPhone";
-import { ContactHint } from "@/components/ContactHint";
 import {
   coverageByStudent,
   type StudentCoverage,
@@ -25,7 +22,6 @@ import type {
 import type { SearchField, StudentRow } from "./types";
 import * as repo from "./dao/students.repo";
 import * as rpc from "./dao/students.rpc";
-import * as api from "./dao/students.api";
 import { useStudentList } from "./domain/useStudentList";
 import { statusLabel, isUnclaimed, matchesFilters } from "./domain/studentRows";
 import { StudentToolbar } from "./ui/StudentToolbar";
@@ -41,6 +37,10 @@ import { DuplicateBanner } from "./ui/DuplicateBanner";
 import { MergeModal } from "./ui/MergeModal";
 import { useAddStudent } from "./domain/useAddStudent";
 import { AddStudentModal } from "./ui/AddStudentModal";
+import { useContact } from "./domain/useContact";
+import { useInvite } from "./domain/useInvite";
+import { ContactModal } from "./ui/ContactModal";
+import { InviteModal } from "./ui/InviteModal";
 
 /** "monday" → "Mon". The chip has room for a weekday and a time, not both in
  *  full, and the day is what an admin scans for. */
@@ -119,14 +119,9 @@ export default function StudentsPage() {
   const [savingLevelFor, setSavingLevelFor] = useState<string | null>(null);
   const [levelError, setLevelError] = useState<string | null>(null);
 
-  const [inviting, setInviting] = useState<StudentRow | null>(null);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteBusy, setInviteBusy] = useState(false);
-  const [inviteResult, setInviteResult] = useState<string | null>(null);
-  // Separate from the message, because the modal's ACTIONS change once the
-  // invite has gone: re-pressing a primary "Send invite" is how an admin
-  // double-sends, or worse, believes they have re-sent when they have not.
-  const [inviteSent, setInviteSent] = useState(false);
+  // Slice 8 — the parent's contact details, and inviting a parent.
+  const contact = useContact();
+  const invite = useInvite(load);
   const [threshold, setThreshold] = useState("2");
   const [expiryDays, setExpiryDays] = useState("14");
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -249,207 +244,6 @@ export default function StudentsPage() {
       return;
     }
     load();
-  }
-
-  // ── The parent's contact details ────────────────────────────────────────
-  //
-  // ⚠ THESE ARE THE PARENT'S DETAILS, STORED ON THE CHILD'S ROW. A child has no
-  // phone or email of their own anywhere in the model and must not get one. The
-  // three provisional_contact_* columns exist for the window BEFORE the adult
-  // who brought the child has an account.
-  //
-  // ⚠ TWO MODES, AND THE CLAIMED ONE IS READ-ONLY BY DESIGN. Once a parent has
-  // an account their real details live on `profiles`, which they maintain
-  // themselves in the app ((parent)/profile/contact.tsx). Offering a second
-  // editable copy here would be exactly the stale duplicate that `students.age`
-  // and `classes.price_per_lesson` were removed for. It is also not ours to
-  // write: parents are global, so profiles.tenant_id is NULL and
-  // is_tenant_admin(NULL) is hard-false — the database refuses it either way.
-  const [contactFor, setContactFor] = useState<StudentRow | null>(null);
-  const [contactLoading, setContactLoading] = useState(false);
-  const [contactClaimed, setContactClaimed] = useState(false);
-  const [contactName, setContactName] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  // PLURAL. parent_students is many-to-many because a child has two parents,
-  // and "show me the mother's number, not the father's" is the ordinary reason
-  // an admin opens this. Taking [0] would answer with whichever row came back
-  // first.
-  const [contactParents, setContactParents] = useState<
-    { full_name: string | null; email: string | null; phone: string | null }[]
-  >([]);
-  const [pendingClaims, setPendingClaims] = useState(0);
-  const [contactBusy, setContactBusy] = useState(false);
-  const [contactError, setContactError] = useState<string | null>(null);
-  // ⚠ NO FORM IS RENDERED WHILE THIS IS SET. Without it, a failed load left the
-  // three inputs on screen holding the ""s they were reset to — so an admin who
-  // did not read the error and pressed Save would ERASE that child's real
-  // contact details, including the phone that is their only match signal.
-  const [contactLoadFailed, setContactLoadFailed] = useState(false);
-  // Which student the in-flight read is for. Open A, close, open B and A's
-  // response can land last — putting A's phone number under B's name.
-  const contactRequestFor = useRef<string | null>(null);
-
-  async function openContact(student: StudentRow) {
-    setContactFor(student);
-    setContactLoading(true);
-    setContactLoadFailed(false);
-    setContactClaimed(false);
-    setContactError(null);
-    setContactParents([]);
-    setPendingClaims(0);
-    setContactName("");
-    setContactPhone("");
-    setContactEmail("");
-    contactRequestFor.current = student.id;
-
-    // ⚠ FETCHED HERE, NOT ADDED TO load()'s SELECT. That one query feeds this
-    // entire page; a join-shape or RLS mistake in it returns null and renders
-    // the admin's primary screen EMPTY rather than merely missing a field. A
-    // failure in this query costs one modal.
-    //
-    // It also means the mode below is decided by a FRESH read, so a child
-    // claimed while the list sat on screen opens read-only rather than
-    // offering an edit that no longer makes sense.
-    const { data, error } = await repo.fetchStudentContact(student.id);
-
-    // A newer open has overtaken this one — drop the response on the floor
-    // rather than painting it under another child's name.
-    if (contactRequestFor.current !== student.id) return;
-
-    if (error || !data) {
-      setContactLoading(false);
-      setContactLoadFailed(true);
-      setContactError("Could not load this child's contact details.");
-      return;
-    }
-
-    const row = data as any;
-    const parents = (row.parent_students ?? [])
-      .map((ps: any) => ps.parents)
-      .filter(Boolean);
-    const claimed = parents.length > 0;
-    setContactClaimed(claimed);
-
-    if (claimed) {
-      // ⚠ READ OFF THE JOINED profiles ROW, NOT THE STUDENT. The select is
-      // `any`, so the wrong nesting level typechecks and renders every field
-      // blank (§7.28) — which reads as "this family gave us nothing" when they
-      // gave us everything. The UI driver asserts the exact seeded strings.
-      setContactParents(
-        parents.map((p: any) => ({
-          full_name: p.profiles?.full_name ?? null,
-          email: p.profiles?.email ?? null,
-          phone: p.profiles?.phone ?? null,
-        }))
-      );
-      setContactLoading(false);
-      return;
-    }
-
-    setContactName(row.provisional_contact_name ?? "");
-    setContactPhone(row.provisional_contact_phone ?? "");
-    setContactEmail(row.provisional_contact_email ?? "");
-
-    // ⚠ A PENDING CLAIM FREEZES THESE FIELDS, AND THAT IS THE POINT.
-    // student_claims.match_reason is SNAPSHOTTED at claim time by design
-    // (20260726000100) — the same rule as invoice_items.student_name. Editing
-    // the phone underneath a pending claim leaves the Claims queue asserting
-    // "their registered phone matches the contact number on this child" when it
-    // no longer does, and the admin then approves a parent–child link on a
-    // justification that is silently false. Nothing else in the product can
-    // unlink a parent from a child except that flow's own undo (§7.47), so a
-    // wrong link is expensive. Resolve the claim first.
-    const { count, error: claimError } = await repo.countPendingClaims(student.id);
-
-    if (contactRequestFor.current !== student.id) return;
-
-    // ⚠ FAILS CLOSED, AND MUST. This is the whole guard: if we cannot find out
-    // whether a claim is pending, the safe answer is "assume one is". Reading a
-    // failed count as zero would silently unlock the fields in exactly the
-    // situation the lock exists for.
-    if (claimError || count === null) {
-      setContactLoading(false);
-      setContactLoadFailed(true);
-      setContactError(
-        "Could not check whether a parent is claiming this child, so editing is locked. Reopen to try again."
-      );
-      return;
-    }
-
-    setPendingClaims(count);
-    setContactLoading(false);
-  }
-
-  async function handleSaveContact() {
-    if (!contactFor) return;
-    setContactBusy(true);
-    setContactError(null);
-
-    // ⚠ AN EXPLICIT THREE-KEY PAYLOAD. Never spread a row object into
-    // .update(): a stray full_name or date_of_birth silently rewrites a child's
-    // identity or trips students_identity_uniq with an error the admin cannot
-    // act on. (tenant_id would be caught by pin_student_tenant(); the others
-    // would not be.) The SANCTIONED way to change full_name is rename_student()
-    // (the Rename action) — never add it to this payload.
-    //
-    // blankToNull mirrors the creation path's NULLIF(trim(...), '') so a
-    // cleared field becomes NULL, not '' — see lib/sgPhone.ts.
-    const { error } = await repo.updateStudentContact(contactFor.id, {
-      provisional_contact_name: blankToNull(contactName),
-      provisional_contact_phone: blankToNull(contactPhone),
-      provisional_contact_email: blankToNull(contactEmail),
-    });
-
-    setContactBusy(false);
-    if (error) {
-      setContactError(`Could not save the contact details. ${error.message}`);
-      return;
-    }
-    // Deliberately NO load(). Every other write on this page refetches because
-    // it changes something the table shows; these three columns are shown
-    // nowhere in it — not in the Parent column (which reads profiles through
-    // parent_students), not in the duplicate detector, not in any filter. A
-    // refetch here would re-run the students, attendance and package queries to
-    // repaint identical rows.
-    setContactFor(null);
-  }
-
-  async function handleInviteParent() {
-    if (!inviting) return;
-    setInviteBusy(true);
-    setInviteResult(null);
-    setInviteSent(false);
-
-    try {
-      const { ok, json } = await api.inviteParent(inviting.id, inviteEmail.trim());
-      if (!ok) {
-        setInviteResult(`Error: ${json.error ?? "invite failed"}`);
-      } else if (json.emailed) {
-        setInviteResult(
-          json.message ?? `Invite sent to ${inviteEmail.trim()}.`
-        );
-        setInviteSent(true);
-        await load();
-      } else if (json.alreadyRegistered) {
-        // A live account: the child was linked, nothing was mailed, and saying
-        // so plainly matters — this used to claim an email had been sent.
-        setInviteResult(json.message);
-        setInviteSent(true);
-        await load();
-      } else {
-        // No RESEND_API_KEY (local, or a misconfigured deploy). Showing the
-        // link is deliberate — it keeps the flow usable — but it must be
-        // clearly NOT the intended outcome, or a broken key looks like success.
-        setInviteResult(
-          `No email was sent (no mail key configured). Send them this link yourself: ${json.invite_link}`
-        );
-        await load();
-      }
-    } catch (e) {
-      setInviteResult(`Error: ${String(e)}`);
-    }
-    setInviteBusy(false);
   }
 
   // ⚠ RISK 10 — "running low" is now the SQL `low` verdict (lessons OR expiry,
@@ -696,9 +490,7 @@ export default function StudentsPage() {
                     onClick={() => {
                       const s = drawerFor;
                       setDrawerFor(null);
-                      setInviting(s);
-                      setInviteEmail("");
-                      setInviteResult(null);
+                      invite.open(s);
                     }}
                     className="w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-left text-sm font-semibold text-sky-700 hover:bg-sky-100"
                   >
@@ -709,7 +501,7 @@ export default function StudentsPage() {
                   onClick={() => {
                     const s = drawerFor;
                     setDrawerFor(null);
-                    openContact(s);
+                    contact.openContact(s);
                   }}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
                 >
@@ -871,267 +663,13 @@ export default function StudentsPage() {
 
       <AddStudentModal add={addStudent} classOptions={addClass.classOptions} />
 
-      {/* ── The parent's contact details ────────────────────────────────────
-          Two modes off ONE fresh read — see openContact(). Editable while the
-          child is unclaimed, read-only once a parent holds the account. */}
-      <Modal
-        // Not "…'s parent": a child can have two, and the claimed branch shows
-        // every one of them.
-        title={`${contactFor?.full_name ?? ""} — parent contact details`}
-        open={contactFor !== null}
-        onClose={() => setContactFor(null)}
-      >
-        {contactLoading ? (
-          <p className="text-sm text-gray-500">Loading…</p>
-        ) : contactLoadFailed ? (
-          // The error and NOTHING ELSE — see contactLoadFailed. An empty form
-          // here is a loaded gun pointed at real contact details.
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {contactError}
-          </p>
-        ) : contactClaimed ? (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              This family has a SwimSync account, so these are their own
-              details. They keep them up to date in the app, under{" "}
-              <span className="font-medium text-gray-700">
-                Profile → Contact Details
-              </span>{" "}
-              — ask them to change it there and it updates everywhere.
-            </p>
-            {contactParents.map((parent, i) => (
-              <div key={i}>
-                {contactParents.length > 1 && (
-                  <p className="mb-1 text-xs font-semibold text-gray-500">
-                    Parent {i + 1} of {contactParents.length}
-                  </p>
-                )}
-                <dl className="divide-y divide-gray-100 rounded-lg border border-gray-200">
-                  {[
-                    ["Name", parent.full_name],
-                    ["Email", parent.email],
-                    ["Phone", parent.phone],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex gap-3 px-3 py-2 text-sm">
-                      <dt className="w-16 shrink-0 font-medium text-gray-500">
-                        {label}
-                      </dt>
-                      <dd className="text-gray-900">
-                        {value || (
-                          <span className="text-gray-400">
-                            Not provided — the parent can add it in the app
-                          </span>
-                        )}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              {pendingClaims > 0
-                ? // "Nobody has claimed this child yet" is true of the JOIN
-                  // TABLE and false to a reader looking at a pending request —
-                  // the two sentences contradicted each other on screen.
-                  "These are the details taken when this child was added. They are what the parent below was matched on."
-                : "Nobody has claimed this child yet, so these are the details taken when they were added. The phone and email are what match this child to their parent's account when the family registers."}
-            </p>
-
-            {pendingClaims > 0 ? (
-              // ⚠ REFUSED, NOT WARNED. See openContact() — the Claims queue
-              // shows a SNAPSHOT of why the candidate was offered, so editing
-              // these underneath it makes the admin approve on a reason that is
-              // no longer true. Do NOT add a bypass, and do NOT "fix" this by
-              // rewriting student_claims.match_reason: it is a record of a past
-              // act, not a live lookup (§6).
-              <div className="space-y-3">
-                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  {pendingClaims === 1
-                    ? "A parent is currently claiming this child, so these details are locked."
-                    : `${pendingClaims} parents are currently claiming this child, so these details are locked.`}{" "}
-                  The claim was raised against the details below — changing them
-                  now would leave the decision resting on a reason that is no
-                  longer true. Settle it on{" "}
-                  <Link
-                    href="/claims"
-                    className="font-semibold underline hover:text-amber-900"
-                  >
-                    Parent claims
-                  </Link>{" "}
-                  first.
-                </p>
-                <dl className="divide-y divide-gray-100 rounded-lg border border-gray-200">
-                  {[
-                    ["Name", contactName],
-                    ["Phone", contactPhone],
-                    ["Email", contactEmail],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex gap-3 px-3 py-2 text-sm">
-                      <dt className="w-16 shrink-0 font-medium text-gray-500">
-                        {label}
-                      </dt>
-                      <dd className="text-gray-900">
-                        {value || <span className="text-gray-400">—</span>}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            ) : (
-              <>
-                <label className="block">
-                  <span className="text-xs font-semibold text-gray-600">
-                    Parent&apos;s name
-                  </span>
-                  <input
-                    value={contactName}
-                    onChange={(e) => setContactName(e.target.value)}
-                    placeholder="Sarah Lim"
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    Who the number belongs to — a parent, a grandparent, a
-                    helper.
-                  </p>
-                </label>
-
-                <label className="block">
-                  <span className="text-xs font-semibold text-gray-600">
-                    Parent&apos;s phone
-                  </span>
-                  <input
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                    placeholder="9123 4567"
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                  <ContactHint check={checkSgPhone(contactPhone)} />
-                </label>
-
-                <label className="block">
-                  <span className="text-xs font-semibold text-gray-600">
-                    Parent&apos;s email
-                  </span>
-                  <input
-                    value={contactEmail}
-                    onChange={(e) => setContactEmail(e.target.value)}
-                    placeholder="sarah@example.com"
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                  <ContactHint check={checkEmail(contactEmail)} />
-                </label>
-
-                {contactError && (
-                  <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                    {contactError}
-                  </p>
-                )}
-
-                {/* Disabled ONLY while the write is in flight. The hints above
-                    never gate this — see ContactHint. */}
-                <Button
-                  className="w-full"
-                  disabled={contactBusy}
-                  onClick={handleSaveContact}
-                >
-                  {contactBusy ? "Saving…" : "Save contact details"}
-                </Button>
-              </>
-            )}
-          </div>
-        )}
-      </Modal>
+      <ContactModal contact={contact} />
 
       {/* ── Rename a child ──────────────────────────────────────────────────
           Not frozen under a pending claim — see openRename's note. */}
       <RenameModal rename={rename} />
 
-      {/* ── Invite the parent of an unclaimed child ─────────────────────────
-          The happy path for a child a coach added. Unlike self-registration
-          there is no matching to get wrong: the admin asserts the link, so the
-          parent lands with this child already on their account and every
-          lesson already marked for them becomes billable. */}
-      <Modal
-        title={`Invite ${inviting?.full_name ?? ""}'s parent`}
-        open={inviting !== null}
-        onClose={() => {
-          setInviting(null);
-          setInviteSent(false);
-          setInviteResult(null);
-        }}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            We&apos;ll email them a link to set a password.{" "}
-            {inviting?.full_name} will already be on their account, along with
-            the attendance already marked — so the lessons can be invoiced
-            normally.
-          </p>
-          <label className="block">
-            <span className="text-xs font-semibold text-gray-600">
-              Parent&apos;s email <span className="font-normal">(optional)</span>
-            </span>
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="parent@example.com"
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          </label>
-          {inviteResult && (
-            <p
-              className={`rounded-lg px-3 py-2 text-xs break-all ${
-                inviteSent
-                  ? "bg-green-50 text-green-800"
-                  : "bg-gray-50 text-gray-700"
-              }`}
-            >
-              {inviteSent ? "✓ " : ""}
-              {inviteResult}
-            </p>
-          )}
-
-          {/* ⚠ ONCE IT HAS GONE, "SEND INVITE" IS NO LONGER THE PRIMARY ACTION.
-              Leaving it as the big blue button invites a second press — and the
-              second press used to send NOTHING while reporting success, because
-              the first one had created the auth user and the route then took
-              the "already has an account" branch. Done is now the primary act;
-              Resend is deliberately secondary, and genuinely re-sends. */}
-          {inviteSent ? (
-            <div className="flex gap-2">
-              <Button
-                className="flex-1"
-                onClick={() => {
-                  setInviting(null);
-                  setInviteSent(false);
-                  setInviteResult(null);
-                }}
-              >
-                Done
-              </Button>
-              <Button
-                variant="outline"
-                disabled={inviteBusy}
-                onClick={handleInviteParent}
-              >
-                {inviteBusy ? "Sending…" : "Resend email"}
-              </Button>
-            </div>
-          ) : (
-            <Button
-              className="w-full"
-              disabled={inviteBusy || !inviteEmail.trim()}
-              onClick={handleInviteParent}
-            >
-              {inviteBusy ? "Sending…" : "Send invite"}
-            </Button>
-          )}
-        </div>
-      </Modal>
+      <InviteModal invite={invite} />
 
       <StatusChangeModal status={status} />
 
