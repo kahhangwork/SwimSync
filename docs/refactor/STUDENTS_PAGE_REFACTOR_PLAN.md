@@ -349,6 +349,12 @@ in full.)
 
 ## 11. The rollout, after the pilot is reviewed
 
+> **The method is now written down once, for both apps:**
+> **`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`.** Every page below follows it; this plan
+> stays as the worked example. The coach-app screens are in the queue too, and the playbook
+> carries the two places they differ (Expo Router routes every file under `app/`; jest only
+> matches `lib/`).
+
 Order by size, which here is also roughly order by pain:
 
 | Page | Lines |
