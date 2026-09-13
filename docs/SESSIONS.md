@@ -28,6 +28,7 @@ _The rows below are moved verbatim. Their length is the pre-2026-08-10 record, n
 standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.101** | 2026-09-12 | The nightly's two reds were driver date-rot, not product bugs; fixed driver-only (7667643) | §7.234 (date-rot family) · §7.122 · §7.98 |
 |---|---|---|---|
 | **8.100** | 2026-09-12 | Admin Students page decomposed into ui/domain/dao tiers, 12 stages, zero behaviour change; now a playbook | §7.233–236 · refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md |
 | **8.99** | 2026-08-30 | A branded signup-confirmation email that is never sent (dormant by design), + a CI guard on the stranding toggle | §7.231, §7.232 · `authEmailConfig.drift.test.ts` |

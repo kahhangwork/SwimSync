@@ -1,10 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-13 — **Smoke drivers for every route in both apps SHIPPED and the nightly is GREEN
-(§8.102)** — first success after two reds, confirming §8.101 too. The feature-tier rollout is now EVERY page
-on three tracks (playbook §7); unit 1 of 17 done, **next is lite batch Admin L-A** (§9)._
+_Last updated: 2026-09-14 — **Admin L-A lite batch SHIPPED to prod (§8.103, `dfe4cad`)** — five "people"
+pages (coaches/admins/parents/unassigned/claims) decomposed to `dao`/`domain`/`ui`, zero behaviour change,
+both boundary ledgers empty, 8/8 drivers green. Unit 2 of 17 done; **next: a nightly, then `packages` (full
+track)** (§9)._
 
-_Previously, 2026-09-12 (§8.100, §8.101) — the Students decomposition shipped; the nightly's two reds were driver date-rot, fixed._
+_Previously, 2026-09-13 (§8.102) — smoke drivers for every route in both apps shipped, nightly GREEN._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +348,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.103 (2026-09-14) — Admin L-A: five "people" pages decomposed to tiers, shipped to prod
+
+**The feature-tier rollout's first lite batch (unit 2 of 17), zero behaviour change, `dfe4cad` on prod.**
+coaches/admins/parents/unassigned/claims → `dao`/`domain`/`ui` + composition pages (each **0 `useState`**,
+≤ 91 lines, was 370–622). Both boundary ledgers re-opened (40 + 17 violations) and shrunk back to **empty**.
+672 vitest + 429 jest + **8/8 UI drivers** green.
+
+- **Method refined:** folded L1–L3 into one commit per page — a standalone L1 leaves the page importing
+  `dao/`, which needs a transitional ledger pin; folding avoids it (`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`
+  §7.1). `claimNaming`/`coachDisableImpact` moved into their pages' `domain/` (sole importers); `git mv` of a
+  lib helper repoints its own `./` imports to `@/lib/` (playbook §5).
+- **Deliberately NOT done:** `packages` (next unit, full track) **waits for a nightly** — never two units in
+  flight. Duplicate `ui/Field.tsx` left feature-scoped (consolidate on a third copy → `BACKLOG.md`).
+- Detail: `docs/refactor/BATCH_A_PLAN.md`. Tests: `docs/TESTING.md` §5.
+
 ## 8.102 (2026-09-13) — Smoke drivers for EVERY route in both apps; the rollout becomes every page
 
 **Two drivers (`18b61a2`), one product fix (`b93d986`), one decision — and the nightly went green.**
@@ -366,23 +382,7 @@ inside a file read at the start of every session.
 - **Deliberately NOT done:** no lite batch started (the playbook waits for a nightly per unit — it has now run);
   `nextDateFor` left duplicated in both drivers (a third copy is the trigger to lift it into `lib.mjs`).
 
-## 8.101 (2026-09-12) — The nightly's two reds were both DRIVER date-rot, not product bugs
-
-**Triaged from the run's own screenshots, fixed, proven red→green on the live stack.** `7667643`, driver-only.
-Both were calendar assumptions that held until the real date moved past them (§7.234); the product was correct
-in every case.
-
-- **`unmarked-lessons` (8/12 → 12/12)** hardcoded the admin billing month to `"2026-07"` while its fixture was
-  changed on 2026-08-30 to derive dates from `now()` — so it checked the wrong month, red every night from Sept 1.
-- **`trials` (crash → 16/16)** booked the most-recent lesson `<= today`; on a Saturday-SGT nightly that is TODAY,
-  which the app files under TODAY not NEEDS MARKING (§7.122). Booking strictly-past fixed it — and exposed a
-  latent §7.98 bug: the roster-open tap grabbed the mounted Schedule tab's plain "Mark Attendance".
-- **`trial-visibility` was green for the WRONG reason** — a hardcoded `/Aug/` matching an unrelated session date,
-  not the guest's trial; derived from the DB to match the parent-side fix that had missed this copy. Still 11/11.
-- **Deliberately NOT done:** no product change, no migration, no app deploy. The fix awaits the next nightly;
-  CI was not force-triggered (user's call).
-
-_(§8.100 demoted to a ledger row in `docs/SESSIONS.md`.)_
+_(§8.101 demoted to a ledger row in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -449,23 +449,17 @@ failures that are just the driver's own UI writes — reset before believing it.
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — lite batch Admin L-A (unit 2 of 17)
+### THE NEXT BUILD — a nightly, then `packages` (full track, unit 3 of 17)
 
-**The feature-tier rollout is every page on three tracks** (playbook §7; `BACKLOG.md` → Foundations is the
-queue). Unit 1, the smoke drivers, shipped and survived its nightly (§8.102), so **L-A is unblocked**:
-`coaches` / `admins` / `parents` / `unassigned` / `claims` — 2,447 lines, about one session.
+**Admin L-A shipped (§8.103, `dfe4cad` on prod).** The gate before the next unit is a **nightly sweep** — never
+two units in flight (playbook §7.1). So the immediate next step is: **wait for the nightly**, confirm the five
+L-A pages (and the widened boundary test) stay green, then start `packages/page.tsx` on the **full** track
+(2,014 lines, its own `docs/refactor/PACKAGES_*_PLAN.md`, 12 stages one-per-nightly).
 
-1. **L0** — `docs/refactor/BATCH_A_PLAN.md` (one table: page, lines, `useState` count, `lib/` verdicts, the
-   driver net re-derived by grep — §7.236); widen `tierBoundaries.drift.test.ts` to the five folders, pin
-   every current violation, prove each check red. **Never widen the ledger after L0.**
-2. **L1 → L3 per page** — `constants`+`types`+`dao/` · `domain/` · `ui/`+page — typecheck + unit tests per
-   commit, no exceptions.
-3. **L4** — run the batch's drivers (`coach-disable`, `admins`, `active-inactive`, `trial-visibility`,
-   `parent-claim`) plus `smoke-admin`; hand-check anything none opens.
-4. **Then wait for a nightly** before `packages` (full track). Never two units in flight.
-
-Tiers stay feature-scoped under the page's folder (§7.233). The rest of the pick-now pool has no rework edges;
-**do not re-derive the queue here** — restating `BACKLOG.md` is how the two drift.
+The lite-track method is now proven at N pages: **fold L1–L3 into one commit per page** (playbook §7.1), and
+for a full page follow the twelve stages of playbook §2. `BACKLOG.md` → *Foundations* is the whole queue and
+its order; **do not re-derive it here** — restating it is how the two drift. Tiers stay feature-scoped under
+the page's folder (§7.233).
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), **on prod
 — re-confirmed 2026-08-30 by `supabase migration list --linked`, `remote` column filled** — 0 pending, rehearsed

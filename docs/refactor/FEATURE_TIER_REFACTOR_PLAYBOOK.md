@@ -235,6 +235,16 @@ rm verify-zz-* fixtures-zz-*                    # before committing anything
   on `KEPT`. Assert case-insensitively.
 - **The plan's line-count estimate was 2–3 days.** It took one session, because the stages
   were small enough that none needed debugging. Keep them that small.
+- **`git mv`-ing a `lib/` helper into `<page>/domain/` breaks its OWN relative imports.**
+  On L-A, `coachDisableImpact.ts` imported `./lessonDates` / `./attendanceCompleteness` /
+  `./classCoverage`; after the move those siblings are still in `lib/`, so every `./`
+  specifier must be repointed to `@/lib/`. `typecheck` catches it, but it is not visible in
+  the move itself — check the moved file's own imports, not just its importers. (A helper
+  with no relative imports, like `claimNaming.ts`, moves clean.)
+- **A shared presentational atom duplicates across feature folders.** L-A produced two
+  byte-identical `ui/Field.tsx` (admins, coaches). Kept feature-scoped on purpose (§7.233 —
+  don't lift to `@/components` mid-refactor). A **third** copy is the trigger to consolidate;
+  file it in `BACKLOG.md` when it appears, don't pre-emptively share.
 
 ---
 
@@ -291,6 +301,19 @@ run per slice.
 A page under ~400 lines with ≤ 5 `useState` may take L1–L3 as **one commit** — the
 split exists so a driver red at L4 bisects to a page, not to a tier; one commit per page
 is enough for that.
+
+**FOLD L1+L2+L3 into one commit per page — proven the right default on Admin L-A
+(2026-09-13), even for pages over that threshold.** L1 as its own commit is a state where
+the page still imports `dao/` directly (it calls the data functions before a hook wraps
+them), and the fence's check 4 forbids a page importing `dao/` — so a standalone L1 needs a
+**transitional dao-import pin** in `ALLOWED_PAGE_IMPORTS` (the Students pilot's "3
+transitional dao/ pins"), which must be predicted and added at L0 or the ledger grows
+mid-batch. Folding sidesteps it entirely: create `dao/` **and** `domain/` together, wire the
+page straight to the hook, and the page never imports `dao/` in any committed state — the
+ledger only ever shrinks after L0 (§3). One commit per page still bisects a driver red to a
+page. So: **fold, or pin the transitional dao imports at L0 — never a standalone L1 with an
+unpinned page→dao import.** All five L-A pages (up to 622 lines / 18 `useState`) folded
+cleanly.
 
 **Batch rules:**
 

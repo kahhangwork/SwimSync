@@ -1554,8 +1554,10 @@ ceremony.
 **Notes:** the method is written down once for both apps — `docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`
 (§7 for the tracks and the order; the coach app differs: tiers go under `SwimSyncApp/features/`, and jest's
 `testMatch` and both `sgDisplay.drift` twins must gain that folder in the same commit). **Order:** the smoke
-drivers (shipped 2026-09-13), then one lite batch (Admin L-A, "people"), then `packages` (full), then alternate. Never
-two units in flight; each survives a nightly before the next starts. Tiers stay feature-scoped, never
+drivers (shipped 2026-09-13), then **Admin L-A "people" (SHIPPED 2026-09-13** — 5 pages, dfe4cad, both
+ledgers back to empty, 8/8 drivers green; folded L1–L3 per page, see playbook §7.1), then `packages` (full)
+**after a nightly confirms L-A**, then alternate. Never two units in flight; each survives a nightly before
+the next starts. Tiers stay feature-scoped, never
 new top-level folders (§7.233). The dao three-way split and its "orchestrate an rpc, never replace one" rule
 graduate to `docs/ARCHITECTURE.md` §6 once a **second** full page confirms them.
 
