@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-13 — **The feature-tier rollout now covers EVERY page in both apps on three tracks**
-(playbook §7: 7 full, 8 lite batches, 2 fence commits; smoke driver first). 2026-09-12: the Students
-decomposition SHIPPED (§8.100), the nightly's two reds FIXED (§8.101) — awaiting the next nightly to confirm._
+_Last updated: 2026-09-13 — **Smoke drivers for every route in both apps SHIPPED and the nightly is GREEN
+(§8.102)** — first success after two reds, confirming §8.101 too. The feature-tier rollout is now EVERY page
+on three tracks (playbook §7); unit 1 of 17 done, **next is lite batch Admin L-A** (§9)._
 
-_Previously, 2026-08-30 (§8.99) — a branded signup-confirmation email that is never sent, and a toggle pinned by CI._
+_Previously, 2026-09-12 (§8.100, §8.101) — the Students decomposition shipped; the nightly's two reds were driver date-rot, fixed._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.236** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.238** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -347,6 +347,25 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.102 (2026-09-13) — Smoke drivers for EVERY route in both apps; the rollout becomes every page
+
+**Two drivers (`18b61a2`), one product fix (`b93d986`), one decision — and the nightly went green.**
+
+- **`verify-smoke-admin.mjs` (64 checks) + `verify-smoke-app.mjs` (73)** open every admin route and every
+  coach/parent/public screen once and assert the right page rendered with no `pageerror`/`console.error`.
+  They are the net for the seven admin pages and most small app screens that NO other driver opens, and the
+  once-per-batch gate of the lite track. `docs/TESTING.md` §5; both green through `run-all-drivers.sh` and in
+  the 2026-09-13 nightly (`34721735241`).
+- **Decision: the feature-tier refactor's end state is EVERY page on the same shape**, ceremony scaled by size —
+  full / lite / fence, 17 units, ~15 sessions. Playbook §7; `BACKLOG.md` → Foundations is the queue.
+- **Found on the first run:** `/profile/contact` fired two `eq.undefined` 400s on a hard reload → fixed (one
+  guard line; pinned by the driver's hard-reload check). Two more filed in `BACKLOG.md`: NativeWind's per-load
+  throw (allowlisted by exact message), and session-less `/register` bouncing to `/login`.
+- **Two traps graduated:** §7.237 (a deep link is replaced by the landing tab — press from the tab bar, poll the
+  render) and §7.238 (Metro served a stale bundle after an edit — grep the served bundle, `--clear`).
+- **Deliberately NOT done:** no lite batch started (the playbook waits for a nightly per unit — it has now run);
+  `nextDateFor` left duplicated in both drivers (a third copy is the trigger to lift it into `lib.mjs`).
+
 ## 8.101 (2026-09-12) — The nightly's two reds were both DRIVER date-rot, not product bugs
 
 **Triaged from the run's own screenshots, fixed, proven red→green on the live stack.** `7667643`, driver-only.
@@ -363,29 +382,7 @@ in every case.
 - **Deliberately NOT done:** no product change, no migration, no app deploy. The fix awaits the next nightly;
   CI was not force-triggered (user's call).
 
-## 8.100 (2026-09-12) — The admin app's Students-page decomposition, COMPLETE
-
-**All 12 stages landed on `main`; zero behaviour change; the method is now a playbook.**
-`docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md` is the closed-out worked example and
-`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md` the reusable method for both apps.
-
-- **`students/page.tsx` (2,284 lines) is now composition** over `ui/` (components), `domain/` (hooks/logic) and
-  `dao/` (data, split three ways by failure mode — `.repo`/`.rpc`/`.api`), plus `constants.ts`/`types.ts` — all
-  feature-scoped under `students/`, never top-level, so the source-scanning guards keep covering them (§7.233).
-- **`tierBoundaries.drift.test.ts` enforces the tier contract** (a shrinking allowlist; `docs/TESTING.md` §5).
-  The domain tier may orchestrate an rpc, never replace one — that is how an override lands on a billing guard.
-- **The rollout is queued** for `packages`/`invoices`/`classes`/`platform`/`lessons` (`BACKLOG.md` → Foundations),
-  one page at a time, each after a nightly sweep. The dao three-way split graduates to `docs/ARCHITECTURE.md`
-  once a second page confirms it.
-- **Deliberately NOT done:** moving package settings off the page (a behaviour change → `BACKLOG.md`, now ripe);
-  ESLint; relocating `lib/`.
-- **Two corrections the pilot surfaced, graduated at close (§7.235, §7.236):** a `lib/` helper that takes the
-  client is still a network reach (bind it in `dao/`), and the plan's driver coverage table was wrong —
-  `verify-student-identity` never opens the admin Students page. The real driver net is in `docs/TESTING.md` §5;
-  **Merge and Rename have no driver at all** (BACKLOG). Every slice was verified by running its real drivers on
-  the worktree, and all eight again on the finished page.
-
-_(§8.99 demoted to a ledger row in `docs/SESSIONS.md`.)_
+_(§8.100 demoted to a ledger row in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -428,11 +425,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-12.** The two-red streak is TRIAGED and FIXED (§8.101, `7667643`): `unmarked-lessons`
-(8/12) and `trials` (crash) were both driver date-rot — reproduced locally, fixed, proven red→green, and a
-third driver (`trial-visibility`) that was green for the wrong reason was hardened. **Not yet confirmed in
-CI** — the fix awaits the next scheduled nightly; re-read the run, don't trust this line (§8.65). Start any
-new red with `gh run download <id> -n ui-driver-run` and the screenshots (§7.228), not a hypothesis.
+**State on 2026-09-13: GREEN** (`34721735241`, 06:04 SGT) — first success after two reds, confirming the
+§8.101 date-rot fixes AND the two new smoke drivers (§8.102) in one run. Re-read the run, don't trust this
+line (§8.65). Start any new red with `gh run download <id> -n ui-driver-run` and the screenshots (§7.228),
+not a hypothesis.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -453,26 +449,23 @@ failures that are just the driver's own UI writes — reset before believing it.
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### The feature-tier rollout — EVERY page, three tracks, smoke driver first
+### THE NEXT BUILD — lite batch Admin L-A (unit 2 of 17)
 
-**Students is done (§8.100), all 12 stages on `main`.** `docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`
-is the method for both apps; `STUDENTS_PAGE_REFACTOR_PLAN.md` the worked example. **Decided 2026-09-13: the
-end state is every page and screen on the same shape** — playbook §7 scales the ceremony (7 giants take the
-full 12 stages one per nightly; 34 mid-size pages take a 3-commit lite track in 8 batches, one nightly per
-batch; 15 small pages take a fence-only commit per app). **The order is the smoke driver (`BACKLOG.md` →
-Foundations, S) → lite batch Admin L-A → `packages` (full) → alternate.** One unit in flight at a time. Tiers
-stay feature-scoped, never top-level, or the source-scanning guards stop covering them (§7.233); in the coach
-app they live under `SwimSyncApp/features/` and jest's `testMatch` must gain it in the same commit.
+**The feature-tier rollout is every page on three tracks** (playbook §7; `BACKLOG.md` → Foundations is the
+queue). Unit 1, the smoke drivers, shipped and survived its nightly (§8.102), so **L-A is unblocked**:
+`coaches` / `admins` / `parents` / `unassigned` / `claims` — 2,447 lines, about one session.
 
-### THE NEXT BUILD — pick the refactor rollout OR a `BACKLOG.md` item by value
+1. **L0** — `docs/refactor/BATCH_A_PLAN.md` (one table: page, lines, `useState` count, `lib/` verdicts, the
+   driver net re-derived by grep — §7.236); widen `tierBoundaries.drift.test.ts` to the five folders, pin
+   every current violation, prove each check red. **Never widen the ledger after L0.**
+2. **L1 → L3 per page** — `constants`+`types`+`dao/` · `domain/` · `ui/`+page — typecheck + unit tests per
+   commit, no exceptions.
+3. **L4** — run the batch's drivers (`coach-disable`, `admins`, `active-inactive`, `trial-visibility`,
+   `parent-claim`) plus `smoke-admin`; hand-check anything none opens.
+4. **Then wait for a nightly** before `packages` (full track). Never two units in flight.
 
-**First: read the next nightly** to confirm the §8.101 driver fixes went green — five-minute check, and §8.65
-is why it is first: a sweep nobody reads stops being an alarm.
-
-**Then, the top pick is a genuine choice.** The feature-tier rollout (§8.100, now every page — playbook §7)
-starts with the smoke driver (`BACKLOG.md` → Foundations); the Wave C S-pool is empty and the remaining pool
-has no rework edges. **Do not re-derive the queue here** — that is what `BACKLOG.md` is for, and restating it
-is how the two drift.
+Tiers stay feature-scoped under the page's folder (§7.233). The rest of the pick-now pool has no rework edges;
+**do not re-derive the queue here** — restating `BACKLOG.md` is how the two drift.
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), **on prod
 — re-confirmed 2026-08-30 by `supabase migration list --linked`, `remote` column filled** — 0 pending, rehearsed

@@ -3740,3 +3740,22 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `grep -lE '/<route>"' drivers/verify-*.mjs` is the coverage map; a table written from memory is a guess.
     Companion: three of those drivers hardcode ports and need a port-substituted copy to run against a
     worktree (BACKLOG). (2026-09-12.)
+
+237. **A deep link into the Expo app is REPLACED by the landing tab, so the screen you asked for is mounted
+    but hidden — assert its render by polling, and reach a nested-stack screen by PRESSING from the tab bar.**
+    `app/_layout.tsx` restores the session on every load and then `router.replace(landing)`; the deep-linked
+    screen survives inside an `aria-hidden` subtree (lib.mjs's `includeHidden` note) — unless it lives on the
+    landing tab's own stack, where the replace pops it. Three costs, all paid on 2026-09-13 building
+    `verify-smoke-app.mjs`: a one-read `innerText` check on `/profile/contact` was green, then red, with no
+    change (the screen renders nothing until its session-keyed effect runs — poll up to ~10 s); `pressByText`
+    into a deep-linked tab found nothing (hidden = unpressable, correctly); and `/home/child/<id>` was popped
+    outright because Home IS the landing. The tab-bar label ("Profile", "Settings") is always visible — press
+    it, then press into the stack. (`docs/TESTING.md` §5. 2026-09-13.)
+
+238. **Metro can serve a STALE bundle after an edit — grep the served bundle for a marker before believing a
+    fix "didn't work".** After editing `contact.tsx` the smoke driver still reported the old behaviour twice;
+    the bundle variant the page actually loads (`…&unstable_transformProfile=hermes-stable`) did not contain
+    the new comment while the plain `lazy=true` variant did. `npx expo start --web --clear` fixed it in one
+    restart. It is §7.31's rule on a different server: a 200 (or a hot-reload message) proves nothing —
+    `curl` the bundle URL from the page's `<script src>` and grep for a string only the new code has.
+    (2026-09-13.)

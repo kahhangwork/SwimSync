@@ -1560,36 +1560,9 @@ new top-level folders (§7.233). The dao three-way split and its "orchestrate an
 graduate to `docs/ARCHITECTURE.md` §6 once a **second** full page confirms them.
 
 ### ~~Smoke drivers — open every route once, assert it rendered~~ — **SHIPPED 2026-09-13**
-`verify-smoke-admin.mjs` (64 checks) + `verify-smoke-app.mjs` (73 checks, reuses `fixtures-payment-collection.sql`),
-both green through `run-all-drivers.sh`; `docs/TESTING.md` §5 describes them. First run found the `/profile/contact`
-`eq.undefined` 400s (fixed) and filed the two items above. Original entry, for the reasoning:
-
-`verify-smoke-admin.mjs` (+ an app twin by role): log in, `goto` every route, assert the page heading is
-present and the console logged no error. **The route → driver map on 2026-09-12 shows 7 admin pages
-opened by NO driver** (`credit-notes`, `holidays`, `accounting`, `history`, `accept-invite`,
-`reset-password`, `forgot-password`) and most small app screens likewise.
-
-**Why:** the lite and fence tracks batch their driver run to once per batch — a batch whose net is "none"
-has no net. This is the cheapest possible one, and it is also the first thing that would have caught a
-page that crashes on mount for every role at once.
-
-**Notes:** a heading assertion, not a content one — the specialised drivers own content. Add it to
-`run-all-drivers.sh`'s nightly set the day it exists. **Do not start a lite batch before this lands.**
-
-### No UI driver covers Merge or Rename on the admin Students page — **S** `[from the Students pilot 2026-09-12]`
-Both actions live behind the Actions drawer; both were verified by hand at Stages 5 and 6 of the
-decomposition (Review & merge → Merge them: 15 pairs → 10 on the class-students fixture). No driver
-opens either modal. `verify-student-identity` is a coach-app driver, not an admin one (§7.236).
-
-**Why:** the refactor's wiring net for those two slices is a screenshot in a commit message. The next
-page in the rollout (`packages/`) should not inherit that habit, and a merge that silently stops working
-is the kind of thing only a driver notices. Either a `verify-students-admin.mjs` (rename → assert the
-row; merge on the class-students fixture → assert the pair count drops), or two steps appended to
-`verify-contact-details.mjs`, which already sits on the page with the right login.
-
-**Notes:** the class-students fixture yields 15 duplicate pairs (same-DOB siblings), so the merge step
-needs no fixture of its own. Rename needs `rename_student()` to refuse a duplicate — assert the refusal
-sentence, not only the happy path.
+`verify-smoke-admin.mjs` (64 checks) + `verify-smoke-app.mjs` (73 checks); green in the nightly of
+2026-09-13. `docs/TESTING.md` §5 describes them; playbook §7.3 is why they exist. The first run found the
+`/profile/contact` `eq.undefined` 400s (fixed, `b93d986`) and filed the two items below.
 
 ### NativeWind throws on every web page load — **S** `[found by verify-smoke-app 2026-09-13]`
 Every load of the Expo app on web raises an uncaught `Cannot manually set color scheme, as dark mode is
