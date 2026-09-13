@@ -59,22 +59,47 @@ Gate every commit: `cd SwimSyncAdmin && npm run typecheck && npm test` **and**
 - [x] **L0** (this doc + fence) — widen `tierBoundaries.drift.test.ts` `SCOPE_DIRS` to the
       five folders, generalise `PAGE`→`PAGES`, pin every current violation in both ledgers
       (by file + snippet, each with the stage that removes it), prove all four checks red
-      then revert. **Ledger opened here; never widened after L0** (playbook §3).
-- [ ] **L1** — per page: `constants.ts` + `types.ts` + the whole `dao/` (`.repo`/`.rpc`/`.api`,
-      client-taking `lib/` helpers bound). After L1 no page imports `@/lib/supabase`.
-- [ ] **L2** — per page: `domain/` hooks + the pure mapping with a **characterisation** test
-      (header says so, §0). `coachDisableImpact`→`coaches/domain/`, `claimNaming`→`claims/domain/`.
-      Page still renders its own JSX.
-- [ ] **L3** — per page: `ui/` surfaces + page reduced to composition (< ~200 lines, 0
-      `useState`). Both ledgers → 0 for that page; icons (`lucide-react`) move into `ui/`.
-- [ ] **L4** (once) — own the shared DB, run the batch net + `smoke-admin`; hand-check
-      anything no driver opens, screenshot named in the commit. A red bisects by page
-      (`git bisect` across the L1–L3 commits with the failing driver).
+      then revert. **Ledger opened here; never widened after L0** (playbook §3). `78d711a`.
+- [x] **L1–L3 folded, ONE commit per page** (see §12 for why folded). Each: `types`/
+      `constants` + `dao/` + `domain/` (pure mapping under a characterisation test) + `ui/`
+      + page-as-composition, in one gated commit. `2309eef` parents · `53a85c6` unassigned ·
+      `dc060bb` claims · `2f3679f` admins · `24ffce7` coaches. Every page: 0 `useState`,
+      ≤ 91 lines, its ledger entries deleted as the code moved. **Both ledgers now empty.**
+- [x] **L4** (once) — full batch net GREEN on the live stack 2026-09-13:
+      coach-disable 13/13 · admins 24/24 · active-inactive 17/17 · trial-visibility 11/11 ·
+      parent-claim 21/21 · platform-admin-scope 32/32 · tenant-admin 10/10 · smoke-admin 64/64.
+      No hand-check needed — smoke-admin opens every admin route these five pages touch and
+      the specialised drivers exercise every action. (Ran one-at-a-time via `--only`; a batched
+      run OOM-killed the box mid-driver — a local resource limit, not a failure. Stop expo for
+      the admin-only drivers to relieve it.)
 
 Then merge → push → delete branch. **Wait for a nightly before `packages`** (never two
 units in flight, playbook §7.1).
 
 ## §12 — findings for `/update-docs` (append as they arise)
 
-_(Nothing yet. Gotchas → `docs/GOTCHAS.md`, missing-driver items → `BACKLOG.md`,
-behaviour changes → none allowed by rule 0.)_
+- **Folded L1+L2+L3 into ONE commit per page, not three.** The playbook's lite track lists
+  L1 (page renders own JSX, imports `dao/` directly) as a committed state — but the fence's
+  end state forbids a page importing `dao/`, so an L1 commit needs a *transitional* dao-import
+  pin in `ALLOWED_PAGE_IMPORTS` (the Students pilot's "3 transitional dao/ pins"). Those pins
+  belong at L0, and I did not predict them. Folding L1–L3 per page sidesteps it entirely: the
+  page goes straight to `domain/` hooks, never imports `dao/` in any committed state, and the
+  ledger only ever shrinks after L0 (§3). One commit per page still bisects a driver red to a
+  page. **Suggest the playbook §7.1 note this: for the lite track, fold — or pin the
+  transitional dao imports at L0.**
+- **`git mv`-ing a `lib/` helper into `<page>/domain/` breaks its OWN relative imports.**
+  `coachDisableImpact.ts` imported `./lessonDates` etc.; after the move those siblings are
+  still in `lib/`, so the `./` specifiers must be repointed to `@/lib/`. typecheck catches it,
+  but it is not obvious from the move itself. (claimNaming had no such imports and moved clean.)
+- **Two `Field` components now exist** (`admins/ui/Field.tsx`, `coaches/ui/Field.tsx`), byte-
+  identical. Kept feature-scoped per §7.233 (don't lift to `@/components` mid-refactor). A
+  third copy is the trigger to consolidate — file in `BACKLOG.md` if a later page needs one.
+- **`nextDateFor` NOT touched** (out of batch scope; it lives in the drivers, not these pages).
+
+- **L4 batched run OOM-killed the box** (expo + admin dev + supabase + functions + chrome +
+  8 node drivers with per-driver resets is too much at once). Running drivers one at a time
+  via `--only`, and stopping expo before the admin-only drivers, kept it under. Not a product
+  finding; worth a line in `docs/TESTING.md` §5 as a local-run caveat.
+
+_Gotchas → `docs/GOTCHAS.md`, missing-driver items → `BACKLOG.md`, behaviour changes → none
+(rule 0)._
