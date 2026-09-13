@@ -66,18 +66,7 @@ type Allowed = { file: string; contains: string; why: string };
  * `<page>/dao/` at commit L1 and its entry is deleted then. Keep it shrinking.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  // ── coaches (L1 → coaches/dao/) ──
-  { file: "app/(admin)/coaches/page.tsx", contains: 'import { supabase }', why: "L1: client moves to coaches/dao" },
-  { file: "app/(admin)/coaches/page.tsx", contains: '.from("coaches")', why: "L1: coaches/dao/coaches.repo.ts" },
-  { file: "app/(admin)/coaches/page.tsx", contains: "supabase.auth.getSession()", why: "L1: coaches/dao/coaches.api.ts (3 fetch handlers)" },
-  { file: "app/(admin)/coaches/page.tsx", contains: 'fetch("/api/create-coach"', why: "L1: coaches/dao/coaches.api.ts" },
-  { file: "app/(admin)/coaches/page.tsx", contains: '.from("session_coaches")', why: "L1: coaches/dao/coaches.repo.ts" },
-  { file: "app/(admin)/coaches/page.tsx", contains: '.from("student_class_enrolments")', why: "L1: coaches/dao/coaches.repo.ts" },
-  { file: "app/(admin)/coaches/page.tsx", contains: '.from("attendance")', why: "L1: coaches/dao/coaches.repo.ts" },
-  { file: "app/(admin)/coaches/page.tsx", contains: '.from("trial_bookings")', why: "L1: coaches/dao/coaches.repo.ts" },
-  { file: "app/(admin)/coaches/page.tsx", contains: '.from("makeup_bookings")', why: "L1: coaches/dao/coaches.repo.ts" },
-  { file: "app/(admin)/coaches/page.tsx", contains: 'fetch("/api/disable-coach"', why: "L1: coaches/dao/coaches.api.ts" },
-  { file: "app/(admin)/coaches/page.tsx", contains: 'fetch("/api/reactivate-coach"', why: "L1: coaches/dao/coaches.api.ts" },
+  // ── coaches: DONE — dao/domain/ui extracted, ledger empty ──
   // ── admins: DONE — dao/domain/ui extracted, ledger empty ──
   // ── parents: dao extracted at L1 (parents.repo/rpc.ts), entries removed ──
   // ── unassigned: DONE — dao/domain/ui extracted, ledger empty ──
@@ -94,11 +83,7 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * are shared and STAY in lib/, reached from domain/ (BATCH_A_PLAN.md).
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  // ── coaches ──
-  { file: "app/(admin)/coaches/page.tsx", contains: "lucide-react", why: "L3: icons -> coaches/ui" },
-  { file: "app/(admin)/coaches/page.tsx", contains: "@/lib/supabase", why: "L1: client -> coaches/dao" },
-  { file: "app/(admin)/coaches/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from coaches/domain (shared, stays in lib)" },
-  { file: "app/(admin)/coaches/page.tsx", contains: "@/lib/coachDisableImpact", why: "L2: MOVE into coaches/domain (sole importer)" },
+  // ── coaches: DONE — page is composition, ledger empty (coachDisableImpact moved into domain) ──
   // ── admins: DONE — page is composition, ledger empty ──
   // ── parents: DONE — dao/domain/ui extracted, page is composition, ledger empty ──
   // ── unassigned: DONE — page is composition, ledger empty ──

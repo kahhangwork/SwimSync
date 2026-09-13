@@ -15,17 +15,17 @@
 // re-derivation: four hand-written copies of that rule diverged once before
 // and it cost a live underbill (§7.18).
 
-import { toSgDate } from "./lessonDates";
+import { toSgDate } from "@/lib/lessonDates";
 import {
   type EnrolmentSpan,
   expectedStudentsOn,
   unmarkedStudents,
-} from "./attendanceCompleteness";
+} from "@/lib/attendanceCompleteness";
 import type {
   CoverageEnrolment,
   CoverageAttendance,
   CoverageBooking,
-} from "./classCoverage";
+} from "@/lib/classCoverage";
 
 /** A lesson whose session_coaches override names the coach being disabled. */
 export type OverrideSession = {
