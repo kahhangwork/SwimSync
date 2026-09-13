@@ -89,14 +89,7 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: "app/(admin)/admins/page.tsx", contains: 'fetch("/api/list-admins"', why: "L1: admins/dao/admins.api.ts" },
   { file: "app/(admin)/admins/page.tsx", contains: 'supabase.rpc("remove_admin_role"', why: "L1: admins/dao/admins.rpc.ts" },
   // ── parents: dao extracted at L1 (parents.repo/rpc.ts), entries removed ──
-  // ── unassigned (L1 → unassigned/dao/) ──
-  { file: "app/(admin)/unassigned/page.tsx", contains: 'import { supabase }', why: "L1: client moves to unassigned/dao" },
-  { file: "app/(admin)/unassigned/page.tsx", contains: '.rpc("student_package_coverage")', why: "L1: unassigned/dao/unassigned.rpc.ts" },
-  { file: "app/(admin)/unassigned/page.tsx", contains: '.from("students")', why: "L1: unassigned/dao/unassigned.repo.ts" },
-  { file: "app/(admin)/unassigned/page.tsx", contains: '.from("trial_bookings")', why: "L1: unassigned/dao/unassigned.repo.ts" },
-  { file: "app/(admin)/unassigned/page.tsx", contains: '.from("coaches")', why: "L1: unassigned/dao/unassigned.repo.ts" },
-  { file: "app/(admin)/unassigned/page.tsx", contains: '.from("classes")', why: "L1: unassigned/dao/unassigned.repo.ts" },
-  { file: "app/(admin)/unassigned/page.tsx", contains: '.from("student_class_enrolments")', why: "L1: unassigned/dao/unassigned.repo.ts" },
+  // ── unassigned: DONE — dao/domain/ui extracted, ledger empty ──
   // ── claims (L1 → claims/dao/) ──
   { file: "app/(admin)/claims/page.tsx", contains: 'import { supabase }', why: "L1: client moves to claims/dao" },
   { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("list_student_claims")', why: "L1: claims/dao/claims.rpc.ts" },
@@ -126,10 +119,7 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/admins/page.tsx", contains: "lucide-react", why: "L3: icons -> admins/ui" },
   { file: "app/(admin)/admins/page.tsx", contains: "@/lib/supabase", why: "L1: client -> admins/dao" },
   // ── parents: DONE — dao/domain/ui extracted, page is composition, ledger empty ──
-  // ── unassigned ──
-  { file: "app/(admin)/unassigned/page.tsx", contains: "lucide-react", why: "L3: icons -> unassigned/ui" },
-  { file: "app/(admin)/unassigned/page.tsx", contains: "@/lib/supabase", why: "L1: client -> unassigned/dao" },
-  { file: "app/(admin)/unassigned/page.tsx", contains: "@/lib/packageCoverage", why: "L2: reached from unassigned/domain (shared, stays in lib)" },
+  // ── unassigned: DONE — page is composition, ledger empty ──
   // ── claims ──
   { file: "app/(admin)/claims/page.tsx", contains: "@/lib/supabase", why: "L1: client -> claims/dao" },
   { file: "app/(admin)/claims/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from claims/domain (shared, stays in lib)" },

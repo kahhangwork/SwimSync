@@ -1,391 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { UserCheck } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
-import { Button } from "@/components/Button";
-import { Modal } from "@/components/Modal";
-import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
-import { PackageChip } from "@/components/PackageChip";
-
-type Student = {
-  id: string;
-  full_name: string;
-  parent_name: string;
-};
-
-type Coach = {
-  id: string;
-  full_name: string;
-};
-
-type ClassOption = {
-  id: string;
-  title: string;
-  day_of_week: string;
-  start_time: string;
-  student_count: number;
-};
-
-function formatTime(t: string): string {
-  const [h, m] = t.split(":");
-  const hour = parseInt(h, 10);
-  return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
-}
-
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+import { useUnassigned } from "./domain/useUnassigned";
+import { UnassignedToolbar } from "./ui/UnassignedToolbar";
+import { UnassignedTable } from "./ui/UnassignedTable";
+import { AssignModal } from "./ui/AssignModal";
 
 export default function UnassignedPage() {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [coaches, setCoaches] = useState<Coach[]>([]);
-  const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-
-  const [assignModal, setAssignModal] = useState<Student | null>(null);
-  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
-    new Map()
-  );
-  const [selectedCoachId, setSelectedCoachId] = useState("");
-  const [selectedClassId, setSelectedClassId] = useState("");
-  const [assigning, setAssigning] = useState(false);
-  const [assignError, setAssignError] = useState<string | null>(null);
-  // Two-press confirm for the one case that can silently block a billing
-  // month. Reset whenever the modal closes or a different child is chosen.
-  const [confirmedTrialEnrol, setConfirmedTrialEnrol] = useState(false);
-
-  useEffect(() => {
-    loadStudents();
-    loadCoaches();
-  }, []);
-
-  async function loadStudents() {
-    setLoading(true);
-    // Payment-method chip — an unassigned child has no class, so the verdict
-    // is the tenant-scoped fallback: family holds a live package here or not.
-    supabase
-      .rpc("student_package_coverage")
-      .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
-    const { data } = await supabase
-      .from("students")
-      .select(
-        "id, full_name, parent_students(parents(profiles(full_name)))"
-      )
-      .eq("assignment_status", "unassigned")
-        .eq("is_active", true)
-      .order("full_name");
-
-    // ⚠ A CHILD WITH AN UPCOMING TRIAL IS NOT WAITING FOR YOU.
-    // A trial is a BOOKING, not an enrolment, so a booked child sits at
-    // assignment_status = 'unassigned' and used to appear here as though they
-    // needed placing. They do not: they are already expected at one specific
-    // lesson, the coach already sees them, and the invoice engine already
-    // counts them.
-    //
-    // Worse, the prompt was actively harmful. "Assign" inserts an ACTIVE
-    // ENROLMENT, which makes the child expected at EVERY lesson of that class
-    // from then on — so a child who tries one lesson and never returns would
-    // silently block that class's month from being billed, because unmarked
-    // attendance stops generation outright with no override.
-    //
-    // Their trial having PASSED is a different matter, and they stay listed:
-    // that is the real decision point — did they convert? This page means
-    // "children waiting on you", not "children with a blank field".
-    const todaySg = new Date().toLocaleDateString("en-CA", {
-      timeZone: "Asia/Singapore",
-    });
-    const { data: upcoming } = await supabase
-      .from("trial_bookings")
-      .select("student_id")
-      .is("cancelled_at", null)
-      .gte("session_date", todaySg);
-    const awaitingTrial = new Set(
-      (upcoming ?? []).map((b: any) => b.student_id as string)
-    );
-
-    setStudents(
-      (data ?? [])
-        .filter((s: any) => !awaitingTrial.has(s.id))
-        .map((s: any) => ({
-        id: s.id,
-        full_name: s.full_name,
-        parent_name:
-          s.parent_students?.[0]?.parents?.profiles?.full_name ?? "—",
-      }))
-    );
-    setLoading(false);
-  }
-
-  async function loadCoaches() {
-    const { data } = await supabase
-      .from("coaches")
-      .select("id, profiles(full_name)")
-      .order("id");
-    setCoaches(
-      (data ?? []).map((c: any) => ({
-        id: c.id,
-        full_name: c.profiles?.full_name ?? "Unknown",
-      }))
-    );
-  }
-
-  async function loadClassesForCoach(coachId: string) {
-    const { data } = await supabase
-      .from("classes")
-      .select(
-        "id, title, day_of_week, start_time, student_class_enrolments(id, is_active)"
-      )
-      .eq("coach_id", coachId)
-      .eq("is_active", true)
-      .order("day_of_week")
-      .order("start_time");
-
-    setClassOptions(
-      (data ?? []).map((c: any) => ({
-        id: c.id,
-        title: c.title,
-        day_of_week: c.day_of_week,
-        start_time: c.start_time,
-        student_count: (c.student_class_enrolments ?? []).filter(
-          (e: any) => e.is_active
-        ).length,
-      }))
-    );
-  }
-
-  async function handleAssign() {
-    if (!assignModal || !selectedClassId) return;
-    setAssigning(true);
-    setAssignError(null);
-
-    // ⚠ ENROLLING IS FOREVER; A TRIAL IS ONE LESSON. An active enrolment makes
-    // this child expected at EVERY lesson of the class from now on, and
-    // unmarked attendance blocks invoice generation outright with no override
-    // — so enrolling a child who is only trying one lesson can silently stop
-    // the business billing that class's month.
-    //
-    // The list above already excludes children with an upcoming trial, so this
-    // should be unreachable from a fresh page. It is here because a page
-    // loaded BEFORE the trial was booked still holds the old list, and the
-    // cost of being wrong is a blocked billing month.
-    const todaySg = new Date().toLocaleDateString("en-CA", {
-      timeZone: "Asia/Singapore",
-    });
-    const { data: liveTrial } = await supabase
-      .from("trial_bookings")
-      .select("session_date")
-      .eq("student_id", assignModal.id)
-      .is("cancelled_at", null)
-      .gte("session_date", todaySg)
-      .order("session_date")
-      .limit(1);
-
-    if ((liveTrial ?? []).length > 0 && !confirmedTrialEnrol) {
-      setAssignError(
-        `${assignModal.full_name} already has a trial booked for ${liveTrial![0].session_date}. ` +
-          `They are expected at that lesson only — you do not need to assign them. ` +
-          `Enrolling makes them expected EVERY week, and an unmarked lesson blocks invoicing. ` +
-          `Press Assign again if you really mean to enrol them permanently.`
-      );
-      setConfirmedTrialEnrol(true);
-      setAssigning(false);
-      return;
-    }
-
-    const { error: enrolError } = await supabase
-      .from("student_class_enrolments")
-      .insert({
-        student_id: assignModal.id,
-        class_id: selectedClassId,
-        is_active: true,
-      });
-
-    if (enrolError) {
-      setAssignError(enrolError.message);
-      setAssigning(false);
-      return;
-    }
-
-    await supabase
-      .from("students")
-      .update({ assignment_status: "assigned" })
-      .eq("id", assignModal.id);
-
-    setAssignModal(null);
-    setSelectedCoachId("");
-    setSelectedClassId("");
-    setConfirmedTrialEnrol(false);
-    setAssigning(false);
-    loadStudents();
-  }
-
-  const filtered = students.filter(
-    (s) =>
-      s.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      s.parent_name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const sort = useTableSort<Student>({ key: "full_name" });
-  const visible = sort.apply(filtered);
+  const p = useUnassigned();
 
   return (
     <div>
       <PageHeader
         title="Unassigned Children"
-        subtitle={`${students.length} children awaiting class assignment`}
+        subtitle={`${p.students.length} children awaiting class assignment`}
       />
 
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search by student or parent name..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
-        />
-      </div>
+      <UnassignedToolbar search={p.search} setSearch={p.setSearch} />
 
-      <Table>
-        <Thead>
-          <Th sort={sort} sortKey="full_name">Student</Th>
-          <Th sort={sort} sortKey="parent_name">Parent</Th>
-          <Th>Action</Th>
-        </Thead>
-        <Tbody>
-          {loading ? (
-            <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={3}>
-                Loading…
-              </Td>
-            </Tr>
-          ) : visible.length === 0 ? (
-            <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={3}>
-                No unassigned children found.
-              </Td>
-            </Tr>
-          ) : (
-            visible.map((student) => (
-              <Tr key={student.id}>
-                <Td className="font-medium text-gray-900">{student.full_name}</Td>
-                <Td className="text-gray-500">
-                  {student.parent_name}
-                  <span className="ml-1.5">
-                    <PackageChip coverage={covMap.get(student.id)} />
-                  </span>
-                </Td>
-                <Td>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setAssignModal(student);
-                      setSelectedCoachId("");
-                      setSelectedClassId("");
-                      setAssignError(null);
-                    }}
-                  >
-                    <UserCheck className="h-3.5 w-3.5" />
-                    Assign
-                  </Button>
-                </Td>
-              </Tr>
-            ))
-          )}
-        </Tbody>
-      </Table>
+      <UnassignedTable
+        filtered={p.filtered}
+        loading={p.loading}
+        covMap={p.covMap}
+        openAssign={p.openAssign}
+      />
 
-      {/* Assign Modal */}
-      <Modal
-        title={`Assign ${assignModal?.full_name ?? ""} to a Class`}
-        open={!!assignModal}
-        onClose={() => {
-          setAssignModal(null);
-          setConfirmedTrialEnrol(false);
-          setAssignError(null);
-        }}
-      >
-        <div className="space-y-4">
-          {assignModal && (
-            <div className="rounded-xl bg-gray-50 p-3 text-sm">
-              <p className="font-medium text-gray-900">{assignModal.full_name}</p>
-              <p className="text-gray-500">Parent: {assignModal.parent_name}</p>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Select Coach
-            </label>
-            <select
-              value={selectedCoachId}
-              onChange={(e) => {
-                setSelectedCoachId(e.target.value);
-                setSelectedClassId("");
-                if (e.target.value) loadClassesForCoach(e.target.value);
-              }}
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
-            >
-              <option value="">— Choose a coach —</option>
-              {coaches.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.full_name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Select Class
-            </label>
-            <select
-              value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
-              disabled={!selectedCoachId}
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:opacity-50"
-            >
-              <option value="">— Choose a class —</option>
-              {classOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title} · {capitalize(c.day_of_week)}{" "}
-                  {formatTime(c.start_time)} · {c.student_count} students
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {assignError && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
-              {assignError}
-            </p>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => {
-                setAssignModal(null);
-                setConfirmedTrialEnrol(false);
-                setAssignError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="flex-1"
-              disabled={!selectedCoachId || !selectedClassId || assigning}
-              onClick={handleAssign}
-            >
-              {assigning ? "Assigning…" : "Confirm Assignment"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      <AssignModal
+        assignModal={p.assignModal}
+        onClose={p.closeAssign}
+        coaches={p.coaches}
+        classOptions={p.classOptions}
+        selectedCoachId={p.selectedCoachId}
+        selectCoach={p.selectCoach}
+        selectedClassId={p.selectedClassId}
+        setSelectedClassId={p.setSelectedClassId}
+        assigning={p.assigning}
+        assignError={p.assignError}
+        handleAssign={p.handleAssign}
+      />
     </div>
   );
 }
