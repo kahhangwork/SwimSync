@@ -25,10 +25,15 @@
 // the "unused entries" test goes red until the entry is deleted. The list shrinks
 // to zero at Stage 11. It must never grow.
 //
-// SCOPE is `app/(admin)/students/` only. Widen SCOPE_DIRS as each later page is
-// converted; a check red on seven unconverted pages is a check nobody keeps green.
+// SCOPE started at `app/(admin)/students/` and was widened to the Admin L-A
+// people-pages on 2026-09-13 (coaches, admins, parents, unassigned, claims —
+// BATCH_A_PLAN.md). Widen SCOPE_DIRS as each later page/batch is converted, and
+// pin its current violations in the ledgers below in the same commit (L0); a
+// check red on unconverted pages is a check nobody keeps green.
 //
-// §7.25: every check was proven RED by breaking the rule on purpose, then reverted.
+// §7.25: every check was proven RED by breaking the rule on purpose, then
+// reverted — re-proven for the L-A scope on 2026-09-13 (ui->dao, dao->react,
+// domain fetch(, and an unpinned @/lib import on a page: all four went red).
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -37,24 +42,109 @@ import { join, sep } from "node:path";
 // This file lives in SwimSyncAdmin/lib, so the admin app root is one level up.
 const ADMIN = join(__dirname, "..");
 
-const SCOPE_DIRS = ["app/(admin)/students"];
+const SCOPE_DIRS = [
+  "app/(admin)/students",
+  // Admin L-A lite batch (docs/refactor/BATCH_A_PLAN.md), widened 2026-09-13.
+  // Checks 3 and 4 are red on day one for these five; every violation is pinned
+  // in the ledgers below with the stage that removes it, and the ledger only shrinks.
+  "app/(admin)/coaches",
+  "app/(admin)/admins",
+  "app/(admin)/parents",
+  "app/(admin)/unassigned",
+  "app/(admin)/claims",
+];
 
-const PAGE = "app/(admin)/students/page.tsx";
+// One route file per scoped dir. Check 4 runs against each.
+const PAGES = SCOPE_DIRS.map((d) => `${d}/page.tsx`);
 
 type Allowed = { file: string; contains: string; why: string };
 
 /**
- * Check 3 — data-access lines still outside `dao/`. Started at 29 lines on
- * 2026-09-12 and reached ZERO at Stage 3 the same day. Keep it empty.
+ * Check 3 — data-access lines still outside `dao/`. Students reached ZERO on
+ * 2026-09-12. The Admin L-A batch (BATCH_A_PLAN.md) re-opened the ledger on
+ * 2026-09-13 with the five people-pages' current calls; every one moves into
+ * `<page>/dao/` at commit L1 and its entry is deleted then. Keep it shrinking.
  */
-const ALLOWED_DATA_ACCESS: Allowed[] = [];
+const ALLOWED_DATA_ACCESS: Allowed[] = [
+  // ── coaches (L1 → coaches/dao/) ──
+  { file: "app/(admin)/coaches/page.tsx", contains: 'import { supabase }', why: "L1: client moves to coaches/dao" },
+  { file: "app/(admin)/coaches/page.tsx", contains: '.from("coaches")', why: "L1: coaches/dao/coaches.repo.ts" },
+  { file: "app/(admin)/coaches/page.tsx", contains: "supabase.auth.getSession()", why: "L1: coaches/dao/coaches.api.ts (3 fetch handlers)" },
+  { file: "app/(admin)/coaches/page.tsx", contains: 'fetch("/api/create-coach"', why: "L1: coaches/dao/coaches.api.ts" },
+  { file: "app/(admin)/coaches/page.tsx", contains: '.from("session_coaches")', why: "L1: coaches/dao/coaches.repo.ts" },
+  { file: "app/(admin)/coaches/page.tsx", contains: '.from("student_class_enrolments")', why: "L1: coaches/dao/coaches.repo.ts" },
+  { file: "app/(admin)/coaches/page.tsx", contains: '.from("attendance")', why: "L1: coaches/dao/coaches.repo.ts" },
+  { file: "app/(admin)/coaches/page.tsx", contains: '.from("trial_bookings")', why: "L1: coaches/dao/coaches.repo.ts" },
+  { file: "app/(admin)/coaches/page.tsx", contains: '.from("makeup_bookings")', why: "L1: coaches/dao/coaches.repo.ts" },
+  { file: "app/(admin)/coaches/page.tsx", contains: 'fetch("/api/disable-coach"', why: "L1: coaches/dao/coaches.api.ts" },
+  { file: "app/(admin)/coaches/page.tsx", contains: 'fetch("/api/reactivate-coach"', why: "L1: coaches/dao/coaches.api.ts" },
+  // ── admins (L1 → admins/dao/) ──
+  { file: "app/(admin)/admins/page.tsx", contains: 'import { supabase }', why: "L1: client moves to admins/dao" },
+  { file: "app/(admin)/admins/page.tsx", contains: "supabase.auth.getSession()", why: "L1: admins/dao/admins.api.ts" },
+  { file: "app/(admin)/admins/page.tsx", contains: "fetch(path,", why: "L1: admins/dao/admins.api.ts" },
+  { file: "app/(admin)/admins/page.tsx", contains: "supabase.auth.getUser()", why: "L1: admins/dao/admins.repo.ts" },
+  { file: "app/(admin)/admins/page.tsx", contains: '.from("profiles")', why: "L1: admins/dao/admins.repo.ts" },
+  { file: "app/(admin)/admins/page.tsx", contains: '.from("tenants").select("id, owner_profile_id")', why: "L1: admins/dao/admins.repo.ts" },
+  { file: "app/(admin)/admins/page.tsx", contains: '.from("coaches").select("profile_id")', why: "L1: admins/dao/admins.repo.ts" },
+  { file: "app/(admin)/admins/page.tsx", contains: 'fetch("/api/list-admins"', why: "L1: admins/dao/admins.api.ts" },
+  { file: "app/(admin)/admins/page.tsx", contains: 'supabase.rpc("remove_admin_role"', why: "L1: admins/dao/admins.rpc.ts" },
+  // ── parents (L1 → parents/dao/) ──
+  { file: "app/(admin)/parents/page.tsx", contains: 'import { supabase }', why: "L1: client moves to parents/dao" },
+  { file: "app/(admin)/parents/page.tsx", contains: '.from("parent_tenants")', why: "L1: parents/dao/parents.repo.ts" },
+  { file: "app/(admin)/parents/page.tsx", contains: 'supabase.rpc("package_live_balances")', why: "L1: parents/dao/parents.rpc.ts" },
+  { file: "app/(admin)/parents/page.tsx", contains: '.from("parent_students")', why: "L1: parents/dao/parents.repo.ts" },
+  { file: "app/(admin)/parents/page.tsx", contains: "supabase,", why: "L1: familyLessonsByParent client bound in parents/dao" },
+  // ── unassigned (L1 → unassigned/dao/) ──
+  { file: "app/(admin)/unassigned/page.tsx", contains: 'import { supabase }', why: "L1: client moves to unassigned/dao" },
+  { file: "app/(admin)/unassigned/page.tsx", contains: '.rpc("student_package_coverage")', why: "L1: unassigned/dao/unassigned.rpc.ts" },
+  { file: "app/(admin)/unassigned/page.tsx", contains: '.from("students")', why: "L1: unassigned/dao/unassigned.repo.ts" },
+  { file: "app/(admin)/unassigned/page.tsx", contains: '.from("trial_bookings")', why: "L1: unassigned/dao/unassigned.repo.ts" },
+  { file: "app/(admin)/unassigned/page.tsx", contains: '.from("coaches")', why: "L1: unassigned/dao/unassigned.repo.ts" },
+  { file: "app/(admin)/unassigned/page.tsx", contains: '.from("classes")', why: "L1: unassigned/dao/unassigned.repo.ts" },
+  { file: "app/(admin)/unassigned/page.tsx", contains: '.from("student_class_enrolments")', why: "L1: unassigned/dao/unassigned.repo.ts" },
+  // ── claims (L1 → claims/dao/) ──
+  { file: "app/(admin)/claims/page.tsx", contains: 'import { supabase }', why: "L1: client moves to claims/dao" },
+  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("list_student_claims")', why: "L1: claims/dao/claims.rpc.ts" },
+  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("package_live_balances")', why: "L1: claims/dao/claims.rpc.ts" },
+  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("approve_student_claim"', why: "L1: claims/dao/claims.rpc.ts" },
+  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("rename_student"', why: "L1: claims/dao/claims.rpc.ts" },
+  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("decline_student_claim"', why: "L1: claims/dao/claims.rpc.ts" },
+  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("undo_student_claim"', why: "L1: claims/dao/claims.rpc.ts" },
+];
 
 /**
- * Check 4 — imports on `page.tsx` outside its own tiers. Started at 11 lib
- * imports (plus 3 transitional dao/ pins) on 2026-09-12 and reached ZERO at
- * Stage 11 the same day. Keep it empty: page.tsx is composition.
+ * Check 4 — imports on `page.tsx` outside its own tiers. Students reached ZERO
+ * on 2026-09-12. Admin L-A re-opened it 2026-09-13. `@/lib/supabase` leaves at
+ * L1 (dao owns the client); the shared `@/lib/*` helpers become domain/ imports
+ * or move into domain/ at L2; `lucide-react` icons move into ui/ at L3.
+ * coachDisableImpact (coaches-only) and claimNaming (claims-only) MOVE into
+ * their page's domain/; the rest (lessonDates, packageCoverage, studentStatus)
+ * are shared and STAY in lib/, reached from domain/ (BATCH_A_PLAN.md).
  */
-const ALLOWED_PAGE_IMPORTS: Allowed[] = [];
+const ALLOWED_PAGE_IMPORTS: Allowed[] = [
+  // ── coaches ──
+  { file: "app/(admin)/coaches/page.tsx", contains: "lucide-react", why: "L3: icons -> coaches/ui" },
+  { file: "app/(admin)/coaches/page.tsx", contains: "@/lib/supabase", why: "L1: client -> coaches/dao" },
+  { file: "app/(admin)/coaches/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from coaches/domain (shared, stays in lib)" },
+  { file: "app/(admin)/coaches/page.tsx", contains: "@/lib/coachDisableImpact", why: "L2: MOVE into coaches/domain (sole importer)" },
+  // ── admins ──
+  { file: "app/(admin)/admins/page.tsx", contains: "lucide-react", why: "L3: icons -> admins/ui" },
+  { file: "app/(admin)/admins/page.tsx", contains: "@/lib/supabase", why: "L1: client -> admins/dao" },
+  // ── parents ──
+  { file: "app/(admin)/parents/page.tsx", contains: "@/lib/supabase", why: "L1: client -> parents/dao" },
+  { file: "app/(admin)/parents/page.tsx", contains: "@/lib/studentStatus", why: "L2: reached from parents/domain (shared, stays in lib)" },
+  { file: "app/(admin)/parents/page.tsx", contains: "@/lib/packageCoverage", why: "L2: reached from parents/domain (shared, stays in lib)" },
+  { file: "app/(admin)/parents/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from parents/domain (shared, stays in lib)" },
+  // ── unassigned ──
+  { file: "app/(admin)/unassigned/page.tsx", contains: "lucide-react", why: "L3: icons -> unassigned/ui" },
+  { file: "app/(admin)/unassigned/page.tsx", contains: "@/lib/supabase", why: "L1: client -> unassigned/dao" },
+  { file: "app/(admin)/unassigned/page.tsx", contains: "@/lib/packageCoverage", why: "L2: reached from unassigned/domain (shared, stays in lib)" },
+  // ── claims ──
+  { file: "app/(admin)/claims/page.tsx", contains: "@/lib/supabase", why: "L1: client -> claims/dao" },
+  { file: "app/(admin)/claims/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from claims/domain (shared, stays in lib)" },
+  { file: "app/(admin)/claims/page.tsx", contains: "@/lib/packageCoverage", why: "L2: reached from claims/domain (shared, stays in lib)" },
+  { file: "app/(admin)/claims/page.tsx", contains: "@/lib/claimNaming", why: "L2: MOVE into claims/domain (sole importer)" },
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -154,11 +244,11 @@ function assertNone(offenders: string[], guidance: string): void {
 
 const label = (s: Site) => `${s.file}:${s.line}  ${s.text.trim()}`;
 
-describe("students/ tier boundaries (page -> ui -> domain -> dao)", () => {
+describe("admin tier boundaries (page -> ui -> domain -> dao)", () => {
   const srcs = sources();
 
-  it("scans the page at all (not vacuously green)", () => {
-    expect(srcs.map((s) => s.file)).toContain(PAGE);
+  it("scans every scoped page at all (not vacuously green)", () => {
+    for (const page of PAGES) expect(srcs.map((s) => s.file)).toContain(page);
   });
 
   it("1. ui/ never imports dao/", () => {
@@ -195,12 +285,14 @@ describe("students/ tier boundaries (page -> ui -> domain -> dao)", () => {
   });
 
   it("4. page.tsx imports its tiers, React, Next and @/components, never @/lib", () => {
-    const page = srcs.find((s) => s.file === PAGE)!;
     const ok = /^(react$|next\/|@\/components\/|\.\/(ui|domain)\/|\.\/(constants|types)$)/;
-    const offenders = imports(page)
-      .filter((i) => !ok.test(i.text))
-      .filter((i) => !allowed(i, ALLOWED_PAGE_IMPORTS))
-      .map(label);
+    const offenders = PAGES.flatMap((p) => {
+      const page = srcs.find((s) => s.file === p)!;
+      return imports(page)
+        .filter((i) => !ok.test(i.text))
+        .filter((i) => !allowed(i, ALLOWED_PAGE_IMPORTS))
+        .map(label);
+    });
     assertNone(
       offenders,
       "page.tsx is composition. Logic -> domain/, data -> dao/. Do NOT add to " +
