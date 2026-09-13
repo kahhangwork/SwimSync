@@ -78,16 +78,7 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: "app/(admin)/coaches/page.tsx", contains: '.from("makeup_bookings")', why: "L1: coaches/dao/coaches.repo.ts" },
   { file: "app/(admin)/coaches/page.tsx", contains: 'fetch("/api/disable-coach"', why: "L1: coaches/dao/coaches.api.ts" },
   { file: "app/(admin)/coaches/page.tsx", contains: 'fetch("/api/reactivate-coach"', why: "L1: coaches/dao/coaches.api.ts" },
-  // ── admins (L1 → admins/dao/) ──
-  { file: "app/(admin)/admins/page.tsx", contains: 'import { supabase }', why: "L1: client moves to admins/dao" },
-  { file: "app/(admin)/admins/page.tsx", contains: "supabase.auth.getSession()", why: "L1: admins/dao/admins.api.ts" },
-  { file: "app/(admin)/admins/page.tsx", contains: "fetch(path,", why: "L1: admins/dao/admins.api.ts" },
-  { file: "app/(admin)/admins/page.tsx", contains: "supabase.auth.getUser()", why: "L1: admins/dao/admins.repo.ts" },
-  { file: "app/(admin)/admins/page.tsx", contains: '.from("profiles")', why: "L1: admins/dao/admins.repo.ts" },
-  { file: "app/(admin)/admins/page.tsx", contains: '.from("tenants").select("id, owner_profile_id")', why: "L1: admins/dao/admins.repo.ts" },
-  { file: "app/(admin)/admins/page.tsx", contains: '.from("coaches").select("profile_id")', why: "L1: admins/dao/admins.repo.ts" },
-  { file: "app/(admin)/admins/page.tsx", contains: 'fetch("/api/list-admins"', why: "L1: admins/dao/admins.api.ts" },
-  { file: "app/(admin)/admins/page.tsx", contains: 'supabase.rpc("remove_admin_role"', why: "L1: admins/dao/admins.rpc.ts" },
+  // ── admins: DONE — dao/domain/ui extracted, ledger empty ──
   // ── parents: dao extracted at L1 (parents.repo/rpc.ts), entries removed ──
   // ── unassigned: DONE — dao/domain/ui extracted, ledger empty ──
   // ── claims: DONE — dao/domain/ui extracted, ledger empty ──
@@ -108,9 +99,7 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/coaches/page.tsx", contains: "@/lib/supabase", why: "L1: client -> coaches/dao" },
   { file: "app/(admin)/coaches/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from coaches/domain (shared, stays in lib)" },
   { file: "app/(admin)/coaches/page.tsx", contains: "@/lib/coachDisableImpact", why: "L2: MOVE into coaches/domain (sole importer)" },
-  // ── admins ──
-  { file: "app/(admin)/admins/page.tsx", contains: "lucide-react", why: "L3: icons -> admins/ui" },
-  { file: "app/(admin)/admins/page.tsx", contains: "@/lib/supabase", why: "L1: client -> admins/dao" },
+  // ── admins: DONE — page is composition, ledger empty ──
   // ── parents: DONE — dao/domain/ui extracted, page is composition, ledger empty ──
   // ── unassigned: DONE — page is composition, ledger empty ──
   // ── claims: DONE — page is composition, ledger empty (claimNaming moved into domain) ──
