@@ -90,14 +90,7 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: "app/(admin)/admins/page.tsx", contains: 'supabase.rpc("remove_admin_role"', why: "L1: admins/dao/admins.rpc.ts" },
   // ── parents: dao extracted at L1 (parents.repo/rpc.ts), entries removed ──
   // ── unassigned: DONE — dao/domain/ui extracted, ledger empty ──
-  // ── claims (L1 → claims/dao/) ──
-  { file: "app/(admin)/claims/page.tsx", contains: 'import { supabase }', why: "L1: client moves to claims/dao" },
-  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("list_student_claims")', why: "L1: claims/dao/claims.rpc.ts" },
-  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("package_live_balances")', why: "L1: claims/dao/claims.rpc.ts" },
-  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("approve_student_claim"', why: "L1: claims/dao/claims.rpc.ts" },
-  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("rename_student"', why: "L1: claims/dao/claims.rpc.ts" },
-  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("decline_student_claim"', why: "L1: claims/dao/claims.rpc.ts" },
-  { file: "app/(admin)/claims/page.tsx", contains: 'supabase.rpc("undo_student_claim"', why: "L1: claims/dao/claims.rpc.ts" },
+  // ── claims: DONE — dao/domain/ui extracted, ledger empty ──
 ];
 
 /**
@@ -120,11 +113,7 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/admins/page.tsx", contains: "@/lib/supabase", why: "L1: client -> admins/dao" },
   // ── parents: DONE — dao/domain/ui extracted, page is composition, ledger empty ──
   // ── unassigned: DONE — page is composition, ledger empty ──
-  // ── claims ──
-  { file: "app/(admin)/claims/page.tsx", contains: "@/lib/supabase", why: "L1: client -> claims/dao" },
-  { file: "app/(admin)/claims/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from claims/domain (shared, stays in lib)" },
-  { file: "app/(admin)/claims/page.tsx", contains: "@/lib/packageCoverage", why: "L2: reached from claims/domain (shared, stays in lib)" },
-  { file: "app/(admin)/claims/page.tsx", contains: "@/lib/claimNaming", why: "L2: MOVE into claims/domain (sole importer)" },
+  // ── claims: DONE — page is composition, ledger empty (claimNaming moved into domain) ──
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
