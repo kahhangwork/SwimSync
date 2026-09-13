@@ -88,12 +88,7 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: "app/(admin)/admins/page.tsx", contains: '.from("coaches").select("profile_id")', why: "L1: admins/dao/admins.repo.ts" },
   { file: "app/(admin)/admins/page.tsx", contains: 'fetch("/api/list-admins"', why: "L1: admins/dao/admins.api.ts" },
   { file: "app/(admin)/admins/page.tsx", contains: 'supabase.rpc("remove_admin_role"', why: "L1: admins/dao/admins.rpc.ts" },
-  // ── parents (L1 → parents/dao/) ──
-  { file: "app/(admin)/parents/page.tsx", contains: 'import { supabase }', why: "L1: client moves to parents/dao" },
-  { file: "app/(admin)/parents/page.tsx", contains: '.from("parent_tenants")', why: "L1: parents/dao/parents.repo.ts" },
-  { file: "app/(admin)/parents/page.tsx", contains: 'supabase.rpc("package_live_balances")', why: "L1: parents/dao/parents.rpc.ts" },
-  { file: "app/(admin)/parents/page.tsx", contains: '.from("parent_students")', why: "L1: parents/dao/parents.repo.ts" },
-  { file: "app/(admin)/parents/page.tsx", contains: "supabase,", why: "L1: familyLessonsByParent client bound in parents/dao" },
+  // ── parents: dao extracted at L1 (parents.repo/rpc.ts), entries removed ──
   // ── unassigned (L1 → unassigned/dao/) ──
   { file: "app/(admin)/unassigned/page.tsx", contains: 'import { supabase }', why: "L1: client moves to unassigned/dao" },
   { file: "app/(admin)/unassigned/page.tsx", contains: '.rpc("student_package_coverage")', why: "L1: unassigned/dao/unassigned.rpc.ts" },
@@ -130,11 +125,7 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // ── admins ──
   { file: "app/(admin)/admins/page.tsx", contains: "lucide-react", why: "L3: icons -> admins/ui" },
   { file: "app/(admin)/admins/page.tsx", contains: "@/lib/supabase", why: "L1: client -> admins/dao" },
-  // ── parents ──
-  { file: "app/(admin)/parents/page.tsx", contains: "@/lib/supabase", why: "L1: client -> parents/dao" },
-  { file: "app/(admin)/parents/page.tsx", contains: "@/lib/studentStatus", why: "L2: reached from parents/domain (shared, stays in lib)" },
-  { file: "app/(admin)/parents/page.tsx", contains: "@/lib/packageCoverage", why: "L2: reached from parents/domain (shared, stays in lib)" },
-  { file: "app/(admin)/parents/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from parents/domain (shared, stays in lib)" },
+  // ── parents: DONE — dao/domain/ui extracted, page is composition, ledger empty ──
   // ── unassigned ──
   { file: "app/(admin)/unassigned/page.tsx", contains: "lucide-react", why: "L3: icons -> unassigned/ui" },
   { file: "app/(admin)/unassigned/page.tsx", contains: "@/lib/supabase", why: "L1: client -> unassigned/dao" },
