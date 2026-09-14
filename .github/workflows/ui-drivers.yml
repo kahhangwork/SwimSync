@@ -25,6 +25,11 @@ on:
   schedule:
     - cron: "0 20 * * *" # 20:00 UTC = 04:00 SGT daily
   workflow_dispatch:
+    inputs:
+      only:
+        description: "Run ONE driver by name (e.g. admin-lesson-detail); blank = full sweep"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -116,10 +121,14 @@ jobs:
 
       - name: Run every UI driver
         id: sweep
+        env:
+          ONLY: ${{ github.event.inputs.only }}
         run: |
           export RUN_DIR="$RUNNER_TEMP/ui-drivers"
           echo "run_dir=$RUN_DIR" >> "$GITHUB_OUTPUT"
-          .claude/skills/run-ui-playwright/drivers/run-all-drivers.sh
+          ARGS=""
+          [ -n "$ONLY" ] && ARGS="--only $ONLY"
+          .claude/skills/run-ui-playwright/drivers/run-all-drivers.sh $ARGS
 
       - name: Upload logs + screenshots
         if: always()
@@ -134,7 +143,10 @@ jobs:
       # the issue if it exists — so an open ui-driver-rot issue always means
       # "red right now", never "red once, long fixed".
       - name: Update the rolling rot issue
-        if: always()
+        # A filtered single-driver dispatch (only != '') must NOT touch the rolling
+        # rot issue: one green driver does not prove the other 51. Only a FULL sweep
+        # (schedule, or dispatch with no `only`) opens/closes it.
+        if: always() && github.event.inputs.only == ''
         env:
           GH_TOKEN: ${{ github.token }}
           OUTCOME: ${{ steps.sweep.outcome }}

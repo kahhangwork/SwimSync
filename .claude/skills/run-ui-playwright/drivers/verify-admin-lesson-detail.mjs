@@ -72,6 +72,12 @@ try {
   await page.goto(`${ADMIN}/lessons`, { waitUntil: "networkidle" });
   await page.getByTestId("needs-marking-toggle").waitFor({ timeout: 15000 });
   const badgeEl = page.locator('[title*="still need"][title*="marking"]');
+  // The badge is filled by its OWN RPC (tenant_unmarked_lesson_count) in the
+  // sidebar, INDEPENDENT of this page's render — networkidle above does not wait
+  // for it. Wait for the badge itself before reading, or the count()>0?…:0 read
+  // below silently returns 0 while the RPC is still in flight (badge 0 / rows N,
+  // the 2026-09-13 nightly flake). Poll the render, don't race it (§7.237).
+  await badgeEl.first().waitFor({ timeout: 15000 });
   const badgeN = (await badgeEl.count()) > 0 ? parseInt((await badgeEl.first().innerText()).trim(), 10) : 0;
   await page.goto(`${ADMIN}/lessons?mode=needs`, { waitUntil: "networkidle" });
   await page.getByTestId("lesson-row").first().waitFor({ timeout: 15000 });
