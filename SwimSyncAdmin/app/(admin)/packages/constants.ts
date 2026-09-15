@@ -16,3 +16,7 @@ export const DMY: Intl.DateTimeFormatOptions = {
  *  list) — the cap is made explicit + surfaced so a truncated fetch is never a
  *  silent slice (⚠ RISK 3). */
 export const ROW_LIMIT = 1000;
+
+/** Singapore dollars, two decimals. The page's one price formatter, shared by
+ *  every tier (promoted from the page component at Stage 5). */
+export const money = (n: number) => `S$${Number(n).toFixed(2)}`;

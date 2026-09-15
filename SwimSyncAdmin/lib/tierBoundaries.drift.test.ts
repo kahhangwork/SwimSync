@@ -118,7 +118,9 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // gone by Stage 11.
   { file: "app/(admin)/packages/page.tsx", contains: "./dao/packages.repo", why: "Stages 4-9: page -> domain -> dao" },
   { file: "app/(admin)/packages/page.tsx", contains: "./dao/packages.rpc", why: "Stages 4-9: page -> domain -> dao" },
-  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/packageOffers", why: "Stage 5: MOVE into packages/domain (sole importer)" },
+  // @/lib/packageOffers MOVED into packages/domain at Stage 5 (sole importer);
+  // the page now imports ./domain/packageOffers (pickOfferProduct), allowed by
+  // check 4. Entry deleted (ledger shrinks).
   // @/lib/tableSearch left at Stage 4 — matchesAnyField moved into
   // domain/packageRows.ts (heldMatching); the page no longer imports it.
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/lessonDates", why: "Stages 4-11: reached from domain/ui (shared, stays in lib)" },

@@ -25,18 +25,21 @@ import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { todayInSg, formatSgStamp } from "@/lib/lessonDates";
-import { defaultConfirmStart, pickOfferProduct } from "@/lib/packageOffers";
+import { pickOfferProduct } from "./domain/packageOffers";
 import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { WhatsAppQueue, type WaQueueRow } from "@/components/WhatsAppQueue";
 import { discountLabel } from "@/lib/referralDiscount";
-import { DMY, ROW_LIMIT } from "./constants";
+import { DMY, ROW_LIMIT, money } from "./constants";
 import type { Category, Product, Purchase, CandidateRow } from "./types";
 import * as repo from "./dao/packages.repo";
 import * as rpc from "./dao/packages.rpc";
 import { usePackageList } from "./domain/usePackageList";
+import { useCategories } from "./domain/useCategories";
+import { usePurchaseActions } from "./domain/usePurchaseActions";
 import { ListNotices } from "./ui/ListNotices";
-
-const money = (n: number) => `S$${Number(n).toFixed(2)}`;
+import { CategoriesSection } from "./ui/CategoriesSection";
+import { ConfirmPaymentModal } from "./ui/ConfirmPaymentModal";
+import { CancelModal } from "./ui/CancelModal";
 
 export default function PackagesPage() {
   // Slice 1 (list-core): all loaded data, held-search, the WhatsApp queue, and
@@ -72,8 +75,29 @@ export default function PackagesPage() {
     setProductActive,
   } = usePackageList();
 
-  // Category form
-  const [newCategory, setNewCategory] = useState("");
+  // Slices 2, 5, 6 — categories, confirm-payment, cancel. Each takes the shared
+  // busy/error and load() from list-core (⚠ RISK 2).
+  const {
+    newCategory,
+    setNewCategory,
+    addCategory,
+    removeCategory,
+    setCategoryDefault,
+    setCategoryCapacity,
+    setAllClassesDefault,
+  } = useCategories({ setBusy, setError, reload: load });
+
+  const {
+    confirming,
+    setConfirming,
+    cancelling,
+    setCancelling,
+    confirmStart,
+    setConfirmStart,
+    confirmPurchase,
+    cancelPurchase,
+  } = usePurchaseActions({ setBusy, setError, reload: load });
+
   // Product form
   const [productModal, setProductModal] = useState(false);
   const [pName, setPName] = useState("");
@@ -97,10 +121,6 @@ export default function PackagesPage() {
   const [salePreview, setSalePreview] = useState<
     { total: number; discount: number; payable: number } | null
   >(null);
-  const [confirmStart, setConfirmStart] = useState("");
-  // Confirm/cancel/cancel-active confirmations
-  const [confirming, setConfirming] = useState<Purchase | null>(null);
-  const [cancelling, setCancelling] = useState<Purchase | null>(null);
   // Manual extension
   const [extending, setExtending] = useState<Purchase | null>(null);
   const [extendWeeks, setExtendWeeks] = useState("1");
@@ -111,104 +131,6 @@ export default function PackagesPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [genBusy, setGenBusy] = useState(false);
   const [genProgress, setGenProgress] = useState<string | null>(null);
-
-  // ── Categories ─────────────────────────────────────────────────────────────
-
-  async function addCategory() {
-    const trimmed = newCategory.trim();
-    if (!trimmed) return;
-    setBusy(true);
-    const { error: err } = await repo.insertCategory({
-      name: trimmed,
-      tenant_id: await rpc.myTenantId(),
-    });
-    setBusy(false);
-    if (err) {
-      setError(
-        err.code === "23505"
-          ? `You already have a category called "${trimmed}".`
-          : "Could not add that category."
-      );
-      return;
-    }
-    setNewCategory("");
-    setError(null);
-    load();
-  }
-
-  async function removeCategory(c: Category) {
-    setBusy(true);
-    const { error: err } = await repo.deleteCategory(c.id);
-    setBusy(false);
-    if (err) {
-      // 23503: a product is sold against it — deleting would silently widen
-      // that product's scope to all classes, which the FK forbids.
-      setError(
-        err.code === "23503"
-          ? `"${c.name}" has packages sold against it. Retire those products first.`
-          : "Could not remove that category."
-      );
-      return;
-    }
-    setError(null);
-    load();
-  }
-
-  /** Set (or clear, with "") a category's default renewal product. The DB
-   *  trigger refuses a product of the wrong category/tenant or a retired one. */
-  async function setCategoryDefault(categoryId: string, productId: string) {
-    setBusy(true);
-    const { error: err } = await repo.updateCategoryDefault(
-      categoryId,
-      productId || null
-    );
-    setBusy(false);
-    if (err) {
-      setError("Could not set that default.");
-      return;
-    }
-    setError(null);
-    load();
-  }
-
-  /** Set (or clear, with "") a category's default max students. The CHECK
-   *  refuses 0 / negatives; the field is validated here so the message names
-   *  the field rather than a constraint. */
-  async function setCategoryCapacity(categoryId: string, raw: string) {
-    const trimmed = raw.trim();
-    const value = trimmed === "" ? null : Number(trimmed);
-    if (value !== null && (!Number.isInteger(value) || value < 1)) {
-      setError("Max students must be a whole number of 1 or more, or blank for no limit.");
-      return;
-    }
-    setBusy(true);
-    const { error: err } = await repo.updateCategoryCapacity(categoryId, value);
-    setBusy(false);
-    if (err) {
-      setError("Could not set that max students.");
-      return;
-    }
-    setError(null);
-    load();
-  }
-
-  /** Set (or clear) the all-classes fallback default for the business. */
-  async function setAllClassesDefault(productId: string) {
-    const tenant = await rpc.myTenantId();
-    if (!tenant) return;
-    setBusy(true);
-    const { error: err } = await repo.updateTenantDefaultProduct(
-      tenant,
-      productId || null
-    );
-    setBusy(false);
-    if (err) {
-      setError("Could not set that default.");
-      return;
-    }
-    setError(null);
-    load();
-  }
 
   // ── Products ───────────────────────────────────────────────────────────────
 
@@ -280,19 +202,6 @@ export default function PackagesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saleModal, saleParent, saleProduct]);
 
-  // Confirm dialog: pre-fill the start date. ⚠ RISK 3 — an OFFER carries the
-  // start_date the parent paid against, so adopt THAT; only a parent-created
-  // request (no start_date) falls back to the freshly-suggested one.
-  useEffect(() => {
-    if (confirming) {
-      rpc.fetchSuggestedStart(confirming.parent_id, confirming.product_id).then(
-        (suggested) =>
-          setConfirmStart(defaultConfirmStart(confirming.start_date, suggested))
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [confirming]);
-
   async function recordSale() {
     if (!saleParent || !saleProduct) return;
     setBusy(true);
@@ -315,41 +224,6 @@ export default function PackagesPage() {
     setSaleParent("");
     setSaleProduct("");
     setSaleStart("");
-    load();
-  }
-
-  async function confirmPurchase(p: Purchase) {
-    setBusy(true);
-    const { error: err } = await repo.activatePendingPurchase(
-      p.id,
-      confirmStart || todayInSg()
-    );
-    setBusy(false);
-    setConfirming(null);
-    if (err) {
-      setError("Could not confirm that purchase.");
-      return;
-    }
-    // Best-effort "your package is active" email to the parent. Never blocks
-    // or fails the confirmation — the package is already active.
-    rpc
-      .invokePackageEmail({ type: "confirmed", package_id: p.id })
-      .catch(() => {});
-
-    // If activating this package converted a referral, tell the REFERRER they
-    // earned a reward. Best-effort, and independent of the confirmed email
-    // above: the conversion + referrer reward are minted by the DB trigger, so
-    // we look the reward up and hand its id to package-emails (RISK 3 path).
-    (async () => {
-      const { data: ref } = await repo.findConvertedReferral(p.id);
-      if (!ref) return;
-      const { data: reward } = await repo.findReferrerReward(ref.id);
-      if (!reward) return;
-      await rpc
-        .invokePackageEmail({ type: "referral_reward", reward_id: reward.id })
-        .catch(() => {});
-    })().catch(() => {});
-
     load();
   }
 
@@ -380,18 +254,6 @@ export default function PackagesPage() {
     setExtending(null);
     setExtendWeeks("1");
     setExtendReason("");
-    load();
-  }
-
-  async function cancelPurchase(p: Purchase) {
-    setBusy(true);
-    const { error: err } = await repo.cancelPurchase(p.id);
-    setBusy(false);
-    setCancelling(null);
-    if (err) {
-      setError("Could not cancel that package.");
-      return;
-    }
     load();
   }
 
@@ -691,121 +553,19 @@ export default function PackagesPage() {
       )}
 
       {/* ── Class categories ──────────────────────────────────────────────── */}
-      <div className="mb-8">
-        <h2 className="mb-1 text-sm font-bold text-gray-900">
-          Class categories
-        </h2>
-        <p className="mb-3 text-xs text-gray-500">
-          Your own grouping of classes — &ldquo;Group&rdquo;,
-          &ldquo;Private&rdquo;, whatever you price together. A package sold
-          against a category is spendable at every class in it, including ones
-          you add later. Assign a class its category on the Classes page.
-        </p>
-        <div className="mb-3 flex gap-2">
-          <input
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addCategory();
-            }}
-            placeholder="Group"
-            className="w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-          />
-          <Button onClick={addCategory} disabled={busy || !newCategory.trim()}>
-            Add category
-          </Button>
-        </div>
-        {categories.length > 0 && (
-          <ul className="space-y-1">
-            {categories.map((c) => {
-              // Products that may default this category: its own, or all-classes.
-              const eligible = activeProducts.filter(
-                (p) => p.category_id === c.id || p.category_id === null
-              );
-              return (
-                <li
-                  key={c.id}
-                  className="flex w-[36rem] items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
-                >
-                  <span className="font-medium text-gray-900">{c.name}</span>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-gray-400">Default:</label>
-                    <select
-                      value={c.default_product_id ?? ""}
-                      onChange={(e) => setCategoryDefault(c.id, e.target.value)}
-                      disabled={busy}
-                      className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
-                    >
-                      <option value="">None</option>
-                      {eligible.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    <label className="text-xs text-gray-400" htmlFor={`cap-${c.id}`}>
-                      Max:
-                    </label>
-                    <input
-                      // Keyed on the STORED value: a refused save (CHECK or RLS)
-                      // reloads and remounts the field back to what the DB holds.
-                      key={`${c.id}-${c.default_capacity ?? ""}`}
-                      id={`cap-${c.id}`}
-                      type="number"
-                      min={1}
-                      step={1}
-                      placeholder="∞"
-                      defaultValue={c.default_capacity ?? ""}
-                      disabled={busy}
-                      onBlur={(e) => {
-                        const next = e.target.value.trim();
-                        const cur = c.default_capacity == null ? "" : String(c.default_capacity);
-                        if (next !== cur) setCategoryCapacity(c.id, next);
-                      }}
-                      title="Default max students per class in this category (blank = no limit). Each class can override it."
-                      className="w-14 rounded-lg border border-gray-300 px-2 py-1 text-xs"
-                    />
-                    <span className="text-xs text-gray-500">
-                      {c.class_count} class{c.class_count === 1 ? "" : "es"}
-                    </span>
-                    <button
-                      onClick={() => removeCategory(c)}
-                      disabled={busy}
-                      className="text-gray-400 hover:text-red-600"
-                      aria-label={`Remove ${c.name}`}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {/* The all-classes fallback: proposed when neither the family's original
-            nor a category default applies (Decision 5). */}
-        <div className="mt-3 flex w-[36rem] items-center gap-2 text-sm">
-          <label className="text-xs text-gray-500">
-            All-classes default (fallback):
-          </label>
-          <select
-            value={tenantDefaultProduct ?? ""}
-            onChange={(e) => setAllClassesDefault(e.target.value)}
-            disabled={busy}
-            className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
-          >
-            <option value="">None</option>
-            {activeProducts
-              .filter((p) => p.category_id === null)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
-        </div>
-      </div>
+      <CategoriesSection
+        categories={categories}
+        activeProducts={activeProducts}
+        tenantDefaultProduct={tenantDefaultProduct}
+        busy={busy}
+        newCategory={newCategory}
+        setNewCategory={setNewCategory}
+        addCategory={addCategory}
+        removeCategory={removeCategory}
+        setCategoryDefault={setCategoryDefault}
+        setCategoryCapacity={setCategoryCapacity}
+        setAllClassesDefault={setAllClassesDefault}
+      />
 
       {/* ── Products ──────────────────────────────────────────────────────── */}
       <div className="mb-8">
@@ -1291,105 +1051,21 @@ export default function PackagesPage() {
         </div>
       </Modal>
 
-      <Modal
-        open={confirming !== null}
-        onClose={() => setConfirming(null)}
-        title="Confirm payment received?"
-      >
-        <p className="text-sm text-gray-600">
-          {confirming && (
-            <>
-              <strong>{confirming.parent_name}</strong> — {confirming.name} for{" "}
-              <strong>{money(confirming.amount_payable)}</strong>
-              {confirming.discount_amount > 0 && (
-                <span className="text-emerald-700">
-                  {" "}(after a {money(confirming.discount_amount)} referral discount
-                  off {money(confirming.total_value)})
-                </span>
-              )}
-              . Confirming activates the package; its validity runs from the
-              start date below.
-            </>
-          )}
-        </p>
-        <div className="mt-4">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Start date
-          </label>
-          {/* ⚠ RISK 3 — for an OFFER the parent already paid against this date;
-              show it so the admin does not silently move the validity window. */}
-          {confirming?.offered_by && confirming?.start_date && (
-            <p className="mb-1 text-xs font-medium text-sky-700">
-              Offered start: {confirming.start_date}
-            </p>
-          )}
-          <input
-            type="date"
-            value={confirmStart}
-            onChange={(e) => setConfirmStart(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          />
-          <p className="mt-1 text-xs text-gray-400">
-            {confirming?.offered_by
-              ? "Defaults to the offered start above — change only if needed."
-              : "Suggested from when this parent’s current coverage ends — adjust it freely."}
-          </p>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setConfirming(null)}
-            disabled={busy}
-          >
-            Not yet
-          </Button>
-          <Button
-            onClick={() => confirming && confirmPurchase(confirming)}
-            disabled={busy}
-          >
-            {busy ? "Confirming…" : "Payment received"}
-          </Button>
-        </div>
-      </Modal>
+      <ConfirmPaymentModal
+        confirming={confirming}
+        confirmStart={confirmStart}
+        setConfirmStart={setConfirmStart}
+        busy={busy}
+        setConfirming={setConfirming}
+        confirmPurchase={confirmPurchase}
+      />
 
-      <Modal
-        open={cancelling !== null}
-        onClose={() => setCancelling(null)}
-        title={
-          cancelling?.status === "pending"
-            ? "Decline this request?"
-            : "Cancel this package?"
-        }
-      >
-        <p className="text-sm text-gray-600">
-          {cancelling?.status === "pending" ? (
-            "The request is withdrawn. Nothing was charged."
-          ) : (
-            <>
-              <strong>{money(cancelling?.value_remaining ?? 0)}</strong>{" "}
-              remains on this package. Cancelling freezes it at that amount —
-              settle any refund with the family directly; SwimSync keeps the
-              record but does not move the money.
-            </>
-          )}
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setCancelling(null)}
-            disabled={busy}
-          >
-            Keep it
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => cancelling && cancelPurchase(cancelling)}
-            disabled={busy}
-          >
-            {busy ? "Working…" : cancelling?.status === "pending" ? "Decline" : "Cancel package"}
-          </Button>
-        </div>
-      </Modal>
+      <CancelModal
+        cancelling={cancelling}
+        busy={busy}
+        setCancelling={setCancelling}
+        cancelPurchase={cancelPurchase}
+      />
 
       {/* Manual extension */}
       <Modal
