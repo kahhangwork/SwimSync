@@ -124,10 +124,10 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // check 4. Entry deleted (ledger shrinks).
   // @/lib/tableSearch left at Stage 4 — matchesAnyField moved into
   // domain/packageRows.ts (heldMatching); the page no longer imports it.
-  // @/lib/lessonDates is the LAST packages page-import pin — todayInSg +
-  // formatSgStamp are used by the still-page-level tables (the held "expired"
-  // check + the requested-at stamp); it leaves at Stage 11 when the tables move.
-  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/lessonDates", why: "Stage 11: reached from ui tables (shared, stays in lib)" },
+  // ── packages: DONE at Stage 11 — the three tables moved to ui/ (each with its
+  //    own useTableSort), todayInSg/formatSgStamp/money/DMY/ROW_LIMIT went with
+  //    them, and @/lib/lessonDates left the page. BOTH packages ledgers are now
+  //    empty; page.tsx is composition with zero useState. ──
   // @/lib/referralDiscount left the page at Stage 6 — discountLabel moved into
   // ui/ProductModal (still shared, stays in lib, reached from ui). Deleted.
   // @/lib/waMessage left the page at Stage 9 — buildPackageOfferMessage/
