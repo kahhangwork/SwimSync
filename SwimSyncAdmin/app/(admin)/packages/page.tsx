@@ -19,7 +19,6 @@
 // RPC is the single derivation (PACKAGES_DESIGN.md ⚠ RISK 4).
 
 import React, { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
@@ -40,19 +39,9 @@ import type {
   CandidateRow,
 } from "./types";
 import * as repo from "./dao/packages.repo";
+import * as rpc from "./dao/packages.rpc";
 
 const money = (n: number) => `S$${Number(n).toFixed(2)}`;
-
-async function myTenantId(): Promise<string | null> {
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) return null;
-  const { data } = await supabase
-    .from("profiles")
-    .select("tenant_id")
-    .eq("id", user.user.id)
-    .single();
-  return (data?.tenant_id as string | null) ?? null;
-}
 
 export default function PackagesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -128,7 +117,7 @@ export default function PackagesPage() {
     // Holiday extensions are event-driven now (reconcile trigger,
     // 20260818000700): expires_on is already current when this page reads it,
     // so there is no pre-read recompute call any more.
-    const tenant = await myTenantId();
+    const tenant = await rpc.myTenantId();
     if (tenant) {
       const { data: t } = await repo.loadTenantSettings(tenant);
       if (t?.display_name) setBusinessName(t.display_name);
@@ -145,7 +134,7 @@ export default function PackagesPage() {
       repo.loadCategories(),
       repo.loadProducts(),
       repo.loadPurchases(),
-      supabase.rpc("package_live_balances"),
+      rpc.liveBalances(),
       repo.loadParentOptions(),
       repo.loadChildren(),
     ]);
@@ -262,13 +251,7 @@ export default function PackagesPage() {
     setBusy(true);
     const { error: err } = await repo.insertCategory({
       name: trimmed,
-      tenant_id: (
-        await supabase
-          .from("profiles")
-          .select("tenant_id")
-          .eq("id", (await supabase.auth.getUser()).data.user?.id)
-          .single()
-      ).data?.tenant_id,
+      tenant_id: await rpc.myTenantId(),
     });
     setBusy(false);
     if (err) {
@@ -342,7 +325,7 @@ export default function PackagesPage() {
 
   /** Set (or clear) the all-classes fallback default for the business. */
   async function setAllClassesDefault(productId: string) {
-    const tenant = await myTenantId();
+    const tenant = await rpc.myTenantId();
     if (!tenant) return;
     setBusy(true);
     const { error: err } = await repo.updateTenantDefaultProduct(
@@ -403,13 +386,7 @@ export default function PackagesPage() {
       // Override present ⇒ its own type + value; absent ⇒ NULL/NULL = inherit.
       referral_discount_type: pRefOverride ? pRefType : null,
       referral_discount_value: pRefOverride ? Number(pRefValue) : null,
-      tenant_id: (
-        await supabase
-          .from("profiles")
-          .select("tenant_id")
-          .eq("id", (await supabase.auth.getUser()).data.user?.id)
-          .single()
-      ).data?.tenant_id,
+      tenant_id: await rpc.myTenantId(),
     });
     setBusy(false);
     if (err) {
@@ -430,47 +407,12 @@ export default function PackagesPage() {
 
   // ── Purchases ──────────────────────────────────────────────────────────────
 
-  // Pre-fill a start date from the smart default. ⚠ RISK 7: this is only a
-  // suggestion — any failure falls back to today, never blocks the flow.
-  async function fetchSuggestedStart(parentId: string, productId: string) {
-    try {
-      const { data, error: err } = await supabase.rpc("suggest_package_start", {
-        p_parent_id: parentId,
-        p_product_id: productId,
-      });
-      if (err || !data) return todayInSg();
-      return String(data);
-    } catch {
-      return todayInSg();
-    }
-  }
-
-  // ⚠ RISK 7 — the ONE source of truth for any pre-insert price preview. Never
-  // lesson_count × rate: that ignores the family's referral reward.
-  async function fetchPreviewPrice(parentId: string, productId: string) {
-    try {
-      const { data, error: err } = await supabase.rpc("preview_package_price", {
-        p_parent_id: parentId,
-        p_product_id: productId,
-      });
-      const row = Array.isArray(data) ? data[0] : data;
-      if (err || !row) return null;
-      return {
-        total: Number(row.total_value),
-        discount: Number(row.discount_amount),
-        payable: Number(row.amount_payable),
-      };
-    } catch {
-      return null;
-    }
-  }
-
   // Sale form: when both parent and product are chosen, suggest a start date AND
   // preview the discounted price (RISK 7).
   useEffect(() => {
     if (saleModal && saleParent && saleProduct) {
-      fetchSuggestedStart(saleParent, saleProduct).then(setSaleStart);
-      fetchPreviewPrice(saleParent, saleProduct).then(setSalePreview);
+      rpc.fetchSuggestedStart(saleParent, saleProduct).then(setSaleStart);
+      rpc.fetchPreviewPrice(saleParent, saleProduct).then(setSalePreview);
     } else {
       setSalePreview(null);
     }
@@ -482,7 +424,7 @@ export default function PackagesPage() {
   // request (no start_date) falls back to the freshly-suggested one.
   useEffect(() => {
     if (confirming) {
-      fetchSuggestedStart(confirming.parent_id, confirming.product_id).then(
+      rpc.fetchSuggestedStart(confirming.parent_id, confirming.product_id).then(
         (suggested) =>
           setConfirmStart(defaultConfirmStart(confirming.start_date, suggested))
       );
@@ -501,13 +443,7 @@ export default function PackagesPage() {
       product_id: saleProduct,
       status: "active",
       start_date: saleStart || todayInSg(),
-      tenant_id: (
-        await supabase
-          .from("profiles")
-          .select("tenant_id")
-          .eq("id", (await supabase.auth.getUser()).data.user?.id)
-          .single()
-      ).data?.tenant_id,
+      tenant_id: await rpc.myTenantId(),
     });
     setBusy(false);
     if (err) {
@@ -535,10 +471,8 @@ export default function PackagesPage() {
     }
     // Best-effort "your package is active" email to the parent. Never blocks
     // or fails the confirmation — the package is already active.
-    supabase.functions
-      .invoke("package-emails", {
-        body: { type: "confirmed", package_id: p.id },
-      })
+    rpc
+      .invokePackageEmail({ type: "confirmed", package_id: p.id })
       .catch(() => {});
 
     // If activating this package converted a referral, tell the REFERRER they
@@ -550,8 +484,8 @@ export default function PackagesPage() {
       if (!ref) return;
       const { data: reward } = await repo.findReferrerReward(ref.id);
       if (!reward) return;
-      await supabase.functions
-        .invoke("package-emails", { body: { type: "referral_reward", reward_id: reward.id } })
+      await rpc
+        .invokePackageEmail({ type: "referral_reward", reward_id: reward.id })
         .catch(() => {});
     })().catch(() => {});
 
@@ -572,11 +506,11 @@ export default function PackagesPage() {
     }
     setBusy(true);
     setExtendError(null);
-    const { error: err } = await supabase.rpc("extend_package", {
-      p_package_id: extending.id,
-      p_days: days,
-      p_reason: extendReason.trim(),
-    });
+    const { error: err } = await rpc.extendPackage(
+      extending.id,
+      days,
+      extendReason.trim()
+    );
     setBusy(false);
     if (err) {
       setExtendError("Could not extend that package.");
@@ -609,13 +543,10 @@ export default function PackagesPage() {
   async function createOneOffer(
     c: CandidateRow
   ): Promise<WaQueueRow & { link: string | null }> {
-    const { data: offerId, error: err } = await supabase.rpc(
-      "create_package_offer",
-      {
-        p_parent_id: c.parent_id,
-        p_product_id: c.chosenProduct,
-        p_start_date: c.chosenStart || todayInSg(),
-      }
+    const { data: offerId, error: err } = await rpc.createPackageOffer(
+      c.parent_id,
+      c.chosenProduct,
+      c.chosenStart || todayInSg()
     );
     if (err || !offerId) {
       throw new Error(err?.message ?? "offer failed");
@@ -624,10 +555,8 @@ export default function PackagesPage() {
     const { data: row } = await repo.loadOfferRow(offerId as string);
 
     // Best-effort email (never blocks the offer).
-    supabase.functions
-      .invoke("package-emails", {
-        body: { type: "offered", package_id: offerId },
-      })
+    rpc
+      .invokePackageEmail({ type: "offered", package_id: offerId })
       .catch(() => {});
 
     const waNumber = toWaNumber(c.parent_phone);
@@ -672,9 +601,7 @@ export default function PackagesPage() {
   async function openGenerateAll() {
     setGenBusy(true);
     setError(null);
-    const { data, error: err } = await supabase.rpc(
-      "package_renewal_candidates"
-    );
+    const { data, error: err } = await rpc.renewalCandidates();
     setGenBusy(false);
     if (err) {
       setError("Could not load renewal candidates.");
@@ -698,10 +625,10 @@ export default function PackagesPage() {
           ) ??
           "";
         const start = suggested
-          ? await fetchSuggestedStart(r.parent_id, suggested)
+          ? await rpc.fetchSuggestedStart(r.parent_id, suggested)
           : todayInSg();
         const preview = suggested
-          ? await fetchPreviewPrice(r.parent_id, suggested)
+          ? await rpc.fetchPreviewPrice(r.parent_id, suggested)
           : null;
         return {
           parent_id: r.parent_id,
@@ -1747,7 +1674,7 @@ export default function PackagesPage() {
                             // RISK 7 — re-price via preview_package_price, never
                             // lesson_count × rate, so a referral discount shows.
                             if (productId) {
-                              fetchPreviewPrice(c.parent_id, productId).then((pv) =>
+                              rpc.fetchPreviewPrice(c.parent_id, productId).then((pv) =>
                                 setCandidates((prev) =>
                                   prev.map((r, j) =>
                                     j === i

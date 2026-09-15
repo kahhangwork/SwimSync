@@ -81,29 +81,12 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // ── parents: dao extracted at L1 (parents.repo/rpc.ts), entries removed ──
   // ── unassigned: DONE — dao/domain/ui extracted, ledger empty ──
   // ── claims: DONE — dao/domain/ui extracted, ledger empty ──
-  // ── packages (full track, PACKAGES_REFACTOR_PLAN.md §5) ──
-  // The page loses ALL supabase by Stage 3 (§6 grep gate: 0 outside dao/ from
-  // Stage 3): .from() → dao/packages.repo.ts at Stage 2; .rpc()/functions.invoke/
-  // auth.getUser → dao/packages.rpc.ts at Stage 3. One entry per call shape; a
-  // snippet may cover several identical/related lines (count noted). Table names
-  // are pinned WITHOUT the `supabase` prefix so both the inline `supabase.from(`
-  // and the joined multiline `supabase .from(` forms match.
-  { file: "app/(admin)/packages/page.tsx", contains: 'import { supabase } from "@/lib/supabase"', why: "Stage 3: client -> dao/ (last supabase ref gone)" },
-  { file: "app/(admin)/packages/page.tsx", contains: "const { data: user } = await supabase.auth.getUser()", why: "Stage 3: myTenantId -> dao/packages.rpc.ts (getCurrentUser)" },
-  { file: "app/(admin)/packages/page.tsx", contains: "(await supabase.auth.getUser()).data.user?.id", why: "Stage 3: getCurrentUser() nested in insert payloads (x3)" },
-  { file: "app/(admin)/packages/page.tsx", contains: '.from("profiles")', why: "Stage 3: tenant_id lookup -> myTenantId() in dao (x4, RISK 6)" },
-  // Stage 2 DONE — the 8 moved-table .from() entries (tenants, class_categories,
-  // package_products, parent_packages, parent_tenants, parent_students,
-  // referrals, referral_rewards) are now in dao/packages.repo.ts and were
-  // deleted here (the ledger shrinks). The profiles selects above stay: they
-  // are the tenant_id lookup that becomes myTenantId() at Stage 3.
-  { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("package_live_balances")', why: "Stage 3: dao/packages.rpc.ts" },
-  { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("suggest_package_start"', why: "Stage 3: dao/packages.rpc.ts (RISK 4: extracted once, imported by slices 4/5/8)" },
-  { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("preview_package_price"', why: "Stage 3: dao/packages.rpc.ts (RISK 4)" },
-  { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("extend_package"', why: "Stage 3: dao/packages.rpc.ts" },
-  { file: "app/(admin)/packages/page.tsx", contains: "const { data: offerId, error: err } = await supabase.rpc(", why: "Stage 3: create_package_offer (multiline) -> dao/packages.rpc.ts" },
-  { file: "app/(admin)/packages/page.tsx", contains: "const { data, error: err } = await supabase.rpc(", why: "Stage 3: package_renewal_candidates (multiline) -> dao/packages.rpc.ts" },
-  { file: "app/(admin)/packages/page.tsx", contains: "supabase.functions", why: "Stage 3: invokePackageEmail() -> dao/packages.rpc.ts (x3: @679/704/787, un-awaited/.catch preserved)" },
+  // ── packages (full track, PACKAGES_REFACTOR_PLAN.md §5) — check 3 EMPTY ──
+  // Stage 2 moved the 19 .from() calls into dao/packages.repo.ts; Stage 3 moved
+  // the 6 RPCs + the package-emails invoke + myTenantId() (the 4 profiles/getUser
+  // sites) into dao/packages.rpc.ts. The page now holds ZERO supabase (§6 grep
+  // gate met), so every packages data-access entry went stale and was deleted —
+  // the ledger shrank to empty for check 3. Nothing more to pin here.
 ];
 
 /**
@@ -129,11 +112,12 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // 0b (the page imports no dao yet, so the shrink-test would flag them stale).
   // They are added at Stage 2/3 when the import first appears (playbook §7.1's
   // sanctioned exception) and removed at Stages 4-9 as each hook wraps the call.
-  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/supabase", why: "Stage 3: client -> packages/dao" },
-  // Transitional (added Stage 2, playbook §7.1): until each slice's hook wraps
-  // the dao call, the page calls dao/packages.repo directly. Removed Stages 4-9
-  // as the hooks land; gone by Stage 11.
+  // Transitional (playbook §7.1): until each slice's hook wraps the dao call,
+  // the page calls dao/packages.{repo,rpc} directly. @/lib/supabase left at
+  // Stage 3 (page holds no client). These two go Stages 4-9 as the hooks land;
+  // gone by Stage 11.
   { file: "app/(admin)/packages/page.tsx", contains: "./dao/packages.repo", why: "Stages 4-9: page -> domain -> dao" },
+  { file: "app/(admin)/packages/page.tsx", contains: "./dao/packages.rpc", why: "Stages 4-9: page -> domain -> dao" },
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/packageOffers", why: "Stage 5: MOVE into packages/domain (sole importer)" },
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/tableSearch", why: "Stage 4: reached from domain (shared, stays in lib)" },
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/lessonDates", why: "Stages 4-11: reached from domain/ui (shared, stays in lib)" },
