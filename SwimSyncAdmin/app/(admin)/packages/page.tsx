@@ -36,8 +36,10 @@ import { usePackageList } from "./domain/usePackageList";
 import { useCategories } from "./domain/useCategories";
 import { usePurchaseActions } from "./domain/usePurchaseActions";
 import { useProductForm } from "./domain/useProductForm";
+import { useExtend } from "./domain/useExtend";
 import { ListNotices } from "./ui/ListNotices";
 import { ProductModal } from "./ui/ProductModal";
+import { ExtendModal } from "./ui/ExtendModal";
 import { CategoriesSection } from "./ui/CategoriesSection";
 import { ConfirmPaymentModal } from "./ui/ConfirmPaymentModal";
 import { CancelModal } from "./ui/CancelModal";
@@ -103,6 +105,10 @@ export default function PackagesPage() {
   const productForm = useProductForm({ setBusy, reload: load });
   const { openProductModal } = productForm;
 
+  // Slice 7 — manual extension.
+  const extend = useExtend({ setBusy, reload: load });
+  const { openExtend } = extend;
+
   // Record-sale form
   const [saleModal, setSaleModal] = useState(false);
   const [saleParent, setSaleParent] = useState("");
@@ -113,11 +119,6 @@ export default function PackagesPage() {
   const [salePreview, setSalePreview] = useState<
     { total: number; discount: number; payable: number } | null
   >(null);
-  // Manual extension
-  const [extending, setExtending] = useState<Purchase | null>(null);
-  const [extendWeeks, setExtendWeeks] = useState("1");
-  const [extendReason, setExtendReason] = useState("");
-  const [extendError, setExtendError] = useState<string | null>(null);
   // Renewal offers — Generate all preview + the resulting WhatsApp queue.
   const [genModal, setGenModal] = useState(false);
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
@@ -160,36 +161,6 @@ export default function PackagesPage() {
     setSaleParent("");
     setSaleProduct("");
     setSaleStart("");
-    load();
-  }
-
-  async function submitExtend() {
-    if (!extending) return;
-    const weeks = Number(extendWeeks);
-    if (!Number.isInteger(weeks) || weeks <= 0) {
-      setExtendError("Enter a whole number of weeks above zero.");
-      return;
-    }
-    const days = weeks * 7;
-    if (days > 365) {
-      setExtendError("That is too long — 52 weeks is the most.");
-      return;
-    }
-    setBusy(true);
-    setExtendError(null);
-    const { error: err } = await rpc.extendPackage(
-      extending.id,
-      days,
-      extendReason.trim()
-    );
-    setBusy(false);
-    if (err) {
-      setExtendError("Could not extend that package.");
-      return;
-    }
-    setExtending(null);
-    setExtendWeeks("1");
-    setExtendReason("");
     load();
   }
 
@@ -722,12 +693,7 @@ export default function PackagesPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              setExtendWeeks("1");
-                              setExtendReason("");
-                              setExtendError(null);
-                              setExtending(p);
-                            }}
+                            onClick={() => openExtend(p)}
                             disabled={busy}
                           >
                             Extend
@@ -876,55 +842,7 @@ export default function PackagesPage() {
       />
 
       {/* Manual extension */}
-      <Modal
-        open={extending !== null}
-        onClose={() => setExtending(null)}
-        title={`Extend ${extending?.name ?? "package"}`}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            A discretionary extension for{" "}
-            <strong>{extending?.parent_name}</strong>, added on top of any
-            public-holiday extension. Currently expires{" "}
-            <strong>{extending?.expires_on ?? "—"}</strong>.
-          </p>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Extra weeks
-            </label>
-            <input
-              value={extendWeeks}
-              onChange={(e) => setExtendWeeks(e.target.value)}
-              inputMode="numeric"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Reason <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              value={extendReason}
-              onChange={(e) => setExtendReason(e.target.value)}
-              placeholder="Goodwill"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          </div>
-          {extendError && <p className="text-sm text-red-600">{extendError}</p>}
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setExtending(null)}
-              disabled={busy}
-            >
-              Cancel
-            </Button>
-            <Button onClick={submitExtend} disabled={busy}>
-              {busy ? "Extending…" : "Extend package"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      <ExtendModal form={extend} busy={busy} />
 
       {/* ── Generate-all preview (Decision 6) — never a blind send ─────────── */}
       <Modal
