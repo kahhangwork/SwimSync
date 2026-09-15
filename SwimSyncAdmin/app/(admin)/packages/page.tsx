@@ -39,6 +39,7 @@ import type {
   ParentOption,
   CandidateRow,
 } from "./types";
+import * as repo from "./dao/packages.repo";
 
 const money = (n: number) => `S$${Number(n).toFixed(2)}`;
 
@@ -129,11 +130,7 @@ export default function PackagesPage() {
     // so there is no pre-read recompute call any more.
     const tenant = await myTenantId();
     if (tenant) {
-      const { data: t } = await supabase
-        .from("tenants")
-        .select("display_name, default_package_product_id, referral_enabled, referral_discount_type, referral_discount_value")
-        .eq("id", tenant)
-        .single();
+      const { data: t } = await repo.loadTenantSettings(tenant);
       if (t?.display_name) setBusinessName(t.display_name);
       setTenantDefaultProduct(t?.default_package_product_id ?? null);
       setTenantReferral({
@@ -145,40 +142,12 @@ export default function PackagesPage() {
 
     // RLS scopes every query here to the caller's own business.
     const [catRes, prodRes, purRes, liveRes, ptRes, childRes] = await Promise.all([
-      supabase
-        .from("class_categories")
-        .select("id, name, default_product_id, default_capacity, classes(id)")
-        .order("name"),
-      // ⚠ THE FK IS NAMED ON PURPOSE. `class_categories(name)` is AMBIGUOUS
-      // from package_products — category_id → class_categories.id (this one)
-      // and class_categories.default_product_id → package_products.id, which
-      // 20260815000600_default_packages added. Bare, PostgREST refuses the
-      // whole query with PGRST201 and this catalogue renders EMPTY. Same trap
-      // on the parent app's products query. Never drop the `!fkey` qualifier.
-      supabase
-        .from("package_products")
-        .select(
-          "id, name, category_id, lesson_count, rate_per_lesson, validity_weeks, is_active, class_categories!package_products_category_id_fkey(name), parent_packages(id, status)"
-        )
-        .order("is_active", { ascending: false })
-        .order("name"),
-      supabase
-        .from("parent_packages")
-        .select(
-          "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, requested_at, start_date, expires_on, holiday_extension_days, cancel_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
-        )
-        .order("status")
-        .order("requested_at", { ascending: false })
-        .limit(ROW_LIMIT),
+      repo.loadCategories(),
+      repo.loadProducts(),
+      repo.loadPurchases(),
       supabase.rpc("package_live_balances"),
-      supabase
-        .from("parent_tenants")
-        .select("parents(id, profiles(full_name, email))")
-        .order("joined_at"),
-      // Children names per family, for the "Who holds one" rows (Decision 9).
-      supabase
-        .from("parent_students")
-        .select("parent_id, students(full_name, is_active)"),
+      repo.loadParentOptions(),
+      repo.loadChildren(),
     ]);
 
     // A failed catalogue fetch and "this business sells nothing" render
@@ -291,7 +260,7 @@ export default function PackagesPage() {
     const trimmed = newCategory.trim();
     if (!trimmed) return;
     setBusy(true);
-    const { error: err } = await supabase.from("class_categories").insert({
+    const { error: err } = await repo.insertCategory({
       name: trimmed,
       tenant_id: (
         await supabase
@@ -317,10 +286,7 @@ export default function PackagesPage() {
 
   async function removeCategory(c: Category) {
     setBusy(true);
-    const { error: err } = await supabase
-      .from("class_categories")
-      .delete()
-      .eq("id", c.id);
+    const { error: err } = await repo.deleteCategory(c.id);
     setBusy(false);
     if (err) {
       // 23503: a product is sold against it — deleting would silently widen
@@ -340,10 +306,10 @@ export default function PackagesPage() {
    *  trigger refuses a product of the wrong category/tenant or a retired one. */
   async function setCategoryDefault(categoryId: string, productId: string) {
     setBusy(true);
-    const { error: err } = await supabase
-      .from("class_categories")
-      .update({ default_product_id: productId || null })
-      .eq("id", categoryId);
+    const { error: err } = await repo.updateCategoryDefault(
+      categoryId,
+      productId || null
+    );
     setBusy(false);
     if (err) {
       setError("Could not set that default.");
@@ -364,10 +330,7 @@ export default function PackagesPage() {
       return;
     }
     setBusy(true);
-    const { error: err } = await supabase
-      .from("class_categories")
-      .update({ default_capacity: value })
-      .eq("id", categoryId);
+    const { error: err } = await repo.updateCategoryCapacity(categoryId, value);
     setBusy(false);
     if (err) {
       setError("Could not set that max students.");
@@ -382,10 +345,10 @@ export default function PackagesPage() {
     const tenant = await myTenantId();
     if (!tenant) return;
     setBusy(true);
-    const { error: err } = await supabase
-      .from("tenants")
-      .update({ default_package_product_id: productId || null })
-      .eq("id", tenant);
+    const { error: err } = await repo.updateTenantDefaultProduct(
+      tenant,
+      productId || null
+    );
     setBusy(false);
     if (err) {
       setError("Could not set that default.");
@@ -431,7 +394,7 @@ export default function PackagesPage() {
 
     setBusy(true);
     setFormError(null);
-    const { error: err } = await supabase.from("package_products").insert({
+    const { error: err } = await repo.insertProduct({
       name,
       category_id: pCategory || null,
       lesson_count: Number(pLessons),
@@ -459,10 +422,7 @@ export default function PackagesPage() {
 
   async function setProductActive(p: Product, active: boolean) {
     setBusy(true);
-    const { error: err } = await supabase
-      .from("package_products")
-      .update({ is_active: active })
-      .eq("id", p.id);
+    const { error: err } = await repo.updateProductActive(p.id, active);
     setBusy(false);
     if (err) setError("Could not update that package.");
     load();
@@ -536,7 +496,7 @@ export default function PackagesPage() {
     // Directly active: the admin recording an offline sale IS the
     // confirmation. The DB snapshots the product's terms and dates expiry from
     // the start date (defaulting to today if the admin cleared the field).
-    const { error: err } = await supabase.from("parent_packages").insert({
+    const { error: err } = await repo.insertPurchase({
       parent_id: saleParent,
       product_id: saleProduct,
       status: "active",
@@ -563,14 +523,10 @@ export default function PackagesPage() {
 
   async function confirmPurchase(p: Purchase) {
     setBusy(true);
-    // WHERE status='pending' makes a double-click (or two admins) collapse to
-    // one confirmation — the second update matches zero rows and is a no-op.
-    // The start date (editable, defaulted) anchors the validity period.
-    const { error: err } = await supabase
-      .from("parent_packages")
-      .update({ status: "active", start_date: confirmStart || todayInSg() })
-      .eq("id", p.id)
-      .eq("status", "pending");
+    const { error: err } = await repo.activatePendingPurchase(
+      p.id,
+      confirmStart || todayInSg()
+    );
     setBusy(false);
     setConfirming(null);
     if (err) {
@@ -590,19 +546,9 @@ export default function PackagesPage() {
     // above: the conversion + referrer reward are minted by the DB trigger, so
     // we look the reward up and hand its id to package-emails (RISK 3 path).
     (async () => {
-      const { data: ref } = await supabase
-        .from("referrals")
-        .select("id")
-        .eq("converted_package_id", p.id)
-        .eq("status", "converted")
-        .maybeSingle();
+      const { data: ref } = await repo.findConvertedReferral(p.id);
       if (!ref) return;
-      const { data: reward } = await supabase
-        .from("referral_rewards")
-        .select("id")
-        .eq("referral_id", ref.id)
-        .eq("kind", "referrer")
-        .maybeSingle();
+      const { data: reward } = await repo.findReferrerReward(ref.id);
       if (!reward) return;
       await supabase.functions
         .invoke("package-emails", { body: { type: "referral_reward", reward_id: reward.id } })
@@ -644,11 +590,7 @@ export default function PackagesPage() {
 
   async function cancelPurchase(p: Purchase) {
     setBusy(true);
-    const { error: err } = await supabase
-      .from("parent_packages")
-      .update({ status: "cancelled" })
-      .eq("id", p.id)
-      .in("status", ["pending", "active"]);
+    const { error: err } = await repo.cancelPurchase(p.id);
     setBusy(false);
     setCancelling(null);
     if (err) {
@@ -679,12 +621,7 @@ export default function PackagesPage() {
       throw new Error(err?.message ?? "offer failed");
     }
 
-    // Read back the minted token + terms for the email and the WhatsApp link.
-    const { data: row } = await supabase
-      .from("parent_packages")
-      .select("public_token, reference_number, name, lesson_count, total_value, amount_payable, discount_amount")
-      .eq("id", offerId as string)
-      .single();
+    const { data: row } = await repo.loadOfferRow(offerId as string);
 
     // Best-effort email (never blocks the offer).
     supabase.functions

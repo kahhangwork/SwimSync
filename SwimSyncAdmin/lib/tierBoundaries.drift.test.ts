@@ -90,16 +90,13 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // and the joined multiline `supabase .from(` forms match.
   { file: "app/(admin)/packages/page.tsx", contains: 'import { supabase } from "@/lib/supabase"', why: "Stage 3: client -> dao/ (last supabase ref gone)" },
   { file: "app/(admin)/packages/page.tsx", contains: "const { data: user } = await supabase.auth.getUser()", why: "Stage 3: myTenantId -> dao/packages.rpc.ts (getCurrentUser)" },
-  { file: "app/(admin)/packages/page.tsx", contains: "(await supabase.auth.getUser()).data.user?.id", why: "Stage 3: getCurrentUser() nested in insert payloads (x3: @397/544/645)" },
-  { file: "app/(admin)/packages/page.tsx", contains: '.from("profiles")', why: "Stage 2: dao/packages.repo.ts (x4)" },
-  { file: "app/(admin)/packages/page.tsx", contains: '.from("tenants")', why: "Stage 2: dao/packages.repo.ts (x2)" },
-  { file: "app/(admin)/packages/page.tsx", contains: '.from("class_categories")', why: "Stage 2: dao/packages.repo.ts (x5)" },
-  { file: "app/(admin)/packages/page.tsx", contains: '.from("package_products")', why: "Stage 2: dao/packages.repo.ts (x3)" },
-  { file: "app/(admin)/packages/page.tsx", contains: '.from("parent_packages")', why: "Stage 2: dao/packages.repo.ts (x5)" },
-  { file: "app/(admin)/packages/page.tsx", contains: '.from("parent_tenants")', why: "Stage 2: dao/packages.repo.ts" },
-  { file: "app/(admin)/packages/page.tsx", contains: '.from("parent_students")', why: "Stage 2: dao/packages.repo.ts" },
-  { file: "app/(admin)/packages/page.tsx", contains: '.from("referrals")', why: "Stage 2: dao/packages.repo.ts" },
-  { file: "app/(admin)/packages/page.tsx", contains: '.from("referral_rewards")', why: "Stage 2: dao/packages.repo.ts" },
+  { file: "app/(admin)/packages/page.tsx", contains: "(await supabase.auth.getUser()).data.user?.id", why: "Stage 3: getCurrentUser() nested in insert payloads (x3)" },
+  { file: "app/(admin)/packages/page.tsx", contains: '.from("profiles")', why: "Stage 3: tenant_id lookup -> myTenantId() in dao (x4, RISK 6)" },
+  // Stage 2 DONE — the 8 moved-table .from() entries (tenants, class_categories,
+  // package_products, parent_packages, parent_tenants, parent_students,
+  // referrals, referral_rewards) are now in dao/packages.repo.ts and were
+  // deleted here (the ledger shrinks). The profiles selects above stay: they
+  // are the tenant_id lookup that becomes myTenantId() at Stage 3.
   { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("package_live_balances")', why: "Stage 3: dao/packages.rpc.ts" },
   { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("suggest_package_start"', why: "Stage 3: dao/packages.rpc.ts (RISK 4: extracted once, imported by slices 4/5/8)" },
   { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("preview_package_price"', why: "Stage 3: dao/packages.rpc.ts (RISK 4)" },
@@ -133,6 +130,10 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // They are added at Stage 2/3 when the import first appears (playbook §7.1's
   // sanctioned exception) and removed at Stages 4-9 as each hook wraps the call.
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/supabase", why: "Stage 3: client -> packages/dao" },
+  // Transitional (added Stage 2, playbook §7.1): until each slice's hook wraps
+  // the dao call, the page calls dao/packages.repo directly. Removed Stages 4-9
+  // as the hooks land; gone by Stage 11.
+  { file: "app/(admin)/packages/page.tsx", contains: "./dao/packages.repo", why: "Stages 4-9: page -> domain -> dao" },
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/packageOffers", why: "Stage 5: MOVE into packages/domain (sole importer)" },
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/tableSearch", why: "Stage 4: reached from domain (shared, stays in lib)" },
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/lessonDates", why: "Stages 4-11: reached from domain/ui (shared, stays in lib)" },
