@@ -124,7 +124,8 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // @/lib/tableSearch left at Stage 4 — matchesAnyField moved into
   // domain/packageRows.ts (heldMatching); the page no longer imports it.
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/lessonDates", why: "Stages 4-11: reached from domain/ui (shared, stays in lib)" },
-  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/referralDiscount", why: "Stage 11: reached from ui table (shared, stays in lib)" },
+  // @/lib/referralDiscount left the page at Stage 6 — discountLabel moved into
+  // ui/ProductModal (still shared, stays in lib, reached from ui). Deleted.
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/waMessage", why: "Stage 9: reached from domain/ui (shared, stays in lib)" },
 ];
 

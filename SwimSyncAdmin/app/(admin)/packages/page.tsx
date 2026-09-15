@@ -28,7 +28,6 @@ import { todayInSg, formatSgStamp } from "@/lib/lessonDates";
 import { pickOfferProduct } from "./domain/packageOffers";
 import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { WhatsAppQueue, type WaQueueRow } from "@/components/WhatsAppQueue";
-import { discountLabel } from "@/lib/referralDiscount";
 import { DMY, ROW_LIMIT, money } from "./constants";
 import type { Category, Product, Purchase, CandidateRow } from "./types";
 import * as repo from "./dao/packages.repo";
@@ -36,7 +35,9 @@ import * as rpc from "./dao/packages.rpc";
 import { usePackageList } from "./domain/usePackageList";
 import { useCategories } from "./domain/useCategories";
 import { usePurchaseActions } from "./domain/usePurchaseActions";
+import { useProductForm } from "./domain/useProductForm";
 import { ListNotices } from "./ui/ListNotices";
+import { ProductModal } from "./ui/ProductModal";
 import { CategoriesSection } from "./ui/CategoriesSection";
 import { ConfirmPaymentModal } from "./ui/ConfirmPaymentModal";
 import { CancelModal } from "./ui/CancelModal";
@@ -98,19 +99,10 @@ export default function PackagesPage() {
     cancelPurchase,
   } = usePurchaseActions({ setBusy, setError, reload: load });
 
-  // Product form
-  const [productModal, setProductModal] = useState(false);
-  const [pName, setPName] = useState("");
-  const [pCategory, setPCategory] = useState("");
-  const [pLessons, setPLessons] = useState("");
-  const [pRate, setPRate] = useState("");
-  const [pWeeks, setPWeeks] = useState("12");
-  // Per-product referral override (D4): off = inherit the tenant default; on =
-  // this product's own type + value (a 0 is an explicit "no referral discount").
-  const [pRefOverride, setPRefOverride] = useState(false);
-  const [pRefType, setPRefType] = useState<"percent" | "amount">("percent");
-  const [pRefValue, setPRefValue] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
+  // Slice 3 — the "Add package" product form.
+  const productForm = useProductForm({ setBusy, reload: load });
+  const { openProductModal } = productForm;
+
   // Record-sale form
   const [saleModal, setSaleModal] = useState(false);
   const [saleParent, setSaleParent] = useState("");
@@ -131,62 +123,6 @@ export default function PackagesPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [genBusy, setGenBusy] = useState(false);
   const [genProgress, setGenProgress] = useState<string | null>(null);
-
-  // ── Products ───────────────────────────────────────────────────────────────
-
-  function openProductModal() {
-    setPName("");
-    setPCategory("");
-    setPLessons("");
-    setPRate("");
-    setPWeeks("12");
-    setPRefOverride(false);
-    setPRefType("percent");
-    setPRefValue("");
-    setFormError(null);
-    setProductModal(true);
-  }
-
-  async function saveProduct() {
-    const name = pName.trim();
-    // Empty BEFORE coercing — Number("") is 0, which has saved a $0 wage rate
-    // and an invoice run day of 1 in this codebase (§7.22, §7.14). The DB
-    // CHECKs would refuse anyway; validating here gives a usable message.
-    if (!name) return setFormError("The package needs a name.");
-    if (pLessons.trim() === "" || !Number.isInteger(Number(pLessons)) || Number(pLessons) <= 0)
-      return setFormError("Lessons must be a whole number above zero.");
-    if (pRate.trim() === "" || !Number.isFinite(Number(pRate)) || Number(pRate) <= 0)
-      return setFormError("The rate per lesson must be above zero.");
-    if (pWeeks.trim() === "" || !Number.isInteger(Number(pWeeks)) || Number(pWeeks) <= 0)
-      return setFormError("Validity must be a whole number of weeks.");
-    if (pRefOverride) {
-      if (pRefValue.trim() === "" || !Number.isFinite(Number(pRefValue)) || Number(pRefValue) < 0)
-        return setFormError("The referral discount must be zero or more.");
-      if (pRefType === "percent" && Number(pRefValue) > 100)
-        return setFormError("A percentage discount cannot exceed 100.");
-    }
-
-    setBusy(true);
-    setFormError(null);
-    const { error: err } = await repo.insertProduct({
-      name,
-      category_id: pCategory || null,
-      lesson_count: Number(pLessons),
-      rate_per_lesson: Number(pRate),
-      validity_weeks: Number(pWeeks),
-      // Override present ⇒ its own type + value; absent ⇒ NULL/NULL = inherit.
-      referral_discount_type: pRefOverride ? pRefType : null,
-      referral_discount_value: pRefOverride ? Number(pRefValue) : null,
-      tenant_id: await rpc.myTenantId(),
-    });
-    setBusy(false);
-    if (err) {
-      setFormError("Could not create the package.");
-      return;
-    }
-    setProductModal(false);
-    load();
-  }
 
   // ── Purchases ──────────────────────────────────────────────────────────────
 
@@ -820,140 +756,12 @@ export default function PackagesPage() {
       </div>
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}
-      <Modal
-        open={productModal}
-        onClose={() => setProductModal(false)}
-        title="Add package"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Name
-            </label>
-            <input
-              value={pName}
-              onChange={(e) => setPName(e.target.value)}
-              placeholder="10 Group Lessons"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Valid for
-            </label>
-            <select
-              value={pCategory}
-              onChange={(e) => setPCategory(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">All classes</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} classes only
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Lessons
-              </label>
-              <input
-                value={pLessons}
-                onChange={(e) => setPLessons(e.target.value)}
-                inputMode="numeric"
-                placeholder="10"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Rate (S$)
-              </label>
-              <input
-                value={pRate}
-                onChange={(e) => setPRate(e.target.value)}
-                inputMode="decimal"
-                placeholder="40"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Weeks valid
-              </label>
-              <input
-                value={pWeeks}
-                onChange={(e) => setPWeeks(e.target.value)}
-                inputMode="numeric"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-          {pLessons && pRate && Number(pLessons) > 0 && Number(pRate) > 0 && (
-            <p className="text-sm text-gray-600">
-              Sells for{" "}
-              <strong>{money(Number(pLessons) * Number(pRate))}</strong> —{" "}
-              {pLessons} lessons at {money(Number(pRate))} each.
-            </p>
-          )}
-
-          {/* Referral discount override (D4). Off = inherit the tenant default. */}
-          <div className="rounded-lg border border-gray-200 p-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-              <input
-                type="checkbox"
-                checked={pRefOverride}
-                onChange={(e) => setPRefOverride(e.target.checked)}
-              />
-              Override referral discount
-            </label>
-            {!pRefOverride ? (
-              <p className="mt-1 text-xs text-gray-500">
-                {tenantReferral.enabled && tenantReferral.type
-                  ? `Inherits the tenant default (${discountLabel(tenantReferral.type, tenantReferral.value ?? 0)}).`
-                  : "Referrals are off, or no tenant default is set — no discount applies."}
-              </p>
-            ) : (
-              <div className="mt-2 flex items-end gap-2">
-                <select
-                  value={pRefType}
-                  onChange={(e) => setPRefType(e.target.value as "percent" | "amount")}
-                  className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
-                >
-                  <option value="percent">Percent (%)</option>
-                  <option value="amount">Fixed (S$)</option>
-                </select>
-                <input
-                  value={pRefValue}
-                  onChange={(e) => setPRefValue(e.target.value)}
-                  inputMode="numeric"
-                  placeholder="0"
-                  className="w-24 rounded-lg border border-gray-300 px-2 py-1 text-sm"
-                />
-                <span className="text-xs text-gray-500">
-                  0 = no referral discount on this product.
-                </span>
-              </div>
-            )}
-          </div>
-
-          {formError && <p className="text-sm text-red-600">{formError}</p>}
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setProductModal(false)}
-              disabled={busy}
-            >
-              Cancel
-            </Button>
-            <Button onClick={saveProduct} disabled={busy}>
-              {busy ? "Saving…" : "Create package"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      <ProductModal
+        form={productForm}
+        categories={categories}
+        tenantReferral={tenantReferral}
+        busy={busy}
+      />
 
       <Modal
         open={saleModal}
