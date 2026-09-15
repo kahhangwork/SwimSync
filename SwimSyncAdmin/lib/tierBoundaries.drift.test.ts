@@ -34,6 +34,10 @@
 // §7.25: every check was proven RED by breaking the rule on purpose, then
 // reverted — re-proven for the L-A scope on 2026-09-13 (ui->dao, dao->react,
 // domain fetch(, and an unpinned @/lib import on a page: all four went red).
+// Re-proven for the packages scope on 2026-09-15 at Stage 0b: packages/ui/Break
+// importing ../dao, packages/dao/break importing React, packages/domain/break
+// calling fetch(, and an unpinned @/lib/utils import on packages/page.tsx — all
+// four checks went red, then the breakers were removed and 6/6 went green.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -52,6 +56,12 @@ const SCOPE_DIRS = [
   "app/(admin)/parents",
   "app/(admin)/unassigned",
   "app/(admin)/claims",
+  // packages (full track, docs/refactor/PACKAGES_REFACTOR_PLAN.md), widened
+  // 2026-09-15 at Stage 0b. Checks 3 and 4 are red on day one; every current
+  // violation on packages/page.tsx is pinned below with the stage that removes
+  // it (data access -> Stage 2/3 per the §6 grep gate; @/lib imports -> the
+  // slice stage that moves the symbol), and the ledger only shrinks from here.
+  "app/(admin)/packages",
 ];
 
 // One route file per scoped dir. Check 4 runs against each.
@@ -71,6 +81,32 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // ── parents: dao extracted at L1 (parents.repo/rpc.ts), entries removed ──
   // ── unassigned: DONE — dao/domain/ui extracted, ledger empty ──
   // ── claims: DONE — dao/domain/ui extracted, ledger empty ──
+  // ── packages (full track, PACKAGES_REFACTOR_PLAN.md §5) ──
+  // The page loses ALL supabase by Stage 3 (§6 grep gate: 0 outside dao/ from
+  // Stage 3): .from() → dao/packages.repo.ts at Stage 2; .rpc()/functions.invoke/
+  // auth.getUser → dao/packages.rpc.ts at Stage 3. One entry per call shape; a
+  // snippet may cover several identical/related lines (count noted). Table names
+  // are pinned WITHOUT the `supabase` prefix so both the inline `supabase.from(`
+  // and the joined multiline `supabase .from(` forms match.
+  { file: "app/(admin)/packages/page.tsx", contains: 'import { supabase } from "@/lib/supabase"', why: "Stage 3: client -> dao/ (last supabase ref gone)" },
+  { file: "app/(admin)/packages/page.tsx", contains: "const { data: user } = await supabase.auth.getUser()", why: "Stage 3: myTenantId -> dao/packages.rpc.ts (getCurrentUser)" },
+  { file: "app/(admin)/packages/page.tsx", contains: "(await supabase.auth.getUser()).data.user?.id", why: "Stage 3: getCurrentUser() nested in insert payloads (x3: @397/544/645)" },
+  { file: "app/(admin)/packages/page.tsx", contains: '.from("profiles")', why: "Stage 2: dao/packages.repo.ts (x4)" },
+  { file: "app/(admin)/packages/page.tsx", contains: '.from("tenants")', why: "Stage 2: dao/packages.repo.ts (x2)" },
+  { file: "app/(admin)/packages/page.tsx", contains: '.from("class_categories")', why: "Stage 2: dao/packages.repo.ts (x5)" },
+  { file: "app/(admin)/packages/page.tsx", contains: '.from("package_products")', why: "Stage 2: dao/packages.repo.ts (x3)" },
+  { file: "app/(admin)/packages/page.tsx", contains: '.from("parent_packages")', why: "Stage 2: dao/packages.repo.ts (x5)" },
+  { file: "app/(admin)/packages/page.tsx", contains: '.from("parent_tenants")', why: "Stage 2: dao/packages.repo.ts" },
+  { file: "app/(admin)/packages/page.tsx", contains: '.from("parent_students")', why: "Stage 2: dao/packages.repo.ts" },
+  { file: "app/(admin)/packages/page.tsx", contains: '.from("referrals")', why: "Stage 2: dao/packages.repo.ts" },
+  { file: "app/(admin)/packages/page.tsx", contains: '.from("referral_rewards")', why: "Stage 2: dao/packages.repo.ts" },
+  { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("package_live_balances")', why: "Stage 3: dao/packages.rpc.ts" },
+  { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("suggest_package_start"', why: "Stage 3: dao/packages.rpc.ts (RISK 4: extracted once, imported by slices 4/5/8)" },
+  { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("preview_package_price"', why: "Stage 3: dao/packages.rpc.ts (RISK 4)" },
+  { file: "app/(admin)/packages/page.tsx", contains: 'supabase.rpc("extend_package"', why: "Stage 3: dao/packages.rpc.ts" },
+  { file: "app/(admin)/packages/page.tsx", contains: "const { data: offerId, error: err } = await supabase.rpc(", why: "Stage 3: create_package_offer (multiline) -> dao/packages.rpc.ts" },
+  { file: "app/(admin)/packages/page.tsx", contains: "const { data, error: err } = await supabase.rpc(", why: "Stage 3: package_renewal_candidates (multiline) -> dao/packages.rpc.ts" },
+  { file: "app/(admin)/packages/page.tsx", contains: "supabase.functions", why: "Stage 3: invokePackageEmail() -> dao/packages.rpc.ts (x3: @679/704/787, un-awaited/.catch preserved)" },
 ];
 
 /**
@@ -88,6 +124,20 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // ── parents: DONE — dao/domain/ui extracted, page is composition, ledger empty ──
   // ── unassigned: DONE — page is composition, ledger empty ──
   // ── claims: DONE — page is composition, ledger empty (claimNaming moved into domain) ──
+  // ── packages (full track, PACKAGES_REFACTOR_PLAN.md §4 verdicts) ──
+  // packageOffers MOVES into packages/domain (sole importer, §4); the other four
+  // @/lib/* helpers STAY in lib/ (shared) and are reached from domain/ui after
+  // their symbols leave the page. NOTE (§5): the transitional page->dao import
+  // pins (./dao/packages.{repo,rpc}) are NOT listed here — they cannot exist at
+  // 0b (the page imports no dao yet, so the shrink-test would flag them stale).
+  // They are added at Stage 2/3 when the import first appears (playbook §7.1's
+  // sanctioned exception) and removed at Stages 4-9 as each hook wraps the call.
+  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/supabase", why: "Stage 3: client -> packages/dao" },
+  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/packageOffers", why: "Stage 5: MOVE into packages/domain (sole importer)" },
+  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/tableSearch", why: "Stage 4: reached from domain (shared, stays in lib)" },
+  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/lessonDates", why: "Stages 4-11: reached from domain/ui (shared, stays in lib)" },
+  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/referralDiscount", why: "Stage 11: reached from ui table (shared, stays in lib)" },
+  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/waMessage", why: "Stage 9: reached from domain/ui (shared, stays in lib)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
