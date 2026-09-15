@@ -119,7 +119,8 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/packages/page.tsx", contains: "./dao/packages.repo", why: "Stages 4-9: page -> domain -> dao" },
   { file: "app/(admin)/packages/page.tsx", contains: "./dao/packages.rpc", why: "Stages 4-9: page -> domain -> dao" },
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/packageOffers", why: "Stage 5: MOVE into packages/domain (sole importer)" },
-  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/tableSearch", why: "Stage 4: reached from domain (shared, stays in lib)" },
+  // @/lib/tableSearch left at Stage 4 — matchesAnyField moved into
+  // domain/packageRows.ts (heldMatching); the page no longer imports it.
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/lessonDates", why: "Stages 4-11: reached from domain/ui (shared, stays in lib)" },
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/referralDiscount", why: "Stage 11: reached from ui table (shared, stays in lib)" },
   { file: "app/(admin)/packages/page.tsx", contains: "@/lib/waMessage", why: "Stage 9: reached from domain/ui (shared, stays in lib)" },

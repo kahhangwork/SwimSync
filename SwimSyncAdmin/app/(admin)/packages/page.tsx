@@ -29,33 +29,48 @@ import { defaultConfirmStart, pickOfferProduct } from "@/lib/packageOffers";
 import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { WhatsAppQueue, type WaQueueRow } from "@/components/WhatsAppQueue";
 import { discountLabel } from "@/lib/referralDiscount";
-import { matchesAnyField } from "@/lib/tableSearch";
 import { DMY, ROW_LIMIT } from "./constants";
-import type {
-  Category,
-  Product,
-  Purchase,
-  ParentOption,
-  CandidateRow,
-} from "./types";
+import type { Category, Product, Purchase, CandidateRow } from "./types";
 import * as repo from "./dao/packages.repo";
 import * as rpc from "./dao/packages.rpc";
+import { usePackageList } from "./domain/usePackageList";
+import { ListNotices } from "./ui/ListNotices";
 
 const money = (n: number) => `S$${Number(n).toFixed(2)}`;
 
 export default function PackagesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [parents, setParents] = useState<ParentOption[]>([]);
-  const [businessName, setBusinessName] = useState("your swim school");
-  const [tenantDefaultProduct, setTenantDefaultProduct] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // "Who holds one" search + the truncation flag for its fetch.
-  const [heldSearch, setHeldSearch] = useState("");
-  const [capped, setCapped] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Slice 1 (list-core): all loaded data, held-search, the WhatsApp queue, and
+  // the shared busy/error flags live in usePackageList. ⚠ RISK 2 — busy/error
+  // are single, owned there, and passed to the other slices (still page
+  // functions until their stage). load() is the hook's; every handler awaits it.
+  const {
+    categories,
+    products,
+    purchases,
+    parents,
+    businessName,
+    tenantDefaultProduct,
+    tenantReferral,
+    loading,
+    error,
+    busy,
+    heldSearch,
+    capped,
+    queue,
+    showSuperseded,
+    pending,
+    superseded,
+    held,
+    heldMatches,
+    activeProducts,
+    setError,
+    setBusy,
+    setQueue,
+    setHeldSearch,
+    setShowSuperseded,
+    load,
+    setProductActive,
+  } = usePackageList();
 
   // Category form
   const [newCategory, setNewCategory] = useState("");
@@ -71,9 +86,6 @@ export default function PackagesPage() {
   const [pRefOverride, setPRefOverride] = useState(false);
   const [pRefType, setPRefType] = useState<"percent" | "amount">("percent");
   const [pRefValue, setPRefValue] = useState("");
-  const [tenantReferral, setTenantReferral] = useState<{
-    enabled: boolean; type: "percent" | "amount" | null; value: number | null;
-  }>({ enabled: false, type: null, value: null });
   const [formError, setFormError] = useState<string | null>(null);
   // Record-sale form
   const [saleModal, setSaleModal] = useState(false);
@@ -99,149 +111,6 @@ export default function PackagesPage() {
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [genBusy, setGenBusy] = useState(false);
   const [genProgress, setGenProgress] = useState<string | null>(null);
-  // Rows to work through in the WhatsApp queue after offers are created. Each
-  // carries its pre-built wa.me link (opened by onOpenChat) plus the fields the
-  // shared WhatsAppQueue renders.
-  const [queue, setQueue] = useState<(WaQueueRow & { link: string | null })[]>([]);
-  // Reveal superseded offers in the Awaiting panel (RISK 1 tracing aid).
-  const [showSuperseded, setShowSuperseded] = useState(false);
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-
-    // Holiday extensions are event-driven now (reconcile trigger,
-    // 20260818000700): expires_on is already current when this page reads it,
-    // so there is no pre-read recompute call any more.
-    const tenant = await rpc.myTenantId();
-    if (tenant) {
-      const { data: t } = await repo.loadTenantSettings(tenant);
-      if (t?.display_name) setBusinessName(t.display_name);
-      setTenantDefaultProduct(t?.default_package_product_id ?? null);
-      setTenantReferral({
-        enabled: !!t?.referral_enabled,
-        type: (t?.referral_discount_type as "percent" | "amount" | null) ?? null,
-        value: t?.referral_discount_value != null ? Number(t.referral_discount_value) : null,
-      });
-    }
-
-    // RLS scopes every query here to the caller's own business.
-    const [catRes, prodRes, purRes, liveRes, ptRes, childRes] = await Promise.all([
-      repo.loadCategories(),
-      repo.loadProducts(),
-      repo.loadPurchases(),
-      rpc.liveBalances(),
-      repo.loadParentOptions(),
-      repo.loadChildren(),
-    ]);
-
-    // A failed catalogue fetch and "this business sells nothing" render
-    // IDENTICALLY without this — an empty products table and no signal. That is
-    // how the PGRST201 embed break above went unnoticed from 2026-08-15; say so
-    // instead of degrading quietly. Same guard as the parent app's Billing tab.
-    if (prodRes.error) {
-      console.error("package_products fetch failed", prodRes.error);
-      setError("Couldn't load the package catalogue — please reload the page.");
-    }
-
-    // parent_id → "Ali, Bo" (active children only).
-    const childrenByParent = new Map<string, string[]>();
-    for (const r of (childRes.data as any[]) ?? []) {
-      const s = Array.isArray(r.students) ? r.students[0] : r.students;
-      if (!s?.is_active || !s?.full_name) continue;
-      const arr = childrenByParent.get(r.parent_id) ?? [];
-      arr.push(s.full_name);
-      childrenByParent.set(r.parent_id, arr);
-    }
-
-    setCategories(
-      (catRes.data ?? []).map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        class_count: (c.classes ?? []).length,
-        default_product_id: c.default_product_id ?? null,
-        default_capacity: c.default_capacity ?? null,
-      }))
-    );
-
-    setProducts(
-      (prodRes.data ?? []).map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        category_id: p.category_id,
-        category_name: p.class_categories?.name ?? null,
-        lesson_count: p.lesson_count,
-        rate_per_lesson: Number(p.rate_per_lesson),
-        validity_weeks: p.validity_weeks,
-        is_active: p.is_active,
-        holder_count: (p.parent_packages ?? []).filter(
-          (x: any) => x.status !== "cancelled"
-        ).length,
-      }))
-    );
-
-    setCapped((purRes.data ?? []).length >= ROW_LIMIT);
-
-    // Live balances by package id — the RPC's number, never recomputed here.
-    const liveById = new Map<string, any>(
-      ((liveRes.data as any[]) ?? []).map((r) => [r.parent_package_id, r])
-    );
-
-    setPurchases(
-      (purRes.data ?? []).map((p: any) => ({
-        id: p.id,
-        parent_id: p.parent_id,
-        parent_name:
-          p.parents?.profiles?.full_name ??
-          p.parents?.profiles?.email ??
-          "Unknown",
-        name: p.name,
-        category_name: p.class_categories?.name ?? null,
-        lesson_count: p.lesson_count,
-        rate_per_lesson: Number(p.rate_per_lesson),
-        total_value: Number(p.total_value),
-        amount_payable: Number(p.amount_payable),
-        discount_amount: Number(p.discount_amount),
-        value_remaining: Number(p.value_remaining),
-        live_value_remaining: liveById.has(p.id)
-          ? Number(liveById.get(p.id).live_value_remaining)
-          : null,
-        live_lessons_remaining: liveById.has(p.id)
-          ? Number(liveById.get(p.id).live_lessons_remaining)
-          : null,
-        status: p.status,
-        product_id: p.product_id,
-        requested_at: p.requested_at,
-        start_date: p.start_date,
-        expires_on: p.expires_on,
-        holiday_extension_days: p.holiday_extension_days ?? 0,
-        cancel_extension_days: p.cancel_extension_days ?? 0,
-        manual_extension_days: p.manual_extension_days ?? 0,
-        reference_number: p.reference_number ?? null,
-        offered_by: p.offered_by ?? null,
-        paid_claimed_at: p.paid_claimed_at ?? null,
-        superseded_by: p.superseded_by ?? null,
-        public_token: p.public_token ?? null,
-        children: (childrenByParent.get(p.parent_id) ?? []).join(", ") || null,
-      }))
-    );
-
-    setParents(
-      (ptRes.data ?? [])
-        .map((r: any) => ({
-          id: r.parents?.id,
-          name:
-            r.parents?.profiles?.full_name ?? r.parents?.profiles?.email ?? "",
-        }))
-        .filter((p: ParentOption) => p.id)
-    );
-
-    setLoading(false);
-  }
 
   // ── Categories ─────────────────────────────────────────────────────────────
 
@@ -394,14 +263,6 @@ export default function PackagesPage() {
       return;
     }
     setProductModal(false);
-    load();
-  }
-
-  async function setProductActive(p: Product, active: boolean) {
-    setBusy(true);
-    const { error: err } = await repo.updateProductActive(p.id, active);
-    setBusy(false);
-    if (err) setError("Could not update that package.");
     load();
   }
 
@@ -676,28 +537,6 @@ export default function PackagesPage() {
     load();
   }
 
-  const pending = purchases.filter((p) => p.status === "pending");
-  // ⚠ RISK 1 — a SUPERSEDED offer (cancelled by a newer request) so a stray
-  // bank transfer against the old PKG- reference can still be traced.
-  const superseded = purchases.filter(
-    (p) => p.status === "cancelled" && p.superseded_by
-  );
-  // "held" is unchanged EXCEPT that a superseded offer is pulled out (it now
-  // lives in the Awaiting panel's Superseded list, not "Who holds one").
-  const held = purchases.filter(
-    (p) => p.status !== "pending" && !(p.status === "cancelled" && p.superseded_by)
-  );
-  // The search narrows the DISPLAY only — `held` stays the base so "nobody holds
-  // one" and "nothing matched your search" can be told apart. Client-side over a
-  // bounded list; a blank term matches everyone (`matchesAnyField`).
-  const heldMatches = held.filter((p) =>
-    matchesAnyField(p, heldSearch, [
-      (r) => r.parent_name,
-      (r) => r.name,
-      (r) => r.reference_number,
-    ])
-  );
-
   // Oldest request first: this queue is work waiting on the admin, and the
   // parent who has been waiting longest is the one to serve next.
   const pendingSort = useTableSort<Purchase>({ key: "requested_at" });
@@ -717,7 +556,6 @@ export default function PackagesPage() {
     accessors: { remaining: (p) => p.live_lessons_remaining },
   });
   const visibleHeld = heldSort.apply(heldMatches);
-  const activeProducts = products.filter((p) => p.is_active);
   return (
     <div>
       <PageHeader
@@ -731,11 +569,8 @@ export default function PackagesPage() {
         </Button>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      <ListNotices error={error} />
+
 
       {/* ── Pending requests — the action queue, so it comes first ────────── */}
       {(pending.length > 0 || superseded.length > 0) && (
