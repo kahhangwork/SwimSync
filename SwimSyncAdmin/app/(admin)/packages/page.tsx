@@ -18,7 +18,7 @@
 // already attended but not yet invoiced. Do NOT recompute that in TS — the
 // RPC is the single derivation (PACKAGES_DESIGN.md ⚠ RISK 4).
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
@@ -37,9 +37,11 @@ import { useCategories } from "./domain/useCategories";
 import { usePurchaseActions } from "./domain/usePurchaseActions";
 import { useProductForm } from "./domain/useProductForm";
 import { useExtend } from "./domain/useExtend";
+import { useSale } from "./domain/useSale";
 import { ListNotices } from "./ui/ListNotices";
 import { ProductModal } from "./ui/ProductModal";
 import { ExtendModal } from "./ui/ExtendModal";
+import { SaleModal } from "./ui/SaleModal";
 import { CategoriesSection } from "./ui/CategoriesSection";
 import { ConfirmPaymentModal } from "./ui/ConfirmPaymentModal";
 import { CancelModal } from "./ui/CancelModal";
@@ -109,60 +111,15 @@ export default function PackagesPage() {
   const extend = useExtend({ setBusy, reload: load });
   const { openExtend } = extend;
 
-  // Record-sale form
-  const [saleModal, setSaleModal] = useState(false);
-  const [saleParent, setSaleParent] = useState("");
-  const [saleProduct, setSaleProduct] = useState("");
-  // Start date — pre-filled from suggest_package_start, always editable, and
-  // failing open to today (⚠ RISK 7: the RPC must never block a sale).
-  const [saleStart, setSaleStart] = useState("");
-  const [salePreview, setSalePreview] = useState<
-    { total: number; discount: number; payable: number } | null
-  >(null);
+  // Slice 4 — record a sale + price preview.
+  const sale = useSale({ setBusy, setError, reload: load });
+  const { setSaleModal } = sale;
+
   // Renewal offers — Generate all preview + the resulting WhatsApp queue.
   const [genModal, setGenModal] = useState(false);
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [genBusy, setGenBusy] = useState(false);
   const [genProgress, setGenProgress] = useState<string | null>(null);
-
-  // ── Purchases ──────────────────────────────────────────────────────────────
-
-  // Sale form: when both parent and product are chosen, suggest a start date AND
-  // preview the discounted price (RISK 7).
-  useEffect(() => {
-    if (saleModal && saleParent && saleProduct) {
-      rpc.fetchSuggestedStart(saleParent, saleProduct).then(setSaleStart);
-      rpc.fetchPreviewPrice(saleParent, saleProduct).then(setSalePreview);
-    } else {
-      setSalePreview(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saleModal, saleParent, saleProduct]);
-
-  async function recordSale() {
-    if (!saleParent || !saleProduct) return;
-    setBusy(true);
-    // Directly active: the admin recording an offline sale IS the
-    // confirmation. The DB snapshots the product's terms and dates expiry from
-    // the start date (defaulting to today if the admin cleared the field).
-    const { error: err } = await repo.insertPurchase({
-      parent_id: saleParent,
-      product_id: saleProduct,
-      status: "active",
-      start_date: saleStart || todayInSg(),
-      tenant_id: await rpc.myTenantId(),
-    });
-    setBusy(false);
-    if (err) {
-      setError("Could not record the sale.");
-      return;
-    }
-    setSaleModal(false);
-    setSaleParent("");
-    setSaleProduct("");
-    setSaleStart("");
-    load();
-  }
 
   // ── Renewal offers ─────────────────────────────────────────────────────────
 
@@ -729,101 +686,12 @@ export default function PackagesPage() {
         busy={busy}
       />
 
-      <Modal
-        open={saleModal}
-        onClose={() => setSaleModal(false)}
-        title="Record a sale"
-      >
-        <p className="mb-4 text-sm text-gray-600">
-          For a purchase arranged outside the app. The package becomes active
-          immediately — record it only once the money has arrived.
-        </p>
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Parent
-            </label>
-            <select
-              value={saleParent}
-              onChange={(e) => setSaleParent(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">Choose…</option>
-              {parents.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Package
-            </label>
-            <select
-              value={saleProduct}
-              onChange={(e) => setSaleProduct(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">Choose…</option>
-              {activeProducts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — {money(p.lesson_count * p.rate_per_lesson)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Start date
-            </label>
-            <input
-              type="date"
-              value={saleStart}
-              onChange={(e) => setSaleStart(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              Suggested from when this parent&rsquo;s current coverage ends —
-              adjust it freely.
-            </p>
-          </div>
-          {/* ⚠ RISK 7 — the price the family pays, from preview_package_price,
-              so a referral discount is visible before recording the sale. */}
-          {salePreview && (
-            <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
-              {salePreview.discount > 0 ? (
-                <span className="text-gray-700">
-                  Pays <strong>{money(salePreview.payable)}</strong>{" "}
-                  <span className="text-emerald-700">
-                    (−{money(salePreview.discount)} referral discount off{" "}
-                    {money(salePreview.total)})
-                  </span>
-                </span>
-              ) : (
-                <span className="text-gray-700">
-                  Pays <strong>{money(salePreview.payable)}</strong>
-                </span>
-              )}
-            </div>
-          )}
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setSaleModal(false)}
-              disabled={busy}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={recordSale}
-              disabled={busy || !saleParent || !saleProduct}
-            >
-              {busy ? "Saving…" : "Record sale"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      <SaleModal
+        form={sale}
+        parents={parents}
+        activeProducts={activeProducts}
+        busy={busy}
+      />
 
       <ConfirmPaymentModal
         confirming={confirming}
