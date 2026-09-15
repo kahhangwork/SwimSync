@@ -116,17 +116,23 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // the page calls dao/packages.{repo,rpc} directly. @/lib/supabase left at
   // Stage 3 (page holds no client). These two go Stages 4-9 as the hooks land;
   // gone by Stage 11.
-  { file: "app/(admin)/packages/page.tsx", contains: "./dao/packages.repo", why: "Stages 4-9: page -> domain -> dao" },
-  { file: "app/(admin)/packages/page.tsx", contains: "./dao/packages.rpc", why: "Stages 4-9: page -> domain -> dao" },
+  // Both transitional page->dao imports GONE at Stage 9: the last direct
+  // repo/rpc caller (generate-offers) became a hook, so the page imports no dao
+  // at all. Entries deleted.
   // @/lib/packageOffers MOVED into packages/domain at Stage 5 (sole importer);
   // the page now imports ./domain/packageOffers (pickOfferProduct), allowed by
   // check 4. Entry deleted (ledger shrinks).
   // @/lib/tableSearch left at Stage 4 — matchesAnyField moved into
   // domain/packageRows.ts (heldMatching); the page no longer imports it.
-  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/lessonDates", why: "Stages 4-11: reached from domain/ui (shared, stays in lib)" },
+  // @/lib/lessonDates is the LAST packages page-import pin — todayInSg +
+  // formatSgStamp are used by the still-page-level tables (the held "expired"
+  // check + the requested-at stamp); it leaves at Stage 11 when the tables move.
+  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/lessonDates", why: "Stage 11: reached from ui tables (shared, stays in lib)" },
   // @/lib/referralDiscount left the page at Stage 6 — discountLabel moved into
   // ui/ProductModal (still shared, stays in lib, reached from ui). Deleted.
-  { file: "app/(admin)/packages/page.tsx", contains: "@/lib/waMessage", why: "Stage 9: reached from domain/ui (shared, stays in lib)" },
+  // @/lib/waMessage left the page at Stage 9 — buildPackageOfferMessage/
+  // buildWaLink/toWaNumber moved into useGenerateOffers + ui/GenerateOffersModal
+  // (still shared, stays in lib). Deleted.
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

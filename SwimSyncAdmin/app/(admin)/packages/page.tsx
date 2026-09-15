@@ -18,30 +18,27 @@
 // already attended but not yet invoiced. Do NOT recompute that in TS — the
 // RPC is the single derivation (PACKAGES_DESIGN.md ⚠ RISK 4).
 
-import React, { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { todayInSg, formatSgStamp } from "@/lib/lessonDates";
-import { pickOfferProduct } from "./domain/packageOffers";
-import { buildPackageOfferMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
-import { WhatsAppQueue, type WaQueueRow } from "@/components/WhatsAppQueue";
+import { WhatsAppQueue } from "@/components/WhatsAppQueue";
 import { DMY, ROW_LIMIT, money } from "./constants";
-import type { Category, Product, Purchase, CandidateRow } from "./types";
-import * as repo from "./dao/packages.repo";
-import * as rpc from "./dao/packages.rpc";
+import type { Category, Product, Purchase } from "./types";
 import { usePackageList } from "./domain/usePackageList";
 import { useCategories } from "./domain/useCategories";
 import { usePurchaseActions } from "./domain/usePurchaseActions";
 import { useProductForm } from "./domain/useProductForm";
 import { useExtend } from "./domain/useExtend";
 import { useSale } from "./domain/useSale";
+import { useGenerateOffers } from "./domain/useGenerateOffers";
 import { ListNotices } from "./ui/ListNotices";
 import { ProductModal } from "./ui/ProductModal";
 import { ExtendModal } from "./ui/ExtendModal";
 import { SaleModal } from "./ui/SaleModal";
+import { GenerateOffersModal } from "./ui/GenerateOffersModal";
 import { CategoriesSection } from "./ui/CategoriesSection";
 import { ConfirmPaymentModal } from "./ui/ConfirmPaymentModal";
 import { CancelModal } from "./ui/CancelModal";
@@ -115,153 +112,15 @@ export default function PackagesPage() {
   const sale = useSale({ setBusy, setError, reload: load });
   const { setSaleModal } = sale;
 
-  // Renewal offers — Generate all preview + the resulting WhatsApp queue.
-  const [genModal, setGenModal] = useState(false);
-  const [candidates, setCandidates] = useState<CandidateRow[]>([]);
-  const [genBusy, setGenBusy] = useState(false);
-  const [genProgress, setGenProgress] = useState<string | null>(null);
-
-  // ── Renewal offers ─────────────────────────────────────────────────────────
-
-  /** Create ONE offer (create_package_offer), fire the best-effort offer email,
-   *  and return the row for the WhatsApp queue. Throws on RPC failure so the
-   *  caller can mark that family and continue (RISK 12: the RPC itself refuses a
-   *  second open offer). */
-  async function createOneOffer(
-    c: CandidateRow
-  ): Promise<WaQueueRow & { link: string | null }> {
-    const { data: offerId, error: err } = await rpc.createPackageOffer(
-      c.parent_id,
-      c.chosenProduct,
-      c.chosenStart || todayInSg()
-    );
-    if (err || !offerId) {
-      throw new Error(err?.message ?? "offer failed");
-    }
-
-    const { data: row } = await repo.loadOfferRow(offerId as string);
-
-    // Best-effort email (never blocks the offer).
-    rpc
-      .invokePackageEmail({ type: "offered", package_id: offerId })
-      .catch(() => {});
-
-    const waNumber = toWaNumber(c.parent_phone);
-    const payUrl = row?.public_token
-      ? `${window.location.origin.replace("admin.", "")}/package/${row.public_token}`
-      : "";
-    const waLink =
-      waNumber && row
-        ? buildWaLink(
-            waNumber,
-            buildPackageOfferMessage({
-              businessName,
-              childrenNames: c.children ? c.children.split(", ") : [],
-              packageName: row.name as string,
-              lessons: Number(row.lesson_count),
-              // RISK 7 — the WhatsApp price MUST equal the /package pay-page
-              // headline and the QR: amount_payable, not the undiscounted worth.
-              price: Number(row.amount_payable),
-              reference: (row.reference_number as string) ?? "",
-              link: payUrl,
-            })
-          )
-        : null;
-
-    return {
-      id: offerId as string,
-      parentName: c.parent_name,
-      subtitle: c.children,
-      meta: row
-        ? `${row.name} · ${money(Number(row.amount_payable))}`
-        : null,
-      waNumber,
-      rawPhone: c.parent_phone,
-      openedStamp: null, // an offer is superseded, not re-chased (no reminded_at)
-      link: waLink,
-    };
-  }
-
-  /** Open the Generate-all preview: pull the candidate families and seed each
-   *  row with its suggested product + start date, editable, ticked when a
-   *  product could be pre-selected (Decision 6). */
-  async function openGenerateAll() {
-    setGenBusy(true);
-    setError(null);
-    const { data, error: err } = await rpc.renewalCandidates();
-    setGenBusy(false);
-    if (err) {
-      setError("Could not load renewal candidates.");
-      return;
-    }
-    const rows: CandidateRow[] = await Promise.all(
-      ((data as any[]) ?? []).map(async (r) => {
-        const suggested =
-          r.suggested_product_id ??
-          pickOfferProduct(
-            r.original_product_id
-              ? {
-                  productId: r.original_product_id,
-                  isActive: activeProducts.some(
-                    (p) => p.id === r.original_product_id
-                  ),
-                }
-              : null,
-            null,
-            null
-          ) ??
-          "";
-        const start = suggested
-          ? await rpc.fetchSuggestedStart(r.parent_id, suggested)
-          : todayInSg();
-        const preview = suggested
-          ? await rpc.fetchPreviewPrice(r.parent_id, suggested)
-          : null;
-        return {
-          parent_id: r.parent_id,
-          parent_name: r.parent_name ?? "Unknown",
-          parent_phone: r.parent_phone ?? null,
-          children: r.children ?? null,
-          package_name: r.package_name ?? null,
-          lessons_left: r.lessons_left ?? null,
-          expires_on: r.expires_on ?? null,
-          expired_days_ago: r.expired_days_ago ?? null,
-          original_product_id: r.original_product_id ?? null,
-          suggested_product_id: suggested || null,
-          has_open_offer: !!r.has_open_offer,
-          chosenProduct: suggested,
-          chosenStart: start,
-          include: !!suggested && !r.has_open_offer,
-          previewTotal: preview?.total ?? null,
-          previewDiscount: preview?.discount ?? null,
-          previewPayable: preview?.payable ?? null,
-        };
-      })
-    );
-    setCandidates(rows);
-    setGenModal(true);
-  }
-
-  /** Confirm the preview: create each ticked offer sequentially (a failure marks
-   *  that row and continues — RISK 12), then open the WhatsApp queue. */
-  async function confirmGenerateAll() {
-    setGenBusy(true);
-    const created: (WaQueueRow & { link: string | null })[] = [];
-    const chosen = candidates.filter((c) => c.include && c.chosenProduct);
-    for (let i = 0; i < chosen.length; i++) {
-      setGenProgress(`Creating offer ${i + 1} of ${chosen.length}…`);
-      try {
-        created.push(await createOneOffer(chosen[i]));
-      } catch {
-        /* skip this family; the rest continue */
-      }
-    }
-    setGenProgress(null);
-    setGenBusy(false);
-    setGenModal(false);
-    setQueue(created);
-    load();
-  }
+  // Slice 8 — generate renewal offers (⚠ RISK 9: list-core state as params).
+  const gen = useGenerateOffers({
+    activeProducts,
+    businessName,
+    setQueue,
+    setError,
+    reload: load,
+  });
+  const { openGenerateAll, genBusy } = gen;
 
   // Oldest request first: this queue is work waiting on the admin, and the
   // parent who has been waiting longest is the one to serve next.
@@ -713,155 +572,7 @@ export default function PackagesPage() {
       <ExtendModal form={extend} busy={busy} />
 
       {/* ── Generate-all preview (Decision 6) — never a blind send ─────────── */}
-      <Modal
-        open={genModal}
-        onClose={() => !genBusy && setGenModal(false)}
-        title="Generate renewal offers"
-      >
-        {candidates.length === 0 ? (
-          <p className="text-sm text-gray-600">
-            No families are due for renewal right now — everyone covered is above
-            the low-balance and expiry thresholds, or already has an open offer.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-xs text-gray-500">
-              Each family below is running low or has recently expired. Tick the
-              ones to offer, adjust the package or start date, then confirm. An
-              email goes out and a WhatsApp queue opens for the rest.
-            </p>
-            <div className="max-h-[420px] space-y-2 overflow-y-auto">
-              {candidates.map((c, i) => (
-                <div
-                  key={c.parent_id}
-                  className="rounded-lg border border-gray-200 p-3"
-                >
-                  <div className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked={c.include}
-                      onChange={(e) =>
-                        setCandidates((prev) =>
-                          prev.map((r, j) =>
-                            j === i ? { ...r, include: e.target.checked } : r
-                          )
-                        )
-                      }
-                      className="mt-1"
-                    />
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-gray-900">
-                        {c.parent_name}
-                        {c.children ? (
-                          <span className="text-gray-400"> · {c.children}</span>
-                        ) : null}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {c.expired_days_ago != null
-                          ? `Expired ${c.expired_days_ago} day${c.expired_days_ago === 1 ? "" : "s"} ago`
-                          : `${c.lessons_left ?? 0} left${c.expires_on ? ` · expires ${c.expires_on}` : ""}`}
-                        {c.has_open_offer ? " · already has an open offer" : ""}
-                        {!toWaNumber(c.parent_phone) ? " · no WhatsApp number" : ""}
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <select
-                          value={c.chosenProduct}
-                          onChange={(e) => {
-                            const productId = e.target.value;
-                            setCandidates((prev) =>
-                              prev.map((r, j) =>
-                                j === i
-                                  ? { ...r, chosenProduct: productId, previewPayable: null,
-                                      previewDiscount: null, previewTotal: null }
-                                  : r
-                              )
-                            );
-                            // RISK 7 — re-price via preview_package_price, never
-                            // lesson_count × rate, so a referral discount shows.
-                            if (productId) {
-                              rpc.fetchPreviewPrice(c.parent_id, productId).then((pv) =>
-                                setCandidates((prev) =>
-                                  prev.map((r, j) =>
-                                    j === i
-                                      ? { ...r, previewTotal: pv?.total ?? null,
-                                          previewDiscount: pv?.discount ?? null,
-                                          previewPayable: pv?.payable ?? null }
-                                      : r
-                                  )
-                                )
-                              );
-                            }
-                          }}
-                          className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
-                        >
-                          <option value="">Choose package…</option>
-                          {activeProducts.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} — {money(p.lesson_count * p.rate_per_lesson)}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="date"
-                          value={c.chosenStart}
-                          onChange={(e) =>
-                            setCandidates((prev) =>
-                              prev.map((r, j) =>
-                                j === i
-                                  ? { ...r, chosenStart: e.target.value }
-                                  : r
-                              )
-                            )
-                          }
-                          className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
-                        />
-                      </div>
-                      {/* ⚠ RISK 7 — the discounted price this offer will carry
-                          (preview_package_price), matching the WhatsApp price
-                          and the pay-page headline. */}
-                      {c.previewPayable != null && (
-                        <div className="mt-1 text-xs text-gray-600">
-                          Pays <strong>{money(c.previewPayable)}</strong>
-                          {c.previewDiscount != null && c.previewDiscount > 0 && (
-                            <span className="text-emerald-700">
-                              {" "}(−{money(c.previewDiscount)} referral off{" "}
-                              {money(c.previewTotal ?? 0)})
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {genProgress && (
-              <p className="text-xs text-sky-700">{genProgress}</p>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setGenModal(false)}
-                disabled={genBusy}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={confirmGenerateAll}
-                disabled={
-                  genBusy ||
-                  candidates.filter((c) => c.include && c.chosenProduct)
-                    .length === 0
-                }
-              >
-                {genBusy
-                  ? "Creating…"
-                  : `Create ${candidates.filter((c) => c.include && c.chosenProduct).length} offer(s)`}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <GenerateOffersModal form={gen} activeProducts={activeProducts} />
 
       {/* ── WhatsApp queue — the shared shell, fed the created offers ───────── */}
       <WhatsAppQueue
