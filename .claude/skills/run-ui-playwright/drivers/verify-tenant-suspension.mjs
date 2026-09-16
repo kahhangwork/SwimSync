@@ -105,9 +105,21 @@ try {
   await page.screenshot({ path: shot("02-dialog.png"), fullPage: true });
 
   // ── 3. Suspend ────────────────────────────────────────────────────────────
+  // Wait for the /api/suspend-tenant response to land — the true "done" signal —
+  // not a fixed timer. A blind waitForTimeout(4000) raced a slow runner here
+  // (nightly 35095280475 asserted the badge while the confirm button still read
+  // "Suspending…"; the DB change itself succeeded, proven by the login-dies check
+  // below). Register the response wait BEFORE the click. Do NOT wait on the
+  // confirm button detaching: it re-labels to "Suspending…" the instant it is
+  // clicked, so a getByRole("Suspend this business") locator matches nothing and
+  // Playwright reports "detached" in ~40ms — the request would then be aborted by
+  // the reload before it finishes. Then reload to read the settled row.
+  const suspendResp = page.waitForResponse(
+    (r) => r.url().includes("/api/suspend-tenant"), { timeout: 15000 });
   await page.getByRole("button", { name: "Suspend this business", exact: true }).click();
-  await page.waitForTimeout(4000);
-  body = await page.evaluate(() => document.body.innerText);
+  await suspendResp;
+  await page.goto(`${ADMIN}/platform`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(800);
   check("the row now shows the suspended badge and an Unsuspend action",
     (await row("SuspendCov School").innerText()).includes("suspended") &&
     (await row("SuspendCov School").innerText()).includes("Unsuspend"));
@@ -137,8 +149,16 @@ try {
   await page.waitForTimeout(1500);
   await row("SuspendCov School").getByText("Unsuspend", { exact: true }).click();
   await page.waitForTimeout(800);
+  // Same de-flake as the suspend path: wait for the /api/unsuspend-tenant
+  // response (the confirm button re-labels to "Unsuspending…" and would race a
+  // detach wait the same way), then reload so the badge's absence is read from
+  // settled state.
+  const unsuspendResp = page.waitForResponse(
+    (r) => r.url().includes("/api/unsuspend-tenant"), { timeout: 15000 });
   await page.getByRole("button", { name: "Unsuspend this business", exact: true }).click();
-  await page.waitForTimeout(4000);
+  await unsuspendResp;
+  await page.goto(`${ADMIN}/platform`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(800);
   check("the suspended badge is gone",
     !(await row("SuspendCov School").innerText()).includes("suspended"));
   await page.screenshot({ path: shot("06-unsuspended.png"), fullPage: true });
