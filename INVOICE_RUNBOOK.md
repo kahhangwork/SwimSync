@@ -213,6 +213,14 @@ Billing is based on **actual attendance**, so make sure last month is complete:
     **NEEDS MARKING** list shows it, and so does the class's own page. Before this
     the guest's lesson was silently skipped and the month closed over it, which
     lost that money for good.
+  - **"Month left open — N billable lesson(s) have no parent account to bill" is an
+    UNCLAIMED child, not an unmarked lesson** *(2026-09-14, August — the first real one)*.
+    A coach-added child whose parent never registered was marked *present*; everything
+    else was marked and invoiced, the month just cannot close over a lesson nobody can
+    be billed for. The **Unclaimed** modal on the Invoices page names the child. Either
+    correct the mark (if the wrong child was ticked), invite the parent, or record the
+    money as settled — then Generate again; existing invoices are skipped. **Absent**
+    marks on an unclaimed child do not hold the month open.
   - **A month with nothing recorded is never closed.** Running generation before
     any attendance is marked reports *"No lessons are recorded … the month is
     still open"* and seals nothing. (Until 2026-07-18 it sealed such a month and

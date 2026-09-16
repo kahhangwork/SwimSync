@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-16 — **`invoices` full-track refactor SHIPPED to `main` (§8.106)** — 1,748 → 200 lines,
-0 `useState`, both boundary ledgers empty, zero behaviour change, full driver net green. Landed via a cross-session
-merge (§7.240); a drift-twin miss reddened `main`, now fixed (§7.241). **A fresh nightly must validate `main` (§9).**_
+_Last updated: 2026-09-17 — **August billing is HALF DONE on prod (§8.107):** 9 invoices out on 14 Sep, month
+held OPEN by one unclaimed child marked present on 2 Aug. Fix the mark / invite / settle, then Generate again —
+`INVOICE_RUNBOOK.md`. One backlog item raised (generation-run visibility). No code change; nightly gate still open (§9)._
 
-_Previously, 2026-09-16 (§8.105) — Admin L-B lite batch shipped; its nightly reddened on one unrelated flake (`verify-tenant-suspension`, §7.240), de-flaked._
+_Previously, 2026-09-16 (§8.106) — `invoices` full-track refactor shipped to `main`, zero behaviour change; drift-twin miss fixed (§7.241). **A fresh nightly must validate `main`.**_
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +347,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.107 (2026-09-17) — August billing diagnosed: one unclaimed child holds the month open
+
+**No code shipped. Prod state read, cause found, backlog item raised (`d9828c4`).** The admin's August run
+reported a bare error first, then "success, month left open — 1 billable lesson has no parent account to bill".
+Read from a `supabase db dump --linked --data-only` parsed offline (psql to a scratch DB was blocked by the
+permission classifier): 9 August invoices created 2026-09-14 09:49 SGT in one ~10 s run (5 paid, 4 outstanding),
+all 22 August lessons fully marked, and **one coach-added child with no parent account marked present on 2 Aug** —
+the engine's fifth seal condition, working as designed. The first-run error is unproven; likeliest a client
+timeout on the run that completed (second run created 0). Edge-function logs around 2026-09-14 01:49 UTC would settle it.
+
+- **Fix is the admin's, not code:** correct the mark, invite the parent, or record a settlement → Generate again. Now a bullet in `INVOICE_RUNBOOK.md`.
+- **Graduated:** the "why did it fail / what holds it open" visibility gap → `BACKLOG.md` (Billing and payments), shapes recorded, not decided.
+- **Deliberately not done:** no override, no attendance edit by me, no PRD change.
+
 ## 8.106 (2026-09-16) — `invoices/page.tsx` full-track decomposition: 1,748 → 200 lines, 0 useState
 
 **The 3rd full-track giant; all 12 stages built on `refactor/invoices-tiers`, on `main`, CI green. Zero
@@ -361,24 +375,7 @@ unmarked-lessons 12/12, payment-collection 19/19).
 - **Landed on `main` via a cross-session merge** (§7.240 sibling — check `git branch --show-current` on a shared tree); nothing reverted. A **one-line drift-twin miss went red on `main`** and was fixed (`6fe19e6`, §7.241): the SwimSyncApp copy of `sgDisplay.drift.test.ts` also scans admin and needed the same `formatBillingMonth` repoint — run BOTH suites.
 - **Graduated:** the cross-slice-cycle + shared-spine-id patterns → playbook §5; the drift-twin trap → §7.241; a `verify-invoice-admin` driver (4 uncovered admin actions) → `BACKLOG.md`.
 
-## 8.105 (2026-09-16) — Admin L-B lite batch: 5 calendar pages to tiers, 2,387 → 440 lines, 0 useState
-
-**Unit 4 of 17 (giant→batch alternation); shipped to `main` (`927a8b4`…`a773058`). Zero behaviour change.**
-Its nightly `35095280475` reddened on ONE unrelated driver (`verify-tenant-suspension` 11/12, a Platform-page
-flake — L-B's 5 pages passed L4 6/6); de-flaked to wait on the API response (`595910e`, §7.240), 12/12 local.
-A fresh nightly is still needed. attendance (867→110), substitutes (539→105), holidays (443→113),
-calendar (282→45), lessons (256→67) — each folded L1–L3 in one commit (playbook §7.1), every page **0 `useState`**,
-both boundary ledgers empty. 708 vitest (+25 characterisation tests) + 429 jest; L4 driver net **6/6 green**
-(smoke-admin 64, admin-calendar 21, admin-lesson-detail 27, cancel-lesson 17, coach-roster 30, platform-admin-scope 32)
-+ holidays hand-check **9/9**.
-
-- **Read `docs/refactor/BATCH_B_PLAN.md` (§12), not this, for the how** — the driver net, move/stay verdicts, and findings.
-- **Two MOVEs** (`git mv`, sole code importer + its test): `holidaysCsv`→holidays/domain, `makeupFromAttendance`→attendance/domain.
-- **Graduated to the playbook** (§1, §5): the `@/lib`-grep-under-reports-relative-imports lesson (`attendanceWindow`
-  looked sole-imported, was shared — corrected before the move), the ui-imports-a-type-from-dao→`types.ts` rule,
-  and the drift-test `walk` now stops at a nested route page (`lessons/[classId]/[date]` is a separate giant).
-
-_(§8.104 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.105 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -396,10 +393,12 @@ Everything below is the monthly loop from here on:
    `SELECT status, count(*) FROM invoices GROUP BY 1;` is the honest scoreboard. The
    WhatsApp queue (Invoices → *WhatsApp reminders*, with the **Claimed** filter) is the
    chasing tool when a future month needs it.
-2. **Keep August marked as it happens** (the coach's **NEEDS MARKING** list on the
-   Schedule tab is the tracker), then **bill August in early September** — same runbook, now routine. The
-   marking window still floors at the 1st of last month (§8.15): August's lessons are
-   markable through September, and no later.
+2. **August is HALF BILLED — finish it before October (§8.107).** 9 invoices went out on 14 Sep; the month
+   is held open by ONE unclaimed child marked present on 2 Aug (Invoices → *Unclaimed* modal names them).
+   Correct the mark / invite the parent / record a settlement, then **Generate August again** — existing
+   invoices are skipped. Do it **before 1 Oct**: the marking window floors at the 1st of last month (§8.15),
+   so an August mark is editable only through September. Then keep September marked as it happens
+   (the coach's **NEEDS MARKING** list is the tracker) and bill it in early October.
    > Marking got two small helps on 2026-08-03 (§8.27): today's card now names **guests
    > apart from students**, so the head-count finally agrees with the number of marks the
    > lesson actually needs, and the **Classes tab lands on the class list** rather than
