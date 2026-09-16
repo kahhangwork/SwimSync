@@ -119,13 +119,8 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: "app/(admin)/attendance/page.tsx", contains: '.from("class_shadow_coaches")', why: "L1: attendance/dao/attendance.repo.ts" },
   { file: "app/(admin)/attendance/page.tsx", contains: '.from("session_coach_absences")', why: "L1: attendance/dao/attendance.repo.ts" },
   { file: "app/(admin)/attendance/page.tsx", contains: '.rpc("book_makeup"', why: "L1: attendance/dao/attendance.rpc.ts" },
-  // substitutes -> substitutes/dao
-  { file: "app/(admin)/substitutes/page.tsx", contains: 'import { supabase }', why: "L1: client -> substitutes/dao" },
-  { file: "app/(admin)/substitutes/page.tsx", contains: '.from("classes")', why: "L1: substitutes/dao/substitutes.repo.ts" },
-  { file: "app/(admin)/substitutes/page.tsx", contains: '.from("coaches")', why: "L1: substitutes/dao/substitutes.repo.ts" },
-  { file: "app/(admin)/substitutes/page.tsx", contains: '.from("lesson_sessions")', why: "L1: substitutes/dao/substitutes.repo.ts" },
-  { file: "app/(admin)/substitutes/page.tsx", contains: '.from("session_coaches")', why: "L1: substitutes/dao/substitutes.repo.ts" },
-  { file: "app/(admin)/substitutes/page.tsx", contains: '.rpc("assign_session_coach"', why: "L1: substitutes/dao/substitutes.rpc.ts" },
+  // ── substitutes: DONE — dao/domain/ui extracted, ledger empty. All reads +
+  //    the assign RPC + the delete moved into substitutes/dao/substitutes.repo.ts. ──
   // holidays -> holidays/dao
   { file: "app/(admin)/holidays/page.tsx", contains: 'import { supabase }', why: "L1: client -> holidays/dao" },
   { file: "app/(admin)/holidays/page.tsx", contains: "supabase.auth.getUser()", why: "L1: holidays/dao/holidays.repo.ts" },
@@ -195,10 +190,8 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/packageCoverage", why: "L2: reached from attendance/domain (shared, stays in lib)" },
   { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/lessonAttribution", why: "L2: reached from attendance/domain (shared, stays in lib)" },
   { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/tableSearch", why: "L2: reached from attendance/domain (shared, stays in lib)" },
-  // substitutes
-  { file: "app/(admin)/substitutes/page.tsx", contains: "@/lib/supabase", why: "L1: client -> substitutes/dao" },
-  { file: "app/(admin)/substitutes/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from substitutes/domain (shared, stays in lib)" },
-  { file: "app/(admin)/substitutes/page.tsx", contains: "@/lib/sessionRoster", why: "L2: reached from substitutes/domain (shared, stays in lib)" },
+  // ── substitutes: DONE — page is composition, ledger empty. lessonDates +
+  //    sessionRoster reached from domain/useSubstitutes and ui/SubstitutesTable. ──
   // holidays
   { file: "app/(admin)/holidays/page.tsx", contains: "@/lib/supabase", why: "L1: client -> holidays/dao" },
   { file: "app/(admin)/holidays/page.tsx", contains: "lucide-react", why: "L3: icons -> holidays/ui" },
