@@ -22,7 +22,7 @@ of risk, one nightly.
 | `substitutes` | 539 | 13 | 5 / 1 / 0 | — | `lessonDates`, `sessionRoster` |
 | `holidays` | 443 | 14 | 8 / 2 / 0 | `holidaysCsv` | — |
 | `calendar` | 282 | 7 | 0 / 0 / 0 | — | `calendarData`, `calendarLessons`, `lessonDates`, `timeOfDay` |
-| `lessons` (list) | 256 | 6 | 0 / 0 / 0 | `attendanceWindow` | `calendarData`, `calendarLessons`, `classColours`, `lessonDates`, `markableFloor`, `timeOfDay`, `utils` |
+| `lessons` (list) | 256 | 6 | 0 / 0 / 0 | — | `attendanceWindow`, `calendarData`, `calendarLessons`, `classColours`, `lessonDates`, `markableFloor`, `timeOfDay`, `utils` |
 
 **`attendance` is the heaviest lite page yet (867 / 24)** — top of the lite range (250–900).
 Still one folded commit; one commit per page bisects a driver red to a page regardless of size.
@@ -36,9 +36,12 @@ page's `dao/`** (it stays shared in `lib/`, reached from `dao/`), not moved.
 `<page>/domain/` only if that page is its **sole code importer**. Verified by
 `grep -rln '@/lib/<mod>' SwimSyncAdmin/{app,lib,components}` on 2026-09-16:
 
-- `makeupFromAttendance` — only `attendance/page.tsx` → **MOVE** into `attendance/domain/`.
-- `holidaysCsv` — only `holidays/page.tsx` → **MOVE** into `holidays/domain/`.
-- `attendanceWindow` — only `lessons/page.tsx` → **MOVE** into `lessons/domain/`.
+- `makeupFromAttendance` — only `attendance/page.tsx` (+ its co-located test) → **MOVE** into `attendance/domain/`.
+- `holidaysCsv` — only `holidays/page.tsx` (+ its test; `lib/csv.ts` only *mentions* it in a comment) → **MOVE** into `holidays/domain/`.
+- `attendanceWindow` — **STAY** (corrected from L0). The `@/lib/` grep showed one importer, but
+  `lib/lessonMarking.ts` and `lib/markableFloor.ts` import it by **relative path** (`./attendanceWindow`),
+  which that grep misses. It is shared; reach `markableWindowStart` from `lessons/domain`.
+  **Lesson: grep both `@/lib/<mod>` AND `./<mod>` (from inside lib/) before calling a helper sole-imported.**
 - `calendarData` — `calendar` + `lessons` (2 importers) → **STAY** (bind in each page's `dao/`).
 - `sessionRoster` — `classes` (non-batch) + `substitutes` → **STAY** (shared).
 - `csv` (3), `lessonAttribution` (3), `tableSearch` (7), `calendarLessons` (10),

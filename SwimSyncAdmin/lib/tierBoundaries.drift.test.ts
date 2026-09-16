@@ -208,16 +208,11 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/calendarLessons", why: "L2: reached from calendar/domain (shared, stays in lib)" },
   { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from calendar/domain (shared, stays in lib)" },
   { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/timeOfDay", why: "L2: reached from calendar/domain (shared, stays in lib)" },
-  // lessons (list)
-  { file: "app/(admin)/lessons/page.tsx", contains: "lucide-react", why: "L3: icons -> lessons/ui" },
-  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/attendanceWindow", why: "L2: MOVE into lessons/domain (sole importer)" },
-  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/calendarData", why: "L1: bound in lessons/dao (does the read, stays in lib)" },
-  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/calendarLessons", why: "L2: reached from lessons/domain (shared, stays in lib)" },
-  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/classColours", why: "L2: reached from lessons/domain (shared, stays in lib)" },
-  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from lessons/domain (shared, stays in lib)" },
-  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/markableFloor", why: "L2: reached from lessons/domain (shared, stays in lib)" },
-  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/timeOfDay", why: "L2: reached from lessons/domain (shared, stays in lib)" },
-  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/utils", why: "L3: cn reached from lessons/ui (shared, stays in lib)" },
+  // ── lessons (list): DONE — dao/domain/ui extracted, page is composition,
+  //    ledger empty. attendanceWindow STAYS (shared: lessonMarking.ts +
+  //    markableFloor.ts import it via relative path — the @/lib grep missed
+  //    those; corrected from the L0 MOVE verdict). calendarData bound in
+  //    lessons/dao; every other @/lib helper reached from domain/ui. ──
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
