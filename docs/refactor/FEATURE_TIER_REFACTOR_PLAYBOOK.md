@@ -76,6 +76,12 @@ page  →  ui  →  domain  →  dao  →  (PostgREST | rpc | /api)
 shared across features or across apps (Students plan §6 has the criterion and the list of
 `lib/` modules that must not move).
 
+**A shared entity type goes in `types.ts`, never in `dao/`.** The boundary test's check 1
+("ui never imports dao") does not distinguish `import type` from a value import, so a `ui/`
+component that pulls a row type from `dao/<page>.repo.ts` goes red. Define the row types in
+the feature-root `types.ts`; `dao/` and `ui/` both import them from there. (Admin L-B,
+`Holiday`/`AttendanceRow`/`MakeupClass`.)
+
 ### Where the folders go — this differs between the apps
 
 | | Admin (Next.js) | Coach / parent app (Expo Router) |
@@ -117,6 +123,12 @@ Green or `git checkout -- .` and try a smaller step. Never "fix it in the next c
 | **3** | `dao/<feature>.rpc.ts` + `.api.ts`, and **bind the client-taking `lib/` helpers** | After this the page imports no client at all. The rpc file's header carries the *orchestrate, never replace* prohibition — copy it |
 | **4** | The list slice: the pure half (`domain/<feature>Rows.ts` — row → entity mapping, filters, labels) **with characterisation tests**, then the stateful half (`domain/useXList.ts` — state, `load()`, the search effect), then the toolbar/notices `ui/` | `load()` is returned from the hook because every write handler awaits it. Keep the mapping pure so it gets the page's first unit tests |
 | **5–10** | One slice per commit, smallest and most similar first: `domain/useX.ts` (state + handlers, taking `reload`) + `ui/XModal.tsx` (markup verbatim, taking the hook's state as one prop). Move a `lib/` module into `domain/` **only** when this page is its sole code importer — `grep -rln` first, and check the hit is not a comment | The page's drawer/actions buttons follow the *close first, then open* order (§7.10); keep it in one helper in the drawer component, not seven copies |
+
+> **The sole-importer grep must cover BOTH `@/lib/<mod>` AND (from inside `lib/`) `./<mod>`, excluding `.test`.**
+> A module in `lib/` is imported by its `lib/` siblings by *relative* path, which `grep -rln '@/lib/<mod>'`
+> silently misses — so a helper can look sole-imported by the page when two other `lib/` modules also use it.
+> Moving it then breaks them. (Admin L-B: `attendanceWindow` looked sole-imported by `lessons/page.tsx`;
+> `lessonMarking.ts` + `markableFloor.ts` import it as `./attendanceWindow`, so it STAYS. Caught before the move.)
 | **11** | Table → `ui/XTable.tsx` (with its `useTableSort`), header → `ui/XHeader.tsx`. Delete the dead imports. **Both ledgers to zero.** | `tsc` does not flag unused imports — grep for each symbol after every cut |
 
 **Order inside 5–10** for the Students page was: rename + add-to-class + status (3 small

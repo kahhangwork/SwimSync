@@ -1560,15 +1560,18 @@ drivers (shipped 2026-09-13), then **Admin L-A "people" (SHIPPED 2026-09-13** �
 ledgers back to empty, 8/8 drivers green; folded L1–L3 per page, see playbook §7.1), then **`packages`
 (full) SHIPPED 2026-09-16** — all 12 stages (`69b9683`…`f0cbcb5`), 2,014 → 244 lines / 0 `useState`, both
 ledgers empty, nightly `35032652395` green on `f0cbcb5`; own plan `docs/refactor/PACKAGES_REFACTOR_PLAN.md`.
+Then **Admin L-B "calendar" (SHIPPED 2026-09-16** — 5 pages attendance/substitutes/holidays/calendar/lessons,
+`927a8b4`…`a773058`, 2,387 → 440 lines / 0 `useState`, both ledgers empty, L4 net 6/6 + holidays hand-check 9/9;
+nightly `35095280475` running; own plan `docs/refactor/BATCH_B_PLAN.md`).
 Then alternate. Never two units in flight; each survives a nightly before the next starts. Tiers stay
 feature-scoped, never new top-level folders (§7.233). **The dao three-way split and its "orchestrate an rpc,
 never replace one" rule graduate to `docs/ARCHITECTURE.md` §6 once a second full page confirms them —
 TRIGGER NOW MET (packages, the 2nd full page, 2026-09-16); ready to write, not yet done (it already lives in
 the playbook §1/§3 and every `dao/*.rpc.ts` header, so this is a consolidation, not a rescue).**
 
-**5 full-track giants remain:** `invoices` (1,748), `classes` (1,714), `platform` (1,395),
+**5 full-track giants remain — NEXT is `invoices` (1,748):** then `classes` (1,714), `platform` (1,395),
 `lessons/[classId]/[date]` (912); coach app `schedule/index` (1,255), `classes/[id]/attendance` (1,183),
-`classes/[id]/roster` (905). *(Students + packages done.)*
+`classes/[id]/roster` (905). *(Students + packages done; Admin L-A + L-B lite batches done.)*
 
 ### ~~Smoke drivers — open every route once, assert it rendered~~ — **SHIPPED 2026-09-13**
 `verify-smoke-admin.mjs` (64 checks) + `verify-smoke-app.mjs` (73 checks); green in the nightly of
