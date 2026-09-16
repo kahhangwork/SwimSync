@@ -121,15 +121,8 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: "app/(admin)/attendance/page.tsx", contains: '.rpc("book_makeup"', why: "L1: attendance/dao/attendance.rpc.ts" },
   // ── substitutes: DONE — dao/domain/ui extracted, ledger empty. All reads +
   //    the assign RPC + the delete moved into substitutes/dao/substitutes.repo.ts. ──
-  // holidays -> holidays/dao
-  { file: "app/(admin)/holidays/page.tsx", contains: 'import { supabase }', why: "L1: client -> holidays/dao" },
-  { file: "app/(admin)/holidays/page.tsx", contains: "supabase.auth.getUser()", why: "L1: holidays/dao/holidays.repo.ts" },
-  { file: "app/(admin)/holidays/page.tsx", contains: '.from("profiles")', why: "L1: holidays/dao/holidays.repo.ts" },
-  { file: "app/(admin)/holidays/page.tsx", contains: '.from("tenants")', why: "L1: holidays/dao/holidays.repo.ts" },
-  { file: "app/(admin)/holidays/page.tsx", contains: '.from("tenant_public_holidays")', why: "L1: holidays/dao/holidays.repo.ts" },
-  { file: "app/(admin)/holidays/page.tsx", contains: '.from("attendance")', why: "L1: holidays/dao/holidays.repo.ts" },
-  { file: "app/(admin)/holidays/page.tsx", contains: '.rpc("mark_day_holiday"', why: "L1: holidays/dao/holidays.rpc.ts" },
-  { file: "app/(admin)/holidays/page.tsx", contains: '.rpc("unmark_day_holiday"', why: "L1: holidays/dao/holidays.rpc.ts" },
+  // ── holidays: DONE — dao/domain/ui extracted, ledger empty. myTenantId +
+  //    every read/write + both RPCs moved into holidays/dao/holidays.repo.ts. ──
 ];
 
 /**
@@ -192,10 +185,9 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/tableSearch", why: "L2: reached from attendance/domain (shared, stays in lib)" },
   // ── substitutes: DONE — page is composition, ledger empty. lessonDates +
   //    sessionRoster reached from domain/useSubstitutes and ui/SubstitutesTable. ──
-  // holidays
-  { file: "app/(admin)/holidays/page.tsx", contains: "@/lib/supabase", why: "L1: client -> holidays/dao" },
-  { file: "app/(admin)/holidays/page.tsx", contains: "lucide-react", why: "L3: icons -> holidays/ui" },
-  { file: "app/(admin)/holidays/page.tsx", contains: "@/lib/holidaysCsv", why: "L2: MOVE into holidays/domain (sole importer)" },
+  // ── holidays: DONE — page is composition, ledger empty. Client -> dao;
+  //    lucide icons -> ui; holidaysCsv MOVED into holidays/domain (git mv, sole
+  //    code importer). ──
   // ── calendar: DONE — dao/domain/ui extracted, page is composition, ledger
   //    empty. calendarData bound in calendar/dao; calendarLessons/lessonDates/
   //    timeOfDay reached from domain (rangeLabel + filters) and ui/CalendarBody. ──

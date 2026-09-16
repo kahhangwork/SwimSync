@@ -1,6 +1,7 @@
 // CSV export for the admin tables (invoices, credit notes, attendance).
 //
-// The only other CSV code in the app is `holidaysCsv.ts`, which PARSES an import;
+// The only other CSV code in the app is the Holidays page's own
+// `holidays/domain/holidaysCsv.ts`, which PARSES an import;
 // this is the inverse — it serialises rows the admin is already looking at and
 // hands the browser a download. Two hazards drove the shape (see WAVE_C_PLAN.md):
 //
