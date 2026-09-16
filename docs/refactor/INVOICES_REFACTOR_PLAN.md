@@ -139,11 +139,10 @@ _(Fold L1–L3 shape does NOT apply — this is a full-track giant; twelve stage
 
 | Stage | What | Commit | Gate | Drivers |
 |---|---|---|---|---|
-| 0 | This plan | — | — | — |
-| 0b | Widen `tierBoundaries.drift.test.ts` to `invoices`; pin ledgers; prove red | | | |
-| 1 | `constants.ts` + `types.ts` | | | |
-| 2 | `dao/invoices.repo.ts` (every `.from()` + auth) | | | |
-| 3 | `dao/invoices.rpc.ts` + `.api.ts`; page holds no client | | | |
+| 0 | This plan | `a1a0c51` | — | — |
+| 0b | Widen `tierBoundaries.drift.test.ts` to `invoices`; pin ledgers; prove red | `a1a0c51` | typecheck + 708 vitest, fence 6/6 | — |
+| 1 | `constants.ts` + `types.ts` (1,748 → 1,662) | `96a851a` | typecheck + 708 vitest | — |
+| 2+3 | `dao/invoices.{repo,rpc,api}.ts` — folded; **page holds no client** (1,662 → 1,561) | `f3a12b8` | typecheck + 708 vitest, fence 6/6 | — (drivers start Stage 4) |
 | 4 | List: `domain/invoiceRows.ts` (+ tests) → `useInvoiceList` → `ui/InvoiceToolbar` + `ui/InvoiceTable` + move `ReminderQueue` into ui | | | invoice-controls |
 | 5 | `useUnclaimed` + `ui/UnclaimedModal` | | | trial-onboarding |
 | 6 | `useOrphans` + `ui/OrphanReport` (move `settlementPayload`) | | | orphan-report |
