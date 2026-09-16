@@ -1,11 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-14 — **Admin L-A lite batch SHIPPED to prod (§8.103, `dfe4cad`)** — five "people"
-pages (coaches/admins/parents/unassigned/claims) decomposed to `dao`/`domain`/`ui`, zero behaviour change,
-both boundary ledgers empty, 8/8 drivers green. Unit 2 of 17 done; **next: a nightly, then `packages` (full
-track)** (§9)._
+_Last updated: 2026-09-16 — **`packages/page.tsx` full-track refactor SHIPPED and nightly-confirmed
+(§8.104)** — all 12 stages, 2,014 → 244 lines / 0 `useState`, both boundary ledgers empty, zero behaviour
+change; nightly `35032652395` green on `f0cbcb5`. Unit 3 of 17 done; **next: the next feature-tier unit —
+`BACKLOG.md` → Foundations** (§9)._
 
-_Previously, 2026-09-13 (§8.102) — smoke drivers for every route in both apps shipped, nightly GREEN._
+_Previously, 2026-09-14 (§8.103) — Admin L-A lite batch (5 "people" pages) shipped to prod, `dfe4cad`._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -348,6 +348,23 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.104 (2026-09-16) — `packages/page.tsx` full-track decomposition: 2,014 → 244 lines, 0 useState
+
+**The 2nd full-track giant (unit 3 of 17); all 12 stages shipped to `main` and confirmed by its OWN nightly
+(`35032652395`, a full sweep green on `f0cbcb5`; rot issue #10 closed). Zero behaviour change.** dao
+(`packages.repo` + `.rpc`) → domain (7 hooks + pure `packageRows` with 14 characterisation tests) → ui
+(10 components); both boundary ledgers empty. 686 vitest + 429 jest + 4 drivers green (verify-packages 21,
+package-renewal 7, referrals 13, smoke-admin 64).
+
+- **The Students playbook transferred to a 2nd giant.** Every stage's commit, the RISK-block outcomes, and
+  the findings are in `docs/refactor/PACKAGES_REFACTOR_PLAN.md` (§6 done-block, §13). Read that, not this,
+  for the how.
+- **One deviation from plan §11:** three table components (`PendingPanel`/`ProductsTable`/`HeldTable`), not
+  one `PackageTable` — each keeps its `useTableSort` in an always-mounted component (RISK 3).
+- **Graduated:** the local-stack OOM trap → §7.239; the 10 driver-uncovered admin actions (a
+  `verify-packages-admin` driver) + the dao-split → `docs/ARCHITECTURE.md` §6 graduation (trigger now met by
+  the 2nd full page) → `BACKLOG.md`.
+
 ## 8.103 (2026-09-14) — Admin L-A: five "people" pages decomposed to tiers, shipped to prod
 
 **The feature-tier rollout's first lite batch (unit 2 of 17), zero behaviour change, `dfe4cad` on prod.**
@@ -363,26 +380,7 @@ coaches/admins/parents/unassigned/claims → `dao`/`domain`/`ui` + composition p
   flight. Duplicate `ui/Field.tsx` left feature-scoped (consolidate on a third copy → `BACKLOG.md`).
 - Detail: `docs/refactor/BATCH_A_PLAN.md`. Tests: `docs/TESTING.md` §5.
 
-## 8.102 (2026-09-13) — Smoke drivers for EVERY route in both apps; the rollout becomes every page
-
-**Two drivers (`18b61a2`), one product fix (`b93d986`), one decision — and the nightly went green.**
-
-- **`verify-smoke-admin.mjs` (64 checks) + `verify-smoke-app.mjs` (73)** open every admin route and every
-  coach/parent/public screen once and assert the right page rendered with no `pageerror`/`console.error`.
-  They are the net for the seven admin pages and most small app screens that NO other driver opens, and the
-  once-per-batch gate of the lite track. `docs/TESTING.md` §5; both green through `run-all-drivers.sh` and in
-  the 2026-09-13 nightly (`34721735241`).
-- **Decision: the feature-tier refactor's end state is EVERY page on the same shape**, ceremony scaled by size —
-  full / lite / fence, 17 units, ~15 sessions. Playbook §7; `BACKLOG.md` → Foundations is the queue.
-- **Found on the first run:** `/profile/contact` fired two `eq.undefined` 400s on a hard reload → fixed (one
-  guard line; pinned by the driver's hard-reload check). Two more filed in `BACKLOG.md`: NativeWind's per-load
-  throw (allowlisted by exact message), and session-less `/register` bouncing to `/login`.
-- **Two traps graduated:** §7.237 (a deep link is replaced by the landing tab — press from the tab bar, poll the
-  render) and §7.238 (Metro served a stale bundle after an edit — grep the served bundle, `--clear`).
-- **Deliberately NOT done:** no lite batch started (the playbook waits for a nightly per unit — it has now run);
-  `nextDateFor` left duplicated in both drivers (a third copy is the trigger to lift it into `lib.mjs`).
-
-_(§8.101 demoted to a ledger row in `docs/SESSIONS.md`.)_
+_(§8.102 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -425,10 +423,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-13: GREEN** (`34721735241`, 06:04 SGT) — first success after two reds, confirming the
-§8.101 date-rot fixes AND the two new smoke drivers (§8.102) in one run. Re-read the run, don't trust this
-line (§8.65). Start any new red with `gh run download <id> -n ui-driver-run` and the screenshots (§7.228),
-not a hypothesis.
+**State on 2026-09-16: GREEN** (`35032652395`, a full 1h20m sweep on `f0cbcb5`) — the run that confirmed the
+whole `packages` refactor (§8.104); rot issue #10 closed, none open. Re-read the run, don't trust this line
+(§8.65). Start any new red with `gh run download <id> -n ui-driver-run` and the screenshots (§7.228), not a
+hypothesis.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -449,17 +447,19 @@ failures that are just the driver's own UI writes — reset before believing it.
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — a nightly, then `packages` (full track, unit 3 of 17)
+### THE NEXT BUILD — the next feature-tier unit (2 of 7 giants done)
 
-**Admin L-A shipped (§8.103, `dfe4cad` on prod).** The gate before the next unit is a **nightly sweep** — never
-two units in flight (playbook §7.1). So the immediate next step is: **wait for the nightly**, confirm the five
-L-A pages (and the widened boundary test) stay green, then start `packages/page.tsx` on the **full** track
-(2,014 lines, its own `docs/refactor/PACKAGES_*_PLAN.md`, 12 stages one-per-nightly).
+**`packages` shipped and survived its nightly (§8.104).** So the "never two units in flight" gate (playbook
+§7.1) is clear and the next unit may start. **Pick from `BACKLOG.md` → Foundations** — it holds the whole
+queue and order (5 full giants left: `invoices`, `classes`, `platform`, `lessons/[classId]/[date]`, and the
+three coach-app screens; plus the lite batches). **Do not re-derive the queue here** — restating it is how
+the two drift.
 
-The lite-track method is now proven at N pages: **fold L1–L3 into one commit per page** (playbook §7.1), and
-for a full page follow the twelve stages of playbook §2. `BACKLOG.md` → *Foundations* is the whole queue and
-its order; **do not re-derive it here** — restating it is how the two drift. Tiers stay feature-scoped under
-the page's folder (§7.233).
+Method for a full page: the twelve stages of playbook §2, one per nightly, with its own
+`docs/refactor/<FEATURE>_REFACTOR_PLAN.md` (Students and packages are the two worked examples). For a lite
+batch: fold L1–L3 per page (playbook §7.1). Tiers stay feature-scoped under the page's folder (§7.233).
+**Now-due once-off:** the dao three-way split + "orchestrate, never replace" rule graduates to
+`docs/ARCHITECTURE.md` §6 (trigger met — `BACKLOG.md`).
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), **on prod
 — re-confirmed 2026-08-30 by `supabase migration list --linked`, `remote` column filled** — 0 pending, rehearsed

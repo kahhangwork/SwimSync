@@ -1,8 +1,10 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps, on three tracks**
-(full / lite / fence — playbook §7), 17 units, smoke driver first; the *Foundations* item rewritten and a
-**Smoke drivers** item added. On 2026-09-12: the Students decomposition shipped (§8.100), the driver-port
+_Last updated: 2026-09-16 — **`packages` (full track) SHIPPED** (2nd full-track giant after Students; 5
+giants remain), a `verify-packages-admin` driver filed, and the dao-split → ARCHITECTURE §6 graduation
+flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
+on three tracks** (full / lite / fence — playbook §7), 17 units, smoke driver first; the *Foundations* item
+rewritten and a **Smoke drivers** item added. On 2026-09-12: the Students decomposition shipped (§8.100), the driver-port
 fix filed, and the package-settings move marked ripe. Earlier: **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
 suites green, **not yet deployed** (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD
 §7.15). Struck from the pick-now list. **One new item added, found by its driver:** the admin sidebar
@@ -1555,11 +1557,18 @@ ceremony.
 (§7 for the tracks and the order; the coach app differs: tiers go under `SwimSyncApp/features/`, and jest's
 `testMatch` and both `sgDisplay.drift` twins must gain that folder in the same commit). **Order:** the smoke
 drivers (shipped 2026-09-13), then **Admin L-A "people" (SHIPPED 2026-09-13** — 5 pages, dfe4cad, both
-ledgers back to empty, 8/8 drivers green; folded L1–L3 per page, see playbook §7.1), then `packages` (full)
-**after a nightly confirms L-A**, then alternate. Never two units in flight; each survives a nightly before
-the next starts. Tiers stay feature-scoped, never
-new top-level folders (§7.233). The dao three-way split and its "orchestrate an rpc, never replace one" rule
-graduate to `docs/ARCHITECTURE.md` §6 once a **second** full page confirms them.
+ledgers back to empty, 8/8 drivers green; folded L1–L3 per page, see playbook §7.1), then **`packages`
+(full) SHIPPED 2026-09-16** — all 12 stages (`69b9683`…`f0cbcb5`), 2,014 → 244 lines / 0 `useState`, both
+ledgers empty, nightly `35032652395` green on `f0cbcb5`; own plan `docs/refactor/PACKAGES_REFACTOR_PLAN.md`.
+Then alternate. Never two units in flight; each survives a nightly before the next starts. Tiers stay
+feature-scoped, never new top-level folders (§7.233). **The dao three-way split and its "orchestrate an rpc,
+never replace one" rule graduate to `docs/ARCHITECTURE.md` §6 once a second full page confirms them —
+TRIGGER NOW MET (packages, the 2nd full page, 2026-09-16); ready to write, not yet done (it already lives in
+the playbook §1/§3 and every `dao/*.rpc.ts` header, so this is a consolidation, not a rescue).**
+
+**5 full-track giants remain:** `invoices` (1,748), `classes` (1,714), `platform` (1,395),
+`lessons/[classId]/[date]` (912); coach app `schedule/index` (1,255), `classes/[id]/attendance` (1,183),
+`classes/[id]/roster` (905). *(Students + packages done.)*
 
 ### ~~Smoke drivers — open every route once, assert it rendered~~ — **SHIPPED 2026-09-13**
 `verify-smoke-admin.mjs` (64 checks) + `verify-smoke-app.mjs` (73 checks); green in the nightly of
@@ -1596,6 +1605,22 @@ whatever is on :3000/:8081 — possibly a sibling, possibly nothing. Small and m
 
 **Notes:** `drivers/lib.mjs` already reads both env vars; the fix is to route these three through it and
 never hardcode a port again. Pairs with the future-date driver item below (both are driver-suite hygiene).
+
+### A `verify-packages-admin` driver for the ten uncovered Packages actions — **S** `[from the packages refactor 2026-09-16]`
+`verify-packages` + `verify-package-renewal` + `verify-referrals` exercise render, the live-balance cell,
+Payment received, offer generation and the referrer reward — but **ten admin actions have no driver**:
+Record a sale, Decline, Cancel, Extend, Retire/Reoffer, Add package, Add category, category Default/Max,
+held search, Show superseded.
+
+**Why:** the packages page was just decomposed with zero behaviour change, and those ten actions were the
+only ones riding on hand checks (screenshots, Stages 4–11 of `PACKAGES_REFACTOR_PLAN.md`). A driver makes
+the guarantee repeatable so the next change to a slice hook is caught by CI, not by remembering to click.
+
+**Notes:** the hand-checks are already written as one-off Playwright scripts against `coach@swimsync.test`
+(the seed tenant admin — NOT the default `superadmin`, who has no tenant and sees "administers none"); lift
+them into a driver + `fixtures-packages-admin.sql`. The fixture needs a superseded offer to cover the
+Show-superseded toggle (the current `fixtures-packages.sql` seeds none). Companion to the L-A driver-gap
+note (`verify-packages` §7.238 family).
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the

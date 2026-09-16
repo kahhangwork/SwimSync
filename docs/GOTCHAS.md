@@ -3759,3 +3759,15 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     restart. It is §7.31's rule on a different server: a 200 (or a hot-reload message) proves nothing —
     `curl` the bundle URL from the page's `<script src>` and grep for a string only the new code has.
     (2026-09-13.)
+
+239. **Running a UI driver needs Docker + the Supabase stack + BOTH dev servers + Playwright at once, and on
+    a tight machine that OOM-kills the Postgres container mid-run (exit 137) — recover with `supabase stop &&
+    supabase start`, never a bare re-`start`.** Symptom while driving the packages drivers on 2026-09-15:
+    `supabase status` says `supabase_db_SwimSync container is not running: exited`, and re-running
+    `supabase start` says "supabase start is already running" (a stale lock) while the DB stays down. The
+    clean `stop` clears the lock and the next `start` comes up `healthy` in ~30 s; then re-run the driver.
+    Two companions: the drivers' own runner hard-requires :3000 AND :8081 to answer (it is not enough for the
+    one app the driver touches to be up), and the dev servers themselves get reclaimed under the same
+    pressure — close what you are not using and expect to restart mid-session. `run-all-drivers.sh --only
+    <name>` runs one driver's reset+seed+run in ~90 s, so prefer it to the full sweep when checking one page.
+    (2026-09-15.)

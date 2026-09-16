@@ -151,6 +151,17 @@ Green, or `git checkout -- .` and take a smaller step. Never "fix it in the next
 | 10 | (unused — packages has 8 slices, no spare) |
 | 11 | table → `ui/PackageTable.tsx` (with `useTableSort`); delete dead imports (grep each symbol); **both ledgers → zero**, header dated |
 
+**DONE 2026-09-16 — every stage shipped to `main`, nightly-confirmed (`35032652395`, a full 1h20m sweep on
+`f0cbcb5`, green; rot issue #10 closed):** 0b `69b9683` · 1 `a38b9f8` · 2 `6c48ab4` · 3 `8dc7cc2` ·
+4 `0f8a31d` · 5 `69ad8b2` · 6 `c5cfe66` · 7 `28c96ef` · 8 `5e887ad` · 9 `0bff67b` · 11 `f0cbcb5`.
+`page.tsx` 2,014 → 244 lines, **0 `useState`**, both boundary ledgers empty. Deviation from §11's wording:
+**three** table components (`ui/PendingPanel` + `ui/ProductsTable` + `ui/HeldTable`), not one `PackageTable`
+— the three tables differ too much to share; each holds its own `useTableSort` in an always-mounted
+component (RISK 3), and the page renders `PendingPanel` unconditionally (it returns null when empty) so the
+sort survives a reload. Also: the transitional page→dao import pins (§5) had to be added at Stages 2/3 (when
+the import first appears), NOT at 0b — a pin with no matching import fails the shrink-test; the DATA_ACCESS
+`why`s therefore read Stage 2/3 (§6 grep gate), and only the page→dao IMPORT pins run to Stages 4–9.
+
 **⚠ RISK 6 (Stages 3, 5) — the email + auth reaches.** Stage 3 binds the invoke and the
 user lookup in `dao/`; Stage 5 moves the `referral_reward` IIFE (@689–707)
 as ONE block into `usePurchaseActions`, **still un-awaited, still `.catch(() => {})`
@@ -255,8 +266,17 @@ uncovered actions.**
 
 ## 13. Durable findings to graduate at `/update-docs`
 
-_(Append as they arise during execution.)_
+_(Append as they arise during execution. GRADUATED 2026-09-16 at `/update-docs`.)_
 
-- **The /packages driver net is thin** — ten actions have no automated coverage; a
-  `verify-packages-admin` driver is filed in `BACKLOG.md`. Until it exists, those actions
-  ride on hand checks (§7).
+- **The /packages driver net is thin** — ten admin actions have no automated coverage
+  (Record a sale, Decline, Cancel, Extend, Retire/Reoffer, Add package, Add category,
+  category Default/Max, held search, Show superseded). All were hand-checked with
+  screenshots across Stages 4–11; a `verify-packages-admin` driver is filed in
+  `BACKLOG.md`. **→ graduated to `BACKLOG.md`.**
+- **The local stack OOM-kills the DB under the driver load** (Docker + Supabase + 2 dev
+  servers + Playwright); `supabase stop && start` recovers, a bare re-`start` hits a stale
+  lock. **→ graduated to `docs/GOTCHAS.md` §7.239.**
+- **packages is the SECOND full-track page** (after Students), so the programme trigger to
+  graduate the dao three-way split + "orchestrate an rpc, never replace one" into
+  `docs/ARCHITECTURE.md` §6 is now MET. **→ noted in `BACKLOG.md` (Feature-tier item) as
+  ready; not yet written, to avoid duplicating the playbook/dao-header copies.**
