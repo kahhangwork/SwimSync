@@ -94,10 +94,13 @@ Gate every commit: `cd SwimSyncAdmin && npm run typecheck && npm test` **and**
       `923b582` holidays (443→113) · `f3b6a8e` attendance (867→110). Every page: **0 `useState`**,
       its ledger entries deleted as the code moved. **Both ledgers now empty.** 708 vitest
       (+25 characterisation tests across the 5 pages) + 429 jest, both apps green at each commit.
-- [ ] **L4** (once) — run the full batch net on the live stack, one driver at a time
-      (`--only`; stop expo for admin-only drivers — the batched run OOM-kills the box, §7.239).
-      Hand-check `holidays` (mark/unmark, CSV import, extension days) with a screenshot named
-      in the commit. Plus `smoke-admin`.
+- [x] **L4** (once) — full batch net GREEN on the live stack 2026-09-16, one driver at a
+      time (`--only`, per-driver DB reset): **smoke-admin 64/64 · admin-calendar 21/21 ·
+      admin-lesson-detail 27/27 · cancel-lesson 17/17 · coach-roster 30/30 (substitutes) ·
+      platform-admin-scope 32/32**. `holidays` hand-check **9/9** (add · ext-days save · void ·
+      restore · CSV import · remove) against `coach@swimsync.test` — screenshot
+      `handcheck-holidays.png` (scratchpad). No product finding; the one red was a script
+      ambiguity (header trigger + modal submit both read "Add holiday").
 
 Then merge → push → delete branch. **Wait for a nightly before the next unit** (never two
 units in flight, playbook §7.1). Next after L-B is a full giant (giant/batch alternation):
