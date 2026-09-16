@@ -143,7 +143,7 @@ _(Fold L1–L3 shape does NOT apply — this is a full-track giant; twelve stage
 | 0b | Widen `tierBoundaries.drift.test.ts` to `invoices`; pin ledgers; prove red | `a1a0c51` | typecheck + 708 vitest, fence 6/6 | — |
 | 1 | `constants.ts` + `types.ts` (1,748 → 1,662) | `96a851a` | typecheck + 708 vitest | — |
 | 2+3 | `dao/invoices.{repo,rpc,api}.ts` — folded; **page holds no client** (1,662 → 1,561) | `f3a12b8` | typecheck + 708 vitest, fence 6/6 | — (drivers start Stage 4) |
-| 4 | List: `domain/invoiceRows.ts` (+ tests) → `useInvoiceList` → `ui/InvoiceToolbar` + `ui/InvoiceTable` + move `ReminderQueue` into ui | | | invoice-controls |
+| 4 | List: `domain/invoiceRows.ts` (+7 tests) → `useInvoiceList` → `ui/InvoiceToolbar` + `ui/InvoiceTable` + `ReminderQueue` git-mv'd into ui (1,561 → 1,197) | `15f542a` | typecheck + 715 vitest, fence 6/6 | **verify-invoice-controls 18/18** |
 | 5 | `useUnclaimed` + `ui/UnclaimedModal` | | | trial-onboarding |
 | 6 | `useOrphans` + `ui/OrphanReport` (move `settlementPayload`) | | | orphan-report |
 | 7 | `usePendingDebits` + `ui/PendingDebits` | | | (unit — dormant) |

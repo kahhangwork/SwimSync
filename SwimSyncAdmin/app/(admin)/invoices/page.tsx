@@ -19,11 +19,13 @@ import * as repo from "./dao/invoices.repo";
 import * as rpc from "./dao/invoices.rpc";
 import { generateInvoices } from "./dao/invoices.api";
 import { useInvoiceList } from "./domain/useInvoiceList";
+import { useUnclaimed } from "./domain/useUnclaimed";
 import { formatBillingMonth } from "./domain/invoiceRows";
 import { InvoiceToolbar } from "./ui/InvoiceToolbar";
 import { InvoiceTable } from "./ui/InvoiceTable";
+import { UnclaimedModal } from "./ui/UnclaimedModal";
 import { ReminderQueue } from "./ui/ReminderQueue";
-import type { UnclaimedStudent, OrphanLine, PendingDebit } from "./types";
+import type { OrphanLine, PendingDebit } from "./types";
 
 export default function InvoicesPage() {
   // The invoices list slice: table data, search/filter/sort, CSV, mark-paid,
@@ -58,19 +60,10 @@ export default function InvoicesPage() {
   const [paynowMobile, setPaynowMobile] = useState<string | null>(null);
   const [paynowSaved, setPaynowSaved] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState("your swim school");
-  // Students with billable attendance and no parent account to bill. They hold
-  // the month OPEN (the engine's fifth seal condition), so the remedy has to be
-  // reachable from right here — an admin sent to another page to find them is
-  // an admin who does not come back.
-  const [unclaimed, setUnclaimed] = useState<UnclaimedStudent[]>([]);
-  const [settling, setSettling] = useState<string | null>(null);
-  // Amount per student for the "paid outside SwimSync" path. Required by the
-  // DB, deliberately: student_settlements CHECKs that a paid_outside row
-  // carries an amount, so "the money arrived" can never be recorded without
-  // saying how much. That is what makes these rows summable later
-  // (BACKLOG → Revenue reporting).
-  const [settleAmount, setSettleAmount] = useState<Record<string, string>>({});
-  const [settleError, setSettleError] = useState<string | null>(null);
+  // Billable lessons with nobody to bill — they hold the month OPEN (the
+  // engine's fifth seal condition). The generation run fills this via
+  // unclaimed.setUnclaimed (domain/useUnclaimed).
+  const unclaimed = useUnclaimed({ genMonth, setGenResult });
   // Lessons recorded into an already-BILLED month (Wave 4). Separate state from
   // `unclaimed` — that one is a generation-run result and lives in a modal;
   // this is a STANDING report that must persist until each line is settled,
@@ -289,7 +282,7 @@ export default function InvoicesPage() {
         setBlockedLessons(json.blocking ?? []);
         // An admin fixing unmarked lessons should learn about unclaimed ones in
         // the same trip, not discover them on the next run.
-        setUnclaimed(json.unclaimed_students ?? []);
+        unclaimed.setUnclaimed(json.unclaimed_students ?? []);
         setGenResult(null);
       } else if (json.status === "nothing_to_bill") {
         // Distinct from a finished month: nothing was found to bill, so the
@@ -321,7 +314,7 @@ export default function InvoicesPage() {
         // opened. Caught by verify-trial-onboarding.mjs, not by any unit test:
         // the engine's response was right the whole time and only the wiring
         // was wrong.
-        setUnclaimed(json.unclaimed_students ?? []);
+        unclaimed.setUnclaimed(json.unclaimed_students ?? []);
         const n = Number(json.unclaimed_billable);
         setGenResult(
           `Created ${json.invoices_created ?? 0} invoice(s) for ${formatBillingMonth(
@@ -355,7 +348,7 @@ export default function InvoicesPage() {
         // reporting "Created 0 invoice(s)" would read as "nothing to bill".
         const deferred = Number(json.parents_deferred ?? 0);
         const unclaimedCount = Number(json.unclaimed_billable ?? 0);
-        setUnclaimed(json.unclaimed_students ?? []);
+        unclaimed.setUnclaimed(json.unclaimed_students ?? []);
         setGenResult(
           `Created ${json.invoices_created ?? 0} invoice(s) for ${formatBillingMonth(
             genMonth
@@ -383,55 +376,6 @@ export default function InvoicesPage() {
       setGenResult(`Error: ${String(e)}`);
     }
     setGenerating(false);
-  }
-
-  /**
-   * Record that an unclaimed student's lessons are settled — the money arrived
-   * outside SwimSync, or is being written off. Either way the month can then
-   * close.
-   *
-   * `settled_through` is the student's LATEST unbilled lesson in this run, not
-   * "today": the settlement must cover exactly what was reported and no more,
-   * so a lesson they attend next month still blocks and is still decided
-   * deliberately.
-   */
-  async function handleSettle(
-    u: UnclaimedStudent,
-    kind: "paid_outside" | "written_off",
-    amount: number | null
-  ) {
-    setSettling(u.student_id);
-    const {
-      data: { user },
-    } = await repo.getUser();
-
-    const { data: student } = await repo.fetchStudentTenant(u.student_id);
-
-    const { error } = await repo.insertSettlement(
-      settlementPayload({
-        tenantId: student?.tenant_id,
-        studentId: u.student_id,
-        settledThrough: u.latest_session_date,
-        kind,
-        amount,
-        recordedBy: user?.id,
-      })
-    );
-
-    setSettling(null);
-    if (error) {
-      // Shown INSIDE the modal. genResult renders on the page behind it, so an
-      // error surfaced there is invisible while the dialog is open — which is
-      // how a failing insert first looked like a silent no-op.
-      setSettleError(error.message);
-      return;
-    }
-    setSettleError(null);
-    setUnclaimed((prev) => prev.filter((x) => x.student_id !== u.student_id));
-    setGenResult(
-      `Recorded for ${u.student_name ?? "that student"}. Generate again to close ` +
-        `${formatBillingMonth(genMonth)}.`
-    );
   }
 
   /** The standing orphan-lesson report (Wave 4). Server-computed: the
@@ -901,106 +845,16 @@ export default function InvoicesPage() {
         )}
       </div>
 
-      {/* ── Billable lessons with nobody to bill ────────────────────────────
-          These hold the month OPEN (the engine's fifth seal condition). The
-          remedy is offered INLINE rather than as a link elsewhere: this is the
-          one screen where the admin is already thinking about closing the
-          month, and a single forgotten walk-in stalls every family's invoice.
-          There is deliberately no bulk "settle all" — that would turn a
-          deliberate decision about money into one careless tap. */}
-      <Modal
-        title="Some lessons have no parent account to bill"
-        open={unclaimed.length > 0}
-        onClose={() => setUnclaimed([])}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-700">
-            These children attended billable lessons but have no parent account
-            yet, so nobody can be invoiced. {formatBillingMonth(genMonth)} stays
-            open until each is resolved — otherwise the month would close over
-            them and the lessons could never be billed, even after the parent
-            registers.
-          </p>
-
-          <ul className="space-y-3">
-            {unclaimed.map((u) => (
-              <li
-                key={u.student_id}
-                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5"
-              >
-                <p className="text-sm font-semibold text-gray-800">
-                  {u.student_name ?? "Unnamed student"}
-                </p>
-                <p className="mt-0.5 text-xs text-gray-600">
-                  {u.lessons} billable lesson{u.lessons === 1 ? "" : "s"} ·{" "}
-                  {u.earliest_session_date === u.latest_session_date
-                    ? formatSgDate(u.earliest_session_date)
-                    : `${formatSgDate(u.earliest_session_date)} – ${formatSgDate(
-                        u.latest_session_date
-                      )}`}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1 text-xs text-gray-600">
-                    S$
-                    <input
-                      value={settleAmount[u.student_id] ?? ""}
-                      onChange={(e) =>
-                        setSettleAmount((prev) => ({
-                          ...prev,
-                          [u.student_id]: e.target.value,
-                        }))
-                      }
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      aria-label={`Amount received for ${u.student_name ?? "student"}`}
-                      className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs"
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    disabled={
-                      settling === u.student_id ||
-                      !(Number(settleAmount[u.student_id]) > 0)
-                    }
-                    onClick={() =>
-                      handleSettle(
-                        u,
-                        "paid_outside",
-                        Number(settleAmount[u.student_id])
-                      )
-                    }
-                  >
-                    Paid outside SwimSync
-                  </Button>
-                  <Button
-                    variant="outline"
-                    disabled={settling === u.student_id}
-                    onClick={() => handleSettle(u, "written_off", null)}
-                  >
-                    Write off
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          {settleError && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              {settleError}
-            </p>
-          )}
-
-          <p className="text-xs text-gray-600">
-            The better fix is usually to <strong>invite the parent</strong> from
-            the Students page — then the lessons bill normally and nothing is
-            written off. Settle only when the money was genuinely handled
-            elsewhere, or is not being collected.
-          </p>
-          <Button className="w-full" onClick={() => setUnclaimed([])}>
-            Close
-          </Button>
-        </div>
-      </Modal>
+      <UnclaimedModal
+        unclaimed={unclaimed.unclaimed}
+        genMonth={genMonth}
+        settling={unclaimed.settling}
+        settleAmount={unclaimed.settleAmount}
+        setSettleAmount={unclaimed.setSettleAmount}
+        settleError={unclaimed.settleError}
+        onSettle={unclaimed.handleSettle}
+        onClose={unclaimed.close}
+      />
 
       {/* Server refused: attendance is incomplete. Distinct from the pre-flight
           dialog above — the client-side coverage check and the engine compute
