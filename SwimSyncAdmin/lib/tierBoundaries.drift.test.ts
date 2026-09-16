@@ -38,6 +38,10 @@
 // importing ../dao, packages/dao/break importing React, packages/domain/break
 // calling fetch(, and an unpinned @/lib/utils import on packages/page.tsx — all
 // four checks went red, then the breakers were removed and 6/6 went green.
+// Re-proven for the Admin L-B scope on 2026-09-16 at L0: checks 3 and 4 went
+// red on the five pages' real violations before the ledger was pinned, and
+// holidays/ui/Break importing ../dao + holidays/dao/break importing React drove
+// checks 1 and 2 red; breakers removed, 6/6 green.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -62,6 +66,17 @@ const SCOPE_DIRS = [
   // it (data access -> Stage 2/3 per the §6 grep gate; @/lib imports -> the
   // slice stage that moves the symbol), and the ledger only shrinks from here.
   "app/(admin)/packages",
+  // Admin L-B lite batch (docs/refactor/BATCH_B_PLAN.md), widened 2026-09-16.
+  // The "calendar" batch: attendance, substitutes, holidays touch the client
+  // (checks 3+4 red day one); calendar and lessons reach data through
+  // @/lib/calendarData, so only check 4 fires for them. Every current violation
+  // is pinned in the ledgers below with the commit that removes it (folded
+  // L1-L3 per page, playbook §7.1); the ledger only shrinks from here.
+  "app/(admin)/attendance",
+  "app/(admin)/substitutes",
+  "app/(admin)/holidays",
+  "app/(admin)/calendar",
+  "app/(admin)/lessons",
 ];
 
 // One route file per scoped dir. Check 4 runs against each.
@@ -87,6 +102,39 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // sites) into dao/packages.rpc.ts. The page now holds ZERO supabase (§6 grep
   // gate met), so every packages data-access entry went stale and was deleted —
   // the ledger shrank to empty for check 3. Nothing more to pin here.
+  // ── Admin L-B (BATCH_B_PLAN.md), pinned 2026-09-16. Each page folds L1-L3 in
+  //    ONE commit (playbook §7.1); the client + every call move into
+  //    <page>/dao/<page>.{repo,rpc}.ts and these entries are deleted then.
+  //    calendar and lessons reach data via @/lib/calendarData, so they hold no
+  //    supabase line — nothing to pin here for them (check 4 only). ──
+  // attendance -> attendance/dao
+  { file: "app/(admin)/attendance/page.tsx", contains: 'import { supabase }', why: "L1: client -> attendance/dao" },
+  { file: "app/(admin)/attendance/page.tsx", contains: '.rpc("student_package_coverage")', why: "L1: attendance/dao/attendance.rpc.ts" },
+  { file: "app/(admin)/attendance/page.tsx", contains: '.from("coaches")', why: "L1: attendance/dao/attendance.repo.ts" },
+  { file: "app/(admin)/attendance/page.tsx", contains: '.from("classes")', why: "L1: attendance/dao/attendance.repo.ts" },
+  { file: "app/(admin)/attendance/page.tsx", contains: '.from("student_class_enrolments")', why: "L1: attendance/dao/attendance.repo.ts" },
+  { file: "app/(admin)/attendance/page.tsx", contains: '.from("attendance")', why: "L1: attendance/dao/attendance.repo.ts" },
+  { file: "app/(admin)/attendance/page.tsx", contains: '.from("session_coaches")', why: "L1: attendance/dao/attendance.repo.ts" },
+  { file: "app/(admin)/attendance/page.tsx", contains: '.from("class_rates")', why: "L1: attendance/dao/attendance.repo.ts" },
+  { file: "app/(admin)/attendance/page.tsx", contains: '.from("class_shadow_coaches")', why: "L1: attendance/dao/attendance.repo.ts" },
+  { file: "app/(admin)/attendance/page.tsx", contains: '.from("session_coach_absences")', why: "L1: attendance/dao/attendance.repo.ts" },
+  { file: "app/(admin)/attendance/page.tsx", contains: '.rpc("book_makeup"', why: "L1: attendance/dao/attendance.rpc.ts" },
+  // substitutes -> substitutes/dao
+  { file: "app/(admin)/substitutes/page.tsx", contains: 'import { supabase }', why: "L1: client -> substitutes/dao" },
+  { file: "app/(admin)/substitutes/page.tsx", contains: '.from("classes")', why: "L1: substitutes/dao/substitutes.repo.ts" },
+  { file: "app/(admin)/substitutes/page.tsx", contains: '.from("coaches")', why: "L1: substitutes/dao/substitutes.repo.ts" },
+  { file: "app/(admin)/substitutes/page.tsx", contains: '.from("lesson_sessions")', why: "L1: substitutes/dao/substitutes.repo.ts" },
+  { file: "app/(admin)/substitutes/page.tsx", contains: '.from("session_coaches")', why: "L1: substitutes/dao/substitutes.repo.ts" },
+  { file: "app/(admin)/substitutes/page.tsx", contains: '.rpc("assign_session_coach"', why: "L1: substitutes/dao/substitutes.rpc.ts" },
+  // holidays -> holidays/dao
+  { file: "app/(admin)/holidays/page.tsx", contains: 'import { supabase }', why: "L1: client -> holidays/dao" },
+  { file: "app/(admin)/holidays/page.tsx", contains: "supabase.auth.getUser()", why: "L1: holidays/dao/holidays.repo.ts" },
+  { file: "app/(admin)/holidays/page.tsx", contains: '.from("profiles")', why: "L1: holidays/dao/holidays.repo.ts" },
+  { file: "app/(admin)/holidays/page.tsx", contains: '.from("tenants")', why: "L1: holidays/dao/holidays.repo.ts" },
+  { file: "app/(admin)/holidays/page.tsx", contains: '.from("tenant_public_holidays")', why: "L1: holidays/dao/holidays.repo.ts" },
+  { file: "app/(admin)/holidays/page.tsx", contains: '.from("attendance")', why: "L1: holidays/dao/holidays.repo.ts" },
+  { file: "app/(admin)/holidays/page.tsx", contains: '.rpc("mark_day_holiday"', why: "L1: holidays/dao/holidays.rpc.ts" },
+  { file: "app/(admin)/holidays/page.tsx", contains: '.rpc("unmark_day_holiday"', why: "L1: holidays/dao/holidays.rpc.ts" },
 ];
 
 /**
@@ -133,6 +181,43 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // @/lib/waMessage left the page at Stage 9 — buildPackageOfferMessage/
   // buildWaLink/toWaNumber moved into useGenerateOffers + ui/GenerateOffersModal
   // (still shared, stays in lib). Deleted.
+  // ── Admin L-B (BATCH_B_PLAN.md), pinned 2026-09-16. Folded L1-L3 per page:
+  //    @/lib/supabase -> dao; lucide-react -> ui; a SOLE-importer helper MOVES
+  //    into <page>/domain; a SHARED helper STAYS in lib, reached from
+  //    domain/ui/dao. calendarData does the data read, so it is bound in
+  //    <page>/dao. Verdicts grep-confirmed (BATCH_B_PLAN.md move-or-stay). ──
+  // attendance
+  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/supabase", why: "L1: client -> attendance/dao" },
+  { file: "app/(admin)/attendance/page.tsx", contains: "lucide-react", why: "L3: icons -> attendance/ui" },
+  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/makeupFromAttendance", why: "L2: MOVE into attendance/domain (sole importer)" },
+  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/csv", why: "L2: reached from attendance/domain (shared, stays in lib)" },
+  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from attendance/domain (shared, stays in lib)" },
+  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/packageCoverage", why: "L2: reached from attendance/domain (shared, stays in lib)" },
+  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/lessonAttribution", why: "L2: reached from attendance/domain (shared, stays in lib)" },
+  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/tableSearch", why: "L2: reached from attendance/domain (shared, stays in lib)" },
+  // substitutes
+  { file: "app/(admin)/substitutes/page.tsx", contains: "@/lib/supabase", why: "L1: client -> substitutes/dao" },
+  { file: "app/(admin)/substitutes/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from substitutes/domain (shared, stays in lib)" },
+  { file: "app/(admin)/substitutes/page.tsx", contains: "@/lib/sessionRoster", why: "L2: reached from substitutes/domain (shared, stays in lib)" },
+  // holidays
+  { file: "app/(admin)/holidays/page.tsx", contains: "@/lib/supabase", why: "L1: client -> holidays/dao" },
+  { file: "app/(admin)/holidays/page.tsx", contains: "lucide-react", why: "L3: icons -> holidays/ui" },
+  { file: "app/(admin)/holidays/page.tsx", contains: "@/lib/holidaysCsv", why: "L2: MOVE into holidays/domain (sole importer)" },
+  // calendar (no supabase line on the page; data via calendarData -> bound in dao)
+  { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/calendarData", why: "L1: bound in calendar/dao (does the read, stays in lib)" },
+  { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/calendarLessons", why: "L2: reached from calendar/domain (shared, stays in lib)" },
+  { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from calendar/domain (shared, stays in lib)" },
+  { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/timeOfDay", why: "L2: reached from calendar/domain (shared, stays in lib)" },
+  // lessons (list)
+  { file: "app/(admin)/lessons/page.tsx", contains: "lucide-react", why: "L3: icons -> lessons/ui" },
+  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/attendanceWindow", why: "L2: MOVE into lessons/domain (sole importer)" },
+  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/calendarData", why: "L1: bound in lessons/dao (does the read, stays in lib)" },
+  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/calendarLessons", why: "L2: reached from lessons/domain (shared, stays in lib)" },
+  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/classColours", why: "L2: reached from lessons/domain (shared, stays in lib)" },
+  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from lessons/domain (shared, stays in lib)" },
+  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/markableFloor", why: "L2: reached from lessons/domain (shared, stays in lib)" },
+  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/timeOfDay", why: "L2: reached from lessons/domain (shared, stays in lib)" },
+  { file: "app/(admin)/lessons/page.tsx", contains: "@/lib/utils", why: "L3: cn reached from lessons/ui (shared, stays in lib)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,8 +254,18 @@ function sources(): Src[] {
     if (!existsSync(dir)) return;
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry);
-      if (statSync(full).isDirectory()) walk(full);
-      else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) {
+      if (statSync(full).isDirectory()) {
+        // A subdirectory that holds its OWN page.tsx is a separate route unit,
+        // not part of this scope. `lessons/[classId]/[date]` (a full-track
+        // giant) lives under `lessons/` (the list page, Admin L-B) but is
+        // refactored on its own turn — it is scoped, and its boundaries
+        // checked, when ITS widening adds it to SCOPE_DIRS. Don't drag a
+        // sibling route into a parent's ledger. Tier folders (ui/domain/dao)
+        // have no page.tsx, so they are still walked. (Added 2026-09-16 with
+        // Admin L-B — the first scoped dir with a nested route.)
+        if (existsSync(join(full, "page.tsx"))) continue;
+        walk(full);
+      } else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) {
         const code = stripComments(readFileSync(full, "utf8"));
         found.push({
           file: full.slice(ADMIN.length + 1).split(sep).join("/"),
