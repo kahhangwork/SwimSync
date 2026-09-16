@@ -200,21 +200,12 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    markableFloor.ts import it via relative path — the @/lib grep missed
   //    those; corrected from the L0 MOVE verdict). calendarData bound in
   //    lessons/dao; every other @/lib helper reached from domain/ui. ──
-  // ── invoices (full track, INVOICES_REFACTOR_PLAN.md §3 verdicts), pinned
-  //    2026-09-16 at Stage 0b. paynow + settlementPayload MOVE into
-  //    invoices/domain (sole importers, §3); the other @/lib helpers STAY in lib/
-  //    (shared) and are reached from domain/ui/dao once their symbols leave the
-  //    page. lucide icons -> ui; ./ReminderQueue -> ui/ReminderQueue. Each entry
-  //    goes stale as the symbol leaves the page and is deleted then. ──
-  { file: "app/(admin)/invoices/page.tsx", contains: "lucide-react", why: "icons -> ui/ Stages 4/8/9 (RefreshCw remains until Stage 9)" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/lessonDates", why: "STAY in lib; reached from domain/ui, leaves page by Stage 11" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/classCoverage", why: "STAY in lib (coaches also imports); reached from domain Stage 9" },
-  // Transitional page->dao imports (playbook §7.1's sanctioned exception): until
-  // each slice's hook wraps its dao call, the page imports the dao modules
-  // directly. Added at Stage 2/3 when the imports first appeared; each is deleted
-  // as the last direct caller becomes a domain/ hook (Stages 4-9), gone by 11.
-  { file: "app/(admin)/invoices/page.tsx", contains: "./dao/invoices.repo", why: "transitional; loadCoverage + getSession callers, gone at Stage 9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "./dao/invoices.api", why: "transitional; gone when generate becomes a hook (Stage 9)" },
+  // ── invoices (full track, INVOICES_REFACTOR_PLAN.md): check 4 EMPTY at Stage 9.
+  //    paynow + settlementPayload MOVED into invoices/domain (sole importers);
+  //    the shared @/lib helpers (csv/lessonDates/sgPhone/waMessage/tableSearch/
+  //    classCoverage) are reached from domain/ui/dao; lucide icons -> ui;
+  //    ReminderQueue -> ui/ReminderQueue. The page imports only its own tiers,
+  //    React and @/components — every entry went stale and was deleted. ──
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

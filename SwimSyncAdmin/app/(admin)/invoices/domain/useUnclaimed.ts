@@ -7,14 +7,13 @@ import { formatBillingMonth } from "./invoiceRows";
 /** Billable lessons with nobody to bill — they hold the month OPEN (the engine's
  *  fifth seal condition). `unclaimed` is also SET by the generation run, so the
  *  hook exposes `setUnclaimed` for useGenerate to fill; settling is a decision
- *  about money, so there is deliberately no bulk action. */
-export function useUnclaimed({
-  genMonth,
-  setGenResult,
-}: {
-  genMonth: string;
-  setGenResult: (s: string | null) => void;
-}) {
+ *  about money, so there is deliberately no bulk action.
+ *
+ *  `handleSettle` takes `genMonth` + `setGenResult` as ARGUMENTS rather than
+ *  creation deps: those belong to useGenerate, which is created AFTER this hook
+ *  (it needs this hook's `setUnclaimed`), so passing them at call time from the
+ *  page's compose layer is what keeps the two slices acyclic. */
+export function useUnclaimed() {
   const [unclaimed, setUnclaimed] = useState<UnclaimedStudent[]>([]);
   const [settling, setSettling] = useState<string | null>(null);
   // Amount per student for the "paid outside SwimSync" path. Required by the
@@ -38,7 +37,9 @@ export function useUnclaimed({
   async function handleSettle(
     u: UnclaimedStudent,
     kind: "paid_outside" | "written_off",
-    amount: number | null
+    amount: number | null,
+    genMonth: string,
+    setGenResult: (s: string | null) => void
   ) {
     setSettling(u.student_id);
     const {
