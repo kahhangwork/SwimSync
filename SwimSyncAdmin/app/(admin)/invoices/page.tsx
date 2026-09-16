@@ -12,12 +12,10 @@ import { computeClassCoverage, type ClassCoverage } from "@/lib/classCoverage";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
-import { blankToNull, checkSgPhone, normalizeSgPhone } from "@/lib/sgPhone";
-import { payNowProxyWarning } from "@/lib/paynow";
 import * as repo from "./dao/invoices.repo";
-import * as rpc from "./dao/invoices.rpc";
 import { generateInvoices } from "./dao/invoices.api";
 import { useInvoiceList } from "./domain/useInvoiceList";
+import { useTenantBilling } from "./domain/useTenantBilling";
 import { useUnclaimed } from "./domain/useUnclaimed";
 import { useOrphans } from "./domain/useOrphans";
 import { usePendingDebits } from "./domain/usePendingDebits";
@@ -27,6 +25,7 @@ import { InvoiceTable } from "./ui/InvoiceTable";
 import { UnclaimedModal } from "./ui/UnclaimedModal";
 import { OrphanReport } from "./ui/OrphanReport";
 import { PendingDebits } from "./ui/PendingDebits";
+import { GenerationPanel } from "./ui/GenerationPanel";
 import { ReminderQueue } from "./ui/ReminderQueue";
 
 export default function InvoicesPage() {
@@ -46,22 +45,11 @@ export default function InvoicesPage() {
   const [genMonth, setGenMonth] = useState(latestBillableMonth);
   const [generating, setGenerating] = useState(false);
   const [genResult, setGenResult] = useState<string | null>(null);
-  // The tenant this admin bills for. A tenant_admin has exactly one; a
-  // platform_admin has none and must pick one (phase 3's tenant switcher),
-  // so the generation controls stay disabled for them rather than silently
-  // acting on somebody's business.
-  const [tenantId, setTenantId] = useState<string | null>(null);
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
-  const [autoEnabled, setAutoEnabled] = useState<boolean | null>(null);
-  const [togglingAuto, setTogglingAuto] = useState(false);
-  const [runDay, setRunDay] = useState<number | null>(null);
-  const [savingRunDay, setSavingRunDay] = useState(false);
-  // PayNow proxy — where invoice QRs point the money. null = not loaded yet
-  // (platform admin has no tenant); "" = loaded and unset.
-  const [paynowUen, setPaynowUen] = useState<string | null>(null);
-  const [paynowMobile, setPaynowMobile] = useState<string | null>(null);
-  const [paynowSaved, setPaynowSaved] = useState<string | null>(null);
-  const [businessName, setBusinessName] = useState("your swim school");
+  // The tenant this admin bills for and its billing schedule (auto/run-day/
+  // PayNow/business name), plus loadTenant — domain/useTenantBilling. tenantId
+  // is the shared spine the reports and generation read.
+  const tenant = useTenantBilling();
+  const { tenantId, isPlatformAdmin, businessName } = tenant;
   // Billable lessons with nobody to bill — they hold the month OPEN (the
   // engine's fifth seal condition). The generation run fills this via
   // unclaimed.setUnclaimed (domain/useUnclaimed).
@@ -88,93 +76,18 @@ export default function InvoicesPage() {
   const [coverageError, setCoverageError] = useState<string | null>(null);
   const coverageRequest = useRef(0);
 
+  // Resolve the tenant, then load its tenant-scoped reports. tenantId is the
+  // shared spine, so the dependent loads chain off the resolved id (which
+  // loadTenant returns) rather than racing the state update.
   useEffect(() => {
-    loadTenant();
+    tenant.loadTenant().then((tid) => {
+      if (tid) {
+        orphans.loadOrphans(tid);
+        debits.loadPendingDebits(tid);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  /**
-   * Resolve who is signed in and which business they bill for, then read that
-   * tenant's billing schedule.
-   *
-   * The schedule moved from the GLOBAL app_settings rows onto `tenants` when
-   * the engine became tenant-scoped. Left on app_settings these controls would
-   * still save happily and the engine would ignore them — a switch that looks
-   * like it works and does nothing.
-   */
-  async function loadTenant() {
-    const { data: auth } = await repo.getUser();
-    if (!auth.user) return;
-
-    const { data: profile } = await repo.fetchProfile(auth.user.id);
-
-    setIsPlatformAdmin(profile?.role === "platform_admin");
-    const tid = (profile?.tenant_id as string | null) ?? null;
-    setTenantId(tid);
-    if (!tid) return;
-    orphans.loadOrphans(tid);
-    debits.loadPendingDebits(tid);
-
-    const { data: tenant } = await repo.fetchTenant(tid);
-
-    setBusinessName((tenant?.display_name as string | null) ?? "your swim school");
-    setAutoEnabled(tenant?.auto_invoice_enabled ?? true);
-    const n = Number(tenant?.invoice_run_day);
-    setRunDay(Number.isFinite(n) && n >= 1 ? Math.min(28, n) : 7);
-    setPaynowUen((tenant?.paynow_uen as string | null) ?? "");
-    setPaynowMobile((tenant?.paynow_mobile as string | null) ?? "");
-  }
-
-  // Saves on blur, like the run day. Validation is ADVISORY only (the
-  // sgPhone doctrine — a blocked save helps nobody); normalizeSgPhone strips
-  // +65 so the stored form is the bare 8 digits the QR payload needs.
-  async function handleSavePaynow(field: "paynow_uen" | "paynow_mobile", raw: string) {
-    if (!tenantId) return;
-    const value =
-      field === "paynow_mobile" ? blankToNull(normalizeSgPhone(raw)) : blankToNull(raw);
-    const { error } = await repo.updateTenant(tenantId, {
-      [field]: value,
-      updated_at: new Date().toISOString(),
-    });
-    // Advisory only: the value still saved. A mistyped mobile can't build a QR,
-    // and the parent's screen would silently show none — warn here instead.
-    const warning = error ? null : payNowProxyWarning(field, value);
-    setPaynowSaved(
-      error
-        ? `Error: ${error.message}`
-        : warning
-          ? `Saved — ⚠ ${warning}`
-          : "PayNow details saved."
-    );
-    if (!error && field === "paynow_mobile") setPaynowMobile(value ?? "");
-    if (!error && field === "paynow_uen") setPaynowUen(value ?? "");
-  }
-
-  // Capped at 28 to match the engine: 29-31 would never fire in February.
-  // The row is seeded by migration — app_settings has no INSERT policy, so
-  // this can only ever UPDATE.
-  async function handleSaveRunDay(next: number) {
-    if (!tenantId) return;
-    const clamped = Math.min(28, Math.max(1, Math.trunc(next)));
-    setSavingRunDay(true);
-    const { error } = await repo.updateTenant(tenantId, {
-      invoice_run_day: clamped,
-      updated_at: new Date().toISOString(),
-    });
-    if (!error) setRunDay(clamped);
-    setSavingRunDay(false);
-  }
-
-  async function handleToggleAuto() {
-    if (autoEnabled === null || !tenantId) return;
-    setTogglingAuto(true);
-    const next = !autoEnabled;
-    const { error } = await repo.updateTenant(tenantId!, {
-      auto_invoice_enabled: next,
-      updated_at: new Date().toISOString(),
-    });
-    if (!error) setAutoEnabled(next);
-    setTogglingAuto(false);
-  }
 
   /**
    * Which lessons should have been marked for `genMonth`, and which weren't.
@@ -415,192 +328,31 @@ export default function InvoicesPage() {
         onSettle={orphans.handleSettleOrphan}
       />
 
-      {/* Invoice generation panel */}
-      <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">
-              Billing month
-            </label>
-            {/* Capped at the last COMPLETED month. This is an affordance, not
-                the guard — `max` constrains neither a programmatically-set
-                value nor every browser, so the engine refuses it too. */}
-            <input
-              type="month"
-              value={genMonth}
-              max={latestBillableMonth}
-              onChange={(e) => setGenMonth(e.target.value)}
-              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
-            />
-          </div>
-          <Button
-            onClick={() => {
-              setGenResult(null);
-              setShowConfirm(true);
-              loadCoverage(genMonth);
-            }}
-            disabled={generating}
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${generating ? "animate-spin" : ""}`}
-            />
-            {generating ? "Generating…" : "Generate Invoices"}
-          </Button>
-
-          {/* Auto-generation toggle.
-              `autoEnabled === null` means UNKNOWN, not off — a platform admin
-              has no tenant, so loadTenant() returns before reading any setting.
-              Rendering null as "off" (and `runDay ?? 7` as "day 7") presented
-              invented values as this business's configuration; it only ever
-              looked right because production happens to be false/7. */}
-          <div className="ml-auto flex items-center gap-3">
-            <div className="text-right">
-              <div className="text-xs font-semibold text-gray-700">
-                Automatic monthly generation
-              </div>
-              <div className="text-[11px] text-gray-400">
-                {autoEnabled === null
-                  ? "No business selected"
-                  : `Runs from day ${runDay ?? 7} for the previous month`}
-              </div>
-            </div>
-            {/* shrink-0: this is a flex item next to a two-line label, and w-11
-                is a flex BASIS, not a floor — without it the track squashes
-                while the absolutely-positioned knob keeps its 20px offset, so
-                the knob rides the edge or overhangs it. */}
-            <button
-              type="button"
-              onClick={handleToggleAuto}
-              disabled={togglingAuto || autoEnabled === null}
-              aria-label="Automatic monthly invoice generation"
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                autoEnabled === null
-                  ? "bg-gray-200"
-                  : autoEnabled
-                    ? "bg-sky-500"
-                    : "bg-gray-300"
-              } disabled:opacity-50`}
-              aria-pressed={!!autoEnabled}
-            >
-              <span
-                className={`absolute top-0.5 left-0 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                  autoEnabled ? "translate-x-[1.375rem]" : "translate-x-0.5"
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* Run day. Only affects the automatic path, so it is greyed out (but
-            still editable) when automatic generation is switched off. */}
-        <div className="mt-3 flex items-center gap-2">
-          <label
-            htmlFor="run-day"
-            className={`text-xs font-medium ${
-              autoEnabled ? "text-gray-700" : "text-gray-400"
-            }`}
-          >
-            Generate automatic invoices from day
-          </label>
-          {/* Blank rather than "7" when unknown — see the toggle above. A
-              number shown here reads as this business's configured run day. */}
-          <input
-            id="run-day"
-            type="number"
-            min={1}
-            max={28}
-            value={runDay ?? ""}
-            placeholder="—"
-            disabled={savingRunDay || runDay === null}
-            onChange={(e) => setRunDay(Number(e.target.value))}
-            onBlur={(e) => handleSaveRunDay(Number(e.target.value))}
-            className="w-16 rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-50"
-          />
-          <span
-            className={`text-xs ${
-              autoEnabled ? "text-gray-500" : "text-gray-400"
-            }`}
-          >
-            of the following month
-            {!autoEnabled && " — no effect while automatic generation is off"}
-          </span>
-        </div>
-
-        {/* PayNow proxy. The invoice QR is computed from these — no QR image
-            is uploaded anywhere. UEN wins when both are set (a corporate
-            account is guaranteed to get the reference on its statement; a
-            personal mobile proxy is best-effort, and mobile-only is a fully
-            supported setup — production's private coach runs on one). */}
-        <div className="mt-4 border-t border-gray-100 pt-3">
-          <div className="text-xs font-semibold text-gray-700 mb-1">
-            PayNow details for invoice QR codes
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="paynow-uen" className="text-xs text-gray-500">
-              UEN
-            </label>
-            <input
-              id="paynow-uen"
-              type="text"
-              value={paynowUen ?? ""}
-              placeholder="e.g. 201403121W"
-              disabled={paynowUen === null}
-              onChange={(e) => setPaynowUen(e.target.value)}
-              onBlur={(e) => handleSavePaynow("paynow_uen", e.target.value)}
-              className="w-36 rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-50"
-            />
-            <label htmlFor="paynow-mobile" className="text-xs text-gray-500 ml-2">
-              or mobile
-            </label>
-            <input
-              id="paynow-mobile"
-              type="text"
-              value={paynowMobile ?? ""}
-              placeholder="e.g. 91234567"
-              disabled={paynowMobile === null}
-              onChange={(e) => setPaynowMobile(e.target.value)}
-              onBlur={(e) => handleSavePaynow("paynow_mobile", e.target.value)}
-              className="w-32 rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-50"
-            />
-            {(() => {
-              const check = checkSgPhone(paynowMobile ?? "");
-              return check.message ? (
-                <span className="text-[11px] text-amber-600">{check.message}</span>
-              ) : null;
-            })()}
-          </div>
-          <p className="mt-1 text-[11px] text-gray-400">
-            Invoices show a PayNow QR with the amount and reference locked in.
-            A UEN (business account) is preferred when you have one — the
-            reference then always reaches your bank statement. A personal
-            mobile number works too; reference visibility depends on the bank.
-          </p>
-          {paynowSaved && (
-            <p
-              className={`mt-1 text-xs font-medium ${
-                paynowSaved.startsWith("Error") ? "text-red-600" : "text-green-600"
-              }`}
-            >
-              {paynowSaved}
-            </p>
-          )}
-        </div>
-
-        <p className="mt-3 text-xs text-gray-500">
-          Manual generation bills whatever attendance is marked for the chosen
-          month (one invoice per parent, across all their children). It ignores
-          the automatic on/off switch and never blocks the scheduled run.
-        </p>
-        {genResult && (
-          <p
-            className={`mt-2 text-sm font-medium ${
-              genResult.startsWith("Error") ? "text-red-600" : "text-green-600"
-            }`}
-          >
-            {genResult}
-          </p>
-        )}
-      </div>
+      <GenerationPanel
+        genMonth={genMonth}
+        setGenMonth={setGenMonth}
+        latestBillableMonth={latestBillableMonth}
+        generating={generating}
+        onGenerate={() => {
+          setGenResult(null);
+          setShowConfirm(true);
+          loadCoverage(genMonth);
+        }}
+        genResult={genResult}
+        autoEnabled={tenant.autoEnabled}
+        togglingAuto={tenant.togglingAuto}
+        onToggleAuto={tenant.handleToggleAuto}
+        runDay={tenant.runDay}
+        setRunDay={tenant.setRunDay}
+        savingRunDay={tenant.savingRunDay}
+        onSaveRunDay={tenant.handleSaveRunDay}
+        paynowUen={tenant.paynowUen}
+        setPaynowUen={tenant.setPaynowUen}
+        paynowMobile={tenant.paynowMobile}
+        setPaynowMobile={tenant.setPaynowMobile}
+        onSavePaynow={tenant.handleSavePaynow}
+        paynowSaved={tenant.paynowSaved}
+      />
 
       <UnclaimedModal
         unclaimed={unclaimed.unclaimed}
