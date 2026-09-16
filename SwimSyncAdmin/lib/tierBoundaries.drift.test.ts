@@ -203,11 +203,9 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/holidays/page.tsx", contains: "@/lib/supabase", why: "L1: client -> holidays/dao" },
   { file: "app/(admin)/holidays/page.tsx", contains: "lucide-react", why: "L3: icons -> holidays/ui" },
   { file: "app/(admin)/holidays/page.tsx", contains: "@/lib/holidaysCsv", why: "L2: MOVE into holidays/domain (sole importer)" },
-  // calendar (no supabase line on the page; data via calendarData -> bound in dao)
-  { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/calendarData", why: "L1: bound in calendar/dao (does the read, stays in lib)" },
-  { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/calendarLessons", why: "L2: reached from calendar/domain (shared, stays in lib)" },
-  { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from calendar/domain (shared, stays in lib)" },
-  { file: "app/(admin)/calendar/page.tsx", contains: "@/lib/timeOfDay", why: "L2: reached from calendar/domain (shared, stays in lib)" },
+  // ── calendar: DONE — dao/domain/ui extracted, page is composition, ledger
+  //    empty. calendarData bound in calendar/dao; calendarLessons/lessonDates/
+  //    timeOfDay reached from domain (rangeLabel + filters) and ui/CalendarBody. ──
   // ── lessons (list): DONE — dao/domain/ui extracted, page is composition,
   //    ledger empty. attendanceWindow STAYS (shared: lessonMarking.ts +
   //    markableFloor.ts import it via relative path — the @/lib grep missed
