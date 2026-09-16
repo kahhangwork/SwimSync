@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle, Download, Link as LinkIcon, MessageCircle, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { exportCsv, type CsvColumn } from "@/lib/csv";
+import { exportCsv } from "@/lib/csv";
 import {
   todayInSg,
   monthBounds,
@@ -24,100 +24,14 @@ import { buildReminderMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { ReminderQueue } from "./ReminderQueue";
 import { ilikeContains } from "@/lib/tableSearch";
 import { useDebouncedValue } from "@/components/useDebouncedValue";
-
-// The Singapore calendar date of a timestamptz, in the dd/mm/yyyy shape this
-// page has always shown. `formatSgStamp` pins Asia/Singapore; the bare
-// `toLocaleDateString("en-SG")` it replaced rendered the VIEWER's date, a day
-// early west of Singapore for anything stamped before 08:00 SGT.
-const DMY: Intl.DateTimeFormatOptions = {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-};
-
-/** PostgREST caps every fetch at max_rows (1000); this many back means the list
- *  is (probably) truncated and search is how to reach past it (⚠ RISK 3). */
-const ROW_LIMIT = 1000;
-
-/** The one column the scoped search targets — pushed into the DB as a bound
- *  `.ilike`, so it reaches every invoice, not just the first 1000. */
-type SearchField = "parent" | "student";
-
-type InvoiceRow = {
-  id: string;
-  billing_month: string;
-  gross_amount: number;
-  package_applied: number;
-  credit_applied: number;
-  /** A prior-period DEBIT (voided-then-paid credit) folded onto this invoice —
-   *  net = gross − package − credit + balance_adjustment. */
-  balance_adjustment: number;
-  net_amount: number;
-  status: string;
-  parent_name: string;
-  student_names: string; // first invoice item's student name(s)
-  reference_number: string;
-  public_token: string;
-  /** When the admin last OPENED a WhatsApp chat for this invoice. It does
-   *  not prove a message was sent — copy must read "chat opened". */
-  reminded_at: string | null;
-  /** The parent's "I've paid" claim — check the bank, then confirm. */
-  paid_claimed_at: string | null;
-  /** wa.me-ready "65XXXXXXXX", or null → the button reads "no number". */
-  wa_number: string | null;
-  /** What the parent actually typed — the queue's advisory when unusable. */
-  raw_phone: string | null;
-  student_name_list: string[];
-};
-
-/** Mirrors GenerateResult.unclaimed_students in the billing engine. */
-type UnclaimedStudent = {
-  student_id: string;
-  student_name: string | null;
-  lessons: number;
-  earliest_session_date: string;
-  latest_session_date: string;
-};
-
-/** Mirrors unbilled_sealed_lessons() in the database — one line per
- *  (student, SEALED month). Same shape as UnclaimedStudent plus the month,
- *  because the admin needs the same thing in both places: enough to date a
- *  settlement. These lessons entered the month AFTER it was billed (backdated
- *  enrolment, backdated make-up, absent→present correction), so the engine can
- *  never see them — this standing report is the only thing that can. */
-type OrphanLine = UnclaimedStudent & { billing_month: string };
-
-/** A parent's pending DEBIT — money owed from a voided-then-paid credit that has
- *  not yet been folded onto an invoice (§8.83). Keyed by (parent_id, tenant_id):
- *  a parent enrolled at two tenants has two balance rows, and this view is scoped
- *  to the admin's own tenant so tenant B's debit never attaches to tenant A. */
-type PendingDebit = {
-  parent_id: string;
-  tenant_id: string;
-  parent_name: string;
-  debit_balance: number;
-};
-
-// CSV export — what's on screen (post-filter/sort `visible`), raw values so an
-// accountant can sum the money columns. Month stays the raw YYYY-MM (sortable in
-// Excel); status is the badge label, not the lowercased enum.
-const INVOICE_CSV_COLUMNS: CsvColumn<InvoiceRow>[] = [
-  { header: "Parent", value: (r) => r.parent_name },
-  { header: "Students", value: (r) => r.student_names },
-  { header: "Month", value: (r) => r.billing_month },
-  { header: "Gross", value: (r) => r.gross_amount },
-  { header: "Package", value: (r) => r.package_applied },
-  { header: "Credit", value: (r) => r.credit_applied },
-  { header: "Adjustment", value: (r) => r.balance_adjustment },
-  { header: "Net", value: (r) => r.net_amount },
-  { header: "Status", value: (r) => (r.status === "paid" ? "Paid" : "Outstanding") },
-  { header: "Parent says paid", value: (r) => (r.paid_claimed_at ? "yes" : "") },
-  { header: "Reference", value: (r) => r.reference_number },
-];
-
-// "Claimed" = outstanding AND the parent has said "I've paid" — the rows an
-// admin should check against the bank first.
-const STATUS_FILTERS = ["All", "Outstanding", "Claimed", "Paid"];
+import { DMY, ROW_LIMIT, STATUS_FILTERS, INVOICE_CSV_COLUMNS } from "./constants";
+import type {
+  SearchField,
+  InvoiceRow,
+  UnclaimedStudent,
+  OrphanLine,
+  PendingDebit,
+} from "./types";
 
 function formatBillingMonth(ym: string): string {
   const [year, month] = ym.split("-");
