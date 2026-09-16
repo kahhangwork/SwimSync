@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { settlementPayload } from "@/lib/settlementPayload";
 import type { UnclaimedStudent } from "../types";
 import * as repo from "../dao/invoices.repo";
+import { settlementPayload } from "./settlementPayload";
 import { formatBillingMonth } from "./invoiceRows";
 
 /** Billable lessons with nobody to bill — they hold the month OPEN (the engine's

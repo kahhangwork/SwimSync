@@ -211,7 +211,6 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/classCoverage", why: "STAY in lib (coaches also imports); reached from domain Stage 9" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/sgPhone", why: "STAY in lib; reached from domain/ui Stage 8" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/paynow", why: "MOVE into invoices/domain (sole importer) Stage 8; page then imports ./domain/paynow" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/settlementPayload", why: "MOVE into invoices/domain (sole importer) Stage 6; page then imports ./domain" },
   // Transitional page->dao imports (playbook §7.1's sanctioned exception): until
   // each slice's hook wraps its dao call, the page imports the dao modules
   // directly. Added at Stage 2/3 when the imports first appeared; each is deleted
