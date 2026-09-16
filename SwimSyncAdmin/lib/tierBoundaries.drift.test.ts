@@ -107,18 +107,9 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    <page>/dao/<page>.{repo,rpc}.ts and these entries are deleted then.
   //    calendar and lessons reach data via @/lib/calendarData, so they hold no
   //    supabase line — nothing to pin here for them (check 4 only). ──
-  // attendance -> attendance/dao
-  { file: "app/(admin)/attendance/page.tsx", contains: 'import { supabase }', why: "L1: client -> attendance/dao" },
-  { file: "app/(admin)/attendance/page.tsx", contains: '.rpc("student_package_coverage")', why: "L1: attendance/dao/attendance.rpc.ts" },
-  { file: "app/(admin)/attendance/page.tsx", contains: '.from("coaches")', why: "L1: attendance/dao/attendance.repo.ts" },
-  { file: "app/(admin)/attendance/page.tsx", contains: '.from("classes")', why: "L1: attendance/dao/attendance.repo.ts" },
-  { file: "app/(admin)/attendance/page.tsx", contains: '.from("student_class_enrolments")', why: "L1: attendance/dao/attendance.repo.ts" },
-  { file: "app/(admin)/attendance/page.tsx", contains: '.from("attendance")', why: "L1: attendance/dao/attendance.repo.ts" },
-  { file: "app/(admin)/attendance/page.tsx", contains: '.from("session_coaches")', why: "L1: attendance/dao/attendance.repo.ts" },
-  { file: "app/(admin)/attendance/page.tsx", contains: '.from("class_rates")', why: "L1: attendance/dao/attendance.repo.ts" },
-  { file: "app/(admin)/attendance/page.tsx", contains: '.from("class_shadow_coaches")', why: "L1: attendance/dao/attendance.repo.ts" },
-  { file: "app/(admin)/attendance/page.tsx", contains: '.from("session_coach_absences")', why: "L1: attendance/dao/attendance.repo.ts" },
-  { file: "app/(admin)/attendance/page.tsx", contains: '.rpc("book_makeup"', why: "L1: attendance/dao/attendance.rpc.ts" },
+  // ── attendance: DONE — dao/domain/ui extracted, ledger empty. All 9 reads +
+  //    both RPCs (student_package_coverage, book_makeup) moved into
+  //    attendance/dao/attendance.repo.ts. ──
   // ── substitutes: DONE — dao/domain/ui extracted, ledger empty. All reads +
   //    the assign RPC + the delete moved into substitutes/dao/substitutes.repo.ts. ──
   // ── holidays: DONE — dao/domain/ui extracted, ledger empty. myTenantId +
@@ -174,15 +165,10 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    into <page>/domain; a SHARED helper STAYS in lib, reached from
   //    domain/ui/dao. calendarData does the data read, so it is bound in
   //    <page>/dao. Verdicts grep-confirmed (BATCH_B_PLAN.md move-or-stay). ──
-  // attendance
-  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/supabase", why: "L1: client -> attendance/dao" },
-  { file: "app/(admin)/attendance/page.tsx", contains: "lucide-react", why: "L3: icons -> attendance/ui" },
-  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/makeupFromAttendance", why: "L2: MOVE into attendance/domain (sole importer)" },
-  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/csv", why: "L2: reached from attendance/domain (shared, stays in lib)" },
-  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/lessonDates", why: "L2: reached from attendance/domain (shared, stays in lib)" },
-  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/packageCoverage", why: "L2: reached from attendance/domain (shared, stays in lib)" },
-  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/lessonAttribution", why: "L2: reached from attendance/domain (shared, stays in lib)" },
-  { file: "app/(admin)/attendance/page.tsx", contains: "@/lib/tableSearch", why: "L2: reached from attendance/domain (shared, stays in lib)" },
+  // ── attendance: DONE — page is composition, ledger empty. Client -> dao;
+  //    lucide icons -> ui; makeupFromAttendance MOVED into attendance/domain
+  //    (git mv, sole code importer); csv/lessonDates/packageCoverage/
+  //    lessonAttribution/tableSearch reached from domain/ui (shared, stay in lib). ──
   // ── substitutes: DONE — page is composition, ledger empty. lessonDates +
   //    sessionRoster reached from domain/useSubstitutes and ui/SubstitutesTable. ──
   // ── holidays: DONE — page is composition, ledger empty. Client -> dao;
