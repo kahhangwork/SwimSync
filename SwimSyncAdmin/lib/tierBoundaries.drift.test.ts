@@ -128,28 +128,10 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    the assign RPC + the delete moved into substitutes/dao/substitutes.repo.ts. ──
   // ── holidays: DONE — dao/domain/ui extracted, ledger empty. myTenantId +
   //    every read/write + both RPCs moved into holidays/dao/holidays.repo.ts. ──
-  // ── invoices (full track, INVOICES_REFACTOR_PLAN.md §6), pinned 2026-09-16 at
-  //    Stage 0b. The client + every call move into invoices/dao/invoices.{repo,
-  //    rpc,api}.ts at Stages 2-3; each entry goes stale and is deleted then. ──
-  { file: "app/(admin)/invoices/page.tsx", contains: 'from "@/lib/supabase"', why: "client import; leaves at Stage 3 (dao owns it)" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "supabase.auth.getUser()", why: "auth read; -> dao Stages 3/5/6" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "supabase.auth.getSession()", why: "auth read; -> dao/invoices.api Stage 3/9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("profiles")', why: "loadTenant; -> dao Stage 3" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("tenants")', why: "loadTenant + paynow/runday/auto saves; -> dao Stage 3/8" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("classes")', why: "loadCoverage; -> dao Stage 3/9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("student_class_enrolments")', why: "loadCoverage; -> dao Stage 3/9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("lesson_sessions")', why: "loadCoverage; -> dao Stage 3/9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("trial_bookings")', why: "loadCoverage; -> dao Stage 3/9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("makeup_bookings")', why: "loadCoverage; -> dao Stage 3/9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("attendance")', why: "loadCoverage; -> dao Stage 3/9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: 'fetch("/api/generate-invoices"', why: "handleGenerate; -> dao/invoices.api Stage 3/9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("students")', why: "handleSettle; -> dao Stage 3/5" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("student_settlements")', why: "settle inserts; -> dao Stage 3/5/6" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.rpc("unbilled_sealed_lessons"', why: "loadOrphans; -> dao Stage 3/6" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("parent_tenant_balances")', why: "loadPendingDebits; -> dao Stage 3/7" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.rpc("write_off_parent_balance"', why: "handleWriteOff; -> dao Stage 3/7" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.from("invoices")', why: "loadInvoices + reminded_at update; -> dao Stage 3/4" },
-  { file: "app/(admin)/invoices/page.tsx", contains: '.rpc("confirm_invoice_paid"', why: "handleMarkPaid; -> dao Stage 3/4" },
+  // ── invoices (full track, INVOICES_REFACTOR_PLAN.md): check 3 EMPTY at Stage
+  //    2/3 (folded). The client + all 19 data-access sites moved into
+  //    invoices/dao/invoices.{repo,rpc,api}.ts; the page holds ZERO supabase and
+  //    ZERO fetch(, so every entry went stale and was deleted. Nothing to pin. ──
 ];
 
 /**
@@ -225,7 +207,6 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    page. lucide icons -> ui; ./ReminderQueue -> ui/ReminderQueue. Each entry
   //    goes stale as the symbol leaves the page and is deleted then. ──
   { file: "app/(admin)/invoices/page.tsx", contains: "lucide-react", why: "icons -> ui/ Stages 4/8/9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/supabase", why: "client -> dao Stage 3" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/csv", why: "STAY in lib; reached from domain/ui Stage 4" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/lessonDates", why: "STAY in lib; reached from domain/ui, leaves page by Stage 11" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/classCoverage", why: "STAY in lib (coaches also imports); reached from domain Stage 9" },
@@ -234,7 +215,13 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/settlementPayload", why: "MOVE into invoices/domain (sole importer) Stage 6; page then imports ./domain" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/waMessage", why: "STAY in lib; reached from domain/ui Stage 4" },
   { file: "app/(admin)/invoices/page.tsx", contains: "./ReminderQueue", why: "MOVE to ui/ReminderQueue Stage 4; page then imports ./ui/ReminderQueue (allowed)" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/tableSearch", why: "STAY in lib; ilikeContains -> dao Stage 3/4" },
+  // Transitional page->dao imports (playbook §7.1's sanctioned exception): until
+  // each slice's hook wraps its dao call, the page imports the dao modules
+  // directly. Added at Stage 2/3 when the imports first appeared; each is deleted
+  // as the last direct caller becomes a domain/ hook (Stages 4-9), gone by 11.
+  { file: "app/(admin)/invoices/page.tsx", contains: "./dao/invoices.repo", why: "transitional; gone when every repo caller is a hook (Stages 4-8)" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "./dao/invoices.rpc", why: "transitional; gone when mark-paid/orphan/write-off callers are hooks (Stages 4-7)" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "./dao/invoices.api", why: "transitional; gone when generate becomes a hook (Stage 9)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

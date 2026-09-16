@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle, Download, Link as LinkIcon, MessageCircle, RefreshCw } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { exportCsv } from "@/lib/csv";
 import {
   todayInSg,
@@ -22,9 +21,11 @@ import { payNowProxyWarning } from "@/lib/paynow";
 import { settlementPayload } from "@/lib/settlementPayload";
 import { buildReminderMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
 import { ReminderQueue } from "./ReminderQueue";
-import { ilikeContains } from "@/lib/tableSearch";
 import { useDebouncedValue } from "@/components/useDebouncedValue";
 import { DMY, ROW_LIMIT, STATUS_FILTERS, INVOICE_CSV_COLUMNS } from "./constants";
+import * as repo from "./dao/invoices.repo";
+import * as rpc from "./dao/invoices.rpc";
+import { generateInvoices } from "./dao/invoices.api";
 import type {
   SearchField,
   InvoiceRow,
@@ -147,14 +148,10 @@ export default function InvoicesPage() {
    * like it works and does nothing.
    */
   async function loadTenant() {
-    const { data: auth } = await supabase.auth.getUser();
+    const { data: auth } = await repo.getUser();
     if (!auth.user) return;
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, tenant_id")
-      .eq("id", auth.user.id)
-      .maybeSingle();
+    const { data: profile } = await repo.fetchProfile(auth.user.id);
 
     setIsPlatformAdmin(profile?.role === "platform_admin");
     const tid = (profile?.tenant_id as string | null) ?? null;
@@ -163,13 +160,7 @@ export default function InvoicesPage() {
     loadOrphans(tid);
     loadPendingDebits(tid);
 
-    const { data: tenant } = await supabase
-      .from("tenants")
-      .select(
-        "display_name, auto_invoice_enabled, invoice_run_day, paynow_uen, paynow_mobile"
-      )
-      .eq("id", tid)
-      .maybeSingle();
+    const { data: tenant } = await repo.fetchTenant(tid);
 
     setBusinessName((tenant?.display_name as string | null) ?? "your swim school");
     setAutoEnabled(tenant?.auto_invoice_enabled ?? true);
@@ -186,10 +177,10 @@ export default function InvoicesPage() {
     if (!tenantId) return;
     const value =
       field === "paynow_mobile" ? blankToNull(normalizeSgPhone(raw)) : blankToNull(raw);
-    const { error } = await supabase
-      .from("tenants")
-      .update({ [field]: value, updated_at: new Date().toISOString() })
-      .eq("id", tenantId);
+    const { error } = await repo.updateTenant(tenantId, {
+      [field]: value,
+      updated_at: new Date().toISOString(),
+    });
     // Advisory only: the value still saved. A mistyped mobile can't build a QR,
     // and the parent's screen would silently show none — warn here instead.
     const warning = error ? null : payNowProxyWarning(field, value);
@@ -211,10 +202,10 @@ export default function InvoicesPage() {
     if (!tenantId) return;
     const clamped = Math.min(28, Math.max(1, Math.trunc(next)));
     setSavingRunDay(true);
-    const { error } = await supabase
-      .from("tenants")
-      .update({ invoice_run_day: clamped, updated_at: new Date().toISOString() })
-      .eq("id", tenantId);
+    const { error } = await repo.updateTenant(tenantId, {
+      invoice_run_day: clamped,
+      updated_at: new Date().toISOString(),
+    });
     if (!error) setRunDay(clamped);
     setSavingRunDay(false);
   }
@@ -223,10 +214,10 @@ export default function InvoicesPage() {
     if (autoEnabled === null || !tenantId) return;
     setTogglingAuto(true);
     const next = !autoEnabled;
-    const { error } = await supabase
-      .from("tenants")
-      .update({ auto_invoice_enabled: next, updated_at: new Date().toISOString() })
-      .eq("id", tenantId!);
+    const { error } = await repo.updateTenant(tenantId!, {
+      auto_invoice_enabled: next,
+      updated_at: new Date().toISOString(),
+    });
     if (!error) setAutoEnabled(next);
     setTogglingAuto(false);
   }
@@ -259,21 +250,9 @@ export default function InvoicesPage() {
 
       // Every query's error is checked: an unchecked failure would leave the
       // row set empty, which reads as "nothing missing" — the exact false
-      // reassurance this dialog exists to prevent.
-      // ⚠ NO `is_active` FILTER, DELIBERATELY — and `deactivated_at` comes with
-      // it. The ENGINE bills every class, active or not, and keeps a retired
-      // class's recorded sessions in its completeness gate (core.ts). While
-      // this query filtered `is_active`, a retired class holding an unmarked
-      // lesson blocked generation and was invisible to this dialog: the admin
-      // read "all marked", pressed Generate, and got a refusal naming a class
-      // on no screen they could reach — §8.32's deadlock on a visibility axis.
-      // computeClassCoverage() clamps a retired class's WEEKLY expectation at
-      // `deactivated_at` (a DATE, §7.109) while still reporting sessions that
-      // genuinely ran, which is the engine's rule exactly. §7.18.
-      const classesRes = await supabase
-        .from("classes")
-        .select("id, title, day_of_week, is_active, deactivated_at")
-        .eq("tenant_id", tenantId!);
+      // reassurance this dialog exists to prevent. (The deliberate NO-`is_active`
+      // filter and why lives with the query, in dao/invoices.repo.ts §7.18.)
+      const classesRes = await repo.fetchCoverageClasses(tenantId!);
       if (classesRes.error) throw classesRes.error;
 
       const classIds = (classesRes.data ?? []).map((c) => c.id);
@@ -287,39 +266,12 @@ export default function InvoicesPage() {
 
       const [enrolmentsRes, sessionsRes, bookingsRes, makeupsRes] =
         await Promise.all([
-          supabase
-            .from("student_class_enrolments")
-            // unenrolled_at is needed as well as enrolled_at: who must be marked
-            // is a question about the LESSON'S date, so an enrolment is a span,
-            // not a flag. See EnrolmentSpan in lib/attendanceCompleteness.ts.
-            .select("class_id, student_id, is_active, enrolled_at, unenrolled_at")
-            .in("class_id", classIds),
-          supabase
-            .from("lesson_sessions")
-            .select("id, class_id, session_date")
-            .in("class_id", classIds)
-            .gte("session_date", bounds.start)
-            .lte("session_date", bounds.end),
-          // Trial AND make-up bookings. Without these this check and the
-          // ENGINE disagree: the engine expects a booked child on their lesson
-          // and refuses to seal, while this dialog would report the month all
-          // clear. §7.18 is exactly that divergence, and it cost a live
-          // underbill. Both kinds satisfy the same "expected at one lesson"
-          // contract, so they merge into one bookings list.
-          supabase
-            .from("trial_bookings")
-            .select("class_id, student_id, session_date")
-            .in("class_id", classIds)
-            .is("cancelled_at", null)
-            .gte("session_date", bounds.start)
-            .lte("session_date", bounds.end),
-          supabase
-            .from("makeup_bookings")
-            .select("class_id, student_id, session_date")
-            .in("class_id", classIds)
-            .is("cancelled_at", null)
-            .gte("session_date", bounds.start)
-            .lte("session_date", bounds.end),
+          repo.fetchEnrolments(classIds),
+          repo.fetchSessions(classIds, bounds.start, bounds.end),
+          // Trial AND make-up bookings, merged below into one bookings list —
+          // both satisfy the same "expected at one lesson" contract (§7.18).
+          repo.fetchTrialBookings(classIds, bounds.start, bounds.end),
+          repo.fetchMakeupBookings(classIds, bounds.start, bounds.end),
         ]);
       if (enrolmentsRes.error) throw enrolmentsRes.error;
       if (sessionsRes.error) throw sessionsRes.error;
@@ -327,13 +279,8 @@ export default function InvoicesPage() {
       if (makeupsRes.error) throw makeupsRes.error;
 
       const sessionIds = (sessionsRes.data ?? []).map((s) => s.id);
-      // NB the attendance select below is by SESSION, not by student, so a
-      // booked child's row is already included — no second query needed.
       const attendanceRes = sessionIds.length
-        ? await supabase
-            .from("attendance")
-            .select("lesson_session_id, student_id")
-            .in("lesson_session_id", sessionIds)
+        ? await repo.fetchAttendance(sessionIds)
         : { data: [], error: null };
       if (attendanceRes.error) throw attendanceRes.error;
 
@@ -364,16 +311,9 @@ export default function InvoicesPage() {
     setGenResult(null);
     const {
       data: { session },
-    } = await supabase.auth.getSession();
+    } = await repo.getSession();
     try {
-      const res = await fetch("/api/generate-invoices", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token ?? ""}`,
-        },
-        body: JSON.stringify({ billing_month: genMonth }),
-      });
+      const res = await generateInvoices(session?.access_token ?? "", genMonth);
       const json = await res.json();
       if (!res.ok) {
         setGenResult(`Error: ${json.error ?? "generation failed"}`);
@@ -498,15 +438,11 @@ export default function InvoicesPage() {
     setSettling(u.student_id);
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await repo.getUser();
 
-    const { data: student } = await supabase
-      .from("students")
-      .select("tenant_id")
-      .eq("id", u.student_id)
-      .single();
+    const { data: student } = await repo.fetchStudentTenant(u.student_id);
 
-    const { error } = await supabase.from("student_settlements").insert(
+    const { error } = await repo.insertSettlement(
       settlementPayload({
         tenantId: student?.tenant_id,
         studentId: u.student_id,
@@ -538,9 +474,7 @@ export default function InvoicesPage() {
    *  settlement") lives in unbilled_sealed_lessons() where pgTAP pins it —
    *  not re-derived here, where it would drift. */
   async function loadOrphans(tid: string) {
-    const { data, error } = await supabase.rpc("unbilled_sealed_lessons", {
-      p_tenant: tid,
-    });
+    const { data, error } = await rpc.unbilledSealedLessons(tid);
     if (!error) setOrphans((data ?? []) as OrphanLine[]);
   }
 
@@ -562,9 +496,9 @@ export default function InvoicesPage() {
     setOrphanSettling(`${line.student_id}:${line.billing_month}`);
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await repo.getUser();
 
-    const { error } = await supabase.from("student_settlements").insert(
+    const { error } = await repo.insertSettlement(
       settlementPayload({
         tenantId,
         studentId: line.student_id,
@@ -595,11 +529,7 @@ export default function InvoicesPage() {
    * authoritative "still owed and uncollected" figure.
    */
   async function loadPendingDebits(tid: string) {
-    const { data, error } = await supabase
-      .from("parent_tenant_balances")
-      .select("parent_id, tenant_id, debit_balance, parents(profiles(full_name))")
-      .eq("tenant_id", tid)
-      .gt("debit_balance", 0);
+    const { data, error } = await repo.fetchPendingDebits(tid);
     if (error) {
       setPendingDebitError(error.message);
       setPendingDebits([]); // don't leave a stale list standing behind an error
@@ -635,11 +565,11 @@ export default function InvoicesPage() {
     }
     const key = `${row.parent_id}:${row.tenant_id}`;
     setWritingOff(key);
-    const { error } = await supabase.rpc("write_off_parent_balance", {
-      p_parent_id: row.parent_id,
-      p_tenant_id: row.tenant_id,
-      p_reason: reason.trim(),
-    });
+    const { error } = await rpc.writeOffParentBalance(
+      row.parent_id,
+      row.tenant_id,
+      reason.trim()
+    );
     setWritingOff(null);
     if (error) {
       setPendingDebitError(error.message);
@@ -654,33 +584,9 @@ export default function InvoicesPage() {
     setLoading(true);
     const term = search.trim();
 
-    // PARENT search is a clean DB pushdown (invoice → ONE parent, so !inner
-    // narrows nothing wrong). STUDENT search is deliberately NOT pushed: an
-    // invoice has MANY items, and a `.ilike` on the invoice_items embed filters
-    // the returned items too — collapsing a multi-child invoice's student list
-    // to just the searched child, which would then misstate the WhatsApp
-    // reminder and CSV (a financial communication). So the items embed stays
-    // plain and student search runs client-side over the fetched set (bounded by
-    // the cap banner, like Classes/Packages).
-    const parentEmbed =
-      term !== "" && searchField === "parent"
-        ? "parents!inner(profiles!inner(full_name, phone))"
-        : "parents(profiles(full_name, phone))";
-
-    let query = supabase
-      .from("invoices")
-      .select(
-        `id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, ${parentEmbed}, invoice_items(student_name, students(full_name))`
-      )
-      .order("generated_at", { ascending: false })
-      .limit(ROW_LIMIT);
-
-    if (term !== "" && searchField === "parent") {
-      // Bound `.ilike`, so punctuation in a name is literal.
-      query = query.ilike("parents.profiles.full_name", ilikeContains(term));
-    }
-
-    const { data, error } = await query;
+    // Parent search is a DB pushdown; student search runs client-side over the
+    // fetched set (why lives with the query, in dao/invoices.repo.ts).
+    const { data, error } = await repo.fetchInvoices(term, searchField);
     if (seq !== invoiceSeq.current) return;
     // Surfaced, never swallowed: an empty table on a failed search reads as
     // "no invoices", the silent wrong answer this change exists to kill.
@@ -749,10 +655,7 @@ export default function InvoicesPage() {
     });
     window.open(buildWaLink(inv.wa_number, message), "_blank", "noopener");
     const stamp = new Date().toISOString();
-    const { error } = await supabase
-      .from("invoices")
-      .update({ reminded_at: stamp })
-      .eq("id", inv.id);
+    const { error } = await repo.updateInvoiceReminded(inv.id, stamp);
     if (!error) {
       setInvoices((prev) =>
         prev.map((row) => (row.id === inv.id ? { ...row, reminded_at: stamp } : row))
@@ -762,12 +665,8 @@ export default function InvoicesPage() {
 
   async function handleMarkPaid(invoiceId: string) {
     setMarkingPaid(invoiceId);
-    // ONE mark-paid path for every client (PRD §7.21): the RPC writes
-    // status + paid_at + paid_marked_by + the payment_records audit row
-    // atomically. This page's old direct UPDATE wrote neither audit field.
-    const { error } = await supabase.rpc("confirm_invoice_paid", {
-      p_invoice_id: invoiceId,
-    });
+    // ONE mark-paid path for every client (PRD §7.21) — see dao/invoices.rpc.ts.
+    const { error } = await rpc.confirmInvoicePaid(invoiceId);
     setMarkingPaid(null);
     if (error) return;
     setInvoices((prev) =>
