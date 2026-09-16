@@ -42,6 +42,11 @@
 // red on the five pages' real violations before the ledger was pinned, and
 // holidays/ui/Break importing ../dao + holidays/dao/break importing React drove
 // checks 1 and 2 red; breakers removed, 6/6 green.
+// Re-proven for the invoices scope on 2026-09-16 at Stage 0b: checks 3 and 4
+// went red on invoices/page.tsx's real violations before the ledger was pinned;
+// invoices/ui/Break importing ../dao, invoices/dao/break importing React,
+// invoices/domain/break calling fetch(, and an unpinned @/lib/money import on
+// the page drove all four checks red — breakers removed, 6/6 green.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -77,6 +82,15 @@ const SCOPE_DIRS = [
   "app/(admin)/holidays",
   "app/(admin)/calendar",
   "app/(admin)/lessons",
+  // invoices (full track, docs/refactor/INVOICES_REFACTOR_PLAN.md), widened
+  // 2026-09-16 at Stage 0b. Checks 3 and 4 are red on day one for the 1,748-line
+  // page; every current violation is pinned in the ledgers below with the stage
+  // that removes it (data access -> Stage 2/3; @/lib imports -> the slice stage
+  // that moves the symbol). The transitional page->dao import pins are NOT added
+  // here (the page imports no dao yet — they would be flagged stale); they are
+  // added at Stage 2/3 when the import first appears and removed at Stages 4-9
+  // as each hook wraps the call (packages §5, playbook §7.1). Ledger only shrinks.
+  "app/(admin)/invoices",
 ];
 
 // One route file per scoped dir. Check 4 runs against each.
@@ -114,6 +128,28 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    the assign RPC + the delete moved into substitutes/dao/substitutes.repo.ts. ──
   // ── holidays: DONE — dao/domain/ui extracted, ledger empty. myTenantId +
   //    every read/write + both RPCs moved into holidays/dao/holidays.repo.ts. ──
+  // ── invoices (full track, INVOICES_REFACTOR_PLAN.md §6), pinned 2026-09-16 at
+  //    Stage 0b. The client + every call move into invoices/dao/invoices.{repo,
+  //    rpc,api}.ts at Stages 2-3; each entry goes stale and is deleted then. ──
+  { file: "app/(admin)/invoices/page.tsx", contains: 'from "@/lib/supabase"', why: "client import; leaves at Stage 3 (dao owns it)" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "supabase.auth.getUser()", why: "auth read; -> dao Stages 3/5/6" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "supabase.auth.getSession()", why: "auth read; -> dao/invoices.api Stage 3/9" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("profiles")', why: "loadTenant; -> dao Stage 3" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("tenants")', why: "loadTenant + paynow/runday/auto saves; -> dao Stage 3/8" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("classes")', why: "loadCoverage; -> dao Stage 3/9" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("student_class_enrolments")', why: "loadCoverage; -> dao Stage 3/9" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("lesson_sessions")', why: "loadCoverage; -> dao Stage 3/9" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("trial_bookings")', why: "loadCoverage; -> dao Stage 3/9" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("makeup_bookings")', why: "loadCoverage; -> dao Stage 3/9" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("attendance")', why: "loadCoverage; -> dao Stage 3/9" },
+  { file: "app/(admin)/invoices/page.tsx", contains: 'fetch("/api/generate-invoices"', why: "handleGenerate; -> dao/invoices.api Stage 3/9" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("students")', why: "handleSettle; -> dao Stage 3/5" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("student_settlements")', why: "settle inserts; -> dao Stage 3/5/6" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.rpc("unbilled_sealed_lessons"', why: "loadOrphans; -> dao Stage 3/6" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("parent_tenant_balances")', why: "loadPendingDebits; -> dao Stage 3/7" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.rpc("write_off_parent_balance"', why: "handleWriteOff; -> dao Stage 3/7" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.from("invoices")', why: "loadInvoices + reminded_at update; -> dao Stage 3/4" },
+  { file: "app/(admin)/invoices/page.tsx", contains: '.rpc("confirm_invoice_paid"', why: "handleMarkPaid; -> dao Stage 3/4" },
 ];
 
 /**
@@ -182,6 +218,23 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    markableFloor.ts import it via relative path — the @/lib grep missed
   //    those; corrected from the L0 MOVE verdict). calendarData bound in
   //    lessons/dao; every other @/lib helper reached from domain/ui. ──
+  // ── invoices (full track, INVOICES_REFACTOR_PLAN.md §3 verdicts), pinned
+  //    2026-09-16 at Stage 0b. paynow + settlementPayload MOVE into
+  //    invoices/domain (sole importers, §3); the other @/lib helpers STAY in lib/
+  //    (shared) and are reached from domain/ui/dao once their symbols leave the
+  //    page. lucide icons -> ui; ./ReminderQueue -> ui/ReminderQueue. Each entry
+  //    goes stale as the symbol leaves the page and is deleted then. ──
+  { file: "app/(admin)/invoices/page.tsx", contains: "lucide-react", why: "icons -> ui/ Stages 4/8/9" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/supabase", why: "client -> dao Stage 3" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/csv", why: "STAY in lib; reached from domain/ui Stage 4" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/lessonDates", why: "STAY in lib; reached from domain/ui, leaves page by Stage 11" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/classCoverage", why: "STAY in lib (coaches also imports); reached from domain Stage 9" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/sgPhone", why: "STAY in lib; reached from domain/ui Stage 8" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/paynow", why: "MOVE into invoices/domain (sole importer) Stage 8; page then imports ./domain/paynow" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/settlementPayload", why: "MOVE into invoices/domain (sole importer) Stage 6; page then imports ./domain" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/waMessage", why: "STAY in lib; reached from domain/ui Stage 4" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "./ReminderQueue", why: "MOVE to ui/ReminderQueue Stage 4; page then imports ./ui/ReminderQueue (allowed)" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/tableSearch", why: "STAY in lib; ilikeContains -> dao Stage 3/4" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
