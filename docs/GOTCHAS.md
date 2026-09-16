@@ -3771,3 +3771,16 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     pressure — close what you are not using and expect to restart mid-session. `run-all-drivers.sh --only
     <name>` runs one driver's reset+seed+run in ~90 s, so prefer it to the full sweep when checking one page.
     (2026-09-15.)
+
+240. **A Playwright `waitFor({ state: "detached" })` (or an `exact:true` `getByRole`) on a button whose LABEL
+    CHANGES on click resolves INSTANTLY — the relabel makes the locator match nothing, and "matches nothing"
+    is reported as "detached".** So waiting for a confirm button to "finish" this way returned in ~40 ms while
+    the request was still in flight; the follow-up `page.goto()` then ABORTED the in-flight POST, the mutation
+    never landed, and three downstream checks failed with no error (it looked like the feature was broken, or
+    the local env, when neither was). Wait on the RESULT, not the button: register
+    `page.waitForResponse(r => r.url().includes("/api/x"))` BEFORE the click, `await` it, then read settled
+    state. Hit while de-flaking `verify-tenant-suspension` on 2026-09-16: the confirm button re-labels
+    "Suspend this business" → "Suspending…", and the nightly's ACTUAL flake was a different one — a fixed
+    `waitForTimeout(4000)` asserting the suspended badge before the RPC returned (the DB change had already
+    succeeded; a §7.228-style "button still mid-action" red on a slow runner). Diagnosed with a Fable 5.1
+    subagent; the response-wait fix verified 12/12 locally. (`docs/TESTING.md` §5. 2026-09-16.)

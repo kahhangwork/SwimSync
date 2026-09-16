@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-16 — **Admin L-B lite batch SHIPPED to `main` (§8.105)** — 5 calendar pages
-(attendance/substitutes/holidays/calendar/lessons) to tiers, 2,387 → 440 lines, every page 0 `useState`,
-both boundary ledgers empty, zero behaviour change; L4 net 6/6 + holidays hand-check 9/9. **Nightly
-`35095280475` RUNNING on `a773058` to validate it — DO NOT push the next unit until it is green (§9).**
-Unit 4 of 17 done; **next: `invoices` (1,748), the next full-track giant.**_
+_Last updated: 2026-09-16 — **Admin L-B lite batch SHIPPED to `main` (§8.105)** — 5 calendar pages to tiers,
+2,387 → 440 lines, every page 0 `useState`, zero behaviour change; L4 net 6/6. **Its nightly reddened on ONE
+unrelated flake (`verify-tenant-suspension`, not L-B) — de-flaked (§7.240); a fresh nightly is still needed.**
+**⚠ `invoices` Stages 0–11 also landed on `main` via a cross-session merge mistake — it needs the invoices
+session's own `/update-docs` + a nightly (§9).**_
 
 _Previously, 2026-09-16 (§8.104) — packages full-track refactor shipped, nightly `35032652395` green on `f0cbcb5`._
 
@@ -351,8 +351,10 @@ inside a file read at the start of every session.
 
 ## 8.105 (2026-09-16) — Admin L-B lite batch: 5 calendar pages to tiers, 2,387 → 440 lines, 0 useState
 
-**Unit 4 of 17 (giant→batch alternation); shipped to `main` (`927a8b4`…`a773058`), nightly `35095280475`
-running to confirm. Zero behaviour change.** attendance (867→110), substitutes (539→105), holidays (443→113),
+**Unit 4 of 17 (giant→batch alternation); shipped to `main` (`927a8b4`…`a773058`). Zero behaviour change.**
+Its nightly `35095280475` reddened on ONE unrelated driver (`verify-tenant-suspension` 11/12, a Platform-page
+flake — L-B's 5 pages passed L4 6/6); de-flaked to wait on the API response (`595910e`, §7.240), 12/12 local.
+A fresh nightly is still needed. attendance (867→110), substitutes (539→105), holidays (443→113),
 calendar (282→45), lessons (256→67) — each folded L1–L3 in one commit (playbook §7.1), every page **0 `useState`**,
 both boundary ledgers empty. 708 vitest (+25 characterisation tests) + 429 jest; L4 driver net **6/6 green**
 (smoke-admin 64, admin-calendar 21, admin-lesson-detail 27, cancel-lesson 17, coach-roster 30, platform-admin-scope 32)
@@ -424,12 +426,15 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-16: a manual run `35095280475` is IN PROGRESS on `a773058`** to validate Admin L-B (§8.105) —
-kicked off with `gh workflow run ui-drivers.yml --ref main` right after the push, so it runs in parallel rather
-than waiting for the scheduled sweep. **Check it before starting the next unit's push:** `gh run view 35095280475`.
-Previous scheduled run `35032652395` was green on `f0cbcb5` (confirmed `packages`, §8.104); rot issue #10 closed,
-none open. Re-read the run, don't trust this line (§8.65). Start any new red with `gh run download <id> -n
-ui-driver-run` and the screenshots (§7.228), not a hypothesis.
+**State on 2026-09-16: run `35095280475` (L-B, on `a773058`) FAILED — but on ONE unrelated driver, not L-B.**
+`verify-tenant-suspension` went 11/12; the 5 L-B pages passed their whole L4 net 6/6. It was a flake on the
+Platform page (untouched by L-B): a fixed `waitForTimeout(4000)` asserted the suspended badge before the
+suspend RPC returned — the DB change had succeeded (the login-dies check passed), a §7.228 "button still
+mid-action" red. De-flaked to wait on the `/api/suspend-tenant` response (`595910e`, §7.240), verified 12/12
+locally. **A fresh nightly is NEEDED to get a clean green** (none triggered yet — `gh workflow run
+ui-drivers.yml --ref main`, then `gh run view <id>`). Previous scheduled run `35032652395` was green on
+`f0cbcb5` (confirmed `packages`, §8.104); rot issue #10 closed, none open. Re-read the run, don't trust this
+line (§8.65). Start any new red with `gh run download <id> -n ui-driver-run` and the screenshots (§7.228).
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -450,21 +455,24 @@ failures that are just the driver's own UI writes — reset before believing it.
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — `invoices` (the next full-track giant)
+### THE NEXT BUILD — `invoices` LANDED ON MAIN (cross-session), NEEDS ITS OWN /update-docs
 
-**Admin L-B shipped (§8.105); its nightly `35095280475` is RUNNING.** By the giant→batch alternation the next
-unit is a **full-track GIANT, and `invoices` (1,748 lines) is the pick** — the largest remaining. **THE GATE:
-do NOT push `invoices` to `main` until L-B's nightly is green** (`gh run view 35095280475`) — never two units
-validated in parallel (playbook §7.1). Building it locally while the nightly runs is fine; landing it is not.
+**⚠ `invoices` Stages 0–11 are on `main` (`a1a0c51`…`40ee0f7`), built by a PARALLEL session** on
+`refactor/invoices-tiers` — its record is `docs/refactor/INVOICES_REFACTOR_PLAN.md` ("full driver net green"
+per its own commits). They reached `main` via a **cross-session merge mistake from THIS session** (a shared
+checkout; a `git merge` ran against the invoices branch — §7.240's sibling lesson: check `git branch
+--show-current` before commit/merge on a shared tree). Nothing was reverted (the user's call). **So the invoices
+session must run its OWN `/update-docs`** to author §8.106 + §9 for it and confirm whether all stages/nightly
+are truly done — THIS entry is a placeholder, not that write-up. **Also uncommitted and NOT ours:**
+`SwimSyncApp/lib/sgDisplay.drift.test.ts` (the invoices session's in-flight coach-app fence edit) — left alone.
 
-Method for a full page: the twelve stages of playbook §2, folded as proven on L-A/L-B if lighter, with its own
-`docs/refactor/INVOICES_REFACTOR_PLAN.md` (Students, packages and BATCH_B are the worked examples). Start by
-`wc -l` + grepping `invoices/page.tsx` for `.from`/`.rpc`/`fetch` and `@/lib/*`, deriving the driver net by
-grep (§7.236), and widening `SCOPE_DIRS` at L0. Tiers stay feature-scoped under the page's folder (§7.233).
-**5 full giants left after invoices:** `classes` (1,714), `platform` (1,395), `lessons/[classId]/[date]` (912);
-coach app `schedule/index` (1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905). Plus the
-lite batches L-C…L-H (`BACKLOG.md` → Foundations). **Still-due once-off:** the dao three-way split +
-"orchestrate, never replace" rule graduates to `docs/ARCHITECTURE.md` §6 (trigger met since packages).
+**Then a nightly must validate `main`** (L-B + invoices + the §7.240 driver fix, together — bisection now spans
+both units, so watch it). Method for any full page is playbook §2 (folded as on L-A/L-B), own
+`<FEATURE>_REFACTOR_PLAN.md`, `SCOPE_DIRS` at L0, driver net by grep (§7.236), tiers feature-scoped (§7.233).
+**Giants left after invoices:** `classes` (1,714), `platform` (1,395), `lessons/[classId]/[date]` (912); coach
+app `schedule/index` (1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905). Plus lite batches
+L-C…L-H (`BACKLOG.md` → Foundations). **Still-due once-off:** the dao three-way split + "orchestrate, never
+replace" rule graduates to `docs/ARCHITECTURE.md` §6 (trigger met since packages).
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), **on prod
 — re-confirmed 2026-08-30 by `supabase migration list --linked`, `remote` column filled** — 0 pending, rehearsed
