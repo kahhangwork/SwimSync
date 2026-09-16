@@ -146,10 +146,14 @@ _(Fold L1–L3 shape does NOT apply — this is a full-track giant; twelve stage
 | 4 | List: `domain/invoiceRows.ts` (+7 tests) → `useInvoiceList` → `ui/InvoiceToolbar` + `ui/InvoiceTable` + `ReminderQueue` git-mv'd into ui (1,561 → 1,197) | `15f542a` | typecheck + 715 vitest, fence 6/6 | **verify-invoice-controls 18/18** |
 | 5 | `useUnclaimed` + `ui/UnclaimedModal` (1,197 → 1,051) | `735137a` | typecheck + 715 vitest, fence 6/6 | trial-onboarding deferred to Stage 9 (modal only reachable via generation) |
 | 6 | `useOrphans` + `ui/OrphanReport` + `settlementPayload` git-mv into domain (1,051 → 911) | `31cc398` | typecheck + 715 vitest, fence 6/6 | **verify-orphan-report 14/14** |
-| 7 | `usePendingDebits` + `ui/PendingDebits` | | | (unit — dormant on prod) |
-| 8 | `useTenantBilling` + `ui/GenerationPanel` (move `paynow`) | | | tenant-admin, platform-admin-scope |
-| 9 | `useGenerate` + `ui/ConfirmGenerateModal` + `ui/BlockedLessonsModal` | | | unmarked-lessons, invoice-controls |
-| 11 | page → composition; delete dead imports; **both ledgers to zero** | | | full net + smoke |
+| 7 | `usePendingDebits` + `ui/PendingDebits` (911 → 808) | `229d3bf` | typecheck + 715 vitest, fence 6/6 | (unit — dormant on prod) |
+| 8 | `useTenantBilling` + `ui/GenerationPanel` + `paynow` git-mv into domain (808 → 560) | `d9cd977` | typecheck + 715 vitest, fence 6/6 | **verify-invoice-controls 18/18** |
+| 9+11 | `useGenerate` + `ui/ConfirmGenerateModal` + `ui/BlockedLessonsModal`; **page → composition, 200 lines, 0 useState, both ledgers EMPTY** | `f72b435` | typecheck + 715 vitest, fence 6/6 | full net (below) |
+
+**Done. Page 1,748 → 200 lines, 0 `useState`, both boundary ledgers empty.** Full driver net,
+all green (2026-09-16, local stack): invoice-controls 18/18 (×2), orphan-report 14/14,
+platform-admin-scope 32/32, tenant-admin 10/10, smoke-admin 64/64, trial-onboarding 10/10,
+unmarked-lessons 12/12, payment-collection 19/19.
 
 ---
 
@@ -175,9 +179,33 @@ banner. (Most are DORMANT on prod — §3 — so no driver exists; the hand-chec
 
 ---
 
-## 13. Findings for `/update-docs` (fill at close)
+## 13. Findings for `/update-docs`
 
-_(Graduates: gotchas hit, the dao three-way-split + "orchestrate never replace" graduation to
-`docs/ARCHITECTURE.md` §6 that has been pending since packages, any new BACKLOG driver items.)_
+- **Cross-slice cycle pattern (new, worth graduating).** `useGenerate` fills the unclaimed
+  modal and `useUnclaimed`'s settle writes `genResult` (owned by `useGenerate`) — a cycle.
+  Broken by making `useUnclaimed` dep-free and passing `genMonth` + `setGenResult` to
+  `handleSettle` at CALL time from the page's compose layer, and creating `useGenerate` after
+  `useUnclaimed` so it can take `setUnclaimed`. General rule for the remaining giants: when two
+  slices write each other's state, the later-created hook takes the earlier's setter, and the
+  reverse direction is passed as a call-time arg — never a creation dep. (Playbook §5 candidate.)
+- **`loadTenant` returns the resolved id** so the page effect chains the tenant-scoped report
+  loads (orphans, pending debits) off the return value rather than racing the `tenantId` state
+  update. Pattern for any "shared-spine id loaded in one hook, needed by siblings".
+- **`sgDisplay.drift.test.ts` allowlist entries are file-pinned** — moving `formatBillingMonth`
+  (a `toLocaleDateString` month+year site) from `page.tsx` to `domain/invoiceRows.ts` needed the
+  entry repointed in the same commit, or the scan flags it at the new path. (Same class as the
+  §1 table's `sgDisplay` note; add invoices as a worked instance.)
+- **Two clean `git mv`s into domain** (`paynow`, `settlementPayload`) — both sole-imported by
+  this page within admin, both with their `.test.ts`, both with no lib-sibling relative imports,
+  so they moved without repointing. `settlementPayload` is shared by TWO invoices hooks
+  (useUnclaimed + useOrphans) — "sole importer" is the FEATURE, not one file.
+- **BACKLOG driver:** four admin actions on this page have no dedicated driver — PayNow save +
+  advisory, run-day save, CSV export cap banner, and pending-debits **Write off** (the last is
+  dormant on prod). `smoke-admin` loads the page (h1 + no console error) and the moves are
+  verbatim, but a `verify-invoice-admin` driver (mirror of the `verify-packages-admin` BACKLOG
+  item from §8.104) would close the gap. File in `BACKLOG.md`.
+- **Still-due once-off (unchanged by this session):** the dao three-way-split + "orchestrate,
+  never replace" rule graduates to `docs/ARCHITECTURE.md` §6 (trigger met since packages; now
+  three full giants exercise it).
 </content>
 </invoke>
