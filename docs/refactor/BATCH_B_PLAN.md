@@ -89,11 +89,11 @@ Gate every commit: `cd SwimSyncAdmin && npm run typecheck && npm test` **and**
       fix `walk` to stop at nested route pages, pin every current violation in both ledgers
       (by file + snippet, each with the commit that removes it), prove all four checks red
       then green. **Ledgers opened here; never widened after L0** (playbook §3).
-- [ ] **L1–L3 folded, ONE commit per page** (playbook §7.1). Each: `types`/`constants` +
-      `dao/` + `domain/` (pure mapping under a characterisation test where there is one) +
-      `ui/` + page-as-composition, in one gated commit. Order smallest/simplest first:
-      `lessons` → `calendar` → `substitutes` → `holidays` → `attendance`. Each page:
-      0 `useState`, its ledger entries deleted as the code moves. Both ledgers to empty.
+- [x] **L1–L3 folded, ONE commit per page** (playbook §7.1). Order smallest/simplest first:
+      `f4fbf7e` lessons (256→67) · `2dc4b4f` calendar (282→45) · `b4b775b` substitutes (539→105) ·
+      `923b582` holidays (443→113) · `f3b6a8e` attendance (867→110). Every page: **0 `useState`**,
+      its ledger entries deleted as the code moved. **Both ledgers now empty.** 708 vitest
+      (+25 characterisation tests across the 5 pages) + 429 jest, both apps green at each commit.
 - [ ] **L4** (once) — run the full batch net on the live stack, one driver at a time
       (`--only`; stop expo for admin-only drivers — the batched run OOM-kills the box, §7.239).
       Hand-check `holidays` (mark/unmark, CSV import, extension days) with a screenshot named
@@ -111,6 +111,23 @@ units in flight, playbook §7.1). Next after L-B is a full giant (giant/batch al
   skips a subdir that holds its own `page.tsx`. First scoped dir with a nested route; worth a
   playbook note — a giant that lives under another page's folder is scoped on its own turn,
   and the walk already excludes it.
+- **The `@/lib/<mod>` sole-importer grep UNDER-REPORTS — it misses relative imports from
+  inside `lib/`.** `attendanceWindow` looked sole-imported by `lessons/page.tsx` at L0, so it
+  was pinned as a MOVE; in fact `lib/lessonMarking.ts` and `lib/markableFloor.ts` import it by
+  `./attendanceWindow`, so it is shared and STAYS. **Before calling a helper sole-imported,
+  grep BOTH `@/lib/<mod>` AND (from inside `lib/`) `./<mod>`, and exclude `.test`.** Cost
+  nothing here (caught before the move); would have broken two lib modules if moved.
+- **A `ui/` component importing a TYPE from `dao/` trips check 1** (ui never imports dao) — the
+  regex does not distinguish `import type`. Shared row types (`Holiday`, `AttendanceRow`,
+  `MakeupClass`) belong in a page-level `types.ts` that dao AND ui import. Playbook §1 already
+  says types live in `types.ts`; this is why it matters for the boundary, not just tidiness.
+- **`useRef<T>(null)` is `RefObject<T | null>` under these React types** — a prop that receives
+  a passed-down ref must type it `RefObject<T | null>`, or tsc rejects the wire-up.
+- **The lite fold puts each page's `useTableSort` in its `ui/…Table` component** (holidays,
+  attendance) — RISK 3 from packages, an always-mounted component. Attendance's sort is created
+  in the hook instead (it feeds the export's `visible`), and passed to the Th wiring; both are
+  stable because the hook lives as long as the page.
 
-_Gotchas → `docs/GOTCHAS.md`, missing-driver items → `BACKLOG.md`, behaviour changes → none
-(rule 0)._
+_Gotchas → `docs/GOTCHAS.md` (the two grep/boundary lessons above are candidates), missing-driver
+items → `BACKLOG.md` (holidays has no specialised driver — see the net table), behaviour changes
+→ none (rule 0)._
