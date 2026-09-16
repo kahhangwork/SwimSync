@@ -3784,3 +3784,15 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `waitForTimeout(4000)` asserting the suspended badge before the RPC returned (the DB change had already
     succeeded; a §7.228-style "button still mid-action" red on a slow runner). Diagnosed with a Fable 5.1
     subagent; the response-wait fix verified 12/12 locally. (`docs/TESTING.md` §5. 2026-09-16.)
+
+241. **`sgDisplay.drift.test.ts` has a TWIN in each app, and BOTH scan `SwimSyncAdmin/app` — so a `toLocaleDateString`
+    that MOVES between admin files must be repointed in the app twin's allowlist too, in the same commit, and you must
+    run BOTH `npm test` suites.** During the invoices refactor `formatBillingMonth` moved from
+    `invoices/page.tsx` to `invoices/domain/invoiceRows.ts`; the admin twin's allowlist entry was repointed and the
+    admin vitest ran green, but the SwimSyncApp twin still pinned the old path and only the admin suite was run
+    locally — so it passed the local gate and went **red on `main`** (CI `frontend-tests (SwimSyncApp)`, run
+    35108878874) after landing. The playbook §2 gate is explicit — `cd SwimSyncAdmin && npm test` **AND**
+    `cd SwimSyncApp && npm test` at every stage — and skipping the second suite is exactly what this hides, because
+    the app twin only fails on an admin-file move it can't see locally. Fix was a one-line repoint of
+    `SwimSyncApp/lib/sgDisplay.drift.test.ts` (`6fe19e6`, jest 429/429). Same family as the §1-table "both twins of
+    `sgDisplay.drift.test.ts`" note in the refactor playbook. (`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`. 2026-09-16.)

@@ -1,8 +1,9 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-16 — **`packages` (full track) SHIPPED** (2nd full-track giant after Students; 5
-giants remain), a `verify-packages-admin` driver filed, and the dao-split → ARCHITECTURE §6 graduation
-flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
+_Last updated: 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
+filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
+dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
 on three tracks** (full / lite / fence — playbook §7), 17 units, smoke driver first; the *Foundations* item
 rewritten and a **Smoke drivers** item added. On 2026-09-12: the Students decomposition shipped (§8.100), the driver-port
 fix filed, and the package-settings move marked ripe. Earlier: **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
@@ -1624,6 +1625,20 @@ the guarantee repeatable so the next change to a slice hook is caught by CI, not
 them into a driver + `fixtures-packages-admin.sql`. The fixture needs a superseded offer to cover the
 Show-superseded toggle (the current `fixtures-packages.sql` seeds none). Companion to the L-A driver-gap
 note (`verify-packages` §7.238 family).
+
+### A `verify-invoice-admin` driver for the uncovered Invoices settings actions — **S** `[from the invoices refactor 2026-09-16]`
+The invoices refactor (§8.106) has a strong net — `verify-invoice-controls` (picker/toggle/platform refusal),
+`orphan-report`, `trial-onboarding`, `unmarked-lessons`, `payment-collection` — but **four admin actions on the
+page have no dedicated driver**: PayNow UEN/mobile save + its advisory, run-day save, the CSV-export cap banner,
+and the pending-debits **Write off** (the last is dormant on prod — 0 credit notes).
+
+**Why:** those four were the only actions on the decomposed page riding on unit tests + `smoke-admin` (which only
+asserts the page renders). A driver makes each guarantee repeatable so the next change to `useTenantBilling` /
+`useInvoiceList` / `usePendingDebits` is caught by CI, not by remembering to click.
+
+**Notes:** same shape as `verify-packages-admin` above — lift one-off scripts against `coach@swimsync.test` into
+a driver. Write-off needs a fixture with a `parent_tenant_balances.debit_balance > 0` row (none seeded today);
+CSV export can't be asserted headlessly past the download, so assert the cap-banner path instead.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the

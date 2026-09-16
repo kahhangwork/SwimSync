@@ -28,6 +28,7 @@ _The rows below are moved verbatim. Their length is the pre-2026-08-10 record, n
 standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.104** | 2026-09-16 | `packages/page.tsx` full-track (2nd giant): 2,014 → 244 lines, 0 useState, zero behaviour change; nightly 35032652395 green | docs/refactor/PACKAGES_REFACTOR_PLAN.md · §7.239 · ARCHITECTURE §6 |
 | **8.103** | 2026-09-14 | Admin L-A lite batch: 5 "people" pages (coaches/admins/parents/unassigned/claims) to tiers, 0 useState, zero behaviour change, dfe4cad on prod | docs/refactor/BATCH_A_PLAN.md · playbook §7.1 |
 | **8.102** | 2026-09-13 | Smoke drivers for every route, both apps (admin 64 + app 73 checks); feature-tier rollout set to every page, 3 tracks | §7.237 · §7.238 · docs/TESTING.md §5 |
 | **8.101** | 2026-09-12 | The nightly's two reds were driver date-rot, not product bugs; fixed driver-only (7667643) | §7.234 (date-rot family) · §7.122 · §7.98 |

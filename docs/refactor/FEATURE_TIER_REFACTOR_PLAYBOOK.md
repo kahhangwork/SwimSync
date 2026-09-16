@@ -257,6 +257,17 @@ rm verify-zz-* fixtures-zz-*                    # before committing anything
   byte-identical `ui/Field.tsx` (admins, coaches). Kept feature-scoped on purpose (§7.233 —
   don't lift to `@/components` mid-refactor). A **third** copy is the trigger to consolidate;
   file it in `BACKLOG.md` when it appears, don't pre-emptively share.
+- **When two slices write EACH OTHER's state, break the cycle at the compose layer, not inside
+  a hook.** Invoices (§8.106): `useGenerate` fills the unclaimed modal (`setUnclaimed`) and
+  `useUnclaimed`'s settle writes `genResult` (owned by `useGenerate`) — a creation-time cycle.
+  Resolved by making the EARLIER hook (`useUnclaimed`) dependency-free and passing the later
+  hook's values (`genMonth`, `setGenResult`) to its handler as **call-time arguments** from the
+  page, while the LATER hook (`useGenerate`) takes the earlier's setter as a creation dep. Rule:
+  the later-created hook may depend on the earlier; the reverse direction is a call-time arg,
+  never a creation dep. The page's compose layer is where the two are wired. Also: a shared-spine
+  id loaded in one hook but needed by siblings (`tenantId` in `useTenantBilling`) — have its
+  `load()` RETURN the id so the mount effect chains the dependent loads off the return value
+  rather than racing the state update.
 
 ---
 
