@@ -1,61 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle, Download, Link as LinkIcon, MessageCircle, RefreshCw } from "lucide-react";
-import { exportCsv } from "@/lib/csv";
+import { RefreshCw } from "lucide-react";
 import {
   todayInSg,
   monthBounds,
   formatSgDate,
-  formatSgStamp,
   previousBillingMonth,
 } from "@/lib/lessonDates";
 import { computeClassCoverage, type ClassCoverage } from "@/lib/classCoverage";
 import { PageHeader } from "@/components/PageHeader";
-import { StatusBadge } from "@/components/StatusBadge";
-import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { blankToNull, checkSgPhone, normalizeSgPhone } from "@/lib/sgPhone";
 import { payNowProxyWarning } from "@/lib/paynow";
 import { settlementPayload } from "@/lib/settlementPayload";
-import { buildReminderMessage, buildWaLink, toWaNumber } from "@/lib/waMessage";
-import { ReminderQueue } from "./ReminderQueue";
-import { useDebouncedValue } from "@/components/useDebouncedValue";
-import { DMY, ROW_LIMIT, STATUS_FILTERS, INVOICE_CSV_COLUMNS } from "./constants";
 import * as repo from "./dao/invoices.repo";
 import * as rpc from "./dao/invoices.rpc";
 import { generateInvoices } from "./dao/invoices.api";
-import type {
-  SearchField,
-  InvoiceRow,
-  UnclaimedStudent,
-  OrphanLine,
-  PendingDebit,
-} from "./types";
-
-function formatBillingMonth(ym: string): string {
-  const [year, month] = ym.split("-");
-  return new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString(
-    "en-SG",
-    { month: "short", year: "numeric" }
-  );
-}
+import { useInvoiceList } from "./domain/useInvoiceList";
+import { formatBillingMonth } from "./domain/invoiceRows";
+import { InvoiceToolbar } from "./ui/InvoiceToolbar";
+import { InvoiceTable } from "./ui/InvoiceTable";
+import { ReminderQueue } from "./ui/ReminderQueue";
+import type { UnclaimedStudent, OrphanLine, PendingDebit } from "./types";
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [searchField, setSearchField] = useState<SearchField>("parent");
-  const debouncedSearch = useDebouncedValue(search);
-  const [capped, setCapped] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  // Only the newest loadInvoices() may write state — an old term's slow response
-  // must not overwrite a newer one.
-  const invoiceSeq = useRef(0);
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [exportNotice, setExportNotice] = useState<string | null>(null);
-  const [markingPaid, setMarkingPaid] = useState<string | null>(null);
+  // The invoices list slice: table data, search/filter/sort, CSV, mark-paid,
+  // WhatsApp stamp, and the reminder queue (domain/useInvoiceList).
+  const list = useInvoiceList();
 
   // Invoice generation controls.
   //
@@ -85,8 +58,6 @@ export default function InvoicesPage() {
   const [paynowMobile, setPaynowMobile] = useState<string | null>(null);
   const [paynowSaved, setPaynowSaved] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState("your swim school");
-  const [queueOpen, setQueueOpen] = useState(false);
-  const [copiedLink, setCopiedLink] = useState<string | null>(null);
   // Students with billable attendance and no parent account to bill. They hold
   // the month OPEN (the engine's fifth seal condition), so the remedy has to be
   // reachable from right here — an admin sent to another page to find them is
@@ -131,12 +102,6 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadTenant();
   }, []);
-
-  // Runs on mount, and again whenever the scoped search changes.
-  useEffect(() => {
-    loadInvoices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, searchField]);
 
   /**
    * Resolve who is signed in and which business they bill for, then read that
@@ -365,7 +330,7 @@ export default function InvoicesPage() {
             n === 1 ? "" : "s"
           } have no parent account to bill.`
         );
-        await loadInvoices();
+        await list.load();
         if (tenantId) await loadPendingDebits(tenantId);
       } else if (
         // ── FAIL SAFE ON ANYTHING UNRECOGNISED ────────────────────────────
@@ -411,7 +376,7 @@ export default function InvoicesPage() {
                 ` Month left open — ${unclaimedCount} billable lesson(s) have no parent account to bill.`
               : " Month left open — some attendance is still unmarked.")
         );
-        await loadInvoices();
+        await list.load();
         if (tenantId) await loadPendingDebits(tenantId);
       }
     } catch (e) {
@@ -579,160 +544,13 @@ export default function InvoicesPage() {
     if (tenantId) await loadPendingDebits(tenantId);
   }
 
-  async function loadInvoices() {
-    const seq = ++invoiceSeq.current;
-    setLoading(true);
-    const term = search.trim();
-
-    // Parent search is a DB pushdown; student search runs client-side over the
-    // fetched set (why lives with the query, in dao/invoices.repo.ts).
-    const { data, error } = await repo.fetchInvoices(term, searchField);
-    if (seq !== invoiceSeq.current) return;
-    // Surfaced, never swallowed: an empty table on a failed search reads as
-    // "no invoices", the silent wrong answer this change exists to kill.
-    if (error) {
-      setLoadError(error.message);
-      setInvoices([]);
-      setCapped(false);
-      setLoading(false);
-      return;
-    }
-    setLoadError(null);
-    setCapped((data ?? []).length >= ROW_LIMIT);
-
-    setInvoices(
-      (data ?? []).map((inv: any) => {
-        const nameList: string[] = [
-          ...new Set(
-            (inv.invoice_items ?? [])
-              .map((item: any) => item.student_name ?? item.students?.full_name)
-              .filter(Boolean)
-          ),
-        ] as string[];
-        return {
-          id: inv.id,
-          billing_month: inv.billing_month,
-          gross_amount: Number(inv.gross_amount),
-          package_applied: Number(inv.package_applied),
-          credit_applied: Number(inv.credit_applied),
-          balance_adjustment: Number(inv.balance_adjustment ?? 0),
-          net_amount: Number(inv.net_amount),
-          status: inv.status,
-          parent_name: inv.parents?.profiles?.full_name ?? "—",
-          student_names: nameList.join(", ") || "—",
-          reference_number: inv.reference_number ?? "—",
-          public_token: inv.public_token ?? "",
-          reminded_at: inv.reminded_at ?? null,
-          paid_claimed_at: inv.paid_claimed_at ?? null,
-          wa_number: toWaNumber(inv.parents?.profiles?.phone ?? null),
-          raw_phone: inv.parents?.profiles?.phone ?? null,
-          student_name_list: nameList,
-        };
-      })
-    );
-    setLoading(false);
-  }
-
-  /** The tokenized public page for an invoice — what the WhatsApp message
-   *  links to (the QR rides on the page; wa.me links cannot carry images). */
-  function invoiceLink(inv: InvoiceRow): string {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://swimsync.sg";
-    return `${base}/invoice/${inv.public_token}`;
-  }
-
-  /** Opens the pre-filled chat, then stamps reminded_at. The stamp means
-   *  "chat opened", NOT "message sent" — the admin still presses Send, and
-   *  the button stays enabled so re-opening is always possible. */
-  async function handleWhatsApp(inv: InvoiceRow, businessName: string) {
-    if (!inv.wa_number) return;
-    const message = buildReminderMessage({
-      businessName,
-      studentNames: inv.student_name_list,
-      billingMonth: inv.billing_month,
-      amount: inv.net_amount,
-      link: invoiceLink(inv),
-      reference: inv.reference_number,
-    });
-    window.open(buildWaLink(inv.wa_number, message), "_blank", "noopener");
-    const stamp = new Date().toISOString();
-    const { error } = await repo.updateInvoiceReminded(inv.id, stamp);
-    if (!error) {
-      setInvoices((prev) =>
-        prev.map((row) => (row.id === inv.id ? { ...row, reminded_at: stamp } : row))
-      );
-    }
-  }
-
-  async function handleMarkPaid(invoiceId: string) {
-    setMarkingPaid(invoiceId);
-    // ONE mark-paid path for every client (PRD §7.21) — see dao/invoices.rpc.ts.
-    const { error } = await rpc.confirmInvoicePaid(invoiceId);
-    setMarkingPaid(null);
-    if (error) return;
-    setInvoices((prev) =>
-      prev.map((inv) =>
-        inv.id === invoiceId ? { ...inv, status: "paid" } : inv
-      )
-    );
-  }
-
-  // Parent search runs in the DB (past the cap). STUDENT search runs HERE, over
-  // the fetched set, because pushing it would corrupt the multi-child item list
-  // (see loadInvoices) — bounded by the cap banner. The status filter also
-  // refines here: "Claimed" is a derived state reading two columns.
-  const studentTerm = searchField === "student" ? search.trim() : "";
-  const filtered = invoices.filter((inv) => {
-    const matchStudent =
-      studentTerm === "" ||
-      inv.student_names.toLowerCase().includes(studentTerm.toLowerCase());
-    const matchStatus =
-      statusFilter === "All" ||
-      (statusFilter === "Claimed"
-        ? inv.status === "outstanding" && inv.paid_claimed_at !== null
-        : inv.status.toLowerCase() === statusFilter.toLowerCase());
-    return matchStudent && matchStatus;
-  });
-
-  const sort = useTableSort<InvoiceRow>({
-    // Newest billing month first, which is the order the query already returns
-    // and the one an admin chasing payment wants.
-    key: "billing_month",
-    dir: "desc",
-    accessors: {
-      // Sort the AMOUNTS, not the rendered "−S$40.00" strings — a currency
-      // string sorts by its leading character, so a minus sign and a dash would
-      // decide the order before the number did.
-      status: (inv) => (inv.status === "outstanding" ? "Outstanding" : "Paid"),
-    },
-  });
-  const visible = sort.apply(filtered);
-
-  function handleExportCsv() {
-    const res = exportCsv(
-      `invoices-${todayInSg()}.csv`,
-      visible,
-      INVOICE_CSV_COLUMNS,
-      { sourceCount: invoices.length },
-    );
-    setExportNotice(
-      res.ok
-        ? null
-        : `Too many invoices to export at once (the list is capped at ${res.cap}). ` +
-            `Narrow it with the status filter, search, or a month, then export again.`,
-    );
-  }
-
-  const totalOutstanding = invoices
-    .filter((i) => i.status === "outstanding")
-    .reduce((sum, i) => sum + i.net_amount, 0);
-
   const hasGaps = (coverage ?? []).some((c) => c.missingDates.length > 0);
 
   return (
     <div>
       <PageHeader
         title="Invoices"
-        subtitle={`Total outstanding: S$${totalOutstanding.toFixed(2)}`}
+        subtitle={`Total outstanding: S$${list.totalOutstanding.toFixed(2)}`}
       />
 
       {/* A platform admin belongs to no tenant, so there is no business for
@@ -1325,71 +1143,24 @@ export default function InvoicesPage() {
         </div>
       </Modal>
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        {/* Scoped search — the dropdown picks the column the term is pushed into,
-            so it reaches every invoice in the DB, not the first 1000 (⚠ RISK 3). */}
-        <div className="flex overflow-hidden rounded-xl border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-sky-400">
-          <select
-            value={searchField}
-            onChange={(e) => setSearchField(e.target.value as SearchField)}
-            className="border-r border-gray-200 bg-gray-50 px-2 py-2.5 text-sm text-gray-600 focus:outline-none"
-            aria-label="Search by"
-          >
-            <option value="parent">Parent</option>
-            <option value="student">Student</option>
-          </select>
-          <input
-            type="text"
-            placeholder={searchField === "student" ? "Search student name…" : "Search parent name…"}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-52 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none"
-          />
-        </div>
-        <div className="flex gap-1.5">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
-              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-                statusFilter === f
-                  ? "bg-sky-500 text-white"
-                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex gap-2">
-          <Button
-            variant="outline"
-            disabled={visible.length === 0}
-            onClick={handleExportCsv}
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
-          <Button
-            variant="outline"
-            disabled={invoices.every((i) => i.status !== "outstanding")}
-            onClick={() => setQueueOpen(true)}
-          >
-            <MessageCircle className="h-4 w-4" />
-            WhatsApp reminders
-          </Button>
-        </div>
-      </div>
-      {exportNotice && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
-          {exportNotice}
-        </div>
-      )}
+      <InvoiceToolbar
+        searchField={list.searchField}
+        setSearchField={list.setSearchField}
+        search={list.search}
+        setSearch={list.setSearch}
+        statusFilter={list.statusFilter}
+        setStatusFilter={list.setStatusFilter}
+        exportDisabled={list.visible.length === 0}
+        remindersDisabled={list.invoices.every((i) => i.status !== "outstanding")}
+        onExportCsv={list.handleExportCsv}
+        onOpenQueue={() => list.setQueueOpen(true)}
+        exportNotice={list.exportNotice}
+      />
 
       <ReminderQueue
-        open={queueOpen}
-        onClose={() => setQueueOpen(false)}
-        rows={invoices
+        open={list.queueOpen}
+        onClose={() => list.setQueueOpen(false)}
+        rows={list.invoices
           .filter((i) => i.status === "outstanding")
           .map((i) => ({
             id: i.id,
@@ -1402,160 +1173,25 @@ export default function InvoicesPage() {
             raw_phone: i.raw_phone,
           }))}
         onOpenChat={(id) => {
-          const inv = invoices.find((i) => i.id === id);
-          if (inv) handleWhatsApp(inv, businessName);
+          const inv = list.invoices.find((i) => i.id === id);
+          if (inv) list.handleWhatsApp(inv, businessName);
         }}
       />
 
-      {loadError && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          Could not load the invoices: {loadError}. The list below is incomplete
-          — do not read it as the full set.
-        </div>
-      )}
-
-      {!loading && !loadError && capped && (
-        <p className="mb-3 text-sm text-amber-700">
-          Showing the first {ROW_LIMIT}{" "}
-          {searchField === "parent" && search.trim() ? "matches" : "invoices"}.{" "}
-          {searchField === "parent" && search.trim()
-            ? "Refine your search to narrow them."
-            : "Search by parent to reach invoices past this limit."}
-        </p>
-      )}
-
-      <Table>
-        <Thead>
-          <Th sort={sort} sortKey="parent_name">Parent</Th>
-          <Th sort={sort} sortKey="student_names">Student(s)</Th>
-          <Th sort={sort} sortKey="billing_month" firstDir="desc">Month</Th>
-          <Th sort={sort} sortKey="gross_amount" firstDir="desc">Gross</Th>
-          <Th sort={sort} sortKey="package_applied" firstDir="desc">Package</Th>
-          <Th sort={sort} sortKey="credit_applied" firstDir="desc">Credit</Th>
-          <Th sort={sort} sortKey="net_amount" firstDir="desc">Net</Th>
-          <Th sort={sort} sortKey="status">Status</Th>
-          <Th>Action</Th>
-        </Thead>
-        <Tbody>
-          {loading ? (
-            <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={9}>
-                Loading…
-              </Td>
-            </Tr>
-          ) : visible.length === 0 ? (
-            <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={9}>
-                No invoices found.
-              </Td>
-            </Tr>
-          ) : (
-            visible.map((inv) => (
-              <Tr key={inv.id}>
-                <Td className="font-medium text-gray-900">{inv.parent_name}</Td>
-                <Td className="text-gray-600 text-xs">{inv.student_names}</Td>
-                <Td>{formatBillingMonth(inv.billing_month)}</Td>
-                <Td>S${inv.gross_amount.toFixed(2)}</Td>
-                <Td className="text-blue-600">
-                  {inv.package_applied > 0
-                    ? `−S$${inv.package_applied.toFixed(2)}`
-                    : "—"}
-                </Td>
-                <Td className="text-blue-600">
-                  {inv.credit_applied > 0
-                    ? `−S$${inv.credit_applied.toFixed(2)}`
-                    : "—"}
-                </Td>
-                <Td
-                  className={`font-semibold ${
-                    inv.status === "outstanding"
-                      ? "text-red-600"
-                      : "text-green-600"
-                  }`}
-                >
-                  S${inv.net_amount.toFixed(2)}
-                </Td>
-                <Td>
-                  <StatusBadge
-                    status={
-                      inv.status === "outstanding" ? "Outstanding" : "Paid"
-                    }
-                  />
-                  {inv.status === "outstanding" && inv.paid_claimed_at && (
-                    <div
-                      className="text-[10px] text-sky-700 mt-0.5"
-                      title="The parent tapped 'I've paid' — check your bank, then Mark Paid"
-                    >
-                      parent says paid{" "}
-                      {formatSgStamp(inv.paid_claimed_at, DMY)}
-                    </div>
-                  )}
-                </Td>
-                <Td>
-                  {inv.status === "outstanding" && (
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={markingPaid === inv.id}
-                        onClick={() => handleMarkPaid(inv.id)}
-                      >
-                        <CheckCircle className="h-3.5 w-3.5" />
-                        {markingPaid === inv.id ? "Saving…" : "Mark Paid"}
-                      </Button>
-                      {/* Stays enabled after the stamp — opening a chat is
-                          not sending a message, so re-opening must always be
-                          possible. "No number" is a visible state, never a
-                          broken link. */}
-                      {inv.wa_number ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleWhatsApp(inv, businessName)}
-                          title={
-                            inv.reminded_at
-                              ? `Chat opened ${formatSgStamp(inv.reminded_at, DMY)}`
-                              : "Open a pre-filled WhatsApp chat"
-                          }
-                        >
-                          <MessageCircle className="h-3.5 w-3.5" />
-                          WhatsApp
-                        </Button>
-                      ) : (
-                        <span
-                          className="text-[11px] text-gray-400"
-                          title="This parent has no usable phone number"
-                        >
-                          no number
-                        </span>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        title="Copy the invoice's payment link"
-                        onClick={() => {
-                          navigator.clipboard?.writeText(invoiceLink(inv));
-                          setCopiedLink(inv.id);
-                          setTimeout(() => setCopiedLink(null), 1500);
-                        }}
-                      >
-                        <LinkIcon className="h-3.5 w-3.5" />
-                        {copiedLink === inv.id ? "Copied" : "Link"}
-                      </Button>
-                    </div>
-                  )}
-                  {inv.status === "outstanding" && inv.reminded_at && (
-                    <div className="text-[10px] text-gray-400 mt-0.5">
-                      chat opened{" "}
-                      {formatSgStamp(inv.reminded_at, DMY)}
-                    </div>
-                  )}
-                </Td>
-              </Tr>
-            ))
-          )}
-        </Tbody>
-      </Table>
+      <InvoiceTable
+        loading={list.loading}
+        loadError={list.loadError}
+        capped={list.capped}
+        searchField={list.searchField}
+        search={list.search}
+        visible={list.visible}
+        sort={list.sort}
+        markingPaid={list.markingPaid}
+        copiedLink={list.copiedLink}
+        onMarkPaid={list.handleMarkPaid}
+        onWhatsApp={(inv) => list.handleWhatsApp(inv, businessName)}
+        onCopyLink={list.copyLink}
+      />
     </div>
   );
 }

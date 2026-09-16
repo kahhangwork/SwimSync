@@ -206,15 +206,12 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    (shared) and are reached from domain/ui/dao once their symbols leave the
   //    page. lucide icons -> ui; ./ReminderQueue -> ui/ReminderQueue. Each entry
   //    goes stale as the symbol leaves the page and is deleted then. ──
-  { file: "app/(admin)/invoices/page.tsx", contains: "lucide-react", why: "icons -> ui/ Stages 4/8/9" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/csv", why: "STAY in lib; reached from domain/ui Stage 4" },
+  { file: "app/(admin)/invoices/page.tsx", contains: "lucide-react", why: "icons -> ui/ Stages 4/8/9 (RefreshCw remains until Stage 9)" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/lessonDates", why: "STAY in lib; reached from domain/ui, leaves page by Stage 11" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/classCoverage", why: "STAY in lib (coaches also imports); reached from domain Stage 9" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/sgPhone", why: "STAY in lib; reached from domain/ui Stage 8" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/paynow", why: "MOVE into invoices/domain (sole importer) Stage 8; page then imports ./domain/paynow" },
   { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/settlementPayload", why: "MOVE into invoices/domain (sole importer) Stage 6; page then imports ./domain" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "@/lib/waMessage", why: "STAY in lib; reached from domain/ui Stage 4" },
-  { file: "app/(admin)/invoices/page.tsx", contains: "./ReminderQueue", why: "MOVE to ui/ReminderQueue Stage 4; page then imports ./ui/ReminderQueue (allowed)" },
   // Transitional page->dao imports (playbook §7.1's sanctioned exception): until
   // each slice's hook wraps its dao call, the page imports the dao modules
   // directly. Added at Stage 2/3 when the imports first appeared; each is deleted

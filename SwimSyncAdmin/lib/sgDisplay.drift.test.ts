@@ -65,9 +65,9 @@ const ALLOWED: { file: string; contains: string; why: string }[] = [
     why: "billing month from parts, month+year only",
   },
   {
-    file: "SwimSyncAdmin/app/(admin)/invoices/page.tsx",
+    file: "SwimSyncAdmin/app/(admin)/invoices/domain/invoiceRows.ts",
     contains: "parseInt(month) - 1",
-    why: "billing month from parts, month+year only",
+    why: "billing month from parts, month+year only (moved from page.tsx at invoices Stage 4)",
   },
   {
     file: "SwimSyncApp/app/(parent)/billing/index.tsx",
