@@ -235,24 +235,17 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    Stage 10 (both sole importers, §3); the rest STAY in lib (shared) and the
   //    page stops importing them as their symbols move into hooks/ui. Every entry
   //    is deleted when its import leaves the page; the ledger only shrinks. ──
-  { file: "app/(admin)/classes/page.tsx", contains: "lucide-react", why: "Stage 11 -> icons (Plus/Pencil/CalendarPlus/CalendarX/Users/Archive/RotateCcw) into ui/" },
-  // Transitional page->dao imports (playbook §7.1): added at Stage 2/3 when the
-  // page first calls the dao directly; removed at Stages 4-10 as each hook wraps
-  // the calls (repo goes when the last direct repo caller becomes a hook; rpc
-  // likewise). Gone by Stage 10/11.
-  { file: "app/(admin)/classes/page.tsx", contains: "./dao/classes.repo", why: "Stages 4-10 -> hooks wrap repo calls (list/roster/form/retire)" },
-  { file: "app/(admin)/classes/page.tsx", contains: "./dao/classes.rpc", why: "Stages 6-10 -> hooks wrap rpc calls (drawer/extra/cancel/retire/form)" },
-  // @/lib/tableSort left the page at Stage 4 — dayOfWeekOrder moved into
-  // domain/classRows.ts (classSortAccessors). Entry deleted (ledger shrinks).
-  // @/lib/classRoster MOVED into classes/domain at Stage 5 (sole importer); the
-  // page no longer imports it (useRoster + ui/ClassTable read ./domain/classRoster).
-  // @/lib/packageCoverage left the page at Stage 5 — coverageByStudent/
-  // StudentCoverage moved into useRoster (covMap). Both entries deleted.
-  // @/lib/sessionRoster (assignableClassShadows) + @/lib/utils (formatTime) left
-  // the page at Stage 6 — both moved into ui/RosterDrawer (shared, stay in lib).
-  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/locationOptions", why: "Stage 10 -> MOVE into classes/domain (sole importer)" },
-  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/classColours", why: "Stage 11 -> CLASS_COLOURS/colourFor into ui/ClassTable + ui/ClassFormModal (shared, stays in lib)" },
-  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/lessonDates", why: "Stage 10/11 -> todayInSg into useClassForm; toSgDate/formatSgDate already left (shared, stays in lib)" },
+  // ── classes (full track): check 4 EMPTY at Stage 10+11 (2026-09-17), bar the
+  //    one lucide icon the PageHeader action still uses. Everything else left as
+  //    its slice landed: @/lib/tableSort -> classRows (S4); @/lib/classRoster
+  //    MOVED into domain + @/lib/packageCoverage -> useRoster (S5); @/lib/
+  //    sessionRoster + @/lib/utils -> ui/RosterDrawer (S6); the transitional
+  //    ./dao/classes.{repo,rpc} pins removed once every call was behind a hook;
+  //    @/lib/locationOptions MOVED into domain + @/lib/classColours ->
+  //    ui/ClassFormModal + @/lib/lessonDates (todayInSg) -> useClassForm (S10/11).
+  //    The lucide Plus icon moved into ui/NewClassButton (coaches pattern), so
+  //    the page imports only its own tiers, React, Next and @/components — check
+  //    4 EMPTY. Nothing to pin. ──
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
