@@ -105,8 +105,9 @@ Gate every commit: `cd SwimSyncAdmin && npm run typecheck && npm test` **and**
       dialog handler (the Void prompt got dismissed → "already handled"), and
       `button[aria-expanded="false"]` matched a collapsed sidebar group before the payout row.
 
-Then — **only after nightly `35187663332` is green** — merge → push → delete branch. Wait for
-a nightly on L-C before the next unit.
+**Gate cleared:** nightly `35187663332` (classes, `7b19d8d`) went GREEN 2026-09-17 07:18 UTC
+(1h23m) → fast-forwarded to `main`, pushed, branch deleted. **Wait for a nightly on L-C
+before the next unit.**
 
 ## §12 — findings for `/update-docs` (append as they arise)
 
