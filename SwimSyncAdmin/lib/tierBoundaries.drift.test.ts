@@ -47,6 +47,16 @@
 // invoices/ui/Break importing ../dao, invoices/dao/break importing React,
 // invoices/domain/break calling fetch(, and an unpinned @/lib/money import on
 // the page drove all four checks red — breakers removed, 6/6 green.
+// Re-proven for the classes scope on 2026-09-17 at Stage 0b: checks 3 and 4 went
+// red on classes/page.tsx's real violations (16 .from()/.rpc() sites + 9 @/lib
+// imports + lucide-react) before the ledger was pinned; classes/ui/Break
+// importing ../dao, classes/dao/break importing React, classes/domain/break
+// calling fetch(, and an unpinned @/lib/csv import on the page drove all four
+// checks red — breakers removed, 6/6 green. This scope also tightened the
+// import-specifier char class to exclude \n<> (see `imports()`): the page's
+// `aria-label="Shadowing from"` (a driver-read label) made the `\bfrom` branch
+// capture a JSX blob as a bogus specifier. Strengthening only — no real import
+// contains those chars, and every prior scope still matched unchanged (6/6).
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -91,6 +101,15 @@ const SCOPE_DIRS = [
   // added at Stage 2/3 when the import first appears and removed at Stages 4-9
   // as each hook wraps the call (packages §5, playbook §7.1). Ledger only shrinks.
   "app/(admin)/invoices",
+  // classes (full track, docs/refactor/CLASSES_REFACTOR_PLAN.md), widened
+  // 2026-09-17 at Stage 0b. Checks 3 and 4 are red on day one for the 1,714-line
+  // page; every current violation is pinned in the ledgers below with the stage
+  // that removes it (data access -> Stage 2/3 folded; @/lib imports -> the slice
+  // stage that moves the symbol — classRoster at Stage 5, locationOptions at
+  // Stage 10, both MOVE into domain; the rest STAY in lib and leave the page as
+  // their symbols move into hooks/ui). No nested route under classes/, so the
+  // whole dir is one unit. Ledger only shrinks.
+  "app/(admin)/classes",
 ];
 
 // One route file per scoped dir. Check 4 runs against each.
@@ -132,6 +151,28 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    2/3 (folded). The client + all 19 data-access sites moved into
   //    invoices/dao/invoices.{repo,rpc,api}.ts; the page holds ZERO supabase and
   //    ZERO fetch(, so every entry went stale and was deleted. Nothing to pin. ──
+  // ── classes (full track, CLASSES_REFACTOR_PLAN.md), pinned 2026-09-17 at
+  //    Stage 0b. Every .from()/.rpc() the page makes today; all 16 leave for
+  //    classes/dao/classes.{repo,rpc}.ts at Stage 2/3 (folded) and their entries
+  //    are deleted then. `.from("classes")` covers the list select, the create
+  //    insert and the edit UPDATE (all three move together). ──
+  { file: "app/(admin)/classes/page.tsx", contains: "import { supabase }", why: "Stage 2/3 -> dao owns the client; the page's import line leaves too" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.from("classes")', why: "Stage 2/3 -> classes.repo.ts (list select + create insert + edit update)" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.from("coaches")', why: "Stage 2/3 -> classes.repo.ts" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.from("coach_rates")', why: "Stage 2/3 -> classes.repo.ts (shadow-rate read, folded into loadCoaches)" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.from("class_categories")', why: "Stage 2/3 -> classes.repo.ts" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.from("locations")', why: "Stage 2/3 -> classes.repo.ts" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.from("student_class_enrolments")', why: "Stage 2/3 -> classes.repo.ts (roster, own .from — §7.52)" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.from("trial_bookings")', why: "Stage 2/3 -> classes.repo.ts (roster, own .from — §7.52)" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.from("class_shadow_coaches")', why: "Stage 2/3 -> classes.repo.ts (shadow read; write path is end_class_shadow — RISK 4)" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("student_package_coverage")', why: "Stage 2/3 -> classes.rpc.ts" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("assign_class_shadow"', why: "Stage 2/3 -> classes.rpc.ts" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("end_class_shadow"', why: "Stage 2/3 -> classes.rpc.ts (END never DELETE — RISK 4)" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("set_class_terms"', why: "Stage 2/3 -> classes.rpc.ts (11 required p_ keys — RISK 1)" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("schedule_extra_lesson"', why: "Stage 2/3 -> classes.rpc.ts" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("cancel_lesson"', why: "Stage 2/3 -> classes.rpc.ts" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("deactivate_class"', why: "Stage 2/3 -> classes.rpc.ts" },
+  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("reactivate_class"', why: "Stage 2/3 -> classes.rpc.ts (cannot refuse — RISK 9)" },
 ];
 
 /**
@@ -206,6 +247,22 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    classCoverage) are reached from domain/ui/dao; lucide icons -> ui;
   //    ReminderQueue -> ui/ReminderQueue. The page imports only its own tiers,
   //    React and @/components — every entry went stale and was deleted. ──
+  // ── classes (full track, CLASSES_REFACTOR_PLAN.md), pinned 2026-09-17 at
+  //    Stage 0b. @/lib/supabase leaves at Stage 2/3 (dao owns the client).
+  //    classRoster MOVES into classes/domain at Stage 5, locationOptions at
+  //    Stage 10 (both sole importers, §3); the rest STAY in lib (shared) and the
+  //    page stops importing them as their symbols move into hooks/ui. Every entry
+  //    is deleted when its import leaves the page; the ledger only shrinks. ──
+  { file: "app/(admin)/classes/page.tsx", contains: "lucide-react", why: "Stage 11 -> icons (Plus/Pencil/CalendarPlus/CalendarX/Users/Archive/RotateCcw) into ui/" },
+  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/supabase", why: "Stage 2/3 -> dao owns the client" },
+  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/tableSort", why: "Stage 4 -> dayOfWeekOrder into classRows sort accessors" },
+  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/classRoster", why: "Stage 5 -> MOVE into classes/domain (sole importer); page imports ./domain/classRoster after" },
+  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/packageCoverage", why: "Stage 5 -> coverageByStudent/StudentCoverage into useRoster (covMap)" },
+  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/sessionRoster", why: "Stage 6 -> assignableClassShadows into useClassDrawer/RosterDrawer (shared, stays in lib)" },
+  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/locationOptions", why: "Stage 10 -> MOVE into classes/domain (sole importer)" },
+  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/classColours", why: "Stage 11 -> CLASS_COLOURS/colourFor into ui/ClassTable + ui/ClassFormModal (shared, stays in lib)" },
+  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/utils", why: "Stage 11 -> formatTime into ui (table/drawer) (shared, stays in lib)" },
+  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/lessonDates", why: "Stage 11 -> todayInSg/toSgDate/formatSgDate into hooks/ui (shared, stays in lib)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -275,7 +332,15 @@ type Site = { file: string; line: number; text: string };
 /** Every static import specifier, with its line. */
 function imports(s: Src): Site[] {
   const out: Site[] = [];
-  const re = /(?:\bfrom\s*|^\s*import\s*)["']([^"']+)["']/gm;
+  // The specifier char class excludes newline and angle brackets: a real ES
+  // module specifier never contains any of them, so this cannot miss an import
+  // — but it stops the `\bfrom\s*["']` alternative from firing on the English
+  // word "from" ending a JSX string (e.g. `aria-label="Shadowing from"` on the
+  // classes page, whose driver reads that exact label), where the "specifier"
+  // would otherwise capture the JSX blob up to the next quote. Tightened
+  // 2026-09-17 (classes Stage 0b); strengthening only — every prior page still
+  // matches its real imports unchanged.
+  const re = /(?:\bfrom\s*|^\s*import\s*)["']([^"'\n<>]+)["']/gm;
   let m: RegExpExecArray | null;
   while ((m = re.exec(s.code)) !== null) {
     out.push({
