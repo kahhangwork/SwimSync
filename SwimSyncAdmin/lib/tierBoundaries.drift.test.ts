@@ -173,6 +173,8 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // ── Admin L-C (BATCH_C_PLAN.md), pinned 2026-09-17 at L0. Each page folds
   //    L1-L3 in ONE commit (playbook §7.1); the client + every call move into
   //    <page>/dao/ and that page's entries are deleted in the same commit. ──
+  // ── accounting: DONE — auth + tenants read in dao/accounting.repo, both RPCs
+  //    in dao/accounting.rpc. ──
   { file: "app/(admin)/wages/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C wages fold -> dao/" },
   { file: "app/(admin)/wages/page.tsx", contains: "supabase.auth.getUser()", why: "L-C wages fold -> dao/" },
   { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"profiles\")", why: "L-C wages fold -> dao/" },
@@ -204,11 +206,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: "app/(admin)/referrals/page.tsx", contains: "supabase.rpc(\"set_referral_code_disabled\"", why: "L-C referrals fold -> dao/" },
   { file: "app/(admin)/referrals/page.tsx", contains: "supabase.rpc(\"grant_referral_reward\"", why: "L-C referrals fold -> dao/" },
   { file: "app/(admin)/referrals/page.tsx", contains: "supabase.rpc(\"void_referral_reward\"", why: "L-C referrals fold -> dao/" },
-  { file: "app/(admin)/accounting/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C accounting fold -> dao/" },
-  { file: "app/(admin)/accounting/page.tsx", contains: "supabase.auth.getUser()", why: "L-C accounting fold -> dao/" },
-  { file: "app/(admin)/accounting/page.tsx", contains: "supabase .from(\"tenants\")", why: "L-C accounting fold -> dao/" },
-  { file: "app/(admin)/accounting/page.tsx", contains: "supabase.rpc(\"accounting_months\"", why: "L-C accounting fold -> dao/" },
-  { file: "app/(admin)/accounting/page.tsx", contains: "supabase.rpc(\"accounting_summary\"", why: "L-C accounting fold -> dao/" },
 ];
 
 /**
@@ -304,6 +301,8 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    page: @/lib/supabase -> dao; lucide-react -> ui; a SOLE-importer helper
   //    MOVES into <page>/domain (git mv); a SHARED helper STAYS in lib, reached
   //    from domain/ui/dao. Verdicts grep-confirmed (BATCH_C_PLAN.md). ──
+  // ── accounting: DONE — page is composition, ledger empty. Client -> dao;
+  //    accounting MOVED into accounting/domain (git mv, sole code importer). ──
   { file: "app/(admin)/wages/page.tsx", contains: "lucide-react", why: "L-C wages fold: icons move into ui/" },
   { file: "app/(admin)/wages/page.tsx", contains: "@/lib/supabase", why: "L-C wages fold: dao owns the client" },
   { file: "app/(admin)/wages/page.tsx", contains: "@/lib/lessonDates", why: "L-C wages fold: shared, STAYS in lib; leaves the page with its symbols" },
@@ -320,8 +319,6 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/referrals/page.tsx", contains: "@/lib/lessonDates", why: "L-C referrals fold: shared, STAYS in lib; leaves the page with its symbols" },
   { file: "app/(admin)/referrals/page.tsx", contains: "@/lib/supabase", why: "L-C referrals fold: dao owns the client" },
   { file: "app/(admin)/referrals/page.tsx", contains: "@/lib/referralDiscount", why: "L-C referrals fold: shared, STAYS in lib; leaves the page with its symbols" },
-  { file: "app/(admin)/accounting/page.tsx", contains: "@/lib/supabase", why: "L-C accounting fold: dao owns the client" },
-  { file: "app/(admin)/accounting/page.tsx", contains: "@/lib/accounting", why: "L-C accounting fold: MOVES into accounting/domain (sole importer)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

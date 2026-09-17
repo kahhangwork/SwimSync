@@ -99,7 +99,7 @@ const ALLOWED: { file: string; contains: string; why: string }[] = [
   // this scanner. It does nothing, and it turns a false positive into a lie that
   // outlives everyone who understood it.
   {
-    file: "SwimSyncAdmin/lib/accounting.ts",
+    file: "SwimSyncAdmin/app/(admin)/accounting/domain/accounting.ts",
     contains: "Math.abs(v).toLocaleString",
     why: "formats a Number (currency); timeZone is meaningless here",
   },
@@ -109,7 +109,7 @@ const ALLOWED: { file: string; contains: string; why: string }[] = [
   // given, in every zone. This is the pairing rule 2 exists to distinguish from a
   // timestamptz rendered as UTC, which is wrong.
   {
-    file: "SwimSyncAdmin/lib/accounting.ts",
+    file: "SwimSyncAdmin/app/(admin)/accounting/domain/accounting.ts",
     contains: "Date.UTC(y, mo - 1, 1)",
     why: "UTC-built Date formatted as UTC — the only correct pairing",
   },

@@ -97,3 +97,9 @@ a nightly on L-C before the next unit.
   `lib/creditNoteEmailState.ts` in ARCHITECTURE + TESTING; `lib/creditNoteVoidState.ts` in
   TESTING; `lib/accounting.ts` in `docs/plans/SGT_DISPLAY_PLAN.md`. (Precedent: `classes` left
   `lib/classRoster.ts` stale in ARCHITECTURE §618 — same sweep can fix both.)
+- **A moved `lib/` module can be path-pinned in a DRIFT TEST's allowlist, which `tsc` never
+  sees.** `lib/accounting.ts` sat in `ALLOWED` of both `sgDisplay.drift.test.ts` twins (a
+  Number formatter + a UTC-built Date). After the `git mv` the scanner found the same lines at
+  the new path, unpinned → 2 red in vitest AND 2 red in jest. Fix: repoint the `file:` in both
+  twins (same allowance, new path). **Before moving a helper, `git grep "lib/<mod>" -- '*.test.ts'`
+  too** — the sole-importer grep only finds imports. Candidate addition to playbook §2's move note.
