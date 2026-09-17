@@ -177,6 +177,9 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    in dao/accounting.rpc. ──
   // ── referrals: DONE — myTenantId + 4 reads + settings update in
   //    dao/referrals.repo, the 3 RPCs in dao/referrals.rpc. ──
+  // ── credit-notes: DONE — auth + viewer profile + the scoped notes query in
+  //    dao/creditNotes.repo; coverage + void RPCs and the credit-note-emails
+  //    invoke in dao/creditNotes.rpc. ──
   { file: "app/(admin)/wages/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C wages fold -> dao/" },
   { file: "app/(admin)/wages/page.tsx", contains: "supabase.auth.getUser()", why: "L-C wages fold -> dao/" },
   { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"profiles\")", why: "L-C wages fold -> dao/" },
@@ -191,13 +194,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: "app/(admin)/wages/page.tsx", contains: "supabase.rpc(\"mark_payout_paid\"", why: "L-C wages fold -> dao/" },
   { file: "app/(admin)/wages/page.tsx", contains: "supabase.from(\"coach_rates\").insert", why: "L-C wages fold -> dao/" },
   { file: "app/(admin)/wages/page.tsx", contains: "supabase.from(\"tenants\").update(patch)", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C credit-notes fold -> dao/" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase .rpc(\"student_package_coverage\")", why: "L-C credit-notes fold -> dao/" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase.auth.getUser()", why: "L-C credit-notes fold -> dao/" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase .from(\"profiles\")", why: "L-C credit-notes fold -> dao/" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase .from(\"credit_notes\")", why: "L-C credit-notes fold -> dao/" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase.functions.invoke(", why: "L-C credit-notes fold -> dao/" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase.rpc(\"void_credit_note\"", why: "L-C credit-notes fold -> dao/" },
 ];
 
 /**
@@ -297,19 +293,15 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    accounting MOVED into accounting/domain (git mv, sole code importer). ──
   // ── referrals: DONE — page is composition, ledger empty. referralDiscount
   //    (shared with packages) + lessonDates reached from types/ui. ──
+  // ── credit-notes: DONE — page is composition, ledger empty. lucide -> ui;
+  //    creditNoteEmailState + creditNoteVoidState MOVED into credit-notes/domain
+  //    (git mv, sole code importer); csv/lessonDates/packageCoverage/tableSearch
+  //    reached from domain/ui/dao (shared, stay in lib). ──
   { file: "app/(admin)/wages/page.tsx", contains: "lucide-react", why: "L-C wages fold: icons move into ui/" },
   { file: "app/(admin)/wages/page.tsx", contains: "@/lib/supabase", why: "L-C wages fold: dao owns the client" },
   { file: "app/(admin)/wages/page.tsx", contains: "@/lib/lessonDates", why: "L-C wages fold: shared, STAYS in lib; leaves the page with its symbols" },
   { file: "app/(admin)/wages/page.tsx", contains: "@/lib/payoutItems", why: "L-C wages fold: MOVES into wages/domain (sole importer)" },
   { file: "app/(admin)/wages/page.tsx", contains: "@/lib/lessonAttribution", why: "L-C wages fold: shared, STAYS in lib; leaves the page with its symbols" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "lucide-react", why: "L-C credit-notes fold: icons move into ui/" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/supabase", why: "L-C credit-notes fold: dao owns the client" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/csv", why: "L-C credit-notes fold: shared, STAYS in lib; leaves the page with its symbols" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/lessonDates", why: "L-C credit-notes fold: shared, STAYS in lib; leaves the page with its symbols" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/packageCoverage", why: "L-C credit-notes fold: shared, STAYS in lib; leaves the page with its symbols" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/creditNoteEmailState", why: "L-C credit-notes fold: MOVES into credit-notes/domain (sole importer)" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/creditNoteVoidState", why: "L-C credit-notes fold: MOVES into credit-notes/domain (sole importer)" },
-  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/tableSearch", why: "L-C credit-notes fold: shared, STAYS in lib; leaves the page with its symbols" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
