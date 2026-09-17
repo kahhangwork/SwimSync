@@ -81,11 +81,29 @@ Gate every commit: `cd SwimSyncAdmin && npm run typecheck && npm test` **and**
       All four checks proven red (checks 3+4 on the real violations before pinning; breakers
       `wages/ui/Break` → `../dao`, `wages/dao/break` → React, `wages/domain/break` → `fetch(`,
       and an unpinned `@/lib/utils` on `accounting/page.tsx`), breakers removed, 6/6 green.
-- [ ] **L1–L3 folded, ONE commit per page.** Order smallest first: accounting (337) ·
-      referrals (447) · credit-notes (631) · wages (894). Every page: 0 `useState`, its ledger
-      entries deleted as the code moved.
-- [ ] **L4** (once) — batch net on the live stack, one driver at a time (`--only`), plus the
-      hand-checks above.
+- [x] **L1–L3 folded, ONE commit per page.** Smallest first: `f1c547d` accounting (337→116) ·
+      `205959e` referrals (447→78) · `3086156` credit-notes (631→85) · `0dcc61c` wages (894→115).
+      Every page: **0 `useState`**, its ledger entries deleted as the code moved. **Both ledgers
+      empty again.** 757 vitest (+23 characterisation cases across the 4 pages) + 429 jest, both
+      apps green at each commit. Every `ui/` file checked verbatim against the original page by
+      a whitespace-insensitive script (prop renames mapped back); the big `ui/` cuts were taken
+      by line range from `git show HEAD:<page>`, not retyped.
+- [x] **L4** (once) — full batch net GREEN on the live stack 2026-09-17, one driver at a time
+      (`--only`, per-driver DB reset), routes warmed first (§7.108): **smoke-admin 64/64 ·
+      coach-wages 10/10 · referrals 13/13 · platform-admin-scope 32/32**. Hand-check script
+      (temporary, deleted) against `coach@swimsync.test` on a reset DB +
+      `fixtures-admin-table-geometry.sql` (its credit note) + one attended June lesson:
+      **26/26** — accounting owner view; referrals Save settings · Disable/Enable code · Grant ·
+      Void via prompt (all DB-verified); credit-notes listed · Not emailed + Resend shown ·
+      Reversed filter · scoped reference search hit + miss · Export CSV download · empty-reason
+      refusal · Cancel · Confirm void → Reversed (DB-verified); wages rain toggle + pay-day clamp
+      to 28 (DB-verified) · Shadow role re-prefills the amount · Calculate payroll → Draft ·
+      breakdown opens (`Sat, 6 Jun · Saturday Beginners · 60 min · S$40.00`) and closes.
+      Screenshots `handcheck-lc-{accounting,referrals,credit-notes,wages,wages-expanded}.png`
+      (scratchpad). Resend was NOT pressed (it would invoke the real email function). **No product
+      finding.** Two script reds, both the script: `launch()` already registers a dismissing
+      dialog handler (the Void prompt got dismissed → "already handled"), and
+      `button[aria-expanded="false"]` matched a collapsed sidebar group before the payout row.
 
 Then — **only after nightly `35187663332` is green** — merge → push → delete branch. Wait for
 a nightly on L-C before the next unit.
