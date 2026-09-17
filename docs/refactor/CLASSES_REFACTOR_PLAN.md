@@ -320,7 +320,19 @@ _Full-track giant: twelve stages, one at a time, gate green at each. No L1–L3 
 **DONE (code): `page.tsx` 1,714 → 164 lines, ZERO useState, both boundary ledgers empty for
 classes.** Driver strategy: the user chose **defer all driver runs to the end** (one Chrome
 session), so every stage above gated on typecheck + vitest + the fence + the source-pins only.
-The full net + the RISK-4 hand-checks still owe a run before this lands on `main`.
+
+**Full driver net run 2026-09-17, local stack — GREEN 11/11:** class-deactivation, class-edit,
+class-terms, class-students, **cancel-lesson 17/17**, locations, coach-roster, attendance-guard,
+platform-admin-scope, tenant-admin, smoke-admin. (cancel-lesson first showed a TIMEOUT under a
+300s batch cap after every check had PASSED — it drives BOTH apps; re-run standalone at 900s it
+was 17/17 in 91s. Environmental, not a regression — the §7.108 shape.)
+
+**One owed item — the RISK-4 shadow HAND-CHECKS** (End an ongoing shadow · the rate-less-coach
+warning · the failed-shadow-load branch). No driver covers them (coach-roster covers ASSIGN only,
+and it PASSED); they are DORMANT on prod (0 shadows) and unit-pinned (shadowRateWarning's 4 cases
++ the END-never-DELETE / one-`.from`-zero-`.delete` grep gate). The move was verbatim + a pure
+extraction, so the risk is low, but the hand-check is still owed — folded into the `verify-class-admin`
+BACKLOG driver (§13).
 
 **Per-stage mitigations (each is a gate for THAT stage's commit; the risk numbers are §5a's):**
 
@@ -398,6 +410,14 @@ the warning would close the gap. File in `BACKLOG.md`.
   "shared-spine id" pattern, third instance.
 - **Still-due once-off:** the dao three-way-split + "orchestrate, never replace" rule graduates to
   `docs/ARCHITECTURE.md` §6 (trigger met since packages; now FOUR full giants exercise it).
+- **BACKLOG driver `verify-class-admin`:** the shadow-coach End + the rate-less-coach warning + the
+  failed-shadow-load branch have no driver (coach-roster covers ASSIGN only). Dormant on prod, so
+  unit-pinned for now (shadowRateWarning 4 cases; END-never-DELETE grep gate). Mirror of the
+  `verify-invoice-admin` / `verify-packages-admin` BACKLOG items — file in `BACKLOG.md`.
+- **Fence infra fix (durable):** `imports()` in `tierBoundaries.drift.test.ts` had a false positive
+  on the English word "from" ending a JSX string (`aria-label="Shadowing from"`, a coach-roster
+  driver label). Tightened the specifier char class to exclude `\n<>` — strengthening only. Worth a
+  note wherever the fence is documented; the classes scope was the first to hit it.
 - **Graduate to `docs/GOTCHAS.md` §7 (from plan-review, durable beyond this page):**
   (1) *a load-bearing ABSENCE of a filter needs a source pin* — no behaviour test can observe what
   a query didn't do; the `classesQueryShape` pin is the pattern (RISK 3, third instance after
