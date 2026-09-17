@@ -1667,6 +1667,23 @@ asserts the page renders). A driver makes each guarantee repeatable so the next 
 a driver. Write-off needs a fixture with a `parent_tenant_balances.debit_balance > 0` row (none seeded today);
 CSV export can't be asserted headlessly past the download, so assert the cap-banner path instead.
 
+### A `verify-class-admin` driver for the uncovered shadow-coach actions — **S** `[from the classes refactor 2026-09-17]`
+The classes refactor (§8.108) has a strong net — `class-deactivation`, `class-edit`, `class-terms`,
+`class-students`, `cancel-lesson`, `locations`, plus `coach-roster` (shadow **ASSIGN**) and `attendance-guard`
+(extra lesson) — but **three shadow-coach actions in the roster drawer have no driver**: **End** an ongoing
+shadow (the money-critical half — END-never-DELETE), the **rate-less-coach warning** (the `coach-roster` fixture
+gives the shadow a rate, so the branch never fires), and the **failed-shadow-load** error branch. All dormant on
+prod (0 `class_shadow_coaches`).
+
+**Why:** those three ride on unit tests (`shadowRateWarning`'s 4 cases) + the source grep gate (one `.from`, zero
+`.delete`/`.update` on `class_shadow_coaches`). A driver makes each repeatable so the next change to
+`useClassDrawer` is caught by CI, not by remembering to click. Same shape as `verify-invoice-admin` /
+`verify-packages-admin`.
+
+**Notes:** End needs a fixture with an ongoing `class_shadow_coaches` row + a rate; the warning needs a coach with
+**no** shadow rate; the failed-load needs the read to error (rename the table in a throwaway, or an RLS denial).
+Assert the DB row COUNT is unchanged across an End (only `effective_to` is set) — a DELETE would claw back paid wages.
+
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the
 single deliberate exclusion in `profile_reference_columns()`; every other FK pointing at

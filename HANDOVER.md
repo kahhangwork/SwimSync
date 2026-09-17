@@ -1,10 +1,12 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-17 — **August billing is HALF DONE on prod (§8.107):** 9 invoices out on 14 Sep, month
-held OPEN by one unclaimed child marked present on 2 Aug. Fix the mark / invite / settle, then Generate again —
-`INVOICE_RUNBOOK.md`. One backlog item raised (generation-run visibility). No code change; nightly gate still open (§9)._
+_Last updated: 2026-09-17 — **`classes` full-track refactor DONE, on `main` (§8.108):** 1,714 → 164 lines,
+0 useState, both fence ledgers empty, driver net 11/11 local. **Nightly `35187663332` is RUNNING on `main`
+(`7b19d8d`) — watch it green before merging the next unit (§7.1 gate).** Next unit = an Admin lite batch (§9).
+August billing still HALF DONE on prod (§8.107) — finish before 1 Oct._
 
-_Previously, 2026-09-16 (§8.106) — `invoices` full-track refactor shipped to `main`, zero behaviour change; drift-twin miss fixed (§7.241). **A fresh nightly must validate `main`.**_
+_Previously, 2026-09-17 (§8.107) — August half billed: 9 invoices out, month held OPEN by one unclaimed child
+marked present 2 Aug; admin fix (mark / invite / settle) + Generate again, before 1 Oct (`INVOICE_RUNBOOK.md`)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +349,29 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.108 (2026-09-17) — `classes/page.tsx` full-track decomposition: 1,714 → 164 lines, 0 useState
+
+**4th full-track giant; 12 stages on `refactor/classes-tiers`, merged to `main` (`7b19d8d`) and pushed. Zero
+behaviour change.** dao (`classes.{repo,rpc}`, typed RPC wrappers) → domain (7 hooks + 3 pure modules with
+characterisation tests) → ui (9 components); both boundary ledgers **empty**. Two clean `git mv`s into domain
+(`classRoster`, `locationOptions`, sole importers). 734 vitest + 429 jest; **driver net 11/11 local**
+(class-deactivation/edit/terms/students, cancel-lesson 17/17, locations, coach-roster, attendance-guard,
+platform-admin-scope, tenant-admin, smoke-admin). **Nightly `35187663332` RUNNING on `main` to confirm — gate
+the next merge on it (§7.1).**
+
+- **Read `docs/refactor/CLASSES_REFACTOR_PLAN.md` (§5a, §6, §13), not this, for the how.** The plan was hardened
+  by a `/plan-review` run (a **Fable 5.1 subagent**) that caught 3 driver-net mis-mappings + the untyped-client
+  RISK 1; every risk landed a structural pin (12-key typed RPC wrappers, source-pin `classesQueryShape.test.ts`,
+  4 `shadowRateWarning` cases, grep gates), several proven RED.
+- **Owed (dormant, unit-pinned):** the shadow **End / rate-warning / failed-load** hand-checks have no driver
+  (`coach-roster` covers ASSIGN only) → `verify-class-admin` in `BACKLOG.md`. Move was verbatim; risk low.
+- **Fence infra fix (durable):** `tierBoundaries.drift.test.ts` `imports()` tightened to exclude `\n<>` — the
+  word "from" ending a JSX string (`aria-label="Shadowing from"`, a `coach-roster` label) was a false-positive
+  specifier. Strengthening only; every prior scope unchanged.
+- **Process footgun:** a `git add … 2>/dev/null` swallowed a stale moved-file pathspec error and aborted the
+  whole add, committing only the rename — the real content sat on disk (where gates ran), caught at merge.
+  **`git status` must be clean after each commit; never `2>/dev/null` a `git add`.**
+
 ## 8.107 (2026-09-17) — August billing diagnosed: one unclaimed child holds the month open
 
 **No code shipped. Prod state read, cause found, backlog item raised (`d9828c4`).** The admin's August run
@@ -361,21 +386,7 @@ timeout on the run that completed (second run created 0). Edge-function logs aro
 - **Graduated:** the "why did it fail / what holds it open" visibility gap → `BACKLOG.md` (Billing and payments), shapes recorded, not decided.
 - **Deliberately not done:** no override, no attendance edit by me, no PRD change.
 
-## 8.106 (2026-09-16) — `invoices/page.tsx` full-track decomposition: 1,748 → 200 lines, 0 useState
-
-**The 3rd full-track giant; all 12 stages built on `refactor/invoices-tiers`, on `main`, CI green. Zero
-behaviour change.** dao (`invoices.{repo,rpc,api}`) → domain (6 hooks + pure `invoiceRows` with 7
-characterisation tests) → ui (9 components); both boundary ledgers **empty**, page imports only its tiers +
-React + `@/components`. 715 vitest + 429 jest; **full driver net green** (invoice-controls 18/18, orphan-report
-14/14, platform-admin-scope 32/32, tenant-admin 10/10, smoke-admin 64/64, trial-onboarding 10/10,
-unmarked-lessons 12/12, payment-collection 19/19).
-
-- **Read `docs/refactor/INVOICES_REFACTOR_PLAN.md` (§6, §13), not this, for the how** — stage log, verdicts, findings.
-- **Two MOVEs** (`git mv`, sole feature importer + test): `paynow` + `settlementPayload` → invoices/domain.
-- **Landed on `main` via a cross-session merge** (§7.240 sibling — check `git branch --show-current` on a shared tree); nothing reverted. A **one-line drift-twin miss went red on `main`** and was fixed (`6fe19e6`, §7.241): the SwimSyncApp copy of `sgDisplay.drift.test.ts` also scans admin and needed the same `formatBillingMonth` repoint — run BOTH suites.
-- **Graduated:** the cross-slice-cycle + shared-spine-id patterns → playbook §5; the drift-twin trap → §7.241; a `verify-invoice-admin` driver (4 uncovered admin actions) → `BACKLOG.md`.
-
-_(§8.105 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.106 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -420,13 +431,12 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-16: `main` now carries L-B (§8.105) + invoices (§8.106) + two test fixes (§7.240 de-flake
-`595910e`, §7.241 drift-twin `6fe19e6`), and CI push-tests are green (`35109974152`). No clean NIGHTLY has run
-against this `main` yet** — the last full nightly (`35095280475`, on the older `a773058`) FAILED on one unrelated
-flake (`verify-tenant-suspension` 11/12, the Platform page, since fixed by §7.240). **Trigger one and watch it —
-`gh workflow run ui-drivers.yml --ref main`, then `gh run view <id>`; bisection now spans L-B + invoices, so read
-it, don't trust this line (§8.65).** Previous scheduled run `35032652395` was green on `f0cbcb5` (packages);
-rot issue #10 closed, none open. Start any new red with `gh run download <id> -n ui-driver-run` + screenshots (§7.228).
+**State on 2026-09-17: `main` is `7b19d8d` (carries `classes` §8.108). Nightly `35187663332` is RUNNING on it —
+watch it: `gh run view 35187663332` (or `gh run list --workflow=ui-drivers.yml`).** It is the GATE for the next
+merge (§7.1): don't land the next unit on `main` until this is green. Bisection this run spans `classes` only
+(the prior nightly `35159359809` was green on `2895cf2`, this branch's base), so a red is almost certainly a
+classes driver — but read it, don't trust this line (§8.65). Start any red with `gh run download 35187663332 -n
+ui-driver-run` + screenshots (§7.228), and re-check a cold-compile timeout per §7.108 before calling it a regression.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
 collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
@@ -447,17 +457,25 @@ failures that are just the driver's own UI writes — reset before believing it.
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — `classes` (the next full-track giant)
+### THE NEXT BUILD — an Admin lite batch (recommended), then a giant
 
-**`invoices` is DONE (§8.106) — 3rd of 7 full giants, on `main`, CI green.** By the giant→batch alternation the
-queue is a lite batch next (L-C…L-H, `BACKLOG.md` → Foundations), or the next giant is **`classes` (1,714)**.
-**5 giants left:** `classes` (1,714), `platform` (1,395), `lessons/[classId]/[date]` (912); coach app
-`schedule/index` (1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905). Method for a full page:
-playbook §2 (folded as on L-A/L-B), own `<FEATURE>_REFACTOR_PLAN.md`, `SCOPE_DIRS` at L0, driver net by grep
-(§7.236), tiers feature-scoped (§7.233); new patterns from invoices in playbook §5 (cross-slice cycle,
-shared-spine id). **GATE: get one clean nightly on `main` first (below) before starting the next unit (§7.1).**
+**`classes` is DONE (§8.108) — 4th of 7 full giants, on `main`.** Three giants in a row (packages, invoices,
+classes), so by the **giant→batch alternation a LITE BATCH is due next**. Recommended: **Admin L-C "money"** —
+`wages`, `credit-notes`, `referrals`, `accounting` (~2,309 lines, folded L1–L3 per page, `docs/refactor/BATCH_C_PLAN.md`).
+Lite-track method: playbook §7.1 (L0 fence-widen + batch plan → L1–L3 folded per page → L4 driver run once).
+**Re-derive the batch's driver net by grep before starting** — `grep -lE '\$\{ADMIN\}/<route>' verify-*.mjs`
+(§7.236, names aren't evidence); `credit-notes` + `accounting` have no driver → the **smoke-admin** driver is
+their net (§7.3). **4 giants left** if you'd rather do one: `platform` (1,395), `lessons/[classId]/[date]` (912);
+coach app `schedule/index` (1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905). A coach-app
+unit is the `features/` layout + jest + RN-web quirks (playbook §1 table).
+
+**GATE (§7.1): build the next unit on a branch, but do NOT merge it to `main` until nightly `35187663332`
+(classes) is green.** Build + gate locally meanwhile (`cd SwimSyncAdmin && npm run typecheck && npm test`).
 **Still-due once-off:** the dao three-way split + "orchestrate, never replace" rule → `docs/ARCHITECTURE.md` §6
-(trigger met since packages; now THREE giants exercise it).
+(trigger met since packages; now FOUR giants exercise it).
+
+**Three dev servers may still be UP from the classes driver run** (admin :3000, Expo :8081, edge functions) —
+`/session-close` releases them, or kill the listeners on those ports. Local DB was reset 11× by the net.
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), **on prod
 — re-confirmed 2026-08-30 by `supabase migration list --linked`, `remote` column filled** — 0 pending, rehearsed
