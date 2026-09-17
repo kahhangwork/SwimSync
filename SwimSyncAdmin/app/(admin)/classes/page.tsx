@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, CalendarPlus, CalendarX, Users, Archive, RotateCcw } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
@@ -26,6 +25,11 @@ import { locationFilterOptions, formLocationOptions } from "@/lib/locationOption
 
 import { ROW_LIMIT, DAYS } from "./constants";
 import type { ClassRow, LocationOpt, Coach, ShadowAssignment } from "./types";
+// Transitional page->dao imports (playbook §7.1): until each slice's hook wraps
+// these calls (Stages 4-10), the page calls the dao directly. Pinned in
+// ALLOWED_PAGE_IMPORTS; both entries are gone by Stage 10.
+import * as repo from "./dao/classes.repo";
+import * as rpc from "./dao/classes.rpc";
 
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -199,28 +203,15 @@ export default function ClassesPage() {
     const today = todayInSg();
     // Payment-method chips for the drawer. Fire-and-forget: a failed RPC only
     // means no chips, never a roster error.
-    supabase
-      .rpc("student_package_coverage")
+    rpc
+      .studentPackageCoverage()
       .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
+    // Two reads, fetched SEPARATELY from the class list on purpose (§7.52 — see
+    // dao). `today` is read here, in the hook's job, and passed down.
     const [{ data: enr, error: enrErr }, { data: bk, error: bkErr }] =
       await Promise.all([
-        supabase
-          .from("student_class_enrolments")
-          .select(
-            "class_id, is_active, enrolled_at, student_id, students(full_name, tenant_levels(label))"
-          )
-          .eq("is_active", true),
-        // Cancelled and past bookings are excluded here AND again in
-        // buildClassRoster — the count must not include a guest who is not
-        // coming, and one definition of "upcoming" (>= today, in SGT) is
-        // already shared with the coach roster and Unassigned Children.
-        supabase
-          .from("trial_bookings")
-          .select(
-            "class_id, session_date, student_id, cancelled_at, students(full_name, tenant_levels(label))"
-          )
-          .is("cancelled_at", null)
-          .gte("session_date", today),
+        repo.loadEnrolments(),
+        repo.loadUpcomingBookings(today),
       ]);
 
     if (enrErr || bkErr) {
@@ -255,43 +246,21 @@ export default function ClassesPage() {
   }
 
   async function loadCategories() {
-    const { data } = await supabase
-      .from("class_categories")
-      .select("id, name, default_capacity")
-      .order("name");
+    const { data } = await repo.loadCategories();
     setCategories(data ?? []);
   }
 
-  // Every location for the business (RLS-scoped), archived included — see the
-  // `locations` state note. Ordered the way the picker shows them.
   async function loadLocations() {
-    const { data } = await supabase
-      .from("locations")
-      .select("id, name, address, archived_at")
-      .order("sort_order")
-      .order("name");
+    const { data } = await repo.loadLocations();
     setLocations((data ?? []) as LocationOpt[]);
   }
 
-  // ⚠ RETIRED CLASSES ARE LOADED, AND THAT IS LOAD-BEARING, NOT COSMETIC.
-  // This used to be `.eq("is_active", true)`. Since the invoice engine stopped
-  // skipping inactive classes, one of them CAN block a billing month — and the
-  // coach class list and the coach Schedule tab both still filter `is_active`,
-  // so this page is the only screen in the product that can show such a class
-  // at all. Filter it here and `reactivate_class()` has nowhere to be called
-  // from: the month blocks, nobody can see why, and there is no override on the
-  // block by design. Retired rows are hidden behind the toggle below, never by
-  // the query.
+  // ⚠ RETIRED CLASSES ARE LOADED — load-bearing, not cosmetic (§7.52 / the
+  // "why no is_active filter" reasoning lives on repo.loadClasses; its query
+  // shape is pinned by domain/classesQueryShape.test.ts). Here we map + set.
   async function loadClasses() {
     setLoading(true);
-    const { data } = await supabase
-      .from("classes")
-      .select(
-        "id, coach_id, title, day_of_week, start_time, end_time, location_id, price_per_lesson, category_id, capacity, colour, is_active, deactivated_at, coaches(profiles(full_name)), locations(name), class_categories(default_capacity), student_class_enrolments(id, is_active)"
-      )
-      .order("day_of_week")
-      .order("start_time")
-      .limit(ROW_LIMIT);
+    const { data } = await repo.loadClasses();
 
     setCapped((data ?? []).length >= ROW_LIMIT);
     setClasses(
@@ -326,11 +295,8 @@ export default function ClassesPage() {
 
   async function loadCoaches() {
     const [{ data }, { data: shadowRates }] = await Promise.all([
-      supabase.from("coaches").select("id, profiles(full_name)"),
-      supabase
-        .from("coach_rates")
-        .select("coach_id, effective_from")
-        .eq("role", "shadow"),
+      repo.loadCoaches(),
+      repo.loadShadowRates(),
     ]);
     const earliestShadowRate = new Map<string, string>();
     for (const r of (shadowRates ?? []) as any[]) {
@@ -359,11 +325,7 @@ export default function ClassesPage() {
    */
   async function loadShadows(classId: string) {
     setShadowError(null);
-    const { data, error } = await supabase
-      .from("class_shadow_coaches")
-      .select("id, coach_id, effective_from, effective_to")
-      .eq("class_id", classId)
-      .order("effective_from", { ascending: false });
+    const { data, error } = await repo.loadShadows(classId);
 
     if (error) {
       // A failed load must NOT render as "nobody shadows this class" — that is
@@ -392,7 +354,7 @@ export default function ClassesPage() {
     }
     setShadowBusy(true);
     setShadowError(null);
-    const { error } = await supabase.rpc("assign_class_shadow", {
+    const { error } = await rpc.assignClassShadow({
       p_class_id: drawerClass.id,
       p_coach_id: shadowPick,
       p_effective_from: shadowFrom || null,
@@ -412,10 +374,8 @@ export default function ClassesPage() {
     if (!drawerClass) return;
     setShadowBusy(true);
     setShadowError(null);
-    // ⚠ END, never DELETE. The row is what says the coach was assigned on the
-    // dates it covers, and pay re-reads that for every already-paid lesson —
-    // deleting it would claw back money genuinely earned (migration §1).
-    const { error } = await supabase.rpc("end_class_shadow", {
+    // ⚠ END, never DELETE — rpc.endClassShadow carries the full reasoning.
+    const { error } = await rpc.endClassShadow({
       p_class_id: drawerClass.id,
       p_coach_id: coachId,
       p_effective_to: null,
@@ -516,15 +476,12 @@ export default function ClassesPage() {
       colour,
     };
 
-    // Editing goes through set_class_terms, never a bare UPDATE. Price and
-    // coach are EFFECTIVE-DATED in class_rates (20260719000700): writing
-    // classes.price_per_lesson directly is display-only and changes nothing
-    // about what anyone is charged or paid. The RPC also writes both tables in
-    // one transaction, so a class's schedule and its billing terms cannot
-    // disagree. Creating a class is still a plain insert — the seed trigger
-    // gives it floor-dated terms.
+    // Editing goes through set_class_terms, never a bare UPDATE (rpc.setClassTerms
+    // carries the full effective-dating reasoning + the RISK 1 required-keys type).
+    // Creating a class is still a plain insert — the seed trigger gives it
+    // floor-dated terms.
     const { error } = editingId
-      ? await supabase.rpc("set_class_terms", {
+      ? await rpc.setClassTerms({
           p_class_id: editingId,
           p_title: title,
           p_day_of_week: day,
@@ -535,13 +492,13 @@ export default function ClassesPage() {
           p_coach_id: coachId,
           // A correction rewrites history (there was never a period at the old
           // number); a change starts a new one from today. Only asked when the
-          // money actually moved — see moneyChanged.
+          // money actually moved — see moneyChanged. Clock read HERE, not in dao.
           p_effective_from: correctInPlace ? null : todayInSg(),
           p_correct_in_place: correctInPlace,
           p_location_address: picked.address,
           p_location_id: locationId,
         })
-      : await supabase.from("classes").insert({ ...payload, is_active: true });
+      : await repo.insertClass({ ...payload, is_active: true });
 
     if (error) {
       setSaveError(error.message);
@@ -554,12 +511,13 @@ export default function ClassesPage() {
     // set_class_terms and is not effective-dated. A plain UPDATE alongside
     // the RPC (create includes it in the insert payload above).
     if (editingId) {
-      const { error: catErr } = await supabase
-        .from("classes")
-        // ONE statement for all three non-terms fields: one failure mode, one
-        // "Saved, but…" message, no third partial-save state.
-        .update({ category_id: categoryId || null, capacity: capacityValue, colour })
-        .eq("id", editingId);
+      // ONE statement for all three non-terms fields: one failure mode, one
+      // "Saved, but…" message, no third partial-save state.
+      const { error: catErr } = await repo.updateClassMeta(editingId, {
+        category_id: categoryId || null,
+        capacity: capacityValue,
+        colour,
+      });
       if (catErr) {
         setSaveError(`Saved, but the category, capacity and colour were not: ${catErr.message}`);
         setSaving(false);
@@ -590,7 +548,7 @@ export default function ClassesPage() {
     // a reason required, and nothing below the window floor. Surfacing the
     // database's own message rather than pre-empting it keeps one source of
     // truth for what is allowed.
-    const { error } = await supabase.rpc("schedule_extra_lesson", {
+    const { error } = await rpc.scheduleExtraLesson({
       p_class_id: extraFor.id,
       p_date: extraDate,
       p_reason: extraReason,
@@ -618,7 +576,7 @@ export default function ClassesPage() {
     if (!cancelFor) return;
     setCancelSaving(true);
     setCancelError(null);
-    const { error } = await supabase.rpc("cancel_lesson", {
+    const { error } = await rpc.cancelLesson({
       p_class_id: cancelFor.id,
       p_date: cancelDate,
       p_reason: cancelReason,
@@ -644,7 +602,7 @@ export default function ClassesPage() {
     setRetireSaving(true);
     setRetireError(null);
 
-    const { error } = await supabase.rpc("deactivate_class", {
+    const { error } = await rpc.deactivateClass({
       p_class_id: retireFor.id,
     });
 
@@ -672,7 +630,7 @@ export default function ClassesPage() {
     setRestoringId(cls.id);
     setRetireError(null);
 
-    const { error } = await supabase.rpc("reactivate_class", {
+    const { error } = await rpc.reactivateClass({
       p_class_id: cls.id,
     });
 

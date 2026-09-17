@@ -151,28 +151,10 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    2/3 (folded). The client + all 19 data-access sites moved into
   //    invoices/dao/invoices.{repo,rpc,api}.ts; the page holds ZERO supabase and
   //    ZERO fetch(, so every entry went stale and was deleted. Nothing to pin. ──
-  // ── classes (full track, CLASSES_REFACTOR_PLAN.md), pinned 2026-09-17 at
-  //    Stage 0b. Every .from()/.rpc() the page makes today; all 16 leave for
-  //    classes/dao/classes.{repo,rpc}.ts at Stage 2/3 (folded) and their entries
-  //    are deleted then. `.from("classes")` covers the list select, the create
-  //    insert and the edit UPDATE (all three move together). ──
-  { file: "app/(admin)/classes/page.tsx", contains: "import { supabase }", why: "Stage 2/3 -> dao owns the client; the page's import line leaves too" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.from("classes")', why: "Stage 2/3 -> classes.repo.ts (list select + create insert + edit update)" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.from("coaches")', why: "Stage 2/3 -> classes.repo.ts" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.from("coach_rates")', why: "Stage 2/3 -> classes.repo.ts (shadow-rate read, folded into loadCoaches)" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.from("class_categories")', why: "Stage 2/3 -> classes.repo.ts" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.from("locations")', why: "Stage 2/3 -> classes.repo.ts" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.from("student_class_enrolments")', why: "Stage 2/3 -> classes.repo.ts (roster, own .from — §7.52)" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.from("trial_bookings")', why: "Stage 2/3 -> classes.repo.ts (roster, own .from — §7.52)" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.from("class_shadow_coaches")', why: "Stage 2/3 -> classes.repo.ts (shadow read; write path is end_class_shadow — RISK 4)" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("student_package_coverage")', why: "Stage 2/3 -> classes.rpc.ts" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("assign_class_shadow"', why: "Stage 2/3 -> classes.rpc.ts" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("end_class_shadow"', why: "Stage 2/3 -> classes.rpc.ts (END never DELETE — RISK 4)" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("set_class_terms"', why: "Stage 2/3 -> classes.rpc.ts (11 required p_ keys — RISK 1)" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("schedule_extra_lesson"', why: "Stage 2/3 -> classes.rpc.ts" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("cancel_lesson"', why: "Stage 2/3 -> classes.rpc.ts" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("deactivate_class"', why: "Stage 2/3 -> classes.rpc.ts" },
-  { file: "app/(admin)/classes/page.tsx", contains: '.rpc("reactivate_class"', why: "Stage 2/3 -> classes.rpc.ts (cannot refuse — RISK 9)" },
+  // ── classes (full track, CLASSES_REFACTOR_PLAN.md): check 3 EMPTY at Stage
+  //    2/3 (folded), 2026-09-17. The client + all 16 .from()/.rpc() sites moved
+  //    into classes/dao/classes.{repo,rpc}.ts; the page holds ZERO supabase, so
+  //    every entry went stale and was deleted. Nothing to pin. ──
 ];
 
 /**
@@ -254,7 +236,12 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    page stops importing them as their symbols move into hooks/ui. Every entry
   //    is deleted when its import leaves the page; the ledger only shrinks. ──
   { file: "app/(admin)/classes/page.tsx", contains: "lucide-react", why: "Stage 11 -> icons (Plus/Pencil/CalendarPlus/CalendarX/Users/Archive/RotateCcw) into ui/" },
-  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/supabase", why: "Stage 2/3 -> dao owns the client" },
+  // Transitional page->dao imports (playbook §7.1): added at Stage 2/3 when the
+  // page first calls the dao directly; removed at Stages 4-10 as each hook wraps
+  // the calls (repo goes when the last direct repo caller becomes a hook; rpc
+  // likewise). Gone by Stage 10/11.
+  { file: "app/(admin)/classes/page.tsx", contains: "./dao/classes.repo", why: "Stages 4-10 -> hooks wrap repo calls (list/roster/form/retire)" },
+  { file: "app/(admin)/classes/page.tsx", contains: "./dao/classes.rpc", why: "Stages 6-10 -> hooks wrap rpc calls (drawer/extra/cancel/retire/form)" },
   { file: "app/(admin)/classes/page.tsx", contains: "@/lib/tableSort", why: "Stage 4 -> dayOfWeekOrder into classRows sort accessors" },
   { file: "app/(admin)/classes/page.tsx", contains: "@/lib/classRoster", why: "Stage 5 -> MOVE into classes/domain (sole importer); page imports ./domain/classRoster after" },
   { file: "app/(admin)/classes/page.tsx", contains: "@/lib/packageCoverage", why: "Stage 5 -> coverageByStudent/StudentCoverage into useRoster (covMap)" },
