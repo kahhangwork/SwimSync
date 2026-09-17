@@ -2,7 +2,7 @@ import { Pencil, CalendarPlus, CalendarX, Users, Archive, RotateCcw } from "luci
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { toSgDate, formatSgDate } from "@/lib/lessonDates";
 import { formatTime } from "@/lib/utils";
-import { formatStudentCount, describeStudentCount, type buildClassRoster } from "@/lib/classRoster";
+import { formatStudentCount, describeStudentCount, type buildClassRoster } from "../domain/classRoster";
 import { colourFor } from "@/lib/classColours";
 import { capitalize, classSortAccessors } from "../domain/classRows";
 import type { ClassRow } from "../types";

@@ -10,6 +10,7 @@ import {
   filterClasses,
   countActiveRetired,
   capitalize,
+  shadowRateWarning,
 } from "./classRows";
 import type { ClassRow } from "../types";
 
@@ -126,6 +127,21 @@ describe("filterClasses", () => {
     expect(
       filterClasses([active, retired], { search: "", locationFilter: "l9", showRetired: true })
     ).toHaveLength(2);
+  });
+});
+
+describe("shadowRateWarning — §7.28 sibling: A DATE, NOT A BOOLEAN (RISK 4)", () => {
+  it("no rate at all → none", () => {
+    expect(shadowRateWarning(null, "2026-09-17")).toBe("none");
+  });
+  it("rate starts AFTER the assignment → late", () => {
+    expect(shadowRateWarning("2026-10-01", "2026-09-17")).toBe("late");
+  });
+  it("rate starts before the assignment → null (covered)", () => {
+    expect(shadowRateWarning("2026-09-01", "2026-09-17")).toBeNull();
+  });
+  it("rate starts ON the assignment date → null (<= boundary)", () => {
+    expect(shadowRateWarning("2026-09-17", "2026-09-17")).toBeNull();
   });
 });
 

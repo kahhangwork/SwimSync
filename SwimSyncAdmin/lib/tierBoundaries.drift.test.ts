@@ -244,13 +244,15 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/classes/page.tsx", contains: "./dao/classes.rpc", why: "Stages 6-10 -> hooks wrap rpc calls (drawer/extra/cancel/retire/form)" },
   // @/lib/tableSort left the page at Stage 4 — dayOfWeekOrder moved into
   // domain/classRows.ts (classSortAccessors). Entry deleted (ledger shrinks).
-  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/classRoster", why: "Stage 5 -> MOVE into classes/domain (sole importer); page imports ./domain/classRoster after" },
-  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/packageCoverage", why: "Stage 5 -> coverageByStudent/StudentCoverage into useRoster (covMap)" },
-  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/sessionRoster", why: "Stage 6 -> assignableClassShadows into useClassDrawer/RosterDrawer (shared, stays in lib)" },
+  // @/lib/classRoster MOVED into classes/domain at Stage 5 (sole importer); the
+  // page no longer imports it (useRoster + ui/ClassTable read ./domain/classRoster).
+  // @/lib/packageCoverage left the page at Stage 5 — coverageByStudent/
+  // StudentCoverage moved into useRoster (covMap). Both entries deleted.
+  // @/lib/sessionRoster (assignableClassShadows) + @/lib/utils (formatTime) left
+  // the page at Stage 6 — both moved into ui/RosterDrawer (shared, stay in lib).
   { file: "app/(admin)/classes/page.tsx", contains: "@/lib/locationOptions", why: "Stage 10 -> MOVE into classes/domain (sole importer)" },
   { file: "app/(admin)/classes/page.tsx", contains: "@/lib/classColours", why: "Stage 11 -> CLASS_COLOURS/colourFor into ui/ClassTable + ui/ClassFormModal (shared, stays in lib)" },
-  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/utils", why: "Stage 11 -> formatTime into ui (table/drawer) (shared, stays in lib)" },
-  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/lessonDates", why: "Stage 11 -> todayInSg/toSgDate/formatSgDate into hooks/ui (shared, stays in lib)" },
+  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/lessonDates", why: "Stage 10/11 -> todayInSg into useClassForm; toSgDate/formatSgDate already left (shared, stays in lib)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

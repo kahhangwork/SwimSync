@@ -5,22 +5,12 @@ import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
-import { Drawer } from "@/components/Drawer";
-import { assignableClassShadows } from "@/lib/sessionRoster";
-import { todayInSg, toSgDate, formatSgDate } from "@/lib/lessonDates";
-import { formatTime } from "@/lib/utils";
-import {
-  buildClassRoster,
-  type RosterEnrolment,
-  type RosterBooking,
-} from "@/lib/classRoster";
-import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
-import { PackageChip } from "@/components/PackageChip";
+import { todayInSg } from "@/lib/lessonDates";
 import { CLASS_COLOURS } from "@/lib/classColours";
 import { locationFilterOptions, formLocationOptions } from "@/lib/locationOptions";
 
 import { DAYS } from "./constants";
-import type { ClassRow, LocationOpt, Coach, ShadowAssignment } from "./types";
+import type { ClassRow, LocationOpt } from "./types";
 // Transitional page->dao imports (playbook §7.1): until each slice's hook wraps
 // these calls (Stages 5-10), the page calls the dao directly. Pinned in
 // ALLOWED_PAGE_IMPORTS; both entries are gone by Stage 10.
@@ -28,8 +18,11 @@ import * as repo from "./dao/classes.repo";
 import * as rpc from "./dao/classes.rpc";
 import { capitalize, countActiveRetired } from "./domain/classRows";
 import { useClassList } from "./domain/useClassList";
+import { useRoster } from "./domain/useRoster";
+import { useClassDrawer } from "./domain/useClassDrawer";
 import { ClassToolbar } from "./ui/ClassToolbar";
 import { ClassTable } from "./ui/ClassTable";
+import { RosterDrawer } from "./ui/RosterDrawer";
 
 function Field({
   label,
@@ -79,31 +72,34 @@ export default function ClassesPage() {
   const loadClasses = list.load;
   const loadCoaches = list.loadCoaches;
 
+  // The roster slice (enrolments/bookings/covMap + the one rosterByClass the
+  // badge and the drawer share). Takes the class list as its input.
+  const roster = useRoster(classes);
+  const { covMap, rosterError, rosterByClass, loadRoster } = roster;
+
+  // The roster drawer + shadow-coach management. Takes the shared coaches spine.
+  const drawer = useClassDrawer(coaches);
+  const {
+    drawerClass,
+    setDrawerClass,
+    shadows,
+    shadowPick,
+    setShadowPick,
+    shadowFrom,
+    setShadowFrom,
+    shadowBusy,
+    shadowError,
+    handleAssignShadow,
+    handleEndShadow,
+  } = drawer;
+
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // ⚠ THE ROSTER IS FETCHED SEPARATELY FROM THE CLASS LIST, ON PURPOSE.
-  //
-  // PostgREST returns null for the ENTIRE select when one embed fails — a
-  // policy gap, an ambiguous relationship, a typo in the nesting. Bolting
-  // these joins onto loadClasses()'s select would mean any of those blanks
-  // every class from this page, rather than degrading one drawer. So the
-  // class list keeps the query it has always had, and the roster lives here,
-  // defaulted to empty, free to fail on its own. See `docs/GOTCHAS.md` §7.52.
-  const [enrolments, setEnrolments] = useState<RosterEnrolment[]>([]);
-  const [bookings, setBookings] = useState<RosterBooking[]>([]);
-  const [rosterError, setRosterError] = useState<string | null>(null);
-  const [drawerClass, setDrawerClass] = useState<ClassRow | null>(null);
-  const [shadows, setShadows] = useState<ShadowAssignment[]>([]);
-  const [shadowPick, setShadowPick] = useState("");
-  const [shadowFrom, setShadowFrom] = useState("");
-  const [shadowBusy, setShadowBusy] = useState(false);
-  const [shadowError, setShadowError] = useState<string | null>(null);
-  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
-    new Map()
-  );
+  // (The roster data lives in useRoster; the drawer selection + shadow-coach
+  // state live in useClassDrawer — both destructured above.)
 
   // Form state
   const [title, setTitle] = useState("");
@@ -180,73 +176,6 @@ export default function ClassesPage() {
     loadRoster();
   }, []);
 
-  // The drawer's shadow list follows whichever class is open. Cleared on close
-  // so the next class cannot flash the previous one's assignments.
-  useEffect(() => {
-    if (drawerClass) loadShadows(drawerClass.id);
-    else {
-      setShadows([]);
-      setShadowPick("");
-      setShadowFrom("");
-      setShadowError(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawerClass?.id, coaches.length]);
-
-  /**
-   * Who is in each class — the drawer's contents, and the "+1" on the badge.
-   *
-   * Two queries, neither of which the class table depends on. An error here
-   * leaves the table intact and shows an explicit message inside the drawer:
-   * a roster we could not read must never be indistinguishable from a class
-   * with nobody in it.
-   */
-  async function loadRoster() {
-    const today = todayInSg();
-    // Payment-method chips for the drawer. Fire-and-forget: a failed RPC only
-    // means no chips, never a roster error.
-    rpc
-      .studentPackageCoverage()
-      .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
-    // Two reads, fetched SEPARATELY from the class list on purpose (§7.52 — see
-    // dao). `today` is read here, in the hook's job, and passed down.
-    const [{ data: enr, error: enrErr }, { data: bk, error: bkErr }] =
-      await Promise.all([
-        repo.loadEnrolments(),
-        repo.loadUpcomingBookings(today),
-      ]);
-
-    if (enrErr || bkErr) {
-      setRosterError((enrErr ?? bkErr)!.message);
-      return;
-    }
-    setRosterError(null);
-
-    setEnrolments(
-      (enr ?? []).map((e: any) => ({
-        class_id: e.class_id,
-        is_active: e.is_active,
-        enrolled_at: e.enrolled_at,
-        student_id: e.student_id,
-        full_name: e.students?.full_name ?? "—",
-        // Read off the JOINED tenant_levels row, never off the student: the
-        // student carries only the id, and a level's label is the business's
-        // own vocabulary.
-        level_label: e.students?.tenant_levels?.label ?? null,
-      }))
-    );
-    setBookings(
-      (bk ?? []).map((b: any) => ({
-        class_id: b.class_id,
-        session_date: b.session_date,
-        student_id: b.student_id,
-        cancelled_at: b.cancelled_at ?? null,
-        full_name: b.students?.full_name ?? "—",
-        level_label: b.students?.tenant_levels?.label ?? null,
-      }))
-    );
-  }
-
   async function loadCategories() {
     const { data } = await repo.loadCategories();
     setCategories(data ?? []);
@@ -255,81 +184,6 @@ export default function ClassesPage() {
   async function loadLocations() {
     const { data } = await repo.loadLocations();
     setLocations((data ?? []) as LocationOpt[]);
-  }
-
-  /**
-   * Who shadows the class currently open in the drawer, and who used to.
-   *
-   * ⚠ ENDED ASSIGNMENTS ARE SHOWN, NOT HIDDEN. An ended one still explains
-   * money: pay asks "was this coach assigned on the LESSON's date", so a coach
-   * who stopped shadowing in August is still paid for August and an admin
-   * looking at that payout needs to see why. Hiding history here would make the
-   * Wages page unexplainable.
-   */
-  async function loadShadows(classId: string) {
-    setShadowError(null);
-    const { data, error } = await repo.loadShadows(classId);
-
-    if (error) {
-      // A failed load must NOT render as "nobody shadows this class" — that is
-      // the state an admin would then try to create, and the second assignment
-      // is refused by the unique index in a way that reads as a bug.
-      setShadowError(error.message);
-      setShadows([]);
-      return;
-    }
-    setShadows(
-      (data ?? []).map((r: any) => ({
-        id: r.id,
-        coach_id: r.coach_id,
-        coach_name:
-          coaches.find((c) => c.id === r.coach_id)?.full_name ?? "Unknown coach",
-        effective_from: r.effective_from,
-        effective_to: r.effective_to,
-      }))
-    );
-  }
-
-  async function handleAssignShadow() {
-    if (!drawerClass || !shadowPick) {
-      setShadowError("Choose a coach first.");
-      return;
-    }
-    setShadowBusy(true);
-    setShadowError(null);
-    const { error } = await rpc.assignClassShadow({
-      p_class_id: drawerClass.id,
-      p_coach_id: shadowPick,
-      p_effective_from: shadowFrom || null,
-    });
-    if (error) {
-      setShadowBusy(false);
-      setShadowError(error.message);
-      return;
-    }
-    setShadowPick("");
-    setShadowFrom("");
-    await loadShadows(drawerClass.id);
-    setShadowBusy(false);
-  }
-
-  async function handleEndShadow(coachId: string) {
-    if (!drawerClass) return;
-    setShadowBusy(true);
-    setShadowError(null);
-    // ⚠ END, never DELETE — rpc.endClassShadow carries the full reasoning.
-    const { error } = await rpc.endClassShadow({
-      p_class_id: drawerClass.id,
-      p_coach_id: coachId,
-      p_effective_to: null,
-    });
-    if (error) {
-      setShadowBusy(false);
-      setShadowError(error.message);
-      return;
-    }
-    await loadShadows(drawerClass.id);
-    setShadowBusy(false);
   }
 
   // The price/coach the edit form OPENED with. Comparing against these is
@@ -595,19 +449,6 @@ export default function ClassesPage() {
     [locations, locationId]
   );
 
-  // One roster per class, derived once. The badge's "+N" and the drawer's
-  // list read the SAME object, so the number and the names it promises can
-  // never disagree. todayInSg() is read here — the caller's job — and passed
-  // down; classRoster.ts itself touches no clock (§7.7).
-  const rosterByClass = useMemo(() => {
-    const today = todayInSg();
-    const map = new Map<string, ReturnType<typeof buildClassRoster>>();
-    for (const c of classes) {
-      map.set(c.id, buildClassRoster(enrolments, bookings, c.id, today));
-    }
-    return map;
-  }, [classes, enrolments, bookings]);
-
   const openRoster = rosterByClass.get(drawerClass?.id ?? "") ?? {
     enrolled: [],
     trials: [],
@@ -847,213 +688,23 @@ export default function ClassesPage() {
         </div>
       </Modal>
 
-      {/* Who is in this class — read-only, two groups, never merged.
-          DELIBERATELY NO WRITE CONTROLS. Not an oversight: the one action an
-          admin might reach for here is assigning a trial child to the class,
-          and that is precisely the action that breaks billing (PRD §7.17).
-          Do NOT add Assign / Enrol / Remove buttons to this drawer. */}
-      <Drawer
-        open={drawerClass !== null}
+      <RosterDrawer
+        drawerClass={drawerClass}
         onClose={() => setDrawerClass(null)}
-        title={drawerClass?.title ?? ""}
-        subtitle={
-          drawerClass
-            ? `${capitalize(drawerClass.day_of_week)} · ${formatTime(
-                drawerClass.start_time
-              )} – ${formatTime(drawerClass.end_time)} · ${
-                drawerClass.location_name
-              }`
-            : undefined
-        }
-      >
-        {rosterError ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-            Couldn&apos;t load the roster: {rosterError}
-          </p>
-        ) : (
-          <div className="space-y-8">
-            <section>
-              <h3 className="text-sm font-semibold text-gray-900">
-                Shadow coaches
-              </h3>
-              <p className="mt-0.5 text-xs text-gray-500">
-                A shadow watches every lesson of this class and is paid their own
-                shadow rate for each one. It lasts until you end it — this is not
-                a per-lesson arrangement. To record a one-off cover instead, use{" "}
-                <span className="font-medium">Substitutes</span>.
-              </p>
-
-              {shadowError && (
-                <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-                  {shadowError}
-                </p>
-              )}
-
-              {shadows.length > 0 && (
-                <ul className="mt-3 space-y-1.5">
-                  {shadows.map((sh) => (
-                    <li
-                      key={sh.id}
-                      className="flex flex-wrap items-center gap-2 text-sm"
-                    >
-                      <span className="font-medium text-gray-900">
-                        {sh.coach_name}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {formatSgDate(sh.effective_from)} –{" "}
-                        {sh.effective_to
-                          ? formatSgDate(sh.effective_to)
-                          : "ongoing"}
-                      </span>
-                      {sh.effective_to === null ? (
-                        <button
-                          type="button"
-                          disabled={shadowBusy}
-                          onClick={() => handleEndShadow(sh.coach_id)}
-                          className="text-xs font-medium text-gray-500 underline disabled:opacity-50"
-                        >
-                          End
-                        </button>
-                      ) : (
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                          ended
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <select
-                  value={shadowPick}
-                  onChange={(e) => setShadowPick(e.target.value)}
-                  className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
-                >
-                  <option value="">Add a shadow…</option>
-                  {assignableClassShadows(
-                    drawerClass?.coach_id ?? "",
-                    shadows
-                      .filter((sh) => sh.effective_to === null)
-                      .map((sh) => sh.coach_id),
-                    coaches.map((c) => ({ id: c.id, name: c.full_name }))
-                  ).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="date"
-                  value={shadowFrom}
-                  onChange={(e) => setShadowFrom(e.target.value)}
-                  className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
-                  aria-label="Shadowing from"
-                />
-                <button
-                  type="button"
-                  disabled={shadowBusy || !shadowPick}
-                  onClick={handleAssignShadow}
-                  className="rounded-lg bg-sky-500 px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  Add
-                </button>
-                <span className="text-xs text-gray-400">
-                  from today if left blank
-                </span>
-              </div>
-
-              {/* Met HERE rather than at payroll, deliberately. A shadow with no
-                  shadow rate makes generate_coach_payouts refuse for the WHOLE
-                  business, months later, with the run blocked until somebody
-                  works out why. Here it costs one sentence. */}
-              {(() => {
-                if (!shadowPick) return null;
-                const from = coaches.find((c) => c.id === shadowPick)
-                  ?.shadowRateFrom;
-                // Compared against the date the ASSIGNMENT starts, because that
-                // is the earliest lesson payroll will price for them.
-                const startsOn = shadowFrom || todayInSg();
-                if (from && from <= startsOn) return null;
-                return (
-                  <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    {from
-                      ? `This coach's shadow rate only starts on ${formatSgDate(from)}, after this assignment does.`
-                      : "This coach has no shadow rate yet."}{" "}
-                    Set one on <span className="font-medium">Wages</span> before
-                    payroll — without a rate in force the whole business&apos;s
-                    payroll run will refuse rather than pay the wrong rate.
-                  </p>
-                );
-              })()}
-            </section>
-
-            <section>
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Enrolled ({openRoster.enrolled.length})
-              </h3>
-              {openRoster.enrolled.length === 0 ? (
-                <p className="text-sm text-gray-400">
-                  Nobody is enrolled in this class yet.
-                </p>
-              ) : (
-                <ul className="divide-y divide-gray-100">
-                  {openRoster.enrolled.map((s) => (
-                    <li key={s.student_id} className="py-2.5">
-                      <p className="text-sm font-medium text-gray-900">
-                        {s.full_name}
-                        <span className="ml-1.5">
-                          <PackageChip coverage={covMap.get(s.student_id)} />
-                        </span>
-                      </p>
-                      <p className="mt-0.5 text-xs text-gray-500">
-                        {s.level_label ?? "No level set"} · Joined{" "}
-                        {formatSgDate(toSgDate(s.enrolled_at), {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            {openRoster.trials.length > 0 && (
-              <section>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Trials coming up ({openRoster.trials.length})
-                </h3>
-                <ul className="divide-y divide-gray-100">
-                  {openRoster.trials.map((t) => (
-                    <li key={t.student_id} className="py-2.5">
-                      <p className="text-sm font-medium text-gray-900">
-                        {t.full_name}
-                        <span className="ml-1.5">
-                          <PackageChip coverage={covMap.get(t.student_id)} />
-                        </span>
-                      </p>
-                      <p className="mt-0.5 text-xs text-gray-500">
-                        {t.level_label ?? "No level set"} · Trial on{" "}
-                        {formatSgDate(t.session_date)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-                {/* The consequence, in words. A reader who takes the "+1" for
-                    class membership is one click from breaking a billing
-                    month, so the screen says what would happen. */}
-                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  A guest for this one lesson — not part of the class. Adding
-                  them to it would make them expected every week, and a lesson
-                  nobody marks blocks the whole month from being invoiced.
-                </p>
-              </section>
-            )}
-          </div>
-        )}
-      </Drawer>
+        rosterError={rosterError}
+        shadows={shadows}
+        shadowError={shadowError}
+        shadowBusy={shadowBusy}
+        shadowPick={shadowPick}
+        onShadowPick={setShadowPick}
+        shadowFrom={shadowFrom}
+        onShadowFrom={setShadowFrom}
+        onAssignShadow={handleAssignShadow}
+        onEndShadow={handleEndShadow}
+        coaches={coaches}
+        openRoster={openRoster}
+        covMap={covMap}
+      />
 
       {/* Create / Edit Class Modal */}
       <Modal

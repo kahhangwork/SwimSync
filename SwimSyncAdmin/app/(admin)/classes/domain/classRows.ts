@@ -79,6 +79,29 @@ export const classSortAccessors = {
   student_count: (c: ClassRow) => c.student_count,
 };
 
+/**
+ * Whether to warn that a coach's shadow rate does not cover a new assignment.
+ *
+ * ⚠ A DATE COMPARISON, NOT A BOOLEAN (the Coach.shadowRateFrom note in types.ts).
+ * Payroll refuses when no shadow rate is in force ON the lesson's date, so "they
+ * have a rate somewhere" is the wrong question — a rate dated AFTER the
+ * assignment still blocks the whole business's payroll run months later. Met
+ * here, at assignment time, it costs one sentence. `startsOn` is compared
+ * lexically (YYYY-MM-DD) and `<=` is the boundary: a rate that starts ON the
+ * assignment date covers it.
+ *   "none" → the coach has no shadow rate at all
+ *   "late" → the rate starts AFTER the assignment does
+ *   null   → covered; show no warning
+ */
+export function shadowRateWarning(
+  shadowRateFrom: string | null,
+  startsOn: string
+): "none" | "late" | null {
+  if (!shadowRateFrom) return "none";
+  if (shadowRateFrom <= startsOn) return null;
+  return "late";
+}
+
 // Active / retired split for the header subtitle and the toggle badge.
 export function countActiveRetired(classes: ClassRow[]): {
   active: number;
