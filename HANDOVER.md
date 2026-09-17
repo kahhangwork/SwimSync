@@ -1,12 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-17 — **`classes` full-track refactor DONE, on `main` (§8.108):** 1,714 → 164 lines,
-0 useState, both fence ledgers empty, driver net 11/11 local. **Nightly `35187663332` is RUNNING on `main`
-(`7b19d8d`) — watch it green before merging the next unit (§7.1 gate).** Next unit = an Admin lite batch (§9).
-August billing still HALF DONE on prod (§8.107) — finish before 1 Oct._
+_Last updated: 2026-09-17 — **Admin L-C "money" lite batch DONE, on `main` (§8.109):** wages / credit-notes /
+referrals / accounting 2,309 → 394 lines, 0 useState, ledgers empty, net + 26 hand-checks green. **Nightly
+`35209608957` RUNNING on `94242f5` — the gate for the next unit (a giant, §9).** August billing still HALF DONE (§8.107)._
 
-_Previously, 2026-09-17 (§8.107) — August half billed: 9 invoices out, month held OPEN by one unclaimed child
-marked present 2 Aug; admin fix (mark / invite / settle) + Generate again, before 1 Oct (`INVOICE_RUNBOOK.md`)._
+_Previously, 2026-09-17 (§8.108) — `classes` full-track DONE (1,714 → 164); its nightly `35187663332` went green._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -349,6 +347,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.109 (2026-09-17) — Admin L-C lite batch: 4 money pages to tiers, 2,309 → 394 lines, 0 useState
+
+**Seven commits on `refactor/admin-lc`, fast-forwarded to `main` (`94242f5`) after classes' nightly `35187663332` went
+green; CI green. Zero behaviour change.** L0 fence-widen (36 data-access + 18 import pins, all four checks proven red)
+→ one folded L1–L3 commit per page: accounting 337→116, referrals 447→78, credit-notes 631→85, wages 894→115. Four
+sole-importer helpers moved into their page's `domain/` (`accounting`, `payoutItems`, `creditNote{Email,Void}State`).
+757 vitest (+23 characterisation) + 429 jest. **L4 local:** smoke-admin 64/64, coach-wages 10/10, referrals 13/13,
+platform-admin-scope 32/32; hand-check 26/26 (Resend deliberately not pressed — real email function).
+
+- **Read `docs/refactor/BATCH_C_PLAN.md` (L4 + §12), not this, for the how.** No product finding.
+- **Graduated:** the drift-test path-pin trap (a moved `lib/` file allowlisted by PATH in both `sgDisplay` twins,
+  §7.241 family), the verbatim-by-script check and two hand-check-script traps → playbook §2/§4; the undriven
+  actions → `BACKLOG.md` (`verify-money-admin`); stale `lib/` paths repointed in ARCHITECTURE §10 / TESTING / §7.152.
+- **Merged before its own nightly by design** (the §7.1 gate is on the NEXT merge). `35209608957` is that nightly.
+
 ## 8.108 (2026-09-17) — `classes/page.tsx` full-track decomposition: 1,714 → 164 lines, 0 useState
 
 **4th full-track giant; 12 stages on `refactor/classes-tiers`, merged to `main` (`7b19d8d`) and pushed. Zero
@@ -371,21 +384,7 @@ the next merge on it (§7.1).**
 - **Process footgun → §7.242:** a `git add … 2>/dev/null` naming a `git mv`d path aborted the whole add and
   committed only the rename; stranded content was caught at merge. Keep `git status` clean after every commit.
 
-## 8.107 (2026-09-17) — August billing diagnosed: one unclaimed child holds the month open
-
-**No code shipped. Prod state read, cause found, backlog item raised (`d9828c4`).** The admin's August run
-reported a bare error first, then "success, month left open — 1 billable lesson has no parent account to bill".
-Read from a `supabase db dump --linked --data-only` parsed offline (psql to a scratch DB was blocked by the
-permission classifier): 9 August invoices created 2026-09-14 09:49 SGT in one ~10 s run (5 paid, 4 outstanding),
-all 22 August lessons fully marked, and **one coach-added child with no parent account marked present on 2 Aug** —
-the engine's fifth seal condition, working as designed. The first-run error is unproven; likeliest a client
-timeout on the run that completed (second run created 0). Edge-function logs around 2026-09-14 01:49 UTC would settle it.
-
-- **Fix is the admin's, not code:** correct the mark, invite the parent, or record a settlement → Generate again. Now a bullet in `INVOICE_RUNBOOK.md`.
-- **Graduated:** the "why did it fail / what holds it open" visibility gap → `BACKLOG.md` (Billing and payments), shapes recorded, not decided.
-- **Deliberately not done:** no override, no attendance edit by me, no PRD change.
-
-_(§8.106 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.107 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -430,11 +429,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-17: `main` is `7b19d8d` (carries `classes` §8.108). Nightly `35187663332` is RUNNING on it —
-watch it: `gh run view 35187663332` (or `gh run list --workflow=ui-drivers.yml`).** It is the GATE for the next
-merge (§7.1): don't land the next unit on `main` until this is green. Bisection this run spans `classes` only
-(the prior nightly `35159359809` was green on `2895cf2`, this branch's base), so a red is almost certainly a
-classes driver — but read it, don't trust this line (§8.65). Start any red with `gh run download 35187663332 -n
+**State on 2026-09-17: `main` is `94242f5` (carries Admin L-C §8.109). Nightly `35209608957` (manual) is RUNNING
+on it — `gh run view 35209608957`.** It is the GATE for the next merge (§7.1). Bisection spans L-C only (the prior
+nightly `35187663332` was green on `7b19d8d`), so a red is most likely a wages/referrals/credit-notes/accounting
+driver — but read it, don't trust this line (§8.65). Start any red with `gh run download 35209608957 -n
 ui-driver-run` + screenshots (§7.228), and re-check a cold-compile timeout per §7.108 before calling it a regression.
 
 **Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
@@ -456,20 +454,16 @@ failures that are just the driver's own UI writes — reset before believing it.
 > weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
 > renumbered: eight files cite it and the number is permanent.)*
 
-### THE NEXT BUILD — an Admin lite batch (recommended), then a giant
+### THE NEXT BUILD — a full-track giant (recommended), then a batch
 
-**`classes` is DONE (§8.108) — 4th of 7 full giants, on `main`.** Three giants in a row (packages, invoices,
-classes), so by the **giant→batch alternation a LITE BATCH is due next**. Recommended: **Admin L-C "money"** —
-`wages`, `credit-notes`, `referrals`, `accounting` (~2,309 lines, folded L1–L3 per page, `docs/refactor/BATCH_C_PLAN.md`).
-Lite-track method: playbook §7.1 (L0 fence-widen + batch plan → L1–L3 folded per page → L4 driver run once).
-**Re-derive the batch's driver net by grep before starting** — `grep -lE '\$\{ADMIN\}/<route>' verify-*.mjs`
-(§7.236, names aren't evidence); `credit-notes` + `accounting` have no driver → the **smoke-admin** driver is
-their net (§7.3). **4 giants left** if you'd rather do one: `platform` (1,395), `lessons/[classId]/[date]` (912);
-coach app `schedule/index` (1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905). A coach-app
-unit is the `features/` layout + jest + RN-web quirks (playbook §1 table).
+**Admin L-C is DONE (§8.109).** Lite batches done: L-A, L-B, L-C. By the **giant→batch alternation a GIANT is due
+next.** **5 giants left:** admin `platform` (1,395), `lessons/[classId]/[date]` (912); coach app `schedule/index`
+(1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905). Recommended: **`platform`** — the largest
+admin page, and admin-side keeps the proven vitest fence; a coach-app unit adds the `features/` layout + jest twin +
+RN-web quirks (playbook §1 table). Method: playbook §2 (Stage 0 plan + `/plan-review`, 0b fence, 12 stages).
+**Re-derive the driver net by grep first** (§7.236). Next lite batch after that: Admin L-D grading or L-E rest.
 
-**GATE (§7.1): build the next unit on a branch, but do NOT merge it to `main` until nightly `35187663332`
-(classes) is green.** Build + gate locally meanwhile (`cd SwimSyncAdmin && npm run typecheck && npm test`).
+**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35209608957` (L-C) is green.**
 **Still-due once-off:** the dao three-way split + "orchestrate, never replace" rule → `docs/ARCHITECTURE.md` §6
 (trigger met since packages; now FOUR giants exercise it).
 

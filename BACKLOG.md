@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -1683,6 +1683,25 @@ prod (0 `class_shadow_coaches`).
 **Notes:** End needs a fixture with an ongoing `class_shadow_coaches` row + a rate; the warning needs a coach with
 **no** shadow rate; the failed-load needs the read to error (rename the table in a throwaway, or an RLS denial).
 Assert the DB row COUNT is unchanged across an End (only `effective_to` is set) — a DELETE would claw back paid wages.
+
+### A `verify-money-admin` driver for the uncovered Credit Notes / Referrals / Wages actions — **S** `[from the Admin L-C refactor 2026-09-17]`
+The L-C lite batch (§8.109) decomposed `wages`, `credit-notes`, `referrals`, `accounting`. Its driver net —
+`coach-wages` (rate · Calculate · Mark paid), `referrals` (page render + minted code), `platform-admin-scope`,
+`smoke-admin` — **presses none of these**: credit-notes **Void** (confirm / empty-reason refusal / cancel), scoped
+**search** + status filter, **Export CSV**; referrals **Save settings**, **Disable/Enable** a code, **Grant**, **Void**
+(a `window.prompt`); wages **rain toggle**, **pay-day clamp**, the **Shadow-role re-prefill**, and the payout
+**breakdown** expand. All passed a one-off hand-check (26/26, `docs/refactor/BATCH_C_PLAN.md` L4).
+
+**Why:** those actions ride on characterisation tests + a one-time script. Void on a credit note reopens a drawn
+invoice server-side and the wages re-prefill is what stops a trainee being saved at a teaching rate — the next change
+to `useVoidNote` / `useRateEditor` should be caught by CI, not by remembering to click. Same shape as
+`verify-invoice-admin` / `verify-class-admin`.
+
+**Notes:** run as `coach@swimsync.test`. `fixtures-admin-table-geometry.sql` already seeds a not-emailed credit note
+(`CN-YYYY-9801`) and a parent membership; wages needs one attended lesson in a past month (copy `coach-wages`'
+insert). Call `page.removeAllListeners("dialog")` before answering the referrals Void prompt (`launch()` registers
+its own handler), and select the payout toggle by name — `button[aria-expanded]` hits the sidebar first. **Do not
+press Resend** unless the driver stubs the email function.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the

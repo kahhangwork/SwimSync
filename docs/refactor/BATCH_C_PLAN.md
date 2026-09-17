@@ -111,6 +111,10 @@ before the next unit.**
 
 ## §12 — findings for `/update-docs` (append as they arise)
 
+_**Graduated 2026-09-17 (`/update-docs`, §8.109):** doc pointers repointed in ARCHITECTURE §10 /
+TESTING / GOTCHAS §7.152 (plans left as historical records); the path-pin + verbatim-script +
+hand-check-script lessons → playbook §2/§4; the missing driver → `BACKLOG.md` (`verify-money-admin`)._
+
 - **Moved-module doc pointers.** `lib/payoutItems.ts` is cited by path in `docs/ARCHITECTURE.md`,
   `docs/GOTCHAS.md`, `docs/TESTING.md`, `docs/plans/CLASS_SHADOW_COACHES_PLAN.md`;
   `lib/creditNoteEmailState.ts` in ARCHITECTURE + TESTING; `lib/creditNoteVoidState.ts` in

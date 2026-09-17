@@ -258,12 +258,12 @@ guards), `lib/trialConvert.test.ts` (the §7.180 two-press guard), `lib/makeupFr
 (the own-enrolled-class gate + the "exclude EVERY own class" host-choice filter) and
 `lib/auditDiff.test.ts` (the snapshot diff + the "an unresolved actor is *unknown user*, never
 *system*" label). `lib/adminNav.test.ts`'s page-count assertion moved 19 → 20 for `/history`.
-**2026-08-17 added `lib/creditNoteEmailState.test.ts`** — the Credit Notes page's Resend gate, pure: it mirrors
+**2026-08-17 added `credit-notes/domain/creditNoteEmailState.test.ts`** — the Credit Notes page's Resend gate, pure: it mirrors
 `is_tenant_admin()` **term for term** (role `tenant_admin`, `admin_disabled_at IS NULL`, tenant
 match), so a platform admin, a coach whose `tenant_id` happens to match, and a disabled admin all
 get **no button** rather than a 403 rendered as "Edge Function returned a non-2xx status code"
 (§7.173); plus the `hasApplications` term, which is the only thing that sees a **partly** spent
-note. **2026-08-18 added `lib/creditNoteVoidState.test.ts`** (§8.69) — the Credit Notes page's Void
+note. **2026-08-18 added `credit-notes/domain/creditNoteVoidState.test.ts`** (§8.69) — the Credit Notes page's Void
 gate + confirm label, pure: the button shows only for the viewer's own tenant's **non-reversed**
 notes (a voided note reads reversed via `reversed_at`, not as still-spent), and a **drawn** note's
 confirm names the amount and the invoice(s) that return to outstanding. The student
@@ -291,7 +291,7 @@ modal and the orphan-lesson report build it through ONE function; it pins the DB
 `settlement_amount_matches_kind` client-side (paid_outside carries the amount, written_off
 strips it even when one was passed) and that `settled_through` is the line's latest lesson
 passed through untouched. Proven red by sabotaging the builder. Wave 3 added
-`lib/sessionRoster.test.ts` and `lib/payoutItems.test.ts` — the two pure modules behind the
+`lib/sessionRoster.test.ts` and `wages/domain/payoutItems.test.ts` — the two pure modules behind the
 Lesson Coaches page and the Coach Wages breakdown, which **disagree on purpose**: the roster
 module resolves access and uses `classes.coach_id`, the payout module resolves money and never
 mentions it. Earlier: the eleven above plus `lib/tableSort.test.ts`,

@@ -2591,7 +2591,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     (`BACKLOG.md` → *The Attendance page's Coach column…*, re-sized S → M), so the trap
     is still live in `attendance/page.tsx`. The rule to carry: **a display-only change
     reaches money the moment it names a person next to an amount.** The money-side twin
-    `lib/payoutItems.ts` reads `classes.coach_id` nowhere at all — copy that, not the
+    `wages/domain/payoutItems.ts` reads `classes.coach_id` nowhere at all — copy that, not the
     roster.
 
 153. **A SUITE CAN BE GREEN BECAUSE IT ONLY EVER TESTS THE ONE RECORD THE RULE CANNOT

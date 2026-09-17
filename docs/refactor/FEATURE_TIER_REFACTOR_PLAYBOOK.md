@@ -129,6 +129,12 @@ Green or `git checkout -- .` and try a smaller step. Never "fix it in the next c
 > silently misses — so a helper can look sole-imported by the page when two other `lib/` modules also use it.
 > Moving it then breaks them. (Admin L-B: `attendanceWindow` looked sole-imported by `lessons/page.tsx`;
 > `lessonMarking.ts` + `markableFloor.ts` import it as `./attendanceWindow`, so it STAYS. Caught before the move.)
+>
+> **Then grep the PATH too: `git grep "lib/<mod>" -- '*.test.ts'`.** An import grep cannot see a drift test that
+> allowlists the file by path — `sgDisplay.drift.test.ts` (both twins, §7.241) pinned `lib/accounting.ts`, so the
+> `git mv` turned 2 vitest + 2 jest red until both `file:` entries were repointed (Admin L-C). Repoint in the move's
+> own commit; it is the same allowance at a new path, not a new one. Comments naming the old path (`lib/*.ts`
+> headers, `docs/ARCHITECTURE.md` §10) go in the same commit too.
 | **11** | Table → `ui/XTable.tsx` (with its `useTableSort`), header → `ui/XHeader.tsx`. Delete the dead imports. **Both ledgers to zero.** | `tsc` does not flag unused imports — grep for each symbol after every cut |
 
 **Order inside 5–10** for the Students page was: rename + add-to-class + status (3 small
@@ -154,6 +160,11 @@ before the medium-risk slices.
 - **Grep after every stage for the symbols that should be gone.** `typecheck` passes with
   a dead `import { Modal }` and a dead `useRef`. The scripts print a count per symbol at the
   end; zero is the target.
+  **Or let the compiler do it once:** `npx tsc --noEmit --noUnusedLocals | grep '(admin)/<page>/'` lists every
+  dead import in the new tier files (the repo-wide run has unrelated hits, so filter to the page).
+- **Check verbatim by script, not by eye.** Cut each `ui/` block by line range from `git show HEAD:<page>`, then
+  compare the component's JSX to the original with whitespace stripped and the prop renames mapped back
+  (`onVoid(` → `voidNote(`). Any divergence prints where it starts. (Admin L-C, all 15 `ui/` files.)
 
 ---
 
@@ -218,6 +229,11 @@ rm verify-zz-* fixtures-zz-*                    # before committing anything
 - **An action no driver covers gets a hand check with a screenshot** (Merge and Rename on
   the Students page: `Review & merge` → modal → `Merge them`, pair count drops). Say in the
   commit message that it was by hand, and file a BACKLOG item for the missing driver.
+  Two traps in a throwaway hand-check script: **`launch()` in `lib.mjs` already registers a
+  dialog handler**, so a second `page.on("dialog")` throws *"already handled"* — call
+  `page.removeAllListeners("dialog")` first (a `window.prompt` Void needs your own answer); and
+  **`button[aria-expanded]` matches the admin SIDEBAR's collapsible groups** before any row
+  toggle — target the row's button by its accessible name. Both cost a false red on L-C.
 - **A red on a cold dev server is §7.108 first.** `verify-assessment` went 23/27 on the
   first hit of an uncompiled route and 27/27 warm, with zero lines of the assessment page
   changed. Re-run before reading it as a regression.
