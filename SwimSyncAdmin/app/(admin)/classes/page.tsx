@@ -28,6 +28,8 @@ import { useExtraLesson } from "./domain/useExtraLesson";
 import { ExtraLessonModal } from "./ui/ExtraLessonModal";
 import { useCancelLesson } from "./domain/useCancelLesson";
 import { CancelLessonModal } from "./ui/CancelLessonModal";
+import { useRetire } from "./domain/useRetire";
+import { RetireModal } from "./ui/RetireModal";
 
 export default function ClassesPage() {
   // The list slice (classes + the shared `coaches` spine + toolbar state).
@@ -142,12 +144,18 @@ export default function ClassesPage() {
     handleCancelLesson,
   } = cancel;
 
-  // ── Retiring a class ──────────────────────────────────────────────────────
-  // (showRetired is a list-toolbar filter and lives in useClassList.)
-  const [retireFor, setRetireFor] = useState<ClassRow | null>(null);
-  const [retireSaving, setRetireSaving] = useState(false);
-  const [restoringId, setRestoringId] = useState<string | null>(null);
-  const [retireError, setRetireError] = useState<string | null>(null);
+  // Retire / restore (showRetired is a list-toolbar filter in useClassList).
+  const retire = useRetire(loadClasses);
+  const {
+    retireFor,
+    setRetireFor,
+    retireSaving,
+    restoringId,
+    retireError,
+    setRetireError,
+    handleRetire,
+    handleRestore,
+  } = retire;
 
   useEffect(() => {
     loadClasses();
@@ -309,59 +317,6 @@ export default function ClassesPage() {
     loadClasses();
   }
 
-  // ── Retire / restore ──────────────────────────────────────────────────────
-  // Both refusal messages come from deactivate_class() itself and are RENDERED,
-  // never swallowed: each one names the children, the booked guests or the
-  // unmarked dates standing in the way, which is the whole difference between
-  // an instruction and a dead end. Pre-empting them here would be a second copy
-  // of three rules that already live in one place.
-  async function handleRetire() {
-    if (!retireFor) return;
-    setRetireSaving(true);
-    setRetireError(null);
-
-    const { error } = await rpc.deactivateClass({
-      p_class_id: retireFor.id,
-    });
-
-    setRetireSaving(false);
-    if (error) {
-      setRetireError(error.message);
-      return;
-    }
-    setRetireFor(null);
-    // Reload rather than patch in place: the row does not disappear, it changes
-    // state, and the reload is what proves the round trip works from this page
-    // alone.
-    await loadClasses();
-  }
-
-  // No confirm, no refusal, no error surface it can get stuck behind. This is
-  // the emergency exit from a class that is blocking a billing month while
-  // being invisible everywhere else — anything that can stop it can strand a
-  // business.
-  async function handleRestore(cls: ClassRow) {
-    // Guarded rather than disabled-on-a-shared-flag: two different rows must
-    // never block each other, and reactivate_class() is idempotent anyway — the
-    // in-flight id exists so the row can SAY something is happening.
-    if (restoringId) return;
-    setRestoringId(cls.id);
-    setRetireError(null);
-
-    const { error } = await rpc.reactivateClass({
-      p_class_id: cls.id,
-    });
-
-    setRestoringId(null);
-    if (error) {
-      // Named, because the banner sits at the top of a table that can be long
-      // enough to scroll the message out of view.
-      setRetireError(`Could not restore ${cls.title}: ${error.message}`);
-      return;
-    }
-    await loadClasses();
-  }
-
   // (The list filter + clamp now live in useClassList / domain/classRows.)
   // Both location derivations are pure and unit-tested in lib/locationOptions.ts.
   const locationOptions = useMemo(() => locationFilterOptions(classes), [classes]);
@@ -431,54 +386,16 @@ export default function ClassesPage() {
         onRestore={handleRestore}
       />
 
-      {/* Retire a class.
-          The three refusals are enforced in deactivate_class() and their
-          messages are shown verbatim below — they name the children, the booked
-          guests or the unmarked dates in the way. This is an ordinary React
-          dialog, not Alert.alert: this is the Next.js panel, and the RN-web
-          no-op does not apply here. */}
-      <Modal
-        title={retireFor ? `Retire ${retireFor.title}?` : "Retire class"}
-        open={retireFor !== null}
+      <RetireModal
+        retireFor={retireFor}
         onClose={() => {
           setRetireFor(null);
           setRetireError(null);
         }}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            This class stops being scheduled. It disappears from the coach&apos;s
-            app, and no new lessons can be marked on it.
-          </p>
-          <p className="text-sm text-gray-600">
-            <span className="font-medium text-gray-900">
-              Lessons it has already taught still bill as normal.
-            </span>{" "}
-            You can put it back at any time with <em>Restore</em>.
-          </p>
-
-          {retireError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {retireError}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-1">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setRetireFor(null);
-                setRetireError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleRetire} disabled={retireSaving}>
-              {retireSaving ? "Retiring…" : "Retire class"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        retireError={retireError}
+        retireSaving={retireSaving}
+        onRetire={handleRetire}
+      />
 
       <CancelLessonModal
         cancelFor={cancelFor}
