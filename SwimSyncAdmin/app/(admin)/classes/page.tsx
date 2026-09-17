@@ -23,35 +23,9 @@ import { useClassDrawer } from "./domain/useClassDrawer";
 import { ClassToolbar } from "./ui/ClassToolbar";
 import { ClassTable } from "./ui/ClassTable";
 import { RosterDrawer } from "./ui/RosterDrawer";
-
-function Field({
-  label,
-  placeholder,
-  type = "text",
-  value,
-  onChange,
-}: {
-  label: string;
-  placeholder: string;
-  type?: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-        {label}
-      </label>
-      <input
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
-      />
-    </div>
-  );
-}
+import { Field } from "./ui/Field";
+import { useExtraLesson } from "./domain/useExtraLesson";
+import { ExtraLessonModal } from "./ui/ExtraLessonModal";
 
 export default function ClassesPage() {
   // The list slice (classes + the shared `coaches` spine + toolbar state).
@@ -133,22 +107,21 @@ export default function ClassesPage() {
   const [capacity, setCapacity] = useState("");
   const [colour, setColour] = useState<string | null>(null);
 
-  // ── Scheduling a lesson off the class's usual weekday ─────────────────────
-  // The admin ARRANGES the lesson; the coach MARKS it. Same split as booking a
-  // trial ("an arrangement, not an observation") — there is deliberately no
-  // attendance-writing anywhere in this panel.
-  //
-  // A coach cannot do this themselves: the database refuses any session that
-  // is not on the class's own weekday, and schedule_extra_lesson() is the only
-  // way past that. It is admin-gated server-side, so this button is a
-  // convenience rather than the control (§7.32 — a limit only the admin screen
-  // applies is not a limit).
-  const [extraFor, setExtraFor] = useState<ClassRow | null>(null);
-  const [extraDate, setExtraDate] = useState("");
-  const [extraReason, setExtraReason] = useState("");
-  const [extraSaving, setExtraSaving] = useState(false);
-  const [extraError, setExtraError] = useState<string | null>(null);
-  const [extraDone, setExtraDone] = useState<string | null>(null);
+  // Scheduling a lesson off the class's usual weekday (§7.32 — see useExtraLesson).
+  const extra = useExtraLesson();
+  const {
+    extraFor,
+    setExtraFor,
+    extraDate,
+    setExtraDate,
+    extraReason,
+    setExtraReason,
+    extraSaving,
+    extraError,
+    extraDone,
+    openExtra,
+    handleScheduleExtra,
+  } = extra;
 
   // ── Cancelling a lesson in advance (plan Phase B) ─────────────────────────
   // The second home for cancel_lesson() — the first is the lesson page reached
@@ -326,39 +299,6 @@ export default function ClassesPage() {
     setShowModal(false);
     resetForm();
     loadClasses();
-  }
-
-  function openExtra(cls: ClassRow) {
-    setExtraFor(cls);
-    setExtraDate("");
-    setExtraReason("");
-    setExtraError(null);
-    setExtraDone(null);
-  }
-
-  async function handleScheduleExtra() {
-    if (!extraFor) return;
-    setExtraSaving(true);
-    setExtraError(null);
-
-    // Every rule here is ALSO enforced in schedule_extra_lesson(): admin only,
-    // a reason required, and nothing below the window floor. Surfacing the
-    // database's own message rather than pre-empting it keeps one source of
-    // truth for what is allowed.
-    const { error } = await rpc.scheduleExtraLesson({
-      p_class_id: extraFor.id,
-      p_date: extraDate,
-      p_reason: extraReason,
-    });
-
-    setExtraSaving(false);
-    if (error) {
-      setExtraError(error.message);
-      return;
-    }
-    setExtraDone(extraDate);
-    setExtraReason("");
-    setExtraDate("");
   }
 
   function openCancel(cls: ClassRow) {
@@ -620,73 +560,18 @@ export default function ClassesPage() {
         </div>
       </Modal>
 
-      {/* Schedule an extra lesson */}
-      <Modal
-        title={
-          extraFor ? `Extra lesson — ${extraFor.title}` : "Extra lesson"
-        }
-        open={extraFor !== null}
+      <ExtraLessonModal
+        extraFor={extraFor}
         onClose={() => setExtraFor(null)}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-500">
-            A lesson on a day this class does not normally run — a makeup, or a
-            public-holiday shift.{" "}
-            <span className="text-gray-700">
-              {extraFor ? capitalize(extraFor.day_of_week) : ""} lessons need no
-              scheduling
-            </span>
-            ; the coach marks those as usual.
-          </p>
-
-          <Field
-            label="Date"
-            placeholder=""
-            value={extraDate}
-            onChange={setExtraDate}
-            type="date"
-          />
-
-          <Field
-            label="Reason"
-            value={extraReason}
-            onChange={setExtraReason}
-            placeholder="e.g. Makeup for the National Day holiday"
-          />
-          <p className="-mt-2 text-xs text-gray-400">
-            The coach sees this on their class, so they know why the lesson is
-            there.
-          </p>
-
-          {extraError && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {extraError}
-            </p>
-          )}
-
-          {extraDone && (
-            <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-              Scheduled for {extraDone}. It now appears on the coach&apos;s class,
-              and the month will not close until they have marked it.
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={() => setExtraFor(null)}
-              className="rounded-xl px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              Close
-            </button>
-            <Button
-              onClick={handleScheduleExtra}
-              disabled={extraSaving || !extraDate || !extraReason.trim()}
-            >
-              {extraSaving ? "Scheduling…" : "Schedule lesson"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        extraDate={extraDate}
+        onExtraDate={setExtraDate}
+        extraReason={extraReason}
+        onExtraReason={setExtraReason}
+        extraSaving={extraSaving}
+        extraError={extraError}
+        extraDone={extraDone}
+        onSchedule={handleScheduleExtra}
+      />
 
       <RosterDrawer
         drawerClass={drawerClass}
