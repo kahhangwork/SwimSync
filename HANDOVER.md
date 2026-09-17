@@ -368,9 +368,8 @@ the next merge on it (§7.1).**
 - **Fence infra fix (durable):** `tierBoundaries.drift.test.ts` `imports()` tightened to exclude `\n<>` — the
   word "from" ending a JSX string (`aria-label="Shadowing from"`, a `coach-roster` label) was a false-positive
   specifier. Strengthening only; every prior scope unchanged.
-- **Process footgun:** a `git add … 2>/dev/null` swallowed a stale moved-file pathspec error and aborted the
-  whole add, committing only the rename — the real content sat on disk (where gates ran), caught at merge.
-  **`git status` must be clean after each commit; never `2>/dev/null` a `git add`.**
+- **Process footgun → §7.242:** a `git add … 2>/dev/null` naming a `git mv`d path aborted the whole add and
+  committed only the rename; stranded content was caught at merge. Keep `git status` clean after every commit.
 
 ## 8.107 (2026-09-17) — August billing diagnosed: one unclaimed child holds the month open
 

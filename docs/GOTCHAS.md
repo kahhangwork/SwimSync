@@ -3796,3 +3796,16 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     the app twin only fails on an admin-file move it can't see locally. Fix was a one-line repoint of
     `SwimSyncApp/lib/sgDisplay.drift.test.ts` (`6fe19e6`, jest 429/429). Same family as the §1-table "both twins of
     `sgDisplay.drift.test.ts`" note in the refactor playbook. (`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`. 2026-09-16.)
+
+242. **A `git add <pathspec>` that names a file `git mv` already moved fails the WHOLE `add`, and staging nothing
+    else — so a stage commits only the rename and strands its real content on disk, where every gate still passes.**
+    During the classes refactor a per-stage commit ran `git add -A '<page>/' lib/tierBoundaries.drift.test.ts
+    lib/locationOptions.ts lib/locationOptions.test.ts 2>/dev/null` — but `locationOptions.{ts,test.ts}` had just been
+    `git mv`d into `<page>/domain/`, so those two pathspecs no longer matched. `git add` errored and aborted,
+    staging none of the listed paths; only the `git mv`'s already-staged rename got committed. `typecheck`, `vitest`
+    and the 11-driver net all ran against the working tree (correct), so nothing flagged it — the incomplete commit
+    surfaced only as a dirty tree at merge (`git status` showed page.tsx modified + 3 untracked files). **The
+    `2>/dev/null` is the trap: it hid the pathspec error.** Rules: after a `git mv`, do NOT re-list the moved paths in
+    a later `git add` (the mv already staged them); never pipe a `git add` to `/dev/null`; and **`git status` must be
+    clean after every commit** — a stray modified/untracked file is a stage that didn't fully commit. Recovered by
+    staging + committing the stranded content as a fixup (`7b19d8d`); zero content lost. (Classes refactor, 2026-09-17.)
