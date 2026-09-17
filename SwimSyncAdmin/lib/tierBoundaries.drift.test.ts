@@ -57,6 +57,12 @@
 // `aria-label="Shadowing from"` (a driver-read label) made the `\bfrom` branch
 // capture a JSX blob as a bogus specifier. Strengthening only — no real import
 // contains those chars, and every prior scope still matched unchanged (6/6).
+// Re-proven for the Admin L-C scope on 2026-09-17 at L0: checks 3 and 4 went
+// red on the four money pages' real violations (36 data-access lines, 18 page
+// imports) before the ledger was pinned; wages/ui/Break importing ../dao,
+// wages/dao/break importing React, wages/domain/break calling fetch(, and an
+// unpinned @/lib/utils import on accounting/page.tsx drove all four checks
+// red — breakers removed, 6/6 green.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -110,6 +116,15 @@ const SCOPE_DIRS = [
   // their symbols move into hooks/ui). No nested route under classes/, so the
   // whole dir is one unit. Ledger only shrinks.
   "app/(admin)/classes",
+  // Admin L-C lite batch (docs/refactor/BATCH_C_PLAN.md), widened 2026-09-17.
+  // The "money" batch: all four pages touch the client (checks 3+4 red day
+  // one). Every current violation is pinned in the ledgers below with the
+  // commit that removes it (folded L1-L3 per page, playbook §7.1); the ledger
+  // only shrinks from here.
+  "app/(admin)/wages",
+  "app/(admin)/credit-notes",
+  "app/(admin)/referrals",
+  "app/(admin)/accounting",
 ];
 
 // One route file per scoped dir. Check 4 runs against each.
@@ -155,6 +170,45 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    2/3 (folded), 2026-09-17. The client + all 16 .from()/.rpc() sites moved
   //    into classes/dao/classes.{repo,rpc}.ts; the page holds ZERO supabase, so
   //    every entry went stale and was deleted. Nothing to pin. ──
+  // ── Admin L-C (BATCH_C_PLAN.md), pinned 2026-09-17 at L0. Each page folds
+  //    L1-L3 in ONE commit (playbook §7.1); the client + every call move into
+  //    <page>/dao/ and that page's entries are deleted in the same commit. ──
+  { file: "app/(admin)/wages/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase.auth.getUser()", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"profiles\")", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"tenants\")", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"coaches\")", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"coach_payouts\")", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"session_coaches\")", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"class_shadow_coaches\")", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"session_coach_absences\")", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"lesson_sessions\")", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase.rpc(\"generate_coach_payouts\"", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase.rpc(\"mark_payout_paid\"", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase.from(\"coach_rates\").insert", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "supabase.from(\"tenants\").update(patch)", why: "L-C wages fold -> dao/" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C credit-notes fold -> dao/" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase .rpc(\"student_package_coverage\")", why: "L-C credit-notes fold -> dao/" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase.auth.getUser()", why: "L-C credit-notes fold -> dao/" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase .from(\"profiles\")", why: "L-C credit-notes fold -> dao/" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase .from(\"credit_notes\")", why: "L-C credit-notes fold -> dao/" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase.functions.invoke(", why: "L-C credit-notes fold -> dao/" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase.rpc(\"void_credit_note\"", why: "L-C credit-notes fold -> dao/" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C referrals fold -> dao/" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.auth.getUser()", why: "L-C referrals fold -> dao/" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "supabase .from(\"profiles\")", why: "L-C referrals fold -> dao/" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.from(\"tenants\")", why: "L-C referrals fold -> dao/" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.from(\"parent_tenants\")", why: "L-C referrals fold -> dao/" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.from(\"referrals\")", why: "L-C referrals fold -> dao/" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.from(\"referral_rewards\")", why: "L-C referrals fold -> dao/" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.rpc(\"set_referral_code_disabled\"", why: "L-C referrals fold -> dao/" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.rpc(\"grant_referral_reward\"", why: "L-C referrals fold -> dao/" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.rpc(\"void_referral_reward\"", why: "L-C referrals fold -> dao/" },
+  { file: "app/(admin)/accounting/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C accounting fold -> dao/" },
+  { file: "app/(admin)/accounting/page.tsx", contains: "supabase.auth.getUser()", why: "L-C accounting fold -> dao/" },
+  { file: "app/(admin)/accounting/page.tsx", contains: "supabase .from(\"tenants\")", why: "L-C accounting fold -> dao/" },
+  { file: "app/(admin)/accounting/page.tsx", contains: "supabase.rpc(\"accounting_months\"", why: "L-C accounting fold -> dao/" },
+  { file: "app/(admin)/accounting/page.tsx", contains: "supabase.rpc(\"accounting_summary\"", why: "L-C accounting fold -> dao/" },
 ];
 
 /**
@@ -246,6 +300,28 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    The lucide Plus icon moved into ui/NewClassButton (coaches pattern), so
   //    the page imports only its own tiers, React, Next and @/components — check
   //    4 EMPTY. Nothing to pin. ──
+  // ── Admin L-C (BATCH_C_PLAN.md), pinned 2026-09-17 at L0. Folded L1-L3 per
+  //    page: @/lib/supabase -> dao; lucide-react -> ui; a SOLE-importer helper
+  //    MOVES into <page>/domain (git mv); a SHARED helper STAYS in lib, reached
+  //    from domain/ui/dao. Verdicts grep-confirmed (BATCH_C_PLAN.md). ──
+  { file: "app/(admin)/wages/page.tsx", contains: "lucide-react", why: "L-C wages fold: icons move into ui/" },
+  { file: "app/(admin)/wages/page.tsx", contains: "@/lib/supabase", why: "L-C wages fold: dao owns the client" },
+  { file: "app/(admin)/wages/page.tsx", contains: "@/lib/lessonDates", why: "L-C wages fold: shared, STAYS in lib; leaves the page with its symbols" },
+  { file: "app/(admin)/wages/page.tsx", contains: "@/lib/payoutItems", why: "L-C wages fold: MOVES into wages/domain (sole importer)" },
+  { file: "app/(admin)/wages/page.tsx", contains: "@/lib/lessonAttribution", why: "L-C wages fold: shared, STAYS in lib; leaves the page with its symbols" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "lucide-react", why: "L-C credit-notes fold: icons move into ui/" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/supabase", why: "L-C credit-notes fold: dao owns the client" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/csv", why: "L-C credit-notes fold: shared, STAYS in lib; leaves the page with its symbols" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/lessonDates", why: "L-C credit-notes fold: shared, STAYS in lib; leaves the page with its symbols" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/packageCoverage", why: "L-C credit-notes fold: shared, STAYS in lib; leaves the page with its symbols" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/creditNoteEmailState", why: "L-C credit-notes fold: MOVES into credit-notes/domain (sole importer)" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/creditNoteVoidState", why: "L-C credit-notes fold: MOVES into credit-notes/domain (sole importer)" },
+  { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/tableSearch", why: "L-C credit-notes fold: shared, STAYS in lib; leaves the page with its symbols" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "@/lib/lessonDates", why: "L-C referrals fold: shared, STAYS in lib; leaves the page with its symbols" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "@/lib/supabase", why: "L-C referrals fold: dao owns the client" },
+  { file: "app/(admin)/referrals/page.tsx", contains: "@/lib/referralDiscount", why: "L-C referrals fold: shared, STAYS in lib; leaves the page with its symbols" },
+  { file: "app/(admin)/accounting/page.tsx", contains: "@/lib/supabase", why: "L-C accounting fold: dao owns the client" },
+  { file: "app/(admin)/accounting/page.tsx", contains: "@/lib/accounting", why: "L-C accounting fold: MOVES into accounting/domain (sole importer)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
