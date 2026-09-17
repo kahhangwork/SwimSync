@@ -20,7 +20,8 @@
 // `classes.coach_id`. Do not "make this consistent" with the wages page — the
 // two disagree on purpose, and 20260719000800 exists because they were once the
 // same query and handing a class over re-priced its entire unpaid history.
-// The money-side twin of this file is `lib/payoutItems.ts`, which reads
+// The money-side twin of this file is
+// `app/(admin)/wages/domain/payoutItems.ts`, which reads
 // `classes.coach_id` nowhere at all.
 //
 // ⚠ THIS MODULE NEVER READS A CLOCK, in the shape `lib/classRoster.ts`

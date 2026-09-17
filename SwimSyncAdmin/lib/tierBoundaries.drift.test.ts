@@ -180,20 +180,9 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // ── credit-notes: DONE — auth + viewer profile + the scoped notes query in
   //    dao/creditNotes.repo; coverage + void RPCs and the credit-note-emails
   //    invoke in dao/creditNotes.rpc. ──
-  { file: "app/(admin)/wages/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase.auth.getUser()", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"profiles\")", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"tenants\")", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"coaches\")", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"coach_payouts\")", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"session_coaches\")", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"class_shadow_coaches\")", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"session_coach_absences\")", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"lesson_sessions\")", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase.rpc(\"generate_coach_payouts\"", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase.rpc(\"mark_payout_paid\"", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase.from(\"coach_rates\").insert", why: "L-C wages fold -> dao/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "supabase.from(\"tenants\").update(patch)", why: "L-C wages fold -> dao/" },
+  // ── wages: DONE — auth + every read/write in dao/wages.repo (one query each;
+  //    the stale-guarded orchestration stays in domain/usePayroll), both RPCs in
+  //    dao/wages.rpc. Check 3 for L-C is EMPTY. ──
 ];
 
 /**
@@ -297,11 +286,10 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    creditNoteEmailState + creditNoteVoidState MOVED into credit-notes/domain
   //    (git mv, sole code importer); csv/lessonDates/packageCoverage/tableSearch
   //    reached from domain/ui/dao (shared, stay in lib). ──
-  { file: "app/(admin)/wages/page.tsx", contains: "lucide-react", why: "L-C wages fold: icons move into ui/" },
-  { file: "app/(admin)/wages/page.tsx", contains: "@/lib/supabase", why: "L-C wages fold: dao owns the client" },
-  { file: "app/(admin)/wages/page.tsx", contains: "@/lib/lessonDates", why: "L-C wages fold: shared, STAYS in lib; leaves the page with its symbols" },
-  { file: "app/(admin)/wages/page.tsx", contains: "@/lib/payoutItems", why: "L-C wages fold: MOVES into wages/domain (sole importer)" },
-  { file: "app/(admin)/wages/page.tsx", contains: "@/lib/lessonAttribution", why: "L-C wages fold: shared, STAYS in lib; leaves the page with its symbols" },
+  // ── wages: DONE — page is composition, ledger empty. lucide -> ui;
+  //    payoutItems MOVED into wages/domain (git mv, sole code importer);
+  //    lessonDates + lessonAttribution reached from domain/ui (shared). Check 4
+  //    for L-C is EMPTY — both ledgers empty again. ──
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

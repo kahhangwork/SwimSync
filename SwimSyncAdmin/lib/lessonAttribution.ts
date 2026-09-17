@@ -13,7 +13,7 @@
 // coach A dropped to $0 and coach B was paid for lessons they never taught. The
 // access-side twin of this file is `lib/sessionRoster.ts`, which DOES read
 // classes.coach_id and is correct to. The money-side sibling is
-// `lib/payoutItems.ts`, whose header says the same thing.
+// `app/(admin)/wages/domain/payoutItems.ts`, whose header says the same thing.
 //
 // WHO TAUGHT, in the order coach_attribution_kind() fixes (20260812000200 §7):
 //   1. SUBSTITUTE — a `session_coaches` row names a coach for this one lesson.
