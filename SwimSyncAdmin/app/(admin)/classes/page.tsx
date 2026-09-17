@@ -1,39 +1,35 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, CalendarPlus, CalendarX, Users, Archive, RotateCcw } from "lucide-react";
+import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { Drawer } from "@/components/Drawer";
 import { assignableClassShadows } from "@/lib/sessionRoster";
 import { todayInSg, toSgDate, formatSgDate } from "@/lib/lessonDates";
-import { dayOfWeekOrder } from "@/lib/tableSort";
 import { formatTime } from "@/lib/utils";
 import {
   buildClassRoster,
-  formatStudentCount,
-  describeStudentCount,
   type RosterEnrolment,
   type RosterBooking,
 } from "@/lib/classRoster";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
 import { PackageChip } from "@/components/PackageChip";
-import { CLASS_COLOURS, colourFor } from "@/lib/classColours";
+import { CLASS_COLOURS } from "@/lib/classColours";
 import { locationFilterOptions, formLocationOptions } from "@/lib/locationOptions";
 
-import { ROW_LIMIT, DAYS } from "./constants";
+import { DAYS } from "./constants";
 import type { ClassRow, LocationOpt, Coach, ShadowAssignment } from "./types";
 // Transitional page->dao imports (playbook §7.1): until each slice's hook wraps
-// these calls (Stages 4-10), the page calls the dao directly. Pinned in
+// these calls (Stages 5-10), the page calls the dao directly. Pinned in
 // ALLOWED_PAGE_IMPORTS; both entries are gone by Stage 10.
 import * as repo from "./dao/classes.repo";
 import * as rpc from "./dao/classes.rpc";
-
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+import { capitalize, countActiveRetired } from "./domain/classRows";
+import { useClassList } from "./domain/useClassList";
+import { ClassToolbar } from "./ui/ClassToolbar";
+import { ClassTable } from "./ui/ClassTable";
 
 function Field({
   label,
@@ -65,13 +61,24 @@ function Field({
 }
 
 export default function ClassesPage() {
-  const [classes, setClasses] = useState<ClassRow[]>([]);
-  const [coaches, setCoaches] = useState<Coach[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  // True when the fetch came back at the cap, so the client-side search is over
-  // a truncated slice — the banner then says so.
-  const [capped, setCapped] = useState(false);
+  // The list slice (classes + the shared `coaches` spine + toolbar state).
+  const list = useClassList();
+  const {
+    classes,
+    coaches,
+    loading,
+    search,
+    setSearch,
+    capped,
+    locationFilter,
+    setLocationFilter,
+    showRetired,
+    setShowRetired,
+    filtered,
+  } = list;
+  const loadClasses = list.load;
+  const loadCoaches = list.loadCoaches;
+
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -124,8 +131,6 @@ export default function ClassesPage() {
   // an archived one to represent a reactivated class's current value (RISK 6),
   // and the name lookup covers retired classes sitting on an archived location.
   const [locations, setLocations] = useState<LocationOpt[]>([]);
-  // The location dropdown in the list toolbar; "" = all locations.
-  const [locationFilter, setLocationFilter] = useState("");
   // Capacity + colour are informational (calendar "x/y" count and card colour),
   // not effective-dated and not money, so they travel with category_id: the
   // same plain UPDATE beside set_class_terms, never inside it.
@@ -161,10 +166,7 @@ export default function ClassesPage() {
   const [cancelDone, setCancelDone] = useState<string | null>(null);
 
   // ── Retiring a class ──────────────────────────────────────────────────────
-  // Hidden by DEFAULT, not absent: a retired class is ordinary clutter on a
-  // busy page right up until the month it blocks, and then it is the only
-  // thing that matters.
-  const [showRetired, setShowRetired] = useState(false);
+  // (showRetired is a list-toolbar filter and lives in useClassList.)
   const [retireFor, setRetireFor] = useState<ClassRow | null>(null);
   const [retireSaving, setRetireSaving] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -253,65 +255,6 @@ export default function ClassesPage() {
   async function loadLocations() {
     const { data } = await repo.loadLocations();
     setLocations((data ?? []) as LocationOpt[]);
-  }
-
-  // ⚠ RETIRED CLASSES ARE LOADED — load-bearing, not cosmetic (§7.52 / the
-  // "why no is_active filter" reasoning lives on repo.loadClasses; its query
-  // shape is pinned by domain/classesQueryShape.test.ts). Here we map + set.
-  async function loadClasses() {
-    setLoading(true);
-    const { data } = await repo.loadClasses();
-
-    setCapped((data ?? []).length >= ROW_LIMIT);
-    setClasses(
-      (data ?? []).map((c: any) => ({
-        id: c.id,
-        coach_id: c.coach_id,
-        title: c.title,
-        coach_name: c.coaches?.profiles?.full_name ?? "—",
-        day_of_week: c.day_of_week,
-        start_time: c.start_time,
-        end_time: c.end_time,
-        // From the joined entity, not the free-text column (dropped in contract).
-        location_name: c.locations?.name ?? "—",
-        location_id: c.location_id,
-        price_per_lesson: Number(c.price_per_lesson),
-        category_id: c.category_id ?? null,
-        capacity: c.capacity ?? null,
-        category_default_capacity: c.class_categories?.default_capacity ?? null,
-        colour: c.colour ?? null,
-        student_count: (c.student_class_enrolments ?? []).filter(
-          (e: any) => e.is_active
-        ).length,
-        // c.is_active, NOT e.is_active — see the note on ClassRow (§7.28). The
-        // line directly above reads the enrolment's flag; these two are one
-        // character apart and mean entirely different things.
-        is_active: c.is_active !== false,
-        deactivated_at: c.deactivated_at ?? null,
-      }))
-    );
-    setLoading(false);
-  }
-
-  async function loadCoaches() {
-    const [{ data }, { data: shadowRates }] = await Promise.all([
-      repo.loadCoaches(),
-      repo.loadShadowRates(),
-    ]);
-    const earliestShadowRate = new Map<string, string>();
-    for (const r of (shadowRates ?? []) as any[]) {
-      const seen = earliestShadowRate.get(r.coach_id);
-      if (!seen || r.effective_from < seen) {
-        earliestShadowRate.set(r.coach_id, r.effective_from);
-      }
-    }
-    setCoaches(
-      (data ?? []).map((c: any) => ({
-        id: c.id,
-        full_name: c.profiles?.full_name ?? "Unknown",
-        shadowRateFrom: earliestShadowRate.get(c.id) ?? null,
-      }))
-    );
   }
 
   /**
@@ -644,20 +587,8 @@ export default function ClassesPage() {
     await loadClasses();
   }
 
-  // Clamp a stale location filter (its classes gone after a reload) to "all", so
-  // it never hides every row with the dropdown showing no matching option.
-  const locationFilterActive =
-    locationFilter !== "" && classes.some((c) => c.location_id === locationFilter);
-
-  const filtered = classes.filter(
-    (c) =>
-      (showRetired || c.is_active) &&
-      (!locationFilterActive || c.location_id === locationFilter) &&
-      (c.title.toLowerCase().includes(search.toLowerCase()) ||
-        c.coach_name.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  // Both derivations are pure and unit-tested in lib/locationOptions.ts.
+  // (The list filter + clamp now live in useClassList / domain/classRows.)
+  // Both location derivations are pure and unit-tested in lib/locationOptions.ts.
   const locationOptions = useMemo(() => locationFilterOptions(classes), [classes]);
   const pickerOptions = useMemo(
     () => formLocationOptions(locations, locationId),
@@ -677,26 +608,12 @@ export default function ClassesPage() {
     return map;
   }, [classes, enrolments, bookings]);
 
-  const sort = useTableSort<ClassRow>({
-    key: "title",
-    accessors: {
-      // Calendar order, not alphabetical — see dayOfWeekOrder.
-      day_of_week: (c) => dayOfWeekOrder(c.day_of_week),
-      // The enrolled count only. The badge reads "2+1"; sorting by the string
-      // would order it as text, and sorting by enrolled+trials would rank a
-      // class of 2 with a guest above a class of 3 weekly students.
-      student_count: (c) => c.student_count,
-    },
-  });
-  const visible = sort.apply(filtered);
-
   const openRoster = rosterByClass.get(drawerClass?.id ?? "") ?? {
     enrolled: [],
     trials: [],
   };
 
-  const activeCount = classes.filter((c) => c.is_active).length;
-  const retiredCount = classes.length - activeCount;
+  const { active: activeCount, retired: retiredCount } = countActiveRetired(classes);
 
   return (
     <div>
@@ -721,239 +638,36 @@ export default function ClassesPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-4">
-        <input
-          type="text"
-          placeholder="Search by class name or coach..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
-        />
-        {locationOptions.length > 1 && (
-          <select
-            aria-label="Location"
-            value={locationFilter}
-            onChange={(e) => setLocationFilter(e.target.value)}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
-          >
-            <option value="">All locations</option>
-            {locationOptions.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-        )}
-        {/* Always offered, even at zero, so the answer to "where did that class
-            go?" is on the page rather than in someone's memory. */}
-        <label className="inline-flex items-center gap-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={showRetired}
-            onChange={(e) => setShowRetired(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-400"
-          />
-          Show retired classes
-          {retiredCount > 0 && (
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
-              {retiredCount}
-            </span>
-          )}
-        </label>
-      </div>
+      <ClassToolbar
+        search={search}
+        onSearch={setSearch}
+        locationOptions={locationOptions}
+        locationFilter={locationFilter}
+        onLocationFilter={setLocationFilter}
+        showRetired={showRetired}
+        onShowRetired={setShowRetired}
+        retiredCount={retiredCount}
+        loading={loading}
+        capped={capped}
+        retireError={retireError}
+        retireFor={retireFor}
+      />
 
-      {/* reactivate_class() cannot refuse, so this only ever carries a network
-          or permission failure — but a restore that silently did nothing is
-          exactly the dead end this page exists to prevent. */}
-      {retireError && retireFor === null && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {retireError}
-        </div>
-      )}
-
-      {!loading && capped && (
-        <p className="mb-3 text-sm text-amber-700">
-          Showing the first {ROW_LIMIT} classes — the list is truncated. This is
-          not expected; contact support if you see it.
-        </p>
-      )}
-
-      <Table>
-        <Thead>
-          <Th sort={sort} sortKey="title">Class Name</Th>
-          <Th sort={sort} sortKey="coach_name">Coach</Th>
-          <Th sort={sort} sortKey="day_of_week">Day</Th>
-          <Th sort={sort} sortKey="start_time">Time</Th>
-          <Th sort={sort} sortKey="location_name">Location</Th>
-          <Th sort={sort} sortKey="price_per_lesson" firstDir="desc">Rate</Th>
-          <Th sort={sort} sortKey="student_count" firstDir="desc">Students</Th>
-          <Th>Actions</Th>
-        </Thead>
-        <Tbody>
-          {loading ? (
-            <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={8}>
-                Loading…
-              </Td>
-            </Tr>
-          ) : visible.length === 0 ? (
-            <Tr>
-              <Td className="text-center text-gray-400 py-8" colSpan={8}>
-                No classes found.
-              </Td>
-            </Tr>
-          ) : (
-            visible.map((cls) => (
-              <Tr key={cls.id}>
-                <Td className="font-medium text-gray-900">
-                  <span
-                    aria-hidden
-                    className={`mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle ${colourFor(cls.colour).dot}`}
-                    title={colourFor(cls.colour).label}
-                  />
-                  {cls.title}
-                  {!cls.is_active && (
-                    <span
-                      className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 align-middle"
-                      title={
-                        cls.deactivated_at
-                          // toSgDate takes the ISO string and converts in SGT.
-                          // new Date(...).toISOString().split("T")[0] here would
-                          // be the UTC date — a day early before 08:00 (§7.7).
-                          ? `Retired on ${formatSgDate(toSgDate(cls.deactivated_at), {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}`
-                          : "Retired before SwimSync recorded retirement dates"
-                      }
-                    >
-                      Retired
-                    </span>
-                  )}
-                </Td>
-                <Td className="text-gray-600">{cls.coach_name}</Td>
-                <Td>{capitalize(cls.day_of_week)}</Td>
-                <Td className="text-gray-500">
-                  {formatTime(cls.start_time)} – {formatTime(cls.end_time)}
-                </Td>
-                <Td className="text-gray-500">{cls.location_name}</Td>
-                <Td className="font-medium">
-                  S${cls.price_per_lesson.toFixed(2)}
-                </Td>
-                <Td>
-                  {/* "2+1", never "3". The enrolled half comes from the class
-                      query's own embed, so this number survives even if the
-                      roster query failed; the "+1" is trials, and it is a
-                      separate number because a guest at one lesson is not a
-                      weekly student (PRD §7.17). */}
-                  <button
-                    onClick={() => setDrawerClass(cls)}
-                    title={describeStudentCount(
-                      cls.student_count,
-                      rosterByClass.get(cls.id)?.trials.length ?? 0
-                    )}
-                    className="inline-flex items-center justify-center rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
-                  >
-                    {formatStudentCount(
-                      cls.student_count,
-                      rosterByClass.get(cls.id)?.trials.length ?? 0
-                    )}
-                  </button>
-                  {/* "/ 6" = the class's own capacity, else its category's
-                      default; nothing when both are unlimited. */}
-                  {(cls.capacity ?? cls.category_default_capacity) != null && (
-                    <span
-                      className="ml-1 text-xs text-gray-500"
-                      title={
-                        cls.capacity != null
-                          ? "Maximum students for this class"
-                          : "Maximum students (category default)"
-                      }
-                    >
-                      / {cls.capacity ?? cls.category_default_capacity}
-                    </span>
-                  )}
-                </Td>
-                <Td>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setDrawerClass(cls)}
-                      className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                    >
-                      <Users className="h-3.5 w-3.5 shrink-0" />
-                      See students
-                    </button>
-                    <button
-                      onClick={() => openEdit(cls)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </button>
-                    {/* NOT offered on a retired class. schedule_extra_lesson()
-                        has no is_active guard of its own, so this would write a
-                        lesson_sessions row on a class the coach's class list and
-                        Schedule tab both filter out: a lesson that exists, can
-                        never be marked, and can never bill. It would not even
-                        block the month — the engine bails on an empty billable
-                        set — so it fails silently in both directions. Hiding the
-                        button is the UI half; §7.32 says a limit only the admin
-                        screen applies is not a limit, and the server-side half
-                        is filed rather than fixed here. Restore first. */}
-                    {cls.is_active && (
-                      <button
-                        onClick={() => openExtra(cls)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                        title="Schedule a lesson on a day this class does not normally run"
-                      >
-                        <CalendarPlus className="h-3.5 w-3.5" />
-                        Extra lesson
-                      </button>
-                    )}
-                    {cls.is_active && (
-                      <button
-                        onClick={() => openCancel(cls)}
-                        data-testid="cancel-lesson-entry"
-                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                        title="Call off one upcoming lesson of this class — parents see it struck out"
-                      >
-                        <CalendarX className="h-3.5 w-3.5 shrink-0" />
-                        Cancel a lesson
-                      </button>
-                    )}
-                    {cls.is_active ? (
-                      <button
-                        onClick={() => {
-                          setRetireError(null);
-                          setRetireFor(cls);
-                        }}
-                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                        title="Stop scheduling this class. Lessons it already taught still bill."
-                      >
-                        <Archive className="h-3.5 w-3.5 shrink-0" />
-                        Retire
-                      </button>
-                    ) : (
-                      // No confirm on the way back. This is the exit from a
-                      // class that can block a billing month while being
-                      // invisible to every other screen.
-                      <button
-                        onClick={() => handleRestore(cls)}
-                        className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100"
-                        title="Put this class back on the schedule"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 shrink-0" />
-                        {restoringId === cls.id ? "Restoring…" : "Restore"}
-                      </button>
-                    )}
-                  </div>
-                </Td>
-              </Tr>
-            ))
-          )}
-        </Tbody>
-      </Table>
+      <ClassTable
+        filtered={filtered}
+        loading={loading}
+        rosterByClass={rosterByClass}
+        restoringId={restoringId}
+        onSeeStudents={setDrawerClass}
+        onEdit={openEdit}
+        onExtra={openExtra}
+        onCancel={openCancel}
+        onRetire={(cls) => {
+          setRetireError(null);
+          setRetireFor(cls);
+        }}
+        onRestore={handleRestore}
+      />
 
       {/* Retire a class.
           The three refusals are enforced in deactivate_class() and their

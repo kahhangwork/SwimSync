@@ -242,7 +242,8 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // likewise). Gone by Stage 10/11.
   { file: "app/(admin)/classes/page.tsx", contains: "./dao/classes.repo", why: "Stages 4-10 -> hooks wrap repo calls (list/roster/form/retire)" },
   { file: "app/(admin)/classes/page.tsx", contains: "./dao/classes.rpc", why: "Stages 6-10 -> hooks wrap rpc calls (drawer/extra/cancel/retire/form)" },
-  { file: "app/(admin)/classes/page.tsx", contains: "@/lib/tableSort", why: "Stage 4 -> dayOfWeekOrder into classRows sort accessors" },
+  // @/lib/tableSort left the page at Stage 4 — dayOfWeekOrder moved into
+  // domain/classRows.ts (classSortAccessors). Entry deleted (ledger shrinks).
   { file: "app/(admin)/classes/page.tsx", contains: "@/lib/classRoster", why: "Stage 5 -> MOVE into classes/domain (sole importer); page imports ./domain/classRoster after" },
   { file: "app/(admin)/classes/page.tsx", contains: "@/lib/packageCoverage", why: "Stage 5 -> coverageByStudent/StudentCoverage into useRoster (covMap)" },
   { file: "app/(admin)/classes/page.tsx", contains: "@/lib/sessionRoster", why: "Stage 6 -> assignableClassShadows into useClassDrawer/RosterDrawer (shared, stays in lib)" },
