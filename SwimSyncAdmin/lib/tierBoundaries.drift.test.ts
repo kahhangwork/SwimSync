@@ -175,6 +175,8 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    <page>/dao/ and that page's entries are deleted in the same commit. ──
   // ── accounting: DONE — auth + tenants read in dao/accounting.repo, both RPCs
   //    in dao/accounting.rpc. ──
+  // ── referrals: DONE — myTenantId + 4 reads + settings update in
+  //    dao/referrals.repo, the 3 RPCs in dao/referrals.rpc. ──
   { file: "app/(admin)/wages/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C wages fold -> dao/" },
   { file: "app/(admin)/wages/page.tsx", contains: "supabase.auth.getUser()", why: "L-C wages fold -> dao/" },
   { file: "app/(admin)/wages/page.tsx", contains: "supabase .from(\"profiles\")", why: "L-C wages fold -> dao/" },
@@ -196,16 +198,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase .from(\"credit_notes\")", why: "L-C credit-notes fold -> dao/" },
   { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase.functions.invoke(", why: "L-C credit-notes fold -> dao/" },
   { file: "app/(admin)/credit-notes/page.tsx", contains: "supabase.rpc(\"void_credit_note\"", why: "L-C credit-notes fold -> dao/" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "import { supabase } from \"@/lib/supabase\"", why: "L-C referrals fold -> dao/" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.auth.getUser()", why: "L-C referrals fold -> dao/" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "supabase .from(\"profiles\")", why: "L-C referrals fold -> dao/" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.from(\"tenants\")", why: "L-C referrals fold -> dao/" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.from(\"parent_tenants\")", why: "L-C referrals fold -> dao/" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.from(\"referrals\")", why: "L-C referrals fold -> dao/" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.from(\"referral_rewards\")", why: "L-C referrals fold -> dao/" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.rpc(\"set_referral_code_disabled\"", why: "L-C referrals fold -> dao/" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.rpc(\"grant_referral_reward\"", why: "L-C referrals fold -> dao/" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "supabase.rpc(\"void_referral_reward\"", why: "L-C referrals fold -> dao/" },
 ];
 
 /**
@@ -303,6 +295,8 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    from domain/ui/dao. Verdicts grep-confirmed (BATCH_C_PLAN.md). ──
   // ── accounting: DONE — page is composition, ledger empty. Client -> dao;
   //    accounting MOVED into accounting/domain (git mv, sole code importer). ──
+  // ── referrals: DONE — page is composition, ledger empty. referralDiscount
+  //    (shared with packages) + lessonDates reached from types/ui. ──
   { file: "app/(admin)/wages/page.tsx", contains: "lucide-react", why: "L-C wages fold: icons move into ui/" },
   { file: "app/(admin)/wages/page.tsx", contains: "@/lib/supabase", why: "L-C wages fold: dao owns the client" },
   { file: "app/(admin)/wages/page.tsx", contains: "@/lib/lessonDates", why: "L-C wages fold: shared, STAYS in lib; leaves the page with its symbols" },
@@ -316,9 +310,6 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/creditNoteEmailState", why: "L-C credit-notes fold: MOVES into credit-notes/domain (sole importer)" },
   { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/creditNoteVoidState", why: "L-C credit-notes fold: MOVES into credit-notes/domain (sole importer)" },
   { file: "app/(admin)/credit-notes/page.tsx", contains: "@/lib/tableSearch", why: "L-C credit-notes fold: shared, STAYS in lib; leaves the page with its symbols" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "@/lib/lessonDates", why: "L-C referrals fold: shared, STAYS in lib; leaves the page with its symbols" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "@/lib/supabase", why: "L-C referrals fold: dao owns the client" },
-  { file: "app/(admin)/referrals/page.tsx", contains: "@/lib/referralDiscount", why: "L-C referrals fold: shared, STAYS in lib; leaves the page with its symbols" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
