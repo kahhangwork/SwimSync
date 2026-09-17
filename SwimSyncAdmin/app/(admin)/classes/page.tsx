@@ -26,6 +26,8 @@ import { RosterDrawer } from "./ui/RosterDrawer";
 import { Field } from "./ui/Field";
 import { useExtraLesson } from "./domain/useExtraLesson";
 import { ExtraLessonModal } from "./ui/ExtraLessonModal";
+import { useCancelLesson } from "./domain/useCancelLesson";
+import { CancelLessonModal } from "./ui/CancelLessonModal";
 
 export default function ClassesPage() {
   // The list slice (classes + the shared `coaches` spine + toolbar state).
@@ -123,16 +125,22 @@ export default function ClassesPage() {
     handleScheduleExtra,
   } = extra;
 
-  // ── Cancelling a lesson in advance (plan Phase B) ─────────────────────────
-  // The second home for cancel_lesson() — the first is the lesson page reached
-  // from the Calendar. Class + future date + reason; every refusal (today/past,
-  // guests booked, already marked) is the RPC's own and is rendered verbatim.
-  const [cancelFor, setCancelFor] = useState<ClassRow | null>(null);
-  const [cancelDate, setCancelDate] = useState("");
-  const [cancelReason, setCancelReason] = useState("");
-  const [cancelSaving, setCancelSaving] = useState(false);
-  const [cancelError, setCancelError] = useState<string | null>(null);
-  const [cancelDone, setCancelDone] = useState<string | null>(null);
+  // Cancelling a lesson in advance (§ the second home for cancel_lesson) — see
+  // useCancelLesson.
+  const cancel = useCancelLesson();
+  const {
+    cancelFor,
+    setCancelFor,
+    cancelDate,
+    setCancelDate,
+    cancelReason,
+    setCancelReason,
+    cancelSaving,
+    cancelError,
+    cancelDone,
+    openCancel,
+    handleCancelLesson,
+  } = cancel;
 
   // ── Retiring a class ──────────────────────────────────────────────────────
   // (showRetired is a list-toolbar filter and lives in useClassList.)
@@ -299,33 +307,6 @@ export default function ClassesPage() {
     setShowModal(false);
     resetForm();
     loadClasses();
-  }
-
-  function openCancel(cls: ClassRow) {
-    setCancelFor(cls);
-    setCancelDate("");
-    setCancelReason("");
-    setCancelError(null);
-    setCancelDone(null);
-  }
-
-  async function handleCancelLesson() {
-    if (!cancelFor) return;
-    setCancelSaving(true);
-    setCancelError(null);
-    const { error } = await rpc.cancelLesson({
-      p_class_id: cancelFor.id,
-      p_date: cancelDate,
-      p_reason: cancelReason,
-    });
-    setCancelSaving(false);
-    if (error) {
-      setCancelError(error.message);
-      return;
-    }
-    setCancelDone(cancelDate);
-    setCancelReason("");
-    setCancelDate("");
   }
 
   // ── Retire / restore ──────────────────────────────────────────────────────
@@ -499,66 +480,18 @@ export default function ClassesPage() {
         </div>
       </Modal>
 
-      {/* Cancel a lesson in advance */}
-      <Modal
-        title={cancelFor ? `Cancel a lesson — ${cancelFor.title}` : "Cancel a lesson"}
-        open={cancelFor !== null}
+      <CancelLessonModal
+        cancelFor={cancelFor}
         onClose={() => setCancelFor(null)}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-500">
-            Call off ONE upcoming lesson of this class — rain, the coach away.
-            Parents see it struck out under Upcoming with your reason, the coach
-            has nothing to mark, and the billing month does not wait for it.{" "}
-            <span className="text-gray-700">A lesson that already happened</span>{" "}
-            is recorded by the coach as cancelled (rain / coach) instead.
-          </p>
-
-          <Field
-            label="Date"
-            placeholder=""
-            value={cancelDate}
-            onChange={setCancelDate}
-            type="date"
-          />
-
-          <Field
-            label="Reason"
-            value={cancelReason}
-            onChange={setCancelReason}
-            placeholder="e.g. Heavy rain forecast — pool closed"
-          />
-          <p className="-mt-2 text-xs text-gray-400">
-            Shown to every parent in the class and to the coach.
-          </p>
-
-          {cancelError && (
-            <p data-testid="cancel-error" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {cancelError}
-            </p>
-          )}
-
-          {cancelDone && (
-            <p data-testid="cancel-done" className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-              Cancelled for {cancelDone}. Open the lesson from the Calendar to restore it.
-            </p>
-          )}
-
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setCancelFor(null)}>
-              Close
-            </Button>
-            <Button
-              className="flex-1"
-              data-testid="confirm-cancel-lesson"
-              onClick={handleCancelLesson}
-              disabled={cancelSaving || !cancelDate || cancelReason.trim() === ""}
-            >
-              {cancelSaving ? "Cancelling…" : "Cancel the lesson"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        cancelDate={cancelDate}
+        onCancelDate={setCancelDate}
+        cancelReason={cancelReason}
+        onCancelReason={setCancelReason}
+        cancelSaving={cancelSaving}
+        cancelError={cancelError}
+        cancelDone={cancelDone}
+        onCancelLesson={handleCancelLesson}
+      />
 
       <ExtraLessonModal
         extraFor={extraFor}
