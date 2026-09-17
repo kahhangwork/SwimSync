@@ -306,18 +306,21 @@ _Full-track giant: twelve stages, one at a time, gate green at each. No L1–L3 
 
 | Stage | What | Commit | Gate | Drivers |
 |---|---|---|---|---|
-| 0 | This plan | — | — | — |
-| 0b | Widen `tierBoundaries.drift.test.ts` to `classes`; pin ledgers by file+snippet; prove each check RED then revert | — | typecheck + vitest, fence green | — |
-| 1 | `constants.ts` (DAYS, ROW_LIMIT) + `types.ts` (ClassRow, LocationOpt, Coach, ShadowAssignment), verbatim comments | — | typecheck + vitest | — |
-| 2+3 | `dao/classes.{repo,rpc}.ts` — folded; **page holds no client** | — | typecheck + vitest, fence | — (drivers start Stage 4) |
-| 4 | List: `domain/classRows.ts` (+tests) → `useClassList` → `ui/ClassToolbar` + `ui/ClassTable` | — | typecheck + vitest, fence | **class-deactivation, class-edit** |
-| 5 | Roster: `useRoster` + `classRoster` git-mv into domain (+test) → the badge stays in `ClassTable` | — | typecheck + vitest, fence | class-students |
-| 6 | Drawer+shadows: `useClassDrawer` + `ui/RosterDrawer` | — | typecheck + vitest, fence | class-students |
-| 7 | Extra lesson: `useExtraLesson` + `ui/ExtraLessonModal` | — | typecheck + vitest, fence | (unit — dormant on prod) |
-| 8 | Cancel lesson: `useCancelLesson` + `ui/CancelLessonModal` | — | typecheck + vitest, fence | **cancel-lesson** |
-| 9 | Retire/restore: `useRetire` + `ui/RetireModal` | — | typecheck + vitest, fence | class-deactivation |
-| 10 | Form: `useClassForm` + `locationOptions` git-mv into domain (+test) + `ui/Field` | — | typecheck + vitest, fence | class-terms, locations |
-| 11 | `ui/ClassFormModal`; **page → composition, ~180 lines, 0 useState, both ledgers EMPTY** | — | typecheck + vitest, fence | full net (below) |
+| 0+0b | This plan + widen `tierBoundaries.drift.test.ts` to `classes`; pin ledgers by file+snippet; prove all 4 checks RED then revert; tighten `imports()` `\n<>` for the "Shadowing from" false positive | `9d10e3b` | typecheck + 715 vitest, fence 6/6 | — |
+| 1 | `constants.ts` (DAYS, ROW_LIMIT) + `types.ts` (ClassRow, LocationOpt, Coach, ShadowAssignment), verbatim comments (1,714 → 1,646) | `146bfc9` | typecheck + 715 vitest | — |
+| 2+3 | `dao/classes.{repo,rpc}.ts` — folded; **page holds no client**; RISK 1 typed wrappers (12 keys), RISK 3 `classesQueryShape.test.ts` (proven red), RISK 4/6 grep gates (1,646 → 1,566) | `6936944` | typecheck + 720 vitest, fence 6/6 | — (drivers deferred) |
+| 4 | List: `domain/classRows.ts` (+10 tests, RISK 2 proven red) → `useClassList` → `ui/ClassToolbar` + `ui/ClassTable` (1,566 → 1,318) | `54a927c` | typecheck + 730 vitest, fence 6/6 | deferred |
+| 5 | Roster: `useRoster` + `classRoster` git-mv into domain (14 cases, total unchanged) (1,318 → 1,239) | `749bfe0` | typecheck + 730 vitest, fence 6/6 | deferred |
+| 6 | Drawer+shadows: `useClassDrawer` + `ui/RosterDrawer`; RISK 4 `shadowRateWarning` (+4 cases), RISK 7 effect-deps, RISK 8 prohibition (1,239 → 969) | `93fdc8b` | typecheck + 734 vitest, fence 6/6 | deferred; End/warning/failed-load HAND-CHECK deferred |
+| 7 | Extra lesson: `useExtraLesson` + `ui/ExtraLessonModal` + `ui/Field` (pulled forward) (969 → 854) | `9fb2c89` | typecheck + 734 vitest, fence 6/6 | deferred |
+| 8 | Cancel lesson: `useCancelLesson` + `ui/CancelLessonModal` (4 testids intact) (854 → 787) | `5f8b52d` | typecheck + 734 vitest, fence 6/6 | deferred |
+| 9 | Retire/restore: `useRetire` + `ui/RetireModal` (RISK 9 guards intact) (787 → 704) | `220ced0` | typecheck + 734 vitest, fence 6/6 | deferred |
+| 10+11 | Form: `useClassForm` + `locationOptions` git-mv (7 cases) + `ui/ClassFormModal` + `ui/NewClassButton`; **page → composition, 164 lines, 0 useState, BOTH ledgers EMPTY** | `9cfe144` | admin typecheck + 734 vitest + fence 6/6; coach app typecheck + 429 jest | full net — DEFERRED (below) |
+
+**DONE (code): `page.tsx` 1,714 → 164 lines, ZERO useState, both boundary ledgers empty for
+classes.** Driver strategy: the user chose **defer all driver runs to the end** (one Chrome
+session), so every stage above gated on typecheck + vitest + the fence + the source-pins only.
+The full net + the RISK-4 hand-checks still owe a run before this lands on `main`.
 
 **Per-stage mitigations (each is a gate for THAT stage's commit; the risk numbers are §5a's):**
 
