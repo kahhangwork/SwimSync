@@ -1,11 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-18 — **`platform` full-track DONE, on `main` `44ae740` (§8.110):** 1,395 → 237 lines,
-0 useState, both ledgers empty, 129/129 drivers + 23 hand-checks. A characterisation test caught a real
-precedence inversion. **Nightly `35306167774` RUNNING on `44ae740` — the gate for the next unit (§9).**
-August billing still HALF DONE — finish before 1 Oct (§9)._
+_Last updated: 2026-09-18 — **Admin L-D grading batch DONE, on `main` `33d4e82` (§8.111):** 5 route units 2,667 → 316
+lines, 0 hooks in any page, both ledgers empty; `AssessmentGrid` writes injected; ARCHITECTURE §6 written. 210/210 drivers
++ 35/35 hand-checks. **Nightly `35319533916` RUNNING — the gate for the next unit (§9).** August billing due before 1 Oct._
 
-_Previously, 2026-09-17 (§8.109) — Admin L-C money batch DONE (2,309 → 394); its nightly `35209608957` went green._
+_Previously, 2026-09-18 (§8.110) — `platform` full-track DONE (1,395 → 237); its nightly `35306167774` went green._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -348,6 +347,25 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.111 (2026-09-18) — Admin L-D grading batch: 5 route units to tiers, 2,667 → 316 lines, 0 hooks
+
+**Nine commits on `refactor/admin-ld`, fast-forwarded to `main` (`33d4e82`) via `/deploy` and pushed; both Vercel
+deploys green. Zero behaviour change.** `/plan-with-confidence` → `/plan-review` (Fable 5.1) → L0 fence → one folded
+commit per page (assessment + `[classId]`, makeups, levels, trials) → ARCHITECTURE §6 → L4. 770 → 806 vitest.
+**Driver net 210/210** (9 drivers) + **35/35 DB-verified hand-checks** of everything no driver presses.
+
+- **Read `docs/refactor/BATCH_D_PLAN.md` (decisions, L0–L4, §12), not this.**
+- **`components/AssessmentGrid.tsx` holds no client:** its writes are injected per caller → `docs/ARCHITECTURE.md` §6.
+  The still-due §6 once-off (dao three-way split, *orchestrate, never replace*) is DONE; playbook §7.5 box ticked.
+- **`/plan-review` (Fable 5.1) found 6 factual errors**, the worst being a nested route the fence would silently
+  have skipped (§7.247). All verified by hand before folding in.
+- **Graduated:** §7.247 (nested `[param]` needs its own `SCOPE_DIRS` entry), §7.248 (a `page.tsx`-keyed scan loses
+  coverage as pages decompose — the §7.54 Thead guard had lost 24 tables; widened, `b3bf04b`), §7.249 (state
+  below a reload's loading switch is destroyed); playbook §2 (JSX-aware renames) + §7.1 (inject shared writes);
+  TESTING §5; BACKLOG `verify-grading-admin` + the Assessment-grid feedback item (2 pre-existing quirks, NOT fixed —
+  rule 0).
+- **PRD untouched** — nothing user-visible changed.
+
 ## 8.110 (2026-09-18) — `platform/page.tsx` full-track decomposition: 1,395 → 237 lines, 0 useState
 
 **5th full-track giant; 14 commits on `refactor/platform-tiers`, fast-forwarded to `main` (`44ae740`) and pushed.
@@ -371,22 +389,7 @@ smoke-admin 64) + **23 hand-check assertions** with screenshots for the 5 surfac
 - **Also graduated OUT of §9 this session:** the 4 sweep-triage rules → `docs/TESTING.md` §5, and the deploy
   narrative → `docs/DEPLOYMENT.md` §11 (it cited ten §11.x entries that already held every word). −4 KB.
 
-## 8.109 (2026-09-17) — Admin L-C lite batch: 4 money pages to tiers, 2,309 → 394 lines, 0 useState
-
-**Seven commits on `refactor/admin-lc`, fast-forwarded to `main` (`94242f5`) after classes' nightly `35187663332` went
-green; CI green. Zero behaviour change.** L0 fence-widen (36 data-access + 18 import pins, all four checks proven red)
-→ one folded L1–L3 commit per page: accounting 337→116, referrals 447→78, credit-notes 631→85, wages 894→115. Four
-sole-importer helpers moved into their page's `domain/` (`accounting`, `payoutItems`, `creditNote{Email,Void}State`).
-757 vitest (+23 characterisation) + 429 jest. **L4 local:** smoke-admin 64/64, coach-wages 10/10, referrals 13/13,
-platform-admin-scope 32/32; hand-check 26/26 (Resend deliberately not pressed — real email function).
-
-- **Read `docs/refactor/BATCH_C_PLAN.md` (L4 + §12), not this, for the how.** No product finding.
-- **Graduated:** the drift-test path-pin trap (a moved `lib/` file allowlisted by PATH in both `sgDisplay` twins,
-  §7.241 family), the verbatim-by-script check and two hand-check-script traps → playbook §2/§4; the undriven
-  actions → `BACKLOG.md` (`verify-money-admin`); stale `lib/` paths repointed in ARCHITECTURE §10 / TESTING / §7.152.
-- **Merged before its own nightly by design** (the §7.1 gate is on the NEXT merge). `35209608957` is that nightly.
-
-_(§8.108 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.109 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -431,38 +434,34 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-18: `main` is `44ae740` (carries the platform refactor, §8.110). Nightly `35306167774`
-(manual) was RUNNING on it when this was written — `gh run view 35306167774`.** It is the GATE for the next
-unit (§7.1). Bisection spans the platform unit only (the prior scheduled run `35283558572` was green on
-`6e2b78a`), so a red is most likely a platform/tenant-provisioning/suspension driver — **but read it, don't
-trust this line** (§8.65).
+**State on 2026-09-18: `main` is `33d4e82` (carries Admin L-D, §8.111). Nightly `35319533916` (manual) was
+RUNNING on it when this was written — `gh run view 35319533916`.** It is the GATE for the next unit (§7.1).
+Bisection spans the L-D batch only (`35306167774` was green on `44ae740`), so a red is most likely a
+levels / trials / makeups / assessment driver — **but read it, don't trust this line** (§8.65).
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
 which mutate shared seed state — are in the same section.
 
-### THE NEXT BUILD — a lite batch is due (the alternation), or the last admin giant
+### THE NEXT BUILD — the last admin giant (the alternation), or the next lite batch
 
-**`platform` is DONE (§8.110).** Full-track giants done: Students (pilot), `packages`, `invoices`, `classes`,
-`platform`. Lite batches done: L-A, L-B, L-C. By the **giant→batch alternation a BATCH is due next.**
+**Admin L-D is DONE (§8.111).** Full-track giants done: Students (pilot), `packages`, `invoices`, `classes`,
+`platform`. Lite batches done: L-A, L-B, L-C, L-D. By the **giant→batch alternation a GIANT is due next.**
 
-- **Recommended: Admin L-D grading** — `levels` `trials` `makeups` `assessment` (+ `assessment/[classId]`,
-  fence), ~2,667 lines, driver net levels · levels-table · level-skills · assessment · trials ·
-  contact-details · makeups. Playbook §7.1 (L0 fence + one folded commit per page + L4 driver run).
-- **Or the last admin giant:** `lessons/[classId]/[date]` (912 lines). The three coach-app giants
-  (`schedule/index` 1,255, `classes/[id]/attendance` 1,183, `classes/[id]/roster` 905) each add the
-  `features/` layout, the jest twin and RN-web quirks (playbook §1 table) — a different KIND of unit, not
-  just a bigger one, so don't treat the first as routine.
-- Either way: **re-derive the driver net by grep first** (§7.236). A driver's NAME is not evidence — this
-  session's `/plan-review` caught one credited with a check it never makes.
+- **Recommended: `lessons/[classId]/[date]` (912 lines)** — the last admin giant; full track (playbook §2), own
+  plan doc. Its `lib/makeupSearch` import is SHARED with `makeups` (stays in `lib/`). Re-derive the driver net by
+  grep first (§7.236).
+- **Or Admin L-E** (`dashboard` `locations` `history`, ~1,161 lines) if a lighter unit fits the session.
+- The three coach-app giants (`schedule/index` 1,255, `classes/[id]/attendance` 1,183, `classes/[id]/roster` 905)
+  add the `features/` layout, the jest twin and RN-web quirks (playbook §1) — a different KIND of unit.
+- **Before any unit:** grep the test suite for other `page.tsx`-keyed scans (§7.248), and give each nested route
+  its own `SCOPE_DIRS` entry (§7.247).
 
-**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35306167774` (platform) is green.**
-**Still-due once-off:** the dao three-way split + "orchestrate, never replace" rule → `docs/ARCHITECTURE.md` §6
-(trigger long met — FIVE giants now exercise it, and `platform` is the second with a three-way `.api` split).
+**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35319533916` (L-D) is green.**
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), on prod,
-0 pending, rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is the fact; a prose
-status is a hint.** §8.110 authored none — a pure refactor, nothing deployed.
+0 pending (157/157 on 2026-09-18), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
+the fact; a prose status is a hint.** §8.111 authored none — a pure refactor.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

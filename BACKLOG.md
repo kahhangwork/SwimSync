@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-18 — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-18 — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -1592,14 +1592,14 @@ Then **Admin L-B "calendar" (SHIPPED 2026-09-16** — 5 pages attendance/substit
 `927a8b4`…`a773058`, 2,387 → 440 lines / 0 `useState`, both ledgers empty, L4 net 6/6 + holidays hand-check 9/9;
 nightly `35095280475` running; own plan `docs/refactor/BATCH_B_PLAN.md`).
 Then alternate. Never two units in flight; each survives a nightly before the next starts. Tiers stay
-feature-scoped, never new top-level folders (§7.233). **The dao three-way split and its "orchestrate an rpc,
-never replace one" rule graduate to `docs/ARCHITECTURE.md` §6 once a second full page confirms them —
-TRIGGER NOW MET (packages, the 2nd full page, 2026-09-16); ready to write, not yet done (it already lives in
-the playbook §1/§3 and every `dao/*.rpc.ts` header, so this is a consolidation, not a rescue).**
+feature-scoped, never new top-level folders (§7.233). The dao three-way split and *orchestrate, never
+replace* are now in `docs/ARCHITECTURE.md` §6 (2026-09-18, Admin L-D).
 
-**5 full-track giants remain — NEXT is `invoices` (1,748):** then `classes` (1,714), `platform` (1,395),
-`lessons/[classId]/[date]` (912); coach app `schedule/index` (1,255), `classes/[id]/attendance` (1,183),
-`classes/[id]/roster` (905). *(Students + packages done; Admin L-A + L-B lite batches done.)*
+**Done:** Students, `packages`, `invoices`, `classes`, `platform` (full); Admin L-A, L-B, L-C, **L-D** (lite).
+**Remaining — 1 admin giant** `lessons/[classId]/[date]` (912), **3 coach-app giants** `schedule/index`
+(1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905); **lite** Admin L-E (`dashboard`
+`locations` `history`) and App L-F/L-G/L-H; the two **fence** commits. The coach-app units are a different
+KIND (the `features/` layout, the jest twin, RN-web quirks — playbook §1), so the first is not routine.
 
 ### ~~Smoke drivers — open every route once, assert it rendered~~ — **SHIPPED 2026-09-13**
 `verify-smoke-admin.mjs` (64 checks) + `verify-smoke-app.mjs` (73 checks); green in the nightly of
@@ -1726,6 +1726,41 @@ tenant-narrowing). `tenants` needs a `slug` — the insert fails without it. To 
 `parent_tenant_balances` in `dao/platform.repo.ts` for one local run. **Beware §7.244/§7.246**: keep exactly one
 `<select>` on the page, use `.first()`/`.last()` for the two "Search" buttons, and scope row locators by a second
 `hasText` — tenant names appear in two tables.
+
+### A `verify-grading-admin` driver for the uncovered Levels / Trials / Make-ups / Assessment actions — **S** `[from the Admin L-D refactor 2026-09-18]`
+The Admin L-D batch (§8.111) decomposed the four grading pages and injected the `AssessmentGrid`'s writes. Its
+nine-driver net (210/210) **presses none of these**: trial **Convert** (the §7.180 two-press guard) and **Cancel**;
+a make-up for a **multi-class** child (the "Which class is this making up?" select that sets `p_home_class_id`),
+**Change**, and **Cancel**; the **grade-scale editor** (add / rename / remove, and the refusal on a held grade);
+skill **Move down** and **remove**; level **Edit**; **promote** ("Move up" is only asserted to *appear*); and any
+grade **write from the Students grading modal**. All were hand-checked once — 35/35, DB-verified (plan L4).
+
+**Why:** Convert and the multi-class make-up are billing-adjacent — the first can stack a permanent enrolment on a
+live unmarked trial and stall a billing month; the second's home class prices the invoice line. A regression in
+either is silent until an invoice run. Same shape as `verify-money-admin` / `verify-platform-controls`.
+
+**Notes:** the seeds are `fixtures-assessment.sql` + `fixtures-makeups.sql` plus ONE extra enrolment (Makeupvis Kid
+→ Saturday Beginners) to make a multi-class child. Convert needs a past trial AND a future one for the same child —
+book both through the form (new child, then "a child already in SwimSync"). **Promote only appears after a
+reload** when the painted grade equals the held one (see the grid item below) — reload before looking for it.
+Unit coverage already exists for the grid's writes (`components/AssessmentGrid.test.tsx`).
+
+### Assessment grid: the promote confirmation never shows, and a re-confirmed grade reads stale until reload — **S** `[found by the Admin L-D hand-checks 2026-09-18]`
+Two feedback gaps in `components/AssessmentGrid.tsx`, both pre-existing (unchanged by the refactor, which was
+verbatim). **(1)** "X moved up to Y." is set as grid state, then `onReload` flips the class page to "Loading…",
+which UNMOUNTS the grid and the message with it — the assessor sees a child vanish from one sub-table with no
+word about it, the exact thing the grid's own comment calls "disorienting". **(2)** Painting a cell with the grade
+it ALREADY holds keeps the old `graded_at` in the optimistic roster, so the row neither turns fresh nor offers
+"Move up" until the page is re-read — though the write did advance `graded_at` (`verify-assessment` proves it
+after a reload).
+
+**Why:** the only real assessor grades poolside on a phone; both gaps make a correct action look like it did
+nothing, which invites a second tap or a skipped promotion.
+
+**Notes:** (1) is fixable by keeping the grid mounted during reload (render it under the loading state rather
+than instead of it) or by lifting the flash to the page — either is a behaviour change, so its own commit,
+never inside a refactor. (2) is one line in `optimisticRoster` (treat a grade written THIS session as fresh
+regardless of equality) — check it against `isFreshGrade` and the §7.221 stroke rules first.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the

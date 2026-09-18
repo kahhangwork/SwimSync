@@ -166,6 +166,13 @@ before the medium-risk slices.
   end; zero is the target.
   **Or let the compiler do it once:** `npx tsc --noEmit --noUnusedLocals | grep '(admin)/<page>/'` lists every
   dead import in the new tier files (the repo-wide run has unrelated hits, so filter to the page).
+- **A scripted prop-prefix rename (`foo` → `p.x.foo`) must be JSX-aware, and the verbatim check cannot catch it
+  when it is not.** A word in JSX TEXT inside an expression (`{cond && (<p>those classes …</p>)}`) matches the
+  identifier `classes` and becomes "those p.t.classes" — and the verbatim check strips the prefix before comparing,
+  so it passes. After every rename, grep the new `ui/` for a prefix inside prose:
+  `grep -nE "[a-z] p\.[a-z]\.[a-z]+ [a-z]" <page>/ui/*.tsx` (Admin L-D: 2 hits, both caught this way, none shipped).
+  Also give the hook's page variable a name no `.map((l) => …)` callback uses (`lv`, not `l`) — the verbatim
+  check strips it and would eat the loop variable's `l.` too.
 - **Check verbatim by script, not by eye.** Cut each `ui/` block by line range from `git show HEAD:<page>`, then
   compare the component's JSX to the original with whitespace stripped and the prop renames mapped back
   (`onVoid(` → `voidNote(`). Any divergence prints where it starts. (Admin L-C, all 15 `ui/` files.)
@@ -352,6 +359,12 @@ run per slice.
 | **L2** | `domain/` — every hook, the pure mapping with its characterisation test — §2 stages 4–10's hook halves in one cut. The page still renders its own JSX | typecheck + unit tests |
 | **L3** | `ui/` + the page reduced to composition — §2 stages 4–11's markup halves. Both ledgers to zero for this page | typecheck + unit tests |
 | **L4** (once per batch) | **Run every driver in the batch's net** (§4), plus the smoke driver (§7.3). Hand-check anything no driver opens, with a screenshot named in the commit | drivers green |
+
+**When a lite page's writes live in a SHARED component, inject them** (`docs/ARCHITECTURE.md` §6, the
+`AssessmentGrid` precedent): a `writes` prop bound per caller as a module-level const, the component added to the
+fence's `SCOPE_FILES`, and — because the injection makes it unit-testable for the first time — **its test in the
+same commit** (`components/AssessmentGrid.test.tsx`). Note `dataAccess()` counts the `import { supabase }` line
+too, so a file with N writes pins N+1 check-3 sites.
 
 A page under ~400 lines with ≤ 5 `useState` may take L1–L3 as **one commit** — the
 split exists so a driver red at L4 bisects to a page, not to a tier; one commit per page

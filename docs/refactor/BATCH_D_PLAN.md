@@ -258,6 +258,12 @@ Then:
 
 ## §12 — findings for `/update-docs` (append as they arise)
 
+_**Graduated 2026-09-18 (`/update-docs`, §8.111):** nested-route scope → §7.247; `page.tsx`-keyed scans → §7.248;
+state below a reload's loading switch → §7.249 (covers the makeups sort AND the grid flash); JSX-aware renames +
+inject-shared-writes + `dataAccess()` counting the import → playbook §2/§7.1; the two grid quirks + the undriven
+actions → `BACKLOG.md`; the expiryWarning deps note stays in `useMakeups` (its code comment is its home); doc
+pointers repointed in the ARCH §6 commit. Plans left as historical records._
+
 - **Moved-module doc pointers:** `lib/skillScale.ts` → `docs/ARCHITECTURE.md:587`,
   `docs/TESTING.md:1105`; `lib/trialConvert.ts` → `BACKLOG.md`, `docs/GOTCHAS.md`,
   `docs/TESTING.md:257`, `docs/ARCHITECTURE.md:611`. (Repointed in the ARCH §6 commit; plans left as

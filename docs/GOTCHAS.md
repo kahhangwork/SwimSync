@@ -3846,3 +3846,27 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     so it failed with a message about a missing child, which reads exactly like a broken tenant-narrowing, i.e. the
     bug it was written to detect. Scope with a second `hasText` (the parent's name) or with a container locator.
     Same family as §7.75/§7.101: a locator taken over a list it does not own. (Platform refactor, 2026-09-18.)
+
+247. **Adding a route's PARENT directory to `SCOPE_DIRS` does not fence its nested `[param]/page.tsx` — each route
+    unit needs its OWN entry, and nothing tells you it is missing.** `sources()` in `tierBoundaries.drift.test.ts`
+    deliberately skips any subdirectory that holds its own `page.tsx` (so `lessons/[classId]/[date]` is not dragged
+    into `lessons`' ledger). The Admin L-D plan widened `assessment` "which covers `[classId]`" — it would not have:
+    the class page and all its future tiers would have sat outside every check, and the vacuity test cannot notice,
+    because `PAGES` is derived from the same `SCOPE_DIRS`. Caught by `/plan-review` before any code. Prove a nested
+    scope is live with a breaker INSIDE it (`assessment/[classId]/ui/Break` → `../dao`). (Admin L-D, 2026-09-18.)
+
+248. **A source-scanning test keyed on `page.tsx` loses coverage every time the tier refactor decomposes a page —
+    silently, and while staying green.** `components/Table.test.tsx`'s §7.54 guard ("no `<Tr>` inside `<Thead>`")
+    walked `page.tsx` files only; by Admin L-D the refactor had moved **24** tables into `<page>/ui/*.tsx`, every one
+    outside the guard. Widened to every non-test `.tsx` under `app/(admin)` (`b3bf04b`), proven red with a planted
+    `<Thead><Tr>` in a `ui/` file. Same family as §7.233 (a scan that misses a folder checks less while passing).
+    Before a refactor unit, `git grep -n 'page\.tsx' -- '*.test.ts*'` for any other. (2026-09-18.)
+
+249. **Anything held in a component that renders BELOW a page's loading switch is destroyed on every reload, not
+    just the first load.** A page whose `load()` flips `loading` on RELOAD (after every write — `makeups`,
+    `trials`, `levels`, `assessment/[classId]`) unmounts whatever `if (loading) return …` / `loading ? … :` hides.
+    Two consequences met in Admin L-D: (1) **a `useTableSort` moved into a `ui/` table would reset the admin's
+    sort after every Book / Cancel / Save** — so on such a page the sort stays in the `domain/` hook (as
+    `attendance`/`invoices` already did); (2) **`AssessmentGrid`'s "moved up to" flash never shows** — it is grid
+    state, and promote's `onReload` unmounts the grid (pre-existing; BACKLOG). Before moving state into a child,
+    check whether its parent unmounts it on reload. (Admin L-D, 2026-09-18.)

@@ -1201,6 +1201,18 @@ caveat:** `run-all-drivers.sh` across many drivers at once can OOM-kill the box 
 admin dev + Expo + Chrome + per-driver node); run the net one at a time via `--only`, and stop Expo before
 the admin-only drivers.
 
+**Admin L-D (2026-09-18) added the fence's first single-FILE scope and the first test of a shared
+component's writes.** `SCOPE_FILES = ["components/AssessmentGrid.tsx"]` scans that one file for check 3 only
+(never walk `components/` — AuthGuard/RequiresTenant/Sidebar hold the client legitimately), and `assessment/[classId]`
+is its own `SCOPE_DIRS` entry (§7.247). **`components/AssessmentGrid.test.tsx` (5)** drives the grid with a fake
+injected `writes`: a cycle upserts ONE cell carrying `tenant_id`; cycling past the top grade CLEARS (a delete); a
+paint stroke is ONE deduped upsert (§7.221); a failed stroke restores every painted cell and reloads once; promote
+calls `promoteStudent(studentId, nextLevelId)` — each proven red by breaking the grid. Characterisation files
+`assessmentRows` (5), `assessClassRows` (5), `makeupRows` (11), `levelRows` (5), `trialRows` (5), each proven red by
+a planted break; `skillScale.test.ts` and `trialConvert.test.ts` moved into their page's `domain/`.
+**`components/Table.test.tsx`'s Thead guard now scans every non-test `.tsx` under `app/(admin)`**, not only
+`page.tsx` — it had lost 24 tables to the refactor (§7.248).
+
 **Which UI drivers actually exercise the admin Students page** (verified by running each after the slice
 it covers, and all of them after Stage 11 — §7.236 is why this list exists): `contact-details` (Actions
 drawer → Contact modal in both modes, the claim lock, **Add student**), `active-inactive` (Set inactive and
