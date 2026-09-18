@@ -597,7 +597,7 @@ progress `cancelled` with nobody enrolled and the reason carried, and a live gue
 expected unmarked guest; the SGT retirement cut-off pair and the
 `enrolled+guests === expectedStudentsOn` parity assertion), `lib/adminAttendanceSave.test.ts` (11 —
 mock deps: only changed rows sent, holiday kept, each step's error surfaced by name, no
-`session_coach_absences` call), `lib/lessonMarking.test.ts`, `lib/classColours.test.ts`,
+`session_coach_absences` call), `lessons/[classId]/[date]/domain/lessonMarking.test.ts`, `lib/classColours.test.ts`,
 `lib/timeOfDay.test.ts`, `components/calendar/LessonCard.test.tsx`, and
 `lib/attendanceSave.drift.test.ts` (five coach-app helper copies byte-identical). pgTAP:
 `class_capacity_colour.test.sql` (12) and `admin_marks_attendance.test.sql` (22 — a PURE tenant admin

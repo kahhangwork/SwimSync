@@ -4,9 +4,12 @@
 // pre-empt, and can never be STRICTER than the database about an EXISTING row:
 // a correction is always allowed by guard_attendance_date, so a row that has a
 // status stays editable whatever the date.
+//
+// (Was lib/lessonMarking.ts; moved 2026-09-18, lesson-detail Stage 1 — this
+// page was its sole importer.)
 
-import { checkMarkableDate, type MarkableCheck } from "./attendanceWindow";
-import type { DayOfWeek } from "./lessonDates";
+import { checkMarkableDate, type MarkableCheck } from "@/lib/attendanceWindow";
+import type { DayOfWeek } from "@/lib/lessonDates";
 
 export type DbStatus =
   | "present"

@@ -39,43 +39,9 @@ import {
   capitalise,
   type DbStatus,
   type RosterKind,
-} from "@/lib/lessonMarking";
+} from "./domain/lessonMarking";
 import { filterEligibleKids } from "@/lib/makeupSearch";
-
-type ClassInfo = {
-  id: string;
-  title: string;
-  day_of_week: DayOfWeek;
-  start_time: string;
-  end_time: string;
-  location_name: string;
-  coach_id: string;
-  category_id: string;
-  colour: string | null;
-  capacity: number | null;
-  is_active: boolean;
-  deactivated_at: string | null;
-};
-
-type RosterRow = {
-  studentId: string;
-  name: string;
-  kind: RosterKind;
-  /** The booking id for a guest (to cancel it). */
-  bookingId: string | null;
-  /** False for a marked row whose child is no longer expected (left the class). */
-  expected: boolean;
-  prev: DbStatus | null;
-};
-
-type CoachOpt = { id: string; name: string };
-
-type EligibleKid = {
-  id: string;
-  full_name: string;
-  home_classes: { id: string; title: string; category_id: string }[];
-  home_class_titles: string[];
-};
+import type { ClassInfo, CoachOpt, EligibleKid, RosterRow } from "./types";
 
 export default function LessonPage() {
   const params = useParams<{ classId: string; date: string }>();

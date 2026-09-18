@@ -378,7 +378,8 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // ── lessons (list): DONE — dao/domain/ui extracted, page is composition,
   //    ledger empty. attendanceWindow STAYS (shared: lessonMarking.ts +
   //    markableFloor.ts import it via relative path — the @/lib grep missed
-  //    those; corrected from the L0 MOVE verdict). calendarData bound in
+  //    those; corrected from the L0 MOVE verdict. lessonMarking has since moved
+  //    to lessons/[classId]/[date]/domain/ and imports it as @/lib/…). calendarData bound in
   //    lessons/dao; every other @/lib helper reached from domain/ui. ──
   // ── invoices (full track, INVOICES_REFACTOR_PLAN.md): check 4 EMPTY at Stage 9.
   //    paynow + settlementPayload MOVED into invoices/domain (sole importers);
@@ -478,7 +479,8 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: F_LESSON, contains: "@/lib/calendarLessons", why: "Stage 7 — formatCount is render-only after the spine" },
   { file: F_LESSON, contains: "@/lib/adminAttendanceSave", why: "Stage 6 — git mv into domain/ (sole importer)" },
   { file: F_LESSON, contains: "@/lib/adminAttendanceSaveDeps", why: "Stage 6 — git mv into dao/lessonDetail.save" },
-  { file: F_LESSON, contains: "@/lib/lessonMarking", why: "Stage 1 — git mv into domain/ (sole importer)" },
+  // @/lib/lessonMarking MOVED into [date]/domain at Stage 1 (git mv, sole
+  // importer); the page imports ./domain/lessonMarking (allowed). Deleted.
   { file: F_LESSON, contains: "@/lib/makeupSearch", why: "Stage 5 — filterEligibleKids -> domain/useGuestBooking (shared, stays)" },
 ];
 
