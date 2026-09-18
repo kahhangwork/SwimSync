@@ -11,8 +11,9 @@
  * bare 23503 into a sentence a business owner understands, and computes the
  * rank a newly added grade should take.
  *
- * Pure and framework-free so it is unit-tested (lib/skillScale.test.ts) rather
- * than only exercised through the page.
+ * Pure and framework-free so it is unit-tested (skillScale.test.ts) rather
+ * than only exercised through the page. Lived in lib/ until Admin L-D moved it
+ * here (sole importer: the Levels page).
  */
 
 export type GradeLevel = { id: string; rank: number; label: string };

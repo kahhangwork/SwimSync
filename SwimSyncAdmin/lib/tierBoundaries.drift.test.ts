@@ -190,7 +190,6 @@ type Allowed = { file: string; contains: string; why: string };
 const F_PLATFORM = "app/(admin)/platform/page.tsx";
 
 // Admin L-D (BATCH_D_PLAN.md) — spelled once, same reason as F_PLATFORM.
-const F_LEVELS = "app/(admin)/levels/page.tsx";
 const F_TRIALS = "app/(admin)/trials/page.tsx";
 
 /**
@@ -254,20 +253,10 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    `import { supabase }` line counts — dataAccess() matches any line naming
   //    the client). Each page folds L1-L3 in ONE commit; its entries are deleted
   //    in that commit. The grid's go in commit 1 with the injection. ──
-  // F_LEVELS — removed at L-D commit 3
-  { file: F_LEVELS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: "const { data } = await supabase .from(\"tenant_levels\")", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: "? await supabase.from(\"tenant_levels\").update(payload).eq(\"id\", editing.id)", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: ": await supabase.from(\"tenant_levels\").insert({", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: "await supabase .from(\"profiles\")", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: ".eq(\"id\", (await supabase.auth.getUser()).data.user?.id)", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: "const { error: err } = await supabase.from(\"tenant_levels\").delete().eq(\"id\", l.id);", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: "const { data } = await supabase .from(\"skill_grade_levels\")", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: "const { error: err } = await supabase.from(\"skill_grade_levels\").insert({", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: "const { error: err } = await supabase .from(\"skill_grade_levels\")", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: "const { error: err } = await supabase.from(\"tenant_level_skills\").insert({", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: "const { error: err } = await supabase .from(\"tenant_level_skills\")", why: "data access -> <page>/dao" },
-  { file: F_LEVELS, contains: "await supabase.from(\"tenant_level_skills\")", why: "data access -> <page>/dao" },
+  // ── levels: DONE (L-D commit 3) — every read/write + the auth/profile tenant
+  //    lookup in dao/levels.repo (resolved inside each insert, in the hook, as
+  //    before); skillScale MOVED into levels/domain (git mv, sole importer);
+  //    studentCounts reached from ui/RemoveLevelModal (shared, stays in lib). ──
   // F_TRIALS — removed at L-D commit 4
   { file: F_TRIALS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
   { file: F_TRIALS, contains: "supabase .rpc(\"student_package_coverage\")", why: "data access -> <page>/dao" },
@@ -427,10 +416,10 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    trialConvert into trials/domain (sole importers, git mv); assessment,
   //    lessonDates, makeupSearch, studentCounts, sgPhone, packageCoverage STAY
   //    (shared) and are reached from domain/ui. ──
-  // F_LEVELS — removed at L-D commit 3
-  { file: F_LEVELS, contains: "@/lib/supabase", why: "client -> dao" },
-  { file: F_LEVELS, contains: "@/lib/studentCounts", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
-  { file: F_LEVELS, contains: "@/lib/skillScale", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  // ── levels: DONE (L-D commit 3) — every read/write + the auth/profile tenant
+  //    lookup in dao/levels.repo (resolved inside each insert, in the hook, as
+  //    before); skillScale MOVED into levels/domain (git mv, sole importer);
+  //    studentCounts reached from ui/RemoveLevelModal (shared, stays in lib). ──
   // F_TRIALS — removed at L-D commit 4
   { file: F_TRIALS, contains: "@/lib/supabase", why: "client -> dao" },
   { file: F_TRIALS, contains: "@/lib/sgPhone", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
