@@ -320,6 +320,27 @@ They still move verbatim.) the URL shape; the §7.64 rule (addressed by
 4. `/deploy` (app-only path) → fast-forward `main`, push, confirm both Vercel deploys, then trigger a nightly on
    the new `main` — it is the gate for the NEXT unit.
 
+## 11a. Stage log — what actually landed (2026-09-18, branch `refactor/lesson-detail`)
+
+| Stage | Commit | Meter | Gate | Drivers |
+|---|---|---|---|---|
+| 0 plan + review | `24073ba` | 32 | — | — |
+| 0b fence | `08d5bc8` | 32 | 83 / 806 | — (22 + 13 pinned, as pre-agreed; 4 breakers + shrink proven red) |
+| 1 types + lessonMarking | `d67d30b` | 32 | 83 / 806 | — |
+| 2 spine | `ac6f34f` | 16 | 84 / 819 (+13) | lesson-detail 27/27, cancel-lesson 17/17 |
+| 3 cancel/restore | `66ad948` | 12 | 84 / 819 | cancel-lesson 17/17 |
+| 4 substitute | `bce6e63` | 9 | 84 / 819 | lesson-detail 27/27 |
+| 5 guests | `c5daa7c` | 3 | 84 / 819 | lesson-detail 27/27 |
+| 6 save | `78be96d` | **0** | 84 / 819 | lesson-detail 27/27 |
+| 7 ui | `286fc94` | 0 | 84 / 819 | lesson-detail 27, cancel-lesson 17, admin-calendar 21, smoke-admin 64 = **129/129** |
+| L4 hand-checks | (this commit) | 0 | — | **20/20** — §8's list items 0–6, screenshots in the session scratchpad |
+
+`page.tsx` **912 → 93 lines**, 0 `useState`, both ledgers empty. Driver counts are RUNTIME counts: the grep
+counts in §8 (28/18) include each driver's cleanup `check()` written twice (try + catch), only one of which runs.
+
+**Hand-check caveat (not ticked as proven):** item 5's assign-substitute ERROR branch did not fire — the assign
+succeeded — so `Could not assign: …` is covered only by the verbatim-move check, not by a render.
+
 ## 12. Findings for `/update-docs`
 
 - **`/plan-review` (Fable 5.1) found 6 factual errors**, all verified by hand before folding in: a check-4 breaker
@@ -331,6 +352,17 @@ They still move verbatim.) the URL shape; the §7.64 rule (addressed by
 - BACKLOG: the load's swallowed errors (`tenants`, `students`, `attendance`, `session_coaches`,
   `session_coach_absences`, `getSession`) — preserved here under rule 0.
 - BACKLOG: `verify-lesson-detail-guests` (trial booking, cancel booking, Set all, multi-home, full-notice).
+- **Playbook (method):** a `ui/` component that DESTRUCTURES its hook object on its first line
+  (`const { cls, roster, … } = ld;`) keeps the moved JSX byte-identical — no `foo` → `p.x.foo` rename at all, so the
+  JSX-text trap (playbook §2, Admin L-D) cannot occur and the verbatim check needs no rename map. Stage 7 moved 11
+  components this way; the verbatim script found every render line except the 4 planned structural rewrites.
+- **Playbook (§4):** `run-all-drivers.sh --only` takes ONE driver name (a comma list matches nothing) — loop it.
+- **Hand-check setup traps (TESTING §5 candidates):** (1) `psql -Atc "A; B; C"` is ONE transaction — an error in C
+  silently rolls back A too, and the INSERT's "INSERT 0 1" echo still prints; (2) a child the hand-check creates must
+  be visible to the logged-in admin under RLS — an enrolment-less child is not, so the trial picker read "(0)"
+  (identical on the pre-refactor code: it is the same query). An INACTIVE enrolment in one of the admin's classes
+  makes it visible and still trial-eligible.
+- BACKLOG (driver gap): the assign-substitute error branch has no render proof anywhere.
 
 ## 13. PRE-COMMIT GATE — walk before EVERY stage commit
 
