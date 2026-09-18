@@ -3870,3 +3870,12 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `attendance`/`invoices` already did); (2) **`AssessmentGrid`'s "moved up to" flash never shows** — it is grid
     state, and promote's `onReload` unmounts the grid (pre-existing; BACKLOG). Before moving state into a child,
     check whether its parent unmounts it on reload. (Admin L-D, 2026-09-18.)
+
+250. **A sole-importer `lib/` PAIR must move in ONE commit — moving half of it makes `lib/` import a route folder,
+    and nothing stops it.** `lib/adminAttendanceSave.ts` was imported by the lesson page AND by its sibling
+    `lib/adminAttendanceSaveDeps.ts` (a type import). The lesson-detail plan moved the first at Stage 1 and the
+    second at Stage 6 — for five commits `lib/` would have imported `@/app/(admin)/lessons/[classId]/[date]/domain/…`.
+    `tsc` *forces* that import rather than flagging it, and the fence never scans `lib/`. Caught at `/plan-review`,
+    not in code. When the sole-importer grep (playbook §2) names a `lib/` sibling as the other importer, the two
+    are one unit: move them together (the Deps half into `dao/`). Assert every stage:
+    `git grep -nE "from ['\"](@/app/|.*\(admin\)/)" -- 'SwimSyncAdmin/lib/*.ts'` → 0. (Lesson detail, 2026-09-18.)

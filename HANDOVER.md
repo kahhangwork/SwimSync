@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-18 — **Admin L-D grading batch DONE, on `main` `33d4e82` (§8.111):** 5 route units 2,667 → 316
-lines, 0 hooks in any page, both ledgers empty; `AssessmentGrid` writes injected; ARCHITECTURE §6 written. 210/210 drivers
-+ 35/35 hand-checks. **Nightly `35319533916` RUNNING — the gate for the next unit (§9).** August billing due before 1 Oct._
+_Last updated: 2026-09-18 — **Lesson detail full-track DONE, on `main` `3690bdb` (§8.112):** 912 → 93 lines, 0 useState,
+both ledgers empty — the LAST admin giant. 129/129 drivers + 20/20 hand-checks. **Nightly `35328388854` RUNNING — the
+gate for the next unit (§9).** August billing due before 1 Oct._
 
-_Previously, 2026-09-18 (§8.110) — `platform` full-track DONE (1,395 → 237); its nightly `35306167774` went green._
+_Previously, 2026-09-18 (§8.111) — Admin L-D grading batch DONE (2,667 → 316); its nightly `35319533916` went green._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.246** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.250** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -347,6 +347,22 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.112 (2026-09-18) — `lessons/[classId]/[date]` full track: 912 → 93 lines, 0 useState — the last admin giant
+
+**Ten commits on `refactor/lesson-detail`, fast-forwarded to `main` (`3690bdb`) via `/deploy` only AFTER nightly
+`35319533916` (L-D) went green (the user's gate); 0 pending migrations; both Vercel deploys green. Zero behaviour
+change.** `/plan-with-confidence` (2 questions) → `/plan-review` (Fable 5.1) → 0b fence → Stages 1–7 → L4.
+806 → 819 vitest. **Drivers 129/129** after the last stage + **20/20 DB-verified hand-checks.**
+
+- **Read `docs/refactor/LESSON_DETAIL_REFACTOR_PLAN.md` (§5 risks, §6 per-stage ⚠ blocks, §11a stage log), not this.**
+- **`/plan-review` found 6 factual errors again** — the worst, a Stage 1/6 split that would have made `lib/` import a
+  route folder for five commits (§7.250). All verified by hand before folding in.
+- **Graduated:** §7.250; playbook §2 (the pair rule + *destructure the hook object* so moved JSX stays byte-identical)
+  and §4 (`--only` takes one driver; runtime vs grep check counts); TESTING §5 (the new test + two hand-check setup
+  traps); BACKLOG `verify-lesson-detail-guests` + the load's six swallowed read errors (NOT fixed — rule 0).
+- **Not proven:** the assign-substitute ERROR render (the assign succeeded by hand) — in the BACKLOG driver item.
+- **PRD untouched** — nothing user-visible changed.
+
 ## 8.111 (2026-09-18) — Admin L-D grading batch: 5 route units to tiers, 2,667 → 316 lines, 0 hooks
 
 **Nine commits on `refactor/admin-ld`, fast-forwarded to `main` (`33d4e82`) via `/deploy` and pushed; both Vercel
@@ -366,30 +382,7 @@ commit per page (assessment + `[classId]`, makeups, levels, trials) → ARCHITEC
   rule 0).
 - **PRD untouched** — nothing user-visible changed.
 
-## 8.110 (2026-09-18) — `platform/page.tsx` full-track decomposition: 1,395 → 237 lines, 0 useState
-
-**5th full-track giant; 14 commits on `refactor/platform-tiers`, fast-forwarded to `main` (`44ae740`) and pushed.
-Zero behaviour change.** Stage 0 plan → `/plan-review` → 0b fence → 11 stages, each gated on typecheck + vitest.
-dao is the **second three-way split** after invoices (`.repo`/`.rpc`/`.api` — this page has 4 `/api/*` routes);
-domain 8 hooks + 2 pure modules; ui 10 components. Both ledgers **empty**. 757 → 770 vitest (+13
-characterisation). **Driver net 129/129** (platform-admin 6, scope 32, provisioning 15, suspension 12,
-smoke-admin 64) + **23 hand-check assertions** with screenshots for the 5 surfaces no driver opens.
-
-- **Read `docs/refactor/PLATFORM_REFACTOR_PLAN.md` (§5 risks, §6 per-stage mitigations, §12), not this.**
-- **A real behaviour bug was caught BEFORE it shipped, by writing a characterisation test** — the only
-  thing that could have. Extracting `familyMessage()` from a sequence of `setFamMessage` calls, the natural
-  rewrite inverts the precedence (inline the failure message is assigned first and *overwritten* by the count
-  branches). typecheck, the fence and every driver pass either way. → playbook §5.
-- **Graduated:** §7.243 (a grep assertion matches its own prohibition comment — fix is structural: count over
-  comment-stripped source), §7.244 (a bare `selectOption("select")` is a one-`<select>` DOM contract),
-  §7.245 (an exact-`h1` smoke check can't tell a refusal branch from content), §7.246 (tenant names in two
-  tables make a row locator ambiguous); `verify-platform-controls` → `BACKLOG.md`; ARCHITECTURE §10, TESTING §5.
-- **`/plan-review` (Fable 5.1 subagent) paid again:** 6 factual errors in the Stage 0 plan, incl. a driver
-  credited with a check it never makes — 3 verified by hand before folding in.
-- **Also graduated OUT of §9 this session:** the 4 sweep-triage rules → `docs/TESTING.md` §5, and the deploy
-  narrative → `docs/DEPLOYMENT.md` §11 (it cited ten §11.x entries that already held every word). −4 KB.
-
-_(§8.109 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.110 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -434,34 +427,32 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-18: `main` is `33d4e82` (carries Admin L-D, §8.111). Nightly `35319533916` (manual) was
-RUNNING on it when this was written — `gh run view 35319533916`.** It is the GATE for the next unit (§7.1).
-Bisection spans the L-D batch only (`35306167774` was green on `44ae740`), so a red is most likely a
-levels / trials / makeups / assessment driver — **but read it, don't trust this line** (§8.65).
+**State on 2026-09-18: `main` is `3690bdb` (carries lesson detail, §8.112). Nightly `35328388854` (manual) was
+RUNNING on it when this was written — `gh run view 35328388854`.** It is the GATE for the next unit (§7.1). The
+previous one (`35319533916`, on L-D's `33d4e82`) went green, so a red now bisects to the lesson-detail commits — most
+likely `admin-lesson-detail` / `cancel-lesson` / `admin-calendar` — **but read it, don't trust this line** (§8.65).
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
 which mutate shared seed state — are in the same section.
 
-### THE NEXT BUILD — the last admin giant (the alternation), or the next lite batch
+### THE NEXT BUILD — Admin L-E (the batch due by the alternation), or the first coach-app giant
 
-**Admin L-D is DONE (§8.111).** Full-track giants done: Students (pilot), `packages`, `invoices`, `classes`,
-`platform`. Lite batches done: L-A, L-B, L-C, L-D. By the **giant→batch alternation a GIANT is due next.**
+**All six admin full-track giants are DONE (§8.112).** Lite batches done: L-A, L-B, L-C, L-D. By the
+**giant→batch alternation a BATCH is due next.**
 
-- **Recommended: `lessons/[classId]/[date]` (912 lines)** — the last admin giant; full track (playbook §2), own
-  plan doc. Its `lib/makeupSearch` import is SHARED with `makeups` (stays in `lib/`). Re-derive the driver net by
-  grep first (§7.236).
-- **Or Admin L-E** (`dashboard` `locations` `history`, ~1,161 lines) if a lighter unit fits the session.
-- The three coach-app giants (`schedule/index` 1,255, `classes/[id]/attendance` 1,183, `classes/[id]/roster` 905)
-  add the `features/` layout, the jest twin and RN-web quirks (playbook §1) — a different KIND of unit.
-- **Before any unit:** grep the test suite for other `page.tsx`-keyed scans (§7.248), and give each nested route
-  its own `SCOPE_DIRS` entry (§7.247).
+- **Recommended: Admin L-E** (`dashboard` `locations` `history`, ~1,161 lines) — the last admin lite batch; net per
+  playbook §7.1 (join-code, orphan-report, platform-admin, locations; **history: none → smoke**). Re-derive by grep (§7.236).
+- **Then the coach-app giants** (`schedule/index` 1,255, `classes/[id]/attendance` 1,183, `classes/[id]/roster` 905) —
+  a different KIND of unit: `SwimSyncApp/features/`, the jest fence twin, RN-web quirks (playbook §1, §3).
+- **Before any unit:** grep the suite for `page.tsx`-keyed scans (§7.248), give nested routes their own `SCOPE_DIRS`
+  entry (§7.247), and move any `lib/` sole-importer PAIR in one commit (§7.250).
 
-**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35319533916` (L-D) is green.**
+**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35328388854` (lesson detail) is green.**
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), on prod,
 0 pending (157/157 on 2026-09-18), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.111 authored none — a pure refactor.
+the fact; a prose status is a hint.** §8.112 authored none — a pure refactor.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

@@ -28,6 +28,7 @@ _The rows below are moved verbatim. Their length is the pre-2026-08-10 record, n
 standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.110** | 2026-09-18 | `platform/page.tsx` full-track: 1,395 → 237 lines, 0 useState | docs/refactor/PLATFORM_REFACTOR_PLAN.md · §7.243–7.246 · playbook §5 |
 | **8.109** | 2026-09-17 | Admin L-C money batch: 4 pages to tiers, 2,309 → 394 lines, 0 useState | docs/refactor/BATCH_C_PLAN.md · playbook §2/§4 · BACKLOG verify-money-admin |
 | **8.108** | 2026-09-17 | `classes/page.tsx` full-track: 1,714 → 164 lines, 0 useState, zero behaviour change | docs/refactor/CLASSES_REFACTOR_PLAN.md · §7.242 · playbook §2 |
 | **8.107** | 2026-09-17 | August billing diagnosed, no code: 9 invoices out, month held open by one unclaimed child | INVOICE_RUNBOOK.md · BACKLOG Billing and payments |

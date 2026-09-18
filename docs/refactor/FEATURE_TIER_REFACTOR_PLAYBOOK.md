@@ -12,7 +12,7 @@ state, decided 2026-09-12, is that EVERY page follows the shape in §1** — not
 giants. What varies with size is the *ceremony*, not the shape: §7 defines three tracks.
 The eight giants (`packages/page.tsx` 2,014 lines ✅, `invoices/page.tsx` 1,748 ✅,
 `classes/page.tsx` 1,714 ✅, `platform/page.tsx` 1,395 ✅, `lessons/[classId]/[date]/page.tsx`
-912, and in the coach app `(coach)/schedule/index.tsx` 1,255,
+912 ✅, and in the coach app `(coach)/schedule/index.tsx` 1,255,
 `(coach)/classes/[id]/attendance.tsx` 1,183, `(coach)/classes/[id]/roster.tsx` 905) take
 the full twelve stages of §2, **one at a time, and never start the next until the last has
 survived a nightly sweep** (plan §11). Everything smaller takes the lite or fence track
@@ -131,6 +131,8 @@ Green or `git checkout -- .` and try a smaller step. Never "fix it in the next c
 > **The sole-importer grep must cover BOTH `@/lib/<mod>` AND (from inside `lib/`) `./<mod>`, excluding `.test`.**
 > A module in `lib/` is imported by its `lib/` siblings by *relative* path, which `grep -rln '@/lib/<mod>'`
 > silently misses — so a helper can look sole-imported by the page when two other `lib/` modules also use it.
+> **And when the only OTHER importer is a `lib/` sibling of the same pair** (`adminAttendanceSave` ← `…SaveDeps`),
+> the two are one unit: move them in the SAME commit, or `lib/` imports a route folder in between (§7.250).
 > Moving it then breaks them. (Admin L-B: `attendanceWindow` looked sole-imported by `lessons/page.tsx`;
 > `lessonMarking.ts` + `markableFloor.ts` import it as `./attendanceWindow`, so it STAYS. Caught before the move.)
 >
@@ -173,6 +175,10 @@ before the medium-risk slices.
   `grep -nE "[a-z] p\.[a-z]\.[a-z]+ [a-z]" <page>/ui/*.tsx` (Admin L-D: 2 hits, both caught this way, none shipped).
   Also give the hook's page variable a name no `.map((l) => …)` callback uses (`lv`, not `l`) — the verbatim
   check strips it and would eat the loop variable's `l.` too.
+- **Better than any rename: DESTRUCTURE the hook object on the component's first line** (`const { cls, roster, … } = ld;`)
+  and the moved JSX stays byte-identical — no `foo` → `p.x.foo` rename exists for the JSX-text trap above to
+  corrupt, and the verbatim check needs no rename map. The lesson-detail Stage 7 moved 11 components this way;
+  the only unmatched lines were the 4 planned structural rewrites. Prefer this over prop prefixes.
 - **Check verbatim by script, not by eye.** Cut each `ui/` block by line range from `git show HEAD:<page>`, then
   compare the component's JSX to the original with whitespace stripped and the prop renames mapped back
   (`onVoid(` → `voidNote(`). Any divergence prints where it starts. (Admin L-C, all 15 `ui/` files.)
@@ -245,6 +251,9 @@ rm verify-zz-* fixtures-zz-*                    # before committing anything
   `page.removeAllListeners("dialog")` first (a `window.prompt` Void needs your own answer); and
   **`button[aria-expanded]` matches the admin SIDEBAR's collapsible groups** before any row
   toggle — target the row's button by its accessible name. Both cost a false red on L-C.
+- **`run-all-drivers.sh --only` takes ONE driver name** — a comma list matches nothing. Loop it. Driver check
+  counts in a plan are RUNTIME counts: a `grep -c 'check('` double-counts a cleanup check written in both `try` and
+  `catch` (lesson detail: grep 28/18, runtime 27/17).
 - **A red on a cold dev server is §7.108 first.** `verify-assessment` went 23/27 on the
   first hit of an uncompiled route and 27/27 warm, with zero lines of the assessment page
   changed. Re-run before reading it as a regression.
@@ -340,7 +349,7 @@ code architecture" a fact the test runner can check rather than a sentence in a 
 
 | Track | Size | Admin | Coach/parent app | Lines |
 |---|---|---|---|---|
-| **Full** (§2, twelve stages, own plan doc) | > ~900 | **1 remaining** (`lessons/[classId]/[date]`) | 3 | ~11,100 |
+| **Full** (§2, twelve stages, own plan doc) | > ~900 | **0 remaining** (all six done 2026-09-18) | 3 | ~11,100 |
 | **Lite** (below) | ~250 – ~900 | 21 pages | 13 screens | ~16,200 |
 | **Fence** (below) | < ~250 | 5 pages | 10 screens | ~2,600 |
 

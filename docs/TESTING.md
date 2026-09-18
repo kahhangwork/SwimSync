@@ -1213,6 +1213,17 @@ a planted break; `skillScale.test.ts` and `trialConvert.test.ts` moved into thei
 **`components/Table.test.tsx`'s Thead guard now scans every non-test `.tsx` under `app/(admin)`**, not only
 `page.tsx` — it had lost 24 tables to the refactor (§7.248).
 
+**The lesson-detail full track (2026-09-18, §8.112) scoped `lessons/[classId]/[date]` as its own `SCOPE_DIRS` entry**
+(§7.247) and added **`lessons/[classId]/[date]/domain/lessonDetailRows.test.ts` (13, characterisation)** — the load's
+roster mapping (the billing gate's `expectedStudentsOn` union; an enrolled child who also holds a guest booking is
+`enrolled` with no booking id; a guest's name overwrites the enrolment's; "Former student" rows) and the two kid
+filters that look alike (`trialKidsFrom` does NOT consult the `classes` join). `lessonMarking.test.ts` and
+`adminAttendanceSave.test.ts` moved into the same `domain/` with their modules.
+**Hand-check setup traps met there:** `psql -Atc "A; B; C"` is ONE transaction — an error in C rolls back A while A's
+`INSERT 0 1` echo still prints; and a child a hand-check creates must be VISIBLE to the logged-in admin under RLS —
+an enrolment-less child is not, so the trial picker read "(0)" on unchanged code. An inactive enrolment in one of
+the admin's classes makes it visible and still trial-eligible.
+
 **Which UI drivers actually exercise the admin Students page** (verified by running each after the slice
 it covers, and all of them after Stage 11 — §7.236 is why this list exists): `contact-details` (Actions
 drawer → Contact modal in both modes, the claim lock, **Add student**), `active-inactive` (Set inactive and

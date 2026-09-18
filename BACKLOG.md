@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-18 — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -1761,6 +1761,38 @@ nothing, which invites a second tap or a skipped promotion.
 than instead of it) or by lifting the flash to the page — either is a behaviour change, so its own commit,
 never inside a refactor. (2) is one line in `optimisticRoster` (treat a grade written THIS session as fresh
 regardless of equality) — check it against `isFreshGrade` and the §7.221 stroke rules first.
+
+### A `verify-lesson-detail-guests` driver for the lesson page's uncovered actions — **S** `[from the lesson-detail refactor 2026-09-18]`
+The four-driver net for `/lessons/[classId]/[date]` (129/129, §8.112) presses none of these: **book a TRIAL** into a
+lesson and **Cancel booking** on a guest row; **Set all**; the **Rain/Coach** and **Paid/Free** sub-toggles; a
+make-up for a child with **two same-category homes** (the "Which class does this make-up replace?" select and its
+refusal); the **`full-notice`** inside the Book modal (the driver's FULL check reads the RPC's refusal via
+`bookError`, not the notice); the invalid-date / unknown-class states; **Keep the lesson**; and the
+**assign-substitute ERROR** branch — which has no render proof anywhere, by driver or by hand. All but the last were
+hand-checked once, 20/20, DB-verified (`docs/refactor/LESSON_DETAIL_REFACTOR_PLAN.md` §11a).
+
+**Why:** the lesson page is the admin's only attendance-writing surface. Cancel booking and the multi-home make-up are
+billing-adjacent (a guest's home class prices the line); Set all writes every editable row at once. A regression in
+any of them is silent until an invoice run.
+
+**Notes:** seeds = `fixtures-admin-calendar.sql` plus ONE trial-eligible child and ONE extra home for Calkid Delta
+(Saturday Beginners). The trial child must be **visible to the admin under RLS** — give it an INACTIVE enrolment in
+Rose (an enrolment-less child reads "(0)" in the picker). To make assign FAIL, pick a shape the RPC refuses (a
+cancelled lesson, or a coach the class rate already pays via SQL) — the picker hides the latter on purpose.
+
+### The lesson page's load swallows six read errors — a failed attendance read looks like "nothing marked" — **S** `[found by the lesson-detail refactor 2026-09-18]`
+`useLessonDetail` checks eight results (`??` chain) and ignores the rest: `tenants`, `students`, `getSession`, and
+the three session-scoped reads (`attendance`, `session_coaches`, `session_coach_absences`). Preserved verbatim by the
+refactor (rule 0) and filed here.
+
+**Why:** a failed `attendance` read renders every row **Not marked**. An admin who re-marks and saves then upserts
+over the real statuses — the save sends `prevStatus: null`, so the changed-rows filter cannot protect them, and a
+billed `present` turned into anything else issues a credit note. A failed `students` read shows empty make-up/trial
+pickers indistinguishable from "nobody eligible"; a failed `session_coaches` read hides a live substitute.
+
+**Notes:** the fix is to fold the session-scoped errors (at least `attendance`) into the same `loadError` path —
+a behaviour change, so its own commit, never inside a refactor. `getSession` failing leaves `actorId` null, which
+already makes `doSave` a silent no-op; say so in the UI rather than doing nothing.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the

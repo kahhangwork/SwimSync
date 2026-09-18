@@ -343,6 +343,9 @@ succeeded — so `Could not assign: …` is covered only by the verbatim-move ch
 
 ## 12. Findings for `/update-docs`
 
+_**Graduated 2026-09-18 by `/update-docs` (§8.112):** the candidate gotcha → §7.250; the playbook items → playbook §2/§4;
+the hand-check traps → TESTING §5; both BACKLOG items filed. Kept below as the record._
+
 - **`/plan-review` (Fable 5.1) found 6 factual errors**, all verified by hand before folding in: a check-4 breaker
   the existing pin would have covered (`@/lib/utils`), a testid list with 2 wrong + 2 missing, the driver's FULL
   check misattributed (it reads the RPC refusal, not `full-notice`), the smoke driver's exact-h1 rule, an
