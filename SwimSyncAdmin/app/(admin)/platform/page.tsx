@@ -1,21 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
-import { ROW_LIMIT } from "./constants";
-import {
-  childrenOfParents,
-  searchFamilyMemberships,
-} from "./dao/platform.repo";
 import { useNotice } from "./domain/useNotice";
 import { usePlatformAccess } from "./domain/usePlatformAccess";
 import { useOwnerTransfer } from "./domain/useOwnerTransfer";
 import { useProvisioning } from "./domain/useProvisioning";
+import { useFamilyStatus } from "./domain/useFamilyStatus";
 import { useStudentMove } from "./domain/useStudentMove";
 import { useSuspend } from "./domain/useSuspend";
 import { useTenants } from "./domain/useTenants";
 import { CreditWarningModal } from "./ui/CreditWarningModal";
+import { FamilyStatusSection } from "./ui/FamilyStatusSection";
 import { NewBusinessForm } from "./ui/NewBusinessForm";
 import { NotPlatformAdmin } from "./ui/NotPlatformAdmin";
 import { OwnerModal } from "./ui/OwnerModal";
@@ -24,9 +20,6 @@ import { SuspendModal } from "./ui/SuspendModal";
 import { ProvisionedBanner } from "./ui/ProvisionedBanner";
 import { StrandedPanel } from "./ui/StrandedPanel";
 import { TenantsTable } from "./ui/TenantsTable";
-import type {
-  FamilyStatusRow,
-} from "./types";
 
 /**
  * Platform admin — cross-tenant operations, for SwimSync itself.
@@ -96,6 +89,8 @@ export default function PlatformPage() {
     doMove,
     cancelMove,
   } = useStudentMove(tenants, setMessage);
+  const { famSearch, setFamSearch, families, famMessage, handleFamilySearch } =
+    useFamilyStatus();
 
   // ── Provisioning a new business ───────────────────────────────────────────
 
@@ -111,82 +106,12 @@ export default function PlatformPage() {
 
 
 
-  const [famSearch, setFamSearch] = useState("");
-  const [families, setFamilies] = useState<FamilyStatusRow[]>([]);
-  const [famMessage, setFamMessage] = useState<string | null>(null);
 
-  // Platform-admin view of a family ACROSS businesses — the one place that
-  // exists. A tenant admin can only ever see their own side of this.
-  //
-  // Deliberately shows activity but NOT assigned/unassigned: which class a
-  // child is in is the business's operational concern, and putting it here
-  // would invite the platform admin to reason about it.
-  async function handleFamilySearch() {
-    setFamMessage(null);
-    const term = famSearch.trim();
-    if (!term) {
-      setFamilies([]);
-      return;
-    }
-    // ⚠ RISK 3 — this used to fetch EVERY parent_tenants row and filter in JS,
-    // which silently searched only the first 1000 memberships. The term is now
-    // pushed into the DB: match the parent's name OR email through the profiles
-    // embed. BOTH embeds are !inner — over a plain (left) embed the .or() would
-    // not restrict the memberships, returning every one with a null embed (the
-    // silent wrong answer). The term is sanitised for the .or() grammar by
-    // orIlike (lib/tableSearch), so a comma or brackets in a name is data, never
-    // structure, and can never change the query.
-    const { data, error } = await searchFamilyMemberships(term);
-
-    if (error) {
-      setFamilies([]);
-      setFamMessage(`Could not search families: ${error.message}`);
-      return;
-    }
-    const matching = (data ?? []) as any[];
-
-    // Bounded by the matched memberships (the .in list), so this second query is
-    // not a fresh unbounded fetch. The sentinel keeps `.in([])` from matching
-    // everything when there are no matches.
-    const { data: kids, error: kidsErr } = await childrenOfParents(
-      matching.map((r) => r.parent_id)
-    );
-    // Surfaced, not swallowed: a failed children read would otherwise render
-    // every matched family as "none" — a wrong answer that looks like data.
-    if (kidsErr) {
-      setFamMessage(
-        `Found ${matching.length} famil${matching.length === 1 ? "y" : "ies"}, but their children could not be loaded — try again.`,
-      );
-    }
-
-    setFamilies(
-      matching.map((r) => ({
-        parent_name: r.parents?.profiles?.full_name ?? "—",
-        email: r.parents?.profiles?.email ?? "—",
-        tenant_name: r.tenants?.display_name ?? "—",
-        family_active: r.is_active,
-        children: (kids ?? [])
-          .filter((k: any) => k.parent_id === r.parent_id && k.students?.tenant_id === r.tenant_id)
-          .map((k: any) => ({ full_name: k.students.full_name, is_active: k.students.is_active })),
-      }))
-    );
-    if (matching.length === 0) setFamMessage("No families matched.");
-    else if (matching.length >= ROW_LIMIT)
-      setFamMessage(`Showing the first ${ROW_LIMIT} matches — refine your search.`);
-  }
 
 
   // All four declared above the two conditional returns below — a hook after a
   // conditional return is a hook that sometimes does not run.
 
-  const familySort = useTableSort<FamilyStatusRow>({
-    key: "parent_name",
-    accessors: {
-      family_active: (f) => !f.family_active,
-      children: (f) => f.children.length,
-    },
-  });
-  const visibleFamilies = familySort.apply(families);
 
   if (allowed === null) return <div className="p-6 text-gray-500">Loading…</div>;
 
@@ -309,78 +234,13 @@ export default function PlatformPage() {
           THAT business's call, so this shows the answer without offering to
           change it. There is no login-blocking control here either: that is a
           platform power over an ACCOUNT and is filed separately. */}
-      <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-5">
-        <h2 className="mb-1 text-lg font-semibold text-gray-900">Family status</h2>
-        <p className="mb-4 text-sm text-gray-500">
-          Where a family stands at each business they deal with. Read-only —
-          activity is the business&apos;s decision, not the platform&apos;s.
-        </p>
-
-        <div className="mb-4 flex gap-2">
-          <input
-            value={famSearch}
-            onChange={(e) => setFamSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleFamilySearch()}
-            placeholder="Search a parent's name or email"
-            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
-          />
-          <button
-            onClick={handleFamilySearch}
-            className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
-          >
-            Search
-          </button>
-        </div>
-
-        {famMessage && (
-          <div className="mb-3 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
-            {famMessage}
-          </div>
-        )}
-
-        {families.length > 0 && (
-          <Table>
-            <Thead>
-              <Th sort={familySort} sortKey="parent_name">Parent</Th>
-              <Th sort={familySort} sortKey="tenant_name">Business</Th>
-              <Th sort={familySort} sortKey="family_active">Family</Th>
-              <Th sort={familySort} sortKey="children">Children there</Th>
-            </Thead>
-            <Tbody>
-              {visibleFamilies.map((f, i) => (
-                <Tr key={`${f.email}:${f.tenant_name}:${i}`}>
-                  <Td>
-                    <div className="font-medium text-gray-900">{f.parent_name}</div>
-                    <div className="text-xs text-gray-500">{f.email}</div>
-                  </Td>
-                  <Td>{f.tenant_name}</Td>
-                  <Td>{f.family_active ? "Active" : "Inactive"}</Td>
-                  <Td>
-                    {f.children.length === 0 ? (
-                      <span className="text-gray-400">none</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {f.children.map((c) => (
-                          <span
-                            key={c.full_name}
-                            className={`rounded px-1.5 py-0.5 text-xs ${
-                              c.is_active
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-gray-100 text-gray-500 line-through"
-                            }`}
-                          >
-                            {c.full_name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-        )}
-      </div>
+<FamilyStatusSection
+        famSearch={famSearch}
+        setFamSearch={setFamSearch}
+        families={families}
+        famMessage={famMessage}
+        onSearch={handleFamilySearch}
+      />
     </div>
   );
 }
