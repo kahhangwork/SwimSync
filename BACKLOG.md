@@ -714,7 +714,7 @@ NEW table + a NEW coach-facing write surface)*:
 Shipped: the *past — needs marking* list on the Trials page carries a **Convert to enrolled**
 action that enrols the child into the class they tried, reusing the Unassigned Children insert.
 The RISK 1 two-press guard (a rebooked *upcoming* trial would otherwise block billing) is in
-`lib/trialConvert.ts` and unit-tested; PRD §7.17 describes the behaviour. The past trial row
+`trials/domain/trialConvert.ts` (was `lib/` until Admin L-D) and unit-tested; PRD §7.17 describes the behaviour. The past trial row
 deliberately stays on the needs-marking list — converting is not marking.
 
 <details><summary>Original item (kept for the reasoning)</summary>

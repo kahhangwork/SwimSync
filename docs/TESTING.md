@@ -254,7 +254,7 @@ _Frontend tests:_
 tests** (2026-08-14; the runner is the fact, this number is a hint that drifts). **2026-08-17
 (Wave C)** added four pure libs, each with its risk-mitigation proven red first:
 `lib/csv.test.ts` (serialisation + the §7.179 formula-injection and source-count truncation
-guards), `lib/trialConvert.test.ts` (the §7.180 two-press guard), `lib/makeupFromAttendance.test.ts`
+guards), `lib/trialConvert.test.ts` (the §7.180 two-press guard — now `app/(admin)/trials/domain/`, Admin L-D), `lib/makeupFromAttendance.test.ts`
 (the own-enrolled-class gate + the "exclude EVERY own class" host-choice filter) and
 `lib/auditDiff.test.ts` (the snapshot diff + the "an unresolved actor is *unknown user*, never
 *system*" label). `lib/adminNav.test.ts`'s page-count assertion moved 19 → 20 for `/history`.
@@ -1102,7 +1102,7 @@ and a final assertion that counts rather than tests presence (§7.118).
   and parent screens: `summariseSkillProgress` (n-of-m at the top grade, ignoring stale rows, empty scale) and
   `cycleGrade` (ungraded → lowest → top → ungraded, keyed on rank not array order). No screen render test exists
   (jest.config restricts to `lib/**`), so the tested layer is these helpers; the screens stay thin.
-- **`skillScale.test.ts` (8, vitest — `SwimSyncAdmin/lib`)** — `nextRank` and `describeDeleteError`, which turns
+- **`skillScale.test.ts` (8, vitest — `SwimSyncAdmin/app/(admin)/levels/domain`, was `lib/` until Admin L-D)** — `nextRank` and `describeDeleteError`, which turns
   the FK-refusal (23503) on an in-use skill/level/grade into the friendly "records are kept" message the Levels
   page shows, and falls back to a generic message for any other error.
 - **`stranger_isolation.test.sql`** — its member-sees pin bumped 16→17 tables (skill_grade_levels is seeded per

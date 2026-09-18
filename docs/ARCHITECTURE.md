@@ -551,6 +551,44 @@ the shape of the system changes:_
   `lessonDates.ts`, and `brand/README.md` says so. **Don't add the mark to the invoice email
   header**: that slot belongs to the *tenant's* logo (PRD §7.10).
 
+- **Every admin page is tiered `page → ui → domain → dao`, and `dao/` is split THREE ways by
+  how a call fails** (feature-tier refactor, 2026-09-12 onward;
+  `docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md` is the method, `SwimSyncAdmin/lib/tierBoundaries.drift.test.ts`
+  the enforcement — the admin app has no ESLint, so the direction is a source-scanning test).
+  - `dao/<feature>.repo.ts` — every `.from()`: PostgREST tables. Fails as an RLS denial, an
+    empty result, or the 1000-row cap.
+  - `dao/<feature>.rpc.ts` — every `.rpc()`: Postgres functions. Fails as `permission denied`
+    (a migration that forgot its GRANT, §7.87) or as the function's own guard refusing, in a
+    sentence written for the admin — **surfaced verbatim, never reworded**.
+  - `dao/<feature>.api.ts` — every `fetch()` to an `app/api/*` route (admin only; `students`,
+    `invoices`, `platform`, `admins`, `coaches` have one). Fails as an HTTP status.
+  - Each function is **thin**: one call, the raw `{ data, error }` returned, no mapping, no
+    retry, no default. A client-taking `lib/` helper (drift-pinned or shared across apps) is
+    **bound** in `dao/` (`export const x = (id) => lib.x(supabase, id)`), never moved.
+
+  **Orchestrate, never replace.** An `.rpc()` is not data access — it is business logic that
+  lives in Postgres (multi-table atomic writes, audit triggers, the billing guards). It sits in
+  its own file so nobody reimplements one "for clarity" in TypeScript, which in this codebase
+  is exactly how an override lands on a guard that must never have one (CLAUDE.md, "Billing").
+  **`domain/` may ORCHESTRATE an rpc — sequence it, await it, reload after it; it may never
+  REPLACE one**, pre-empt its refusal, or reshape its arguments. Every `*.rpc.ts` header carries
+  this line. The same rule governs multi-call flows: every `await` boundary (a stale-response
+  check, a two-press guard, a tenant lookup inside an insert) stays in the `domain/` hook, in
+  the order the page had it — a dao function that bundled two awaits would hide the seam
+  (`wages` `usePayroll`, `trials` `handleConvert`).
+
+  **A SHARED component that writes gets its writes INJECTED, not a dao of its own.**
+  `components/AssessmentGrid.tsx` is used by two features (`assessment/[classId]` and the
+  Students grading modal); it takes `writes: GradeWrites` (type in `lib/assessment.ts`), and
+  each caller's hook binds the three functions to *its own* dao as a **module-level const**
+  (stable identity — the grid's `flushStroke` `useCallback` deps are `[onReload]` only). The
+  grid keeps every piece of orchestration (dedupe, whole-stroke snapshot, rollback, reload);
+  only the transport moved. Chosen over a shared `components/*.repo.ts` because a `.repo` file
+  outside `dao/` would itself trip the fence's check 3, and a `lib/` file would be invisible
+  to it. The fence scans the grid by name (`SCOPE_FILES`), so the client cannot return.
+  Precedent for the shape: `lib/adminAttendanceSave.ts` + its bound `SaveDeps`. (Admin L-D,
+  `docs/refactor/BATCH_D_PLAN.md`.)
+
 ---
 
 ---
@@ -584,7 +622,7 @@ the shape of the system changes:_
 | `SwimSyncAdmin/components/calendar/` | `TimeGrid` (sticky gutter/header, lanes), `MonthGrid`, `AgendaList`, `LessonCard`, `LessonTooltip`, `CalendarToolbar` — all read-only |
 | `SwimSyncAdmin/lib/claimNaming.ts` | The two naming decisions on the claim-approval screen, pure: the certainty-dependent picker default (parent's name for `confirmed`, current for `unsure`) and the post-approve message (a rename failure reads "linked, name not applied", never an approval failure). Backend primitive is `rename_student()` (`20260814000100`); §7.154 |
 | `SwimSyncAdmin/lib/tableSearch.ts` | Scoped admin-table search: `ilikeContains` (bound `.ilike` arg, escapes LIKE wildcards), `orValue`/`orIlike` (sanitised PostgREST `.or()` grammar — value double-quoted, wildcard backslash **doubled**, §7.217), `matchesAnyField` (pure client fallback). The pushdown must ride an `!inner` embed for a joined column (§7.216) |
-| `SwimSyncAdmin/lib/skillScale.ts` | Grade-scale editor helpers (Piece 4): `nextRank` (one past the top), `describeDeleteError` — turns the FK-refusal (23503) on an in-use skill/level/grade into the friendly "records are kept" message the Levels page shows. Hosted on `/levels` (no new route → the §7.178 sidebar page-count pin is untouched) |
+| `SwimSyncAdmin/app/(admin)/levels/domain/skillScale.ts` | *(was `lib/skillScale.ts`; moved 2026-09-18, Admin L-D — sole importer)* Grade-scale editor helpers (Piece 4): `nextRank` (one past the top), `describeDeleteError` — turns the FK-refusal (23503) on an in-use skill/level/grade into the friendly "records are kept" message the Levels page shows. Hosted on `/levels` (no new route → the §7.178 sidebar page-count pin is untouched) |
 | `SwimSyncApp/lib/skillProgress.ts` | Swim-skill grading, pure + jest-tested (shared by the coach grade screen and the parent child view): `summariseSkillProgress` (n-of-m at the top grade, tolerant of stale rows/empty scale) and `cycleGrade` (tap cycle ungraded → lowest → top → ungraded, keyed on rank). "Done" = top rank, computed |
 | `SwimSyncApp/app/(coach)/classes/[id]/grade.tsx` | Coach grade screen — file-routed, reached from the roster's *Grade*. Fetches the child's current-level skills + the tenant scale + existing grades; tap-to-cycle upserts `student_skill_progress` (delete on clear), optimistic with Toast-on-error (never `Alert.alert`). Empty states for no-level / no-skills |
 | `SwimSyncAdmin/components/useDebouncedValue.ts` | Debounce hook — the scoped search runs in the DB, so each keystroke is a round trip; the initial value passes through with no delay so first-load is not held back |
@@ -608,7 +646,7 @@ the shape of the system changes:_
 | `SwimSyncApp/lib/timeOfDay.ts` | Time of day in Singapore. Coach-only, **not** in the `lessonDates.ts` twins. Only `nowMinutesInSg()` knows about timezones; everything comparing times takes a plain number, so it **cannot** read a clock and therefore cannot read the wrong one (§7.7) |
 | `SwimSyncAdmin/lib/tableSort.ts` | One comparison rule for all 22 admin tables. Blanks last in **both** directions, numeric-aware, weekdays in week order, stable, and ISO dates compared as text so nothing constructs a `Date` (§7.7-proof by construction) |
 | `SwimSyncAdmin/lib/csv.ts` | CSV export for the admin tables (Invoices/Credit Notes/Attendance). `toCsv` + `exportCsv` (Blob download). Carries the two §7.179 guards: formula-injection prefix on string fields (numbers pass through), and a truncation block keyed on the **unfiltered source count**. UTF-8 BOM |
-| `SwimSyncAdmin/lib/{trialConvert,makeupFromAttendance,auditDiff}.ts` | Wave C pure helpers (each `+.test`): the convert-a-trial two-press guard (§7.180); the make-up own-enrolled-class gate + host-choice exclusion; the Change History snapshot-diff + the "unresolved actor → *unknown user*, never *system*" label |
+| `SwimSyncAdmin/app/(admin)/trials/domain/trialConvert.ts`, `…/attendance/domain/makeupFromAttendance.ts`, `SwimSyncAdmin/lib/auditDiff.ts` | Wave C pure helpers (each `+.test`; the first two moved beside their sole importer by the tier refactor): the convert-a-trial two-press guard (§7.180); the make-up own-enrolled-class gate + host-choice exclusion; the Change History snapshot-diff + the "unresolved actor → *unknown user*, never *system*" label |
 | `SwimSyncAdmin/app/(admin)/history/page.tsx` | **Change History** — reads `audit_log` (grant + RLS pre-existed), one global list filtered by entity type + date range in the DB, diffs the `to_jsonb` snapshots. Deliberately not "Audit log": the trail has holes by design |
 | `SwimSyncApp/lib/upcomingLessons.ts` (+ test) | Parent upcoming-lessons projection: weekday walk over ~4 weeks from active enrolments, `tenant_public_holidays` subtracted. Derived at read time — no pre-generated sessions |
 | `SwimSyncAdmin/components/Table.tsx` | Now the shared **sorting primitive**, not just markup — carries `useTableSort` and the column-width mechanism. `<Thead>` owns its own `<tr>`, pinned by a call-site scan |

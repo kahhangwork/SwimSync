@@ -72,6 +72,10 @@ page  →  ui  →  domain  →  dao  →  (PostgREST | rpc | /api)
   Next, and `@/components/*`. **Never `@/lib/*`, never `./dao/*`.** Anything the page
   seems to need from `lib/` belongs in a `domain/` hook or a `ui/` component instead.
 
+**Why `dao/` is split three ways, the *orchestrate, never replace* rule, and how a SHARED
+component's writes are injected: `docs/ARCHITECTURE.md` §6** ("Every admin page is tiered…").
+That is the reference; this playbook is the method.
+
 `constants.ts` and `types.ts` are the **feature root**, not `lib/`. `lib/` is for code
 shared across features or across apps (Students plan §6 has the criterion and the list of
 `lib/` modules that must not move).
@@ -451,5 +455,5 @@ Recommended order:
 - [ ] `jest.config.js` `testMatch` covers `features/`, and `SCAN_DIRS` in both twins of
       `sgDisplay.drift.test.ts` covers it too (§1's table)
 - [ ] the smoke drivers are in `run-all-drivers.sh`'s nightly set
-- [ ] the dao three-way split and the "orchestrate, never replace" rule are in
-      `docs/ARCHITECTURE.md` §6, and this playbook points at them
+- [x] the dao three-way split and the "orchestrate, never replace" rule are in
+      `docs/ARCHITECTURE.md` §6, and this playbook points at them (§1) — 2026-09-18, Admin L-D

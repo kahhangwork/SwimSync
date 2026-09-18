@@ -196,23 +196,21 @@ Gate every commit: `cd SwimSyncAdmin && npm run typecheck && npm test` **and**
       breakers drove all four checks red (incl. `[classId]/ui/Break` → nested scope live, and a grid
       `supabase` line → `SCOPE_FILES` live); shrink test proven by corrupting one pin. Removed →
       6/6. Gate: 770 vitest + 429 jest, both typechecks green.
-- [ ] **L1–L3 folded, ONE commit per page, smallest first:**
-      1. `assessment` + `assessment/[classId]` + **the grid injection** (+ the students ~12 lines)
-         + **`AssessmentGrid.test.tsx` (RISK 1)** — one commit: the grid prop is required, so both
-         callers must change with it. Students' ledgers must stay EMPTY.
-      2. `makeups`
-      3. `levels` (+ `git mv lib/skillScale{,.test}.ts` → `levels/domain/`)
-      4. `trials` (+ `git mv lib/trialConvert{,.test}.ts` → `trials/domain/`).
-         ⚠ RISK 2 PROHIBITION: no `await` boundary in `handleConvert` / `loadAll` moves into dao —
-         one query per dao function; the two-press guard's order is untouched.
-      Each: 0 `useState` in `page.tsx`, page ≲ 200 lines, its ledger entries deleted as code
-      moves, characterisation tests for every pure extraction (playbook §5 — a precedence
-      inversion was caught this way on `platform`), `ui/` verified verbatim by script,
-      `npx tsc --noEmit --noUnusedLocals | grep '(admin)/<page>/'` clean.
-- [ ] **ARCH §6** (docs) — the dao three-way split (`.repo`/`.rpc`/`.api`), "orchestrate, never
-      replace", and injected writes for a shared component (the grid) as the third form; playbook
-      §1 points at it. Ticks playbook §7.5's last box. Same commit: repoint the moved-module
-      pointers `ARCHITECTURE.md:587/611`, `TESTING.md:257/1105`.
+- [x] **L1–L3 folded, ONE commit per page, smallest first** — all five route units: **0 `useState` /
+      `useMemo` / `useTableSort` in any `page.tsx`**, both ledgers **EMPTY** (0 pins left).
+      `944ac88` assessment 324→63 + `[classId]` 244→55 + grid injection (+ students ~20 lines,
+      `AssessmentGrid.test.tsx` 5/5, each proven red) · `b3bf04b` (unplanned, test-only) the §7.54
+      Thead guard widened to `ui/` · `7795f7b` makeups 654→65 · `208659c` levels 704→71 (+`skillScale`
+      git mv) · `d5cc8f8` trials 741→62 (+`trialConvert` git mv). **806 vitest** (770 → +36:
+      5 grid + 31 characterisation across the five pages' pure modules, each module proven red by a
+      planted break) + **429 jest**, both typechecks green at every commit; `tsc --noUnusedLocals`
+      clean for every new file. Every `ui/` file verbatim-by-script against its original page; a
+      second grep caught one prefix rename inside JSX text ("those p.t.classes") that the
+      prefix-stripping verbatim check cannot see — fixed before commit.
+- [x] **ARCH §6** (docs) — dao three-way split, *orchestrate, never replace*, and injected writes
+      for a shared component written into `docs/ARCHITECTURE.md` §6; playbook §1 points at it and
+      §7.5's last box is ticked. Moved-module pointers repointed (ARCHITECTURE §10 ×2, TESTING ×2,
+      GOTCHAS §7 line, BACKLOG line).
 - [ ] **L4** (once) — every driver in the net, one at a time (`--only`, per-driver DB reset),
       routes warmed first (§7.108), then the hand-checks above.
 - [ ] **Ship** — fast-forward `main`, push, confirm Vercel built both apps, `gh workflow run

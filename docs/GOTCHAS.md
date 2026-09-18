@@ -2936,7 +2936,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     override** (§7.15). The guard was ported into the convert handler, and the past trial row
     deliberately STAYS on the needs-marking list — converting is not marking. Rule: before
     dropping a guard you inherited, read its predicate; "it can't apply here" is a claim about
-    code you may not have read. (`lib/trialConvert.ts`, §8.66)
+    code you may not have read. (`trials/domain/trialConvert.ts`, was `lib/` until Admin L-D; §8.66)
 
 181. **A `*/` inside a CSS comment closes it — Tailwind class patterns are booby-trapped.**
     A block comment in `globals.css` documenting the responsive scaling wrote the class pair
