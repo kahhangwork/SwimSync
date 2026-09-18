@@ -199,7 +199,7 @@ functions (`cancelTrialBooking`, `cancelMakeupBooking`) and holds no logic. Erro
 #### Stage 0b
 - ⚠ RISK 8 **STEP:** run the widened fence BEFORE pinning and record the red counts (check 3 lines; check 4
   specifiers — expected 12 `@/lib/*` + `lucide-react` = **13**, `@/lib/utils` is ONE pin covering two lines).
-  `grep -c supabase page.tsx` = 24 is a hint only; the red run is the fact. Write the counts here.
+  `grep -c supabase page.tsx` = 24 is a hint only; the red run is the fact. **Recorded (0b, 2026-09-18): check 3 = 22 lines, check 4 = 13 specifiers on 14 lines — both as pre-agreed.**
 - ⚠ **STEP:** the breaker for check 4 is `@/lib/money` (a module the page does not import).
 - ⚠ **ASSERTION:** the `srcs` presence test lists `app/(admin)/lessons/[classId]/[date]/page.tsx`.
 

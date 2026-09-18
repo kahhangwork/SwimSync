@@ -84,6 +84,15 @@
 // supabase line in components/AssessmentGrid.tsx (proves SCOPE_FILES is live)
 // drove all four checks red — breakers removed, 6/6 green. Shrink test
 // re-proven: corrupting the cancel_makeup_booking pin turned it AND check 3 red.
+// Re-proven for the lesson-detail scope (lessons/[classId]/[date], full track)
+// on 2026-09-18 at Stage 0b: checks 3 and 4 went red on the page's real
+// violations (22 data-access lines, 13 specifiers on 14 import lines — the counts
+// pre-agreed at plan-review) before the ledger was pinned; [date]/ui/Break
+// importing ../dao, [date]/dao/break importing React, [date]/domain/break calling
+// fetch(, and an unpinned @/lib/money import on the page (NOT @/lib/utils — the
+// page already imports it, so its pin would cover a breaker) drove all four checks
+// red — breakers removed, 6/6 green. Shrink test re-proven: corrupting the
+// restore_lesson pin turned it AND check 3 red.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -167,6 +176,14 @@ const SCOPE_DIRS = [
   "app/(admin)/makeups",
   "app/(admin)/assessment",
   "app/(admin)/assessment/[classId]",
+  // lesson detail (full track, docs/refactor/LESSON_DETAIL_REFACTOR_PLAN.md),
+  // widened 2026-09-18 at Stage 0b. ⚠ Its OWN entry, like assessment/[classId]:
+  // the `lessons` scope's walk skips `[classId]/[date]` because it holds its own
+  // page.tsx (§7.247). Checks 3 and 4 are red on day one; every violation is
+  // pinned below with the stage that removes it. No transitional page->dao pins:
+  // every slice creates its dao calls AND the hook that wraps them in one commit
+  // (plan §5 RISK 8), so the page never imports dao/. Ledger only shrinks.
+  "app/(admin)/lessons/[classId]/[date]",
 ];
 
 // Single shared files outside any route unit, scanned for check 3 ONLY (they
@@ -188,6 +205,7 @@ type Allowed = { file: string; contains: string; why: string };
 // would call it stale, which reads as "the code moved" rather than "the path is
 // wrong"). Added with the platform scope, 2026-09-18.
 const F_PLATFORM = "app/(admin)/platform/page.tsx";
+const F_LESSON = "app/(admin)/lessons/[classId]/[date]/page.tsx";
 
 // (Admin L-D's F_LEVELS/F_TRIALS/F_MAKEUPS/F_ASSESS/F_ASSESS_CLASS/F_GRID were
 // deleted with their last ledger entry, 2026-09-18.)
@@ -268,6 +286,32 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // ── assessment + assessment/[classId] + AssessmentGrid: DONE (L-D commit 1) —
   //    each route's reads in its own dao/*.repo; the grid's 3 writes injected
   //    as `writes`, bound in assessment/[classId]/dao and students/dao. ──
+  // ── lesson detail (full track, LESSON_DETAIL_REFACTOR_PLAN.md), pinned
+  //    2026-09-18 at Stage 0b: 22 data-access lines (red-run count, pre-agreed at
+  //    plan-review). Each entry names the stage whose slice moves it into
+  //    dao/lessonDetail.{repo,rpc}.ts; the client import goes with the last call. ──
+  { file: F_LESSON, contains: 'import { supabase } from "@/lib/supabase"', why: "Stage 5 — the last page call (guests) moves to dao" },
+  { file: F_LESSON, contains: "supabase.auth.getSession()", why: "Stage 2 — spine reads -> dao/lessonDetail.repo" },
+  { file: F_LESSON, contains: 'supabase .from("classes")', why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: 'supabase.from("lesson_sessions")', why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: 'supabase.from("coaches")', why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: 'supabase .from("student_class_enrolments")', why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: 'supabase.from("trial_bookings")', why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: 'supabase.from("makeup_bookings")', why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: 'supabase.from("class_rates")', why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: 'supabase.from("class_shadow_coaches")', why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: 'supabase.from("tenants")', why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: 'supabase .from("students")', why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: 'supabase.from("attendance")', why: "Stage 2 — spine (session-scoped)" },
+  { file: F_LESSON, contains: 'supabase.from("session_coaches").select', why: "Stage 2 — spine (session-scoped)" },
+  { file: F_LESSON, contains: 'supabase.from("session_coach_absences")', why: "Stage 2 — spine (session-scoped)" },
+  { file: F_LESSON, contains: 'supabase.rpc("cancel_lesson"', why: "Stage 3 — cancel/restore -> dao/lessonDetail.rpc" },
+  { file: F_LESSON, contains: 'supabase.rpc("restore_lesson"', why: "Stage 3 — cancel/restore" },
+  { file: F_LESSON, contains: 'supabase.rpc("assign_session_coach"', why: "Stage 4 — substitute" },
+  { file: F_LESSON, contains: 'supabase.from("session_coaches").delete()', why: "Stage 4 — substitute (remove cover)" },
+  { file: F_LESSON, contains: 'supabase.rpc("book_makeup"', why: "Stage 5 — guests" },
+  { file: F_LESSON, contains: 'supabase.rpc("book_trial"', why: "Stage 5 — guests" },
+  { file: F_LESSON, contains: "supabase.rpc(fn,", why: "Stage 5 — guests (cancel_trial/makeup_booking)" },
 ];
 
 /**
@@ -418,6 +462,24 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // ── assessment + assessment/[classId] + AssessmentGrid: DONE (L-D commit 1) —
   //    each route's reads in its own dao/*.repo; the grid's 3 writes injected
   //    as `writes`, bound in assessment/[classId]/dao and students/dao. ──
+  // ── lesson detail (full track, LESSON_DETAIL_REFACTOR_PLAN.md §4), pinned
+  //    2026-09-18 at Stage 0b: 13 distinct specifiers on 14 lines (@/lib/utils is
+  //    imported twice; one pin covers both). lessonMarking MOVES into domain at
+  //    Stage 1; adminAttendanceSave(+Deps) move at Stage 6 (domain/ + dao/); the
+  //    rest STAY in lib (shared) and leave the page as their symbols move. ──
+  { file: F_LESSON, contains: "lucide-react", why: "Stage 7 — ArrowLeft moves into ui/" },
+  { file: F_LESSON, contains: "@/lib/supabase", why: "Stage 5 — the last page call moves to dao" },
+  { file: F_LESSON, contains: "@/lib/classColours", why: "Stage 7 — colourFor -> ui/LessonHeader" },
+  { file: F_LESSON, contains: "@/lib/lessonDates", why: "Stage 7 — formatSgDate is render-only after the spine" },
+  { file: F_LESSON, contains: "@/lib/utils", why: "Stage 7 — formatTime/cn -> ui/" },
+  { file: F_LESSON, contains: "@/lib/attendanceCompleteness", why: "Stage 2 — roster mapping -> domain/lessonDetailRows" },
+  { file: F_LESSON, contains: "@/lib/lessonAttribution", why: "Stage 2 — spine" },
+  { file: F_LESSON, contains: "@/lib/markableFloor", why: "Stage 2 — bound in dao/lessonDetail.repo" },
+  { file: F_LESSON, contains: "@/lib/calendarLessons", why: "Stage 7 — formatCount is render-only after the spine" },
+  { file: F_LESSON, contains: "@/lib/adminAttendanceSave", why: "Stage 6 — git mv into domain/ (sole importer)" },
+  { file: F_LESSON, contains: "@/lib/adminAttendanceSaveDeps", why: "Stage 6 — git mv into dao/lessonDetail.save" },
+  { file: F_LESSON, contains: "@/lib/lessonMarking", why: "Stage 1 — git mv into domain/ (sole importer)" },
+  { file: F_LESSON, contains: "@/lib/makeupSearch", why: "Stage 5 — filterEligibleKids -> domain/useGuestBooking (shared, stays)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
