@@ -6,12 +6,11 @@
 // list; addressed by (classId, date) — NEVER a session id (§7.64): the row may
 // not exist yet, and this page creates it only when the admin saves marks.
 //
-// THE SAVE IS THE COACH APP'S SAVE — lib/adminAttendanceSave.ts mirrors it step
+// THE SAVE IS THE COACH APP'S SAVE — domain/adminAttendanceSave.ts mirrors it step
 // for step (session resolve-or-insert → one upsert of the CHANGED rows → audit
 // → bounded credit-note email), with every step's error surfaced. Every DB
 // guard the coach meets applies here unchanged; there is NO override.
 
-import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -23,13 +22,10 @@ import { dayOfWeekOf, formatSgDate } from "@/lib/lessonDates";
 import { formatTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { formatCount } from "@/lib/calendarLessons";
-import { saveAdminAttendance, type SaveEntry } from "@/lib/adminAttendanceSave";
-import { supabaseSaveDeps } from "@/lib/adminAttendanceSaveDeps";
 import {
   STATUS_LABEL,
   SET_ALL_OPTIONS,
   optionsForKind,
-  holidayTransitions,
   rowEditable,
   capitalise,
   type DbStatus,
@@ -37,9 +33,9 @@ import {
 } from "./domain/lessonMarking";
 import { useLessonDetail } from "./domain/useLessonDetail";
 import { useCancelLesson } from "./domain/useCancelLesson";
+import { useAttendanceSave } from "./domain/useAttendanceSave";
 import { useSubstitute } from "./domain/useSubstitute";
 import { useGuestBooking } from "./domain/useGuestBooking";
-import type { SaveMsg } from "./types";
 
 export default function LessonPage() {
   const params = useParams<{ classId: string; date: string }>();
@@ -75,10 +71,29 @@ export default function LessonPage() {
     mainName,
   } = useLessonDetail(classId, date);
 
-  // ── Save / action state ─────────────────────────────────────────────────
-  const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<SaveMsg>(null);
-  const [confirmHoliday, setConfirmHoliday] = useState<number | null>(null);
+  // Hook order is the saveMsg dependency order (plan §3): the save slice owns
+  // saveMsg, so it is created before the two slices that also write it.
+  const { saving, saveMsg, setSaveMsg, confirmHoliday, setConfirmHoliday, doSave, requestSave, setAll } = useAttendanceSave({
+    classId,
+    date,
+    cls,
+    actorId,
+    sessionId,
+    roster,
+    draft,
+    setDraft,
+    newRowsAllowed,
+    reload,
+  });
+  const { coachPick, setCoachPick, coachBusy, coachMsg, classCoachName, substituteOptions, assignCoach, removeCover } = useSubstitute({
+    classId,
+    date,
+    cls,
+    coaches,
+    termsCoachId,
+    attr,
+    reload,
+  });
   const {
     bookKind,
     setBookKind,
@@ -99,52 +114,6 @@ export default function LessonPage() {
   const { cancelOpen, setCancelOpen, cancelReason, setCancelReason, cancelBusy, cancelError, setCancelError, doCancelLesson, doRestoreLesson } =
     useCancelLesson(classId, date, reload, setSaveMsg);
 
-  const { coachPick, setCoachPick, coachBusy, coachMsg, classCoachName, substituteOptions, assignCoach, removeCover } = useSubstitute({
-    classId,
-    date,
-    cls,
-    coaches,
-    termsCoachId,
-    attr,
-    reload,
-  });
-
-  // ── Save ────────────────────────────────────────────────────────────────
-  async function doSave() {
-    if (!cls || !actorId) return;
-    setSaving(true);
-    setSaveMsg(null);
-    const entries: SaveEntry[] = roster
-      .filter((r) => draft[r.studentId] !== null && draft[r.studentId] !== undefined)
-      .map((r) => ({ studentId: r.studentId, status: draft[r.studentId] as string, prevStatus: r.prev }));
-    const res = await saveAdminAttendance({ deps: supabaseSaveDeps(), classId, date, actorProfileId: actorId, knownSessionId: sessionId, entries });
-    setSaving(false);
-    if (res.ok) {
-      setSaveMsg({ kind: "ok", text: res.sent === 0 ? "Nothing to save." : `Saved ${res.sent} mark${res.sent === 1 ? "" : "s"}.${res.emailed ? " A credit-note email was requested." : ""}` });
-      reload();
-    } else {
-      setSaveMsg({ kind: "error", text: res.message });
-      if (res.step === "audit") reload();
-    }
-  }
-
-  function requestSave() {
-    const n = holidayTransitions(roster.map((r) => ({ studentId: r.studentId, kind: r.kind, prev: r.prev, next: draft[r.studentId] ?? null })));
-    if (n > 0) setConfirmHoliday(n);
-    else void doSave();
-  }
-
-  function setAll(status: DbStatus) {
-    setDraft((d) => {
-      const next = { ...d };
-      for (const r of roster) {
-        if (!rowEditable(r.prev !== null, newRowsAllowed)) continue;
-        if (!optionsForKind(r.kind).includes(status)) continue;
-        next[r.studentId] = status;
-      }
-      return next;
-    });
-  }
 
   // ── Render ──────────────────────────────────────────────────────────────
   const backHref = `/calendar?view=day&date=${date}`;

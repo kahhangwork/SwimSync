@@ -31,13 +31,16 @@
 // the DB decides.
 //
 // Pure orchestration over an injected `deps` so every branch is unit-tested
-// with a mock; `supabaseSaveDeps()` (adminAttendanceSaveDeps.ts) binds it to
+// with a mock; `supabaseSaveDeps()` (../dao/lessonDetail.save.ts) binds it to
 // the real client — kept apart so this file imports no Supabase client and the
 // tests need no env.
+//
+// (Was lib/adminAttendanceSave.ts; moved 2026-09-18, lesson-detail Stage 6 — this
+// page was its sole importer. Its Deps binding moved into dao/ in the same commit.)
 
-import { buildAttendanceRows, type AttendanceRow } from "./attendancePayload";
-import { attendanceSaveErrorMessage } from "./attendanceSaveError";
-import { mayHaveIssuedCreditNote } from "./creditNoteEmail";
+import { buildAttendanceRows, type AttendanceRow } from "@/lib/attendancePayload";
+import { attendanceSaveErrorMessage } from "@/lib/attendanceSaveError";
+import { mayHaveIssuedCreditNote } from "@/lib/creditNoteEmail";
 
 export type SaveEntry = {
   studentId: string;

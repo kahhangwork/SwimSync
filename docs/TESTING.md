@@ -595,7 +595,7 @@ created (restore keeps the row, flag cleared), so the fixture's session count is
 Unit: `lib/calendarLessons.test.ts` (33 — incl. the advance-cancel pair: a cancelled session is
 progress `cancelled` with nobody enrolled and the reason carried, and a live guest on it is still an
 expected unmarked guest; the SGT retirement cut-off pair and the
-`enrolled+guests === expectedStudentsOn` parity assertion), `lib/adminAttendanceSave.test.ts` (11 —
+`enrolled+guests === expectedStudentsOn` parity assertion), `lessons/[classId]/[date]/domain/adminAttendanceSave.test.ts` (11 —
 mock deps: only changed rows sent, holiday kept, each step's error surfaced by name, no
 `session_coach_absences` call), `lessons/[classId]/[date]/domain/lessonMarking.test.ts`, `lib/classColours.test.ts`,
 `lib/timeOfDay.test.ts`, `components/calendar/LessonCard.test.tsx`, and

@@ -463,10 +463,11 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: F_LESSON, contains: "@/lib/calendarLessons", why: "Stage 7 — formatCount is render-only after the spine" },
   // Stage 2 (spine): attendanceCompleteness + lessonAttribution -> domain/,
   // markableFloor bound in dao/lessonDetail.repo. 3 entries deleted.
+  // Stage 6 (save): adminAttendanceSave git mv'd into [date]/domain and
+  // adminAttendanceSaveDeps into [date]/dao/lessonDetail.save (sole importer,
+  // moved together so lib/ never imports a route). 2 deleted.
   // Stage 5: @/lib/supabase left the page (every call in dao/), @/lib/makeupSearch
   // -> domain/useGuestBooking (shared with makeups, stays in lib). 2 deleted.
-  { file: F_LESSON, contains: "@/lib/adminAttendanceSave", why: "Stage 6 — git mv into domain/ (sole importer)" },
-  { file: F_LESSON, contains: "@/lib/adminAttendanceSaveDeps", why: "Stage 6 — git mv into dao/lessonDetail.save" },
   // @/lib/lessonMarking MOVED into [date]/domain at Stage 1 (git mv, sole
   // importer); the page imports ./domain/lessonMarking (allowed). Deleted.
 ];

@@ -1,9 +1,13 @@
-// Binds adminAttendanceSave.ts to the real Supabase client. Separate file so
-// the pure orchestration (and its tests) import no client.
+// Binds domain/adminAttendanceSave.ts to the real Supabase client. Separate file
+// so the pure orchestration (and its tests) import no client.
+//
+// (Was lib/adminAttendanceSaveDeps.ts; moved 2026-09-18, lesson-detail Stage 6.)
+// It imports a TYPE from ../domain — legal: fence check 2 forbids dao/ importing
+// React, ui/ or @/components only, and a type import carries no runtime edge.
 
-import { notifyCreditNoteEmails } from "./creditNoteEmail";
-import { supabase } from "./supabase";
-import type { SaveDeps } from "./adminAttendanceSave";
+import { notifyCreditNoteEmails } from "@/lib/creditNoteEmail";
+import { supabase } from "@/lib/supabase";
+import type { SaveDeps } from "../domain/adminAttendanceSave";
 
 /** The real client, bound. */
 export function supabaseSaveDeps(): SaveDeps {

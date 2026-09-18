@@ -586,7 +586,7 @@ the shape of the system changes:_
   only the transport moved. Chosen over a shared `components/*.repo.ts` because a `.repo` file
   outside `dao/` would itself trip the fence's check 3, and a `lib/` file would be invisible
   to it. The fence scans the grid by name (`SCOPE_FILES`), so the client cannot return.
-  Precedent for the shape: `lib/adminAttendanceSave.ts` + its bound `SaveDeps`. (Admin L-D,
+  Precedent for the shape: `adminAttendanceSave.ts` + its bound `SaveDeps` (now `lessons/[classId]/[date]/domain/` + `dao/lessonDetail.save.ts`). (Admin L-D,
   `docs/refactor/BATCH_D_PLAN.md`.)
 
 ---
@@ -616,7 +616,7 @@ the shape of the system changes:_
 | `SwimSyncAdmin/lib/lessonAttribution.ts` | Who was **paid** for a lesson, for the Attendance audit page — the **money** axis (`class_rate_on().paid_coach_id`), mirroring `coach_attribution_kind()` (substitute → terms → shadow). Reads `classes.coach_id` nowhere (§7.152). `resolveShadows()` is the **one** home for the client shadow arm — `wages/page.tsx` calls it too, so there is no second copy |
 | `SwimSyncAdmin/lib/calendarLessons.ts` | The admin Calendar + Lessons pages' pure core: lessons = weekday pattern ∪ session rows (minus the SGT retirement cut-off), `enrolled+guests/capacity` via `expectedStudentsOn` (the billing gate's set, by construction), coach via `attributeLessons`, lane packing, view ranges. No clock, no client — `today`/`nowMinutes` are inputs |
 | `SwimSyncAdmin/lib/calendarData.ts` | The READS for the calendar. **No write may ever be added here** — a phantom `lesson_sessions` row is a billable lesson; the only writer is the lesson page |
-| `SwimSyncAdmin/lib/adminAttendanceSave.ts` (+ `…SaveDeps.ts`) | The admin's attendance save = the coach app's path, step for step, with every step's error surfaced and only CHANGED rows sent. Never writes `session_coach_absences`. Its helpers (`attendancePayload`, `attendanceSaveError`, `creditNoteEmail`, `attendanceWindow`, `markableFloor`) are byte-identical copies of the coach app's, enforced by `attendanceSave.drift.test.ts` |
+| `SwimSyncAdmin/app/(admin)/lessons/[classId]/[date]/domain/adminAttendanceSave.ts` (+ `dao/lessonDetail.save.ts`) | *(was `lib/adminAttendanceSave.ts` + `lib/adminAttendanceSaveDeps.ts`; moved 2026-09-18, lesson-detail Stage 6 — sole importer)* The admin's attendance save = the coach app's path, step for step, with every step's error surfaced and only CHANGED rows sent. Never writes `session_coach_absences`. Its helpers (`attendancePayload`, `attendanceSaveError`, `creditNoteEmail`, `attendanceWindow`, `markableFloor`) are byte-identical copies of the coach app's, enforced by `attendanceSave.drift.test.ts` |
 | `SwimSyncAdmin/app/(admin)/lessons/[classId]/[date]/domain/lessonMarking.ts` | *(was `lib/lessonMarking.ts`; moved 2026-09-18, lesson-detail Stage 1 — sole importer)* Which statuses a roster row may take (trial statuses for trial guests only), the client markability affordance, the holiday-confirm count |
 | `SwimSyncAdmin/lib/classColours.ts` | The ONLY meaning of a `classes.colour` key — 12 swatches, unknown/NULL → neutral. Literal Tailwind strings (§7.191) |
 | `SwimSyncAdmin/components/calendar/` | `TimeGrid` (sticky gutter/header, lanes), `MonthGrid`, `AgendaList`, `LessonCard`, `LessonTooltip`, `CalendarToolbar` — all read-only |

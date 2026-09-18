@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { rowsToSend, saveAdminAttendance, type SaveDeps, type SaveEntry } from "./adminAttendanceSave";
-import { hasUniformKeys } from "./attendancePayload";
+import { hasUniformKeys } from "@/lib/attendancePayload";
 
 function mockDeps(over: Partial<SaveDeps> = {}) {
   const calls: Record<string, unknown[]> = { findSession: [], insertSession: [], upsertAttendance: [], insertAudit: [], notifyCreditNote: [] };
