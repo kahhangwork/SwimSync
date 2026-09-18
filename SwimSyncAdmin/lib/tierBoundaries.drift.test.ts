@@ -63,6 +63,17 @@
 // wages/dao/break importing React, wages/domain/break calling fetch(, and an
 // unpinned @/lib/utils import on accounting/page.tsx drove all four checks
 // red — breakers removed, 6/6 green.
+// Re-proven for the platform scope on 2026-09-18 at Stage 0b: checks 3 and 4
+// went red on platform/page.tsx's real violations (16 data-access sites + 5
+// @/lib imports — the exact counts pre-agreed at plan-review, plan §6 RISK 9)
+// before the ledger was pinned; platform/ui/Break importing ../dao,
+// platform/dao/break importing React, platform/domain/break calling fetch(, and
+// an unpinned @/lib/money import on the page drove all four checks red —
+// breakers removed, 6/6 green. The SHRINK test was proven live the same way for
+// the first time: corrupting one pinned snippet
+// (parent_tenant_balances -> ...balancesXX) turned BOTH the shrink test ("lacks
+// ...") and check 3 red, which is the property that makes a stale entry
+// impossible to leave behind.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -125,12 +136,30 @@ const SCOPE_DIRS = [
   "app/(admin)/credit-notes",
   "app/(admin)/referrals",
   "app/(admin)/accounting",
+  // platform (full track, docs/refactor/PLATFORM_REFACTOR_PLAN.md), widened
+  // 2026-09-18 at Stage 0b. Checks 3 and 4 are red on day one for the
+  // 1,395-line page; every current violation is pinned in the ledgers below
+  // with the stage that removes it (data access -> Stage 2/3 folded; @/lib
+  // imports -> the slice stage that moves the symbol — moveStudentWarning
+  // MOVES into domain/ at Stage 9, the other three STAY in lib and leave the
+  // page as their symbols move into dao/hooks/ui). The transitional
+  // page->dao pins are NOT added here (the page imports no dao yet — the
+  // shrink test would flag them stale); they are added at Stage 2/3 when the
+  // import first appears and removed at Stages 8/9/10 (plan §6). Ledger only
+  // shrinks.
+  "app/(admin)/platform",
 ];
 
 // One route file per scoped dir. Check 4 runs against each.
 const PAGES = SCOPE_DIRS.map((d) => `${d}/page.tsx`);
 
 type Allowed = { file: string; contains: string; why: string };
+
+// Spelled once: the ledgers below name this page 21 times at Stage 0b, and a
+// typo in one of them is an entry that silently pins nothing (the shrink test
+// would call it stale, which reads as "the code moved" rather than "the path is
+// wrong"). Added with the platform scope, 2026-09-18.
+const F_PLATFORM = "app/(admin)/platform/page.tsx";
 
 /**
  * Check 3 — data-access lines still outside `dao/`. Students reached ZERO on
@@ -183,6 +212,32 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // ── wages: DONE — auth + every read/write in dao/wages.repo (one query each;
   //    the stale-guarded orchestration stays in domain/usePayroll), both RPCs in
   //    dao/wages.rpc. Check 3 for L-C is EMPTY. ──
+  // ── platform (full track, PLATFORM_REFACTOR_PLAN.md), pinned 2026-09-18 at
+  //    Stage 0b. All 16 sites move into platform/dao/platform.{repo,rpc,api}.ts
+  //    at Stage 2/3 (folded), and every entry below is deleted in that commit.
+  //    The count was pre-agreed at plan-review (plan §6, RISK 9 mitigation) by
+  //    running this file's own stripComments/dataAccess logic over the page:
+  //    16, not "about fifteen". parent_students appears TWICE (the family-status
+  //    children read and the credit-check link read), so those two snippets are
+  //    distinguished by their destructured names — a bare .from("parent_students")
+  //    would exempt both and the ledger could then shrink by one while two
+  //    violations remained. ──
+  { file: F_PLATFORM, contains: 'from "@/lib/supabase"', why: "the client import itself; leaves at Stage 2/3 when dao owns it" },
+  { file: F_PLATFORM, contains: "supabase.auth.getUser()", why: "the platform-admin gate; -> dao/platform.repo.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'supabase .from("profiles")', why: "the gate's role read; -> dao/platform.repo.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'supabase.rpc("platform_tenant_overview")', why: "-> dao/platform.rpc.ts loadOverview() at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'supabase.rpc("platform_stranded_parents")', why: "the Promise.all sibling; -> the same loadOverview() at Stage 2/3" },
+  { file: F_PLATFORM, contains: "supabase.auth.getSession()", why: "postAs's bearer token; -> dao/platform.api.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: "await fetch(path, {", why: "postAs itself; -> dao/platform.api.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'supabase.rpc("platform_tenant_admins"', why: "-> dao/platform.rpc.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'supabase.rpc("platform_reassign_owner"', why: "-> dao/platform.rpc.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'supabase .from("parent_tenants")', why: "family-status search (!inner + orIlike); -> dao/platform.repo.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'data: kids, error: kidsErr } = await supabase .from("parent_students")', why: "family-status children read (the .in() sentinel); -> dao/platform.repo.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'supabase .from("students")', why: "the student search; -> dao/platform.repo.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'supabase .rpc("student_package_coverage")', why: "the un-awaited coverage chip fetch; -> dao/platform.rpc.ts at Stage 2/3, still un-awaited" },
+  { file: F_PLATFORM, contains: 'data: links, error: linkErr } = await supabase .from("parent_students")', why: "credit-check parent links; -> dao/platform.repo.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'supabase .from("parent_tenant_balances")', why: "credit-check balances; -> dao/platform.repo.ts at Stage 2/3" },
+  { file: F_PLATFORM, contains: 'supabase.rpc("reassign_student_tenant"', why: "the cross-business move; -> dao/platform.rpc.ts at Stage 2/3" },
 ];
 
 /**
@@ -290,6 +345,21 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    payoutItems MOVED into wages/domain (git mv, sole code importer);
   //    lessonDates + lessonAttribution reached from domain/ui (shared). Check 4
   //    for L-C is EMPTY — both ledgers empty again. ──
+  // ── platform (full track, PLATFORM_REFACTOR_PLAN.md), pinned 2026-09-18 at
+  //    Stage 0b. Exactly 5 imports, each with the stage that removes it (§4
+  //    verdicts, grep-confirmed both ways + the *.test.ts path-pin grep).
+  //    moveStudentWarning MOVES into platform/domain (sole importer); the other
+  //    three STAY in lib/ (shared: lessonDates 52 importers, packageCoverage 18,
+  //    tableSearch 6) and simply stop being imported HERE as their symbols move
+  //    into dao/domain/ui. The transitional ./dao/platform.{repo,rpc,api} pins
+  //    are deliberately absent: the page imports no dao yet, so the shrink test
+  //    would flag them stale. They are added at Stage 2/3 and removed at Stages
+  //    8 (.api), 9 (.rpc) and 10 (.repo). ──
+  { file: F_PLATFORM, contains: "@/lib/supabase", why: "dao owns the client; leaves at Stage 2/3" },
+  { file: F_PLATFORM, contains: "@/lib/lessonDates", why: "formatSgDate/toSgDate move into ui/TenantsTable + ui/StrandedPanel at Stage 5; STAYS in lib (52 importers)" },
+  { file: F_PLATFORM, contains: "@/lib/packageCoverage", why: "coverageByStudent + StudentCoverage move into domain/useStudentMove at Stage 9; STAYS in lib (18 importers)" },
+  { file: F_PLATFORM, contains: "@/lib/tableSearch", why: "ilikeContains/orIlike sit inside query builders, so they leave at Stage 2/3 with the dao; STAYS in lib (6 importers)" },
+  { file: F_PLATFORM, contains: "@/lib/moveStudentWarning", why: "MOVES into platform/domain at Stage 9 (sole importer, git mv with its test)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
