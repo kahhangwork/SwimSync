@@ -334,14 +334,11 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    are deliberately absent: the page imports no dao yet, so the shrink test
   //    would flag them stale. They are added at Stage 2/3 and removed at Stages
   //    8 (.api), 9 (.rpc) and 10 (.repo). ──
-  { file: F_PLATFORM, contains: "@/lib/packageCoverage", why: "coverageByStudent + StudentCoverage move into domain/useStudentMove at Stage 9; STAYS in lib (18 importers)" },
-  { file: F_PLATFORM, contains: "@/lib/moveStudentWarning", why: "MOVES into platform/domain at Stage 9 (sole importer, git mv with its test)" },
   // TRANSITIONAL (playbook §7.1, packages plan §5): until each slice's hook wraps
   // its dao call, the page calls dao/platform.{repo,rpc,api} directly. These
   // three could NOT be pinned at 0b — the page imported no dao yet, so the
   // shrink test would have called them stale. Their removal stage is the stage
   // whose hook takes the LAST direct caller. There is never a fourth.
-  { file: F_PLATFORM, contains: "./dao/platform.rpc", why: "last direct callers are doMove/handleSearch; gone at Stage 9" },
   { file: F_PLATFORM, contains: "./dao/platform.repo", why: "last direct caller is handleFamilySearch; gone at Stage 10" },
 ];
 

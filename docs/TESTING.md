@@ -1078,7 +1078,7 @@ and a final assertion that counts rather than tests presence (§7.118).
   student moves and lands unlevelled (RED against the old body by construction — it threw on the level
   trigger), each linked parent gets a membership at the destination (0/2-parent + inactive-reactivation
   cases), and isolation at the old business holds. 6 of 13 fail on the pre-fix body — the RED proof (§7.218).
-- **`tableSearch.test.ts` + `moveStudentWarning.test.ts` (vitest)** — the search helpers (`ilikeContains`,
+- **`tableSearch.test.ts` + `app/(admin)/platform/domain/moveStudentWarning.test.ts` (vitest)** — the search helpers (`ilikeContains`,
   `orIlike` incl. hostile-term cases, `matchesAnyField`) and the credit sum. ⚠ These assert the `.or()`
   string SHAPE only; the wildcard-escaping bug (§7.217) and the `!inner` requirement (§7.216) are DB
   behaviours a vitest cannot see — both were proven with a live-DB probe, not a unit test.

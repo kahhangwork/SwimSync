@@ -2,38 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { Modal } from "@/components/Modal";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
-import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
-import { PackageChip } from "@/components/PackageChip";
-import { totalFamilyCredit } from "@/lib/moveStudentWarning";
 import { ROW_LIMIT } from "./constants";
 import {
   childrenOfParents,
-  familyCreditAt,
-  parentLinksForStudent,
   searchFamilyMemberships,
-  searchStudents,
 } from "./dao/platform.repo";
-import {
-  reassignStudentTenant,
-  studentPackageCoverage,
-} from "./dao/platform.rpc";
 import { useNotice } from "./domain/useNotice";
 import { usePlatformAccess } from "./domain/usePlatformAccess";
 import { useOwnerTransfer } from "./domain/useOwnerTransfer";
 import { useProvisioning } from "./domain/useProvisioning";
+import { useStudentMove } from "./domain/useStudentMove";
 import { useSuspend } from "./domain/useSuspend";
 import { useTenants } from "./domain/useTenants";
+import { CreditWarningModal } from "./ui/CreditWarningModal";
 import { NewBusinessForm } from "./ui/NewBusinessForm";
 import { NotPlatformAdmin } from "./ui/NotPlatformAdmin";
 import { OwnerModal } from "./ui/OwnerModal";
+import { StudentMoveSection } from "./ui/StudentMoveSection";
 import { SuspendModal } from "./ui/SuspendModal";
 import { ProvisionedBanner } from "./ui/ProvisionedBanner";
 import { StrandedPanel } from "./ui/StrandedPanel";
 import { TenantsTable } from "./ui/TenantsTable";
 import type {
-  StudentRow,
   FamilyStatusRow,
 } from "./types";
 
@@ -57,12 +48,6 @@ import type {
 
 export default function PlatformPage() {
   const { allowed, check } = usePlatformAccess();
-  const [search, setSearch] = useState("");
-  const [students, setStudents] = useState<StudentRow[]>([]);
-  const [covMap, setCovMap] = useState<Map<string, StudentCoverage>>(
-    new Map()
-  );
-  const [moving, setMoving] = useState<string | null>(null);
   const { message, setMessage } = useNotice();
   const { tenants, stranded, loadError, load: loadTenants } = useTenants();
   const {
@@ -98,19 +83,19 @@ export default function PlatformPage() {
     suspendError,
     toggleSuspend,
   } = useSuspend(setMessage, loadTenants);
-  // The advisory credit warning before a cross-business move (Piece 3). Set when
-  // the family holds credit at the OLD business (or that could not be checked);
-  // confirming calls doMove(). `moveNonce` remounts the per-row picker so it
-  // resets to "Choose…" after a move or a cancel (it is uncontrolled).
-  const [pendingMove, setPendingMove] = useState<{
-    studentId: string;
-    tenantId: string;
-    studentName: string;
-    oldTenantName: string;
-    credit: number;
-    checkFailed: boolean;
-  } | null>(null);
-  const [moveNonce, setMoveNonce] = useState(0);
+  const {
+    search,
+    setSearch,
+    students,
+    covMap,
+    moving,
+    moveNonce,
+    pendingMove,
+    handleSearch,
+    handleMove,
+    doMove,
+    cancelMove,
+  } = useStudentMove(tenants, setMessage);
 
   // ── Provisioning a new business ───────────────────────────────────────────
 
@@ -190,107 +175,9 @@ export default function PlatformPage() {
       setFamMessage(`Showing the first ${ROW_LIMIT} matches — refine your search.`);
   }
 
-  async function handleSearch() {
-    setMessage(null);
-    if (!search.trim()) {
-      setStudents([]);
-      return;
-    }
-    const { data } = await searchStudents(search);
-    setStudents((data ?? []) as StudentRow[]);
-    // Payment-method chips. Under a platform admin the RPC returns EVERY
-    // tenant's rows, each carrying its tenant_id — keyed per student here, so
-    // a cross-tenant mixup is structurally impossible. Fire-and-forget.
-    studentPackageCoverage().then(({ data: cov }) =>
-      setCovMap(coverageByStudent(cov ?? []))
-    );
-  }
-
-  // Advisory gate: credit never crosses businesses (PRD §5.6), so a family with
-  // credit at the OLD business would strand it. Check the balance FIRST and
-  // prompt; a zero balance (the common case) moves straight through.
-  async function handleMove(studentId: string, tenantId: string) {
-    // Disable this row's picker for the whole credit check, so a second
-    // selection cannot overwrite the pending move mid-flight.
-    setMoving(studentId);
-    const student = students.find((s) => s.id === studentId);
-    const oldTenantId = student?.tenant_id ?? null;
-    const oldTenantName =
-      tenants.find((t) => t.tenant_id === oldTenantId)?.display_name ??
-      "the old business";
-
-    let credit = 0;
-    let checkFailed = false;
-    if (oldTenantId) {
-      // ⚠ RISK (fable): sum EVERY linked parent's credit, not just one — a child
-      // can have two parents. The balance table is platform-admin readable.
-      const { data: links, error: linkErr } = await parentLinksForStudent(studentId);
-      // A failed link read must fail TOWARD prompting: skipping it silently
-      // would drop the warning in exactly the case we cannot verify.
-      if (linkErr) checkFailed = true;
-      const parentIds = (links ?? []).map((l: any) => l.parent_id);
-      if (!checkFailed && parentIds.length > 0) {
-        const { data: bal, error: balErr } = await familyCreditAt(
-          oldTenantId,
-          parentIds
-        );
-        if (balErr) checkFailed = true;
-        else credit = totalFamilyCredit((bal ?? []) as any[]);
-      }
-    }
-
-    setMoving(null);
-    // Warn when there IS credit, or when the check could not run (fail toward
-    // prompting — an advisory that silently skips is worse than one shown twice).
-    if (credit > 0 || checkFailed) {
-      setPendingMove({
-        studentId,
-        tenantId,
-        studentName: student?.full_name ?? "this child",
-        oldTenantName,
-        credit,
-        checkFailed,
-      });
-      // The picker keeps its chosen value; the dialog owns the next step, and
-      // both its buttons bump moveNonce to reset it.
-      return;
-    }
-    await doMove(studentId, tenantId);
-  }
-
-  async function doMove(studentId: string, tenantId: string) {
-    setPendingMove(null);
-    setMoving(studentId);
-    setMessage(null);
-    const { error } = await reassignStudentTenant(studentId, tenantId);
-    setMoving(null);
-    setMoveNonce((n) => n + 1); // reset the per-row picker
-    if (error) {
-      setMessage(`Could not move: ${error.message}`);
-      return;
-    }
-    // Refresh FIRST, then set the message: handleSearch() clears it on entry,
-    // so setting it beforehand meant the confirmation was wiped by its own
-    // refresh and the move looked like it had done nothing.
-    await handleSearch();
-    setMessage(
-      "Moved. Any active class enrolment was closed — the new business needs to assign them a class."
-    );
-  }
 
   // All four declared above the two conditional returns below — a hook after a
   // conditional return is a hook that sometimes does not run.
-  const studentSort = useTableSort<StudentRow>({
-    key: "full_name",
-    accessors: {
-      // The business NAME, which is what the cell shows — the row holds only an
-      // id, and sorting by a uuid would look like no sort at all.
-      tenant: (s) =>
-        tenants.find((t) => t.tenant_id === s.tenant_id)?.display_name ?? null,
-      is_active: (s) => !s.is_active,
-    },
-  });
-  const visibleStudents = studentSort.apply(students);
 
   const familySort = useTableSort<FamilyStatusRow>({
     key: "parent_name",
@@ -397,140 +284,25 @@ export default function PlatformPage() {
           are exactly who the student-move tool below exists for. */}
 {stranded.length > 0 && <StrandedPanel stranded={stranded} />}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-gray-900">
-          Move a student to another business
-        </h2>
-        <p className="mt-1 mb-3 text-sm text-gray-600">
-          For when a parent entered the wrong join code. Moving closes any active
-          class enrolment — attendance and billing history stay with the business
-          that recorded them.
-        </p>
-
-        <div className="mb-4 flex gap-2">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="Search a child's name"
-            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
-          />
-          <button
-            onClick={handleSearch}
-            className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-600"
-          >
-            Search
-          </button>
-        </div>
-
-        {message && (
-          <div className="mb-3 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
-            {message}
-          </div>
-        )}
-
-        {students.length > 0 && (
-          <Table>
-            <Thead>
-              <Th sort={studentSort} sortKey="full_name">Child</Th>
-              <Th sort={studentSort} sortKey="tenant">Currently with</Th>
-              <Th sort={studentSort} sortKey="is_active">Active?</Th>
-              <Th>Move to</Th>
-            </Thead>
-            <Tbody>
-              {visibleStudents.map((s) => (
-                <Tr key={s.id}>
-                  <Td>
-                    {s.full_name}
-                    <span className="ml-1.5">
-                      <PackageChip coverage={covMap.get(s.id)} />
-                    </span>
-                  </Td>
-                  <Td>
-                    {tenants.find((t) => t.tenant_id === s.tenant_id)?.display_name ??
-                      "—"}
-                  </Td>
-                  <Td>{s.is_active ? "Active" : "Inactive"}</Td>
-                  <Td>
-                    <select
-                      key={`move-${s.id}-${moveNonce}`}
-                      defaultValue=""
-                      disabled={moving === s.id}
-                      onChange={(e) =>
-                        e.target.value && handleMove(s.id, e.target.value)
-                      }
-                      className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
-                    >
-                      <option value="">
-                        {moving === s.id ? "Moving…" : "Choose…"}
-                      </option>
-                      {tenants
-                        .filter((t) => t.tenant_id !== s.tenant_id)
-                        .map((t) => (
-                          <option key={t.tenant_id} value={t.tenant_id}>
-                            {t.display_name}
-                          </option>
-                        ))}
-                    </select>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-        )}
-      </div>
+<StudentMoveSection
+        tenants={tenants}
+        students={students}
+        covMap={covMap}
+        moving={moving}
+        moveNonce={moveNonce}
+        search={search}
+        setSearch={setSearch}
+        message={message}
+        onSearch={handleSearch}
+        onMove={handleMove}
+      />
 
       {/* ── Advisory: the family's credit does NOT move (Piece 3) ───────────── */}
-      <Modal
-        title="Credit stays with the old business"
-        open={pendingMove !== null}
-        onClose={() => {
-          setPendingMove(null);
-          setMoveNonce((n) => n + 1); // reset the picker on cancel too
-        }}
-      >
-        {pendingMove && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-700">
-              {pendingMove.checkFailed ? (
-                <>
-                  Couldn&apos;t check whether{" "}
-                  <strong>{pendingMove.studentName}</strong>&apos;s family holds
-                  credit at <strong>{pendingMove.oldTenantName}</strong>. Credit
-                  never moves between businesses (PRD §5.6), so any they have
-                  there would become unspendable after the move.
-                </>
-              ) : (
-                <>
-                  <strong>{pendingMove.studentName}</strong>&apos;s family holds{" "}
-                  <strong>S${pendingMove.credit.toFixed(2)}</strong> in credit at{" "}
-                  <strong>{pendingMove.oldTenantName}</strong>. Credit never moves
-                  between businesses (PRD §5.6), so it will become{" "}
-                  <strong>unspendable</strong> once the child is moved. Settle or
-                  spend it first if you can.
-                </>
-              )}
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => doMove(pendingMove.studentId, pendingMove.tenantId)}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
-              >
-                Move anyway
-              </button>
-              <button
-                onClick={() => {
-                  setPendingMove(null);
-                  setMoveNonce((n) => n + 1);
-                }}
-                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
+<CreditWarningModal
+        pendingMove={pendingMove}
+        onConfirm={doMove}
+        onCancel={cancelMove}
+      />
 
       {/* ── Family status across businesses ──────────────────────────────────
           Read-only on purpose. Whether a family is a customer of a business is
