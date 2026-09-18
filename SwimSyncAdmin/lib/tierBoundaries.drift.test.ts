@@ -291,20 +291,8 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    plan-review). Each entry names the stage whose slice moves it into
   //    dao/lessonDetail.{repo,rpc}.ts; the client import goes with the last call. ──
   { file: F_LESSON, contains: 'import { supabase } from "@/lib/supabase"', why: "Stage 5 — the last page call (guests) moves to dao" },
-  { file: F_LESSON, contains: "supabase.auth.getSession()", why: "Stage 2 — spine reads -> dao/lessonDetail.repo" },
-  { file: F_LESSON, contains: 'supabase .from("classes")', why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: 'supabase.from("lesson_sessions")', why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: 'supabase.from("coaches")', why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: 'supabase .from("student_class_enrolments")', why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: 'supabase.from("trial_bookings")', why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: 'supabase.from("makeup_bookings")', why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: 'supabase.from("class_rates")', why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: 'supabase.from("class_shadow_coaches")', why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: 'supabase.from("tenants")', why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: 'supabase .from("students")', why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: 'supabase.from("attendance")', why: "Stage 2 — spine (session-scoped)" },
-  { file: F_LESSON, contains: 'supabase.from("session_coaches").select', why: "Stage 2 — spine (session-scoped)" },
-  { file: F_LESSON, contains: 'supabase.from("session_coach_absences")', why: "Stage 2 — spine (session-scoped)" },
+  // Stage 2 (spine): getSession + the 13 reads moved into dao/lessonDetail.repo
+  // (loadLessonReads / loadSessionReads). 14 entries deleted.
   { file: F_LESSON, contains: 'supabase.rpc("cancel_lesson"', why: "Stage 3 — cancel/restore -> dao/lessonDetail.rpc" },
   { file: F_LESSON, contains: 'supabase.rpc("restore_lesson"', why: "Stage 3 — cancel/restore" },
   { file: F_LESSON, contains: 'supabase.rpc("assign_session_coach"', why: "Stage 4 — substitute" },
@@ -473,10 +461,9 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: F_LESSON, contains: "@/lib/classColours", why: "Stage 7 — colourFor -> ui/LessonHeader" },
   { file: F_LESSON, contains: "@/lib/lessonDates", why: "Stage 7 — formatSgDate is render-only after the spine" },
   { file: F_LESSON, contains: "@/lib/utils", why: "Stage 7 — formatTime/cn -> ui/" },
-  { file: F_LESSON, contains: "@/lib/attendanceCompleteness", why: "Stage 2 — roster mapping -> domain/lessonDetailRows" },
-  { file: F_LESSON, contains: "@/lib/lessonAttribution", why: "Stage 2 — spine" },
-  { file: F_LESSON, contains: "@/lib/markableFloor", why: "Stage 2 — bound in dao/lessonDetail.repo" },
   { file: F_LESSON, contains: "@/lib/calendarLessons", why: "Stage 7 — formatCount is render-only after the spine" },
+  // Stage 2 (spine): attendanceCompleteness + lessonAttribution -> domain/,
+  // markableFloor bound in dao/lessonDetail.repo. 3 entries deleted.
   { file: F_LESSON, contains: "@/lib/adminAttendanceSave", why: "Stage 6 — git mv into domain/ (sole importer)" },
   { file: F_LESSON, contains: "@/lib/adminAttendanceSaveDeps", why: "Stage 6 — git mv into dao/lessonDetail.save" },
   // @/lib/lessonMarking MOVED into [date]/domain at Stage 1 (git mv, sole

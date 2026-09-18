@@ -11,7 +11,7 @@
 // → bounded credit-note email), with every step's error surfaced. Every DB
 // guard the coach meets applies here unchanged; there is NO override.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -20,13 +20,10 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
 import { colourFor } from "@/lib/classColours";
-import { dayOfWeekOf, formatSgDate, todayInSg, toSgDate, type DayOfWeek } from "@/lib/lessonDates";
+import { dayOfWeekOf, formatSgDate } from "@/lib/lessonDates";
 import { formatTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { expectedStudentsOn, studentsEnrolledOn, type EnrolmentSpan } from "@/lib/attendanceCompleteness";
-import { attributeLessons, termsCoachOn, type AbsenceRow, type ClassRateRow, type ClassShadowRow, type SubstituteRow } from "@/lib/lessonAttribution";
-import { fetchMarkableFloor } from "@/lib/markableFloor";
-import { formatCount, isFull } from "@/lib/calendarLessons";
+import { formatCount } from "@/lib/calendarLessons";
 import { saveAdminAttendance, type SaveEntry } from "@/lib/adminAttendanceSave";
 import { supabaseSaveDeps } from "@/lib/adminAttendanceSaveDeps";
 import {
@@ -34,37 +31,48 @@ import {
   SET_ALL_OPTIONS,
   optionsForKind,
   holidayTransitions,
-  lessonMarkability,
   rowEditable,
   capitalise,
   type DbStatus,
   type RosterKind,
 } from "./domain/lessonMarking";
 import { filterEligibleKids } from "@/lib/makeupSearch";
-import type { ClassInfo, CoachOpt, EligibleKid, RosterRow } from "./types";
+import { useLessonDetail } from "./domain/useLessonDetail";
+import type { RosterRow } from "./types";
 
 export default function LessonPage() {
   const params = useParams<{ classId: string; date: string }>();
   const classId = params.classId;
   const date = params.date;
 
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [cls, setCls] = useState<ClassInfo | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  /** Set when the admin cancelled this lesson in advance (cancel_lesson). */
-  const [cancelled, setCancelled] = useState<{ reason: string | null } | null>(null);
-  const [roster, setRoster] = useState<RosterRow[]>([]);
-  const [draft, setDraft] = useState<Record<string, DbStatus | null>>({});
-  const [coaches, setCoaches] = useState<CoachOpt[]>([]);
-  const [attr, setAttr] = useState<{ mainId: string | null; isCover: boolean; subRowId: string | null; shadowIds: string[] } | null>(null);
-  const [termsCoachId, setTermsCoachId] = useState<string | null>(null);
-  const [floor, setFloor] = useState<string | null>(null);
-  const [actorId, setActorId] = useState<string | null>(null);
-  const [holidayDays, setHolidayDays] = useState<number>(7);
-  const [kids, setKids] = useState<EligibleKid[]>([]);
-  const [trialKids, setTrialKids] = useState<{ id: string; full_name: string }[]>([]);
-  const [reloadTick, setReloadTick] = useState(0);
+  const {
+    loading,
+    loadError,
+    cls,
+    sessionId,
+    cancelled,
+    roster,
+    draft,
+    setDraft,
+    coaches,
+    attr,
+    termsCoachId,
+    actorId,
+    holidayDays,
+    kids,
+    trialKids,
+    reload,
+    today,
+    markability,
+    newRowsAllowed,
+    notALesson,
+    isFuture,
+    enrolledCount,
+    guestCount,
+    full,
+    dirty,
+    mainName,
+  } = useLessonDetail(classId, date);
 
   // ── Save / action state ─────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
@@ -88,199 +96,6 @@ export default function LessonPage() {
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
-  const today = todayInSg();
-  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
-
-  // ── Load ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!validDate) {
-      setLoading(false);
-      setLoadError("That date isn't valid.");
-      return;
-    }
-    let stale = false;
-    setLoading(true);
-    setLoadError(null);
-    (async () => {
-      const floorP = fetchMarkableFloor();
-      const [{ data: sess }, clsRes, sessionRes, coachesRes, enrolRes, trialsRes, makeupsRes, ratesRes, shadowsRes, tenantRes, kidsRes] =
-        await Promise.all([
-          supabase.auth.getSession(),
-          supabase
-            .from("classes")
-            .select("id, title, day_of_week, start_time, end_time, location_id, locations(name), coach_id, category_id, colour, capacity, is_active, deactivated_at, class_categories(default_capacity)")
-            .eq("id", classId)
-            .maybeSingle(),
-          supabase.from("lesson_sessions").select("id, cancelled_at, cancellation_reason").eq("class_id", classId).eq("session_date", date).maybeSingle(),
-          supabase.from("coaches").select("id, profiles(full_name)"),
-          supabase
-            .from("student_class_enrolments")
-            .select("student_id, enrolled_at, unenrolled_at, students(full_name)")
-            .eq("class_id", classId),
-          supabase.from("trial_bookings").select("id, student_id, students(full_name)").eq("class_id", classId).eq("session_date", date).is("cancelled_at", null),
-          supabase.from("makeup_bookings").select("id, student_id, students(full_name)").eq("class_id", classId).eq("session_date", date).is("cancelled_at", null),
-          supabase.from("class_rates").select("class_id, effective_from, paid_coach_id").eq("class_id", classId),
-          supabase.from("class_shadow_coaches").select("class_id, coach_id, effective_from, effective_to").eq("class_id", classId),
-          supabase.from("tenants").select("holiday_extension_days").limit(1).maybeSingle(),
-          supabase
-            .from("students")
-            .select("id, full_name, is_active, student_class_enrolments(is_active, classes(id, title, category_id))")
-            .order("full_name"),
-        ]);
-      if (stale) return;
-
-      const firstErr = clsRes.error ?? sessionRes.error ?? coachesRes.error ?? enrolRes.error ?? trialsRes.error ?? makeupsRes.error ?? ratesRes.error ?? shadowsRes.error;
-      if (firstErr) {
-        setLoadError(firstErr.message);
-        setLoading(false);
-        return;
-      }
-      if (!clsRes.data) {
-        setLoadError("That class does not exist, or is not in your business.");
-        setLoading(false);
-        return;
-      }
-
-      const c: any = clsRes.data;
-      const info: ClassInfo = {
-        id: c.id,
-        title: c.title,
-        day_of_week: c.day_of_week,
-        start_time: c.start_time,
-        end_time: c.end_time,
-        location_name: c.locations?.name ?? "",
-        coach_id: c.coach_id,
-        category_id: c.category_id,
-        colour: c.colour ?? null,
-        capacity: c.capacity ?? c.class_categories?.default_capacity ?? null,
-        is_active: c.is_active !== false,
-        deactivated_at: c.deactivated_at ?? null,
-      };
-      setCls(info);
-      setActorId(sess.session?.user.id ?? null);
-      setHolidayDays(Number(tenantRes.data?.holiday_extension_days ?? 7));
-      const sid = (sessionRes.data?.id as string | undefined) ?? null;
-      setSessionId(sid);
-      const sessRow = sessionRes.data as { cancelled_at?: string | null; cancellation_reason?: string | null } | null;
-      setCancelled(sessRow?.cancelled_at ? { reason: sessRow.cancellation_reason ?? null } : null);
-
-      const coachList: CoachOpt[] = ((coachesRes.data ?? []) as any[])
-        .map((x) => ({ id: x.id, name: x.profiles?.full_name ?? "Unknown coach" }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-      setCoaches(coachList);
-
-      // Attendance + substitute only exist when the session does.
-      let marks = new Map<string, DbStatus>();
-      let subs: SubstituteRow[] = [];
-      let subRowId: string | null = null;
-      let absences: AbsenceRow[] = [];
-      if (sid) {
-        const [attRes, subRes, absRes] = await Promise.all([
-          supabase.from("attendance").select("student_id, status").eq("lesson_session_id", sid),
-          supabase.from("session_coaches").select("id, lesson_session_id, coach_id").eq("lesson_session_id", sid),
-          supabase.from("session_coach_absences").select("lesson_session_id, coach_id").eq("lesson_session_id", sid),
-        ]);
-        if (stale) return;
-        marks = new Map(((attRes.data ?? []) as any[]).map((a) => [a.student_id, a.status as DbStatus]));
-        subs = ((subRes.data ?? []) as any[]).map((s) => ({ lesson_session_id: s.lesson_session_id, coach_id: s.coach_id }));
-        subRowId = ((subRes.data ?? []) as any[])[0]?.id ?? null;
-        absences = (absRes.data ?? []) as AbsenceRow[];
-      }
-
-      // Who is expected: the SAME union the billing gate uses.
-      const spans: EnrolmentSpan[] = ((enrolRes.data ?? []) as any[]).map((e) => ({
-        studentId: e.student_id,
-        from: toSgDate(e.enrolled_at),
-        until: e.unenrolled_at ? toSgDate(e.unenrolled_at) : null,
-      }));
-      const names = new Map<string, string>();
-      for (const e of (enrolRes.data ?? []) as any[]) names.set(e.student_id, e.students?.full_name ?? "Unknown");
-      const guests: { id: string; student_id: string; kind: RosterKind; name: string }[] = [
-        ...((trialsRes.data ?? []) as any[]).map((b) => ({ id: b.id, student_id: b.student_id, kind: "trial" as const, name: b.students?.full_name ?? "Unknown" })),
-        ...((makeupsRes.data ?? []) as any[]).map((b) => ({ id: b.id, student_id: b.student_id, kind: "makeup" as const, name: b.students?.full_name ?? "Unknown" })),
-      ];
-      for (const g of guests) names.set(g.student_id, g.name);
-      const bookedByDate = new Map<string, string[]>([[date, guests.map((g) => g.student_id)]]);
-      const enrolledSet = new Set(studentsEnrolledOn(date, spans));
-      const expected = expectedStudentsOn(date, spans, bookedByDate);
-      const rows: RosterRow[] = expected.map((id) => {
-        const g = guests.find((x) => x.student_id === id);
-        return {
-          studentId: id,
-          name: names.get(id) ?? "Unknown",
-          kind: enrolledSet.has(id) ? "enrolled" : g?.kind ?? "trial",
-          bookingId: enrolledSet.has(id) ? null : g?.id ?? null,
-          expected: true,
-          prev: marks.get(id) ?? null,
-        };
-      });
-      // A marked row for a child no longer expected (left the class) is still
-      // shown, read-only-ish, so the admin sees it — and it is a correction.
-      for (const [id, st] of marks) {
-        if (!expected.includes(id)) rows.push({ studentId: id, name: names.get(id) ?? "Former student", kind: "enrolled", bookingId: null, expected: false, prev: st });
-      }
-      rows.sort((a, b) => a.name.localeCompare(b.name));
-      setRoster(rows);
-      setDraft(Object.fromEntries(rows.map((r) => [r.studentId, r.prev])));
-
-      const a = attributeLessons({
-        lessons: [{ lesson_session_id: sid ?? "pending", class_id: classId, session_date: date }],
-        substitutes: subs,
-        classRates: (ratesRes.data ?? []) as ClassRateRow[],
-        shadows: (shadowsRes.data ?? []) as ClassShadowRow[],
-        absences,
-      }).get(sid ?? "pending");
-      setAttr({ mainId: a?.main_coach_id ?? null, isCover: a?.is_cover ?? false, subRowId, shadowIds: a?.shadow_coach_ids ?? [] });
-      setTermsCoachId(termsCoachOn((ratesRes.data ?? []) as ClassRateRow[], classId, date));
-
-      const kidRows = (kidsRes.data ?? []) as any[];
-      setKids(
-        kidRows
-          .filter((k) => k.is_active)
-          .map((k) => {
-            const enrolled = (k.student_class_enrolments ?? [])
-              .filter((e: any) => e.is_active && e.classes)
-              .map((e: any) => ({ id: e.classes.id, title: e.classes.title, category_id: e.classes.category_id }));
-            if (enrolled.length === 0) return null;
-            return { id: k.id, full_name: k.full_name, home_classes: enrolled, home_class_titles: enrolled.map((e: any) => e.title) };
-          })
-          .filter(Boolean) as EligibleKid[]
-      );
-      setTrialKids(
-        kidRows
-          .filter((k) => k.is_active && !(k.student_class_enrolments ?? []).some((e: any) => e.is_active))
-          .map((k) => ({ id: k.id, full_name: k.full_name }))
-      );
-
-      setFloor(await floorP);
-      if (stale) return;
-      setLoading(false);
-    })();
-    return () => {
-      stale = true;
-    };
-  }, [classId, date, validDate, reloadTick]);
-
-  const reload = useCallback(() => setReloadTick((t) => t + 1), []);
-
-  // ── Derived ─────────────────────────────────────────────────────────────
-  const markability = useMemo(
-    () =>
-      cls
-        ? lessonMarkability({ date, today, classDayOfWeek: cls.day_of_week, classTitle: cls.title, sessionExists: sessionId !== null, windowFloor: floor })
-        : null,
-    [cls, date, today, sessionId, floor]
-  );
-  const newRowsAllowed = markability?.ok ?? false;
-  const notALesson = !!cls && !sessionId && dayOfWeekOf(date) !== cls.day_of_week;
-  const isFuture = date > today;
-
-  const enrolledCount = roster.filter((r) => r.expected && r.bookingId === null).length;
-  const guestCount = roster.filter((r) => r.expected && r.bookingId !== null).length;
-  const full = !!cls && isFull(enrolledCount, guestCount, cls.capacity);
-
-  const dirty = roster.some((r) => (draft[r.studentId] ?? null) !== r.prev);
-  const mainName = coaches.find((c) => c.id === attr?.mainId)?.name ?? "—";
   // The coach the class rate already pays teaches this lesson anyway, so
   // assigning them records no cover — the DB refuses it (20260821000100). Exclude
   // that coach from the picker so the UI never offers what the DB will reject.

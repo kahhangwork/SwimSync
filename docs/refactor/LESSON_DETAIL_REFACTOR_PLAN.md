@@ -273,8 +273,8 @@ The test header says: **characterisation — pins existing behaviour; §7.25's p
 
 | Driver | Checks | What it proves here |
 |---|---|---|
-| `verify-admin-lesson-detail` | 28 | load, roster, save + holiday confirm + audit + CN001, floor banner, not-a-lesson, substitute assign/remove, FULL, make-up booking |
-| `verify-cancel-lesson` | 18 | cancel modal (reason gate), banner, save/booking disabled, restore |
+| `verify-admin-lesson-detail` | 27 (runtime; grep says 28 — the cleanup check is written twice, try + catch) | load, roster, save + holiday confirm + audit + CN001, floor banner, not-a-lesson, substitute assign/remove, FULL, make-up booking |
+| `verify-cancel-lesson` | 17 (runtime; same try/catch double) | cancel modal (reason gate), banner, save/booking disabled, restore |
 | `verify-admin-calendar` | 21 | double-click → this route (URL only) |
 | `verify-smoke-admin` | 2 | `goto` this route; **`h1` EXACTLY equals the class title** (`"Saturday Beginners"`, `:153`) — the loading-state `"Lesson"` fails it, so the PageHeader title span moves verbatim |
 
