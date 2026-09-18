@@ -38,7 +38,8 @@ import {
 } from "./domain/lessonMarking";
 import { filterEligibleKids } from "@/lib/makeupSearch";
 import { useLessonDetail } from "./domain/useLessonDetail";
-import type { RosterRow } from "./types";
+import { useCancelLesson } from "./domain/useCancelLesson";
+import type { RosterRow, SaveMsg } from "./types";
 
 export default function LessonPage() {
   const params = useParams<{ classId: string; date: string }>();
@@ -76,7 +77,7 @@ export default function LessonPage() {
 
   // ── Save / action state ─────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [saveMsg, setSaveMsg] = useState<SaveMsg>(null);
   const [confirmHoliday, setConfirmHoliday] = useState<number | null>(null);
   const [coachPick, setCoachPick] = useState("");
   const [coachBusy, setCoachBusy] = useState(false);
@@ -87,14 +88,8 @@ export default function LessonPage() {
   const [bookHome, setBookHome] = useState("");
   const [bookBusy, setBookBusy] = useState(false);
   const [bookError, setBookError] = useState<string | null>(null);
-  // Advance-cancel / restore (plan Phase B, Step B4). Every rule is enforced by
-  // cancel_lesson()/restore_lesson() themselves — future-only, no guests, no
-  // marks, not into a billed month — and their message is RENDERED, not
-  // pre-empted (§7.32: a limit only the admin screen applies is not a limit).
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
-  const [cancelBusy, setCancelBusy] = useState(false);
-  const [cancelError, setCancelError] = useState<string | null>(null);
+  const { cancelOpen, setCancelOpen, cancelReason, setCancelReason, cancelBusy, cancelError, setCancelError, doCancelLesson, doRestoreLesson } =
+    useCancelLesson(classId, date, reload, setSaveMsg);
 
   // The coach the class rate already pays teaches this lesson anyway, so
   // assigning them records no cover — the DB refuses it (20260821000100). Exclude
@@ -212,32 +207,6 @@ export default function LessonPage() {
     }
     void doBook();
   }
-  // ── Cancel / restore the whole lesson ───────────────────────────────────
-  async function doCancelLesson() {
-    setCancelBusy(true);
-    setCancelError(null);
-    const { error } = await supabase.rpc("cancel_lesson", { p_class_id: classId, p_date: date, p_reason: cancelReason });
-    setCancelBusy(false);
-    if (error) {
-      setCancelError(error.message);
-      return;
-    }
-    setCancelOpen(false);
-    setCancelReason("");
-    reload();
-  }
-  async function doRestoreLesson() {
-    setCancelBusy(true);
-    setSaveMsg(null);
-    const { error } = await supabase.rpc("restore_lesson", { p_class_id: classId, p_date: date });
-    setCancelBusy(false);
-    if (error) {
-      setSaveMsg({ kind: "error", text: `Could not restore the lesson: ${error.message}` });
-      return;
-    }
-    reload();
-  }
-
   async function cancelBooking(row: RosterRow) {
     if (!row.bookingId) return;
     const fn = row.kind === "trial" ? "cancel_trial_booking" : "cancel_makeup_booking";

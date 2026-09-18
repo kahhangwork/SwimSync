@@ -293,8 +293,8 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: F_LESSON, contains: 'import { supabase } from "@/lib/supabase"', why: "Stage 5 — the last page call (guests) moves to dao" },
   // Stage 2 (spine): getSession + the 13 reads moved into dao/lessonDetail.repo
   // (loadLessonReads / loadSessionReads). 14 entries deleted.
-  { file: F_LESSON, contains: 'supabase.rpc("cancel_lesson"', why: "Stage 3 — cancel/restore -> dao/lessonDetail.rpc" },
-  { file: F_LESSON, contains: 'supabase.rpc("restore_lesson"', why: "Stage 3 — cancel/restore" },
+  // Stage 3 (cancel/restore): both RPCs moved into dao/lessonDetail.rpc,
+  // wrapped by domain/useCancelLesson. 2 entries deleted.
   { file: F_LESSON, contains: 'supabase.rpc("assign_session_coach"', why: "Stage 4 — substitute" },
   { file: F_LESSON, contains: 'supabase.from("session_coaches").delete()', why: "Stage 4 — substitute (remove cover)" },
   { file: F_LESSON, contains: 'supabase.rpc("book_makeup"', why: "Stage 5 — guests" },

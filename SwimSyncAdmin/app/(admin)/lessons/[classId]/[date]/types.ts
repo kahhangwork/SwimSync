@@ -38,3 +38,6 @@ export type EligibleKid = {
   home_classes: { id: string; title: string; category_id: string }[];
   home_class_titles: string[];
 };
+
+/** The attendance bar's message. Written by the save, restore and cancel-booking slices. */
+export type SaveMsg = { kind: "ok" | "error"; text: string } | null;
