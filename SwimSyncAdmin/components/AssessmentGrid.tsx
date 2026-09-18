@@ -34,7 +34,6 @@
 //       "clear" swatch to the paint toolbar.
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { cycleGrade } from "@/lib/skillProgress";
 import {
   groupRosterByLevel,
@@ -42,6 +41,7 @@ import {
   nextLevel,
   dedupeStroke,
   type GradeLevel,
+  type GradeWrites,
   type Level,
   type RosterStudent,
   type StudentRow,
@@ -66,6 +66,11 @@ type Props = {
   onReload: () => void | Promise<void>;
   /** Hide the paint toolbar — the single-child drawer has no run to paint. */
   compact?: boolean;
+  /** The three writes, bound to the caller's dao (see GradeWrites). The grid
+   *  holds no client. Pass a MODULE-LEVEL const: flushStroke's useCallback
+   *  deps are [onReload] only, so `writes` must keep a stable identity — never
+   *  add it to those deps. */
+  writes: GradeWrites;
 };
 
 export function AssessmentGrid({
@@ -76,6 +81,7 @@ export function AssessmentGrid({
   since,
   onReload,
   compact = false,
+  writes,
 }: Props) {
   // skill_id → grade_level_id, per student. Seeded from the roster and then
   // driven optimistically; the server is re-read on any failure.
@@ -129,9 +135,7 @@ export function AssessmentGrid({
     if (cells.length === 0) return;
 
     setBusy(true);
-    const { error: err } = await supabase
-      .from("student_skill_progress")
-      .upsert(cells, { onConflict: "student_id,skill_id" });
+    const { error: err } = await writes.upsertGrades(cells);
     setBusy(false);
 
     if (err) {
@@ -157,14 +161,8 @@ export function AssessmentGrid({
                           snapshot: Record<string, Record<string, string>>) {
     setBusy(true);
     const { error: err } = cell
-      ? await supabase
-          .from("student_skill_progress")
-          .upsert([cell], { onConflict: "student_id,skill_id" })
-      : await supabase
-          .from("student_skill_progress")
-          .delete()
-          .eq("student_id", studentId)
-          .eq("skill_id", skillId);
+      ? await writes.upsertGrades([cell])
+      : await writes.clearGrade(studentId, skillId);
     setBusy(false);
 
     if (err) {
@@ -234,10 +232,7 @@ export function AssessmentGrid({
   async function onPromote(row: StudentRow, to: Level) {
     setPromoting(row.student.id);
     setError(null);
-    const { error: err } = await supabase
-      .from("students")
-      .update({ level_id: to.id })
-      .eq("id", row.student.id);
+    const { error: err } = await writes.promoteStudent(row.student.id, to.id);
     setPromoting(null);
 
     if (err) {

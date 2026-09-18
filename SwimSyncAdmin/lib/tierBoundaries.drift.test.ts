@@ -193,9 +193,6 @@ const F_PLATFORM = "app/(admin)/platform/page.tsx";
 const F_LEVELS = "app/(admin)/levels/page.tsx";
 const F_TRIALS = "app/(admin)/trials/page.tsx";
 const F_MAKEUPS = "app/(admin)/makeups/page.tsx";
-const F_ASSESS = "app/(admin)/assessment/page.tsx";
-const F_ASSESS_CLASS = "app/(admin)/assessment/[classId]/page.tsx";
-const F_GRID = "components/AssessmentGrid.tsx";
 
 /**
  * Check 3 — data-access lines still outside `dao/`. Students reached ZERO on
@@ -301,26 +298,9 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: F_MAKEUPS, contains: "supabase.rpc(\"package_live_balances\").then(({ data }) => {", why: "data access -> <page>/dao" },
   { file: F_MAKEUPS, contains: "const { error } = await supabase.rpc(\"book_makeup\", {", why: "data access -> <page>/dao" },
   { file: F_MAKEUPS, contains: "const { error } = await supabase.rpc(\"cancel_makeup_booking\", {", why: "data access -> <page>/dao" },
-  // F_ASSESS — removed at L-D commit 1
-  { file: F_ASSESS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
-  { file: F_ASSESS, contains: "supabase .from(\"tenant_levels\")", why: "data access -> <page>/dao" },
-  { file: F_ASSESS, contains: "supabase.from(\"skill_grade_levels\").select(\"id, rank, label\").order(\"rank\"),", why: "data access -> <page>/dao" },
-  { file: F_ASSESS, contains: "supabase .from(\"classes\")", why: "data access -> <page>/dao" },
-  { file: F_ASSESS, contains: "? await supabase .from(\"student_class_enrolments\")", why: "data access -> <page>/dao" },
-  { file: F_ASSESS, contains: "? await supabase .from(\"student_skill_progress\")", why: "data access -> <page>/dao" },
-  // F_ASSESS_CLASS — removed at L-D commit 1
-  { file: F_ASSESS_CLASS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
-  { file: F_ASSESS_CLASS, contains: "supabase .from(\"classes\")", why: "data access -> <page>/dao" },
-  { file: F_ASSESS_CLASS, contains: "supabase .from(\"tenant_levels\")", why: "data access -> <page>/dao" },
-  { file: F_ASSESS_CLASS, contains: "supabase.from(\"skill_grade_levels\").select(\"id, rank, label\").order(\"rank\"),", why: "data access -> <page>/dao" },
-  { file: F_ASSESS_CLASS, contains: "supabase .from(\"student_class_enrolments\")", why: "data access -> <page>/dao" },
-  { file: F_ASSESS_CLASS, contains: "? await supabase .from(\"student_skill_progress\")", why: "data access -> <page>/dao" },
-  // F_GRID — removed at L-D commit 1 (injected writes)
-  { file: F_GRID, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
-  { file: F_GRID, contains: "const { error: err } = await supabase .from(\"student_skill_progress\")", why: "data access -> <page>/dao" },
-  { file: F_GRID, contains: "? await supabase .from(\"student_skill_progress\")", why: "data access -> <page>/dao" },
-  { file: F_GRID, contains: ": await supabase .from(\"student_skill_progress\")", why: "data access -> <page>/dao" },
-  { file: F_GRID, contains: "const { error: err } = await supabase .from(\"students\")", why: "data access -> <page>/dao" },
+  // ── assessment + assessment/[classId] + AssessmentGrid: DONE (L-D commit 1) —
+  //    each route's reads in its own dao/*.repo; the grid's 3 writes injected
+  //    as `writes`, bound in assessment/[classId]/dao and students/dao. ──
 ];
 
 /**
@@ -470,14 +450,9 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: F_MAKEUPS, contains: "@/lib/supabase", why: "client -> dao" },
   { file: F_MAKEUPS, contains: "@/lib/lessonDates", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
   { file: F_MAKEUPS, contains: "@/lib/makeupSearch", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
-  // F_ASSESS — removed at L-D commit 1
-  { file: F_ASSESS, contains: "@/lib/supabase", why: "client -> dao" },
-  { file: F_ASSESS, contains: "@/lib/lessonDates", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
-  { file: F_ASSESS, contains: "@/lib/assessment", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
-  // F_ASSESS_CLASS — removed at L-D commit 1
-  { file: F_ASSESS_CLASS, contains: "@/lib/supabase", why: "client -> dao" },
-  { file: F_ASSESS_CLASS, contains: "@/lib/lessonDates", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
-  { file: F_ASSESS_CLASS, contains: "@/lib/assessment", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  // ── assessment + assessment/[classId] + AssessmentGrid: DONE (L-D commit 1) —
+  //    each route's reads in its own dao/*.repo; the grid's 3 writes injected
+  //    as `writes`, bound in assessment/[classId]/dao and students/dao. ──
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

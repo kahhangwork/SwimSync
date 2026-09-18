@@ -11,11 +11,20 @@
 import { useState } from "react";
 import type {
   GradeLevel as SkillGradeLevel,
+  GradeWrites,
   Level as SkillLevel,
   RosterStudent,
 } from "@/lib/assessment";
 import * as repo from "../dao/students.repo";
 import type { StudentRow } from "../types";
+
+// The grid's writes (components/AssessmentGrid's injected `writes`), bound to
+// this feature's dao. MODULE-LEVEL on purpose: a stable identity (Admin L-D).
+export const gradeWrites: GradeWrites = {
+  upsertGrades: repo.upsertGrades,
+  clearGrade: repo.clearGrade,
+  promoteStudent: repo.updateStudentLevel,
+};
 
 export function useGrading(reload: () => Promise<void>) {
   const [levels, setLevels] = useState<{ id: string; label: string }[]>([]);

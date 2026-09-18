@@ -10,7 +10,7 @@
 import { Modal } from "@/components/Modal";
 import { AssessmentGrid } from "@/components/AssessmentGrid";
 import { todayInSg } from "@/lib/lessonDates";
-import type { GradingState } from "../domain/useGrading";
+import { gradeWrites, type GradingState } from "../domain/useGrading";
 
 export function GradingModal(p: { grading: GradingState; tenantId: string | null }) {
   const g = p.grading;
@@ -41,6 +41,7 @@ export function GradingModal(p: { grading: GradingState; tenantId: string | null
             since={todayInSg()}
             compact
             onReload={() => g.openGrading(g.gradingFor!)}
+            writes={gradeWrites}
           />
         </div>
       ) : null}

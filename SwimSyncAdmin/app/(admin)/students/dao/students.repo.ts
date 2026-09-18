@@ -15,6 +15,7 @@
 // shaped the way it is, and several of them are load-bearing (§7.28).
 
 import { supabase } from "@/lib/supabase";
+import type { StrokeCell } from "@/lib/assessment";
 import { ilikeContains } from "@/lib/tableSearch";
 import { ROW_LIMIT } from "../constants";
 import type { SearchField } from "../types";
@@ -131,6 +132,21 @@ export const fetchSkillProgress = (studentId: string) =>
 
 export const updateStudentLevel = (studentId: string, levelId: string | null) =>
   supabase.from("students").update({ level_id: levelId }).eq("id", studentId);
+
+// The grading modal's grid writes (components/AssessmentGrid, injected as
+// `writes` — Admin L-D, BATCH_D_PLAN.md). Promote reuses updateStudentLevel
+// above: the grid's query was byte-identical to it.
+export const upsertGrades = (cells: StrokeCell[]) =>
+  supabase
+    .from("student_skill_progress")
+    .upsert(cells, { onConflict: "student_id,skill_id" });
+
+export const clearGrade = (studentId: string, skillId: string) =>
+  supabase
+    .from("student_skill_progress")
+    .delete()
+    .eq("student_id", studentId)
+    .eq("skill_id", skillId);
 
 // ── Contact ─────────────────────────────────────────────────────────────────
 

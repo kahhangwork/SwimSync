@@ -315,6 +315,25 @@ export type StrokeCell = {
 };
 
 /**
+ * The grid's three writes, INJECTED by each caller (components/AssessmentGrid's
+ * `writes` prop) so the shared component holds no database client. Each caller's
+ * domain hook binds them to its own dao (Admin L-D, BATCH_D_PLAN.md). Every one
+ * resolves to the PostgREST `{ error }` shape the grid already reads — the grid
+ * keeps all the orchestration (dedupe, whole-stroke snapshot, rollback, reload).
+ * Lives here, a pure module every caller already imports, so no dao ever has to
+ * import from `@/components`.
+ */
+type WriteResult = PromiseLike<{ error: { message: string } | null }>;
+export type GradeWrites = {
+  /** Array upsert on (student_id, skill_id). One cell or a whole paint stroke. */
+  upsertGrades: (cells: StrokeCell[]) => WriteResult;
+  /** Clearing a grade is a DELETE — never part of a stroke (header, (c)). */
+  clearGrade: (studentId: string, skillId: string) => WriteResult;
+  /** Move a child up to the next level. */
+  promoteStudent: (studentId: string, levelId: string) => WriteResult;
+};
+
+/**
  * Collapse a paint stroke to one row per (student, skill), last write wins.
  *
  * ⚠ THIS IS NOT A TIDINESS PASS — WITHOUT IT THE WHOLE STROKE FAILS.
