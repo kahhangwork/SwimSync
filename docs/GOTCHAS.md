@@ -3809,3 +3809,40 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     a later `git add` (the mv already staged them); never pipe a `git add` to `/dev/null`; and **`git status` must be
     clean after every commit** — a stray modified/untracked file is a stage that didn't fully commit. Recovered by
     staging + committing the stranded content as a fixup (`7b19d8d`); zero content lost. (Classes refactor, 2026-09-17.)
+
+243. **A plan's grep assertion of the form "X must appear 0 times" MATCHES ITS OWN PROHIBITION COMMENT, forever.**
+    Three assertions in `PLATFORM_REFACTOR_PLAN.md` read false-high the moment the code they governed was written:
+    `strandedRes.error` = 1 not 0, `!inner` = 3 not 2, `useEffect` = 3 not 0. Every extra hit was a comment
+    *forbidding or explaining the very string being counted* — `// Do NOT check strandedRes.error` matches
+    `grep strandedRes.error`, and it always will, because a good prohibition names the thing it forbids. The trap is
+    that the count looks like a real violation, so you go hunting for code that does not exist. **The fix is
+    structural, not vigilance: count over comment-stripped source.** The repo already ships the stripper —
+    `stripComments()` in `SwimSyncAdmin/lib/tierBoundaries.drift.test.ts`, which is why the fence's own checks never
+    had this problem. A throwaway `codegrep.py` doing the same was used from Stage 4 of the platform refactor
+    onward and every assertion then read its true value. Write plan assertions as "N in CODE" and say which tool
+    produced the number. (Platform refactor, 2026-09-18.)
+
+244. **A bare `page.selectOption("select", …)` in a driver is a ONE-`<select>` DOM CONTRACT on the page under test,
+    and nothing at either end says so.** `verify-platform-admin` drives the student-move picker that way. It works
+    only because `@/components/Modal` renders `null` when closed, so the platform page happens to expose exactly one
+    `<select>` while no modal is open. Add a second one that renders unconditionally — a filter, a page-size picker,
+    a form left mounted — and the driver silently drives the wrong control: Playwright's strict mode does not fire
+    for `selectOption`'s string form, so it resolves the first match and the assertion fails later, somewhere else,
+    for a reason that looks like a product bug. Recorded in `platform/ui/StudentMoveSection.tsx`'s header. Related:
+    the same page has TWO "Search" buttons, so the driver uses `.first()` — which makes the DOM ORDER of the
+    student-move and family-status cards a contract too. (Platform refactor, 2026-09-18.)
+
+245. **`verify-smoke-admin`'s exact-`h1` check cannot tell a page's REFUSAL branch from its content when both render
+    `PageHeader` with the same title — so it is never evidence that an access gate works.** `/platform` renders
+    `<h1>Platform</h1>` both when the platform admin sees the real page and when a tenant admin is refused
+    ("This page is for the SwimSync platform admin"). The smoke driver passes on either. It is a route-renders,
+    no-console-error check and that is all it is; the gate itself is asserted by `verify-platform-admin-scope` and
+    `verify-platform-admin`, which match on the refusal TEXT. Don't count a smoke pass toward a gate change.
+    (Platform refactor, 2026-09-18.)
+
+246. **On a page that renders tenant names in TWO tables, `locator("tr", { hasText: <tenant name> })` is ambiguous
+    and silently resolves to the FIRST one.** The platform page shows every business in the Businesses overview
+    *and* again in family status. A Stage 10 hand-check filtered rows by "Twoside Swim" and got the overview row —
+    so it failed with a message about a missing child, which reads exactly like a broken tenant-narrowing, i.e. the
+    bug it was written to detect. Scope with a second `hasText` (the parent's name) or with a container locator.
+    Same family as §7.75/§7.101: a locator taken over a list it does not own. (Platform refactor, 2026-09-18.)

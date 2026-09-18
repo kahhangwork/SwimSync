@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-18 — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -1702,6 +1702,30 @@ to `useVoidNote` / `useRateEditor` should be caught by CI, not by remembering to
 insert). Call `page.removeAllListeners("dialog")` before answering the referrals Void prompt (`launch()` registers
 its own handler), and select the payout toggle by name — `button[aria-expanded]` hits the sidebar first. **Do not
 press Resend** unless the driver stubs the email function.
+
+### A `verify-platform-controls` driver for the five uncovered Platform surfaces — **S** `[from the platform refactor 2026-09-18]`
+The platform full-track refactor (§8.110) decomposed `platform/page.tsx`. Its driver net — `platform-admin`,
+`platform-admin-scope`, `tenant-provisioning`, `tenant-suspension`, `smoke-admin` (129/129) — **opens none of
+these five**: the **stranded-parents panel** ("Signed up but not in any business"), the **`N unpaid`**
+`staff_without_rate` chip, the **Change owner / Set owner** modal *and its stale-response guard*, the **"Credit
+stays with the old business"** advisory (both exits **and** the `checkFailed` branch), and the whole **Family
+status** search. All were hand-checked during the refactor — 23 assertions with screenshots, stage by stage.
+
+**Why:** each is dormant on production for a DATA reason, not a bug (§3), so its first real firing is still ahead
+of us and there is nothing between a regression and that firing. Two carry real consequences: the owner-transfer
+ref guard is what stops business A's admin list landing in business B's modal, and the credit advisory is the only
+warning before credit is stranded unspendable at the old business (PRD §5.6). Same shape as `verify-money-admin`
+and `verify-class-admin`.
+
+**Notes:** the seeds are the hard part and they are all in the stage commits' hand-check scripts (`406bb3f`,
+`4607bc4`, `4135d91`). Shapes needed: a parent with **zero** `parent_tenants` rows; a rate-less **staff** coach
+(not the owner — the owner is excluded in SQL by design, §7.131); **two** businesses with **distinct** co-admins
+(the guard is unobservable if they share one); a family holding `credit_balance > 0` at the child's current
+business; and a parent at **two** businesses with one child at each (the only shape that exposes the
+tenant-narrowing). `tenants` needs a `slug` — the insert fails without it. To exercise `checkFailed`, rename
+`parent_tenant_balances` in `dao/platform.repo.ts` for one local run. **Beware §7.244/§7.246**: keep exactly one
+`<select>` on the page, use `.first()`/`.last()` for the two "Search" buttons, and scope row locators by a second
+`hasText` — tenant names appear in two tables.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the

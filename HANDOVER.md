@@ -1,10 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-17 — **Admin L-C "money" lite batch DONE, on `main` (§8.109):** wages / credit-notes /
-referrals / accounting 2,309 → 394 lines, 0 useState, ledgers empty, net + 26 hand-checks green. **Nightly
-`35209608957` RUNNING on `94242f5` — the gate for the next unit (a giant, §9).** August billing still HALF DONE (§8.107)._
+_Last updated: 2026-09-18 — **`platform` full-track DONE, on `main` `44ae740` (§8.110):** 1,395 → 237 lines,
+0 useState, both ledgers empty, 129/129 drivers + 23 hand-checks. A characterisation test caught a real
+precedence inversion. **Nightly `35306167774` RUNNING on `44ae740` — the gate for the next unit (§9).**
+August billing still HALF DONE — finish before 1 Oct (§9)._
 
-_Previously, 2026-09-17 (§8.108) — `classes` full-track DONE (1,714 → 164); its nightly `35187663332` went green._
+_Previously, 2026-09-17 (§8.109) — Admin L-C money batch DONE (2,309 → 394); its nightly `35209608957` went green._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +28,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.241** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.246** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -347,6 +348,29 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.110 (2026-09-18) — `platform/page.tsx` full-track decomposition: 1,395 → 237 lines, 0 useState
+
+**5th full-track giant; 14 commits on `refactor/platform-tiers`, fast-forwarded to `main` (`44ae740`) and pushed.
+Zero behaviour change.** Stage 0 plan → `/plan-review` → 0b fence → 11 stages, each gated on typecheck + vitest.
+dao is the **second three-way split** after invoices (`.repo`/`.rpc`/`.api` — this page has 4 `/api/*` routes);
+domain 8 hooks + 2 pure modules; ui 10 components. Both ledgers **empty**. 757 → 770 vitest (+13
+characterisation). **Driver net 129/129** (platform-admin 6, scope 32, provisioning 15, suspension 12,
+smoke-admin 64) + **23 hand-check assertions** with screenshots for the 5 surfaces no driver opens.
+
+- **Read `docs/refactor/PLATFORM_REFACTOR_PLAN.md` (§5 risks, §6 per-stage mitigations, §12), not this.**
+- **A real behaviour bug was caught BEFORE it shipped, by writing a characterisation test** — the only
+  thing that could have. Extracting `familyMessage()` from a sequence of `setFamMessage` calls, the natural
+  rewrite inverts the precedence (inline the failure message is assigned first and *overwritten* by the count
+  branches). typecheck, the fence and every driver pass either way. → playbook §5.
+- **Graduated:** §7.243 (a grep assertion matches its own prohibition comment — fix is structural: count over
+  comment-stripped source), §7.244 (a bare `selectOption("select")` is a one-`<select>` DOM contract),
+  §7.245 (an exact-`h1` smoke check can't tell a refusal branch from content), §7.246 (tenant names in two
+  tables make a row locator ambiguous); `verify-platform-controls` → `BACKLOG.md`; ARCHITECTURE §10, TESTING §5.
+- **`/plan-review` (Fable 5.1 subagent) paid again:** 6 factual errors in the Stage 0 plan, incl. a driver
+  credited with a check it never makes — 3 verified by hand before folding in.
+- **Also graduated OUT of §9 this session:** the 4 sweep-triage rules → `docs/TESTING.md` §5, and the deploy
+  narrative → `docs/DEPLOYMENT.md` §11 (it cited ten §11.x entries that already held every word). −4 KB.
+
 ## 8.109 (2026-09-17) — Admin L-C lite batch: 4 money pages to tiers, 2,309 → 394 lines, 0 useState
 
 **Seven commits on `refactor/admin-lc`, fast-forwarded to `main` (`94242f5`) after classes' nightly `35187663332` went
@@ -362,29 +386,7 @@ platform-admin-scope 32/32; hand-check 26/26 (Resend deliberately not pressed �
   actions → `BACKLOG.md` (`verify-money-admin`); stale `lib/` paths repointed in ARCHITECTURE §10 / TESTING / §7.152.
 - **Merged before its own nightly by design** (the §7.1 gate is on the NEXT merge). `35209608957` is that nightly.
 
-## 8.108 (2026-09-17) — `classes/page.tsx` full-track decomposition: 1,714 → 164 lines, 0 useState
-
-**4th full-track giant; 12 stages on `refactor/classes-tiers`, merged to `main` (`7b19d8d`) and pushed. Zero
-behaviour change.** dao (`classes.{repo,rpc}`, typed RPC wrappers) → domain (7 hooks + 3 pure modules with
-characterisation tests) → ui (9 components); both boundary ledgers **empty**. Two clean `git mv`s into domain
-(`classRoster`, `locationOptions`, sole importers). 734 vitest + 429 jest; **driver net 11/11 local**
-(class-deactivation/edit/terms/students, cancel-lesson 17/17, locations, coach-roster, attendance-guard,
-platform-admin-scope, tenant-admin, smoke-admin). **Nightly `35187663332` RUNNING on `main` to confirm — gate
-the next merge on it (§7.1).**
-
-- **Read `docs/refactor/CLASSES_REFACTOR_PLAN.md` (§5a, §6, §13), not this, for the how.** The plan was hardened
-  by a `/plan-review` run (a **Fable 5.1 subagent**) that caught 3 driver-net mis-mappings + the untyped-client
-  RISK 1; every risk landed a structural pin (12-key typed RPC wrappers, source-pin `classesQueryShape.test.ts`,
-  4 `shadowRateWarning` cases, grep gates), several proven RED.
-- **Owed (dormant, unit-pinned):** the shadow **End / rate-warning / failed-load** hand-checks have no driver
-  (`coach-roster` covers ASSIGN only) → `verify-class-admin` in `BACKLOG.md`. Move was verbatim; risk low.
-- **Fence infra fix (durable):** `tierBoundaries.drift.test.ts` `imports()` tightened to exclude `\n<>` — the
-  word "from" ending a JSX string (`aria-label="Shadowing from"`, a `coach-roster` label) was a false-positive
-  specifier. Strengthening only; every prior scope unchanged.
-- **Process footgun → §7.242:** a `git add … 2>/dev/null` naming a `git mv`d path aborted the whole add and
-  committed only the rename; stranded content was caught at merge. Keep `git status` clean after every commit.
-
-_(§8.107 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.108 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -429,118 +431,55 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-17: `main` is `94242f5` (carries Admin L-C §8.109). Nightly `35209608957` (manual) is RUNNING
-on it — `gh run view 35209608957`.** It is the GATE for the next merge (§7.1). Bisection spans L-C only (the prior
-nightly `35187663332` was green on `7b19d8d`), so a red is most likely a wages/referrals/credit-notes/accounting
-driver — but read it, don't trust this line (§8.65). Start any red with `gh run download 35209608957 -n
-ui-driver-run` + screenshots (§7.228), and re-check a cold-compile timeout per §7.108 before calling it a regression.
+**State on 2026-09-18: `main` is `44ae740` (carries the platform refactor, §8.110). Nightly `35306167774`
+(manual) was RUNNING on it when this was written — `gh run view 35306167774`.** It is the GATE for the next
+unit (§7.1). Bisection spans the platform unit only (the prior scheduled run `35283558572` was green on
+`6e2b78a`), so a red is most likely a platform/tenant-provisioning/suspension driver — **but read it, don't
+trust this line** (§8.65).
 
-**Hand-run caveats (which drivers are not re-runnable, which mutate shared seed state) are
-collected in `docs/TESTING.md` §5** — graduated there 2026-08-12; don't restate them here.
-**One more, learned 2026-08-30:** `check-fixture-roundtrip.sh` run straight after a UI driver reports
-failures that are just the driver's own UI writes — reset before believing it.
+**How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
+§7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
+which mutate shared seed state — are in the same section.
 
-> **FIRST, download the run's screenshots — `gh run download <id> -n ui-driver-run -D <dir>`.** They are
-> already being collected and were never once opened; on 2026-08-30 a two-night red that had survived two
-> wrong hypotheses was settled in one look by a button still reading *"Creating…"* (§7.228). **Then read
-> §7.108** — a driver dying on `page.goto(admin/login)` with a
-> 30s `networkidle` timeout is a cold Next.js compile, not rot and not a product bug; `curl`
-> the route and re-run first. **Then ask which weekday the run actually saw** (§7.122), and
-> whether the driver takes an ordinal over a list it does not own (§7.75, §7.101) or skips
-> itself on a date condition and reports PASS (§7.100). *(**§7.73 is cited across the repo as
-> the shorthand for "an assumption that held until the data changed"** — that family reading
-> is fine and is how `ui-drivers.yml` and `docs/TESTING.md` use it. But its text is the
-> unordered-`LIMIT 1` fixture bug and contains **no calendar content**, so for a
-> weekday-dependent failure the pointers above are the ones that actually pay. Noted, not
-> renumbered: eight files cite it and the number is permanent.)*
+### THE NEXT BUILD — a lite batch is due (the alternation), or the last admin giant
 
-### THE NEXT BUILD — a full-track giant (recommended), then a batch
+**`platform` is DONE (§8.110).** Full-track giants done: Students (pilot), `packages`, `invoices`, `classes`,
+`platform`. Lite batches done: L-A, L-B, L-C. By the **giant→batch alternation a BATCH is due next.**
 
-**Admin L-C is DONE (§8.109).** Lite batches done: L-A, L-B, L-C. By the **giant→batch alternation a GIANT is due
-next.** **5 giants left:** admin `platform` (1,395), `lessons/[classId]/[date]` (912); coach app `schedule/index`
-(1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905). Recommended: **`platform`** — the largest
-admin page, and admin-side keeps the proven vitest fence; a coach-app unit adds the `features/` layout + jest twin +
-RN-web quirks (playbook §1 table). Method: playbook §2 (Stage 0 plan + `/plan-review`, 0b fence, 12 stages).
-**Re-derive the driver net by grep first** (§7.236). Next lite batch after that: Admin L-D grading or L-E rest.
+- **Recommended: Admin L-D grading** — `levels` `trials` `makeups` `assessment` (+ `assessment/[classId]`,
+  fence), ~2,667 lines, driver net levels · levels-table · level-skills · assessment · trials ·
+  contact-details · makeups. Playbook §7.1 (L0 fence + one folded commit per page + L4 driver run).
+- **Or the last admin giant:** `lessons/[classId]/[date]` (912 lines). The three coach-app giants
+  (`schedule/index` 1,255, `classes/[id]/attendance` 1,183, `classes/[id]/roster` 905) each add the
+  `features/` layout, the jest twin and RN-web quirks (playbook §1 table) — a different KIND of unit, not
+  just a bigger one, so don't treat the first as routine.
+- Either way: **re-derive the driver net by grep first** (§7.236). A driver's NAME is not evidence — this
+  session's `/plan-review` caught one credited with a check it never makes.
 
-**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35209608957` (L-C) is green.**
+**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35306167774` (platform) is green.**
 **Still-due once-off:** the dao three-way split + "orchestrate, never replace" rule → `docs/ARCHITECTURE.md` §6
-(trigger met since packages; now FOUR giants exercise it).
+(trigger long met — FIVE giants now exercise it, and `platform` is the second with a three-way `.api` split).
 
-**Three dev servers may still be UP from the classes driver run** (admin :3000, Expo :8081, edge functions) —
-`/session-close` releases them, or kill the listeners on those ports. Local DB was reset 11× by the net.
-
-**No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), **on prod
-— re-confirmed 2026-08-30 by `supabase migration list --linked`, `remote` column filled** — 0 pending, rehearsed
-DOWN in `supabase/rollback/`. §8.99 authored none. *(That check corrected a live trap: `BACKLOG.md`'s pick-now
-item 1 had said "NOT YET DEPLOYED, deploy via `/deploy` when ready" for a migration already on prod and already
-exercised there. Fixed the same day. **The linked migration list is the fact; a prose status is a hint.**)*
+**No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), on prod,
+0 pending, rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is the fact; a prose
+status is a hint.** §8.110 authored none — a pure refactor, nothing deployed.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers
 > `credit_notes.email_sent_at` too).
 
-### Triage rules, when the sweep does redden
+### When the sweep reddens, and when you deploy — both graduated
 
-**Four triage rules worth keeping, all bought with real time:**
+**Reading a red sweep → `docs/TESTING.md` §5, "Reading a RED nightly sweep".** The four triage
+rules, the screenshots-first instruction and the cold-compile check moved there on 2026-09-18.
+They were 5 KB of reference sitting inside *Next steps*, which is where reference goes to be
+re-written every session and read by nobody.
 
-- **A sweep left red stops being an alarm.** A deliberate page-count pin nobody bumped (§7.178)
-  once sat on top of a LIVE regression (§7.176) in the same rot issue, unread, while CI was red on
-  every push. **Triage the day it reddens even when you are sure which check it is** — you are sure
-  about one driver; it reports several. §8.65. *(Wave-5 suspect→commit map if one of those areas
-  reddens: `verify-admins`→`ee15814`; `platform-admin-scope`/Platform page→`9c1279c`; Coaches
-  page→`f5d91aa`. The Attendance money-axis change, §8.53, registered NO driver — vitest + a one-off
-  8/8 browser run cover it.)*
-- **A job that dies before checkout is not your code.** Three CI runs on 2026-08-06 failed
-  in *"Set up job"* during a GitHub Actions major outage. Check `githubstatus.com` before
-  reading a diff.
-- **When the sweep reddens, ask which moved — the product or the driver's assumption.**
-  §7.73 is the assumption case (its family, not its literal text — see the note above);
-  §8.33 is the product case, and it was a live bug that four green *manual* runs had missed
-  because they ran outside the broken window.
-- **The change that shipped yesterday is the SUSPECT, never the verdict** (§8.35). The
-  2026-08-08 red looked exactly like §7.98 — written the day before, about the same screen
-  — and was in fact a driver that had been broken for two weeks and had been skipping
-  itself into a green PASS. Check when the driver last actually asserted anything.
-  **2026-08-10 made the same point twice over** (§8.42): `schedule-week`'s red looked exactly
-  like the §8.40 deploy hours earlier, and was a locator that had never worked on a weekday.
-  **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
-  — byte-identical driver, identical failure, suspect exonerated in one run.
-
-**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending. (Migration state
-is stated once above under *THE NEXT BUILD*.) **§11.44 is the freshest worked
-example** — a same-signature `CREATE OR REPLACE` (no grant dump, §11.32) FIRST, apps to `main` LAST, verified by
-grepping the served bundle (§7.31). **§11.43 is the freshest CONTRACT half** — a one-way column DROP with no grant
-dump and no app deploy. **§11.42 is the freshest FULL sequence done IN ORDER** — a new table
-+ a DROP+CREATE function signature needing a remote grant dump → GATE → apps to `main` LAST, proving the new
-auth-gated route by 200-vs-404 (§8.64's technique for §11.25's gap), with a committed rehearsed DOWN.
-§11.40/§11.39/§11.37 are earlier full-sequence examples; **§11.38 records the §11.9 ordering mistake recurring**
-(recovered by reverting the app files only, landing the backend, re-applying apps last). §11.36 is the
-same-signature contrast (no grant dump needed, §11.32 pattern).
-**§8.70 (DEPLOYMENT §11.29) is the freshest worked example of the full sequence** — and the first
-**expand/contract** one: 7 migrations → engine v25 → apps → served-bundle grep GATE → the contract
-migration LAST (held back by a `.hold` rename until the apps stopped reading the dropped columns);
-a git push deploys neither migrations nor edge functions. §8.64 (§11.25) is the earlier example where the APPS had to wait on a
-NEW edge function. The rule stands:
-migrations to prod (engine too when `core.ts` changes — it did NOT for either email feature) FIRST,
-apps to `main` LAST.
-§7.123 still applies to signatures. Whatever comes next: still one at
-a time (§7.55), a worktree never authors one, and budget the post-deploy grant check (§7.39,
-§7.89) **and** the rollback rehearsal (§7.93 — running the DOWN file is the half that finds the
-bugs). **Don't take `supabase db push`'s own output as proof it applied:** it printed a
-`pgdelta` certificate stack trace *and* `Finished supabase db push` on 2026-08-09 **and again
-on 2026-08-10** — three times now, so treat it as the normal output, not an incident.
-`supabase migration list --linked` is the fact — check the `remote` column is filled.
-**And read the function body from `pg_get_functiondef()`, never from the migration that first
-created it** (§7.115): `CREATE OR REPLACE` means the newest definition can be in any later
-file, and grep finds the oldest first. That cost a wrong risk rating on 2026-08-10.
-
-> **To hold one migration back from another, MOVE THE FILE out of `supabase/migrations/` and
-> put it back for the second push.** `supabase db push` applies everything pending, so two
-> files present at once is one deploy and the ordering you wrote down did not happen (§7.49,
-> §7.30). §8.39 used this to keep an RPC ungranted until its engine was confirmed live —
-> §7.87 turned into a feature flag, and it is the pattern to copy whenever a new client path
-> is only safe *after* something else deploys.
+**Deploying → `docs/DEPLOYMENT.md` §11 and CLAUDE.md's "Deploying" rules.** The narrative that
+used to sit here cited ten §11.x entries that already held every word of it — §11.44 (freshest
+same-signature `CREATE OR REPLACE`), §11.43 (freshest CONTRACT half), §11.42 (freshest full
+sequence in order), §11.29 (the expand/contract worked example). Read those, not a fourth copy.
+**Run `/deploy` before the next backend push** — it hard-gates the app deploy behind 0-pending.
 
 ### The documents are on a THIRD attempt at discipline-by-instruction — watch it
 

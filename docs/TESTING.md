@@ -1082,6 +1082,14 @@ and a final assertion that counts rather than tests presence (§7.118).
   `orIlike` incl. hostile-term cases, `matchesAnyField`) and the credit sum. ⚠ These assert the `.or()`
   string SHAPE only; the wildcard-escaping bug (§7.217) and the `!inner` requirement (§7.216) are DB
   behaviours a vitest cannot see — both were proven with a live-DB probe, not a unit test.
+- **`app/(admin)/platform/domain/familyRows.test.ts` (vitest, 13 cases)** — the platform page's first unit
+  coverage, added by the full-track refactor (§8.110). **Characterisation**, so §7.25's prove-it-red rule does
+  not apply. Two halves: `buildFamilyRows` (the double narrowing — a child belongs to a row only when BOTH
+  `parent_id` AND `students.tenant_id` match; the two-business case is what proves it) and `familyMessage`
+  (the precedence). **The precedence cases are the ones that earn their keep**: inline, the children-failed
+  message was assigned first and OVERWRITTEN by the count branches, so "No families matched." wins — and the
+  natural extraction inverts that. Two cases pin it. Nothing else can: typecheck, the fence and every driver
+  pass either way (playbook §5).
 - **`verify-level-skills.mjs`** — its `/students` level-picker selector moved from `page.locator("select").nth(2)`
   to `table select` nth(2): the new scoped-search toolbar `<select>` shifted the bare position index. A
   position-based selector over a page whose toolbar can grow a control is the recurring driver trap.
@@ -1202,3 +1210,47 @@ outcome), `levels` and `level-skills` (the inline level picker), `class-students
 identity` is a coach-app driver and never opens the page.** Merge and Rename have no driver (BACKLOG).
 `active-inactive`, `levels` and `level-skills` hardcode ports and need a port-substituted copy to run
 against a worktree (playbook §4).
+
+### Reading a RED nightly sweep — the four triage rules
+
+*(Graduated from `HANDOVER.md` §9 on 2026-09-18. They had sat inside "Next steps", which is
+where reference material goes to be re-read by nobody and re-written every session. They are
+durable and they belong beside the drivers they describe.)*
+
+**First, download the run's screenshots** — `gh run download <id> -n ui-driver-run -D <dir>`.
+They are already collected and were never once opened; on 2026-08-30 a two-night red that had
+survived two wrong hypotheses was settled in one look by a button still reading *"Creating…"*
+(§7.228). **Then read §7.108** — a driver dying on `page.goto(admin/login)` with a 30s
+`networkidle` timeout is a cold Next.js compile, not rot and not a product bug; `curl` the route
+and re-run first. **Then ask which weekday the run actually saw** (§7.122), and whether the
+driver takes an ordinal over a list it does not own (§7.75, §7.101, §7.246) or skips itself on a
+date condition and reports PASS (§7.100).
+
+Then the four rules, all bought with real time:
+
+- **A sweep left red stops being an alarm.** A deliberate page-count pin nobody bumped (§7.178)
+  once sat on top of a LIVE regression (§7.176) in the same rot issue, unread, while CI was red on
+  every push. **Triage the day it reddens even when you are sure which check it is** — you are sure
+  about one driver; it reports several. §8.65. *(Wave-5 suspect→commit map if one of those areas
+  reddens: `verify-admins`→`ee15814`; `platform-admin-scope`/Platform page→`9c1279c`; Coaches
+  page→`f5d91aa`. The Attendance money-axis change, §8.53, registered NO driver — vitest + a one-off
+  8/8 browser run cover it.)*
+- **A job that dies before checkout is not your code.** Three CI runs on 2026-08-06 failed
+  in *"Set up job"* during a GitHub Actions major outage. Check `githubstatus.com` before
+  reading a diff.
+- **When the sweep reddens, ask which moved — the product or the driver's assumption.**
+  §7.73 is the assumption case (**its family, not its literal text** — §7.73 is the unordered-`LIMIT 1`
+  fixture bug and contains no calendar content, but it is cited across the repo as the shorthand for
+  "an assumption that held until the data changed"); §8.33 is the product case, and it was a live bug
+  that four green *manual* runs had missed because they ran outside the broken window.
+- **The change that shipped yesterday is the SUSPECT, never the verdict** (§8.35). The
+  2026-08-08 red looked exactly like §7.98 — written the day before, about the same screen
+  — and was in fact a driver that had been broken for two weeks and had been skipping
+  itself into a green PASS. Check when the driver last actually asserted anything.
+  **2026-08-10 made the same point twice over** (§8.42): `schedule-week`'s red looked exactly
+  like the §8.40 deploy hours earlier, and was a locator that had never worked on a weekday.
+  **The cheap way to settle it is to check the driver out at the suspect's parent and re-run**
+  — byte-identical driver, identical failure, suspect exonerated in one run.
+
+**One more, learned 2026-08-30:** `check-fixture-roundtrip.sh` run straight after a UI driver
+reports failures that are just the driver's own UI writes — reset before believing it.

@@ -619,7 +619,7 @@ the shape of the system changes:_
 | `SwimSyncAdmin/components/Drawer.tsx` | Right-hand slide-over. Deliberately the same prop shape as `Modal.tsx` and no richer |
 | `SwimSyncAdmin/components/Table.test.tsx` | **The `<Thead>` call-site contract, enforced.** Scans every `app/(admin)/**/page.tsx` and fails if one wraps its `<Th>`s in a `<Tr>`. Walks the tree at test time, so pages that don't exist yet are covered. §7.54 |
 | `SwimSyncAdmin/app/(admin)/wages/page.tsx` | Coach payroll: rates, policy, run, mark paid |
-| `SwimSyncAdmin/app/(admin)/platform/page.tsx` | Platform admin: every business + the student rescue tool |
+| `SwimSyncAdmin/app/(admin)/platform/` | Platform admin: every business + the student rescue tool. **Feature-tiered 2026-09-18** (§8.110) — `page.tsx` is 237 lines of composition, `dao/platform.{repo,rpc,api}.ts` holds every call (the second three-way dao split, after invoices), `domain/` 8 hooks + 2 pure modules, `ui/` 10 components. The load-bearing prohibitions live in the file headers: `loadOverview`'s asymmetric errors, `postAs`'s absent `try`, the owner-transfer ref guard, `moveNonce`'s two reset paths, the family-row double narrowing |
 | `supabase/migrations/` | Schema, RLS, triggers, grants (ordered, source of truth) |
 | `…/20260309000500_credit_note_trigger.sql` | Auto-issues a credit note on billable→non-billable edit of an invoiced lesson |
 | `…/20260711000100_credit_applications.sql` | Credit-note allocation ledger (fixes partial-application drift) |

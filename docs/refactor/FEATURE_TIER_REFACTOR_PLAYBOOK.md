@@ -10,8 +10,8 @@ behind each decision; read this for what to do._
 **Who this is for:** every session that opens a page or screen in either app. **The end
 state, decided 2026-09-12, is that EVERY page follows the shape in §1** — not just the
 giants. What varies with size is the *ceremony*, not the shape: §7 defines three tracks.
-The seven giants (`packages/page.tsx` 2,014 lines, `invoices/page.tsx` 1,748,
-`classes/page.tsx` 1,714, `platform/page.tsx` 1,395, `lessons/[classId]/[date]/page.tsx`
+The eight giants (`packages/page.tsx` 2,014 lines ✅, `invoices/page.tsx` 1,748 ✅,
+`classes/page.tsx` 1,714 ✅, `platform/page.tsx` 1,395 ✅, `lessons/[classId]/[date]/page.tsx`
 912, and in the coach app `(coach)/schedule/index.tsx` 1,255,
 `(coach)/classes/[id]/attendance.tsx` 1,183, `(coach)/classes/[id]/roster.tsx` 905) take
 the full twelve stages of §2, **one at a time, and never start the next until the last has
@@ -273,6 +273,18 @@ rm verify-zz-* fixtures-zz-*                    # before committing anything
   byte-identical `ui/Field.tsx` (admins, coaches). Kept feature-scoped on purpose (§7.233 —
   don't lift to `@/components` mid-refactor). A **third** copy is the trigger to consolidate;
   file it in `BACKLOG.md` when it appears, don't pre-emptively share.
+- **A SEQUENCE of `setX` calls has precedence, and extracting it to a pure function INVERTS it.**
+  Inline, a later `setMessage` silently overwrites an earlier one; in a function, the earlier
+  `return` wins — the two orders are exact opposites, so the mechanical translation is wrong in a
+  way that reads *more* correct. Platform Stage 10: `handleFamilySearch` assigned the
+  children-failed message FIRST and then let the count branches overwrite it, so
+  `"No families matched."` beats a failed children read. Extracting `familyMessage()` the natural
+  way — `if (kidsFailed) return …` first — flipped that, because a failure sounds more urgent than
+  a count. **Nothing else catches it**: `tsc`, the fence, and every driver pass either way, and both
+  versions render a plausible sentence in a plausible place. Before extracting, write down which
+  assignment wins, then pin it with a case for **every pair**. This is the clearest evidence so far
+  for §2's rule that `domain/` needs its pure mapping under characterisation tests — it is the first
+  time that rule caught something rather than merely being obeyed.
 - **When two slices write EACH OTHER's state, break the cycle at the compose layer, not inside
   a hook.** Invoices (§8.106): `useGenerate` fills the unclaimed modal (`setUnclaimed`) and
   `useUnclaimed`'s settle writes `genResult` (owned by `useGenerate`) — a creation-time cycle.
@@ -317,7 +329,7 @@ code architecture" a fact the test runner can check rather than a sentence in a 
 
 | Track | Size | Admin | Coach/parent app | Lines |
 |---|---|---|---|---|
-| **Full** (§2, twelve stages, own plan doc) | > ~900 | 5 remaining | 3 | ~11,100 |
+| **Full** (§2, twelve stages, own plan doc) | > ~900 | **1 remaining** (`lessons/[classId]/[date]`) | 3 | ~11,100 |
 | **Lite** (below) | ~250 – ~900 | 21 pages | 13 screens | ~16,200 |
 | **Fence** (below) | < ~250 | 5 pages | 10 screens | ~2,600 |
 
