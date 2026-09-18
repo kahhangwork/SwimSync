@@ -189,8 +189,8 @@ type Allowed = { file: string; contains: string; why: string };
 // wrong"). Added with the platform scope, 2026-09-18.
 const F_PLATFORM = "app/(admin)/platform/page.tsx";
 
-// Admin L-D (BATCH_D_PLAN.md) — spelled once, same reason as F_PLATFORM.
-const F_TRIALS = "app/(admin)/trials/page.tsx";
+// (Admin L-D's F_LEVELS/F_TRIALS/F_MAKEUPS/F_ASSESS/F_ASSESS_CLASS/F_GRID were
+// deleted with their last ledger entry, 2026-09-18.)
 
 /**
  * Check 3 — data-access lines still outside `dao/`. Students reached ZERO on
@@ -257,24 +257,11 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    lookup in dao/levels.repo (resolved inside each insert, in the hook, as
   //    before); skillScale MOVED into levels/domain (git mv, sole importer);
   //    studentCounts reached from ui/RemoveLevelModal (shared, stays in lib). ──
-  // F_TRIALS — removed at L-D commit 4
-  { file: F_TRIALS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "supabase .rpc(\"student_package_coverage\")", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "const { data: auth } = await supabase.auth.getUser();", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "const { data: profile } = await supabase .from(\"profiles\")", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "supabase .from(\"classes\")", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "supabase.from(\"class_categories\").select(\"id, name\").order(\"name\"),", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "supabase .from(\"trial_rates\")", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "supabase .from(\"trial_bookings\")", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "? await supabase .from(\"attendance\")", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "const { data: kids } = await supabase .from(\"students\")", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "? await supabase.rpc(\"book_trial\", {", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: ": await supabase.rpc(\"add_unclaimed_student\", {", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "const { error } = await supabase.rpc(\"cancel_trial_booking\", {", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "const { data: liveTrial } = await supabase .from(\"trial_bookings\")", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "const { error: enrolError } = await supabase .from(\"student_class_enrolments\")", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "const { error: statusError } = await supabase .from(\"students\")", why: "data access -> <page>/dao" },
-  { file: F_TRIALS, contains: "const { error } = await supabase.from(\"trial_rates\").insert({", why: "data access -> <page>/dao" },
+  // ── trials: DONE (L-D commit 4) — auth/profile + every read/write in
+  //    dao/trials.repo (the Convert flow's three calls stay separate awaits in
+  //    domain/useTrials — RISK 2), the 4 RPCs in dao/trials.rpc; trialConvert
+  //    MOVED into trials/domain (git mv, sole importer); sgPhone, packageCoverage,
+  //    lessonDates reached from domain/ui (shared). Admin L-D: BOTH LEDGERS EMPTY. ──
   // ── makeups: DONE (L-D commit 2) — reads in dao/makeups.repo, the 3 RPCs in
   //    dao/makeups.rpc; the two fire-and-forget advisory loads stay un-awaited in
   //    domain/useMakeups. makeupSearch + lessonDates STAY (shared). ──
@@ -420,12 +407,11 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    lookup in dao/levels.repo (resolved inside each insert, in the hook, as
   //    before); skillScale MOVED into levels/domain (git mv, sole importer);
   //    studentCounts reached from ui/RemoveLevelModal (shared, stays in lib). ──
-  // F_TRIALS — removed at L-D commit 4
-  { file: F_TRIALS, contains: "@/lib/supabase", why: "client -> dao" },
-  { file: F_TRIALS, contains: "@/lib/sgPhone", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
-  { file: F_TRIALS, contains: "@/lib/packageCoverage", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
-  { file: F_TRIALS, contains: "@/lib/lessonDates", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
-  { file: F_TRIALS, contains: "@/lib/trialConvert", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  // ── trials: DONE (L-D commit 4) — auth/profile + every read/write in
+  //    dao/trials.repo (the Convert flow's three calls stay separate awaits in
+  //    domain/useTrials — RISK 2), the 4 RPCs in dao/trials.rpc; trialConvert
+  //    MOVED into trials/domain (git mv, sole importer); sgPhone, packageCoverage,
+  //    lessonDates reached from domain/ui (shared). Admin L-D: BOTH LEDGERS EMPTY. ──
   // ── makeups: DONE (L-D commit 2) — reads in dao/makeups.repo, the 3 RPCs in
   //    dao/makeups.rpc; the two fire-and-forget advisory loads stay un-awaited in
   //    domain/useMakeups. makeupSearch + lessonDates STAY (shared). ──
