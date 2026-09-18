@@ -11,10 +11,8 @@ import { totalFamilyCredit } from "@/lib/moveStudentWarning";
 import { ROW_LIMIT } from "./constants";
 import {
   childrenOfParents,
-  currentUser,
   familyCreditAt,
   parentLinksForStudent,
-  profileRole,
   searchFamilyMemberships,
   searchStudents,
 } from "./dao/platform.repo";
@@ -26,6 +24,9 @@ import {
   tenantAdmins,
 } from "./dao/platform.rpc";
 import { postAs } from "./dao/platform.api";
+import { useNotice } from "./domain/useNotice";
+import { usePlatformAccess } from "./domain/usePlatformAccess";
+import { NotPlatformAdmin } from "./ui/NotPlatformAdmin";
 import type {
   TenantRow,
   TenantAdminOption,
@@ -53,7 +54,7 @@ import type {
  */
 
 export default function PlatformPage() {
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const { allowed, check } = usePlatformAccess();
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [search, setSearch] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);
@@ -61,7 +62,7 @@ export default function PlatformPage() {
     new Map()
   );
   const [moving, setMoving] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const { message, setMessage } = useNotice();
   // The advisory credit warning before a cross-business move (Piece 3). Set when
   // the family holds credit at the OLD business (or that could not be checked);
   // confirming calls doMove(). `moveNonce` remounts the per-row picker so it
@@ -101,18 +102,12 @@ export default function PlatformPage() {
     inviteLink: string | null;
   } | null>(null);
 
+  // The page owns the ONE mount effect; usePlatformAccess holds no effect of its
+  // own, so `check()` RETURNS the verdict and loadTenants() chains off the return
+  // value rather than racing the state update (playbook §5).
   useEffect(() => {
     (async () => {
-      const { data: auth } = await currentUser();
-      if (!auth.user) {
-        setAllowed(false);
-        return;
-      }
-      const { data: profile } = await profileRole(auth.user.id);
-
-      const ok = profile?.role === "platform_admin";
-      setAllowed(ok);
-      if (ok) await loadTenants();
+      if (await check()) await loadTenants();
     })();
   }, []);
 
@@ -515,17 +510,7 @@ export default function PlatformPage() {
 
   if (allowed === null) return <div className="p-6 text-gray-500">Loading…</div>;
 
-  if (!allowed) {
-    return (
-      <div>
-        <PageHeader title="Platform" subtitle="Cross-tenant operations" />
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600">
-          This page is for the SwimSync platform admin. Your account
-          administers a single business, which is what every other page shows.
-        </div>
-      </div>
-    );
-  }
+  if (!allowed) return <NotPlatformAdmin />;
 
   return (
     <div>
