@@ -257,3 +257,11 @@ Then:
   `assessment/ui/ClassChecklist.tsx`. General lesson for the playbook: **any source-scanning test
   keyed on `page.tsx` loses coverage as each page is decomposed** — grep the test suite for
   `"page.tsx"` before a unit, not only the fence.
+- **Playbook candidate — a sort (or any state) held BELOW a page's `if (loading) return` resets on
+  every reload.** makeups' `loadAll()` flips `loading` after each Book/Cancel, which unmounts
+  everything under the early return. `useTableSort` in a `ui/` table would silently reset the
+  admin's sort after every write; it stays in the hook (as in `attendance`, `invoices`). Rule: a
+  page that sets `loading` on RELOAD (not only first load) keeps its sort in `domain/`.
+- **Latent (not fixed — rule 0):** makeups' `expiryWarning` `useMemo` omits `homeClass` from its
+  deps. Harmless today (every home change clears `bookDate`, forcing a recompute) — noted in the
+  hook; a BACKLOG hygiene candidate, never a refactor change.

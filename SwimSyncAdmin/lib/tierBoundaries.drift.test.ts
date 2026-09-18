@@ -192,7 +192,6 @@ const F_PLATFORM = "app/(admin)/platform/page.tsx";
 // Admin L-D (BATCH_D_PLAN.md) — spelled once, same reason as F_PLATFORM.
 const F_LEVELS = "app/(admin)/levels/page.tsx";
 const F_TRIALS = "app/(admin)/trials/page.tsx";
-const F_MAKEUPS = "app/(admin)/makeups/page.tsx";
 
 /**
  * Check 3 — data-access lines still outside `dao/`. Students reached ZERO on
@@ -287,17 +286,9 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: F_TRIALS, contains: "const { error: enrolError } = await supabase .from(\"student_class_enrolments\")", why: "data access -> <page>/dao" },
   { file: F_TRIALS, contains: "const { error: statusError } = await supabase .from(\"students\")", why: "data access -> <page>/dao" },
   { file: F_TRIALS, contains: "const { error } = await supabase.from(\"trial_rates\").insert({", why: "data access -> <page>/dao" },
-  // F_MAKEUPS — removed at L-D commit 2
-  { file: F_MAKEUPS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
-  { file: F_MAKEUPS, contains: "supabase .from(\"classes\")", why: "data access -> <page>/dao" },
-  { file: F_MAKEUPS, contains: "supabase .from(\"makeup_bookings\")", why: "data access -> <page>/dao" },
-  { file: F_MAKEUPS, contains: "supabase .from(\"students\")", why: "data access -> <page>/dao" },
-  { file: F_MAKEUPS, contains: "supabase .from(\"lesson_sessions\")", why: "data access -> <page>/dao" },
-  { file: F_MAKEUPS, contains: "? await supabase .from(\"attendance\")", why: "data access -> <page>/dao" },
-  { file: F_MAKEUPS, contains: "supabase .from(\"parent_students\")", why: "data access -> <page>/dao" },
-  { file: F_MAKEUPS, contains: "supabase.rpc(\"package_live_balances\").then(({ data }) => {", why: "data access -> <page>/dao" },
-  { file: F_MAKEUPS, contains: "const { error } = await supabase.rpc(\"book_makeup\", {", why: "data access -> <page>/dao" },
-  { file: F_MAKEUPS, contains: "const { error } = await supabase.rpc(\"cancel_makeup_booking\", {", why: "data access -> <page>/dao" },
+  // ── makeups: DONE (L-D commit 2) — reads in dao/makeups.repo, the 3 RPCs in
+  //    dao/makeups.rpc; the two fire-and-forget advisory loads stay un-awaited in
+  //    domain/useMakeups. makeupSearch + lessonDates STAY (shared). ──
   // ── assessment + assessment/[classId] + AssessmentGrid: DONE (L-D commit 1) —
   //    each route's reads in its own dao/*.repo; the grid's 3 writes injected
   //    as `writes`, bound in assessment/[classId]/dao and students/dao. ──
@@ -446,10 +437,9 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: F_TRIALS, contains: "@/lib/packageCoverage", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
   { file: F_TRIALS, contains: "@/lib/lessonDates", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
   { file: F_TRIALS, contains: "@/lib/trialConvert", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
-  // F_MAKEUPS — removed at L-D commit 2
-  { file: F_MAKEUPS, contains: "@/lib/supabase", why: "client -> dao" },
-  { file: F_MAKEUPS, contains: "@/lib/lessonDates", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
-  { file: F_MAKEUPS, contains: "@/lib/makeupSearch", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  // ── makeups: DONE (L-D commit 2) — reads in dao/makeups.repo, the 3 RPCs in
+  //    dao/makeups.rpc; the two fire-and-forget advisory loads stay un-awaited in
+  //    domain/useMakeups. makeupSearch + lessonDates STAY (shared). ──
   // ── assessment + assessment/[classId] + AssessmentGrid: DONE (L-D commit 1) —
   //    each route's reads in its own dao/*.repo; the grid's 3 writes injected
   //    as `writes`, bound in assessment/[classId]/dao and students/dao. ──
