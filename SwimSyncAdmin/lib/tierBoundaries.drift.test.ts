@@ -137,16 +137,13 @@ const SCOPE_DIRS = [
   "app/(admin)/referrals",
   "app/(admin)/accounting",
   // platform (full track, docs/refactor/PLATFORM_REFACTOR_PLAN.md), widened
-  // 2026-09-18 at Stage 0b. Checks 3 and 4 are red on day one for the
-  // 1,395-line page; every current violation is pinned in the ledgers below
-  // with the stage that removes it (data access -> Stage 2/3 folded; @/lib
-  // imports -> the slice stage that moves the symbol — moveStudentWarning
-  // MOVES into domain/ at Stage 9, the other three STAY in lib and leave the
-  // page as their symbols move into dao/hooks/ui). The transitional
-  // page->dao pins are NOT added here (the page imports no dao yet — the
-  // shrink test would flag them stale); they are added at Stage 2/3 when the
-  // import first appears and removed at Stages 8/9/10 (plan §6). Ledger only
-  // shrinks.
+  // 2026-09-18 at Stage 0b and DONE at Stage 11 the same day. Both ledgers are
+  // EMPTY: page.tsx is composition with zero useState, the client and all 16
+  // data-access sites are in dao/platform.{repo,rpc,api}.ts, and the three
+  // transitional page->dao pins were removed on the schedule set at Stage 2/3
+  // (.api at 8, .rpc at 9, .repo at 10). moveStudentWarning MOVED into
+  // domain/ (sole importer); lessonDates, packageCoverage and tableSearch
+  // STAY in lib (shared) and are reached from dao/domain/ui.
   "app/(admin)/platform",
 ];
 
@@ -324,6 +321,14 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    payoutItems MOVED into wages/domain (git mv, sole code importer);
   //    lessonDates + lessonAttribution reached from domain/ui (shared). Check 4
   //    for L-C is EMPTY — both ledgers empty again. ──
+  // ── platform (full track): BOTH LEDGERS EMPTY at Stage 11 (2026-09-18).
+  //    Everything left as its slice landed: @/lib/supabase + @/lib/tableSearch
+  //    -> dao (Stage 2/3); @/lib/lessonDates -> ui/TenantsTable +
+  //    ui/StrandedPanel (Stage 5); @/lib/packageCoverage ->
+  //    domain/useStudentMove and @/lib/moveStudentWarning MOVED into
+  //    domain/ (Stage 9); the three transitional ./dao/platform.* pins removed
+  //    at Stages 8, 9 and 10 as each hook took the last direct caller. The page
+  //    imports only its own tiers, React and @/components. Nothing to pin. ──
   // ── platform (full track, PLATFORM_REFACTOR_PLAN.md), pinned 2026-09-18 at
   //    Stage 0b. Exactly 5 imports, each with the stage that removes it (§4
   //    verdicts, grep-confirmed both ways + the *.test.ts path-pin grep).

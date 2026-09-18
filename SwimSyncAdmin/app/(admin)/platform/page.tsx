@@ -92,8 +92,6 @@ export default function PlatformPage() {
   const { famSearch, setFamSearch, families, famMessage, handleFamilySearch } =
     useFamilyStatus();
 
-  // ── Provisioning a new business ───────────────────────────────────────────
-
   // The page owns the ONE mount effect; usePlatformAccess holds no effect of its
   // own, so `check()` RETURNS the verdict and loadTenants() chains off the return
   // value rather than racing the state update (playbook §5).
@@ -103,16 +101,21 @@ export default function PlatformPage() {
     })();
   }, []);
 
+  // ⚠ EVERY HOOK ABOVE IS CALLED BEFORE THE TWO RETURNS BELOW, and that is not
+  // formatting — a hook after a conditional return is a hook that sometimes does
+  // not run. The page used to hold four useTableSort calls up here for the same
+  // reason; they now live in the ui/ components they sort, which only mount on
+  // the allowed branch, so the constraint moved rather than disappeared.
+  //
+  // ⚠ THE ORDER OF THE HOOKS IS A DEPENDENCY ORDER. useNotice and useTenants are
+  // created FIRST because the four writer slices take `setMessage` and
+  // `loadTenants` as creation arguments; useStudentMove takes `tenants`. Every
+  // arrow points at an earlier hook, which is what keeps this a DAG and avoids
+  // the call-time-argument trick the invoices refactor needed (playbook §5).
 
-
-
-
-
-
-  // All four declared above the two conditional returns below — a hook after a
-  // conditional return is a hook that sometimes does not run.
-
-
+  // `allowed === null` is a THIRD state, not a falsy boolean. Collapsing these
+  // two returns into one `if (!allowed)` flashes the refusal card at the platform
+  // admin on every load, while the gate is still deciding.
   if (allowed === null) return <div className="p-6 text-gray-500">Loading…</div>;
 
   if (!allowed) return <NotPlatformAdmin />;
@@ -130,14 +133,10 @@ export default function PlatformPage() {
         </div>
       )}
 
-
       {/* A tenant admin asks "how is MY business doing?"; a platform admin asks
           "WHICH business needs me?" — so this is one row per business with the
           signals that answer that, not a set of platform-wide totals. */}
-      {/* The join code is the ONLY route into a business — there is no
-          directory — so it is shown once, prominently, at the moment it is
-          created. */}
-{provisioned && (
+      {provisioned && (
         <ProvisionedBanner
           provisioned={provisioned}
           onDismiss={() => setProvisioned(null)}
@@ -164,7 +163,7 @@ export default function PlatformPage() {
           </button>
         </div>
 
-{showNew && (
+        {showNew && (
           <NewBusinessForm
             newBiz={newBiz}
             setNewBiz={setNewBiz}
@@ -174,7 +173,7 @@ export default function PlatformPage() {
             onCancel={() => setShowNew(false)}
           />
         )}
-<TenantsTable
+        <TenantsTable
           tenants={tenants}
           loadError={loadError}
           resending={resending}
@@ -183,7 +182,7 @@ export default function PlatformPage() {
           onSuspend={setSuspendModal}
         />
 
-<OwnerModal
+        <OwnerModal
           ownerModal={ownerModal}
           ownerAdmins={ownerAdmins}
           ownerLoading={ownerLoading}
@@ -195,7 +194,7 @@ export default function PlatformPage() {
           onClose={closeOwnerModal}
         />
 
-<SuspendModal
+        <SuspendModal
           suspendModal={suspendModal}
           suspendBusy={suspendBusy}
           suspendError={suspendError}
@@ -204,12 +203,9 @@ export default function PlatformPage() {
         />
       </div>
 
-      {/* Registered, never entered a join code. They belong to no business, so
-          no tenant admin can see them and nothing else surfaces them — and they
-          are exactly who the student-move tool below exists for. */}
-{stranded.length > 0 && <StrandedPanel stranded={stranded} />}
+      {stranded.length > 0 && <StrandedPanel stranded={stranded} />}
 
-<StudentMoveSection
+      <StudentMoveSection
         tenants={tenants}
         students={students}
         covMap={covMap}
@@ -222,19 +218,13 @@ export default function PlatformPage() {
         onMove={handleMove}
       />
 
-      {/* ── Advisory: the family's credit does NOT move (Piece 3) ───────────── */}
-<CreditWarningModal
+      <CreditWarningModal
         pendingMove={pendingMove}
         onConfirm={doMove}
         onCancel={cancelMove}
       />
 
-      {/* ── Family status across businesses ──────────────────────────────────
-          Read-only on purpose. Whether a family is a customer of a business is
-          THAT business's call, so this shows the answer without offering to
-          change it. There is no login-blocking control here either: that is a
-          platform power over an ACCOUNT and is filed separately. */}
-<FamilyStatusSection
+      <FamilyStatusSection
         famSearch={famSearch}
         setFamSearch={setFamSearch}
         families={families}
