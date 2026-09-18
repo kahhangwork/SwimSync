@@ -268,18 +268,18 @@ Gate every stage: `cd SwimSyncAdmin && npm run typecheck && npm test`.
 
 | Stage | What | Commit |
 |---|---|---|
-| **0** | This plan | |
-| **0b** | Widen `tierBoundaries.drift.test.ts` to `app/(admin)/platform`; pin every current violation in both ledgers; prove all four checks RED, revert the breakers | |
-| **1** | `constants.ts` (`ROW_LIMIT`) + `types.ts` (5 entity types), verbatim with their comments | |
-| **2/3** | `dao/platform.repo.ts` + `.rpc.ts` + `.api.ts`, **folded** — the page holds zero `supabase` and zero `fetch(` after this. Check-3 ledger to empty | |
-| **4** | `domain/useNotice.ts` + `domain/usePlatformAccess.ts` + `ui/NotPlatformAdmin.tsx` | |
-| **5** | `domain/useTenants.ts` + `ui/TenantsTable.tsx` + `ui/StrandedPanel.tsx` | |
-| **6** | `domain/useProvisioning.ts` + `ui/NewBusinessForm.tsx` + `ui/ProvisionedBanner.tsx` | |
-| **7** | `domain/useOwnerTransfer.ts` + `ui/OwnerModal.tsx` | |
-| **8** | `domain/useSuspend.ts` + `ui/SuspendModal.tsx` | |
-| **9** | `domain/useStudentMove.ts` + `git mv` `moveStudentWarning{,.test}.ts` + `ui/StudentMoveSection.tsx` + `ui/CreditWarningModal.tsx` | |
-| **10** | `domain/familyRows.ts` + its characterisation test + `domain/useFamilyStatus.ts` + `ui/FamilyStatusSection.tsx` | |
-| **11** | The page reduced to composition; dead imports cut (`npx tsc --noEmit --noUnusedLocals \| grep '(admin)/platform/'`). **Both ledgers empty**, header dates updated | |
+| **0** | This plan |  `6e55686 + 78ef0b4` |
+| **0b** | Widen `tierBoundaries.drift.test.ts` to `app/(admin)/platform`; pin every current violation in both ledgers; prove all four checks RED, revert the breakers |  `1b240ca` |
+| **1** | `constants.ts` (`ROW_LIMIT`) + `types.ts` (5 entity types), verbatim with their comments |  `8516197` |
+| **2/3** | `dao/platform.repo.ts` + `.rpc.ts` + `.api.ts`, **folded** — the page holds zero `supabase` and zero `fetch(` after this. Check-3 ledger to empty |  `bf9384a` |
+| **4** | `domain/useNotice.ts` + `domain/usePlatformAccess.ts` + `ui/NotPlatformAdmin.tsx` |  `766285b` |
+| **5** | `domain/useTenants.ts` + `ui/TenantsTable.tsx` + `ui/StrandedPanel.tsx` |  `2fa775c` |
+| **6** | `domain/useProvisioning.ts` + `ui/NewBusinessForm.tsx` + `ui/ProvisionedBanner.tsx` |  `6bcad10` |
+| **7** | `domain/useOwnerTransfer.ts` + `ui/OwnerModal.tsx` |  `4607bc4` |
+| **8** | `domain/useSuspend.ts` + `ui/SuspendModal.tsx` |  `1a9be9f` |
+| **9** | `domain/useStudentMove.ts` + `git mv` `moveStudentWarning{,.test}.ts` + `ui/StudentMoveSection.tsx` + `ui/CreditWarningModal.tsx` |  `406bb3f` |
+| **10** | `domain/familyRows.ts` + its characterisation test + `domain/useFamilyStatus.ts` + `ui/FamilyStatusSection.tsx` |  `4135d91` |
+| **11** | The page reduced to composition; dead imports cut (`npx tsc --noEmit --noUnusedLocals \| grep '(admin)/platform/'`). **Both ledgers empty**, header dates updated |  `77fd9e5` |
 
 **Stages 2 and 3 fold** (playbook §7.1): a standalone dao stage leaves the page importing
 `./dao/*` directly, which check 4 forbids and which would need transitional pins predicted at
@@ -633,41 +633,99 @@ own net is green. **The unit AFTER this one waits on `platform`'s nightly.**
 
 ---
 
-## 12. Findings for `/update-docs` (filled in as they appear)
+## 12. Findings for `/update-docs`
 
-_(empty at Stage 0)_
+Written at Stage 11, 2026-09-18. Four durable items; the rest of the work is in the
+commits and needs no further home.
 
----
+### For `docs/GOTCHAS.md` §7 — append the next numbers, never renumber
 
+1. **A plan's grep assertion matches its own prohibition comment.** Three assertions in this
+   plan read high (`strandedRes.error` = 1 not 0, `!inner` = 3 not 2, `useEffect` = 3 not 0)
+   because the code carries a comment *forbidding or explaining the very string being counted*.
+   A prohibition always matches the grep that enforces it. **Fix, and it is structural rather
+   than vigilance:** count over comment-stripped source. The repo already has the stripper —
+   `stripComments()` in `lib/tierBoundaries.drift.test.ts`. A throwaway `codegrep.py` doing the
+   same was used from Stage 4 on and every assertion then read its true value.
+
+2. **A bare `page.selectOption("select", …)` in a driver is a one-`<select>` DOM CONTRACT on
+   the page under test.** `verify-platform-admin` has one, and it works only because `Modal`
+   renders `null` when closed. Adding a second `<select>` that renders with no modal open
+   breaks it silently — the driver would drive the wrong control. Recorded in
+   `ui/StudentMoveSection.tsx`'s header; worth a gotcha because it is invisible at both ends.
+
+3. **An exact-`h1` smoke check cannot distinguish a refusal branch from content** when both
+   render the same `PageHeader` title. `verify-smoke-admin` asserts `h1 === "Platform"`, which
+   passes on the platform page AND on the "this page is for the platform admin" refusal card.
+   It is a route-renders check, never evidence that a gate works.
+
+4. **A page that renders tenant names in TWO tables makes `locator("tr", { hasText: <name> })`
+   ambiguous.** The Stage 10 hand-check matched the Businesses row instead of the family-status
+   row and failed for the wrong reason (§7.75's family). Scope with a second `hasText`.
+
+### For `BACKLOG.md`
+
+**Write `verify-platform-controls.mjs`** — one driver covering the FIVE platform surfaces no
+driver opens today, all hand-checked this session and each dormant on production for a data
+reason, not a bug:
+
+| Surface | Hand-checked at | Why no driver today |
+|---|---|---|
+| "Signed up but not in any business" stranded panel | Stage 5, 5/5 | needs a parent with no `parent_tenants` row |
+| `N unpaid` `staff_without_rate` chip | Stage 5 | needs a rate-less STAFF coach (§7.131) |
+| Change owner / Set owner modal + its stale-response guard | Stage 7, 5/5 | dormant — owner transfer has no target on prod |
+| "Credit stays with the old business" advisory, both exits + the `checkFailed` branch | Stage 9, 12/12 | dormant — no cross-business move since §8.91 |
+| Family status search (name, email, two-business narrowing, no-match) | Stage 10, 6/6 | never had one; the plan credited `verify-platform-admin` in error |
+
+The seeds are the hard part and they are all in the commits' hand-check scripts.
+
+### For the playbook
+
+The **Stage 10 precedence bug is the strongest argument yet for characterisation tests**, and
+worth adding to §5's pitfalls: extracting `familyMessage()` from an inline sequence of
+`setFamMessage` calls, the natural rewrite (`if (kidsFailed) return …` first) **inverts** the
+original precedence, because inline the failure message was assigned first and then
+*overwritten* by the count branches. It reads more correct and is a behaviour change. Nothing
+but a test that pins the existing order catches it — no gate, no driver, no typecheck.
+
+### Not a finding
+
+`verify-tenant-provisioning`'s hardcoded `localhost:3000` cost nothing here (root checkout,
+not a worktree) and is already documented in the playbook §4.
 ## 13. PRE-COMMIT GATE — walk before EVERY stage commit; the starred ones before Stages 9, 8, 6 and 11
+
+_**Walked in full at Stage 11, 2026-09-18: every box passes.** The counts are reproduced in that
+commit; `codegrep.py` (comment-stripped) was used for all of them, per finding 1._
 
 **Highest value (★) — these are the writes users depend on:**
 
-- [ ] ★ **RISK 1** (Stage 9) `setMoveNonce((n) => n + 1)` ×2 in `useStudentMove.ts`, ×0 in `ui/`;
+- [x] ★ **RISK 1** (Stage 9) `setMoveNonce((n) => n + 1)` ×2 in `useStudentMove.ts`, ×0 in `ui/`;
       `onClose` and Cancel share `onCancel`; `checkFailed = true` ×2; `await handleSearch()` precedes
       `"Moved."`; `document.querySelectorAll("select").length === 1` with one result and no modal;
       `verify-platform-admin` green incl. the DB check; credit-warning hand-check screenshot named.
-- [ ] ★ **RISK 2** (Stage 8) `setSuspendModal(null)` ×1 in `useSuspend.ts`, after `setMessage(`;
+- [x] ★ **RISK 2** (Stage 8) `setSuspendModal(null)` ×1 in `useSuspend.ts`, after `setMessage(`;
       `suspended_at !== null` ×1 in `ui/TenantsTable.tsx`; `verify-tenant-suspension` green.
-- [ ] ★ **RISK 3** (Stage 6) `.trim().toLowerCase()` on both emails; `<h3>` direct child of the panel;
+- [x] ★ **RISK 3** (Stage 6) `.trim().toLowerCase()` on both emails; `<h3>` direct child of the panel;
       `json: any` in `.api.ts`; the three default error strings ×1 each; `verify-tenant-provisioning`
       green with `RESEND_API_KEY` unset on :3000.
-- [ ] ★ **RISK 4** (Stage 4) `allowed === null` ×1 on the page; `useEffect` ×0 in
+- [x] ★ **RISK 4** (Stage 4) `allowed === null` ×1 on the page; `useEffect` ×0 in
       `usePlatformAccess.ts`; `setAllowed` before `await load()`; `verify-platform-admin-scope` green.
 
 **The rest:**
 
-- [ ] **RISK 5** (Stage 7) `ownerModalTenantRef.current` ×3 in `useOwnerTransfer.ts`; A-then-B hand-check screenshot.
-- [ ] **RISK 6** (Stage 5) `strandedRes.error` ×0 anywhere under `platform/`; `loadOverview(` ×1 in `domain/`.
-- [ ] **RISK 7** (Stage 10) `!inner` ×2 and the sentinel ×1 in `.repo.ts`; `familyRows.test.ts` green
+- [x] **RISK 5** (Stage 7) `ownerModalTenantRef.current` ×3 in `useOwnerTransfer.ts`; A-then-B hand-check screenshot.
+- [x] **RISK 6** (Stage 5) `strandedRes.error` ×0 anywhere under `platform/`; `loadOverview(` ×1 in `domain/`.
+- [x] **RISK 7** (Stage 10) `!inner` ×2 and the sentinel ×1 in `.repo.ts`; `familyRows.test.ts` green
       (76 → 77 files); family-status hand-check screenshot (no driver).
-- [ ] **RISK 8** (Stage 4) one `useNotice(` on the page; banner still inside the "Move a student" card.
-- [ ] **RISK 9** (every stage) ledger pair in the commit message matches the schedule
+- [x] **RISK 8** (Stage 4) one `useNotice(` on the page; banner still inside the "Move a student" card.
+- [x] **RISK 9** (every stage) ledger pair in the commit message matches the schedule
       `16/5 → 0/6 → 0/6 → 0/5 → 0/5 → 0/5 → 0/4 → 0/1 → 0/0 → 0/0`; never up.
-- [ ] **RISK 10** (Stage 9) `git grep "lib/moveStudentWarning"` = 0 after; vitest still 76 files.
-- [ ] **Meter** `useState` count in the commit message (29 → … → 0); `npm run typecheck && npm test`
+- [x] **RISK 10** (Stage 9) `git grep "lib/moveStudentWarning"` = 0 **in code** after; vitest still 76
+      files. (The raw grep returns **1**: the fence file's own changelog line recording that the
+      module moved. That is history, not a stale import — finding 1 of §12 again.)
+- [x] **Meter** `useState` count in the commit message (29 → … → 0); `npm run typecheck && npm test`
       green; test count ≥ the previous commit's.
-- [ ] **Nothing tidied.** Every `ui/` file is the JSX block with `x` → `p.x`; every string a driver
+- [x] **Nothing tidied.** Every `ui/` file is the JSX block with `x` → `p.x`; every string a driver
       reads is byte-identical (`grep` it in the new file before committing).
 
 **Graduate to `docs/GOTCHAS.md` §7 at close (append the next free number — ≥ §7.243 as of
