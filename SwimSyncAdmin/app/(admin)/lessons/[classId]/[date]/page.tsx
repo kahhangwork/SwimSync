@@ -11,11 +11,10 @@
 // → bounded credit-note email), with every step's error surfaced. Every DB
 // guard the coach meets applies here unchanged; there is NO override.
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
@@ -36,11 +35,11 @@ import {
   type DbStatus,
   type RosterKind,
 } from "./domain/lessonMarking";
-import { filterEligibleKids } from "@/lib/makeupSearch";
 import { useLessonDetail } from "./domain/useLessonDetail";
 import { useCancelLesson } from "./domain/useCancelLesson";
 import { useSubstitute } from "./domain/useSubstitute";
-import type { RosterRow, SaveMsg } from "./types";
+import { useGuestBooking } from "./domain/useGuestBooking";
+import type { SaveMsg } from "./types";
 
 export default function LessonPage() {
   const params = useParams<{ classId: string; date: string }>();
@@ -80,12 +79,23 @@ export default function LessonPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<SaveMsg>(null);
   const [confirmHoliday, setConfirmHoliday] = useState<number | null>(null);
-  const [bookKind, setBookKind] = useState<"makeup" | "trial" | null>(null);
-  const [bookQuery, setBookQuery] = useState("");
-  const [bookKid, setBookKid] = useState("");
-  const [bookHome, setBookHome] = useState("");
-  const [bookBusy, setBookBusy] = useState(false);
-  const [bookError, setBookError] = useState<string | null>(null);
+  const {
+    bookKind,
+    setBookKind,
+    bookQuery,
+    setBookQuery,
+    bookKid,
+    setBookKid,
+    bookHome,
+    setBookHome,
+    bookBusy,
+    bookError,
+    setBookError,
+    bookKidRow,
+    makeupCandidates,
+    requestBook,
+    cancelBooking,
+  } = useGuestBooking({ classId, date, cls, kids, reload, setSaveMsg });
   const { cancelOpen, setCancelOpen, cancelReason, setCancelReason, cancelBusy, cancelError, setCancelError, doCancelLesson, doRestoreLesson } =
     useCancelLesson(classId, date, reload, setSaveMsg);
 
@@ -134,62 +144,6 @@ export default function LessonPage() {
       }
       return next;
     });
-  }
-
-  // ── Guests ──────────────────────────────────────────────────────────────
-  const bookKidRow = kids.find((k) => k.id === bookKid);
-  const homeClass =
-    bookKidRow?.home_classes.find((c) => c.id === bookHome) ??
-    (bookKidRow?.home_classes.length === 1 ? bookKidRow.home_classes[0] : undefined);
-  // Eligible for a make-up INTO this lesson: active, enrolled somewhere in the
-  // same category, and NOT in this class. The RPC re-checks all of it (§7.32).
-  const makeupCandidates = useMemo(() => {
-    if (!cls) return [];
-    return filterEligibleKids(
-      kids.filter((k) => k.home_classes.some((c) => c.category_id === cls.category_id) && !k.home_classes.some((c) => c.id === cls.id)),
-      bookQuery
-    );
-  }, [kids, cls, bookQuery]);
-
-  async function doBook() {
-    if (!cls) return;
-    setBookBusy(true);
-    setBookError(null);
-    const { error } =
-      bookKind === "makeup"
-        ? await supabase.rpc("book_makeup", { p_class_id: classId, p_session_date: date, p_student_id: bookKid, p_home_class_id: homeClass?.id ?? null })
-        : await supabase.rpc("book_trial", { p_class_id: classId, p_session_date: date, p_student_id: bookKid });
-    setBookBusy(false);
-    if (error) {
-      setBookError(error.message);
-      return;
-    }
-    setBookKind(null);
-    setBookKid("");
-    setBookHome("");
-    setBookQuery("");
-    reload();
-  }
-  function requestBook() {
-    if (!bookKid) {
-      setBookError("Choose a child.");
-      return;
-    }
-    if (bookKind === "makeup" && bookKidRow && bookKidRow.home_classes.length > 1 && !homeClass) {
-      setBookError("Choose which class this make-up replaces.");
-      return;
-    }
-    void doBook();
-  }
-  async function cancelBooking(row: RosterRow) {
-    if (!row.bookingId) return;
-    const fn = row.kind === "trial" ? "cancel_trial_booking" : "cancel_makeup_booking";
-    const { error } = await supabase.rpc(fn, { p_booking_id: row.bookingId });
-    if (error) {
-      setSaveMsg({ kind: "error", text: `Could not cancel the booking: ${error.message}` });
-      return;
-    }
-    reload();
   }
 
   // ── Render ──────────────────────────────────────────────────────────────

@@ -25,3 +25,20 @@ export function restoreLesson(classId: string, date: string) {
 export function assignSessionCoach(classId: string, date: string, coachId: string) {
   return supabase.rpc("assign_session_coach", { p_class_id: classId, p_session_date: date, p_coach_id: coachId });
 }
+
+/** Book a make-up guest into this lesson (capacity, category and home-class rules are the RPC's). */
+export function bookMakeup(classId: string, date: string, studentId: string, homeClassId: string | null) {
+  return supabase.rpc("book_makeup", { p_class_id: classId, p_session_date: date, p_student_id: studentId, p_home_class_id: homeClassId });
+}
+
+export function bookTrial(classId: string, date: string, studentId: string) {
+  return supabase.rpc("book_trial", { p_class_id: classId, p_session_date: date, p_student_id: studentId });
+}
+
+export function cancelTrialBooking(bookingId: string) {
+  return supabase.rpc("cancel_trial_booking", { p_booking_id: bookingId });
+}
+
+export function cancelMakeupBooking(bookingId: string) {
+  return supabase.rpc("cancel_makeup_booking", { p_booking_id: bookingId });
+}

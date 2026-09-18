@@ -290,17 +290,16 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    2026-09-18 at Stage 0b: 22 data-access lines (red-run count, pre-agreed at
   //    plan-review). Each entry names the stage whose slice moves it into
   //    dao/lessonDetail.{repo,rpc}.ts; the client import goes with the last call. ──
-  { file: F_LESSON, contains: 'import { supabase } from "@/lib/supabase"', why: "Stage 5 — the last page call (guests) moves to dao" },
   // Stage 2 (spine): getSession + the 13 reads moved into dao/lessonDetail.repo
   // (loadLessonReads / loadSessionReads). 14 entries deleted.
   // Stage 3 (cancel/restore): both RPCs moved into dao/lessonDetail.rpc,
   // wrapped by domain/useCancelLesson. 2 entries deleted.
+  // Stage 5 (guests): book_makeup / book_trial / cancel_{trial,makeup}_booking
+  // -> dao/lessonDetail.rpc behind domain/useGuestBooking; the page no longer
+  // imports the client. 4 entries deleted (the import line's with them).
   // Stage 4 (substitute): assign_session_coach -> dao/lessonDetail.rpc, the
   // session_coaches delete -> dao/lessonDetail.repo, both behind
   // domain/useSubstitute. 2 entries deleted.
-  { file: F_LESSON, contains: 'supabase.rpc("book_makeup"', why: "Stage 5 — guests" },
-  { file: F_LESSON, contains: 'supabase.rpc("book_trial"', why: "Stage 5 — guests" },
-  { file: F_LESSON, contains: "supabase.rpc(fn,", why: "Stage 5 — guests (cancel_trial/makeup_booking)" },
 ];
 
 /**
@@ -458,18 +457,18 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    Stage 1; adminAttendanceSave(+Deps) move at Stage 6 (domain/ + dao/); the
   //    rest STAY in lib (shared) and leave the page as their symbols move. ──
   { file: F_LESSON, contains: "lucide-react", why: "Stage 7 — ArrowLeft moves into ui/" },
-  { file: F_LESSON, contains: "@/lib/supabase", why: "Stage 5 — the last page call moves to dao" },
   { file: F_LESSON, contains: "@/lib/classColours", why: "Stage 7 — colourFor -> ui/LessonHeader" },
   { file: F_LESSON, contains: "@/lib/lessonDates", why: "Stage 7 — formatSgDate is render-only after the spine" },
   { file: F_LESSON, contains: "@/lib/utils", why: "Stage 7 — formatTime/cn -> ui/" },
   { file: F_LESSON, contains: "@/lib/calendarLessons", why: "Stage 7 — formatCount is render-only after the spine" },
   // Stage 2 (spine): attendanceCompleteness + lessonAttribution -> domain/,
   // markableFloor bound in dao/lessonDetail.repo. 3 entries deleted.
+  // Stage 5: @/lib/supabase left the page (every call in dao/), @/lib/makeupSearch
+  // -> domain/useGuestBooking (shared with makeups, stays in lib). 2 deleted.
   { file: F_LESSON, contains: "@/lib/adminAttendanceSave", why: "Stage 6 — git mv into domain/ (sole importer)" },
   { file: F_LESSON, contains: "@/lib/adminAttendanceSaveDeps", why: "Stage 6 — git mv into dao/lessonDetail.save" },
   // @/lib/lessonMarking MOVED into [date]/domain at Stage 1 (git mv, sole
   // importer); the page imports ./domain/lessonMarking (allowed). Deleted.
-  { file: F_LESSON, contains: "@/lib/makeupSearch", why: "Stage 5 — filterEligibleKids -> domain/useGuestBooking (shared, stays)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
