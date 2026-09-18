@@ -212,32 +212,11 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // ── wages: DONE — auth + every read/write in dao/wages.repo (one query each;
   //    the stale-guarded orchestration stays in domain/usePayroll), both RPCs in
   //    dao/wages.rpc. Check 3 for L-C is EMPTY. ──
-  // ── platform (full track, PLATFORM_REFACTOR_PLAN.md), pinned 2026-09-18 at
-  //    Stage 0b. All 16 sites move into platform/dao/platform.{repo,rpc,api}.ts
-  //    at Stage 2/3 (folded), and every entry below is deleted in that commit.
-  //    The count was pre-agreed at plan-review (plan §6, RISK 9 mitigation) by
-  //    running this file's own stripComments/dataAccess logic over the page:
-  //    16, not "about fifteen". parent_students appears TWICE (the family-status
-  //    children read and the credit-check link read), so those two snippets are
-  //    distinguished by their destructured names — a bare .from("parent_students")
-  //    would exempt both and the ledger could then shrink by one while two
-  //    violations remained. ──
-  { file: F_PLATFORM, contains: 'from "@/lib/supabase"', why: "the client import itself; leaves at Stage 2/3 when dao owns it" },
-  { file: F_PLATFORM, contains: "supabase.auth.getUser()", why: "the platform-admin gate; -> dao/platform.repo.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'supabase .from("profiles")', why: "the gate's role read; -> dao/platform.repo.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'supabase.rpc("platform_tenant_overview")', why: "-> dao/platform.rpc.ts loadOverview() at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'supabase.rpc("platform_stranded_parents")', why: "the Promise.all sibling; -> the same loadOverview() at Stage 2/3" },
-  { file: F_PLATFORM, contains: "supabase.auth.getSession()", why: "postAs's bearer token; -> dao/platform.api.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: "await fetch(path, {", why: "postAs itself; -> dao/platform.api.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'supabase.rpc("platform_tenant_admins"', why: "-> dao/platform.rpc.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'supabase.rpc("platform_reassign_owner"', why: "-> dao/platform.rpc.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'supabase .from("parent_tenants")', why: "family-status search (!inner + orIlike); -> dao/platform.repo.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'data: kids, error: kidsErr } = await supabase .from("parent_students")', why: "family-status children read (the .in() sentinel); -> dao/platform.repo.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'supabase .from("students")', why: "the student search; -> dao/platform.repo.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'supabase .rpc("student_package_coverage")', why: "the un-awaited coverage chip fetch; -> dao/platform.rpc.ts at Stage 2/3, still un-awaited" },
-  { file: F_PLATFORM, contains: 'data: links, error: linkErr } = await supabase .from("parent_students")', why: "credit-check parent links; -> dao/platform.repo.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'supabase .from("parent_tenant_balances")', why: "credit-check balances; -> dao/platform.repo.ts at Stage 2/3" },
-  { file: F_PLATFORM, contains: 'supabase.rpc("reassign_student_tenant"', why: "the cross-business move; -> dao/platform.rpc.ts at Stage 2/3" },
+  // ── platform (full track, PLATFORM_REFACTOR_PLAN.md): check 3 EMPTY at Stage
+  //    2/3 (folded), 2026-09-18. The client and all 16 data-access sites moved
+  //    into platform/dao/platform.{repo,rpc,api}.ts; the page holds ZERO
+  //    supabase and ZERO fetch(, so every entry went stale and was deleted.
+  //    Nothing to pin. ──
 ];
 
 /**
@@ -355,11 +334,17 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    are deliberately absent: the page imports no dao yet, so the shrink test
   //    would flag them stale. They are added at Stage 2/3 and removed at Stages
   //    8 (.api), 9 (.rpc) and 10 (.repo). ──
-  { file: F_PLATFORM, contains: "@/lib/supabase", why: "dao owns the client; leaves at Stage 2/3" },
   { file: F_PLATFORM, contains: "@/lib/lessonDates", why: "formatSgDate/toSgDate move into ui/TenantsTable + ui/StrandedPanel at Stage 5; STAYS in lib (52 importers)" },
   { file: F_PLATFORM, contains: "@/lib/packageCoverage", why: "coverageByStudent + StudentCoverage move into domain/useStudentMove at Stage 9; STAYS in lib (18 importers)" },
-  { file: F_PLATFORM, contains: "@/lib/tableSearch", why: "ilikeContains/orIlike sit inside query builders, so they leave at Stage 2/3 with the dao; STAYS in lib (6 importers)" },
   { file: F_PLATFORM, contains: "@/lib/moveStudentWarning", why: "MOVES into platform/domain at Stage 9 (sole importer, git mv with its test)" },
+  // TRANSITIONAL (playbook §7.1, packages plan §5): until each slice's hook wraps
+  // its dao call, the page calls dao/platform.{repo,rpc,api} directly. These
+  // three could NOT be pinned at 0b — the page imported no dao yet, so the
+  // shrink test would have called them stale. Their removal stage is the stage
+  // whose hook takes the LAST direct caller. There is never a fourth.
+  { file: F_PLATFORM, contains: "./dao/platform.api", why: "last direct caller is toggleSuspend; gone at Stage 8" },
+  { file: F_PLATFORM, contains: "./dao/platform.rpc", why: "last direct callers are doMove/handleSearch; gone at Stage 9" },
+  { file: F_PLATFORM, contains: "./dao/platform.repo", why: "last direct caller is handleFamilySearch; gone at Stage 10" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

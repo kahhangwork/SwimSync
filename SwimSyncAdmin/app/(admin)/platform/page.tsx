@@ -1,16 +1,31 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Modal } from "@/components/Modal";
 import { formatSgDate, toSgDate } from "@/lib/lessonDates";
 import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
 import { PackageChip } from "@/components/PackageChip";
-import { ilikeContains, orIlike } from "@/lib/tableSearch";
 import { totalFamilyCredit } from "@/lib/moveStudentWarning";
 import { ROW_LIMIT } from "./constants";
+import {
+  childrenOfParents,
+  currentUser,
+  familyCreditAt,
+  parentLinksForStudent,
+  profileRole,
+  searchFamilyMemberships,
+  searchStudents,
+} from "./dao/platform.repo";
+import {
+  loadOverview,
+  reassignOwner as rpcReassignOwner,
+  reassignStudentTenant,
+  studentPackageCoverage,
+  tenantAdmins,
+} from "./dao/platform.rpc";
+import { postAs } from "./dao/platform.api";
 import type {
   TenantRow,
   TenantAdminOption,
@@ -88,16 +103,12 @@ export default function PlatformPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: auth } = await supabase.auth.getUser();
+      const { data: auth } = await currentUser();
       if (!auth.user) {
         setAllowed(false);
         return;
       }
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", auth.user.id)
-        .maybeSingle();
+      const { data: profile } = await profileRole(auth.user.id);
 
       const ok = profile?.role === "platform_admin";
       setAllowed(ok);
@@ -120,10 +131,7 @@ export default function PlatformPage() {
    * — false reassurance on the one page that exists to show trouble.
    */
   async function loadTenants() {
-    const [overview, strandedRes] = await Promise.all([
-      supabase.rpc("platform_tenant_overview"),
-      supabase.rpc("platform_stranded_parents"),
-    ]);
+    const [overview, strandedRes] = await loadOverview();
     if (overview.error) {
       setLoadError(overview.error.message);
       return;
@@ -131,22 +139,6 @@ export default function PlatformPage() {
     setLoadError(null);
     setTenants((overview.data ?? []) as TenantRow[]);
     setStranded((strandedRes.data ?? []) as StrandedParent[]);
-  }
-
-  /** POST helper that carries the caller's token — the API routes verify it,
-   *  and provision_tenant()'s gate is evaluated against THIS user, not the
-   *  service role. */
-  async function postAs(path: string, body: unknown) {
-    const { data: sess } = await supabase.auth.getSession();
-    const res = await fetch(path, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${sess.session?.access_token ?? ""}`,
-      },
-      body: JSON.stringify(body),
-    });
-    return { res, json: await res.json().catch(() => ({})) };
   }
 
   async function provisionTenant(e: React.FormEvent) {
@@ -257,9 +249,7 @@ export default function PlatformPage() {
     setOwnerChoice("");
     setOwnerError(null);
     setOwnerLoading(true);
-    const { data, error } = await supabase.rpc("platform_tenant_admins", {
-      p_tenant_id: t.tenant_id,
-    });
+    const { data, error } = await tenantAdmins(t.tenant_id);
     // Guard against a stale response: close A, open B fast enough and A's
     // list would land in B's modal. Submitting would be server-refused anyway
     // ("must be an admin of that business") — this just prevents the baffling
@@ -277,10 +267,7 @@ export default function PlatformPage() {
     if (!ownerModal || !ownerChoice) return;
     setOwnerSaving(true);
     setOwnerError(null);
-    const { error } = await supabase.rpc("platform_reassign_owner", {
-      p_tenant_id: ownerModal.tenantId,
-      p_new_owner_profile_id: ownerChoice,
-    });
+    const { error } = await rpcReassignOwner(ownerModal.tenantId, ownerChoice);
     setOwnerSaving(false);
     if (error) {
       // The RPC's refusals (deactivated target, non-admin, …) surface verbatim
@@ -361,15 +348,7 @@ export default function PlatformPage() {
     // silent wrong answer). The term is sanitised for the .or() grammar by
     // orIlike (lib/tableSearch), so a comma or brackets in a name is data, never
     // structure, and can never change the query.
-    const { data, error } = await supabase
-      .from("parent_tenants")
-      .select(
-        "parent_id, tenant_id, is_active, tenants(display_name), parents!inner(profile_id, profiles!inner(full_name, email))"
-      )
-      .or(orIlike(["full_name", "email"], term), {
-        referencedTable: "parents.profiles",
-      })
-      .limit(ROW_LIMIT);
+    const { data, error } = await searchFamilyMemberships(term);
 
     if (error) {
       setFamilies([]);
@@ -381,13 +360,9 @@ export default function PlatformPage() {
     // Bounded by the matched memberships (the .in list), so this second query is
     // not a fresh unbounded fetch. The sentinel keeps `.in([])` from matching
     // everything when there are no matches.
-    const { data: kids, error: kidsErr } = await supabase
-      .from("parent_students")
-      .select("parent_id, students(full_name, is_active, tenant_id)")
-      .in(
-        "parent_id",
-        matching.length ? matching.map((r) => r.parent_id) : ["00000000-0000-0000-0000-000000000000"]
-      );
+    const { data: kids, error: kidsErr } = await childrenOfParents(
+      matching.map((r) => r.parent_id)
+    );
     // Surfaced, not swallowed: a failed children read would otherwise render
     // every matched family as "none" — a wrong answer that looks like data.
     if (kidsErr) {
@@ -418,20 +393,14 @@ export default function PlatformPage() {
       setStudents([]);
       return;
     }
-    const { data } = await supabase
-      .from("students")
-      .select("id, full_name, tenant_id, assignment_status, is_active")
-      // ilikeContains escapes the LIKE wildcards so a name with a literal % or _
-      // matches itself — consistent with the scoped search (lib/tableSearch).
-      .ilike("full_name", ilikeContains(search))
-      .limit(25);
+    const { data } = await searchStudents(search);
     setStudents((data ?? []) as StudentRow[]);
     // Payment-method chips. Under a platform admin the RPC returns EVERY
     // tenant's rows, each carrying its tenant_id — keyed per student here, so
     // a cross-tenant mixup is structurally impossible. Fire-and-forget.
-    supabase
-      .rpc("student_package_coverage")
-      .then(({ data: cov }) => setCovMap(coverageByStudent(cov ?? [])));
+    studentPackageCoverage().then(({ data: cov }) =>
+      setCovMap(coverageByStudent(cov ?? []))
+    );
   }
 
   // Advisory gate: credit never crosses businesses (PRD §5.6), so a family with
@@ -452,20 +421,16 @@ export default function PlatformPage() {
     if (oldTenantId) {
       // ⚠ RISK (fable): sum EVERY linked parent's credit, not just one — a child
       // can have two parents. The balance table is platform-admin readable.
-      const { data: links, error: linkErr } = await supabase
-        .from("parent_students")
-        .select("parent_id")
-        .eq("student_id", studentId);
+      const { data: links, error: linkErr } = await parentLinksForStudent(studentId);
       // A failed link read must fail TOWARD prompting: skipping it silently
       // would drop the warning in exactly the case we cannot verify.
       if (linkErr) checkFailed = true;
       const parentIds = (links ?? []).map((l: any) => l.parent_id);
       if (!checkFailed && parentIds.length > 0) {
-        const { data: bal, error: balErr } = await supabase
-          .from("parent_tenant_balances")
-          .select("credit_balance")
-          .eq("tenant_id", oldTenantId)
-          .in("parent_id", parentIds);
+        const { data: bal, error: balErr } = await familyCreditAt(
+          oldTenantId,
+          parentIds
+        );
         if (balErr) checkFailed = true;
         else credit = totalFamilyCredit((bal ?? []) as any[]);
       }
@@ -494,10 +459,7 @@ export default function PlatformPage() {
     setPendingMove(null);
     setMoving(studentId);
     setMessage(null);
-    const { error } = await supabase.rpc("reassign_student_tenant", {
-      p_student_id: studentId,
-      p_tenant_id: tenantId,
-    });
+    const { error } = await reassignStudentTenant(studentId, tenantId);
     setMoving(null);
     setMoveNonce((n) => n + 1); // reset the per-row picker
     if (error) {

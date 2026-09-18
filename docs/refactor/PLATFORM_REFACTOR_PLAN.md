@@ -320,7 +320,10 @@ and `invoices` plan record. They are deleted at Stages 8, 9 and 10 respectively 
 >   stays in the caller, byte-identical (`if (overview.error) { setLoadError(…); return; }`).
 > - **Do NOT** check `strandedRes.error` anywhere. **Do NOT** clear `tenants` on `overview.error`.
 > - **Assertion (grep):** `grep -c "strandedRes.error\|stranded.error" app/\(admin\)/platform/` = **0**
->   at every stage.
+>   at every stage — **in CODE**. Corrected at Stage 2/3: the raw grep returns **1**, and that hit
+>   is `dao/platform.rpc.ts`'s own prohibition comment ("Do NOT check strandedRes.error…"). A
+>   prohibition that names the thing it forbids will always match the grep that forbids it. Read
+>   the hit before believing the count.
 >
 > **⚠ RISK 3 MITIGATION (`postAs` — no `try`, `json` is `any`).**
 > - **Step:** `dao/platform.api.ts` is `postAs` verbatim, return type `Promise<{ res: Response;
@@ -348,7 +351,9 @@ and `invoices` plan record. They are deleted at Stages 8, 9 and 10 respectively 
 >   both `!inner`, the `.or(orIlike([...]), { referencedTable: "parents.profiles" })`, and
 >   `.limit(ROW_LIMIT)` (import `ROW_LIMIT` from `../constants`); `childrenOfParents(ids)` carries
 >   the `.in()` with the `"00000000-0000-0000-0000-000000000000"` sentinel INSIDE the dao.
-> - **Assertion (grep):** `grep -c '!inner' dao/platform.repo.ts` = **2**;
+> - **Assertion (grep):** `grep -c '!inner' dao/platform.repo.ts` = **2** in the SELECT STRING —
+>   the raw grep returns **3** (corrected at Stage 2/3; the third is the comment explaining why both
+>   embeds are `!inner`). Assert on line 61's select string, not on the file-wide count;
 >   `grep -c '00000000-0000-0000-0000-000000000000' dao/platform.repo.ts` = **1** and `domain/` = **0**.
 >
 > **⚠ RISK 9 MITIGATION (the transitional pins, and their removal schedule).**
