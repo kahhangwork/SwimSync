@@ -234,8 +234,11 @@ Gate every commit: `cd SwimSyncAdmin && npm run typecheck && npm test` **and**
       (scratchpad). **No regression.** Two script reds, both the SCRIPT meeting pre-existing
       behaviour (→ §12): the promote click waited for a "Move up" that appears only after a reload,
       and the "moved up to" flash is never visible on the class page.
-- [ ] **Ship** — fast-forward `main`, push, confirm Vercel built both apps, `gh workflow run
-      ui-drivers.yml`, delete the branch. That nightly is the gate for the next unit.
+- [x] **Ship** (2026-09-18, `/deploy`) — app-only change set (`SwimSyncAdmin/` + docs; no
+      `supabase/` path), so the backend steps are empty BY DECISION; gate still walked:
+      `migration list --linked` 157/157, **0 pending**; `next build` green. Fast-forwarded
+      `refactor/admin-ld` → `main` and pushed; a manual nightly dispatched on it — **that run is
+      the gate for the next unit** (`gh run list --workflow=ui-drivers.yml`).
 
 ## Pre-commit gate — walk before EVERY code commit; a box that can't be ticked is a blocker
 
