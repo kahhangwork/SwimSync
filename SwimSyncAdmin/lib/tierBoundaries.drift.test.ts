@@ -74,6 +74,16 @@
 // (parent_tenant_balances -> ...balancesXX) turned BOTH the shrink test ("lacks
 // ...") and check 3 red, which is the property that makes a stale entry
 // impossible to leave behind.
+// Re-proven for the Admin L-D scope on 2026-09-18 at L0: checks 3 and 4 went
+// red on the five route units' + AssessmentGrid's real violations (57 distinct
+// data-access snippets, 17 page imports) before the ledger was pinned;
+// levels/ui/Break importing ../dao, levels/dao/break importing React,
+// levels/domain/break calling fetch(, an unpinned @/lib/utils import on
+// makeups/page.tsx, assessment/[classId]/ui/Break importing ../dao (proves the
+// NESTED route is scoped — it needs its own SCOPE_DIRS entry), and a new
+// supabase line in components/AssessmentGrid.tsx (proves SCOPE_FILES is live)
+// drove all four checks red — breakers removed, 6/6 green. Shrink test
+// re-proven: corrupting the cancel_makeup_booking pin turned it AND check 3 red.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -145,7 +155,28 @@ const SCOPE_DIRS = [
   // domain/ (sole importer); lessonDates, packageCoverage and tableSearch
   // STAY in lib (shared) and are reached from dao/domain/ui.
   "app/(admin)/platform",
+  // Admin L-D lite batch (docs/refactor/BATCH_D_PLAN.md), widened 2026-09-18.
+  // The "grading" batch: all five route units touch the client (checks 3+4 red
+  // day one). ⚠ `assessment/[classId]` is its OWN entry: sources() skips any
+  // subdir holding its own page.tsx (see the walk below), so widening
+  // `assessment` alone would leave the class page and its tiers unfenced.
+  // Every current violation is pinned below with the commit that removes it
+  // (folded L1-L3 per page, playbook §7.1); the ledger only shrinks.
+  "app/(admin)/levels",
+  "app/(admin)/trials",
+  "app/(admin)/makeups",
+  "app/(admin)/assessment",
+  "app/(admin)/assessment/[classId]",
 ];
+
+// Single shared files outside any route unit, scanned for check 3 ONLY (they
+// are not in ui/, dao/ or PAGES, so checks 1/2/4 skip them by construction).
+// Do NOT widen this to a directory walk of components/: AuthGuard,
+// RequiresTenant and Sidebar hold the client legitimately today and would go
+// red. AssessmentGrid is shared by assessment/[classId] and the Students
+// grading modal; its writes are INJECTED by each caller's hook (Admin L-D,
+// BATCH_D_PLAN.md), and this entry stops the client coming back.
+const SCOPE_FILES = ["components/AssessmentGrid.tsx"];
 
 // One route file per scoped dir. Check 4 runs against each.
 const PAGES = SCOPE_DIRS.map((d) => `${d}/page.tsx`);
@@ -157,6 +188,14 @@ type Allowed = { file: string; contains: string; why: string };
 // would call it stale, which reads as "the code moved" rather than "the path is
 // wrong"). Added with the platform scope, 2026-09-18.
 const F_PLATFORM = "app/(admin)/platform/page.tsx";
+
+// Admin L-D (BATCH_D_PLAN.md) — spelled once, same reason as F_PLATFORM.
+const F_LEVELS = "app/(admin)/levels/page.tsx";
+const F_TRIALS = "app/(admin)/trials/page.tsx";
+const F_MAKEUPS = "app/(admin)/makeups/page.tsx";
+const F_ASSESS = "app/(admin)/assessment/page.tsx";
+const F_ASSESS_CLASS = "app/(admin)/assessment/[classId]/page.tsx";
+const F_GRID = "components/AssessmentGrid.tsx";
 
 /**
  * Check 3 — data-access lines still outside `dao/`. Students reached ZERO on
@@ -214,6 +253,74 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    into platform/dao/platform.{repo,rpc,api}.ts; the page holds ZERO
   //    supabase and ZERO fetch(, so every entry went stale and was deleted.
   //    Nothing to pin. ──
+  // ── Admin L-D (BATCH_D_PLAN.md), pinned 2026-09-18 at L0: 57 distinct
+  //    data-access snippets across the five route units + the grid (its
+  //    `import { supabase }` line counts — dataAccess() matches any line naming
+  //    the client). Each page folds L1-L3 in ONE commit; its entries are deleted
+  //    in that commit. The grid's go in commit 1 with the injection. ──
+  // F_LEVELS — removed at L-D commit 3
+  { file: F_LEVELS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: "const { data } = await supabase .from(\"tenant_levels\")", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: "? await supabase.from(\"tenant_levels\").update(payload).eq(\"id\", editing.id)", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: ": await supabase.from(\"tenant_levels\").insert({", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: "await supabase .from(\"profiles\")", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: ".eq(\"id\", (await supabase.auth.getUser()).data.user?.id)", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: "const { error: err } = await supabase.from(\"tenant_levels\").delete().eq(\"id\", l.id);", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: "const { data } = await supabase .from(\"skill_grade_levels\")", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: "const { error: err } = await supabase.from(\"skill_grade_levels\").insert({", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: "const { error: err } = await supabase .from(\"skill_grade_levels\")", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: "const { error: err } = await supabase.from(\"tenant_level_skills\").insert({", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: "const { error: err } = await supabase .from(\"tenant_level_skills\")", why: "data access -> <page>/dao" },
+  { file: F_LEVELS, contains: "await supabase.from(\"tenant_level_skills\")", why: "data access -> <page>/dao" },
+  // F_TRIALS — removed at L-D commit 4
+  { file: F_TRIALS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "supabase .rpc(\"student_package_coverage\")", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "const { data: auth } = await supabase.auth.getUser();", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "const { data: profile } = await supabase .from(\"profiles\")", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "supabase .from(\"classes\")", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "supabase.from(\"class_categories\").select(\"id, name\").order(\"name\"),", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "supabase .from(\"trial_rates\")", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "supabase .from(\"trial_bookings\")", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "? await supabase .from(\"attendance\")", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "const { data: kids } = await supabase .from(\"students\")", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "? await supabase.rpc(\"book_trial\", {", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: ": await supabase.rpc(\"add_unclaimed_student\", {", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "const { error } = await supabase.rpc(\"cancel_trial_booking\", {", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "const { data: liveTrial } = await supabase .from(\"trial_bookings\")", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "const { error: enrolError } = await supabase .from(\"student_class_enrolments\")", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "const { error: statusError } = await supabase .from(\"students\")", why: "data access -> <page>/dao" },
+  { file: F_TRIALS, contains: "const { error } = await supabase.from(\"trial_rates\").insert({", why: "data access -> <page>/dao" },
+  // F_MAKEUPS — removed at L-D commit 2
+  { file: F_MAKEUPS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
+  { file: F_MAKEUPS, contains: "supabase .from(\"classes\")", why: "data access -> <page>/dao" },
+  { file: F_MAKEUPS, contains: "supabase .from(\"makeup_bookings\")", why: "data access -> <page>/dao" },
+  { file: F_MAKEUPS, contains: "supabase .from(\"students\")", why: "data access -> <page>/dao" },
+  { file: F_MAKEUPS, contains: "supabase .from(\"lesson_sessions\")", why: "data access -> <page>/dao" },
+  { file: F_MAKEUPS, contains: "? await supabase .from(\"attendance\")", why: "data access -> <page>/dao" },
+  { file: F_MAKEUPS, contains: "supabase .from(\"parent_students\")", why: "data access -> <page>/dao" },
+  { file: F_MAKEUPS, contains: "supabase.rpc(\"package_live_balances\").then(({ data }) => {", why: "data access -> <page>/dao" },
+  { file: F_MAKEUPS, contains: "const { error } = await supabase.rpc(\"book_makeup\", {", why: "data access -> <page>/dao" },
+  { file: F_MAKEUPS, contains: "const { error } = await supabase.rpc(\"cancel_makeup_booking\", {", why: "data access -> <page>/dao" },
+  // F_ASSESS — removed at L-D commit 1
+  { file: F_ASSESS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
+  { file: F_ASSESS, contains: "supabase .from(\"tenant_levels\")", why: "data access -> <page>/dao" },
+  { file: F_ASSESS, contains: "supabase.from(\"skill_grade_levels\").select(\"id, rank, label\").order(\"rank\"),", why: "data access -> <page>/dao" },
+  { file: F_ASSESS, contains: "supabase .from(\"classes\")", why: "data access -> <page>/dao" },
+  { file: F_ASSESS, contains: "? await supabase .from(\"student_class_enrolments\")", why: "data access -> <page>/dao" },
+  { file: F_ASSESS, contains: "? await supabase .from(\"student_skill_progress\")", why: "data access -> <page>/dao" },
+  // F_ASSESS_CLASS — removed at L-D commit 1
+  { file: F_ASSESS_CLASS, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
+  { file: F_ASSESS_CLASS, contains: "supabase .from(\"classes\")", why: "data access -> <page>/dao" },
+  { file: F_ASSESS_CLASS, contains: "supabase .from(\"tenant_levels\")", why: "data access -> <page>/dao" },
+  { file: F_ASSESS_CLASS, contains: "supabase.from(\"skill_grade_levels\").select(\"id, rank, label\").order(\"rank\"),", why: "data access -> <page>/dao" },
+  { file: F_ASSESS_CLASS, contains: "supabase .from(\"student_class_enrolments\")", why: "data access -> <page>/dao" },
+  { file: F_ASSESS_CLASS, contains: "? await supabase .from(\"student_skill_progress\")", why: "data access -> <page>/dao" },
+  // F_GRID — removed at L-D commit 1 (injected writes)
+  { file: F_GRID, contains: "import { supabase } from \"@/lib/supabase\";", why: "data access -> <page>/dao" },
+  { file: F_GRID, contains: "const { error: err } = await supabase .from(\"student_skill_progress\")", why: "data access -> <page>/dao" },
+  { file: F_GRID, contains: "? await supabase .from(\"student_skill_progress\")", why: "data access -> <page>/dao" },
+  { file: F_GRID, contains: ": await supabase .from(\"student_skill_progress\")", why: "data access -> <page>/dao" },
+  { file: F_GRID, contains: "const { error: err } = await supabase .from(\"students\")", why: "data access -> <page>/dao" },
 ];
 
 /**
@@ -344,6 +451,33 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // three could NOT be pinned at 0b — the page imported no dao yet, so the
   // shrink test would have called them stale. Their removal stage is the stage
   // whose hook takes the LAST direct caller. There is never a fourth.
+  // ── Admin L-D (BATCH_D_PLAN.md), pinned 2026-09-18 at L0: 17 page imports.
+  //    @/lib/supabase -> dao; skillScale MOVES into levels/domain and
+  //    trialConvert into trials/domain (sole importers, git mv); assessment,
+  //    lessonDates, makeupSearch, studentCounts, sgPhone, packageCoverage STAY
+  //    (shared) and are reached from domain/ui. ──
+  // F_LEVELS — removed at L-D commit 3
+  { file: F_LEVELS, contains: "@/lib/supabase", why: "client -> dao" },
+  { file: F_LEVELS, contains: "@/lib/studentCounts", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  { file: F_LEVELS, contains: "@/lib/skillScale", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  // F_TRIALS — removed at L-D commit 4
+  { file: F_TRIALS, contains: "@/lib/supabase", why: "client -> dao" },
+  { file: F_TRIALS, contains: "@/lib/sgPhone", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  { file: F_TRIALS, contains: "@/lib/packageCoverage", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  { file: F_TRIALS, contains: "@/lib/lessonDates", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  { file: F_TRIALS, contains: "@/lib/trialConvert", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  // F_MAKEUPS — removed at L-D commit 2
+  { file: F_MAKEUPS, contains: "@/lib/supabase", why: "client -> dao" },
+  { file: F_MAKEUPS, contains: "@/lib/lessonDates", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  { file: F_MAKEUPS, contains: "@/lib/makeupSearch", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  // F_ASSESS — removed at L-D commit 1
+  { file: F_ASSESS, contains: "@/lib/supabase", why: "client -> dao" },
+  { file: F_ASSESS, contains: "@/lib/lessonDates", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  { file: F_ASSESS, contains: "@/lib/assessment", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  // F_ASSESS_CLASS — removed at L-D commit 1
+  { file: F_ASSESS_CLASS, contains: "@/lib/supabase", why: "client -> dao" },
+  { file: F_ASSESS_CLASS, contains: "@/lib/lessonDates", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
+  { file: F_ASSESS_CLASS, contains: "@/lib/assessment", why: "symbol leaves the page (MOVE or reached from domain/ui)" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -402,6 +536,10 @@ function sources(): Src[] {
     }
   };
   for (const dir of SCOPE_DIRS) walk(join(ADMIN, dir));
+  for (const file of SCOPE_FILES) {
+    const code = stripComments(readFileSync(join(ADMIN, file), "utf8"));
+    found.push({ file, code, lines: code.split("\n") });
+  }
   return found;
 }
 
@@ -467,6 +605,7 @@ describe("admin tier boundaries (page -> ui -> domain -> dao)", () => {
 
   it("scans every scoped page at all (not vacuously green)", () => {
     for (const page of PAGES) expect(srcs.map((s) => s.file)).toContain(page);
+    for (const file of SCOPE_FILES) expect(srcs.map((s) => s.file)).toContain(file);
   });
 
   it("1. ui/ never imports dao/", () => {
