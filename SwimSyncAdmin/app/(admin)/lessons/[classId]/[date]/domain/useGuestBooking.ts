@@ -103,3 +103,6 @@ export function useGuestBooking(input: {
     cancelBooking,
   };
 }
+
+/** What the page hands its ui/ components (they destructure it, so the JSX moved verbatim). */
+export type GuestBookingState = ReturnType<typeof useGuestBooking>;

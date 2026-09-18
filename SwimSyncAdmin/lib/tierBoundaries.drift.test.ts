@@ -205,7 +205,7 @@ type Allowed = { file: string; contains: string; why: string };
 // would call it stale, which reads as "the code moved" rather than "the path is
 // wrong"). Added with the platform scope, 2026-09-18.
 const F_PLATFORM = "app/(admin)/platform/page.tsx";
-const F_LESSON = "app/(admin)/lessons/[classId]/[date]/page.tsx";
+// (F_LESSON was deleted with its last ledger entry, lesson-detail Stage 7, 2026-09-18.)
 
 // (Admin L-D's F_LEVELS/F_TRIALS/F_MAKEUPS/F_ASSESS/F_ASSESS_CLASS/F_GRID were
 // deleted with their last ledger entry, 2026-09-18.)
@@ -286,20 +286,12 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // ── assessment + assessment/[classId] + AssessmentGrid: DONE (L-D commit 1) —
   //    each route's reads in its own dao/*.repo; the grid's 3 writes injected
   //    as `writes`, bound in assessment/[classId]/dao and students/dao. ──
-  // ── lesson detail (full track, LESSON_DETAIL_REFACTOR_PLAN.md), pinned
-  //    2026-09-18 at Stage 0b: 22 data-access lines (red-run count, pre-agreed at
-  //    plan-review). Each entry names the stage whose slice moves it into
-  //    dao/lessonDetail.{repo,rpc}.ts; the client import goes with the last call. ──
-  // Stage 2 (spine): getSession + the 13 reads moved into dao/lessonDetail.repo
-  // (loadLessonReads / loadSessionReads). 14 entries deleted.
-  // Stage 3 (cancel/restore): both RPCs moved into dao/lessonDetail.rpc,
-  // wrapped by domain/useCancelLesson. 2 entries deleted.
-  // Stage 5 (guests): book_makeup / book_trial / cancel_{trial,makeup}_booking
-  // -> dao/lessonDetail.rpc behind domain/useGuestBooking; the page no longer
-  // imports the client. 4 entries deleted (the import line's with them).
-  // Stage 4 (substitute): assign_session_coach -> dao/lessonDetail.rpc, the
-  // session_coaches delete -> dao/lessonDetail.repo, both behind
-  // domain/useSubstitute. 2 entries deleted.
+  // ── lesson detail (full track, LESSON_DETAIL_REFACTOR_PLAN.md): check 3 EMPTY
+  //    at Stage 5 (2026-09-18). All 22 pinned lines moved by slice: the spine's
+  //    getSession + 13 reads -> dao/lessonDetail.repo (S2); cancel/restore (S3),
+  //    assign (S4), bookings (S5) -> dao/lessonDetail.rpc; the cover delete ->
+  //    .repo (S4); the page's client import went with the last call (S5). The
+  //    save's client binding is dao/lessonDetail.save (git mv, S6). Nothing to pin. ──
 ];
 
 /**
@@ -451,25 +443,14 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // ── assessment + assessment/[classId] + AssessmentGrid: DONE (L-D commit 1) —
   //    each route's reads in its own dao/*.repo; the grid's 3 writes injected
   //    as `writes`, bound in assessment/[classId]/dao and students/dao. ──
-  // ── lesson detail (full track, LESSON_DETAIL_REFACTOR_PLAN.md §4), pinned
-  //    2026-09-18 at Stage 0b: 13 distinct specifiers on 14 lines (@/lib/utils is
-  //    imported twice; one pin covers both). lessonMarking MOVES into domain at
-  //    Stage 1; adminAttendanceSave(+Deps) move at Stage 6 (domain/ + dao/); the
-  //    rest STAY in lib (shared) and leave the page as their symbols move. ──
-  { file: F_LESSON, contains: "lucide-react", why: "Stage 7 — ArrowLeft moves into ui/" },
-  { file: F_LESSON, contains: "@/lib/classColours", why: "Stage 7 — colourFor -> ui/LessonHeader" },
-  { file: F_LESSON, contains: "@/lib/lessonDates", why: "Stage 7 — formatSgDate is render-only after the spine" },
-  { file: F_LESSON, contains: "@/lib/utils", why: "Stage 7 — formatTime/cn -> ui/" },
-  { file: F_LESSON, contains: "@/lib/calendarLessons", why: "Stage 7 — formatCount is render-only after the spine" },
-  // Stage 2 (spine): attendanceCompleteness + lessonAttribution -> domain/,
-  // markableFloor bound in dao/lessonDetail.repo. 3 entries deleted.
-  // Stage 6 (save): adminAttendanceSave git mv'd into [date]/domain and
-  // adminAttendanceSaveDeps into [date]/dao/lessonDetail.save (sole importer,
-  // moved together so lib/ never imports a route). 2 deleted.
-  // Stage 5: @/lib/supabase left the page (every call in dao/), @/lib/makeupSearch
-  // -> domain/useGuestBooking (shared with makeups, stays in lib). 2 deleted.
-  // @/lib/lessonMarking MOVED into [date]/domain at Stage 1 (git mv, sole
-  // importer); the page imports ./domain/lessonMarking (allowed). Deleted.
+  // ── lesson detail (full track, LESSON_DETAIL_REFACTOR_PLAN.md): BOTH LEDGERS
+  //    EMPTY at Stage 7 (2026-09-18). lessonMarking (S1) and adminAttendanceSave
+  //    (S6) MOVED into [date]/domain, adminAttendanceSaveDeps into [date]/dao (S6)
+  //    — sole importers, git mv; attendanceCompleteness/lessonAttribution ->
+  //    domain (S2), markableFloor bound in dao (S2), supabase + makeupSearch left
+  //    at S5; lucide-react, classColours, lessonDates, utils and calendarLessons
+  //    went into ui/ with the markup (S7). The page imports only its own tiers
+  //    and next/navigation. The LAST admin full-track giant. Nothing to pin. ──
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

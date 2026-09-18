@@ -77,3 +77,6 @@ export function useAttendanceSave(input: {
 
   return { saving, saveMsg, setSaveMsg, confirmHoliday, setConfirmHoliday, doSave, requestSave, setAll };
 }
+
+/** What the page hands its ui/ components (they destructure it, so the JSX moved verbatim). */
+export type AttendanceSaveState = ReturnType<typeof useAttendanceSave>;

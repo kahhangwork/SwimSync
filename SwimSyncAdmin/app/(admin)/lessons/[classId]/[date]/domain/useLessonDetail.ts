@@ -184,3 +184,6 @@ export function useLessonDetail(classId: string, date: string) {
     mainName,
   };
 }
+
+/** What the page hands its ui/ components (they destructure it, so the JSX moved verbatim). */
+export type LessonDetail = ReturnType<typeof useLessonDetail>;

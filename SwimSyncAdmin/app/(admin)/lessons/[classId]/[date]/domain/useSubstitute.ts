@@ -62,3 +62,6 @@ export function useSubstitute(input: {
 
   return { coachPick, setCoachPick, coachBusy, coachMsg, classCoachName, substituteOptions, assignCoach, removeCover };
 }
+
+/** What the page hands its ui/ components (they destructure it, so the JSX moved verbatim). */
+export type SubstituteState = ReturnType<typeof useSubstitute>;

@@ -59,3 +59,6 @@ export function useCancelLesson(classId: string, date: string, reload: () => voi
     doRestoreLesson,
   };
 }
+
+/** What the page hands its ui/ components (they destructure it, so the JSX moved verbatim). */
+export type CancelLessonState = ReturnType<typeof useCancelLesson>;
