@@ -341,7 +341,6 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // three could NOT be pinned at 0b — the page imported no dao yet, so the
   // shrink test would have called them stale. Their removal stage is the stage
   // whose hook takes the LAST direct caller. There is never a fourth.
-  { file: F_PLATFORM, contains: "./dao/platform.api", why: "last direct caller is toggleSuspend; gone at Stage 8" },
   { file: F_PLATFORM, contains: "./dao/platform.rpc", why: "last direct callers are doMove/handleSearch; gone at Stage 9" },
   { file: F_PLATFORM, contains: "./dao/platform.repo", why: "last direct caller is handleFamilySearch; gone at Stage 10" },
 ];
