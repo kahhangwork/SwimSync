@@ -39,6 +39,7 @@ import {
 import { filterEligibleKids } from "@/lib/makeupSearch";
 import { useLessonDetail } from "./domain/useLessonDetail";
 import { useCancelLesson } from "./domain/useCancelLesson";
+import { useSubstitute } from "./domain/useSubstitute";
 import type { RosterRow, SaveMsg } from "./types";
 
 export default function LessonPage() {
@@ -79,9 +80,6 @@ export default function LessonPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<SaveMsg>(null);
   const [confirmHoliday, setConfirmHoliday] = useState<number | null>(null);
-  const [coachPick, setCoachPick] = useState("");
-  const [coachBusy, setCoachBusy] = useState(false);
-  const [coachMsg, setCoachMsg] = useState<string | null>(null);
   const [bookKind, setBookKind] = useState<"makeup" | "trial" | null>(null);
   const [bookQuery, setBookQuery] = useState("");
   const [bookKid, setBookKid] = useState("");
@@ -91,13 +89,15 @@ export default function LessonPage() {
   const { cancelOpen, setCancelOpen, cancelReason, setCancelReason, cancelBusy, cancelError, setCancelError, doCancelLesson, doRestoreLesson } =
     useCancelLesson(classId, date, reload, setSaveMsg);
 
-  // The coach the class rate already pays teaches this lesson anyway, so
-  // assigning them records no cover — the DB refuses it (20260821000100). Exclude
-  // that coach from the picker so the UI never offers what the DB will reject.
-  // Falls back to the class's own coach before rates have loaded.
-  const excludedCoachId = termsCoachId ?? cls?.coach_id ?? null;
-  const classCoachName = coaches.find((c) => c.id === excludedCoachId)?.name ?? "the class's coach";
-  const substituteOptions = coaches.filter((c) => c.id !== excludedCoachId);
+  const { coachPick, setCoachPick, coachBusy, coachMsg, classCoachName, substituteOptions, assignCoach, removeCover } = useSubstitute({
+    classId,
+    date,
+    cls,
+    coaches,
+    termsCoachId,
+    attr,
+    reload,
+  });
 
   // ── Save ────────────────────────────────────────────────────────────────
   async function doSave() {
@@ -134,32 +134,6 @@ export default function LessonPage() {
       }
       return next;
     });
-  }
-
-  // ── Coaches ─────────────────────────────────────────────────────────────
-  async function assignCoach() {
-    if (!coachPick) return;
-    setCoachBusy(true);
-    setCoachMsg(null);
-    const { error } = await supabase.rpc("assign_session_coach", { p_class_id: classId, p_session_date: date, p_coach_id: coachPick });
-    setCoachBusy(false);
-    if (error) {
-      setCoachMsg(`Could not assign: ${error.message}`);
-      return;
-    }
-    setCoachPick("");
-    reload();
-  }
-  async function removeCover() {
-    if (!attr?.subRowId) return;
-    setCoachBusy(true);
-    const { error } = await supabase.from("session_coaches").delete().eq("id", attr.subRowId);
-    setCoachBusy(false);
-    if (error) {
-      setCoachMsg(`Could not remove: ${error.message}`);
-      return;
-    }
-    reload();
   }
 
   // ── Guests ──────────────────────────────────────────────────────────────

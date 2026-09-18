@@ -55,3 +55,8 @@ export function loadSessionReads(sid: string) {
     supabase.from("session_coach_absences").select("lesson_session_id, coach_id").eq("lesson_session_id", sid),
   ]);
 }
+
+/** Remove the substitute (back to the class's regular coach). */
+export function deleteSessionCoach(subRowId: string) {
+  return supabase.from("session_coaches").delete().eq("id", subRowId);
+}

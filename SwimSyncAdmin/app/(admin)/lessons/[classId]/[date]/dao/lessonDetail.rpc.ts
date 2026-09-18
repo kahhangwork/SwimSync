@@ -20,3 +20,8 @@ export function cancelLesson(classId: string, date: string, reason: string) {
 export function restoreLesson(classId: string, date: string) {
   return supabase.rpc("restore_lesson", { p_class_id: classId, p_date: date });
 }
+
+/** A per-lesson substitute. The DB refuses the coach the class rate already pays (20260821000100). */
+export function assignSessionCoach(classId: string, date: string, coachId: string) {
+  return supabase.rpc("assign_session_coach", { p_class_id: classId, p_session_date: date, p_coach_id: coachId });
+}

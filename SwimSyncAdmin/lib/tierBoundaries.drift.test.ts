@@ -295,8 +295,9 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   // (loadLessonReads / loadSessionReads). 14 entries deleted.
   // Stage 3 (cancel/restore): both RPCs moved into dao/lessonDetail.rpc,
   // wrapped by domain/useCancelLesson. 2 entries deleted.
-  { file: F_LESSON, contains: 'supabase.rpc("assign_session_coach"', why: "Stage 4 — substitute" },
-  { file: F_LESSON, contains: 'supabase.from("session_coaches").delete()', why: "Stage 4 — substitute (remove cover)" },
+  // Stage 4 (substitute): assign_session_coach -> dao/lessonDetail.rpc, the
+  // session_coaches delete -> dao/lessonDetail.repo, both behind
+  // domain/useSubstitute. 2 entries deleted.
   { file: F_LESSON, contains: 'supabase.rpc("book_makeup"', why: "Stage 5 — guests" },
   { file: F_LESSON, contains: 'supabase.rpc("book_trial"', why: "Stage 5 — guests" },
   { file: F_LESSON, contains: "supabase.rpc(fn,", why: "Stage 5 — guests (cancel_trial/makeup_booking)" },
