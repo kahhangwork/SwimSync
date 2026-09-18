@@ -250,3 +250,10 @@ Then:
 - **`/plan-review` (Fable 5.1) found 6 factual errors in the draft** (E1 nested-route scope,
   E2 `.from` count, E3 grid's 5th site, E4 two doc pointers, E5 makeups' dup-slot press, E6 the
   `since` semantics) — all verified by hand before folding in.
+- **GOTCHA candidate (§7.54 guard eroded by the refactor itself).** `components/Table.test.tsx`'s
+  "Thead owns its `<tr>`" scan walked `page.tsx` only; the feature-tier programme moved tables into
+  `<page>/ui/*.tsx`, so **24 ui/ files with a `<Thead>`** had silently left the guard. Widened to
+  every non-test `.tsx` under `app/(admin)` (all 24 clean); proven red by planting `<Thead><Tr>` in
+  `assessment/ui/ClassChecklist.tsx`. General lesson for the playbook: **any source-scanning test
+  keyed on `page.tsx` loses coverage as each page is decomposed** — grep the test suite for
+  `"page.tsx"` before a unit, not only the fence.

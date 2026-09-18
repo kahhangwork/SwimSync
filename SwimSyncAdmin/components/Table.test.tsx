@@ -17,18 +17,22 @@ import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "./Table";
  * See `docs/GOTCHAS.md` §7.54.
  */
 
+// Every .tsx under app/(admin), not just page.tsx. The feature-tier refactor
+// (docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md) moves each page's tables
+// into <page>/ui/*.tsx — a page.tsx-only walk silently lost every table the
+// refactor moved (found at Admin L-D, 2026-09-18). Tests are skipped.
 function adminPages(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) out.push(...adminPages(full));
-    else if (entry === "page.tsx") out.push(full);
+    else if (entry.endsWith(".tsx") && !entry.endsWith(".test.tsx")) out.push(full);
   }
   return out;
 }
 
 describe("Thead owns its <tr> — call-site scan", () => {
-  it("no admin page wraps its <Th>s in a <Tr>", () => {
+  it("no admin page or its ui/ wraps its <Th>s in a <Tr>", () => {
     const pages = adminPages(join(process.cwd(), "app", "(admin)"));
 
     // Guards the guard: if the walk ever returns nothing — a moved directory,
