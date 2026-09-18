@@ -211,8 +211,29 @@ Gate every commit: `cd SwimSyncAdmin && npm run typecheck && npm test` **and**
       for a shared component written into `docs/ARCHITECTURE.md` §6; playbook §1 points at it and
       §7.5's last box is ticked. Moved-module pointers repointed (ARCHITECTURE §10 ×2, TESTING ×2,
       GOTCHAS §7 line, BACKLOG line).
-- [ ] **L4** (once) — every driver in the net, one at a time (`--only`, per-driver DB reset),
-      routes warmed first (§7.108), then the hand-checks above.
+- [x] **L4** (once) — full batch net **GREEN** on the live stack 2026-09-18, one driver at a time
+      (`run-all-drivers.sh --only`, per-driver reset + kong restart + fixture), routes warmed first
+      (§7.108): **levels 9/9 · levels-table 15/15 · level-skills 16/16 · trials 14/14 ·
+      contact-details 21/21 · makeups 12/12 · assessment 27/27 · platform-admin-scope 32/32 ·
+      smoke-admin 64/64 — 210/210.** Hand-check script (temporary, scratchpad, deleted) against
+      `coach@swimsync.test` on a reset DB + `fixtures-assessment.sql` + `fixtures-makeups.sql` + one
+      extra enrolment (Makeupvis Kid → Saturday Beginners, to make a multi-class child):
+      **35/35** — assessment index refetches on a `since` edit (5 rest calls) and its counts move;
+      the class page receives `since`, does **NOT** refetch on an edit (0 rest calls), regroups
+      fresh/stale and rewrites the Back link; cold-open defaults to today SGT; **promote** writes the
+      next level (DB) · Students modal cycle click writes (DB) · levels Edit note · new level +
+      new grade both carry the admin's `tenant_id` (RISK 6) · Enter-adds + button-adds a skill ·
+      **Move down** · remove skill · grade rename on Enter · remove unused grade · a HELD grade refused
+      with the records-kept line · Remove on a held level explains the 2 holders · remove an unheld
+      level · trials: new child's past trial → needs-marking; existing child → Upcoming; **Convert
+      press 1 warns "Press Convert again" and writes 0 enrolments, press 2 writes exactly 1 + sets
+      `assigned`** (RISK 2) · Cancel · makeups: multi-class child asked "Which class…"; **Change**
+      un-picks; hosts exclude EVERY own class; switching home clears class + date; `book_makeup`
+      carries `p_home_class_id` = the chosen home (RISK 5); Cancel. Screenshots
+      `handcheck-ld-{assessment-index,assessment-promote,students-grading-modal,levels-skills,levels-grade-scale,levels-remove-copy,trials-convert-warning,trials,makeups-booked}.png`
+      (scratchpad). **No regression.** Two script reds, both the SCRIPT meeting pre-existing
+      behaviour (→ §12): the promote click waited for a "Move up" that appears only after a reload,
+      and the "moved up to" flash is never visible on the class page.
 - [ ] **Ship** — fast-forward `main`, push, confirm Vercel built both apps, `gh workflow run
       ui-drivers.yml`, delete the branch. That nightly is the gate for the next unit.
 
@@ -263,3 +284,12 @@ Then:
 - **Latent (not fixed — rule 0):** makeups' `expiryWarning` `useMemo` omits `homeClass` from its
   deps. Harmless today (every home change clears `bookDate`, forcing a recompute) — noted in the
   hook; a BACKLOG hygiene candidate, never a refactor change.
+- **Pre-existing (NOT a regression — the refactored markup is verbatim; BACKLOG candidates):**
+  (1) **The grid's "X moved up to Y." flash never shows on `assessment/[classId]`.** Promote calls
+  `onReload` → `load()` sets `loading` → the page renders "Loading…" in place of the grid → the
+  grid UNMOUNTS and its `flash` state dies. Same `loading ? … : <AssessmentGrid>` shape on `main`.
+  The row moving is the only feedback — exactly what the grid's own comment calls "disorienting".
+  (2) **Re-confirming an UNCHANGED grade stays stale in the optimistic view** until a reload: the
+  optimistic roster keeps the old `graded_at` when the grade id is equal, so a painted row of the
+  same top grade neither reads fresh nor offers "Move up" until the page is re-read (the DB write
+  is correct — `verify-assessment` proves it after a reload). Found by the L4 hand-check script.
