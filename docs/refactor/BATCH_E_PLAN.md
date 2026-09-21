@@ -250,3 +250,59 @@ Each needs the DB query or screenshot that proves it.
 - [ ] Each fence `page.tsx` passes checks 3 and 4
 - [ ] 52/52 drivers green; all 7 hand-checks recorded
 - [ ] Every admin route file is now fenced — the admin half of playbook §7.5 is closed
+
+---
+
+## 6. Stage log — what actually happened (2026-09-21)
+
+Six commits on `refactor/admin-le`. **Zero behaviour change.** Every gate ran both
+suites, every commit typechecked.
+
+| Commit | Page | Lines | `useState` | Suites |
+|---|---|---|---|---|
+| `12d719a` | L0 — fence +7 routes, 52 violations pinned | — | — | 819 / 429 |
+| `71e5de0` | dashboard | 473 → 52 | 11 → 0 | 822 / 429 |
+| `40e8c87` | locations | 386 → 98 | 12 → 0 | 822 / 429 |
+| `5c271b5` | history (+ `auditDiff` pair move) | 302 → 70 | 7 → 0 | 828 / 429 |
+| `c830e8d` | the four auth pages (fence) | 629 → 415 | 25 → 0 | 828 / 429 |
+
+**Both ledgers are EMPTY. Every admin route file in `SwimSyncAdmin` is fenced** — the
+admin half of playbook §7.5 is closed.
+
+### The counts were predicted exactly
+
+L0 printed **42 check-3 sites (40 distinct snippets) and 12 check-4 imports**, matching
+the plan's table row for row. The "client sites" column of the first draft (19) was wrong
+and `/plan-review` caught it: `dataAccess()` pins every line naming the client, the import
+included.
+
+### Prove-red, five breakers
+
+The four standard ones plus **one inside `app/login/`** — these are the first scoped routes
+outside `app/(admin)`, and check 1's output named the login breaker, so the walk demonstrably
+reaches them. The shrink test was re-proven by corrupting the `student_package_coverage` pin.
+
+### Verification
+
+- **Full sweep: 48/52.** The four failures — `payment-collection`, `referrals`,
+  `smoke-app`, `trial-onboarding` — were re-run **on `main`** and fail there **identically**
+  (same scores, same messages). Pre-existing and local-only: the 2026-09-20 nightly was
+  green on `main`. **Not caused by L-E.** They are BACKLOG material, not this batch's.
+- **Batch net, warmed first (§7.108): 112/112** across join-code, orphan-report,
+  platform-admin, locations, smoke-admin and tenant-provisioning.
+- **RISK 1: `verify-platform-admin-scope` 32/32 BEFORE the fence commit and 32/32 AFTER.**
+- **18/18 hand-checks**, script kept at `docs/refactor/batch-e-handchecks.mjs`.
+- `npx next build` green.
+
+### What the hand-checks caught — both in the CHECKS, not the product
+
+1. The metric cards were compared against a **service-role** count, which spans every
+   tenant, while the page is RLS-scoped to one business. Card 0 vs SQL 1 looked like a
+   regression and was a badly-scoped query. Scope by the admin's own `tenant_id`.
+2. The retired-location fixture set `is_active = false` **without `deactivated_at`**, which
+   `classes_inactive_requires_deactivated_at` refuses. The write was never checked, so the
+   fixture silently did nothing and the page's generic copy — correctly — rendered. The
+   script now **throws** on a refused fixture write rather than reporting a product failure.
+
+Both are the same lesson, and it is the one worth carrying: **an unverified fixture makes
+a correct product look broken.** The fix is structural — check the write.
