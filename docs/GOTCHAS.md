@@ -3893,3 +3893,15 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     time of a real regression. The fix is structural, not vigilance — `if (error) throw` on every fixture write,
     so a refused write fails as a fixture error and can never be read as a product one. The script is kept at
     `docs/refactor/batch-e-handchecks.mjs` as the shape to copy. (Admin L-E, 2026-09-21.)
+
+252. **A force-click on a DEEP-LINKED coach screen can land on the Schedule screen mounted underneath it — and
+    open a DIFFERENT lesson, with no error.** The roster hand-check (§8.114) reached the screen by `gotoAuthed`
+    rather than by tab taps, and its setup had added a Sunday class; `tap(getByText("What Toddler 1 covers"))`
+    (`click({force:true})` at the element's coordinates) hit that class's Mark card on the still-mounted
+    Schedule screen and opened `/attendance` for Sunday. The same tap passes in `verify-level-skills`, which
+    arrives by tabs. §7.10's shape, met from a new direction: the underlay is whatever the landing route
+    rendered, so a fixture that adds rows can move a card under your target. **In a hand-check, click the
+    exact element: `locator.evaluate((e) => e.click())`.** Second trap, same script: the Toast lives **3000 ms**
+    (`components/Toast.tsx`) — a `waitForTimeout(3500)` before reading the page misses it every time; `waitFor`
+    the toast text immediately after the action. (Coach roster, 2026-09-21; the corrected script is
+    `docs/refactor/coach-roster-handchecks.mjs`.)

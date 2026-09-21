@@ -1246,6 +1246,21 @@ link and presses through it; `verify-admins` only asserts the string appears in 
 `verify-smoke-app`'s `/reset-password` and `/accept-invite` are the **Expo app's** screens, built from
 `${EXPO}`. Read that script before writing the next batch's: §7.251 is the two ways its first run lied.
 
+**The app half of the fence began with the coach roster (2026-09-21, §8.114).**
+`SwimSyncApp/lib/tierBoundaries.drift.test.ts` (8 tests) is the app's fence — how it differs from the admin twin
+is playbook §3. Characterisation files: **`features/roster/domain/rosterFormat.test.ts` (5)** and
+**`features/roster/domain/rosterRows.test.ts` (21)**, whose load-bearing half pins the coach's backlog — the
+union that must agree with `generate-invoices`: the Mark target is last-write-wins over ASCENDING dates even
+when that date is recorded, a cancelled lesson substitutes `[]` for enrolments while its bookings still count,
+the guest-only zero-enrolment class (20260810), and the mid-month joiner's denominator (§8.15). 429 → 462 jest.
+**The roster's driver net** (by grep of rendered strings AND the entry tap, then read for role): `trials` (the
+only end-to-end check of the Mark target), `student-identity` (ages, the two-Ethan-Tans birthday, the Remove
+label), `levels`, `level-skills` (expands the curriculum), `attendance-guard`, `makeups`, `trial-visibility`,
+`smoke-app`; `schedule-week` lands on it by URL only. **Not** `verify-class-students` (admin-only) nor
+`verify-coach-roster` (it opens `/attendance`). **No driver presses Remove or the curriculum's Hide** — both are
+hand-checked by **`docs/refactor/coach-roster-handchecks.mjs`** + `.sql` (12 checks, DB-verified); read §7.252
+before reusing it.
+
 **Which UI drivers actually exercise the admin Students page** (verified by running each after the slice
 it covers, and all of them after Stage 11 — §7.236 is why this list exists): `contact-details` (Actions
 drawer → Contact modal in both modes, the claim lock, **Add student**), `active-inactive` (Set inactive and

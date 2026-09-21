@@ -13,7 +13,7 @@ giants. What varies with size is the *ceremony*, not the shape: §7 defines thre
 The eight giants (`packages/page.tsx` 2,014 lines ✅, `invoices/page.tsx` 1,748 ✅,
 `classes/page.tsx` 1,714 ✅, `platform/page.tsx` 1,395 ✅, `lessons/[classId]/[date]/page.tsx`
 912 ✅, and in the coach app `(coach)/schedule/index.tsx` 1,255,
-`(coach)/classes/[id]/attendance.tsx` 1,183, `(coach)/classes/[id]/roster.tsx` 905) take
+`(coach)/classes/[id]/attendance.tsx` 1,183, `(coach)/classes/[id]/roster.tsx` 905 ✅) take
 the full twelve stages of §2, **one at a time, and never start the next until the last has
 survived a nightly sweep** (plan §11). Everything smaller takes the lite or fence track
 (§7), **in batches**, one nightly per batch.
@@ -95,6 +95,7 @@ the feature-root `types.ts`; `dao/` and `ui/` both import them from there. (Admi
 | Import path | `./domain/useX` | `@/features/<screen>/domain/useX` |
 | Unit tests | `domain/*.test.ts`, picked up by vitest automatically | `jest.config.js` `testMatch` is `**/lib/**/*.test.ts` — **widen it to `**/features/**/*.test.ts` in the same commit as the first test**, or the tests silently never run |
 | Source-scan guards | `sgDisplay.drift.test.ts` scans `SwimSyncAdmin/app` — covered for free | `SCAN_DIRS` in **both twins** of `sgDisplay.drift.test.ts` must gain `SwimSyncApp/features` in the same commit as the folder. A scan that misses a folder stays green while checking less (Students plan §12) |
+| Styling | Tailwind scans `app/**` — tiers under it are covered | **`tailwind.config.js` `content` must include `./features/**`** — NativeWind purges any class used only in a `features/*/ui` file, on native AND web, with no error (§7.191's shape). Added at roster 0b; prove it by `getComputedStyle` of a class used nowhere else, after `expo start --clear` |
 | The client | `@/lib/supabase` | `@/lib/supabase` (same name, different file) |
 | RN-web | — | `Alert.alert` is a no-op on web; anything you move keeps using `confirmAction` / Toast. A previous screen stays mounted under the current one (§7.10, §7.58) — keep that in mind when a `ui/` component asserts on text |
 
@@ -128,6 +129,10 @@ Green or `git checkout -- .` and try a smaller step. Never "fix it in the next c
 | **4** | The list slice: the pure half (`domain/<feature>Rows.ts` — row → entity mapping, filters, labels) **with characterisation tests**, then the stateful half (`domain/useXList.ts` — state, `load()`, the search effect), then the toolbar/notices `ui/` | `load()` is returned from the hook because every write handler awaits it. Keep the mapping pure so it gets the page's first unit tests |
 | **5–10** | One slice per commit, smallest and most similar first: `domain/useX.ts` (state + handlers, taking `reload`) + `ui/XModal.tsx` (markup verbatim, taking the hook's state as one prop). Move a `lib/` module into `domain/` **only** when this page is its sole code importer — `grep -rln` first, and check the hit is not a comment | The page's drawer/actions buttons follow the *close first, then open* order (§7.10); keep it in one helper in the drawer component, not seven copies |
 
+> **Sole importer is necessary, not sufficient.** A `lib/` file whose header says it is TWINNED with the other
+> app (`studentStatus.ts`, `lessonDates.ts` — "EDIT BOTH") stays in `lib/` even with one importer; bind it in
+> `dao/` instead (coach roster, 2026-09-21).
+>
 > **The sole-importer grep must cover BOTH `@/lib/<mod>` AND (from inside `lib/`) `./<mod>`, excluding `.test`.**
 > A module in `lib/` is imported by its `lib/` siblings by *relative* path, which `grep -rln '@/lib/<mod>'`
 > silently misses — so a helper can look sole-imported by the page when two other `lib/` modules also use it.
@@ -203,10 +208,16 @@ correct. Pin every current violation in `ALLOWED_DATA_ACCESS` / `ALLOWED_PAGE_IM
 removes it. The sixth test fails on any entry that no longer matches, so the ledger can only
 shrink. **Never add an entry after Stage 0b.** A new violation is a new violation.
 
-**For the coach app**, write the jest twin (`SwimSyncApp/lib/tierBoundaries.drift.test.ts`,
-same body, jest globals — the `sgDisplay.drift.test.ts` pair is the template) scoped to
-`features/<screen>`, and make check 3's client pattern match `@/lib/supabase` there too.
-Add the file to `testMatch` if it lives outside `lib/`.
+**For the coach app** the twin EXISTS: `SwimSyncApp/lib/tierBoundaries.drift.test.ts` (roster, 2026-09-21).
+It is deliberately **not** a byte-for-byte twin — three checks differ, and each difference is load-bearing:
+check 2 also forbids `react-native` / `expo-router` in `dao/` (the admin's `^react(-dom)?` does not match
+`react-native`); check 3 also flags an import of any `lib/` module that **holds the client itself**, a set
+DERIVED at test time (`markableFloor`, `sessionMainCoach`, `useCoachHasPayouts` today) — a plain twin could
+never see a `domain/` hook calling `fetchMarkableFloor()`; check 4's allowlist is the app's (`react-native`,
+`expo-router`, `@expo/vector-icons`, `@/features/<screen>/{ui,domain,types}`) and forbids `@/store` — the
+store is read in `domain/` only. Route files live outside `SCOPE_DIRS`, so they are listed in `PAGES`
+explicitly, paired by index with their `features/<screen>` dir; a missing one reads RED, not TypeError.
+**To add the next screen:** append to `SCOPE_DIRS` and `PAGES` together, pin its violations, prove red.
 
 Prove every check red before trusting it: drop a `ui/Break.tsx` that imports `../dao/x`,
 a `dao/break.ts` that imports React, a `domain/break.ts` that calls `fetch(`, and swap one
@@ -216,7 +227,10 @@ lib import on the page. Watch each fail, delete them, confirm green. Say so in t
 
 ## 4. Verification — the drivers are the net, and the plan's list can be wrong
 
-**Find the drivers that actually open this page. Do not trust a name.**
+**Find the drivers that actually open this page. Do not trust a name.** For an APP screen, also grep
+its **entry tap** (`View Roster & Sessions`) and its **primary button** text (`Mark Attendance`), not only
+the strings it renders — the roster's first derivation missed 3 of its 9 drivers, including the only one
+on its billing-critical Mark target (`verify-trials`).
 
 ```bash
 cd .claude/skills/run-ui-playwright/drivers
@@ -349,7 +363,7 @@ code architecture" a fact the test runner can check rather than a sentence in a 
 
 | Track | Size | Admin | Coach/parent app | Lines |
 |---|---|---|---|---|
-| **Full** (§2, twelve stages, own plan doc) | > ~900 | **0 remaining** (all six done 2026-09-18) | 3 | ~11,100 |
+| **Full** (§2, twelve stages, own plan doc) | > ~900 | **0 remaining** (all six done 2026-09-18) | 2 (roster ✅ 2026-09-21) | ~11,100 |
 | **Lite** (below) | ~250 – ~900 | 21 pages | 13 screens | ~16,200 |
 | **Fence** (below) | < ~250 | 5 pages | 10 screens | ~2,600 |
 
@@ -474,8 +488,8 @@ Recommended order:
 - [ ] both ledgers empty in both apps — the fence holds with no exceptions listed
 - [ ] every full-track page meets §6; every lite page has `page.tsx`/`index.tsx` under
       ~200 lines and zero `useState`; every fence page passes checks 3 and 4
-- [ ] `jest.config.js` `testMatch` covers `features/`, and `SCAN_DIRS` in both twins of
-      `sgDisplay.drift.test.ts` covers it too (§1's table)
+- [x] `jest.config.js` `testMatch` covers `features/`, and `SCAN_DIRS` in both twins of
+      `sgDisplay.drift.test.ts` covers it too (§1's table) — and Tailwind `content` — 2026-09-21, roster 0b
 - [ ] the smoke drivers are in `run-all-drivers.sh`'s nightly set
 - [x] the dao three-way split and the "orchestrate, never replace" rule are in
       `docs/ARCHITECTURE.md` §6, and this playbook points at them (§1) — 2026-09-18, Admin L-D

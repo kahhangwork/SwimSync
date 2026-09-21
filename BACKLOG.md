@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-21 — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113 — every admin route file is now fenced, both ledgers empty; the admin half of playbook §7.5 is closed). Two items filed: a `reset-password` recovery driver, and four drivers that fail on a LOCAL sweep but pass in CI. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -1810,6 +1810,20 @@ equivalent path IS covered, by `verify-tenant-provisioning`, which is why that o
 this and asserts it worked. Do NOT model it on `verify-smoke-app`'s `/reset-password`: that is the **Expo app's**
 screen, built from `${EXPO}`, a different page entirely. The three cleanup/settle traps are §7.251.
 
+### A driver for the coach roster's Remove — **S** `[from the coach roster refactor 2026-09-21]`
+The coach's **Remove** on `(coach)/classes/[id]/roster` — `confirmAction` → `close_student_enrolment` → toast →
+reload — is pressed by **no** driver; `verify-student-identity` only reads the button's label. Nor does any
+driver press the level curriculum's **Hide** (`verify-level-skills` only expands it). Both were hand-checked at
+the roster refactor (`docs/refactor/coach-roster-handchecks.mjs` + `.sql`, 12/12, DB-verified).
+
+**Why:** Remove closes a real enrolment, and it is the coach's only way to stop a child who has left from
+blocking the month's invoicing. A regression would either fail silently (the confirm on RN-web is
+`window.confirm`, easy to break) or close the wrong class — a child in two classes must lose only THIS one.
+
+**Notes:** the hand-check script is the driver's skeleton, including the cancel path (dismiss → nothing
+changes) and the DB read (this class closed, the other class untouched, `students.is_active` still true).
+Reach the roster by TAB taps, or click by DOM, and `waitFor` the 3000 ms toast — §7.252 is both traps.
+
 ### Four UI drivers fail on a LOCAL full sweep but pass in CI — **S** `[found by Admin L-E's L4 2026-09-21]`
 `run-all-drivers.sh` run locally on 2026-09-21 returned 48/52. The four reds — `payment-collection` (times out
 waiting for the parent app's *I've paid*), `referrals` (1/13: the `/package` pay-page headline), `smoke-app`
@@ -1825,7 +1839,9 @@ session to wave failures through, which is precisely how §8.65's live regressio
 difference — a `Pay Driver Swim` tenant from `fixtures-payment-collection.sql` was still present and visible to
 cross-tenant queries during the hand-checks. Start with a clean `supabase db reset` and re-run just those four;
 compare against the CI job's env (`SERVICE_ROLE_KEY`, `RESEND_API_KEY` UNSET — `verify-tenant-provisioning`
-requires the latter). The triage method that settled it is `docs/TESTING.md` §5's fourth rule: re-run the driver
+requires the latter). **Evidence against the leftover-rows theory (2026-09-21, coach roster):** `smoke-app` ran
+four times through `run-all-drivers.sh --only`, which resets the DB before each driver, and failed 70/73 on the
+same three checks every time — so a clean reset alone does not fix it; look at env/config next. The triage method that settled it is `docs/TESTING.md` §5's fourth rule: re-run the driver
 at the suspect's parent before blaming the branch.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)

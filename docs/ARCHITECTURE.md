@@ -600,8 +600,17 @@ the shape of the system changes:_
   front door for 40 of the 52 drivers. **Nothing in `dao/` may read `window` at module scope**:
   these pages prerender at `next build`, so `forgot-password`'s `redirectTo` origin is computed
   inside the call, and a `dao/` binding for `onAuthStateChange` must RETURN the subscription handle
-  or the effect's cleanup silently stops unsubscribing. Remaining: the three coach-app giants and
-  the app's own lite/fence batches.
+  or the effect's cleanup silently stops unsubscribing.
+
+  **The app half began 2026-09-21 with the coach roster** (`docs/refactor/COACH_ROSTER_REFACTOR_PLAN.md`,
+  905 → 64 lines). Its shapes are the app's defaults: tiers live in **`SwimSyncApp/features/<screen>/`**,
+  never beside the route (Expo Router routes every file under `app/`); **the store (`@/store/*`) is read in
+  `domain/` only** — a hook reads `showToast` itself, the route never imports it; **`ui/` imports
+  expo-router's `router` singleton directly**, unlike the admin's router-at-the-page rule, because an Expo
+  `router` needs no navigation context and keeping it lets the JSX move verbatim; and the route keeps its one
+  **`useFocusEffect`**, keyed on the `loadData` a hook returns **unwrapped** — a wrapped or re-memoised
+  `loadData` changes identity every render and refetches forever. Remaining: the `attendance` and
+  `schedule/index` giants and the app's lite/fence batches.
 
 ---
 
