@@ -31,7 +31,6 @@ import {
   formatSummary,
   progressLabel,
   isFinished,
-  type LessonProgress,
   type DbStatus,
 } from "@/lib/attendanceSummary";
 import Card from "@/components/Card";
@@ -39,55 +38,8 @@ import PrimaryButton from "@/components/PrimaryButton";
 import { confirmAction } from "@/lib/confirm";
 import { useAppStore } from "@/store/useAppStore";
 import { removeFromClass } from "@/lib/studentStatus";
-
-type Student = {
-  id: string;
-  full_name: string;
-  date_of_birth: string | null;
-  level_label: string | null;
-  level_note: string | null;
-  level_skills: string[];
-};
-
-type Session = {
-  id: string | null; // null = the lesson should have happened but was never marked
-  session_date: string;
-  progress: LessonProgress;
-  /** "3 present · 2 cancelled (rain)", or "" when nothing is recorded. */
-  summary: string;
-  /** Cancelled in advance by the admin (cancel_lesson) — nothing to mark. */
-  cancelled?: boolean;
-  cancelReason?: string | null;
-};
-
-type ClassInfo = {
-  title: string;
-  day_of_week: string;
-  start_time: string;
-  end_time: string;
-  location_name: string;
-};
-
-function formatTime(time: string): string {
-  const [h, m] = time.split(":");
-  const hour = parseInt(h, 10);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  const hour12 = hour % 12 || 12;
-  return `${hour12}:${m} ${ampm}`;
-}
-
-function formatDate(dateStr: string): string {
-  return formatSgDate(dateStr, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function capitalize(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
+import type { Student, Session, ClassInfo, Guest, Extra } from "@/features/roster/types";
+import { formatTime, formatDate, capitalize } from "@/features/roster/domain/rosterFormat";
 
 export default function ClassRosterScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -97,23 +49,17 @@ export default function ClassRosterScreen() {
   // enrolled, so they never appear in the roster below — and the coach had no
   // way to know a trial was coming until the child turned up at the poolside.
   // The counts already accounted for them; only the coach didn't.
-  const [upcomingTrials, setUpcomingTrials] = useState<
-    { id: string; full_name: string; session_date: string }[]
-  >([]);
+  const [upcomingTrials, setUpcomingTrials] = useState<Guest[]>([]);
   // Make-up guests: enrolled children from ANOTHER same-category class,
   // booked into one lesson here. Same shape and same stakes as trials.
-  const [upcomingMakeups, setUpcomingMakeups] = useState<
-    { id: string; full_name: string; session_date: string }[]
-  >([]);
+  const [upcomingMakeups, setUpcomingMakeups] = useState<Guest[]>([]);
   // Lessons the admin has SCHEDULED off the class's usual weekday — a makeup,
   // a holiday shift. The session row exists ahead of time (unlike an ordinary
   // lesson, which is created lazily when attendance is saved), and the sessions
   // query below is bounded to today, so without this the coach would get no
   // warning at all: the extra lesson would simply appear in their backlog on
   // the day, unexplained.
-  const [upcomingExtras, setUpcomingExtras] = useState<
-    { id: string; session_date: string; reason: string }[]
-  >([]);
+  const [upcomingExtras, setUpcomingExtras] = useState<Extra[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   // DATE ONLY. This used to carry the resolved `sessionId` and pass it to the
   // attendance screen in the URL; that screen no longer accepts one (it resolves

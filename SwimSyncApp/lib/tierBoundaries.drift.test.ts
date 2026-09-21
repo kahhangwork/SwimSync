@@ -58,8 +58,7 @@ import { join, sep } from "node:path";
 const APP = join(__dirname, "..");
 
 const SCOPE_DIRS = [
-  // Coach roster (full track), 2026-09-21. The folder does not exist until
-  // Stage 1; checks 1-3 over it are vacuous until then, by construction.
+  // Coach roster (full track), 2026-09-21.
   "features/roster",
 ];
 
@@ -232,6 +231,10 @@ describe("app tier boundaries (route -> ui -> domain -> dao)", () => {
     // featureOf() pairs PAGES[i] with SCOPE_DIRS[i]; a length mismatch would
     // make check 4 throw instead of fail.
     expect(PAGES.length).toBe(SCOPE_DIRS.length);
+    // A scoped dir that does not exist makes checks 1-3 vacuous for it (the
+    // walk skips a missing dir). Added at roster Stage 1, when features/roster
+    // first existed.
+    for (const dir of SCOPE_DIRS) expect(existsSync(join(APP, dir))).toBe(true);
   });
 
   it("derives the client-holding lib/ helpers (check 3 is not blind to them)", () => {
