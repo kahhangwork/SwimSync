@@ -109,10 +109,16 @@ check(
   afterCode.join_code
 );
 
-// restore the name so the sweep's fixtures are untouched
+// Restore BOTH the name and the join code. The code is documented in
+// LOCAL_DEV_GUIDE.md as SWIM-TEST and a parent needs it to add a child by
+// hand, so a rotation left in place makes the guide wrong for the next
+// session. (Missed on the first run of this script — 2026-09-21.)
 await db
   .from("tenants")
-  .update({ display_name: tenantBefore.display_name })
+  .update({
+    display_name: tenantBefore.display_name,
+    join_code: tenantBefore.join_code,
+  })
   .eq("id", tenantBefore.id);
 
 // 3. The six metric cards against SQL.
