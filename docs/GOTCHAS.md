@@ -3879,3 +3879,17 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     not in code. When the sole-importer grep (playbook §2) names a `lib/` sibling as the other importer, the two
     are one unit: move them together (the Deps half into `dao/`). Assert every stage:
     `git grep -nE "from ['\"](@/app/|.*\(admin\)/)" -- 'SwimSyncAdmin/lib/*.ts'` → 0. (Lesson detail, 2026-09-18.)
+
+251. **A hand-check that reports a product failure is wrong about as often as the product is — verify the
+    CHECK before you believe it, and make its fixture writes THROW.** Admin L-E's 18 hand-checks produced two
+    "failures", both in the check: (1) the six dashboard metric cards were compared against counts read with the
+    **service-role** key, which spans every tenant, while the page is RLS-scoped to the admin's own business —
+    `card=0 sql=1` looked like a regression and was a leftover `Pay Driver Swim` tenant from another driver's
+    fixtures; scope the SQL by the same `tenant_id` the page sees. (2) The retired-location fixture set
+    `is_active = false` **without `deactivated_at`**, which `classes_inactive_requires_deactivated_at` refuses —
+    the `update()` error was never read, so the fixture silently did nothing, the location had no retired class,
+    and the page's *generic* removal copy rendered exactly as it should. The check called that a product bug.
+    **Both are the same failure: an unverified fixture makes correct behaviour look broken**, and it costs the
+    time of a real regression. The fix is structural, not vigilance — `if (error) throw` on every fixture write,
+    so a refused write fails as a fixture error and can never be read as a product one. The script is kept at
+    `docs/refactor/batch-e-handchecks.mjs` as the shape to copy. (Admin L-E, 2026-09-21.)

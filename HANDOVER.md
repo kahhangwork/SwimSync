@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-18 — **Lesson detail full-track DONE, on `main` `3690bdb` (§8.112):** 912 → 93 lines, 0 useState,
-both ledgers empty — the LAST admin giant. 129/129 drivers + 20/20 hand-checks. **Nightly `35328388854` RUNNING — the
-gate for the next unit (§9).** August billing due before 1 Oct._
+_Last updated: 2026-09-21 — **Admin L-E + the admin FENCE commit SHIPPED, on `main` `ed6c6e5` (§8.113):** 1,790 → 733
+lines, 0 useState, **BOTH LEDGERS EMPTY — every admin route file is fenced.** Sweep 48/52 (the 4 reds fail on `main`
+too). **Nightly `35587264596` RUNNING — the gate for the next unit (§9).** August billing due before 1 Oct._
 
-_Previously, 2026-09-18 (§8.111) — Admin L-D grading batch DONE (2,667 → 316); its nightly `35319533916` went green._
+_Previously, 2026-09-18 (§8.112) — lesson detail full-track DONE (912 → 93), the last admin giant; its nightly went green._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +347,28 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.113 (2026-09-21) — Admin L-E + the admin FENCE commit: 7 route units, 1,790 → 733 lines — the admin fence is CLOSED
+
+**Six commits on `refactor/admin-le`, fast-forwarded to `main` (`ed6c6e5`) after the previous unit's nightly
+(`35328388854`) went green; 0 migrations, 0 edge functions, so `/deploy` had no backend gate. CI green; live pages
+verified 200. Zero behaviour change.** `/plan-with-confidence` (2 questions) → `/plan-review` (Fable 5.1) → L0 →
+3 lite pages → the fence commit → L4. 819 → 828 vitest, jest 429 unchanged.
+
+- **Read `docs/refactor/BATCH_E_PLAN.md` (§1 measured scope, the inline ⚠ RISK blocks, §6 stage log), not this.**
+- **BOTH LEDGERS ARE EMPTY and every admin route file is in `SCOPE_DIRS`** — the admin half of playbook §7.5 is
+  closed. The four auth pages are the first scoped routes OUTSIDE `app/(admin)`, so L0's prove-red included a
+  breaker inside `app/login/`.
+- **`/plan-review` found 8 factual errors; 7 held and 1 was wrong** — it claimed `verify-tenant-provisioning`
+  never touches `accept-invite`, when that driver is the only full coverage of its valid path. Checked by hand
+  before folding in, which is the only reason the claim was caught.
+- **Graduated:** §7.251 (a hand-check's own fixture lied twice); TESTING §5 (the L-E scope, the 9 new
+  characterisation tests, what the hand-checks cover); ARCHITECTURE §6 (the fence track's shapes — router at the
+  page, no module-scope `window`, return the subscription handle); BACKLOG ×2 (a `reset-password` driver; the
+  four local-only driver reds).
+- **Not fixed, deliberately:** the 4 sweep reds. They fail identically on `main` and the nightly was green there —
+  BACKLOG, not this batch (rule 0).
+- **PRD untouched** — nothing user-visible changed.
+
 ## 8.112 (2026-09-18) — `lessons/[classId]/[date]` full track: 912 → 93 lines, 0 useState — the last admin giant
 
 **Ten commits on `refactor/lesson-detail`, fast-forwarded to `main` (`3690bdb`) via `/deploy` only AFTER nightly
@@ -363,26 +385,7 @@ change.** `/plan-with-confidence` (2 questions) → `/plan-review` (Fable 5.1) �
 - **Not proven:** the assign-substitute ERROR render (the assign succeeded by hand) — in the BACKLOG driver item.
 - **PRD untouched** — nothing user-visible changed.
 
-## 8.111 (2026-09-18) — Admin L-D grading batch: 5 route units to tiers, 2,667 → 316 lines, 0 hooks
-
-**Nine commits on `refactor/admin-ld`, fast-forwarded to `main` (`33d4e82`) via `/deploy` and pushed; both Vercel
-deploys green. Zero behaviour change.** `/plan-with-confidence` → `/plan-review` (Fable 5.1) → L0 fence → one folded
-commit per page (assessment + `[classId]`, makeups, levels, trials) → ARCHITECTURE §6 → L4. 770 → 806 vitest.
-**Driver net 210/210** (9 drivers) + **35/35 DB-verified hand-checks** of everything no driver presses.
-
-- **Read `docs/refactor/BATCH_D_PLAN.md` (decisions, L0–L4, §12), not this.**
-- **`components/AssessmentGrid.tsx` holds no client:** its writes are injected per caller → `docs/ARCHITECTURE.md` §6.
-  The still-due §6 once-off (dao three-way split, *orchestrate, never replace*) is DONE; playbook §7.5 box ticked.
-- **`/plan-review` (Fable 5.1) found 6 factual errors**, the worst being a nested route the fence would silently
-  have skipped (§7.247). All verified by hand before folding in.
-- **Graduated:** §7.247 (nested `[param]` needs its own `SCOPE_DIRS` entry), §7.248 (a `page.tsx`-keyed scan loses
-  coverage as pages decompose — the §7.54 Thead guard had lost 24 tables; widened, `b3bf04b`), §7.249 (state
-  below a reload's loading switch is destroyed); playbook §2 (JSX-aware renames) + §7.1 (inject shared writes);
-  TESTING §5; BACKLOG `verify-grading-admin` + the Assessment-grid feedback item (2 pre-existing quirks, NOT fixed —
-  rule 0).
-- **PRD untouched** — nothing user-visible changed.
-
-_(§8.110 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.111 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -427,32 +430,40 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-18: `main` is `3690bdb` (carries lesson detail, §8.112). Nightly `35328388854` (manual) was
-RUNNING on it when this was written — `gh run view 35328388854`.** It is the GATE for the next unit (§7.1). The
-previous one (`35319533916`, on L-D's `33d4e82`) went green, so a red now bisects to the lesson-detail commits — most
-likely `admin-lesson-detail` / `cancel-lesson` / `admin-calendar` — **but read it, don't trust this line** (§8.65).
+**State on 2026-09-21: `main` is `ed6c6e5` (carries Admin L-E + the fence commit, §8.113). Nightly `35587264596`
+(manual) was RUNNING on it when this was written — `gh run view 35587264596`.** It is the GATE for the next unit
+(§7.1). The scheduled run before it (`35541254420`, on `14acd6d`) went green, so a red now bisects to the L-E
+commits — most likely `smoke-admin` / `join-code` / `platform-admin-scope` — **but read it, don't trust this line**
+(§8.65). **A LOCAL sweep currently returns 48/52 on `main` itself** — four parent-app/billing drivers fail locally
+and pass in CI; that is a BACKLOG item, not a signal about your branch.
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
 which mutate shared seed state — are in the same section.
 
-### THE NEXT BUILD — Admin L-E (the batch due by the alternation), or the first coach-app giant
+### THE NEXT BUILD — the coach app (the admin side is finished)
 
-**All six admin full-track giants are DONE (§8.112).** Lite batches done: L-A, L-B, L-C, L-D. By the
-**giant→batch alternation a BATCH is due next.**
+**Every admin route file in `SwimSyncAdmin` is now tiered and fenced, both ledgers empty (§8.113).** Six full-track
+giants, five lite batches (L-A…L-E) and the fence commit are done. **The admin half of playbook §7.5 is closed.**
+What remains is the coach/parent app, and it is a different KIND of unit.
 
-- **Recommended: Admin L-E** (`dashboard` `locations` `history`, ~1,161 lines) — the last admin lite batch; net per
-  playbook §7.1 (join-code, orphan-report, platform-admin, locations; **history: none → smoke**). Re-derive by grep (§7.236).
-- **Then the coach-app giants** (`schedule/index` 1,255, `classes/[id]/attendance` 1,183, `classes/[id]/roster` 905) —
-  a different KIND of unit: `SwimSyncApp/features/`, the jest fence twin, RN-web quirks (playbook §1, §3).
-- **Before any unit:** grep the suite for `page.tsx`-keyed scans (§7.248), give nested routes their own `SCOPE_DIRS`
-  entry (§7.247), and move any `lib/` sole-importer PAIR in one commit (§7.250).
+- **The three coach-app giants** (`(coach)/schedule/index` 1,255, `classes/[id]/attendance` 1,183,
+  `classes/[id]/roster` 905) — **re-measure before planning** (§7.236). Full track, one at a time, one nightly each.
+- **Then the app's lite batches** — L-F parent home, L-G parent money, L-H rest (playbook §7.1's table).
+- **What is different about app units, and will bite:** tier folders go in `SwimSyncApp/features/`, NOT beside the
+  route (Expo Router makes every file under `app/` a route); `jest.config.js` `testMatch` must gain
+  `**/features/**/*.test.ts` **in the same commit as the first test** or the tests silently never run; `SCAN_DIRS`
+  in **both** twins of `sgDisplay.drift.test.ts` must gain `SwimSyncApp/features`; `Alert.alert` is a no-op on
+  RN-web; and the route→driver grep **under-reports** app drivers, which navigate by tapping tabs — read the
+  drivers for the ROLE, not the route (playbook §1, §7.1's caveat).
+- **Before any unit:** grep the suite for `page.tsx`-keyed scans (§7.248), give nested routes their own
+  `SCOPE_DIRS` entry (§7.247), and move any `lib/` sole-importer PAIR in one commit (§7.250).
 
-**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35328388854` (lesson detail) is green.**
+**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35587264596` (Admin L-E) is green.**
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), on prod,
 0 pending (157/157 on 2026-09-18), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.112 authored none — a pure refactor.
+the fact; a prose status is a hint.** §8.113 authored none — a pure refactor.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

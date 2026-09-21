@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-21 — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113 — every admin route file is now fenced, both ledgers empty; the admin half of playbook §7.5 is closed). Two items filed: a `reset-password` recovery driver, and four drivers that fail on a LOCAL sweep but pass in CI. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -1793,6 +1793,40 @@ pickers indistinguishable from "nobody eligible"; a failed `session_coaches` rea
 **Notes:** the fix is to fold the session-scoped errors (at least `attendance`) into the same `loadError` path —
 a behaviour change, so its own commit, never inside a refactor. `getSession` failing leaves `actorId` null, which
 already makes `doSave` a silent no-op; say so in the UI rather than doing nothing.
+
+### A driver for the `reset-password` recovery path — **S** `[from the Admin L-E fence commit 2026-09-21]`
+`/reset-password` (admin) is opened by **one** driver, `verify-smoke-admin`, and only on its INVALID branch:
+logged out, no token, "checking…" → "invalid" after 3s. The whole valid path — a real recovery link parsed from
+the URL hash, `onAuthStateChange` settling the session, setting a password, and signing in with it — is exercised
+by nothing. It was hand-checked at Admin L-E's L4 (`docs/refactor/batch-e-handchecks.mjs` check 7, 3/3) and that
+script is the driver's skeleton: `auth.admin.generateLink({ type: "recovery" })`, open it, set the password, then
+prove `signInWithPassword` succeeds and restore the seed password.
+
+**Why:** it is the only way a locked-out admin gets back in, and it is a one-shot token flow — the failure is
+silent ("this link has expired" on a good link), and the admin cannot retry their way out of it. `accept-invite`'s
+equivalent path IS covered, by `verify-tenant-provisioning`, which is why that one needs no item.
+
+**Notes:** restore `password123` afterwards or every other driver's `loginAdmin` fails — the hand-check script does
+this and asserts it worked. Do NOT model it on `verify-smoke-app`'s `/reset-password`: that is the **Expo app's**
+screen, built from `${EXPO}`, a different page entirely. The three cleanup/settle traps are §7.251.
+
+### Four UI drivers fail on a LOCAL full sweep but pass in CI — **S** `[found by Admin L-E's L4 2026-09-21]`
+`run-all-drivers.sh` run locally on 2026-09-21 returned 48/52. The four reds — `payment-collection` (times out
+waiting for the parent app's *I've paid*), `referrals` (1/13: the `/package` pay-page headline), `smoke-app`
+(70/73: `/invoice/<id>` and `/package/<id>` render + console errors), `trial-onboarding` (5/8: the unclaimed-child
+generation report) — were re-run **on `main`** and failed **identically**, same scores and messages. The nightly
+on that same `main` commit was GREEN the night before (`35541254420`, 14acd6d). So this is local-environment
+drift, not code, and not the L-E branch.
+
+**Why:** a local sweep is the pre-merge gate for every refactor unit. Four permanent local reds train the next
+session to wave failures through, which is precisely how §8.65's live regression sat unread beneath a stale pin.
+
+**Notes:** all four are parent-app/billing surfaces, which suggests leftover tenant rows rather than a code
+difference — a `Pay Driver Swim` tenant from `fixtures-payment-collection.sql` was still present and visible to
+cross-tenant queries during the hand-checks. Start with a clean `supabase db reset` and re-run just those four;
+compare against the CI job's env (`SERVICE_ROLE_KEY`, `RESEND_API_KEY` UNSET — `verify-tenant-provisioning`
+requires the latter). The triage method that settled it is `docs/TESTING.md` §5's fourth rule: re-run the driver
+at the suspect's parent before blaming the branch.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the

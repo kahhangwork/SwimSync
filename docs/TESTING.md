@@ -1224,6 +1224,28 @@ filters that look alike (`trialKidsFrom` does NOT consult the `classes` join). `
 an enrolment-less child is not, so the trial picker read "(0)" on unchanged code. An inactive enrolment in one of
 the admin's classes makes it visible and still trial-eligible.
 
+**Admin L-E + the admin FENCE commit (2026-09-21, §8.113) closed the admin half of the fence.** All seven
+remaining route units are in `SCOPE_DIRS` — `dashboard`, `locations`, `history`, and the four auth pages
+`login`, `accept-invite`, `reset-password`, `forgot-password`, which are the **first scoped routes outside
+`app/(admin)`**. L0's prove-red therefore included a breaker inside `app/login/`: a walk that never reached
+them would stay green while checking nothing. **Both ledgers are now EMPTY for every admin route.**
+Characterisation files added: **`dashboard/domain/dashboardRows.test.ts` (3)** — `formatBillingMonth`,
+including the zone-independence claim the `sgDisplay` allowance rests on (§7.241: its pin moved to
+`dashboardRows.ts` in **both** app twins) — and **`history/domain/historyRows.test.ts` (6)**, whose
+load-bearing half pins the audit filter's `+08:00` day bounds so neither can silently become zoneless
+(§7.227); they live in `history/constants.ts` because `dao/` may import the feature root but never `domain/`.
+`auditDiff.ts` and its test moved into `history/domain/` as a pair (§7.250). 819 → 828 vitest.
+
+**What no driver presses on these pages, and how it was proved:** the 18 hand-checks in
+**`docs/refactor/batch-e-handchecks.mjs`** — the dashboard's Rename and join-code rotation (both DB-verified),
+the six metric cards against tenant-scoped SQL, both locations removal paths, the history filters, and
+**`reset-password`'s entire valid path**, which has NO driver: the check generates a real recovery link with
+`auth.admin.generateLink`, sets a password and proves `signInWithPassword` succeeds with it, then restores the
+seed password. `accept-invite`'s valid path IS covered — `verify-tenant-provisioning` opens the real invite
+link and presses through it; `verify-admins` only asserts the string appears in an error panel, and
+`verify-smoke-app`'s `/reset-password` and `/accept-invite` are the **Expo app's** screens, built from
+`${EXPO}`. Read that script before writing the next batch's: §7.251 is the two ways its first run lied.
+
 **Which UI drivers actually exercise the admin Students page** (verified by running each after the slice
 it covers, and all of them after Stage 11 — §7.236 is why this list exists): `contact-details` (Actions
 drawer → Contact modal in both modes, the claim lock, **Add student**), `active-inactive` (Set inactive and

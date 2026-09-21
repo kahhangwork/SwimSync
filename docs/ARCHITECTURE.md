@@ -589,6 +589,20 @@ the shape of the system changes:_
   Precedent for the shape: `adminAttendanceSave.ts` + its bound `SaveDeps` (now `lessons/[classId]/[date]/domain/` + `dao/lessonDetail.save.ts`). (Admin L-D,
   `docs/refactor/BATCH_D_PLAN.md`.)
 
+  **The admin half is COMPLETE as of 2026-09-21** (Admin L-E + the fence commit,
+  `docs/refactor/BATCH_E_PLAN.md`): every route file in `SwimSyncAdmin` is in `SCOPE_DIRS` and
+  **both ledgers are empty**. The four auth pages (`login`, `accept-invite`, `reset-password`,
+  `forgot-password`) are the fence track (playbook §7.2) — a `dao/<page>.repo.ts` for their
+  `supabase.auth.*` calls and a `domain/use<Page>.ts` for their state, and **no `ui/` folder**: a
+  130-line login page does not need one, so its JSX never moved. Two shapes there are deliberate
+  and load-bearing. **`useRouter()` stays in `login/page.tsx`** and the hook receives `push` at
+  call time, so the landing decision can be read without Next's navigation context — login is the
+  front door for 40 of the 52 drivers. **Nothing in `dao/` may read `window` at module scope**:
+  these pages prerender at `next build`, so `forgot-password`'s `redirectTo` origin is computed
+  inside the call, and a `dao/` binding for `onAuthStateChange` must RETURN the subscription handle
+  or the effect's cleanup silently stops unsubscribing. Remaining: the three coach-app giants and
+  the app's own lite/fence batches.
+
 ---
 
 ---
