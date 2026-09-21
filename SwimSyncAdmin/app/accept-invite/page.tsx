@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import { Logo } from "@/components/Logo";
+import { useAcceptInvite } from "./domain/useAcceptInvite";
 
 /**
  * Where an invited business owner lands to set their FIRST password.
@@ -16,96 +15,18 @@ import { Logo } from "@/components/Logo";
  * SwimSync, and it names the business they are being handed.
  */
 export default function AcceptInvitePage() {
-  const [status, setStatus] = useState<"checking" | "valid" | "invalid">(
-    "checking"
-  );
-  const [business, setBusiness] = useState<string | null>(null);
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-
-  // The invite link lands here with the session token in the URL hash;
-  // supabase-js (detectSessionInUrl) parses it. Same settling logic as
-  // /reset-password: wait for a session, fail on an error hash or a timeout.
-  useEffect(() => {
-    let settled = false;
-    const settle = (ok: boolean) => {
-      if (!settled) {
-        settled = true;
-        setStatus(ok ? "valid" : "invalid");
-      }
-    };
-
-    if (typeof window !== "undefined" && /error=/.test(window.location.hash)) {
-      settle(false);
-      return;
-    }
-
-    // Name the business they're being given, so the page proves it is about
-    // them and not a generic password form.
-    const loadBusiness = async () => {
-      const { data } = await supabase
-        .from("profiles")
-        // The !tenant_id hint is load-bearing: tenants also points back at
-        // profiles via owner_profile_id (20260806000100), so a bare
-        // tenants(...) embed is ambiguous and PostgREST refuses it.
-        .select("tenants!tenant_id(display_name)")
-        .maybeSingle();
-      const t = Array.isArray(data?.tenants) ? data?.tenants[0] : data?.tenants;
-      if (t?.display_name) setBusiness(t.display_name);
-    };
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        settle(true);
-        loadBusiness();
-      }
-    });
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        settle(true);
-        loadBusiness();
-      }
-    });
-    const timer = setTimeout(() => settle(false), 3000);
-
-    return () => {
-      clearTimeout(timer);
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!password || !confirm) {
-      setError("Please enter and confirm your password.");
-      return;
-    }
-    if (password !== confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-    setLoading(true);
-    const { error: updErr } = await supabase.auth.updateUser({ password });
-    if (updErr) {
-      setLoading(false);
-      setError(updErr.message);
-      return;
-    }
-    // Force a clean sign-in with the new password, same as /reset-password.
-    await supabase.auth.signOut();
-    setLoading(false);
-    setDone(true);
-  }
+  const {
+    status,
+    business,
+    password,
+    setPassword,
+    confirm,
+    setConfirm,
+    error,
+    loading,
+    done,
+    handleSubmit,
+  } = useAcceptInvite();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-sky-50 px-4">

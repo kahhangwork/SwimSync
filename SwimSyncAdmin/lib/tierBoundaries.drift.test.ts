@@ -235,11 +235,6 @@ type Allowed = { file: string; contains: string; why: string };
 // would call it stale, which reads as "the code moved" rather than "the path is
 // wrong"). Added with the platform scope, 2026-09-18.
 const F_PLATFORM = "app/(admin)/platform/page.tsx";
-// Admin L-E + the fence commit, spelled once each (BATCH_E_PLAN.md), 2026-09-21.
-const F_LOGIN = "app/login/page.tsx";
-const F_ACCEPT_INVITE = "app/accept-invite/page.tsx";
-const F_RESET_PASSWORD = "app/reset-password/page.tsx";
-const F_FORGOT_PASSWORD = "app/forgot-password/page.tsx";
 // (F_LESSON was deleted with its last ledger entry, lesson-detail Stage 7, 2026-09-18.)
 
 // (Admin L-D's F_LEVELS/F_TRIALS/F_MAKEUPS/F_ASSESS/F_ASSESS_CLASS/F_GRID were
@@ -346,27 +341,15 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    (git mv, sole importer, §7.250 pair rule). The +08:00 day bounds
   //    live in constants.ts so dao/ can reach them without importing
   //    domain/ (RISK 6, §7.227). ──
-  // ── login (4): ALL deleted in L-E commit 4 (the fence commit). ──
-  { file: F_LOGIN, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_LOGIN, contains: "const { data, error: authError } = await supabase.auth.signInWithPassword({", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_LOGIN, contains: 'const { data: profile } = await supabase .from("profiles")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_LOGIN, contains: "await supabase.auth.signOut();", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  // ── accept-invite (6): ALL deleted in L-E commit 4 (the fence commit). ──
-  { file: F_ACCEPT_INVITE, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_ACCEPT_INVITE, contains: 'const { data } = await supabase .from("profiles")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_ACCEPT_INVITE, contains: "supabase.auth.getSession().then(({ data }) => {", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_ACCEPT_INVITE, contains: "} = supabase.auth.onAuthStateChange((_event, session) => {", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_ACCEPT_INVITE, contains: "const { error: updErr } = await supabase.auth.updateUser({ password });", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_ACCEPT_INVITE, contains: "await supabase.auth.signOut();", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  // ── reset-password (5): ALL deleted in L-E commit 4 (the fence commit). ──
-  { file: F_RESET_PASSWORD, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_RESET_PASSWORD, contains: "supabase.auth.getSession().then(({ data }) => {", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_RESET_PASSWORD, contains: "} = supabase.auth.onAuthStateChange((_event, session) => {", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_RESET_PASSWORD, contains: "const { error: updErr } = await supabase.auth.updateUser({ password });", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_RESET_PASSWORD, contains: "await supabase.auth.signOut();", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  // ── forgot-password (2): ALL deleted in L-E commit 4 (the fence commit). ──
-  { file: F_FORGOT_PASSWORD, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_FORGOT_PASSWORD, contains: "const { error: resetError } = await supabase.auth.resetPasswordForEmail(", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  // ── the four AUTH pages (fence track, §7.2): DONE (L-E commit 4) —
+  //    login, accept-invite, reset-password, forgot-password. Each has a
+  //    dao/<page>.repo holding its supabase.auth.* calls and a
+  //    domain/use<Page>; no ui/ folder (§7.2 — the JSX did not move).
+  //    RISK 1: useRouter stays in login/page.tsx and push is handed to
+  //    the hook at call time; signOut stays inside the refusal branch.
+  //    RISK 2: the /error=/ hash check stays first, the subscription
+  //    handle is returned so cleanup can unsubscribe, and window is
+  //    read at call time only — these pages prerender. ──
 ];
 
 /**
@@ -543,15 +526,15 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    (git mv, sole importer, §7.250 pair rule). The +08:00 day bounds
   //    live in constants.ts so dao/ can reach them without importing
   //    domain/ (RISK 6, §7.227). ──
-  // ── login (2): ALL deleted in L-E commit 4 (the fence commit). ──
-  { file: F_LOGIN, contains: "@/lib/adminNav", why: "L-E L0: leaves the page in its own commit" },
-  { file: F_LOGIN, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
-  // ── accept-invite (1): ALL deleted in L-E commit 4 (the fence commit). ──
-  { file: F_ACCEPT_INVITE, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
-  // ── reset-password (1): ALL deleted in L-E commit 4 (the fence commit). ──
-  { file: F_RESET_PASSWORD, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
-  // ── forgot-password (1): ALL deleted in L-E commit 4 (the fence commit). ──
-  { file: F_FORGOT_PASSWORD, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
+  // ── the four AUTH pages (fence track, §7.2): DONE (L-E commit 4) —
+  //    login, accept-invite, reset-password, forgot-password. Each has a
+  //    dao/<page>.repo holding its supabase.auth.* calls and a
+  //    domain/use<Page>; no ui/ folder (§7.2 — the JSX did not move).
+  //    RISK 1: useRouter stays in login/page.tsx and push is handed to
+  //    the hook at call time; signOut stays inside the refusal branch.
+  //    RISK 2: the /error=/ hash check stays first, the subscription
+  //    handle is returned so cleanup can unsubscribe, and window is
+  //    read at call time only — these pages prerender. ──
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,66 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { landingRoute } from "@/lib/adminNav";
-import { supabase } from "@/lib/supabase";
 import { Logo } from "@/components/Logo";
+import { useLogin } from "./domain/useLogin";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError || !data.session) {
-      setError(authError?.message ?? "Login failed.");
-      setLoading(false);
-      return;
-    }
-
-    // Verify superadmin role
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, tenant_id")
-      .eq("id", data.session.user.id)
-      .single();
-
-    // `superadmin` split into tenant_admin (one business) and platform_admin
-    // (SwimSync itself, cross-tenant support). Both belong in this panel. A
-    // coach or parent is told where they DO belong — "access denied" to
-    // someone holding a perfectly good account is a support ticket, not a
-    // boundary. (RequiresTenant repeats this refusal for any session that
-    // arrives without passing through here.)
-    if (profile?.role !== "tenant_admin" && profile?.role !== "platform_admin") {
-      await supabase.auth.signOut();
-      setError(
-        profile?.role === "coach" || profile?.role === "parent"
-          ? "This is the admin panel — please use the SwimSync app instead."
-          : "Access denied. Admin accounts only."
-      );
-      setLoading(false);
-      return;
-    }
-
-    // A platform admin has no business, so /dashboard would show them
-    // cross-tenant totals labelled as one business. Derived from the SAME fact
-    // the sidebar and the page gate use — a second way of asking "which kind of
-    // admin is this?" is a second thing to keep in sync, and the two
-    // disagreeing is how you get a redirect loop.
-    router.push(landingRoute(profile?.tenant_id as string | null));
-  }
+  const { email, setEmail, password, setPassword, error, loading, handleLogin } =
+    useLogin();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-sky-50 px-4">
@@ -76,7 +24,10 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-7">
           <h2 className="text-lg font-bold text-gray-900 mb-5">Sign In</h2>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form
+            onSubmit={(e) => handleLogin(e, (href) => router.push(href))}
+            className="space-y-4"
+          >
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Email

@@ -1,35 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import { Logo } from "@/components/Logo";
+import { useForgotPassword } from "./domain/useForgotPassword";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
-
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!email.trim()) {
-      setError("Please enter your email address.");
-      return;
-    }
-    setLoading(true);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim(),
-      { redirectTo: `${window.location.origin}/reset-password` }
-    );
-    setLoading(false);
-    if (resetError) {
-      setError(resetError.message);
-      return;
-    }
-    setSent(true);
-  }
+  const { email, setEmail, error, loading, sent, handleSend } =
+    useForgotPassword();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-sky-50 px-4">
