@@ -236,7 +236,6 @@ type Allowed = { file: string; contains: string; why: string };
 // wrong"). Added with the platform scope, 2026-09-18.
 const F_PLATFORM = "app/(admin)/platform/page.tsx";
 // Admin L-E + the fence commit, spelled once each (BATCH_E_PLAN.md), 2026-09-21.
-const F_LOCATIONS = "app/(admin)/locations/page.tsx";
 const F_HISTORY = "app/(admin)/history/page.tsx";
 const F_LOGIN = "app/login/page.tsx";
 const F_ACCEPT_INVITE = "app/accept-invite/page.tsx";
@@ -339,14 +338,10 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    dao/dashboard.{repo,rpc}; the page holds no client. countMetrics()
   //    keeps the seven-way Promise.all VERBATIM (RISK 5); the coverage RPC
   //    and the tenant-card load stay separate and un-awaited. ──
-  // ── locations (7): ALL deleted in L-E commit 2. ──
-  { file: F_LOCATIONS, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_LOCATIONS, contains: 'const { data } = await supabase .from("locations")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_LOCATIONS, contains: '? await supabase.from("locations").update(payload).eq("id", editing.id)', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_LOCATIONS, contains: ': await supabase.from("locations").insert({', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_LOCATIONS, contains: 'await supabase .from("profiles")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_LOCATIONS, contains: '.eq("id", (await supabase.auth.getUser()).data.user?.id)', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_LOCATIONS, contains: 'const { error: err } = await supabase .from("locations")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  // ── locations: DONE (L-E commit 2) — list/insert/update/archive + the
+  //    auth+profile tenant lookup in dao/locations.repo as THREE functions
+  //    (the levels shape), so the hook keeps the page's call order and the
+  //    23505/23514 messages. useTableSort stays in domain/ (RISK 4, §7.249). ──
   // ── history (2): ALL deleted in L-E commit 3. ──
   { file: F_HISTORY, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
   { file: F_HISTORY, contains: 'let query = supabase .from("audit_log")', why: "L-E L0: moves into this page's dao/ in its own commit" },
@@ -538,8 +533,10 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    dao/dashboard.{repo,rpc}; the page holds no client. countMetrics()
   //    keeps the seven-way Promise.all VERBATIM (RISK 5); the coverage RPC
   //    and the tenant-card load stay separate and un-awaited. ──
-  // ── locations (1): ALL deleted in L-E commit 2. ──
-  { file: F_LOCATIONS, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
+  // ── locations: DONE (L-E commit 2) — list/insert/update/archive + the
+  //    auth+profile tenant lookup in dao/locations.repo as THREE functions
+  //    (the levels shape), so the hook keeps the page's call order and the
+  //    23505/23514 messages. useTableSort stays in domain/ (RISK 4, §7.249). ──
   // ── history (2): ALL deleted in L-E commit 3. ──
   { file: F_HISTORY, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
   { file: F_HISTORY, contains: "@/lib/auditDiff", why: "L-E L0: leaves the page in its own commit" },
