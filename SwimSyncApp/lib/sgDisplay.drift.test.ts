@@ -59,9 +59,9 @@ const ALLOWED: { file: string; contains: string; why: string }[] = [
   // yields the month it was built from, in every zone. Verified from
   // America/New_York: still "August 2026". No instant is involved.
   {
-    file: "SwimSyncAdmin/app/(admin)/dashboard/page.tsx",
+    file: "SwimSyncAdmin/app/(admin)/dashboard/domain/dashboardRows.ts",
     contains: "parseInt(month) - 1",
-    why: "billing month from parts, month+year only",
+    why: "billing month from parts, month+year only (moved from page.tsx at Admin L-E, §7.241 — repointed in BOTH twins)",
   },
   {
     file: "SwimSyncAdmin/app/(admin)/invoices/domain/invoiceRows.ts",

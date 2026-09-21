@@ -236,7 +236,6 @@ type Allowed = { file: string; contains: string; why: string };
 // wrong"). Added with the platform scope, 2026-09-18.
 const F_PLATFORM = "app/(admin)/platform/page.tsx";
 // Admin L-E + the fence commit, spelled once each (BATCH_E_PLAN.md), 2026-09-21.
-const F_DASHBOARD = "app/(admin)/dashboard/page.tsx";
 const F_LOCATIONS = "app/(admin)/locations/page.tsx";
 const F_HISTORY = "app/(admin)/history/page.tsx";
 const F_LOGIN = "app/login/page.tsx";
@@ -336,21 +335,10 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    the client). Each lite page folds L1-L3 in ONE commit; the four auth
   //    pages go together in the fence commit. Entries are deleted in that
   //    commit, never re-pointed. ──
-  // ── dashboard (16 sites, 14 distinct snippets): ALL deleted in L-E commit 1. ──
-  { file: F_DASHBOARD, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'const { error } = await supabase .from("tenants")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'const { data, error } = await supabase.rpc("regenerate_join_code", {', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'supabase .from("students")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'supabase .from("invoices")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'supabase .from("credit_notes")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'supabase.from("coaches").select("id", { count: "exact", head: true }),', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'supabase .from("classes")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'const { data: unassignedData } = await supabase .from("students")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'supabase .rpc("student_package_coverage")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'const { data: invoiceData } = await supabase .from("invoices")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: "const { data: auth } = await supabase.auth.getUser();", why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'const { data: profile } = await supabase .from("profiles")', why: "L-E L0: moves into this page's dao/ in its own commit" },
-  { file: F_DASHBOARD, contains: 'const { data: t } = await supabase .from("tenants")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  // ── dashboard: DONE (L-E commit 1) — every count/read/write in
+  //    dao/dashboard.{repo,rpc}; the page holds no client. countMetrics()
+  //    keeps the seven-way Promise.all VERBATIM (RISK 5); the coverage RPC
+  //    and the tenant-card load stay separate and un-awaited. ──
   // ── locations (7): ALL deleted in L-E commit 2. ──
   { file: F_LOCATIONS, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
   { file: F_LOCATIONS, contains: 'const { data } = await supabase .from("locations")', why: "L-E L0: moves into this page's dao/ in its own commit" },
@@ -546,11 +534,10 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    12 page imports. No transitional page->dao pins — every page folds its
   //    dao/ AND its domain/ in one commit, so no committed state has the page
   //    importing dao/ (playbook §7.1). ──
-  // ── dashboard (4): ALL deleted in L-E commit 1. ──
-  { file: F_DASHBOARD, contains: "lucide-react", why: "L-E L0: leaves the page in its own commit" },
-  { file: F_DASHBOARD, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
-  { file: F_DASHBOARD, contains: "@/lib/studentCounts", why: "L-E L0: leaves the page in its own commit" },
-  { file: F_DASHBOARD, contains: "@/lib/packageCoverage", why: "L-E L0: leaves the page in its own commit" },
+  // ── dashboard: DONE (L-E commit 1) — every count/read/write in
+  //    dao/dashboard.{repo,rpc}; the page holds no client. countMetrics()
+  //    keeps the seven-way Promise.all VERBATIM (RISK 5); the coverage RPC
+  //    and the tenant-card load stay separate and un-awaited. ──
   // ── locations (1): ALL deleted in L-E commit 2. ──
   { file: F_LOCATIONS, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
   // ── history (2): ALL deleted in L-E commit 3. ──
