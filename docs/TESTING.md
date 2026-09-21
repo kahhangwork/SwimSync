@@ -256,7 +256,7 @@ tests** (2026-08-14; the runner is the fact, this number is a hint that drifts).
 `lib/csv.test.ts` (serialisation + the §7.179 formula-injection and source-count truncation
 guards), `lib/trialConvert.test.ts` (the §7.180 two-press guard — now `app/(admin)/trials/domain/`, Admin L-D), `lib/makeupFromAttendance.test.ts`
 (the own-enrolled-class gate + the "exclude EVERY own class" host-choice filter) and
-`lib/auditDiff.test.ts` (the snapshot diff + the "an unresolved actor is *unknown user*, never
+`app/(admin)/history/domain/auditDiff.test.ts` (the snapshot diff + the "an unresolved actor is *unknown user*, never
 *system*" label). `lib/adminNav.test.ts`'s page-count assertion moved 19 → 20 for `/history`.
 **2026-08-17 added `credit-notes/domain/creditNoteEmailState.test.ts`** — the Credit Notes page's Resend gate, pure: it mirrors
 `is_tenant_admin()` **term for term** (role `tenant_admin`, `admin_disabled_at IS NULL`, tenant

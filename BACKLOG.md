@@ -799,7 +799,7 @@ Shipped as the **Change History** page (`/history`) — both settled shape decis
 labelled "Change History" not "Audit log" (the trail has holes by design), and one global
 filtered list, not per-entity. Reads `audit_log` directly (grant + RLS already existed),
 entity-type + date-range filters applied in the DB, diffs the `to_jsonb` snapshots
-(`lib/auditDiff.ts`, unit-tested). ⚠ RISK 5: an unresolvable actor renders "unknown user",
+(`app/(admin)/history/domain/auditDiff.ts`, unit-tested). ⚠ RISK 5: an unresolvable actor renders "unknown user",
 never "system" — actor_id is always non-null (no-JWT writes insert no row), so "system" is a
 defensive-only fallback. PRD §14 describes it.
 
