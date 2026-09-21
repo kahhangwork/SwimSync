@@ -67,8 +67,7 @@ const PAGES = ["app/(coach)/classes/[id]/roster.tsx"];
 
 type Allowed = { file: string; contains: string; why: string };
 
-// Spelled once — a typo'd path in a ledger entry pins nothing.
-const F_ROSTER = "app/(coach)/classes/[id]/roster.tsx";
+// (F_ROSTER was deleted with its last ledger entry, roster Stage 5, 2026-09-21.)
 
 /**
  * Check 3 — network reaches outside `dao/`. Roster Stage 0b pinned 9: the
@@ -86,8 +85,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: F_ROSTER, contains: "@/lib/lessonDates", why: "roster Stage 1-5 (formatters -> domain, display -> ui)" },
-  { file: F_ROSTER, contains: "@/lib/attendanceSummary", why: "roster Stage 2/5 (rosterRows.ts, ui/PastSessions)" },
 ];
 
 /** Blank comments in place, preserving newlines, so line numbers stay true. */

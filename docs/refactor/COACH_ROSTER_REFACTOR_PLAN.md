@@ -278,8 +278,32 @@ none of the 8 `lib/` modules.
 3. `/commit-review` per stage, then `/deploy` (0 migrations, 0 edge functions → app-only, `main` IS the
    deploy).
 
-## 11a. Stage log
-_(filled as stages land)_
+## 11a. Stage log — what actually landed (2026-09-21, branch `refactor/coach-roster`)
+
+| Stage | Commit | Ledger (3 / 4) | jest | Drivers / checks |
+|---|---|---|---|---|
+| 0b | `7aa91ee` | 9 / 9 | 429 → 436 | Proven red: all 4 checks + the helper leg (`@/lib/markableFloor`) + a typo'd route path (red, not TypeError) + a corrupted pin (shrink test) + `features/` testMatch + BOTH sgDisplay twins. Admin vitest 828 |
+| 1 | `81b6f61` | 9 / 9 | → 441 | — (types + formatters only). `formatTime("")` renders `12:undefined AM` — pinned, not fixed |
+| 2 | `166d99d` | 9 / 8 | → 462 | trials 16/16, student-identity 13/13 (= baseline). Line-set check: every logic line of `rosterRows.ts` exists in the pre-cut route |
+| 3 | `40bfbd8` | 2 / 6 | 462 | Full net = baseline (below). ONE `[roster] load` per focus (temp log, removed). Dao query text line-identical by script |
+| 4 | `14127f2` | **0** / 2 | 462 | Hand-check 12/12 (`coach-roster-handchecks.mjs`), DB-verified; level-skills 14/14 |
+| 5 | (this commit) | **0 / 0** | 462 | 5 `ui/` bodies VERBATIM by script; `text-[11px]` computes 11px after `--clear` (control `text-sm` 14px); full net = baseline, all 9, same three smoke-app reds |
+
+**Baseline net (pre-Stage 3):** trials 16/16 · student-identity 13/13 · levels 9/9 · level-skills 14/14 ·
+attendance-guard 22/22 · makeups 15/15 · trial-visibility 11/11 · schedule-week 21/21 · smoke-app **70/73** — the
+three `/invoice/<id>` + `/package/<id>` reds that BACKLOG's *"Four UI drivers fail on a LOCAL full sweep"* records
+as failing identically on `main`; neither route is the roster. Stage 3 matched it exactly, same three reds.
+
+**The route:** 905 → **64** lines, 11 → **0** `useState`, 8 `@/lib` + `@/store` → **0**.
+
+**Nightly gate:** `35587264596` (Admin L-E, `ed6c6e5`) — **success, all 52 drivers passed** (read from the log, 52
+PASS / 0 FAIL), 2026-09-21 11:32Z.
+
+**One harness trap met (not a product bug):** the hand-check's first attempt force-clicked *What Toddler 1 covers*
+on a deep-linked roster and landed on the **Schedule screen mounted underneath** (§7.10) — the setup's extra Sunday
+class had put a Mark card at the same coordinates, and it opened that lesson's attendance. `verify-level-skills`
+never meets it because it arrives by tab taps. DOM clicks (`el.click()`) fixed the script. The first run also
+slept past the toast's 3000 ms life (`components/Toast.tsx`) — wait for the toast, don't sleep past it.
 
 ## 12. Findings for `/update-docs`
 - **Playbook §1 table + ARCHITECTURE §6:** the app's `tailwind.config.js` `content` must gain
@@ -292,8 +316,18 @@ _(filled as stages land)_
   text, not only the strings it renders. The first derivation here missed 3 of 9 drivers.
 - **Playbook §4 (`lib/` verdicts):** being the sole importer is necessary, not sufficient. A twin file
   (`studentStatus`) stays.
-- **The stale `schedule/index.tsx:328` cross-reference** in roster's comment (§10).
-- _(more as found)_
+- **The stale `schedule/index.tsx:328` cross-reference** in roster's comment (§10) — it travelled verbatim into
+  `domain/useRosterData.ts`.
+- **§7 candidate (hand-check scripts on the app):** a force-click on a DEEP-LINKED app screen can land on the
+  Schedule screen mounted beneath it (§7.10's shape, met from a `gotoAuthed` rather than a tab tap). Hand-check
+  scripts use `el.click()`; and a toast lives 3000 ms — `waitFor` it, never `waitForTimeout` past it.
+- **TESTING §5:** the roster's characterisation suites (`rosterFormat.test.ts` 5, `rosterRows.test.ts` 21), the app
+  fence (`SwimSyncApp/lib/tierBoundaries.drift.test.ts`, 8 tests), the hand-check pair in `docs/refactor/`.
+- **BACKLOG:** `verify-coach-remove-student` (Remove has no driver — the hand-check is the only proof); a driver
+  press of the level toggle's **Hide** branch (level-skills only expands).
+- **ARCHITECTURE §6:** the first APP unit's shapes — tiers in `features/<screen>/`, the store read in `domain/` only,
+  `ui/` imports expo-router's `router` singleton directly (no navigation context to protect), `useFocusEffect` on
+  the route keyed on a hook-returned `loadData`.
 
 ## 13. PRE-COMMIT GATE — walk before EVERY stage commit
 
