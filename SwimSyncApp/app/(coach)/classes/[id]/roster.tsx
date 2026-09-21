@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { supabase } from "@/lib/supabase";
 import {
   formatSgDate,
   ageFromDob,
@@ -18,12 +17,10 @@ import {
 import { progressLabel, isFinished } from "@/lib/attendanceSummary";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
-import { confirmAction } from "@/lib/confirm";
-import { useAppStore } from "@/store/useAppStore";
-import { removeFromClass } from "@/lib/studentStatus";
-import type { Student } from "@/features/roster/types";
 import { formatTime, formatDate, capitalize } from "@/features/roster/domain/rosterFormat";
 import { useRosterData } from "@/features/roster/domain/useRosterData";
+import { useRemoveStudent } from "@/features/roster/domain/useRemoveStudent";
+import { useOpenLevel } from "@/features/roster/domain/useOpenLevel";
 
 export default function ClassRosterScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -41,10 +38,8 @@ export default function ClassRosterScreen() {
     todayDate,
     loadData,
   } = useRosterData(id);
-  const [removingId, setRemovingId] = useState<string | null>(null);
-  // Which student's level curriculum is expanded — poolside reference.
-  const [openLevelFor, setOpenLevelFor] = useState<string | null>(null);
-  const showToast = useAppStore((s) => s.showToast);
+  const { removingId, handleRemove } = useRemoveStudent(id, loadData);
+  const { openLevelFor, setOpenLevelFor } = useOpenLevel();
 
   useFocusEffect(
     useCallback(() => {
@@ -53,32 +48,6 @@ export default function ClassRosterScreen() {
   );
 
 
-  // Removing a student closes their enrolment; it never deletes anything.
-  // Their past attendance still bills (the invoice engine reads attendance
-  // rows, not current enrolment), and they drop out of the completeness check
-  // so a child who has stopped coming can no longer block invoicing.
-  // confirmAction, not Alert.alert — Alert is a no-op on the web build.
-  const handleRemove = (student: Student) => {
-    confirmAction(
-      "Remove from class?",
-      `${student.full_name} will be removed from THIS class. Any other class they attend is untouched, and they return to the admin's unassigned list only if this was their last one. Lessons they have already attended are still billed, and their history is kept.`,
-      async () => {
-        setRemovingId(student.id);
-        // `id` — this screen's own class, never the child's "the" class. Since
-        // Wave 2 a child may be in several, and the roster a coach is looking at
-        // is the only one they have any business closing.
-        const { error } = await removeFromClass(supabase, student.id, id);
-        setRemovingId(null);
-        if (error) {
-          showToast(`Could not remove ${student.full_name}.`, "error");
-          return;
-        }
-        showToast(`${student.full_name} removed from this class.`, "success");
-        loadData();
-      },
-      "Remove"
-    );
-  };
 
   if (loading) {
     return (

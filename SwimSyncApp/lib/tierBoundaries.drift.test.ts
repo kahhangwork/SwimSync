@@ -78,8 +78,6 @@ const F_ROSTER = "app/(coach)/classes/[id]/roster.tsx";
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: F_ROSTER, contains: 'import { supabase } from "@/lib/supabase";', why: "roster Stage 4: the client leaves with the last call (dao owns it)" },
-  { file: F_ROSTER, contains: "await removeFromClass(supabase, student.id, id)", why: "roster Stage 4: dao/roster.rpc.ts binding" },
 ];
 
 /**
@@ -88,12 +86,8 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: F_ROSTER, contains: "@/lib/supabase", why: "roster Stage 4 (dao owns the client)" },
   { file: F_ROSTER, contains: "@/lib/lessonDates", why: "roster Stage 1-5 (formatters -> domain, display -> ui)" },
   { file: F_ROSTER, contains: "@/lib/attendanceSummary", why: "roster Stage 2/5 (rosterRows.ts, ui/PastSessions)" },
-  { file: F_ROSTER, contains: "@/lib/confirm", why: "roster Stage 4 (useRemoveStudent)" },
-  { file: F_ROSTER, contains: "@/store/useAppStore", why: "roster Stage 4 (useRemoveStudent reads showToast)" },
-  { file: F_ROSTER, contains: "@/lib/studentStatus", why: "roster Stage 4 (dao/roster.rpc.ts binding)" },
 ];
 
 /** Blank comments in place, preserving newlines, so line numbers stay true. */
