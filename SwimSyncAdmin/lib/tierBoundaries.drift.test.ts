@@ -93,6 +93,19 @@
 // page already imports it, so its pin would cover a breaker) drove all four checks
 // red — breakers removed, 6/6 green. Shrink test re-proven: corrupting the
 // restore_lesson pin turned it AND check 3 red.
+// Re-proven for the Admin L-E scope + the FENCE commit on 2026-09-21 at L0:
+// checks 3 and 4 went red on the seven route units' real violations (42
+// data-access sites / 40 distinct snippets, 12 page imports — the exact counts
+// pre-agreed at plan-review) before the ledger was pinned;
+// dashboard/ui/Break importing ../dao, dashboard/dao/break importing React,
+// dashboard/domain/break calling fetch(, an unpinned @/lib/utils import on
+// locations/page.tsx, and — the one this scope exists to prove —
+// app/login/ui/Break importing ../dao, since login, accept-invite,
+// reset-password and forgot-password are the FIRST scoped routes OUTSIDE
+// app/(admin) and a walk that never reached them would stay green while
+// checking nothing. All four checks went red and the login breaker was named
+// in check 1's output; breakers removed, 6/6 green. Shrink test re-proven:
+// corrupting the student_package_coverage pin turned it AND check 3 red.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -184,6 +197,23 @@ const SCOPE_DIRS = [
   // every slice creates its dao calls AND the hook that wraps them in one commit
   // (plan §5 RISK 8), so the page never imports dao/. Ledger only shrinks.
   "app/(admin)/lessons/[classId]/[date]",
+  // Admin L-E lite batch + the admin FENCE commit (docs/refactor/BATCH_E_PLAN.md),
+  // widened 2026-09-21. Two tracks in one unit:
+  //   lite (§7.1)  — dashboard, locations, history: full §1 shape, folded L1-L3.
+  //   fence (§7.2) — login, accept-invite, reset-password, forgot-password: no
+  //                  ui/ folder, just dao/ + domain/ so checks 3 and 4 pass.
+  // ⚠ The four auth pages are the FIRST scoped routes outside app/(admin) — L0's
+  // prove-red includes a breaker inside app/login/ precisely because a walk that
+  // never reached them would stay green while checking nothing.
+  // Every current violation is pinned below with the commit that removes it; the
+  // ledger only shrinks from here.
+  "app/(admin)/dashboard",
+  "app/(admin)/locations",
+  "app/(admin)/history",
+  "app/login",
+  "app/accept-invite",
+  "app/reset-password",
+  "app/forgot-password",
 ];
 
 // Single shared files outside any route unit, scanned for check 3 ONLY (they
@@ -205,6 +235,14 @@ type Allowed = { file: string; contains: string; why: string };
 // would call it stale, which reads as "the code moved" rather than "the path is
 // wrong"). Added with the platform scope, 2026-09-18.
 const F_PLATFORM = "app/(admin)/platform/page.tsx";
+// Admin L-E + the fence commit, spelled once each (BATCH_E_PLAN.md), 2026-09-21.
+const F_DASHBOARD = "app/(admin)/dashboard/page.tsx";
+const F_LOCATIONS = "app/(admin)/locations/page.tsx";
+const F_HISTORY = "app/(admin)/history/page.tsx";
+const F_LOGIN = "app/login/page.tsx";
+const F_ACCEPT_INVITE = "app/accept-invite/page.tsx";
+const F_RESET_PASSWORD = "app/reset-password/page.tsx";
+const F_FORGOT_PASSWORD = "app/forgot-password/page.tsx";
 // (F_LESSON was deleted with its last ledger entry, lesson-detail Stage 7, 2026-09-18.)
 
 // (Admin L-D's F_LEVELS/F_TRIALS/F_MAKEUPS/F_ASSESS/F_ASSESS_CLASS/F_GRID were
@@ -292,6 +330,59 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
   //    assign (S4), bookings (S5) -> dao/lessonDetail.rpc; the cover delete ->
   //    .repo (S4); the page's client import went with the last call (S5). The
   //    save's client binding is dao/lessonDetail.save (git mv, S6). Nothing to pin. ──
+  // ── Admin L-E + the fence commit (BATCH_E_PLAN.md), pinned 2026-09-21 at L0.
+  //    42 data-access sites across 7 route units, 40 distinct snippets (the
+  //    `import { supabase }` line counts — dataAccess() matches any line naming
+  //    the client). Each lite page folds L1-L3 in ONE commit; the four auth
+  //    pages go together in the fence commit. Entries are deleted in that
+  //    commit, never re-pointed. ──
+  // ── dashboard (16 sites, 14 distinct snippets): ALL deleted in L-E commit 1. ──
+  { file: F_DASHBOARD, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'const { error } = await supabase .from("tenants")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'const { data, error } = await supabase.rpc("regenerate_join_code", {', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'supabase .from("students")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'supabase .from("invoices")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'supabase .from("credit_notes")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'supabase.from("coaches").select("id", { count: "exact", head: true }),', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'supabase .from("classes")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'const { data: unassignedData } = await supabase .from("students")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'supabase .rpc("student_package_coverage")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'const { data: invoiceData } = await supabase .from("invoices")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: "const { data: auth } = await supabase.auth.getUser();", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'const { data: profile } = await supabase .from("profiles")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_DASHBOARD, contains: 'const { data: t } = await supabase .from("tenants")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  // ── locations (7): ALL deleted in L-E commit 2. ──
+  { file: F_LOCATIONS, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_LOCATIONS, contains: 'const { data } = await supabase .from("locations")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_LOCATIONS, contains: '? await supabase.from("locations").update(payload).eq("id", editing.id)', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_LOCATIONS, contains: ': await supabase.from("locations").insert({', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_LOCATIONS, contains: 'await supabase .from("profiles")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_LOCATIONS, contains: '.eq("id", (await supabase.auth.getUser()).data.user?.id)', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_LOCATIONS, contains: 'const { error: err } = await supabase .from("locations")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  // ── history (2): ALL deleted in L-E commit 3. ──
+  { file: F_HISTORY, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_HISTORY, contains: 'let query = supabase .from("audit_log")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  // ── login (4): ALL deleted in L-E commit 4 (the fence commit). ──
+  { file: F_LOGIN, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_LOGIN, contains: "const { data, error: authError } = await supabase.auth.signInWithPassword({", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_LOGIN, contains: 'const { data: profile } = await supabase .from("profiles")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_LOGIN, contains: "await supabase.auth.signOut();", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  // ── accept-invite (6): ALL deleted in L-E commit 4 (the fence commit). ──
+  { file: F_ACCEPT_INVITE, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_ACCEPT_INVITE, contains: 'const { data } = await supabase .from("profiles")', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_ACCEPT_INVITE, contains: "supabase.auth.getSession().then(({ data }) => {", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_ACCEPT_INVITE, contains: "} = supabase.auth.onAuthStateChange((_event, session) => {", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_ACCEPT_INVITE, contains: "const { error: updErr } = await supabase.auth.updateUser({ password });", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_ACCEPT_INVITE, contains: "await supabase.auth.signOut();", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  // ── reset-password (5): ALL deleted in L-E commit 4 (the fence commit). ──
+  { file: F_RESET_PASSWORD, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_RESET_PASSWORD, contains: "supabase.auth.getSession().then(({ data }) => {", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_RESET_PASSWORD, contains: "} = supabase.auth.onAuthStateChange((_event, session) => {", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_RESET_PASSWORD, contains: "const { error: updErr } = await supabase.auth.updateUser({ password });", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_RESET_PASSWORD, contains: "await supabase.auth.signOut();", why: "L-E L0: moves into this page's dao/ in its own commit" },
+  // ── forgot-password (2): ALL deleted in L-E commit 4 (the fence commit). ──
+  { file: F_FORGOT_PASSWORD, contains: 'import { supabase } from "@/lib/supabase";', why: "L-E L0: moves into this page's dao/ in its own commit" },
+  { file: F_FORGOT_PASSWORD, contains: "const { error: resetError } = await supabase.auth.resetPasswordForEmail(", why: "L-E L0: moves into this page's dao/ in its own commit" },
 ];
 
 /**
@@ -451,6 +542,29 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   //    at S5; lucide-react, classColours, lessonDates, utils and calendarLessons
   //    went into ui/ with the markup (S7). The page imports only its own tiers
   //    and next/navigation. The LAST admin full-track giant. Nothing to pin. ──
+  // ── Admin L-E + the fence commit (BATCH_E_PLAN.md), pinned 2026-09-21 at L0:
+  //    12 page imports. No transitional page->dao pins — every page folds its
+  //    dao/ AND its domain/ in one commit, so no committed state has the page
+  //    importing dao/ (playbook §7.1). ──
+  // ── dashboard (4): ALL deleted in L-E commit 1. ──
+  { file: F_DASHBOARD, contains: "lucide-react", why: "L-E L0: leaves the page in its own commit" },
+  { file: F_DASHBOARD, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
+  { file: F_DASHBOARD, contains: "@/lib/studentCounts", why: "L-E L0: leaves the page in its own commit" },
+  { file: F_DASHBOARD, contains: "@/lib/packageCoverage", why: "L-E L0: leaves the page in its own commit" },
+  // ── locations (1): ALL deleted in L-E commit 2. ──
+  { file: F_LOCATIONS, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
+  // ── history (2): ALL deleted in L-E commit 3. ──
+  { file: F_HISTORY, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
+  { file: F_HISTORY, contains: "@/lib/auditDiff", why: "L-E L0: leaves the page in its own commit" },
+  // ── login (2): ALL deleted in L-E commit 4 (the fence commit). ──
+  { file: F_LOGIN, contains: "@/lib/adminNav", why: "L-E L0: leaves the page in its own commit" },
+  { file: F_LOGIN, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
+  // ── accept-invite (1): ALL deleted in L-E commit 4 (the fence commit). ──
+  { file: F_ACCEPT_INVITE, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
+  // ── reset-password (1): ALL deleted in L-E commit 4 (the fence commit). ──
+  { file: F_RESET_PASSWORD, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
+  // ── forgot-password (1): ALL deleted in L-E commit 4 (the fence commit). ──
+  { file: F_FORGOT_PASSWORD, contains: "@/lib/supabase", why: "L-E L0: leaves the page in its own commit" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
