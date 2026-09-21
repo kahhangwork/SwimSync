@@ -97,7 +97,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: F_ROSTER, contains: "@/lib/supabase", why: "roster Stage 4 (dao owns the client)" },
   { file: F_ROSTER, contains: "@/lib/lessonDates", why: "roster Stage 1-5 (formatters -> domain, display -> ui)" },
-  { file: F_ROSTER, contains: "@/lib/scheduleWeek", why: "roster Stage 2 (rosterRows.ts)" },
   { file: F_ROSTER, contains: "@/lib/markableFloor", why: "roster Stage 3 (dao/roster.rpc.ts)" },
   { file: F_ROSTER, contains: "@/lib/attendanceCompleteness", why: "roster Stage 2 (rosterRows.ts)" },
   { file: F_ROSTER, contains: "@/lib/attendanceSummary", why: "roster Stage 2/5 (rosterRows.ts, ui/PastSessions)" },
