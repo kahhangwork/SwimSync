@@ -79,14 +79,7 @@ const F_ROSTER = "app/(coach)/classes/[id]/roster.tsx";
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
   { file: F_ROSTER, contains: 'import { supabase } from "@/lib/supabase";', why: "roster Stage 4: the client leaves with the last call (dao owns it)" },
-  { file: F_ROSTER, contains: 'const { data: cls } = await supabase .from("classes")', why: "roster Stage 3: dao/roster.repo.ts" },
-  { file: F_ROSTER, contains: 'const { data: sessionData } = await supabase .from("lesson_sessions")', why: "roster Stage 3: dao/roster.repo.ts" },
-  { file: F_ROSTER, contains: 'const { data: extraData } = await supabase .from("lesson_sessions")', why: "roster Stage 3: dao/roster.repo.ts" },
-  { file: F_ROSTER, contains: 'supabase .from("trial_bookings")', why: "roster Stage 3: dao/roster.repo.ts" },
-  { file: F_ROSTER, contains: 'supabase .from("makeup_bookings")', why: "roster Stage 3: dao/roster.repo.ts" },
-  { file: F_ROSTER, contains: 'const { data: guestRows } = await supabase .from("students")', why: "roster Stage 3: dao/roster.repo.ts" },
   { file: F_ROSTER, contains: "await removeFromClass(supabase, student.id, id)", why: "roster Stage 4: dao/roster.rpc.ts binding" },
-  { file: F_ROSTER, contains: 'import { fetchMarkableFloor } from "@/lib/markableFloor";', why: "roster Stage 3: dao/roster.rpc.ts binding (client-holding helper)" },
 ];
 
 /**
@@ -97,8 +90,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: F_ROSTER, contains: "@/lib/supabase", why: "roster Stage 4 (dao owns the client)" },
   { file: F_ROSTER, contains: "@/lib/lessonDates", why: "roster Stage 1-5 (formatters -> domain, display -> ui)" },
-  { file: F_ROSTER, contains: "@/lib/markableFloor", why: "roster Stage 3 (dao/roster.rpc.ts)" },
-  { file: F_ROSTER, contains: "@/lib/attendanceCompleteness", why: "roster Stage 2 (rosterRows.ts)" },
   { file: F_ROSTER, contains: "@/lib/attendanceSummary", why: "roster Stage 2/5 (rosterRows.ts, ui/PastSessions)" },
   { file: F_ROSTER, contains: "@/lib/confirm", why: "roster Stage 4 (useRemoveStudent)" },
   { file: F_ROSTER, contains: "@/store/useAppStore", why: "roster Stage 4 (useRemoveStudent reads showToast)" },
