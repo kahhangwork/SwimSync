@@ -1,0 +1,318 @@
+// TWIN FILE: SwimSyncAdmin/lib/tierBoundaries.drift.test.ts is the admin fence.
+// This is the COACH/PARENT APP's, and it is deliberately NOT a byte-for-byte twin
+// (unlike sgDisplay.drift.test.ts) — three checks had to be rewritten for Expo:
+//
+//   page (app/…)  →  ui  →  domain  →  dao  →  (PostgREST | rpc)
+//
+// Tier folders live OUTSIDE app/, in `features/<screen>/{ui,domain,dao}` —
+// Expo Router makes every file under app/ a route (playbook §1). So the route
+// files are listed in PAGES explicitly rather than derived from SCOPE_DIRS.
+//
+// Four checks:
+//
+//   1. No file in `ui/` imports from `dao/`.
+//   2. No file in `dao/` imports React, react-native, expo-router, `ui/` or
+//      `@/components`. (The admin's `^react(-dom)?` does NOT match
+//      `react-native`; a dao that renders or navigates is wrong either way.)
+//   3. No file outside `dao/` reaches the network: the supabase client, a
+//      `fetch(` — OR an import of a `lib/` module that holds the client ITSELF
+//      (`markableFloor`, `sessionMainCoach`, …). ⚠ That third leg is the app-
+//      specific one: `fetchMarkableFloor()` imports `./supabase` inside lib/, so
+//      a plain twin of the admin regex could never see a domain/ hook calling
+//      it. The set is DERIVED at test time (every non-test lib/*.ts importing
+//      `./supabase` or `@/lib/supabase`), so a new client-holding helper is
+//      fenced the day it is written, not the day someone remembers to list it.
+//      One level only — a lib/ helper importing another client-holding helper
+//      is not followed.
+//   4. A route file is composition: it imports its own feature's tiers, React,
+//      react-native, expo-router, @expo/vector-icons and `@/components/*` —
+//      never `@/lib/*`, never `@/store/*` (the store is read in domain/ only,
+//      settled 2026-09-21 at /plan-with-confidence), never `…/dao`.
+//
+// THE ALLOWLIST IS A DEBT LEDGER, NOT AN EXEMPTION — same rule as the admin
+// file: pinned by file AND content snippet, never file-level; the "unused
+// entries" test fails on any entry that no longer matches, so it only shrinks.
+// Never add an entry after the unit's Stage 0b.
+//
+// SCOPE: the coach roster screen (full track, docs/refactor/
+// COACH_ROSTER_REFACTOR_PLAN.md), 2026-09-21 Stage 0b — the first app unit.
+//
+// §7.25: every check was proven RED by breaking the rule on purpose, then
+// reverted. Roster Stage 0b, 2026-09-21: with the ledgers emptied, checks 3
+// and 4 went red on exactly the 9 + 9 violations pre-agreed at plan-review.
+// Then, ledgers pinned: features/roster/ui/Break importing ../dao (check 1);
+// dao/break importing react, react-native AND expo-router (check 2, all three
+// named); domain/break importing @/lib/markableFloor and calling fetch( (check
+// 3, both named — the helper leg is live); unpinned @/lib/timeOfDay and
+// @/store/other on the route (check 4). The same run proved the infra lines:
+// domain/zz.test.ts failing proves jest's testMatch reaches features/, and a
+// toLocaleDateString() in domain/break went red in BOTH sgDisplay twins. A
+// typo'd PAGES path turned the scan test red (not a TypeError), and
+// corrupting the makeup_bookings pin turned the shrink test AND check 3 red.
+// Breakers removed, 7/7 green.
+
+import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { join, sep } from "node:path";
+
+// This file lives in SwimSyncApp/lib, so the app root is one level up.
+const APP = join(__dirname, "..");
+
+const SCOPE_DIRS = [
+  // Coach roster (full track), 2026-09-21. The folder does not exist until
+  // Stage 1; checks 1-3 over it are vacuous until then, by construction.
+  "features/roster",
+];
+
+// The route files. Check 4 runs against each; check 3 scans them too.
+const PAGES = ["app/(coach)/classes/[id]/roster.tsx"];
+
+type Allowed = { file: string; contains: string; why: string };
+
+// Spelled once — a typo'd path in a ledger entry pins nothing.
+const F_ROSTER = "app/(coach)/classes/[id]/roster.tsx";
+
+/**
+ * Check 3 — network reaches outside `dao/`. Roster Stage 0b pinned 9: the
+ * client import, the six `.from()` builders, `removeFromClass(supabase, …)`,
+ * and the `@/lib/markableFloor` import (a client-holding helper). Stage 3
+ * removes the six `.from()` pins and the markableFloor import; Stage 4 the
+ * client import and `removeFromClass`.
+ */
+const ALLOWED_DATA_ACCESS: Allowed[] = [
+  { file: F_ROSTER, contains: 'import { supabase } from "@/lib/supabase";', why: "roster Stage 4: the client leaves with the last call (dao owns it)" },
+  { file: F_ROSTER, contains: 'const { data: cls } = await supabase .from("classes")', why: "roster Stage 3: dao/roster.repo.ts" },
+  { file: F_ROSTER, contains: 'const { data: sessionData } = await supabase .from("lesson_sessions")', why: "roster Stage 3: dao/roster.repo.ts" },
+  { file: F_ROSTER, contains: 'const { data: extraData } = await supabase .from("lesson_sessions")', why: "roster Stage 3: dao/roster.repo.ts" },
+  { file: F_ROSTER, contains: 'supabase .from("trial_bookings")', why: "roster Stage 3: dao/roster.repo.ts" },
+  { file: F_ROSTER, contains: 'supabase .from("makeup_bookings")', why: "roster Stage 3: dao/roster.repo.ts" },
+  { file: F_ROSTER, contains: 'const { data: guestRows } = await supabase .from("students")', why: "roster Stage 3: dao/roster.repo.ts" },
+  { file: F_ROSTER, contains: "await removeFromClass(supabase, student.id, id)", why: "roster Stage 4: dao/roster.rpc.ts binding" },
+  { file: F_ROSTER, contains: 'import { fetchMarkableFloor } from "@/lib/markableFloor";', why: "roster Stage 3: dao/roster.rpc.ts binding (client-holding helper)" },
+];
+
+/**
+ * Check 4 — route-file imports outside its own tiers. Roster Stage 0b pinned
+ * 9: eight `@/lib/*` modules and `@/store/useAppStore`. Each leaves as its
+ * symbols move into domain/ or ui/; all nine are gone at Stage 5.
+ */
+const ALLOWED_PAGE_IMPORTS: Allowed[] = [
+  { file: F_ROSTER, contains: "@/lib/supabase", why: "roster Stage 4 (dao owns the client)" },
+  { file: F_ROSTER, contains: "@/lib/lessonDates", why: "roster Stage 1-5 (formatters -> domain, display -> ui)" },
+  { file: F_ROSTER, contains: "@/lib/scheduleWeek", why: "roster Stage 2 (rosterRows.ts)" },
+  { file: F_ROSTER, contains: "@/lib/markableFloor", why: "roster Stage 3 (dao/roster.rpc.ts)" },
+  { file: F_ROSTER, contains: "@/lib/attendanceCompleteness", why: "roster Stage 2 (rosterRows.ts)" },
+  { file: F_ROSTER, contains: "@/lib/attendanceSummary", why: "roster Stage 2/5 (rosterRows.ts, ui/PastSessions)" },
+  { file: F_ROSTER, contains: "@/lib/confirm", why: "roster Stage 4 (useRemoveStudent)" },
+  { file: F_ROSTER, contains: "@/store/useAppStore", why: "roster Stage 4 (useRemoveStudent reads showToast)" },
+  { file: F_ROSTER, contains: "@/lib/studentStatus", why: "roster Stage 4 (dao/roster.rpc.ts binding)" },
+];
+
+/** Blank comments in place, preserving newlines, so line numbers stay true. */
+function stripComments(src: string): string {
+  const out = src.split("");
+  const blank = (from: number, to: number) => {
+    for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " ";
+  };
+  let i = 0;
+  while (i < src.length) {
+    const two = src.slice(i, i + 2);
+    if (two === "//") {
+      let j = i;
+      while (j < src.length && src[j] !== "\n") j++;
+      blank(i, j);
+      i = j;
+    } else if (two === "/*") {
+      const end = src.indexOf("*/", i + 2);
+      const stop = end === -1 ? src.length : end + 2;
+      blank(i, stop);
+      i = stop;
+    } else i++;
+  }
+  return out.join("");
+}
+
+type Src = { file: string; code: string; lines: string[] };
+
+const rel = (full: string) => full.slice(APP.length + 1).split(sep).join("/");
+
+function read(full: string): Src {
+  const code = stripComments(readFileSync(full, "utf8"));
+  return { file: rel(full), code, lines: code.split("\n") };
+}
+
+function sources(): Src[] {
+  const found: Src[] = [];
+  const walk = (dir: string) => {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) found.push(read(full));
+    }
+  };
+  for (const dir of SCOPE_DIRS) walk(join(APP, dir));
+  // A missing route file is NOT read (it would throw ENOENT and read as a broken
+  // test); the "scans every scoped page" test below goes red on it instead.
+  for (const page of PAGES) if (existsSync(join(APP, page))) found.push(read(join(APP, page)));
+  return found;
+}
+
+const inTier = (file: string, tier: "ui" | "domain" | "dao") =>
+  file.includes(`/${tier}/`);
+
+type Site = { file: string; line: number; text: string };
+
+/** Every static import specifier, with its line. */
+function imports(s: Src): Site[] {
+  const out: Site[] = [];
+  const re = /(?:\bfrom\s*|^\s*import\s*)["']([^"'\n<>]+)["']/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s.code)) !== null) {
+    out.push({
+      file: s.file,
+      line: s.code.slice(0, m.index).split("\n").length,
+      text: m[1],
+    });
+  }
+  return out;
+}
+
+/** lib/ modules that import the supabase client themselves (one level). */
+function clientHelpers(): string[] {
+  const lib = join(APP, "lib");
+  return readdirSync(lib)
+    .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f) && f !== "supabase.ts")
+    .filter((f) =>
+      /from\s*["'](\.\/supabase|@\/lib\/supabase)["']/.test(
+        stripComments(readFileSync(join(lib, f), "utf8"))
+      )
+    )
+    .map((f) => f.replace(/\.tsx?$/, ""));
+}
+
+const HELPERS = clientHelpers();
+const helperImport = new RegExp(
+  `from\\s*["']@\\/lib\\/(${HELPERS.join("|") || "(?!)"})["']`
+);
+
+/**
+ * Lines that reach the network: a supabase client use, a `fetch(` call, or an
+ * import of a client-holding lib/ helper. A builder chain that opens with a
+ * bare `supabase` at end-of-line is joined with the next line, so it can be
+ * pinned by the table it reads (`supabase .from("students")`).
+ */
+function dataAccess(s: Src): Site[] {
+  const out: Site[] = [];
+  s.lines.forEach((l, i) => {
+    if (/\bsupabase\b/.test(l) || /\bfetch\s*\(/.test(l) || helperImport.test(l)) {
+      const joined = /\bsupabase\s*$/.test(l) ? `${l} ${s.lines[i + 1] ?? ""}` : l;
+      out.push({ file: s.file, line: i + 1, text: joined.replace(/\s+/g, " ") });
+    }
+  });
+  return out;
+}
+
+const allowed = (site: Site, list: Allowed[]) =>
+  list.some((a) => a.file === site.file && site.text.includes(a.contains));
+
+function assertNone(offenders: string[], guidance: string): void {
+  if (offenders.length > 0) {
+    throw new Error(`${guidance}\n\n  ${offenders.join("\n  ")}\n`);
+  }
+  expect(offenders).toEqual([]);
+}
+
+const label = (s: Site) => `${s.file}:${s.line}  ${s.text.trim()}`;
+
+describe("app tier boundaries (route -> ui -> domain -> dao)", () => {
+  const srcs = sources();
+
+  it("scans every scoped route file at all (not vacuously green)", () => {
+    for (const page of PAGES) expect(srcs.map((s) => s.file)).toContain(page);
+    // featureOf() pairs PAGES[i] with SCOPE_DIRS[i]; a length mismatch would
+    // make check 4 throw instead of fail.
+    expect(PAGES.length).toBe(SCOPE_DIRS.length);
+  });
+
+  it("derives the client-holding lib/ helpers (check 3 is not blind to them)", () => {
+    // markableFloor is the one the roster imports; if this list is empty the
+    // derivation broke and check 3 silently lost its third leg.
+    expect(HELPERS).toContain("markableFloor");
+  });
+
+  it("1. ui/ never imports dao/", () => {
+    const offenders = srcs
+      .filter((s) => inTier(s.file, "ui"))
+      .flatMap(imports)
+      .filter((i) => /(^|\/)dao(\/|$)/.test(i.text))
+      .map(label);
+    assertNone(offenders, "ui/ talks to domain/, never to dao/ directly.");
+  });
+
+  it("2. dao/ never imports React, react-native, expo-router, ui/, or @/components", () => {
+    const offenders = srcs
+      .filter((s) => inTier(s.file, "dao"))
+      .flatMap(imports)
+      .filter((i) =>
+        /^react(-dom|-native)?(\/|$)|^expo-router(\/|$)|(^|\/)ui(\/|$)|^@\/components/.test(i.text)
+      )
+      .map(label);
+    assertNone(offenders, "dao/ is transport only: no React, no presentation, no navigation.");
+  });
+
+  it("3. only dao/ reaches the network (client, fetch(, or a client-holding lib/ helper)", () => {
+    const offenders = srcs
+      .filter((s) => !inTier(s.file, "dao"))
+      .flatMap(dataAccess)
+      .filter((x) => !allowed(x, ALLOWED_DATA_ACCESS))
+      .map(label);
+    assertNone(
+      offenders,
+      "Data access belongs in features/<screen>/dao/. Do NOT add to " +
+        "ALLOWED_DATA_ACCESS: it only shrinks."
+    );
+  });
+
+  it("4. a route file imports its tiers, React, RN, expo-router, icons and @/components — never @/lib or @/store", () => {
+    const offenders = PAGES.flatMap((p) => {
+      const page = srcs.find((s) => s.file === p);
+      if (!page) return [`${p}  (route file not found — see the scan test)`];
+      const feature = featureOf(p);
+      const ok = new RegExp(
+        `^(react$|react-native$|expo-router$|@expo\\/vector-icons$|@\\/components\\/|` +
+          `@\\/features\\/${feature}\\/(ui|domain)\\/|@\\/features\\/${feature}\\/(constants|types)$)`
+      );
+      return imports(page)
+        .filter((i) => !ok.test(i.text))
+        .filter((i) => !allowed(i, ALLOWED_PAGE_IMPORTS))
+        .map(label);
+    });
+    assertNone(
+      offenders,
+      "A route file is composition. Logic -> domain/, data -> dao/. Do NOT add to " +
+        "ALLOWED_PAGE_IMPORTS: it only shrinks."
+    );
+  });
+
+  it("has no unused allowlist entries (the ledger only shrinks)", () => {
+    const stale: string[] = [];
+    const ledgers: [string, Allowed[], (s: Src) => Site[]][] = [
+      ["ALLOWED_DATA_ACCESS", ALLOWED_DATA_ACCESS, dataAccess],
+      ["ALLOWED_PAGE_IMPORTS", ALLOWED_PAGE_IMPORTS, imports],
+    ];
+    for (const [name, list, pick] of ledgers) {
+      for (const a of list) {
+        const s = srcs.find((x) => x.file === a.file);
+        const hit = s !== undefined && pick(s).some((site) => allowed(site, [a]));
+        if (!hit) stale.push(`${name}: ${a.file} lacks ${JSON.stringify(a.contains)}`);
+      }
+    }
+    assertNone(stale, "The code moved. Delete the entry; that is the point.");
+  });
+});
+
+/** The features/<name> a route file belongs to — one SCOPE_DIRS entry per PAGES entry, by index. */
+function featureOf(page: string): string {
+  const dir = SCOPE_DIRS[PAGES.indexOf(page)];
+  return dir.replace(/^features\//, "");
+}

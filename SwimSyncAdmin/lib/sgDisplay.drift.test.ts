@@ -42,6 +42,7 @@ const SCAN_DIRS = [
   "SwimSyncApp/app",
   "SwimSyncApp/components",
   "SwimSyncApp/lib",
+  "SwimSyncApp/features",
 ];
 
 /**

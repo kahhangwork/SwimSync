@@ -3,6 +3,10 @@ module.exports = {
   content: [
     "./app/**/*.{js,jsx,ts,tsx}",
     "./components/**/*.{js,jsx,ts,tsx}",
+    // Tier folders of refactored screens live OUTSIDE app/ (Expo Router routes
+    // every file there). Unscanned, a class used only in features/*/ui is purged
+    // with no error — the admin's §7.191 trap.
+    "./features/**/*.{js,jsx,ts,tsx}",
   ],
   presets: [require("nativewind/preset")],
   theme: {
