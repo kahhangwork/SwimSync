@@ -38,6 +38,8 @@
 // COACH_ROSTER_REFACTOR_PLAN.md), 2026-09-21 Stage 0b — the first app unit.
 // + the coach attendance MARKING screen (full track, docs/refactor/
 // COACH_ATTENDANCE_REFACTOR_PLAN.md), 2026-09-22 Stage 0b.
+// + the coach SCHEDULE landing tab (full track, docs/refactor/
+// COACH_SCHEDULE_REFACTOR_PLAN.md), 2026-09-22 Stage 0b — the last app giant.
 //
 // §7.25: every check was proven RED by breaking the rule on purpose, then
 // reverted. Roster Stage 0b, 2026-09-21: with the ledgers emptied, checks 3
@@ -51,6 +53,19 @@
 // toLocaleDateString() in domain/break went red in BOTH sgDisplay twins. A
 // typo'd PAGES path turned the scan test red (not a TypeError), and
 // corrupting the makeup_bookings pin turned the shrink test AND check 3 red.
+// Breakers removed, 7/7 green.
+//
+// Schedule Stage 0b, 2026-09-22: with the new pins emptied, checks 3 and 4
+// went red on exactly 12 + 12 sites (the plan's prediction, confirmed by
+// plan-review's simulation). Then, pinned: schedule/ui/Break importing
+// ../dao (1); dao/break importing expo-router (2); domain/break importing
+// @/lib/markableFloor AND calling fetch( (3, both named); an unpinned
+// @/lib/confirm on the route (4 — timeOfDay is already imported there); a
+// failing domain/zz.test.ts ran; a toLocaleDateString() in domain/break went
+// red in BOTH sgDisplay twins; a corrupted trial_bookings pin turned the
+// shrink test AND check 3 red; a typo'd PAGES path and a SCOPE_DIRS/PAGES
+// length mismatch each turned the scan test red. And EACH of the 24 pins,
+// removed alone, left exactly ONE offender — no pin covers two sites.
 // Breakers removed, 7/7 green.
 //
 // Attendance Stage 0b, 2026-09-22: with the new pins emptied, checks 3 and 4
@@ -75,21 +90,29 @@ const SCOPE_DIRS = [
   "features/roster",
   // Coach attendance marking (full track), 2026-09-22.
   "features/mark-attendance",
+  // Coach Schedule, the landing tab (full track), 2026-09-22.
+  "features/schedule",
 ];
 
 // The route files. Check 4 runs against each; check 3 scans them too.
 const PAGES = [
   "app/(coach)/classes/[id]/roster.tsx",
   "app/(coach)/classes/[id]/attendance.tsx",
+  "app/(coach)/schedule/index.tsx",
 ];
 
 type Allowed = { file: string; contains: string; why: string };
 
 // (F_ROSTER was deleted with its last ledger entry, roster Stage 5, 2026-09-21.)
 // (F_ATT was deleted with its last ledger entry, attendance Stage 6, 2026-09-22.)
+const F_SCHED = "app/(coach)/schedule/index.tsx";
 
 /**
- * Check 3 — network reaches outside `dao/`. ATTENDANCE Stage 0b pinned 20
+ * Check 3 — network reaches outside `dao/`. SCHEDULE Stage 0b pinned 12: the
+ * client import, two client-holding helper imports and nine `.from()`
+ * builders — one pin each, no pin shared. All leave at Stage 3.
+ *
+ * ATTENDANCE Stage 0b pinned 20
  * sites with 19 entries: the client import, two client-holding helper
  * imports, 14 `.from()` builders, 2 `.rpc()` and `notifyCreditNoteEmails(
  * supabase, …)`. ⚠ ONE entry covers TWO lines — :314 (load) and :629 (save)
@@ -103,10 +126,29 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
+  // ── Coach Schedule (docs/refactor/COACH_SCHEDULE_REFACTOR_PLAN.md) — ALL 12 leave at Stage 3 ──
+  { file: F_SCHED, contains: `import { supabase } from "@/lib/supabase"`, why: "the client; Stage 3 (dao/)" },
+  { file: F_SCHED, contains: `from "@/lib/markableFloor"`, why: "client-holding helper; Stage 3 binds it in dao/schedule.rpc.ts" },
+  { file: F_SCHED, contains: `from "@/lib/sessionMainCoach"`, why: "client-holding helper; Stage 3 binds it in dao/schedule.rpc.ts" },
+  { file: F_SCHED, contains: `supabase.from("coaches")`, why: "coach lookup; Stage 3 (dao/schedule.repo.ts)" },
+  // ⚠ KEEP THE SPACE: a bare `.from("classes")` also matches the covered and
+  // shadowed reads below, so one pin would silently cover three sites.
+  { file: F_SCHED, contains: `supabase .from("classes")`, why: "owned classes; Stage 3" },
+  { file: F_SCHED, contains: `supabase .from("session_coaches")`, why: "roster rows; Stage 3" },
+  { file: F_SCHED, contains: `.in("id", coveredClassIds)`, why: "covered classes; Stage 3" },
+  { file: F_SCHED, contains: `supabase .from("class_shadow_coaches")`, why: "shadow assignments; Stage 3" },
+  { file: F_SCHED, contains: `.in("id", shadowClassIds)`, why: "shadowed classes; Stage 3" },
+  { file: F_SCHED, contains: `supabase .from("lesson_sessions")`, why: "window sessions; Stage 3" },
+  { file: F_SCHED, contains: `supabase .from("trial_bookings")`, why: "trial bookings; Stage 3" },
+  { file: F_SCHED, contains: `supabase .from("makeup_bookings")`, why: "make-up bookings; Stage 3" },
 ];
 
 /**
- * Check 4 — route-file imports outside its own tiers. ATTENDANCE Stage 0b
+ * Check 4 — route-file imports outside its own tiers. SCHEDULE Stage 0b
+ * pinned 12: eleven `@/lib/*` modules and `@/store/useAppStore`; all gone at
+ * Stage 5.
+ *
+ * ATTENDANCE Stage 0b
  * pinned 14: thirteen `@/lib/*` modules and `@/store/useAppStore`; all gone at
  * Stage 6.
  *
@@ -115,6 +157,19 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
+  // ── Coach Schedule — each leaves when its last symbol moves; all 12 gone at Stage 5 ──
+  { file: F_SCHED, contains: "@/store/useAppStore", why: "session; Stage 3 (useScheduleLoad) / Stage 5 (Greeting)" },
+  { file: F_SCHED, contains: "@/lib/supabase", why: "Stage 3" },
+  { file: F_SCHED, contains: "@/lib/markableFloor", why: "Stage 3" },
+  { file: F_SCHED, contains: "@/lib/sessionMainCoach", why: "Stage 3" },
+  { file: F_SCHED, contains: "@/lib/lessonDates", why: "todayInSg/backlogWindowStart -> domain, formatSgDate -> ui; by Stage 5" },
+  { file: F_SCHED, contains: "@/lib/attendanceCompleteness", why: "the loop -> domain/scheduleRows; Stage 2" },
+  { file: F_SCHED, contains: "@/lib/timeOfDay", why: "nowMinutesInSg -> useWeek, isNowInRange -> ui; by Stage 5" },
+  { file: F_SCHED, contains: "@/lib/attendanceSummary", why: "loop -> domain, chips/labels -> ui; by Stage 5" },
+  { file: F_SCHED, contains: "@/lib/scheduleWeek", why: "useWeek / useScheduleSections; by Stage 4" },
+  { file: F_SCHED, contains: "@/lib/scheduleBuckets", why: "useScheduleSections; Stage 4" },
+  { file: F_SCHED, contains: "@/lib/locationFilter", why: "useScheduleSections; Stage 4" },
+  { file: F_SCHED, contains: "@/lib/coachRoster", why: "parse* -> useScheduleLoad, canMark/roleBadge -> ui; by Stage 5" },
 ];
 
 /** Blank comments in place, preserving newlines, so line numbers stay true. */
