@@ -221,6 +221,12 @@ Billing is based on **actual attendance**, so make sure last month is complete:
     correct the mark (if the wrong child was ticked), invite the parent, or record the
     money as settled — then Generate again; existing invoices are skipped. **Absent**
     marks on an unclaimed child do not hold the month open.
+  - **The Billing months card** *(2026-09-22)*, at the top of the Invoices page, is where to
+    look first: every month that is not closed, with **why** as of its last run, and the
+    newest three closed months. An open month's **Unclaimed** / **Unmarked** buttons open
+    the same lists as above. Expand a month to see its last five runs — including one that
+    timed out in the browser but finished on the server. The Dashboard shows one amber line
+    while any month needs attention.
   - **A month with nothing recorded is never closed.** Running generation before
     any attendance is marked reports *"No lessons are recorded … the month is
     still open"* and seals nothing. (Until 2026-07-18 it sealed such a month and
@@ -231,7 +237,8 @@ Billing is based on **actual attendance**, so make sure last month is complete:
     `DELETE FROM billing_periods WHERE billing_month = '2026-07' AND tenant_id = '<the business>';`
     *(the key is now `(tenant_id, billing_month)` — sealing is per business, so scope the
     delete or you reopen the month for everyone)*
-    Then generate again. Note the existing invoices are **not** rewritten — the
+    Then generate again. (Until you do, the Billing months card shows it as *"Reopened after
+    sealing — generate again"*.) Note the existing invoices are **not** rewritten — the
     no-double-billing guard skips parents who already have one, so a lesson
     added after invoicing still needs a credit-note correction rather than a
     top-up.

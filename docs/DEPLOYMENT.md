@@ -935,3 +935,17 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     makes the narrowing and the `graded_by` re-attribution lossless. ~~**Dormant on prod:** still no child graded.~~
     **No longer dormant, same day** — exercised on prod 2026-08-29 (§8.94, the plan's §11): two children graded,
     four of five arms confirmed on real data. A copy fix (`ccb60be`) followed as an app-only push, no backend.
+
+47. **Deploy record (2026-09-22): Billing months + the run log — migration FIRST, engine, then apps LAST (§7.60
+    honoured).** (1) `20260922000100_billing_runs` → `main` (`acbe0fe`) → `supabase db push`; `migration list
+    --linked` **158/158, 0 pending**; remote grant dump: `GRANT SELECT … TO authenticated`, `GRANT SELECT,INSERT …
+    TO service_role`, nothing to anon (§7.255). (2) `supabase functions deploy generate-invoices` **v27 → v28**;
+    the downloaded bundle carries `runLog.ts` / `NON_ATTEMPT_STATUSES`. (3) **Prod smoke = the real August close**:
+    the owner settled the unclaimed child and generated twice; `billing_runs` held exactly the two rows (open →
+    sealed), and August sealed 22 Sep 23:58. It exposed §7.259 (a "0 invoices" label) — fixed before the app push.
+    (4) apps → `main` (`6c0a5ab`); the `/invoices` chunks carry `Closed on` and the RISK 6 copy, `/dashboard`'s
+    carry `billing-alert`. CI went red once on §7.260 (the midnight test) and was green on re-run.
+    **Reading prod without a dump:** `supabase db query --linked "<sql>"` runs read-only SQL against prod and
+    returns JSON (the last statement's rows only) — far cheaper than §8.107's offline data dump for a one-row
+    question. **Rollback cover:** `supabase/rollback/20260922000100_billing_runs_DOWN.sql`, rehearsed; roll back
+    apps + engine first (the engine's write is best-effort, the card's read is not).

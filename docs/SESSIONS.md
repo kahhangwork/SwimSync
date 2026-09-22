@@ -28,6 +28,7 @@ _The rows below are moved verbatim. Their length is the pre-2026-08-10 record, n
 standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.115** | 2026-09-22 | Coach attendance full track: 1,183 → 166 lines, the marking screen | docs/refactor/COACH_ATTENDANCE_REFACTOR_PLAN.md · §7.253–7.254 |
 | **8.114** | 2026-09-21 | Coach roster full track: 905 → 64 lines, the first app unit + the app fence | docs/refactor/COACH_ROSTER_REFACTOR_PLAN.md · §7.252 |
 | **8.113** | 2026-09-21 | Admin L-E + the fence commit: every admin route fenced, both ledgers empty | docs/refactor/BATCH_E_PLAN.md · §7.251 |
 | **8.112** | 2026-09-18 | Lesson detail full track: 912 → 93 lines, the last admin giant | docs/refactor/LESSON_DETAIL_REFACTOR_PLAN.md · §7.250 · BACKLOG verify-lesson-detail-guests |

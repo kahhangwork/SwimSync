@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-22 — **Coach Schedule tab SHIPPED, on `main` `7148f83` (§8.116): the LAST full-track giant** —
-1,255 → 101 lines, 0 hooks declared, both ledgers empty; 17/17 drivers = baseline; CI + both Vercel deploys green.
-**Nightly `35738235448` on `7148f83` is the gate for the app lite batches (§9).** August billing due before 1 Oct._
+_Last updated: 2026-09-23 — **Billing months card + generation run log SHIPPED, `main` `6c0a5ab` (§8.117); AUGUST
+2026 IS BILLED AND CLOSED** (sealed 22 Sep 23:58, 9 invoices, 1 settlement). Migration 158/158, engine v28, apps live.
+**Nightly `35753594101` on `6c0a5ab` is the gate for the next build (§9).**_
 
-_Previously, same day (§8.115) — Coach attendance, the MARKING screen: 1,183 → 166 lines; the second app unit._
+_Previously, same day (§8.116) — Coach Schedule tab: 1,255 → 101 lines, the LAST full-track giant._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +347,19 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.117 (2026-09-22) — Billing months card + generation run log; August 2026 closed on prod
+
+**The admin could not see which months were closed, nor WHY one stayed open** (BACKLOG, raised billing August).
+`/plan-with-confidence` (6 decisions) → `/plan-review` (Fable 5.1, 11 findings, 5 spot-checked, 1 partly wrong) →
+3 commits: `acbe0fe` migration, `1259ea3` engine + admin, `6c0a5ab` a label fix. Deployed in order via `/deploy`.
+
+- **Read `docs/plans/BILLING_MONTHS_PLAN.md` (D1–D7, the ⚠ RISK blocks, §11 stage log), PRD §7.7 + §9.24.**
+- **The prod smoke test WAS the real August close:** the owner settled the unclaimed child and generated; the log
+  held exactly the two runs (open → sealed). It also caught §7.259 one commit before the app push.
+- **The review's worst finding would have shipped silently:** the engine had no INSERT on the new table (§7.255).
+- **Graduated:** §7.255–§7.260; ARCHITECTURE §6y + §10; TESTING §5; DEPLOYMENT §11 #47 (incl. `supabase db query
+  --linked` for read-only prod SQL); INVOICE_RUNBOOK; BACKLOG +2 (run-day source, the midnight test), −1 (shipped).
+
 ## 8.116 (2026-09-22) — Coach Schedule full track: 1,255 → 101 lines, 0 hooks declared — the LAST giant
 
 **Six commits on `refactor/coach-schedule` (0b, 1–5), fast-forwarded to `main` (`7148f83`) via `/deploy` after
@@ -362,24 +375,7 @@ CI + both Vercel deploys green, the live bundle carries the screen. Zero behavio
   §2/§4/§5/§7 (import rebuild, ordered-JSX check, mutate each guard, click targeting; the full track is DONE) ·
   BACKLOG (a Schedule driver; the local-reds item now GREEN locally). **PRD untouched** — nothing user-visible changed.
 
-## 8.115 (2026-09-22) — Coach attendance full track: 1,183 → 166 lines, 0 useState — the coach's MARKING screen
-
-**Seven commits on `refactor/coach-attendance` (0b, 1–6), fast-forwarded to `main` (`6f1da89`) via `/deploy`; 0 migrations
-(157/157 on prod), 0 edge functions; CI `35701070831` + both Vercel deploys green. Zero behaviour change.** The gate nightly
-`35681798827` was 51/52 — `tenant-suspension`'s first-login sleep, 12/12 locally — and **the user accepted it**.
-`/plan-with-confidence` (3 questions) → `/plan-review` (Fable 5.1, 4 factual errors, all held) → stages → L4. 462 → 484 jest.
-
-- **Read `docs/refactor/COACH_ATTENDANCE_REFACTOR_PLAN.md` (§6 per-stage ⚠ blocks, §11a stage log), not this.**
-- **The save path is proven, not just moved:** 14/14 dao chains identical to the original incl. terminals, the 21-step
-  order by script, and a DB-verified hand-check (credit note +1 / ONE email request; re-save ZERO; first save ONE
-  session) 11/11 before AND after — proven able to fail. The full 11-driver net = baseline after Stages 3, 4 and 6.
-- **A live bug found and deliberately NOT fixed (rule 0):** a coach tapping an admin-cancelled lesson gets a permanent
-  spinner, no back button — BACKLOG, first item under *Coach workflow*.
-- **Stage 2's driver runs were void** (Expo under `CI=1` served a frozen bundle, §7.253); the later nets re-proved it.
-- **Graduated:** §7.253, §7.254 (a coach deep link lands on Schedule — the root of §7.252); BACKLOG ×3; ARCHITECTURE §6;
-  TESTING §5; playbook §3/§4/§7. **PRD untouched** — nothing user-visible changed.
-
-_(§8.114 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.115 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -397,12 +393,9 @@ Everything below is the monthly loop from here on:
    `SELECT status, count(*) FROM invoices GROUP BY 1;` is the honest scoreboard. The
    WhatsApp queue (Invoices → *WhatsApp reminders*, with the **Claimed** filter) is the
    chasing tool when a future month needs it.
-2. **August is HALF BILLED — finish it before October (§8.107).** 9 invoices went out on 14 Sep; the month
-   is held open by ONE unclaimed child marked present on 2 Aug (Invoices → *Unclaimed* modal names them).
-   Correct the mark / invite the parent / record a settlement, then **Generate August again** — existing
-   invoices are skipped. Do it **before 1 Oct**: the marking window floors at the 1st of last month (§8.15),
-   so an August mark is editable only through September. Then keep September marked as it happens
-   (the coach's **NEEDS MARKING** list is the tracker) and bill it in early October.
+2. **August 2026 is BILLED AND CLOSED** (2026-09-22, §8.117) — 9 invoices, the unclaimed child settled. Keep
+   September marked as it happens (the coach's **NEEDS MARKING** list is the tracker) and bill it in early
+   October. **Invoices → Billing months is now the scoreboard**: every open month, why, and its last runs.
    > Marking got two small helps on 2026-08-03 (§8.27): today's card now names **guests
    > apart from students**, so the head-count finally agrees with the number of marks the
    > lesson actually needs, and the **Classes tab lands on the class list** rather than
@@ -424,11 +417,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-22: `main` is `7148f83` (coach Schedule, §8.116). Nightly `35738235448` was dispatched on it
-and is the GATE for the next unit (§7.1)** — every coach driver lands on this screen, so a red anywhere in the
-coach set can bisect here; **read it, don't trust this line** (§8.65). The previous run, `35712884217` on the
-attendance code, was **52/52**. Locally, `smoke-app` 73/73 and `trial-onboarding` 10/10 were GREEN all session —
-BACKLOG's local-reds item may be closable.
+**State on 2026-09-23: `main` is `6c0a5ab` (Billing months, §8.117). Nightly `35753594101` was dispatched on it
+and is the GATE for the next unit (§7.1)** — `trial-onboarding` gained 5 card checks, so a red there bisects here;
+**read it, don't trust this line** (§8.65). The previous run, `35738235448` on `7148f83`, was **52/52**. Locally,
+`trial-onboarding` 15/15 — BACKLOG's local-reds item may be closable.
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
@@ -440,17 +432,19 @@ which mutate shared seed state — are in the same section.
 §8.116). What remains is the app's lite batches **L-F** (parent home) / **L-G** (parent money) / **L-H** (rest), then
 the fence track — playbook §7.1–§7.2; **re-measure and re-derive each batch's driver net before planning** (§7.236).
 
+- **Or the engine's run-day source** (BACKLOG, §8.117's RISK 9) — small, but it changes billing timing: its own
+  branch and Deno coverage, and it must land before cron is ever enabled.
 - **Or fix the cancelled-lesson spinner first** — a small, real, user-facing bug (BACKLOG *Coach workflow*), one line
   plus a test update, and a behaviour change, so its own branch and its own PRD check — not inside a refactor.
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current stage has (§7.253); reach a screen by TAP for anything visual (§7.254).
 
-**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35738235448` (on `7148f83`) is green —
+**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35753594101` (on `6c0a5ab`) is green —
 read it from the log, not the badge.**
 
-**No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), on prod,
-0 pending (157/157 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.113–§8.116 authored none — pure refactors.
+**No migration is HELD or in flight.** Latest applied is `20260922000100` (billing_runs, §8.117), on prod,
+0 pending (158/158 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
+the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116 none (pure refactors).
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

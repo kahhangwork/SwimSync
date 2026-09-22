@@ -525,7 +525,11 @@ font-size shrinks with viewport width) in both states and asserts the knob stays
 track, that a click round-trips through the DB, and that the billing month defaults to and is
 capped at the last completed month;
 `verify-trial-onboarding.mjs` (+ `fixtures-trial-onboarding.sql`) drives the case of a
-**billable lesson with nobody to bill** (10 checks): generation names the unclaimed child,
+**billable lesson with nobody to bill** (15 checks since 2026-09-22 — the five new ones: the engine
+WROTE a `billing_runs` row; after a **reload** the Billing months card shows the month *Open* with
+its reason and "as of last run"; the card's *Unclaimed* button reopens the modal; and after settling,
+the card **does not offer the child again** (RISK 6). It never re-generates after settling — that
+would seal the seed tenant's month (plan RISK 4). Red with the card removed): generation names the unclaimed child,
 explains it as a *missing parent account* rather than unmarked attendance, offers the settle
 actions inline, and **does not seal the month** — sealing would strand those lessons the
 moment the parent finally registered, the permanent-underbill shape of §7.8/§7.13/§7.32.
@@ -1339,3 +1343,16 @@ Then the four rules, all bought with real time:
 
 **One more, learned 2026-08-30:** `check-fixture-roundtrip.sh` run straight after a UI driver
 reports failures that are just the driver's own UI writes — reset before believing it.
+
+### Billing months + the run log (2026-09-22)
+
+- **pgTAP `billing_runs.test.sql`** (14) — service_role INSERT/SELECT granted, UPDATE/DELETE not (§7.255); the
+  audience (owner, co-admin, platform admin read; another business, coach, parent don't); deleting an admin who
+  ran billing succeeds with `ran_by` NULL (§7.256). Red with the grant revoked and with a plain FK.
+- **Deno `runLog.test.ts`** (11, in `test.sh`) — the pure row mapping, the five non-attempt statuses write zero
+  rows (§7.257), error rows truncated; integration: the row is READ BACK naming the child, a failed insert never
+  throws and leaves the invoice, the tenant delete cascades the log (§7.258). Red under each of RISK 1/3/5.
+- **vitest `lib/billingMonths.test.ts`** (27) — the month states, the D2 cap (an open month is never hidden, even
+  behind 20 closed), the D6 run-day flip, RISK 6/7/8, the fail-safe raw status. 8 deliberate mutations, each caught.
+- **No driver covers the Dashboard alert or "Show all"** — hand-checked (tenant admin sees the alert, platform
+  admin does not; 4 → 7 → 4 rows). Plan: `docs/plans/BILLING_MONTHS_PLAN.md` §11.

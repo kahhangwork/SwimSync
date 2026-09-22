@@ -657,6 +657,8 @@ the shape of the system changes:_
 | `SwimSyncAdmin/app/(admin)/wages/domain/payoutItems.ts` | The Coach Wages breakdown — the **money** axis, and it never mentions `classes.coach_id`. **The pair above disagree deliberately**: access follows the current coach, money follows history (`20260719000800`) |
 | `SwimSyncAdmin/lib/lessonAttribution.ts` | Who was **paid** for a lesson, for the Attendance audit page — the **money** axis (`class_rate_on().paid_coach_id`), mirroring `coach_attribution_kind()` (substitute → terms → shadow). Reads `classes.coach_id` nowhere (§7.152). `resolveShadows()` is the **one** home for the client shadow arm — `wages/page.tsx` calls it too, so there is no second copy |
 | `SwimSyncAdmin/lib/calendarLessons.ts` | The admin Calendar + Lessons pages' pure core: lessons = weekday pattern ∪ session rows (minus the SGT retirement cut-off), `enrolled+guests/capacity` via `expectedStudentsOn` (the billing gate's set, by construction), coach via `attributeLessons`, lane packing, view ranges. No clock, no client — `today`/`nowMinutes` are inputs |
+| `SwimSyncAdmin/lib/billingMonths.ts` | Billing months: month states, the D2 row cap, reasons, the RISK 6 filter. Pure; shared by the Invoices card and the Dashboard alert (§6y) |
+| `supabase/functions/generate-invoices/runLog.ts` | One `billing_runs` row per generation ATTEMPT; `NON_ATTEMPT_STATUSES` is the skip list (§7.257). Best-effort, never throws |
 | `SwimSyncAdmin/lib/calendarData.ts` | The READS for the calendar. **No write may ever be added here** — a phantom `lesson_sessions` row is a billable lesson; the only writer is the lesson page |
 | `SwimSyncAdmin/app/(admin)/lessons/[classId]/[date]/domain/adminAttendanceSave.ts` (+ `dao/lessonDetail.save.ts`) | *(was `lib/adminAttendanceSave.ts` + `lib/adminAttendanceSaveDeps.ts`; moved 2026-09-18, lesson-detail Stage 6 — sole importer)* The admin's attendance save = the coach app's path, step for step, with every step's error surfaced and only CHANGED rows sent. Never writes `session_coach_absences`. Its helpers (`attendancePayload`, `attendanceSaveError`, `creditNoteEmail`, `attendanceWindow`, `markableFloor`) are byte-identical copies of the coach app's, enforced by `attendanceSave.drift.test.ts` |
 | `SwimSyncAdmin/app/(admin)/lessons/[classId]/[date]/domain/lessonMarking.ts` | *(was `lib/lessonMarking.ts`; moved 2026-09-18, lesson-detail Stage 1 — sole importer)* Which statuses a roster row may take (trial statuses for trial guests only), the client markability affordance, the holiday-confirm count |
@@ -813,6 +815,17 @@ first — it was intentionally removed as unbuilt, not lost.
 were also empty stubs — they are now **wired to a real screen**
 (`components/ChangePasswordScreen.tsx`, routes `…/settings/change-password.tsx` and
 `…/profile/change-password.tsx`). Kept & working: parent **Add Child Profile**.
+
+### 6y. Billing months: the reason a month is open is a SNAPSHOT of the last run, never recomputed (2026-09-22)
+
+`billing_runs` stores what each generation ATTEMPT reported; `lib/billingMonths.ts` derives each month's state
+from it plus `billing_periods` and the invoice months. **Do not "improve" this into a live recompute of why a month
+is open** — that would be a second copy of the engine's billing rules in SQL or TypeScript, and the two would
+drift (the §7.18 shape). The card labels the reason "as of last run" instead. The one live read it does make is
+RISK 6's: before the Unclaimed modal opens from a stored run, children claimed or settled since are filtered out,
+because a stale list there can record the same money twice. **Only attempts are logged** (§7.257), the log write is
+best-effort and happens BEFORE any email (so a timed-out request still leaves the truth), and the module is shared
+by the Invoices card and the Dashboard alert so the two cannot disagree. Plan: `docs/plans/BILLING_MONTHS_PLAN.md`.
 
 ### 6z. A SUBSTITUTE IS PER-LESSON; A SHADOW IS PER-CLASS — and they take OPPOSITE date sources
 

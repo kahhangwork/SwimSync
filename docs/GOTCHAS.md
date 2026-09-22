@@ -3929,3 +3929,44 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     Stage 6 when a Tailwind probe found no menu. **For anything visual, reach the screen by an in-app tap**
     (Schedule → NEEDS MARKING → the lesson). The same replace is a product behaviour — a refresh or a shared
     link bounces a coach to Schedule — filed in `BACKLOG.md`. (Coach attendance, 2026-09-22.)
+
+255. **A new table the ENGINE writes needs an explicit `GRANT … TO service_role` — its default privileges on new
+    tables were revoked in `20260814000300`, and `table_grants.test.sql` deliberately does not cover service_role.**
+    Combined with a best-effort write (a log that must never fail billing, so it never throws), a missing grant is
+    a **silent no-op in every environment** — the feature ships and records nothing. The billing-months plan's first
+    draft said "confirm default privileges cover it"; `/plan-review` caught it. **Grant it in the migration, pin it
+    in pgTAP (`has_table_privilege('service_role', …, 'INSERT')`), and make the Deno test read the row BACK** — a
+    returned result proves nothing. Then check the remote grant dump. (Billing months, 2026-09-22 —
+    `billing_runs.test.sql`, `runLog.test.ts`.)
+
+256. **Any FK onto `profiles(id)` must be `ON DELETE SET NULL` (or `CASCADE`) — a plain FK makes that admin
+    undeletable.** `delete-admin` deletes the auth user and relies on `auth.users → profiles` cascading; a RESTRICT
+    reference from any row that admin ever created fails the cascade. The route's header warned about it; the
+    schema does not enforce it. `billing_runs.ran_by` is SET NULL, pinned by a pgTAP delete. (Billing months,
+    2026-09-22.)
+
+257. **The billing engine's early returns are REFUSALS TO ATTEMPT, not attempts** — `before_run_day`,
+    `auto_disabled`, `tenant_suspended`, `month_not_ended`, `already_complete`. Any run log, metric or "last run"
+    display must skip them: once cron is on, every daily tick returns one per tenant, and a log that keeps them
+    marks every month "open" from the 1st and buries the real runs. The skip list is ONE exported constant,
+    `NON_ATTEMPT_STATUSES` in `generate-invoices/runLog.ts` — a new early-return status joins it there. (Billing
+    months, 2026-09-22.)
+
+258. **A table with an FK onto `tenants` breaks the Deno suite's teardown unless the FK cascades.** `teardown()`
+    deletes its scenario tenant as **service_role**; a leftover child row fails that delete, the tenant LEAKS, and
+    the second `test.sh` pass runs on leaked state (§7.15). Seen for real: running the RISK 5 mutation (plain FK)
+    left two `test-…` tenants behind. An append-only table can't be cleaned by an explicit delete either (no DELETE
+    grant, by design) — so **`ON DELETE CASCADE` is the structural answer**, as `billing_runs.tenant_id` does.
+    (Billing months, 2026-09-22.)
+
+259. **`billing_periods.invoices_issued` counts only the invoices the SEALING run created — not the month's
+    total.** August 2026 sealed on prod with `invoices_issued = 0` while 9 invoices existed from the 14 Sep run
+    that left it open. Never display it as "N invoices for the month"; count `invoices` instead. The Billing months
+    card shows the close date only for this reason. Found on the prod smoke test, one commit before the app push.
+    (Billing months, 2026-09-22.)
+
+260. **`advance_cancel_lesson.test.sql` #21 fails when CI starts between 00:00 and 00:01 SGT.** Its fixture class
+    runs 00:00–00:01 so that "today's lesson" always counts as ENDED — except during that first minute of the SGT
+    day, when it has not ended yet (`have: 0, want: 1`). A push at 23:59 SGT (CI `35751015146`, pgTAP at
+    00:00:53) went red on an unrelated change. **Re-run the failed job after 00:01** — it passed. Fixing the
+    fixture is in BACKLOG. (Billing months deploy, 2026-09-22.)
