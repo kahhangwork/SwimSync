@@ -24,7 +24,7 @@ import {
   isShowingDate,
   type ResolvedSession,
 } from "@/lib/attendanceSession";
-import { toSgDate, todayInSg, type DayOfWeek } from "@/lib/lessonDates";
+import { todayInSg, type DayOfWeek } from "@/lib/lessonDates";
 import {
   lessonRole,
   canMark,
@@ -39,7 +39,15 @@ import {
 import PrimaryButton from "@/components/PrimaryButton";
 import type { AttState, DBStatus, StudentRow, TopStatus } from "@/features/mark-attendance/types";
 import { TOP_STATUSES } from "@/features/mark-attendance/constants";
-import { formatDate, fromDBStatus, toDBStatus } from "@/features/mark-attendance/domain/attendanceStatus";
+import { formatDate, toDBStatus } from "@/features/mark-attendance/domain/attendanceStatus";
+import {
+  cancelledBlock,
+  enrolledOn,
+  guestRows,
+  initialAttendance,
+  loadedStatusesOf,
+  shadowRows,
+} from "@/features/mark-attendance/domain/attendanceRows";
 import { exitHrefOf } from "@/features/mark-attendance/domain/exitHref";
 
 export default function MarkAttendanceScreen() {
@@ -180,26 +188,8 @@ export default function MarkAttendanceScreen() {
 
     setClassTitle(cls.title);
 
-    // ── THE ROSTER FOR A DATE IS THE ROSTER AS IT WAS ON THAT DATE ──────────
-    // This used to filter on `is_active` alone, with no reference to `date` at
-    // all — so opening any past lesson showed TODAY'S roster. A child who
-    // joined last month appeared on a lesson from before they existed here,
-    // and because the save refuses until every student on screen has a status,
-    // the coach was FORCED to record attendance for a child who was not there.
-    //
-    // Both ends inclusive, matching EnrolmentSpan: a trial walk-in's enrolment
-    // opens and closes on its own date, and an exclusive end would drop them
-    // from the very screen that is marking them.
-    const enrolledOnDate: StudentRow[] = (cls.student_class_enrolments ?? [])
-      .filter((e: any) => {
-        const from = toSgDate(e.enrolled_at);
-        const until = e.unenrolled_at ? toSgDate(e.unenrolled_at) : null;
-        return from <= date && (until === null || date <= until);
-      })
-      .map((e: any) => ({
-        id: e.students.id,
-        full_name: e.students.full_name,
-      }));
+    // The roster AS IT WAS ON THIS DATE, both ends inclusive — see enrolledOn.
+    const enrolledOnDate: StudentRow[] = enrolledOn(cls.student_class_enrolments, date);
 
     // The business's marking floor, STARTED here so it overlaps the session
     // lookup below rather than delaying the screen by a round trip. Awaited at
@@ -226,13 +216,8 @@ export default function MarkAttendanceScreen() {
     // write whatever this screen shows, so a stale screen cannot mark it.
     if (existingSession?.cancelled_at) {
       const reason = (existingSession as any).cancellation_reason as string | null;
-      setBlocked({
-        ok: false,
-        title: "This lesson was cancelled",
-        detail: `Your business's admin cancelled ${classTitle || "this lesson"} on ${formatDate(date)}${
-          reason ? ` — ${reason}` : ""
-        }. Nothing is marked for a cancelled lesson; if it is going ahead after all, ask them to restore it.`,
-      });
+      // ⚠ `classTitle` is the STATE from this closure, not cls.title — see cancelledBlock.
+      setBlocked(cancelledBlock(classTitle, date, reason));
       setLoading(false);
       return;
     }
@@ -318,13 +303,7 @@ export default function MarkAttendanceScreen() {
 
       if (token !== loadToken.current) return;
 
-      setShadowsHere(
-        (shadowRoster ?? []).map((r: any) => ({
-          coach_id: r.coach_id,
-          name: r.full_name ?? "Unknown coach",
-          present: !r.absent,
-        }))
-      );
+      setShadowsHere(shadowRows(shadowRoster));
     } else {
       setShadowsHere([]);
     }
@@ -387,52 +366,18 @@ export default function MarkAttendanceScreen() {
 
     const roster = mergeRoster(
       enrolledOnDate,
-      (attData ?? [])
-        .map((a: any) => a.students)
-        .filter(Boolean)
-        .map((s: any) => ({ id: s.id, full_name: s.full_name })),
-      (booked ?? [])
-        .map((b: any) => b.students)
-        .filter(Boolean)
-        .map((s: any) => ({ id: s.id, full_name: s.full_name })),
-      (makeupBooked ?? [])
-        .map((b: any) => b.students)
-        .filter(Boolean)
-        .map((s: any) => ({ id: s.id, full_name: s.full_name }))
+      guestRows(attData),
+      guestRows(booked),
+      guestRows(makeupBooked)
     );
 
     setStudents(roster);
 
-    // Pre-fill attendance from existing records (or default to present)
-    const initAtt: Record<string, AttState> = {};
-    if (sid) {
-      for (const student of roster) {
-        const existing = (attData ?? []).find(
-          (a: any) => a.student_id === student.id
-        );
-        if (existing) {
-          const parsed = fromDBStatus(existing.status as DBStatus);
-          initAtt[student.id] = {
-            top: parsed.top,
-            sub: parsed.sub,
-          };
-        } else {
-          initAtt[student.id] = { top: "unmarked", sub: null };
-        }
-      }
-    } else {
-      for (const student of roster) {
-        initAtt[student.id] = { top: "unmarked", sub: null };
-      }
-    }
+    const initAtt = initialAttendance(roster, attData, sid);
 
     setAttendance(initAtt);
-    // The statuses AS LOADED, for the credit-note-email check in handleSave. A note
-    // can only be issued when a lesson LEAVES a billable status, so this is what lets
-    // the common save skip the edge-function round trip entirely.
-    loadedStatuses.current = Object.fromEntries(
-      Object.entries(initAtt).map(([id, st]) => [id, toDBStatus(st.top, st.sub)])
-    );
+    // The statuses AS LOADED, for the credit-note-email check — see loadedStatusesOf.
+    loadedStatuses.current = loadedStatusesOf(initAtt);
     setLoading(false);
   }
 

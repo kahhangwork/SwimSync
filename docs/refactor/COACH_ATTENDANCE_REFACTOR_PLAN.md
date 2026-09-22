@@ -361,7 +361,14 @@ store shape, no `lib/` module.
 | Stage | Commit | Ledger (3 / 4) | jest | Drivers / checks |
 |---|---|---|---|---|
 | 0b | `79a4d85` | 20 sites, 19 pins / 14 | 462 → 462 | Empty-ledger red list = **20 + 14 exactly** (the corrected prediction). Proven red: checks 1–4 (helper leg via `sessionMainCoach`, `fetch(`), jest reaching `features/mark-attendance`, BOTH sgDisplay twins, a corrupted pin (shrink + check 3), a typo'd `PAGES` path and a length mismatch (scan test, no TypeError). Infra lines verified present, not re-added |
-| 1 | (this commit) | 20 / 14 | → 471 | — (types + pure helpers). 4 bodies VERBATIM by script (types, constants, attendanceStatus, exitHref's comment). `.gitkeep` deleted. Route 1,183 → 1,083. Before any driver: nightly `35681798827` = 51/52, the red `tenant-suspension` 10/12 (first Expo login's fixed 6 s sleep, :72) → **12/12 locally** |
+| 1 | `a86e1b7` | 20 / 14 | → 471 | — (types + pure helpers). 4 bodies VERBATIM by script (types, constants, attendanceStatus, exitHref's comment). `.gitkeep` deleted. Route 1,183 → 1,083. Before any driver: nightly `35681798827` = 51/52, the red `tenant-suspension` 10/12 (first Expo login's fixed 6 s sleep, :72) → **12/12 locally** |
+| 2 | (this commit) | 20 / 14 | → 480 | attendance-guard 22/22, trials 16/16, makeups 15/15, trial-onboarding 5/8 (= baseline). Every logic line of `attendanceRows.ts` exists in the pre-cut route (script; only signatures/returns/renames differ). Names final: `enrolledOn` (not `enrolledOnDate` — the route's local keeps that name) |
+
+**Baseline net (Stage 1 code, 2026-09-22):** attendance-guard 22/22 · stale-screen 22/22 · coach-roster 30/30 ·
+bulk-setall 10/10 · admin-lesson-detail 27/27 · trials 16/16 · makeups 15/15 · trial-onboarding **5/8** ·
+schedule-week 21/21 · tz-saturday 6/6 · smoke-app **70/73**. The two reds are BACKLOG's *"Four UI drivers fail on a
+LOCAL full sweep"* (`BACKLOG.md:1827`) — same scores, same messages (the admin's unclaimed-child generation report;
+`/invoice` + `/package` render). Neither is this screen.
 
 **Deviation (0b):** the scan test asserts every `SCOPE_DIRS` folder EXISTS (roster Stage 1 added that), so
 `features/mark-attendance/.gitkeep` holds the folder open. **Stage 1 deletes it** in the same commit that adds
