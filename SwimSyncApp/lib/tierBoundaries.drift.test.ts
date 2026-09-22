@@ -117,8 +117,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: F_ATT, contains: "@/store/useAppStore", why: "Stage 5 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
-  { file: F_ATT, contains: "@/lib/confirm", why: "Stage 5 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
   { file: F_ATT, contains: "@/lib/attendanceBulk", why: "Stage 5 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
   { file: F_ATT, contains: "@/lib/attendanceSession", why: "Stage 6 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
   { file: F_ATT, contains: "@/lib/coachRoster", why: "Stage 6 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },

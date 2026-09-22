@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -10,9 +10,7 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useAppStore } from "@/store/useAppStore";
-import { confirmAction } from "@/lib/confirm";
-import { applyBulkStatus, SET_ALL_OPTIONS, BulkOption } from "@/lib/attendanceBulk";
+import { SET_ALL_OPTIONS } from "@/lib/attendanceBulk";
 import {
   isShowingDate,
 } from "@/lib/attendanceSession";
@@ -21,11 +19,11 @@ import {
   roleNotice,
 } from "@/lib/coachRoster";
 import PrimaryButton from "@/components/PrimaryButton";
-import type { TopStatus } from "@/features/mark-attendance/types";
 import { TOP_STATUSES } from "@/features/mark-attendance/constants";
 import { formatDate } from "@/features/mark-attendance/domain/attendanceStatus";
 import { useAttendanceLoad } from "@/features/mark-attendance/domain/useAttendanceLoad";
 import { useSaveAttendance } from "@/features/mark-attendance/domain/useSaveAttendance";
+import { useMarking } from "@/features/mark-attendance/domain/useMarking";
 import { exitHrefOf } from "@/features/mark-attendance/domain/exitHref";
 
 export default function MarkAttendanceScreen() {
@@ -58,9 +56,6 @@ export default function MarkAttendanceScreen() {
     router.replace(exitHref as any);
   }
 
-  const showToast = useAppStore((s) => s.showToast);
-
-  const [menuOpen, setMenuOpen] = useState(false);
   const {
     classTitle,
     students,
@@ -87,6 +82,11 @@ export default function MarkAttendanceScreen() {
     loadedStatuses,
     leaveScreen,
   });
+  const { menuOpen, setMenuOpen, setTop, setSub, onSetAll } = useMarking(
+    students,
+    attendance,
+    setAttendance
+  );
 
   // ⚠ THESE DEPS ARE LOAD-BEARING — this was `[]`, and it wrote attendance to
   // the wrong day (§7.64). One route serves every lesson, distinguished only
@@ -97,49 +97,6 @@ export default function MarkAttendanceScreen() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, date]);
-
-  function setTop(studentId: string, top: TopStatus) {
-    setAttendance((prev) => ({
-      ...prev,
-      [studentId]: { ...prev[studentId], top, sub: null },
-    }));
-  }
-
-  function setSub(studentId: string, sub: string) {
-    setAttendance((prev) => ({
-      ...prev,
-      [studentId]: { ...prev[studentId], sub },
-    }));
-  }
-
-  function onSetAll(opt: BulkOption) {
-    setMenuOpen(false);
-    const apply = () => {
-      setAttendance((prev) =>
-        applyBulkStatus(
-          // Never re-mark a holiday row — the guard refuses a coach clearing one,
-          // and a single refused row fails the whole batch save (§7.67).
-          students.filter((s) => prev[s.id]?.top !== "holiday").map((s) => s.id),
-          prev,
-          { top: opt.top, sub: opt.sub }
-        )
-      );
-      showToast(`All ${students.length} set to ${opt.label}.`, "info");
-    };
-    const anyMarked = students.some(
-      (s) => (attendance[s.id]?.top ?? "unmarked") !== "unmarked"
-    );
-    if (anyMarked) {
-      confirmAction(
-        `Set all to ${opt.label}?`,
-        `This will change all ${students.length} students to ${opt.label}.`,
-        apply,
-        "Set all"
-      );
-    } else {
-      apply();
-    }
-  }
 
   // The spinner also covers the gap between a param change and the reload
   // landing. The effect runs after paint, so without `isShowingDate` there is
