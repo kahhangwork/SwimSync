@@ -140,7 +140,8 @@ DB-free work meanwhile.
 
 ```bash
 npm run dev -- -p 3100                       # admin
-CI=1 npx expo start --web --port 8082        # app — CI=1 stops it waiting on a keypress in a background shell
+npx expo start --web --port 8082 < /dev/null   # app — </dev/null stops the keypress wait. NOT CI=1: that also turns
+                                               # Metro's file watcher OFF, so every driver run tests a frozen bundle (§7.253)
 supabase functions serve --env-file supabase/functions/.env --no-verify-jwt   # only ONE of these can run per stack
 ```
 

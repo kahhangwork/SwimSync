@@ -3905,3 +3905,27 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     (`components/Toast.tsx`) — a `waitForTimeout(3500)` before reading the page misses it every time; `waitFor`
     the toast text immediately after the action. (Coach roster, 2026-09-21; the corrected script is
     `docs/refactor/coach-roster-handchecks.mjs`.)
+
+253. **`CI=1 npx expo start` serves a FROZEN bundle — Metro does not watch files in CI mode — so every local
+    driver run after an edit tests the code as it was at startup, and passes.** Started that way for a
+    non-interactive shell during the coach attendance refactor (§8.115); Stage 2's four driver runs all hit the
+    original code and matched baseline, which proved nothing. Found only because a Stage 3 temp `console.log`
+    never printed: the served entry bundle lacked `exitHrefOf`, a Stage 1 symbol. **Start Expo for local driver
+    work WITHOUT `CI=1`** — `npx expo start --web --port 8081 < /dev/null` is non-interactive and still watches.
+    **And prove the bundle is current before trusting a run:** `curl` the entry bundle
+    (`/node_modules/expo-router/entry.bundle?platform=web&dev=true&…`) and grep for a string only the new code
+    has — a throwaway edit that appears and disappears within seconds proves the watcher. §7.31's
+    served-bundle rule, met on localhost. **The source was `/worktree-start`'s own instructions**, which said
+    `CI=1 npx expo start` "to stop the keypress wait" — corrected the same day to `< /dev/null`. (Coach
+    attendance, 2026-09-22.)
+
+254. **A coach's full-page load of ANY coach URL ends on Schedule, with the requested screen mounted HIDDEN
+    beneath it — the root of §7.252.** `app/_layout.tsx`'s `routeForSession` runs `router.replace(landingFor(…))`
+    after `getSession()` on every web load, and `landingFor` returns `/(coach)/schedule` for anyone with a
+    `coaches` row. The requested route still mounts in the Classes stack, so `gotoAuthed(…/attendance?…)`
+    "works" for DOM clicks — the element exists and `el.click()` reaches it — while `page.url()` reads
+    `/schedule`, `innerText` of the hidden screen is **empty** (use `textContent`), and anything VISUAL
+    (computed layout, a screenshot, a coordinate click) is about the Schedule screen on top. Met at attendance
+    Stage 6 when a Tailwind probe found no menu. **For anything visual, reach the screen by an in-app tap**
+    (Schedule → NEEDS MARKING → the lesson). The same replace is a product behaviour — a refresh or a shared
+    link bounces a coach to Schedule — filed in `BACKLOG.md`. (Coach attendance, 2026-09-22.)

@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-22 — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -610,6 +610,38 @@ workspaces arrive for another reason.
 ---
 
 ## Coach workflow
+
+### A coach opening an admin-CANCELLED lesson gets a permanent spinner — **S** `[found planning the attendance refactor 2026-09-22]`
+Tap a lesson the admin cancelled in advance and the marking screen spins forever: no roster, no notice, no back
+button (the Classes stack header is hidden), so the tab bar is the only way out. Reachable by three ordinary
+taps — Schedule's DONE section (`tappable`), today's card (`openAttendance`, no cancelled gate), and the roster's
+Past Sessions. Confirmed on the pre-refactor code by the Schedule DONE tap (screenshot, 2026-09-22).
+
+**Why:** the "This lesson was cancelled" screen — written for exactly this case in §8.81 — has never rendered.
+A coach who taps a struck-through card sees what looks like a hang. Billing is safe (the DB trigger refuses the
+write and there is nothing to mark), so this is a dead end, not a money bug.
+
+**Notes:** the cause is one missing line: `load()`'s cancelled branch (now `features/mark-attendance/domain/
+useAttendanceLoad.ts`) sets `blocked` but never `resolved`, so `isShowingDate(null, date)` holds the spinner; the
+`!cls` branch sets `resolved` for exactly this reason. The fix is `setResolved({ date, sessionId: sid })` before
+the return. **Fixing it exposes a second bug:** the notice reads the `classTitle` STATE from the closure
+(`cancelledBlock(classTitle, …)`), the previous render's value — a cold open says "cancelled this lesson", and a
+class change in place names the OLD class. Pass `cls.title`. Pinned as-is by `attendanceRows.test.ts` case 8 —
+update that test in the same commit. Both were preserved deliberately by the refactor (rule 0). Ship with a
+driver step: cancel via the admin, tap the DONE card, assert the notice and *Back to class*.
+
+### A refresh or shared link bounces a coach to Schedule — **S** `[found by the attendance refactor 2026-09-22]`
+Every full-page load of a coach URL ends on Schedule: `app/_layout.tsx`'s `routeForSession` calls
+`router.replace(landingFor(…))` after `getSession()` regardless of where the coach already is (§7.254). The
+requested screen still mounts, hidden underneath.
+
+**Why:** on the web app (the only app today), a coach who refreshes mid-marking, or opens a bookmarked roster,
+loses their place and lands on Schedule, with nothing on screen saying why.
+
+**Notes:** the redirect exists for login and the bare `/` — keep it there. The likely fix is to replace only when
+the current path is outside the role's own group (a coach already under `/(coach)/…` stays put). Check the
+parent side the same way (`/(parent)/home`). §7.254 is the test-harness half: drivers that deep-link rely on
+DOM clicks reaching the hidden screen, so read them after the fix — some may start seeing the real screen.
 
 ### ~~Makeup lessons~~ — SHIPPED 2026-08-02 as the guest-pass model (PRD §7.20)
 The two invariants it was expected to break held un-broken: a make-up is a **booking**
@@ -1824,6 +1856,20 @@ blocking the month's invoicing. A regression would either fail silently (the con
 changes) and the DB read (this class closed, the other class untouched, `students.is_active` still true).
 Reach the roster by TAB taps, or click by DOM, and `waitFor` the 3000 ms toast — §7.252 is both traps.
 
+### A driver for the coach marking screen's credit-note email and read-only title — **S** `[from the coach attendance refactor 2026-09-22]`
+Two things on `(coach)/classes/[id]/attendance` no driver asserts: **the credit-note email path** — flipping an
+INVOICED lesson Present → Absent must issue one credit note and exactly ONE `credit-note-emails` request, and a
+no-change re-save must issue none (the `mayHaveIssuedCreditNote` guard) — and **the read-only title** *Lesson
+Attendance* a class shadow sees (`verify-coach-roster` checks the notice and `· shadowing`, not the title).
+
+**Why:** the email is how a parent learns they were credited; the guard is what keeps every normal save off an
+edge-function cold start. A regression in either is invisible — the save still says "Attendance saved."
+
+**Notes:** `docs/refactor/coach-attendance-handchecks.mjs` + `.sql` is the skeleton (11 checks incl. a first save
+creating exactly one session row), proven able to fail. It deep-links, so every press is a DOM click on the
+hidden screen (§7.254) — fine for DB assertions; for the title, one `check()` inside `verify-coach-roster`'s
+shadow leg is cheaper than a new driver.
+
 ### Four UI drivers fail on a LOCAL full sweep but pass in CI — **S** `[found by Admin L-E's L4 2026-09-21]`
 `run-all-drivers.sh` run locally on 2026-09-21 returned 48/52. The four reds — `payment-collection` (times out
 waiting for the parent app's *I've paid*), `referrals` (1/13: the `/package` pay-page headline), `smoke-app`
@@ -1841,7 +1887,7 @@ cross-tenant queries during the hand-checks. Start with a clean `supabase db res
 compare against the CI job's env (`SERVICE_ROLE_KEY`, `RESEND_API_KEY` UNSET — `verify-tenant-provisioning`
 requires the latter). **Evidence against the leftover-rows theory (2026-09-21, coach roster):** `smoke-app` ran
 four times through `run-all-drivers.sh --only`, which resets the DB before each driver, and failed 70/73 on the
-same three checks every time — so a clean reset alone does not fix it; look at env/config next. The triage method that settled it is `docs/TESTING.md` §5's fourth rule: re-run the driver
+same three checks every time — so a clean reset alone does not fix it; look at env/config next. **Still identical on 2026-09-22** (coach attendance: `smoke-app` 70/73 and `trial-onboarding` 5/8 at every one of five stage runs, same messages). The triage method that settled it is `docs/TESTING.md` §5's fourth rule: re-run the driver
 at the suspect's parent before blaming the branch.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)

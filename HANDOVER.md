@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-21 — **Coach roster SHIPPED, on `main` `b654967` (§8.114): the FIRST APP unit** — 905 → 64
-lines, 0 useState, both ledgers empty; the app's fence twin + `features/` infra exist. CI + both Vercel deploys green.
-**Next nightly on `b654967` is the gate for the `attendance` giant (§9).** August billing due before 1 Oct._
+_Last updated: 2026-09-22 — **Coach attendance (the MARKING screen) SHIPPED, on `main` `6f1da89` (§8.115): the second APP
+unit** — 1,183 → 166 lines, 0 useState, both ledgers empty; CI + both Vercel deploys green. **Nightly `35712884217` on
+`6f1da89` is the gate for `schedule/index`, the LAST giant (§9).** August billing due before 1 Oct._
 
-_Previously, 2026-09-21 (§8.113) — Admin L-E + the fence commit: every admin route file fenced; nightly `35587264596` green 52/52._
+_Previously, 2026-09-21 (§8.114) — Coach roster, the first APP unit: 905 → 64 lines; the app's fence + `features/` infra._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.252** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.254** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -347,6 +347,23 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.115 (2026-09-22) — Coach attendance full track: 1,183 → 166 lines, 0 useState — the coach's MARKING screen
+
+**Seven commits on `refactor/coach-attendance` (0b, 1–6), fast-forwarded to `main` (`6f1da89`) via `/deploy`; 0 migrations
+(157/157 on prod), 0 edge functions; CI `35701070831` + both Vercel deploys green. Zero behaviour change.** The gate nightly
+`35681798827` was 51/52 — `tenant-suspension`'s first-login sleep, 12/12 locally — and **the user accepted it**.
+`/plan-with-confidence` (3 questions) → `/plan-review` (Fable 5.1, 4 factual errors, all held) → stages → L4. 462 → 484 jest.
+
+- **Read `docs/refactor/COACH_ATTENDANCE_REFACTOR_PLAN.md` (§6 per-stage ⚠ blocks, §11a stage log), not this.**
+- **The save path is proven, not just moved:** 14/14 dao chains identical to the original incl. terminals, the 21-step
+  order by script, and a DB-verified hand-check (credit note +1 / ONE email request; re-save ZERO; first save ONE
+  session) 11/11 before AND after — proven able to fail. The full 11-driver net = baseline after Stages 3, 4 and 6.
+- **A live bug found and deliberately NOT fixed (rule 0):** a coach tapping an admin-cancelled lesson gets a permanent
+  spinner, no back button — BACKLOG, first item under *Coach workflow*.
+- **Stage 2's driver runs were void** (Expo under `CI=1` served a frozen bundle, §7.253); the later nets re-proved it.
+- **Graduated:** §7.253, §7.254 (a coach deep link lands on Schedule — the root of §7.252); BACKLOG ×3; ARCHITECTURE §6;
+  TESTING §5; playbook §3/§4/§7. **PRD untouched** — nothing user-visible changed.
+
 ## 8.114 (2026-09-21) — Coach roster full track: 905 → 64 lines, 0 useState — the first APP unit, and the app's fence
 
 **Seven commits on `refactor/coach-roster` (0b, 1–5), fast-forwarded to `main` (`b654967`) via `/deploy` only AFTER
@@ -366,29 +383,7 @@ CI `35597311039` + both Vercel deploys green. Zero behaviour change.** `/plan-wi
   clean reset).
 - **PRD untouched** — nothing user-visible changed.
 
-## 8.113 (2026-09-21) — Admin L-E + the admin FENCE commit: 7 route units, 1,790 → 733 lines — the admin fence is CLOSED
-
-**Six commits on `refactor/admin-le`, fast-forwarded to `main` (`ed6c6e5`) after the previous unit's nightly
-(`35328388854`) went green; 0 migrations, 0 edge functions, so `/deploy` had no backend gate. CI green; live pages
-verified 200. Zero behaviour change.** `/plan-with-confidence` (2 questions) → `/plan-review` (Fable 5.1) → L0 →
-3 lite pages → the fence commit → L4. 819 → 828 vitest, jest 429 unchanged.
-
-- **Read `docs/refactor/BATCH_E_PLAN.md` (§1 measured scope, the inline ⚠ RISK blocks, §6 stage log), not this.**
-- **BOTH LEDGERS ARE EMPTY and every admin route file is in `SCOPE_DIRS`** — the admin half of playbook §7.5 is
-  closed. The four auth pages are the first scoped routes OUTSIDE `app/(admin)`, so L0's prove-red included a
-  breaker inside `app/login/`.
-- **`/plan-review` found 8 factual errors; 7 held and 1 was wrong** — it claimed `verify-tenant-provisioning`
-  never touches `accept-invite`, when that driver is the only full coverage of its valid path. Checked by hand
-  before folding in, which is the only reason the claim was caught.
-- **Graduated:** §7.251 (a hand-check's own fixture lied twice); TESTING §5 (the L-E scope, the 9 new
-  characterisation tests, what the hand-checks cover); ARCHITECTURE §6 (the fence track's shapes — router at the
-  page, no module-scope `window`, return the subscription handle); BACKLOG ×2 (a `reset-password` driver; the
-  four local-only driver reds).
-- **Not fixed, deliberately:** the 4 sweep reds. They fail identically on `main` and the nightly was green there —
-  BACKLOG, not this batch (rule 0).
-- **PRD untouched** — nothing user-visible changed.
-
-_(§8.112 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.113 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -433,38 +428,35 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-21: `main` is `b654967` (the coach roster, §8.114). NO nightly has run on it yet** — the last,
-`35587264596` on `ed6c6e5` (Admin L-E), was green 52/52. **The first nightly on `b654967` is the GATE for the next
-unit (§7.1)**; a red there bisects to the roster commits — most likely `trials` / `student-identity` /
-`level-skills` / `attendance-guard` — **but read it, don't trust this line** (§8.65). **A LOCAL `smoke-app` returns
-70/73 on `main` itself** (the `/invoice` + `/package` checks) — a BACKLOG item, not a signal about your branch.
+**State on 2026-09-22: `main` is `6f1da89` (coach attendance, §8.115). Nightly `35712884217` was dispatched on it
+and is the GATE for the next unit (§7.1)** — a red there bisects to the attendance commits, most likely
+`attendance-guard` / `stale-screen` / `coach-roster` / `bulk-setall`, **but read it, don't trust this line** (§8.65).
+The previous run, `35681798827` on the roster code, was 51/52 (`tenant-suspension`'s first-login sleep, accepted by
+the user). **A LOCAL `smoke-app` 70/73 and `trial-onboarding` 5/8 are the known local-only reds** (BACKLOG).
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
 which mutate shared seed state — are in the same section.
 
-### THE NEXT BUILD — the coach app's second giant, `attendance`
+### THE NEXT BUILD — the LAST giant, `(coach)/schedule/index` (1,255)
 
-**The admin half of playbook §7.5 is closed (§8.113); the app half began with the roster (§8.114).** The app's
-fence, `features/` jest/sgDisplay/Tailwind infra, and its import rules now exist — **copy the roster, don't
-re-derive it: `docs/refactor/COACH_ROSTER_REFACTOR_PLAN.md` is the app worked example.**
+**Two app units done (roster §8.114, attendance §8.115).** Copy the attendance plan, don't re-derive it:
+**`docs/refactor/COACH_ATTENDANCE_REFACTOR_PLAN.md` is the freshest app worked example** (a save path, a
+`[id, date]` effect, hand-check scripts in `docs/refactor/`).
 
-- **Next: `(coach)/classes/[id]/attendance.tsx` (1,183)** — the coach's MARKING screen, so the save path is the
-  billing-critical slice (the lesson-detail plan's RISK 1 is the admin mirror). Then `(coach)/schedule/index`
-  (1,255). **Re-measure before planning** (§7.236). Full track, one at a time, one nightly each.
-- **Then the app's lite batches** — L-F parent home, L-G parent money, L-H rest (playbook §7.1's table).
-- **Adding a screen to the app fence:** append to `SCOPE_DIRS` AND `PAGES` together (paired by index), pin its
-  violations, prove red (playbook §3). Derive the driver net from rendered strings **plus the entry tap and the
-  primary button** (playbook §4). Hand-check scripts: DOM clicks, and `waitFor` the toast (§7.252).
-- **Before any unit:** grep the suite for `page.tsx`-keyed scans (§7.248), and move any `lib/` sole-importer PAIR
-  in one commit (§7.250) — but a TWINNED `lib/` file stays even with one importer (playbook §2).
+- **Next: `(coach)/schedule/index.tsx`** — the coach's landing tab and NEEDS MARKING, which feeds billing (§8i).
+  **Re-measure before planning** (§7.236). Then the app's lite batches L-F / L-G / L-H (playbook §7.1).
+- **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
+  current stage has (§7.253); reach a screen by TAP for anything visual (§7.254).
+- **Or fix the cancelled-lesson spinner first** — a small, real, user-facing bug (BACKLOG *Coach workflow*), one line
+  plus a test update, and a behaviour change, so its own branch and its own PRD check — not inside a refactor.
 
-**GATE (§7.1): build on a branch, but do NOT merge to `main` until the first nightly on `b654967` (the roster) is
-green — read it from the log, not the badge.**
+**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35712884217` (on `6f1da89`) is green —
+read it from the log, not the badge.**
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), on prod,
-0 pending (157/157 on 2026-09-21), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.113 and §8.114 authored none — pure refactors.
+0 pending (157/157 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
+the fact; a prose status is a hint.** §8.113–§8.115 authored none — pure refactors.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

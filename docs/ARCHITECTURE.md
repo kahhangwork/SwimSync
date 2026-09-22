@@ -609,8 +609,17 @@ the shape of the system changes:_
   expo-router's `router` singleton directly**, unlike the admin's router-at-the-page rule, because an Expo
   `router` needs no navigation context and keeping it lets the JSX move verbatim; and the route keeps its one
   **`useFocusEffect`**, keyed on the `loadData` a hook returns **unwrapped** — a wrapped or re-memoised
-  `loadData` changes identity every render and refetches forever. Remaining: the `attendance` and
-  `schedule/index` giants and the app's lite/fence batches.
+  `loadData` changes identity every render and refetches forever.
+
+  **The second app unit, the coach MARKING screen, 2026-09-22** (`docs/refactor/COACH_ATTENDANCE_REFACTOR_PLAN.md`,
+  1,183 → 166 lines), added three shapes. **A route whose effect is `useEffect(…, [id, date])` keeps it on the
+  route, calling a PLAIN `load` the hook recreates each render — no `useCallback`** (the `[id, date]` deps are
+  §7.64's fix; the save and the cancelled notice read render-time state). **The hooks never read the URL params**:
+  the route reads `id`/`date` once and passes the same bindings everywhere, since two reads is how §7.64's
+  header/roster split re-enters. **A route that branches its render on `@/lib` predicates gets a tiny
+  `domain/screenState.ts`** (a wrapper or a re-export) rather than a route `@/lib` import, and a `ui/` component
+  that owns several sibling JSX blocks wraps them in a fragment so they move verbatim. Remaining: the
+  `schedule/index` giant and the app's lite/fence batches.
 
 ---
 

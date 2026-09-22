@@ -398,6 +398,10 @@ whole list ternary, not one card).
 `types.ts`.
 
 ## 12. Findings for `/update-docs`
+
+**Graduated 2026-09-22:** §7.253 (`CI=1` frozen bundle) · §7.254 (the landing replace) · BACKLOG ×3 (the cancelled
+spinner + stale title; the coach landing bounce; the marking-screen driver) · ARCHITECTURE §6 (the unit's shapes) ·
+TESTING §5 (suites + net) · playbook §3/§4/§7. The hand-check pair is `docs/refactor/coach-attendance-handchecks.*`.
 _(filled in per stage)_ Known at planning:
 - **BACKLOG (a real bug, found at planning): a coach opening an admin-CANCELLED lesson gets a permanent spinner.**
   The cancelled branch of `load()` sets `blocked` but never `resolved`, so `isShowingDate` holds the loader; the

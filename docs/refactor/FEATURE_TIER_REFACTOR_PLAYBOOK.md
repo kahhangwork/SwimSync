@@ -13,7 +13,7 @@ giants. What varies with size is the *ceremony*, not the shape: §7 defines thre
 The eight giants (`packages/page.tsx` 2,014 lines ✅, `invoices/page.tsx` 1,748 ✅,
 `classes/page.tsx` 1,714 ✅, `platform/page.tsx` 1,395 ✅, `lessons/[classId]/[date]/page.tsx`
 912 ✅, and in the coach app `(coach)/schedule/index.tsx` 1,255,
-`(coach)/classes/[id]/attendance.tsx` 1,183, `(coach)/classes/[id]/roster.tsx` 905 ✅) take
+`(coach)/classes/[id]/attendance.tsx` 1,183 ✅, `(coach)/classes/[id]/roster.tsx` 905 ✅) take
 the full twelve stages of §2, **one at a time, and never start the next until the last has
 survived a nightly sweep** (plan §11). Everything smaller takes the lite or fence track
 (§7), **in batches**, one nightly per batch.
@@ -217,7 +217,9 @@ never see a `domain/` hook calling `fetchMarkableFloor()`; check 4's allowlist i
 `expo-router`, `@expo/vector-icons`, `@/features/<screen>/{ui,domain,types}`) and forbids `@/store` — the
 store is read in `domain/` only. Route files live outside `SCOPE_DIRS`, so they are listed in `PAGES`
 explicitly, paired by index with their `features/<screen>` dir; a missing one reads RED, not TypeError.
-**To add the next screen:** append to `SCOPE_DIRS` and `PAGES` together, pin its violations, prove red.
+**To add the next screen:** append to `SCOPE_DIRS` and `PAGES` together, pin its violations, prove red. The scan
+test asserts every `SCOPE_DIRS` folder EXISTS, so at 0b — before Stage 1 creates `types.ts` — hold it open with a
+`.gitkeep` and delete that in Stage 1 (attendance, 2026-09-22).
 
 Prove every check red before trusting it: drop a `ui/Break.tsx` that imports `../dao/x`,
 a `dao/break.ts` that imports React, a `domain/break.ts` that calls `fetch(`, and swap one
@@ -268,6 +270,10 @@ rm verify-zz-* fixtures-zz-*                    # before committing anything
 - **`run-all-drivers.sh --only` takes ONE driver name** — a comma list matches nothing. Loop it. Driver check
   counts in a plan are RUNTIME counts: a `grep -c 'check('` double-counts a cleanup check written in both `try` and
   `catch` (lesson detail: grep 28/18, runtime 27/17).
+- **App drivers run against whatever bundle Metro is serving — prove it is the new one.** A `CI=1 expo start`
+  never rebuilds (§7.253): curl the entry bundle and grep for a symbol only the current stage has, before the
+  first driver of every stage. And a deep link lands on Schedule with the target HIDDEN beneath (§7.254) — fine
+  for DOM clicks and DB reads, wrong for anything visual; reach the screen by tap for Tailwind proofs.
 - **A red on a cold dev server is §7.108 first.** `verify-assessment` went 23/27 on the
   first hit of an uncompiled route and 27/27 warm, with zero lines of the assessment page
   changed. Re-run before reading it as a regression.
@@ -363,7 +369,7 @@ code architecture" a fact the test runner can check rather than a sentence in a 
 
 | Track | Size | Admin | Coach/parent app | Lines |
 |---|---|---|---|---|
-| **Full** (§2, twelve stages, own plan doc) | > ~900 | **0 remaining** (all six done 2026-09-18) | 2 (roster ✅ 2026-09-21) | ~11,100 |
+| **Full** (§2, twelve stages, own plan doc) | > ~900 | **0 remaining** (all six done 2026-09-18) | 3 (roster ✅ 2026-09-21, attendance ✅ 2026-09-22; `schedule/index` left) | ~11,100 |
 | **Lite** (below) | ~250 – ~900 | 21 pages | 13 screens | ~16,200 |
 | **Fence** (below) | < ~250 | 5 pages | 10 screens | ~2,600 |
 

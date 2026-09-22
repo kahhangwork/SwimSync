@@ -1247,7 +1247,7 @@ link and presses through it; `verify-admins` only asserts the string appears in 
 `${EXPO}`. Read that script before writing the next batch's: §7.251 is the two ways its first run lied.
 
 **The app half of the fence began with the coach roster (2026-09-21, §8.114).**
-`SwimSyncApp/lib/tierBoundaries.drift.test.ts` (8 tests) is the app's fence — how it differs from the admin twin
+`SwimSyncApp/lib/tierBoundaries.drift.test.ts` (7 tests — the runner, 2026-09-22) is the app's fence — how it differs from the admin twin
 is playbook §3. Characterisation files: **`features/roster/domain/rosterFormat.test.ts` (5)** and
 **`features/roster/domain/rosterRows.test.ts` (21)**, whose load-bearing half pins the coach's backlog — the
 union that must agree with `generate-invoices`: the Mark target is last-write-wins over ASCENDING dates even
@@ -1260,6 +1260,18 @@ label), `levels`, `level-skills` (expands the curriculum), `attendance-guard`, `
 `verify-coach-roster` (it opens `/attendance`). **No driver presses Remove or the curriculum's Hide** — both are
 hand-checked by **`docs/refactor/coach-roster-handchecks.mjs`** + `.sql` (12 checks, DB-verified); read §7.252
 before reusing it.
+
+**The coach attendance (marking) screen joined the app fence 2026-09-22 (§8.115)** — `SCOPE_DIRS` +
+`features/mark-attendance`, ledgers pinned at 20 sites / 14 imports, both empty at Stage 6. Characterisation
+files under `features/mark-attendance/domain/`: `attendanceStatus.test.ts` (7), `exitHref.test.ts` (2),
+`attendanceRows.test.ts` (9 — the roster-as-of-date span, SG-date ends, the credit-note guard's null map, and the
+cancelled notice's stale title, pinned), `screenState.test.ts` (4). 462 → 484 jest. **Its driver net** (11):
+`attendance-guard`, `stale-screen`, `coach-roster`, `bulk-setall`, `admin-lesson-detail` (the coach leg), `trials`,
+`makeups`, `trial-onboarding`, `schedule-week` (URL only), `tz-saturday`, `smoke-app`. **Not** `verify-cancel-lesson`
+(its coach leg is Schedule only). **No driver asserts the credit-note email path, the first-save session create, or
+the read-only title** — `docs/refactor/coach-attendance-handchecks.mjs` + `.sql` (11 checks, DB-verified, proven
+able to fail) covers the first two; BACKLOG has the driver. Before trusting any local run, read §7.253 (a `CI=1`
+Expo serves a frozen bundle) and §7.254 (a deep link lands on Schedule).
 
 **Which UI drivers actually exercise the admin Students page** (verified by running each after the slice
 it covers, and all of them after Stage 11 — §7.236 is why this list exists): `contact-details` (Actions
