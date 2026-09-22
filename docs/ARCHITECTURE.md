@@ -618,8 +618,18 @@ the shape of the system changes:_
   the route reads `id`/`date` once and passes the same bindings everywhere, since two reads is how §7.64's
   header/roster split re-enters. **A route that branches its render on `@/lib` predicates gets a tiny
   `domain/screenState.ts`** (a wrapper or a re-export) rather than a route `@/lib` import, and a `ui/` component
-  that owns several sibling JSX blocks wraps them in a fragment so they move verbatim. Remaining: the
-  `schedule/index` giant and the app's lite/fence batches.
+  that owns several sibling JSX blocks wraps them in a fragment so they move verbatim.
+
+  **The third and last app giant, the coach SCHEDULE tab, 2026-09-22** (`docs/refactor/COACH_SCHEDULE_REFACTOR_PLAN.md`,
+  1,255 → 101 lines), added three more. **Keep the load's identity semantics, whichever they are**: here `loadData`
+  was a `useCallback` whose deps `[session, todayDate, weekOffset]` decide when the focus effect refetches, so the
+  hook keeps that `useCallback` byte-identical — the opposite surface to the marking screen's plain `load`, the
+  same rule. **Per-render clock values come from a hook that recomputes them every render** (`useWeek`: no memo on
+  `todayDate` / `nowMins` — a memoised clock is the FROZEN clock its ⚠ OFFSET comment forbids) and reach the load
+  hook as plain arguments — no "latest value" ref, no clock read in the load hook. **A loop with inner closures
+  becomes a pure function whose parameters carry the closures' free-variable names**, closures kept inner, so the
+  body moves without a rename (`buildSchedule`); `dao/` functions likewise take parameters named as the chains used
+  them, so every chain is byte-identical. Remaining: the app's lite/fence batches (playbook §7.1–§7.2).
 
 ---
 

@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-22 — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-22 — **Coach Schedule (the LAST full-track giant) SHIPPED** (§8.116); a **Schedule driver** item filed (role badges, location chips + clamp, DONE tap), and the local-reds item updated (`smoke-app` / `trial-onboarding` GREEN locally). Earlier same day — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -1870,6 +1870,23 @@ creating exactly one session row), proven able to fail. It deep-links, so every 
 hidden screen (§7.254) — fine for DB assertions; for the title, one `check()` inside `verify-coach-roster`'s
 shadow leg is cheaper than a new driver.
 
+### A driver for the coach Schedule's role badges, location chips and DONE tap — **S** `[from the coach schedule refactor 2026-09-22]`
+Three things on `(coach)/schedule/index` no driver asserts: **the role UI** — `Covering` / `Shadowing` / `Covered`
+badges and the `View lesson` vs `Mark Attendance` button on TODAY's cards (`verify-coach-roster`'s `Covering` is the
+ADMIN lesson page); **the location chips** — render, filter, and the clamp back to *All locations*; and **a tap on a
+DONE row** landing on `…/attendance?date=…&from=schedule` (`verify-schedule-week` pins only COMING UP → roster).
+
+**Why:** the badges and button are how a substitute, a shadow and an owner tell whose lesson it is to mark — a
+wrong button either nags a coach the DB will refuse, or hides the Mark button from the coach who owes the marks
+(§8i). The chips are the only control that can empty the week, and nothing proves they cannot strand it.
+
+**Notes:** `docs/refactor/coach-schedule-handchecks.mjs` + `.sql` (on top of `fixtures-coach-roster.sql`) is the
+skeleton — 9 checks, 9/9 before and after the refactor. **The clamp is reachable only when a location's classes
+vanish between loads** (weekly recurrence means week navigation never empties a location); the skeleton
+deactivates them (`is_active=false` needs `deactivated_at`, a CHECK) and refocuses. Target a DONE card by
+`div.text-sm.font-bold` and a day by its EXACT label — a day-shaped regex hits NEEDS MARKING rows, and
+`getByText(title).last()` hit a TODAY title on a screen mounted underneath (§7.254).
+
 ### Four UI drivers fail on a LOCAL full sweep but pass in CI — **S** `[found by Admin L-E's L4 2026-09-21]`
 `run-all-drivers.sh` run locally on 2026-09-21 returned 48/52. The four reds — `payment-collection` (times out
 waiting for the parent app's *I've paid*), `referrals` (1/13: the `/package` pay-page headline), `smoke-app`
@@ -1887,7 +1904,7 @@ cross-tenant queries during the hand-checks. Start with a clean `supabase db res
 compare against the CI job's env (`SERVICE_ROLE_KEY`, `RESEND_API_KEY` UNSET — `verify-tenant-provisioning`
 requires the latter). **Evidence against the leftover-rows theory (2026-09-21, coach roster):** `smoke-app` ran
 four times through `run-all-drivers.sh --only`, which resets the DB before each driver, and failed 70/73 on the
-same three checks every time — so a clean reset alone does not fix it; look at env/config next. **Still identical on 2026-09-22** (coach attendance: `smoke-app` 70/73 and `trial-onboarding` 5/8 at every one of five stage runs, same messages). The triage method that settled it is `docs/TESTING.md` §5's fourth rule: re-run the driver
+same three checks every time — so a clean reset alone does not fix it; look at env/config next. **Still identical on 2026-09-22** (coach attendance: `smoke-app` 70/73 and `trial-onboarding` 5/8 at every one of five stage runs, same messages). **Then GREEN later the same day** (coach schedule: `smoke-app` **73/73** and `trial-onboarding` **10/10** — note 10 checks, not 8 — at every one of three full 17-driver runs; `payment-collection` and `referrals` were not run). Nothing in the repo changed between the two sessions except the schedule refactor, so the likeliest cause is local state (the dev servers were restarted fresh). **Re-run all four once before quoting this item; it may be closable.** The triage method that settled it is `docs/TESTING.md` §5's fourth rule: re-run the driver
 at the suspect's parent before blaming the branch.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)

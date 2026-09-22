@@ -1273,6 +1273,19 @@ the read-only title** — `docs/refactor/coach-attendance-handchecks.mjs` + `.sq
 able to fail) covers the first two; BACKLOG has the driver. Before trusting any local run, read §7.253 (a `CI=1`
 Expo serves a frozen bundle) and §7.254 (a deep link lands on Schedule).
 
+**The coach Schedule tab joined the app fence 2026-09-22 (§8.116)** — `SCOPE_DIRS` + `features/schedule`, ledgers
+pinned at 12 sites / 12 imports (24 pins, each proven to match exactly one site), both empty at Stage 5.
+Characterisation files under `features/schedule/domain/`: `scheduleFormat.test.ts` (4), `scheduleIndex.test.ts` (6)
+and **`scheduleRows.test.ts` (11) — the NEEDS MARKING loop that feeds billing**: owned / covered / shadowed date
+sources, a substitute on a shadowed class still nagged (3b), the §7.97 trial-before-enrolment case, cancelled
+lessons, the raw duplicated probe list. **Five mutations of the loop were each caught** (plan §11a). 484 → 505 jest.
+**Its driver net is all 17 coach-login drivers** — every coach login and deep link lands on this screen (§7.254):
+`schedule-week`, `unmarked-lessons`, `cancel-lesson`, `coach-roster`, `stale-screen`, `tz-saturday`, `trials` (the
+§7.97 runtime proof), `bulk-setall`, `smoke-app`, `attendance-guard`, `makeups`, `trial-onboarding`,
+`trial-visibility`, `levels`, `level-skills`, `student-identity`, `admin-lesson-detail`. **No driver asserts the role
+badges / `View lesson`, the location chips and their clamp, or a DONE tap** — `docs/refactor/coach-schedule-handchecks.mjs`
++ `.sql` covers them (9 checks); BACKLOG has the driver.
+
 **Which UI drivers actually exercise the admin Students page** (verified by running each after the slice
 it covers, and all of them after Stage 11 — §7.236 is why this list exists): `contact-details` (Actions
 drawer → Contact modal in both modes, the claim lock, **Add student**), `active-inactive` (Set inactive and

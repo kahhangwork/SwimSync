@@ -12,7 +12,7 @@ state, decided 2026-09-12, is that EVERY page follows the shape in §1** — not
 giants. What varies with size is the *ceremony*, not the shape: §7 defines three tracks.
 The eight giants (`packages/page.tsx` 2,014 lines ✅, `invoices/page.tsx` 1,748 ✅,
 `classes/page.tsx` 1,714 ✅, `platform/page.tsx` 1,395 ✅, `lessons/[classId]/[date]/page.tsx`
-912 ✅, and in the coach app `(coach)/schedule/index.tsx` 1,255,
+912 ✅, and in the coach app `(coach)/schedule/index.tsx` 1,255 ✅,
 `(coach)/classes/[id]/attendance.tsx` 1,183 ✅, `(coach)/classes/[id]/roster.tsx` 905 ✅) take
 the full twelve stages of §2, **one at a time, and never start the next until the last has
 survived a nightly sweep** (plan §11). Everything smaller takes the lite or fence track
@@ -184,6 +184,14 @@ before the medium-risk slices.
   and the moved JSX stays byte-identical — no `foo` → `p.x.foo` rename exists for the JSX-text trap above to
   corrupt, and the verbatim check needs no rename map. The lesson-detail Stage 7 moved 11 components this way;
   the only unmatched lines were the 4 planned structural rewrites. Prefer this over prop prefixes.
+- **Rebuild the route's import block from SYMBOL USAGE at every stage** (coach schedule, 2026-09-22): a table of
+  module → names in the route's original order, emit only the names the body references, exclude components the
+  route still declares locally. No stale import survives a stage, `--noUnusedLocals` stays empty, and the fence's
+  shrink test then names exactly the pins to delete — 23 pins left over Stages 2–5 that way, none by hand.
+- **Check the ORDER of the moved JSX, not just the set** (coach schedule): the ordered sequence of JSX text and
+  string literals (copy, every `className`, `testID`) in `git show HEAD:<route>` must equal the composed route with
+  each `<Ui …/>` expanded. A set check cannot see two sections swapped or two `<Text>` nodes merged, and drivers
+  depend on both (anchored regexes, heading splits). Prove it red on a swap before trusting it.
 - **Check verbatim by script, not by eye.** Cut each `ui/` block by line range from `git show HEAD:<page>`, then
   compare the component's JSX to the original with whitespace stripped and the prop renames mapped back
   (`onVoid(` → `voidNote(`). Any divergence prints where it starts. (Admin L-C, all 15 `ui/` files.)
@@ -274,6 +282,10 @@ rm verify-zz-* fixtures-zz-*                    # before committing anything
   never rebuilds (§7.253): curl the entry bundle and grep for a symbol only the current stage has, before the
   first driver of every stage. And a deep link lands on Schedule with the target HIDDEN beneath (§7.254) — fine
   for DOM clicks and DB reads, wrong for anything visual; reach the screen by tap for Tailwind proofs.
+- **Target a hand-check click by the element's OWN class or EXACT label** (coach schedule): a day-shaped regex hit
+  a NEEDS MARKING row with the same date shape, and `getByText(title).last()` hit a TODAY title on a screen mounted
+  underneath (§7.254). `locator("div.text-sm.font-bold").filter({ hasText })` for a card, `getByText("Sat, 26 Sept",
+  { exact: true })` for a day.
 - **A red on a cold dev server is §7.108 first.** `verify-assessment` went 23/27 on the
   first hit of an uncompiled route and 27/27 warm, with zero lines of the assessment page
   changed. Re-run before reading it as a regression.
@@ -325,6 +337,11 @@ rm verify-zz-* fixtures-zz-*                    # before committing anything
   assignment wins, then pin it with a case for **every pair**. This is the clearest evidence so far
   for §2's rule that `domain/` needs its pure mapping under characterisation tests — it is the first
   time that rule caught something rather than merely being obeyed.
+- **A characterisation test can pass a mutation for want of a fixture ROW.** Coach schedule Stage 2: widening the
+  covered-out probe from `owned` to `showsWholeSchedule` passed every case until the shadow case gained a session row
+  for the probe to see. So for a billing-critical `domain/` extraction, **mutate each guarded line once** (narrow a
+  range, drop a `continue`, dedupe a list) and watch a named case go red — a green run proves nothing until
+  something has gone red.
 - **When two slices write EACH OTHER's state, break the cycle at the compose layer, not inside
   a hook.** Invoices (§8.106): `useGenerate` fills the unclaimed modal (`setUnclaimed`) and
   `useUnclaimed`'s settle writes `genResult` (owned by `useGenerate`) — a creation-time cycle.
@@ -369,7 +386,7 @@ code architecture" a fact the test runner can check rather than a sentence in a 
 
 | Track | Size | Admin | Coach/parent app | Lines |
 |---|---|---|---|---|
-| **Full** (§2, twelve stages, own plan doc) | > ~900 | **0 remaining** (all six done 2026-09-18) | 3 (roster ✅ 2026-09-21, attendance ✅ 2026-09-22; `schedule/index` left) | ~11,100 |
+| **Full** (§2, twelve stages, own plan doc) | > ~900 | **0 remaining** (all six done 2026-09-18) | **0 remaining** (roster ✅ 2026-09-21, attendance ✅ + schedule ✅ 2026-09-22) | ~11,100 |
 | **Lite** (below) | ~250 – ~900 | 21 pages | 13 screens | ~16,200 |
 | **Fence** (below) | < ~250 | 5 pages | 10 screens | ~2,600 |
 

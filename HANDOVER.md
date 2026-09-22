@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-22 — **Coach attendance (the MARKING screen) SHIPPED, on `main` `6f1da89` (§8.115): the second APP
-unit** — 1,183 → 166 lines, 0 useState, both ledgers empty; CI + both Vercel deploys green. **Nightly `35712884217` on
-`6f1da89` is the gate for `schedule/index`, the LAST giant (§9).** August billing due before 1 Oct._
+_Last updated: 2026-09-22 — **Coach Schedule tab SHIPPED, on `main` `7148f83` (§8.116): the LAST full-track giant** —
+1,255 → 101 lines, 0 hooks declared, both ledgers empty; 17/17 drivers = baseline; CI + both Vercel deploys green.
+**Nightly `35738235448` on `7148f83` is the gate for the app lite batches (§9).** August billing due before 1 Oct._
 
-_Previously, 2026-09-21 (§8.114) — Coach roster, the first APP unit: 905 → 64 lines; the app's fence + `features/` infra._
+_Previously, same day (§8.115) — Coach attendance, the MARKING screen: 1,183 → 166 lines; the second app unit._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +347,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.116 (2026-09-22) — Coach Schedule full track: 1,255 → 101 lines, 0 hooks declared — the LAST giant
+
+**Six commits on `refactor/coach-schedule` (0b, 1–5), fast-forwarded to `main` (`7148f83`) via `/deploy` after
+nightly `35712884217` (attendance) was read 52/52 from its log; 0 migrations (157/157 on prod), 0 edge functions;
+CI + both Vercel deploys green, the live bundle carries the screen. Zero behaviour change.** `/plan-with-confidence`
+(4 questions) → `/plan-review` (Fable 5.1, 12 findings, 5 spot-checked, all held) → stages → L4. 484 → 505 jest.
+
+- **Read `docs/refactor/COACH_SCHEDULE_REFACTOR_PLAN.md` (§6 ⚠ blocks, §11a stage log, §12), not this.**
+- **NEEDS MARKING — which feeds billing — is now a pure, tested function** (`buildSchedule`); five deliberate
+  mutations of its guards were each caught. The full 17-driver net = baseline on Stage 1, Stage 3 and the finished
+  screen; role badges, location chips + clamp and a DONE tap (no driver) hand-checked 9/9 before and after.
+- **Graduated:** ARCHITECTURE §6 (the third app unit's shapes) · TESTING §5 (suites + the 17-driver net) · playbook
+  §2/§4/§5/§7 (import rebuild, ordered-JSX check, mutate each guard, click targeting; the full track is DONE) ·
+  BACKLOG (a Schedule driver; the local-reds item now GREEN locally). **PRD untouched** — nothing user-visible changed.
+
 ## 8.115 (2026-09-22) — Coach attendance full track: 1,183 → 166 lines, 0 useState — the coach's MARKING screen
 
 **Seven commits on `refactor/coach-attendance` (0b, 1–6), fast-forwarded to `main` (`6f1da89`) via `/deploy`; 0 migrations
@@ -364,26 +379,7 @@ inside a file read at the start of every session.
 - **Graduated:** §7.253, §7.254 (a coach deep link lands on Schedule — the root of §7.252); BACKLOG ×3; ARCHITECTURE §6;
   TESTING §5; playbook §3/§4/§7. **PRD untouched** — nothing user-visible changed.
 
-## 8.114 (2026-09-21) — Coach roster full track: 905 → 64 lines, 0 useState — the first APP unit, and the app's fence
-
-**Seven commits on `refactor/coach-roster` (0b, 1–5), fast-forwarded to `main` (`b654967`) via `/deploy` only AFTER
-nightly `35587264596` (Admin L-E) was read green, 52/52 from its log (the user's gate); 0 migrations, 157/157 on prod;
-CI `35597311039` + both Vercel deploys green. Zero behaviour change.** `/plan-with-confidence` (3 questions) →
-`/plan-review` (Fable 5.1) → stages → L4. 429 → 462 jest. Full 9-driver net = baseline after Stages 3 and 5.
-
-- **Read `docs/refactor/COACH_ROSTER_REFACTOR_PLAN.md` (§6 per-stage ⚠ blocks, §11a stage log), not this.**
-- **The app half of the fence now exists** — `SwimSyncApp/lib/tierBoundaries.drift.test.ts`, NOT a byte-twin of the
-  admin one (playbook §3 has the three differences), plus `features/` in jest `testMatch`, both `sgDisplay` twins'
-  `SCAN_DIRS`, and **Tailwind `content`** — the last found at planning, not in the playbook until today (§1 table).
-- **`/plan-review` found 8 factual errors; all held on spot-check** — the costliest two: a plain fence twin could
-  never see `fetchMarkableFloor()`, and the driver net missed 3 of 9 drivers, incl. the only one on the Mark target.
-- **Graduated:** §7.252 (a deep-linked force-click lands on the mounted Schedule screen; the 3000 ms toast);
-  playbook §1/§2/§3/§4/§7; ARCHITECTURE §6 (the app's shapes); TESTING §5 (the suites + the roster's net);
-  BACKLOG `verify-coach-remove-student` + new evidence on the four local-only reds (`smoke-app` 70/73 survives a
-  clean reset).
-- **PRD untouched** — nothing user-visible changed.
-
-_(§8.113 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.114 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -428,35 +424,33 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-22: `main` is `6f1da89` (coach attendance, §8.115). Nightly `35712884217` was dispatched on it
-and is the GATE for the next unit (§7.1)** — a red there bisects to the attendance commits, most likely
-`attendance-guard` / `stale-screen` / `coach-roster` / `bulk-setall`, **but read it, don't trust this line** (§8.65).
-The previous run, `35681798827` on the roster code, was 51/52 (`tenant-suspension`'s first-login sleep, accepted by
-the user). **A LOCAL `smoke-app` 70/73 and `trial-onboarding` 5/8 are the known local-only reds** (BACKLOG).
+**State on 2026-09-22: `main` is `7148f83` (coach Schedule, §8.116). Nightly `35738235448` was dispatched on it
+and is the GATE for the next unit (§7.1)** — every coach driver lands on this screen, so a red anywhere in the
+coach set can bisect here; **read it, don't trust this line** (§8.65). The previous run, `35712884217` on the
+attendance code, was **52/52**. Locally, `smoke-app` 73/73 and `trial-onboarding` 10/10 were GREEN all session —
+BACKLOG's local-reds item may be closable.
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
 which mutate shared seed state — are in the same section.
 
-### THE NEXT BUILD — the LAST giant, `(coach)/schedule/index` (1,255)
+### THE NEXT BUILD — the full track is DONE; the app's lite batches next
 
-**Two app units done (roster §8.114, attendance §8.115).** Copy the attendance plan, don't re-derive it:
-**`docs/refactor/COACH_ATTENDANCE_REFACTOR_PLAN.md` is the freshest app worked example** (a save path, a
-`[id, date]` effect, hand-check scripts in `docs/refactor/`).
+**Every giant in both apps has taken the full track** (the last three: roster §8.114, attendance §8.115, schedule
+§8.116). What remains is the app's lite batches **L-F** (parent home) / **L-G** (parent money) / **L-H** (rest), then
+the fence track — playbook §7.1–§7.2; **re-measure and re-derive each batch's driver net before planning** (§7.236).
 
-- **Next: `(coach)/schedule/index.tsx`** — the coach's landing tab and NEEDS MARKING, which feeds billing (§8i).
-  **Re-measure before planning** (§7.236). Then the app's lite batches L-F / L-G / L-H (playbook §7.1).
-- **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
-  current stage has (§7.253); reach a screen by TAP for anything visual (§7.254).
 - **Or fix the cancelled-lesson spinner first** — a small, real, user-facing bug (BACKLOG *Coach workflow*), one line
   plus a test update, and a behaviour change, so its own branch and its own PRD check — not inside a refactor.
+- **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
+  current stage has (§7.253); reach a screen by TAP for anything visual (§7.254).
 
-**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35712884217` (on `6f1da89`) is green —
+**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35738235448` (on `7148f83`) is green —
 read it from the log, not the badge.**
 
 **No migration is HELD or in flight.** Latest applied is `20260829000100` (grading admin-only, §8.93), on prod,
 0 pending (157/157 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.113–§8.115 authored none — pure refactors.
+the fact; a prose status is a hint.** §8.113–§8.116 authored none — pure refactors.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers
