@@ -105,7 +105,7 @@ type Allowed = { file: string; contains: string; why: string };
 
 // (F_ROSTER was deleted with its last ledger entry, roster Stage 5, 2026-09-21.)
 // (F_ATT was deleted with its last ledger entry, attendance Stage 6, 2026-09-22.)
-const F_SCHED = "app/(coach)/schedule/index.tsx";
+// (F_SCHED was deleted with its last ledger entry, schedule Stage 5, 2026-09-22.)
 
 /**
  * Check 3 — network reaches outside `dao/`. SCHEDULE Stage 0b pinned 12: the
@@ -126,9 +126,6 @@ const F_SCHED = "app/(coach)/schedule/index.tsx";
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  // ── Coach Schedule (docs/refactor/COACH_SCHEDULE_REFACTOR_PLAN.md) — ALL 12 leave at Stage 3 ──
-  // ⚠ KEEP THE SPACE: a bare `.from("classes")` also matches the covered and
-  // shadowed reads below, so one pin would silently cover three sites.
 ];
 
 /**
@@ -145,12 +142,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  // ── Coach Schedule — each leaves when its last symbol moves; all 12 gone at Stage 5 ──
-  { file: F_SCHED, contains: "@/lib/lessonDates", why: "todayInSg/backlogWindowStart -> domain, formatSgDate -> ui; by Stage 5" },
-  { file: F_SCHED, contains: "@/lib/timeOfDay", why: "nowMinutesInSg -> useWeek, isNowInRange -> ui; by Stage 5" },
-  { file: F_SCHED, contains: "@/lib/attendanceSummary", why: "loop -> domain, chips/labels -> ui; by Stage 5" },
-  { file: F_SCHED, contains: "@/lib/scheduleWeek", why: "useWeek / useScheduleSections; by Stage 4" },
-  { file: F_SCHED, contains: "@/lib/coachRoster", why: "parse* -> useScheduleLoad, canMark/roleBadge -> ui; by Stage 5" },
 ];
 
 /** Blank comments in place, preserving newlines, so line numbers stay true. */
