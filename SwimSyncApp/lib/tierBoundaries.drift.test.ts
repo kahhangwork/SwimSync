@@ -150,8 +150,6 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: F_SCHED, contains: "@/lib/timeOfDay", why: "nowMinutesInSg -> useWeek, isNowInRange -> ui; by Stage 5" },
   { file: F_SCHED, contains: "@/lib/attendanceSummary", why: "loop -> domain, chips/labels -> ui; by Stage 5" },
   { file: F_SCHED, contains: "@/lib/scheduleWeek", why: "useWeek / useScheduleSections; by Stage 4" },
-  { file: F_SCHED, contains: "@/lib/scheduleBuckets", why: "useScheduleSections; Stage 4" },
-  { file: F_SCHED, contains: "@/lib/locationFilter", why: "useScheduleSections; Stage 4" },
   { file: F_SCHED, contains: "@/lib/coachRoster", why: "parse* -> useScheduleLoad, canMark/roleBadge -> ui; by Stage 5" },
 ];
 

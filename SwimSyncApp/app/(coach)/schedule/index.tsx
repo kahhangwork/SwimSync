@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import { useCallback } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { backlogWindowStart, formatSgDate } from "@/lib/lessonDates";
+import { formatSgDate } from "@/lib/lessonDates";
 import { isNowInRange } from "@/lib/timeOfDay";
 import {
   progressLabel,
@@ -17,13 +17,7 @@ import {
   isFinished,
   type LessonProgress,
 } from "@/lib/attendanceSummary";
-import {
-  selectableWeekOffsets,
-  canGoBack,
-  canGoForward,
-} from "@/lib/scheduleWeek";
-import { bucketWeek } from "@/lib/scheduleBuckets";
-import { locationChips } from "@/lib/locationFilter";
+import { canGoBack, canGoForward } from "@/lib/scheduleWeek";
 import { canMark, roleBadge, type LessonRole } from "@/lib/coachRoster";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
@@ -35,6 +29,9 @@ import {
 } from "@/features/schedule/domain/scheduleFormat";
 import { useWeek } from "@/features/schedule/domain/useWeek";
 import { useScheduleLoad } from "@/features/schedule/domain/useScheduleLoad";
+import {
+  useScheduleSections,
+} from "@/features/schedule/domain/useScheduleSections";
 
 /**
  * The status pill. One component for every section, so a state cannot be worded
@@ -201,16 +198,20 @@ export default function ScheduleScreen() {
   const { session, needsMarking, weekLessons, floor, truncated, loading, loadData } =
     useScheduleLoad({ weekOffset, todayDate, nowMins, weekStart, weekEnd });
 
-  // "" = all locations. Filters the WEEK buckets only — NEEDS MARKING stays
-  // floor-scoped and ignores it, the same way it ignores the week selector, so a
-  // straggler at another location is never hidden.
-  const [locationFilter, setLocationFilter] = useState<string>("");
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
-  // Derived AFTER the load: it needs the business's floor (Stage 4 moves it).
-  const bounds = selectableWeekOffsets(
-    todayDate,
-    backlogWindowStart(todayDate, null, floor)
-  );
+  const {
+    bounds,
+    setLocationFilter,
+    expandedDays,
+    visibleNeedsMarking,
+    scheduleLocationOpts,
+    effLocationFilter,
+    buckets,
+    todayLessons,
+    todayStudents,
+    todayGuests,
+    toggleDay,
+    openAttendance,
+  } = useScheduleSections({ todayDate, showsTodaySection, needsMarking, weekLessons, floor });
 
   // ⚠ ONE EFFECT, NOT TWO. `useFocusEffect` re-runs whenever its callback
   // identity changes WHILE FOCUSED, and `loadData` is rebuilt on every
@@ -223,64 +224,6 @@ export default function ScheduleScreen() {
     }, [loadData])
   );
 
-  // ── DE-DUPLICATION, IN THE RENDER BODY ────────────────────────────────────
-  // Today's unmarked lesson belongs in TODAY (where it has a button), not in
-  // both sections. Deriving this here — from the same render's `needsMarking`
-  // and `showsTodaySection` — means the two values cannot disagree. Doing it
-  // inside loadData would make a week that re-renders without refetching show
-  // neither, and today's lesson would be unmarkable from the landing tab.
-  const visibleNeedsMarking = needsMarking.filter(
-    (i) => !(showsTodaySection && i.date === todayDate)
-  );
-
-  // A lesson appears in EXACTLY ONE section. Anything already listed under
-  // NEEDS MARKING is pulled out of the week's own buckets, or an unmarked past
-  // lesson would render twice — once as a nag and once under DONE, which reads
-  // as "finished" and is the opposite of true. (Today's lesson goes the other
-  // way: bucketWeek puts it in `today`, and the filter above keeps it out of
-  // NEEDS MARKING so it keeps its Mark button.)
-  const needsKeys = new Set(
-    visibleNeedsMarking.map((i) => `${i.class_id}:${i.date}`)
-  );
-  // Distinct locations across the week's lessons, for the filter chips.
-  const scheduleLocationOpts = React.useMemo(
-    () => locationChips(weekLessons.map((l) => ({ id: l.locationId, name: l.location }))),
-    [weekLessons]
-  );
-
-  // Clamp to "all" when the selected location has no lessons this week — else the
-  // chips disappear (options ≤ 1) while the filter renders the week empty with no
-  // control to clear it.
-  const effLocationFilter = scheduleLocationOpts.some((o) => o.id === locationFilter)
-    ? locationFilter
-    : "";
-  const buckets = bucketWeek(
-    weekLessons
-      .filter((l) => !needsKeys.has(`${l.classId}:${l.date}`))
-      .filter((l) => !effLocationFilter || l.locationId === effLocationFilter),
-    todayDate
-  );
-  const todayLessons = showsTodaySection ? buckets.today : [];
-  const todayStudents = todayLessons.reduce((s, l) => s + l.students, 0);
-  const todayGuests = todayLessons.reduce((s, l) => s + l.guests, 0);
-
-  const toggleDay = (date: string) =>
-    setExpandedDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(date)) next.delete(date);
-      else next.add(date);
-      return next;
-    });
-
-  // ⚠ `sessionId` IS DELIBERATELY NOT PASSED. The attendance screen resolves
-  // the session from (class_id, date) itself and no longer accepts one from the
-  // URL — it used to trust it without checking that it belonged to this class
-  // or this date. `l.sessionId` is still carried in the item because the
-  // sections use it to render marking state; it is simply not navigation input.
-  const openAttendance = (l: { classId: string; date: string; sessionId: string | null }) =>
-    router.push(
-      `/(coach)/classes/${l.classId}/attendance?date=${l.date}&from=schedule`
-    );
 
   /** A collapsed day, expandable. Used by COMING UP and DONE. */
 
