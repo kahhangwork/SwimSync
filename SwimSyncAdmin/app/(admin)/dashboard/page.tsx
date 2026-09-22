@@ -3,6 +3,8 @@
 import { PageHeader } from "@/components/PageHeader";
 import { useDashboard } from "./domain/useDashboard";
 import { useTenantCard } from "./domain/useTenantCard";
+import { useBillingAlert } from "./domain/useBillingAlert";
+import { BillingAlert } from "./ui/BillingAlert";
 import { MetricGrid } from "./ui/MetricGrid";
 import { OutstandingMini } from "./ui/OutstandingMini";
 import { TenantCard } from "./ui/TenantCard";
@@ -11,6 +13,7 @@ import { UnassignedMini } from "./ui/UnassignedMini";
 export default function DashboardPage() {
   const { metrics, unassigned, covMap, invoices, loading } = useDashboard();
   const card = useTenantCard();
+  const billing = useBillingAlert();
 
   return (
     <div>
@@ -22,6 +25,8 @@ export default function DashboardPage() {
             : "Your SwimSync overview"
         }
       />
+
+      <BillingAlert summary={billing.summary} />
 
       {card.tenant && (
         <TenantCard

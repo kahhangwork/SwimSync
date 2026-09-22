@@ -283,17 +283,29 @@ GRANT SELECT, INSERT ON public.billing_runs TO service_role;    -- ⚠ RISK 1: N
 ## 11. Pre-commit gate
 
 **The three that matter most. Each blocks the commit if it cannot be ticked:**
-- [ ] **RISK 1:** pgTAP `service_role` INSERT = true, **and** a Deno test proves the row exists, **and** the prod grant dump shows `service_role=ar`
-- [ ] **RISK 3:** `toRunRows` returns 0 rows for all five non-attempt statuses
-- [ ] **RISK 5:** `test.sh` green twice, with 0 orphan `billing_runs` rows
+- [x] **RISK 1:** pgTAP `service_role` INSERT = true, **and** a Deno test proves the row exists, **and** the prod grant dump shows `service_role=ar` *(prod dump 2026-09-22: `GRANT SELECT,INSERT … TO service_role`, `GRANT SELECT … TO authenticated`, nothing to anon)*
+- [x] **RISK 3:** `toRunRows` returns 0 rows for all five non-attempt statuses
+- [x] **RISK 5:** `test.sh` green twice, with 0 orphan `billing_runs` rows
 
 **The rest:**
-- [ ] RISK 2: deleting a profile with a run row succeeds, and `ran_by` becomes NULL
-- [ ] RISK 4: the driver does not re-generate; the teardown deletes `billing_runs`; the round-trip is green
-- [ ] RISK 6: stale unclaimed students are filtered before the modal opens
-- [ ] RISK 7: the earlier-unbilled month is promoted into a visible row
-- [ ] RISK 8: a reopened month has its own reason
-- [ ] RISK 9: BACKLOG item added; engine untouched
-- [ ] RISK 10: the invoice-month read is ordered and bounded
-- [ ] RISK 11: `error` is truncated, with no stack
-- [ ] Every new test proven to fail with its rule broken (§7.25)
+- [x] RISK 2: deleting a profile with a run row succeeds, and `ran_by` becomes NULL
+- [x] RISK 4: the driver does not re-generate; the teardown deletes `billing_runs`; the round-trip is green
+- [x] RISK 6: stale unclaimed students are filtered before the modal opens
+- [x] RISK 7: the earlier-unbilled month is promoted into a visible row
+- [x] RISK 8: a reopened month has its own reason
+- [x] RISK 9: BACKLOG item added; engine untouched
+- [x] RISK 10: the invoice-month read is ordered and bounded
+- [x] RISK 11: `error` is truncated, with no stack
+- [x] Every new test proven to fail with its rule broken (§7.25)
+
+### Stage log (2026-09-22)
+
+| Step | Result |
+|---|---|
+| 1 migration | `acbe0fe`. pgTAP 14 assertions, red with the grant revoked / FK plain. DOWN rehearsed. 1502/1502 |
+| 2 prod | 158/158 applied, 0 pending; grant dump as above |
+| 3 engine | `runLog.ts` 11 Deno tests, red under each of RISK 1/3/5; `test.sh` 247/247 twice |
+| 4 admin | `lib/billingMonths.ts` vitest 27 — 8 deliberate mutations each caught; 855/855; typecheck clean |
+| 5 driver | `verify-trial-onboarding.mjs` 15/15, red (2 FAIL) with the card removed; fixture round-trip 26/26 |
+| hand-checks | Dashboard alert (tenant admin: shown; platform admin: none); Show all 4→7→4; month click sets the picker |
+| review | 3 fixes: no second "error" row after a recorded run; the stale note cleared on load; "could not check" distinct from "all settled". Plus a found gap: a SETTLED child was re-offered — now filtered (RISK 6 widened) |

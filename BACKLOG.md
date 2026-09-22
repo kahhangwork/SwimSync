@@ -1082,32 +1082,17 @@ worked by hand. This is the parent-side, no-admin-action version. **Notes:** all
 exist — `package_renewal_candidates()` is the "who", `package-emails` the delivery — so it
 is a scheduled check away, gated on cron (same blocker as the invoice reminder chain).
 
-### The admin cannot see WHY a generation run failed, or what held the month open — **S** `[raised 2026-09-17]`
-Two gaps, found billing August 2026 for real. (1) The first Generate click reported a bare
-error; the second reported success with the month "left open — 1 billable lesson has no parent
-account to bill". Nothing in the UI says *which* lesson, *which* child, or what the first error
-was. (2) No record of a generation *attempt* exists anywhere — `audit_log` has no row, so after
-the fact the only evidence is the Supabase edge-function log, which the admin has no access to.
+### The engine's automatic run-day guard reads the GLOBAL run day, not the business's — **S** `[raised 2026-09-22]`
+`generate-invoices/core.ts` (~line 375) decides `before_run_day` from `app_settings.invoice_run_day`,
+a platform-wide key. It selects `tenants.invoice_run_day` (the value the Invoices page edits, and
+the one PRD §9.16 says the schedule moved to) and never reads it. PRD §7.7 describes the run day as
+a per-business setting — the code is behind the spec.
 
-**What it took to answer instead:** a prod data dump parsed offline. The answer was one
-unclaimed child (coach-added, parent never registered) marked *present* on 2 Aug, in a month where every other lesson was
-marked and 9 invoices had already gone out; the first-run "error" was most likely the HTTP
-response timing out on a run that had in fact completed (all 9 `generated_at` within 10 s, the
-second run created 0). That is a 30-second question that cost an evening.
-
-**Why:** the seal guards are correct and must stay (no override — CLAUDE.md), but a refusal the
-admin cannot *read* is indistinguishable from a bug, and the month sits unbilled while they guess.
-The `open — N billable lesson(s) have no parent account` branch already opens the Unclaimed modal
-(`useGenerate.ts`), so the first gap may be partly a discoverability problem — check before building.
-
-**Notes — shape to explore, not decided:** (a) the result panel names the blocking rows
-(child + lesson date + class) for every open-month reason, not just a count; (b) the engine
-writes one `audit_log` row per run (`invoices_generated` / `generation_blocked` / `generation_failed`,
-with the status + counts in `new_value`) so a *Generation history* on the Invoices page can show
-"14 Sep 09:49 — 9 created, open: 1 unclaimed" and the previous error's text; (c) surface a run
-that timed out client-side as *"may still be running — refresh before retrying"* rather than
-`Error:`. Server-side the data is all in the engine's return value already (`results`, `created`,
-`unclaimed_students`, `blocking`); nothing needs a new query, only a home.
+**Why:** display-only today — cron is off, and the manual path ignores the run day. But the Billing
+months card (§7.7, 2026-09-22) flips a month to amber from the *business's* run day, so the day cron
+is enabled the card and the engine would disagree about when a month is late. **Must land before
+cron is enabled.** Found by the Billing-months `/plan-review` (RISK 9) and deliberately not fixed
+there: it changes billing timing, so it needs its own branch and its own Deno coverage.
 
 ### ~~Bound `recompute_package_extensions`~~ — **S** — **SUPERSEDED 2026-08-19** (§8.70)
 The scan is **gone entirely** — holiday extension became event-driven (marked at attendance

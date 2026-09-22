@@ -79,6 +79,11 @@ BEGIN
   DELETE FROM students WHERE full_name = 'Fixture Walkin';
   DELETE FROM billing_periods
     WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
+  -- The run log for that month (docs/plans/BILLING_MONTHS_PLAN.md ⚠ RISK 4):
+  -- the driver's own Generate writes one, and the Billing months card asserts on
+  -- the LATEST run's reason, so a stale earlier run must not be there to read.
+  DELETE FROM billing_runs
+    WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
 
   -- ── An UNCLAIMED child with one billable lesson in that month ─────────────
   -- No parent_students row: that absence IS the fixture.

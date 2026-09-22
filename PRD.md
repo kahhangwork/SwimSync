@@ -1484,6 +1484,43 @@ rained off) is genuinely finished and **does** seal.
 
 *(implemented)* When no billing month is passed (the automatic/cron path — the daily job POSTs an empty body), the engine defaults to **the previous calendar month in the app timezone**, derived via `Intl` in `generate-invoices/dates.ts` (`APP_TIMEZONE`, default `Asia/Singapore`) — **not** the runtime's UTC clock. Deriving it from UTC billed a month early at the SGT day boundary (a 1am SGT run is the prior day in UTC), which would matter the moment cron is enabled; the manual path is unaffected as it always sends an explicit month. The timezone is a single configurable seam, deliberately **not** per-coach/per-tenant — one zone suffices while all usage is SGT, and true multi-timezone belongs with future tenanting.
 
+#### Billing months — which months are closed, and why one is still open *(implemented 2026-09-22)*
+
+The Invoices page carries a **Billing months** card directly above the Generate panel. Each
+row is a month and its state:
+
+| State | Meaning |
+|---|---|
+| **Closed** | The month is sealed: the date it closed and how many invoices it issued. |
+| **Open** (red) | Generation has run (or invoices exist) but the month is not sealed. The row says **why**, from the latest run: *N lessons have unmarked attendance*, *N lessons have no parent to bill*, *Bill <month> first*, *No lessons recorded*, *Last run failed: …*, or *Reopened after sealing*. Any other engine status is shown raw, never as a tick. |
+| **Not billed yet** (amber) | The newest billable month, not yet run, once the business's run day has passed — or an earlier month that another month's run says must be billed first. |
+| **Not run yet** (grey) | The newest billable month, before the run day. |
+
+- **The reason is a snapshot of the last run**, labelled *"as of last run, 14 Sep, 09:49"*.
+  It does not recompute live — the billing engine stays the only copy of the rules. Fixing the
+  cause and generating again refreshes it.
+- **Every month that is not closed always shows.** Only the newest **three** closed months
+  do; the rest sit behind *Show all N months*, so the card stays a few rows tall.
+- **Acting from the card.** An open month offers **Unmarked (n)** (the existing unmarked-lessons
+  list) and **Unclaimed (n)** (the existing Unclaimed modal, to invite the parent or record a
+  settlement), and sets the Generate month to that month. A child who has been **claimed or
+  settled since the run** is not offered again; if nobody is left, the row says to generate
+  again to refresh.
+- **Run history.** Expanding a month lists its newest **five** runs: when, who, how many
+  invoices were created, and the result or the error text. A run that timed out in the
+  browser but completed on the server shows here as it actually finished.
+- **The Dashboard** shows one amber line when any month needs attention (e.g. *"Aug 2026 is
+  still open — 1 lesson has no parent to bill"*), linking to Invoices. Every admin of the
+  business sees it; the platform admin, who belongs to no business, does not.
+
+**What is recorded.** Every generation **attempt** writes one row per business to
+`billing_runs` (§9.24) — including runs that were blocked or threw. A run that did not try
+to bill (before the run day, automatic generation off, business suspended, month not ended,
+month already closed) writes nothing, so a daily automatic run cannot flood the history.
+Recording is best-effort and happens after billing has committed: a failed write never
+affects invoices. Runs before 22 Sep 2026 were never recorded; a month open from before then
+reads *"Reason not recorded — generate again to see why"*.
+
 #### Email notification on generation *(implemented)*
 
 When invoice generation creates a **new** invoice, SwimSync emails that parent an
@@ -3189,6 +3226,27 @@ and — for a correction to an already-paid month — `is_adjustment` with the
 - `parent_tenant_balances.credit_balance = SUM of remaining across that parent's notes **from that business**` *(was `parents.credit_balance`, pooled per parent, before §5.6)*
 
 ---
+
+### 9.24 BillingRuns *(implemented 2026-09-22)*
+
+*One row per invoice-generation **attempt**, per business — the history behind the Billing
+months card (§7.7). Written only by the billing engine; readable by the business's admins
+(owner and co-admins) and the platform admin. Append-only.*
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| **tenant_id** | UUID (FK) | Yes | The business. Rows go with the business if it is deleted |
+| **billing_month** | String (YYYY-MM) | Yes | The month the run was for |
+| **ran_at** | Timestamp | Yes | When it ran |
+| **ran_by** | UUID (FK → profiles) | No | Who pressed Generate; empty for the automatic run, or once that admin is deleted |
+| **mode** | Text | No | `manual` / `auto` |
+| **status** | Text | Yes | The engine's result, or `error` |
+| **sealed** | Boolean | Yes | Whether this run closed the month |
+| **invoices_created** | Integer | Yes | Invoices this run created |
+| **classes_still_incomplete** / **unclaimed_billable** | Integer | No | Counts behind an open month |
+| **earlier_unbilled_month** | String (YYYY-MM) | No | The earlier month that must be billed first |
+| **blocking** / **unclaimed_students** | JSON | No | The unmarked lessons / the children with no parent account, as reported |
+| **message** / **error** | Text | No | The engine's message; an error's text (message only, ≤ 500 characters) |
 
 ## 10. Invoice Calculation Logic
 

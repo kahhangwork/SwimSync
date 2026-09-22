@@ -150,3 +150,52 @@ export const fetchInvoices = (term: string, searchField: SearchField) => {
 
 export const updateInvoiceReminded = (invoiceId: string, stamp: string) =>
   supabase.from("invoices").update({ reminded_at: stamp }).eq("id", invoiceId);
+
+// ── Billing months card (docs/plans/BILLING_MONTHS_PLAN.md §6) ──────────────
+// The seal per month. RLS (billing_periods_select) already scopes to the
+// admin's business; the tenant filter is explicit anyway, as everywhere here.
+export const fetchBillingPeriods = (tenantId: string) =>
+  supabase
+    .from("billing_periods")
+    .select("billing_month, completed_at, invoices_issued")
+    .eq("tenant_id", tenantId);
+
+// The run log, newest first. 200 is far above any real need (≈1–5 runs a
+// month, and refusals-to-attempt are never logged — runLog.ts ⚠ RISK 3).
+export const fetchBillingRuns = (tenantId: string) =>
+  supabase
+    .from("billing_runs")
+    .select(
+      "id, billing_month, ran_at, mode, status, sealed, invoices_created, unclaimed_billable, earlier_unbilled_month, blocking, unclaimed_students, error, profiles(full_name)"
+    )
+    .eq("tenant_id", tenantId)
+    .order("ran_at", { ascending: false })
+    .limit(200);
+
+// Which months have ANY invoice — an open month whose runs predate the run log
+// shows up through this. ⚠ RISK 10: PostgREST caps a read at 1,000 rows, so the
+// read is bounded to recent months and ordered newest-first; an older month is
+// either sealed or visible through a run row.
+export const fetchInvoiceMonths = (tenantId: string, fromMonth: string) =>
+  supabase
+    .from("invoices")
+    .select("billing_month")
+    .eq("tenant_id", tenantId)
+    .gte("billing_month", fromMonth)
+    .order("billing_month", { ascending: false });
+
+// ⚠ RISK 6: which of a stored run's unclaimed students have since been claimed
+// (a parent registered). Read at the moment the admin opens the modal.
+export const fetchClaimedStudentIds = (studentIds: string[]) =>
+  supabase
+    .from("parent_students")
+    .select("student_id")
+    .in("student_id", studentIds);
+
+// …and which have a LIVE settlement (a reversed one no longer settles anything).
+export const fetchLiveSettlements = (studentIds: string[]) =>
+  supabase
+    .from("student_settlements")
+    .select("student_id, settled_through")
+    .in("student_id", studentIds)
+    .is("reversed_at", null);

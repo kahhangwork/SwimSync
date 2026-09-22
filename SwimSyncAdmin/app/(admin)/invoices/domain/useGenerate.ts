@@ -26,10 +26,15 @@ export function useGenerate({
   tenantId,
   setUnclaimed,
   afterGenerate,
+  afterAnyRun,
 }: {
   tenantId: string | null;
   setUnclaimed: (rows: UnclaimedStudent[]) => void;
   afterGenerate: () => Promise<void>;
+  /** Runs after EVERY attempt — refused, failed or timed out included. The
+   *  Billing months card reloads here: a client-side timeout can hide a run
+   *  the server completed, and the run log is where the truth is. */
+  afterAnyRun?: () => void;
 }) {
   // The latest month that can be billed is the one BEFORE today: invoices cover
   // a complete calendar month (PRD §5.5). This used to default to the CURRENT
@@ -250,6 +255,7 @@ export function useGenerate({
     } catch (e) {
       setGenResult(`Error: ${String(e)}`);
     }
+    afterAnyRun?.();
     setGenerating(false);
   }
 

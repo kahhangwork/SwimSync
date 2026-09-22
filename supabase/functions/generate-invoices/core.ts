@@ -56,6 +56,10 @@ export type GenerateOptions = {
    *  admin may only bill their own business); the daily cron omits it and
    *  every tenant is processed independently. */
   tenant_id?: string;
+  /** Who pressed Generate (a profiles.id), for the run log only — never used
+   *  for authorisation. Set by the admin route, which has already verified the
+   *  caller; absent on the cron. See runLog.ts. */
+  requested_by?: string;
   /** Clock injection — TESTS ONLY. Production callers omit it and get the real
    *  time. Exists so the run-day guard and the default billing month can be
    *  exercised deterministically rather than only on the right day of the

@@ -88,6 +88,11 @@ BEGIN
   DELETE FROM billing_periods
     WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
 
+  -- The run log the driver's Generate wrote (⚠ RISK 4). Tenant+month scoped for
+  -- the same reason as the seal above: billing_runs has no class axis.
+  DELETE FROM billing_runs
+    WHERE tenant_id = v_tenant AND billing_month = to_char(v_month, 'YYYY-MM');
+
   -- The class this fixture owns, and the effective-dated rate its trigger made.
   -- It used to BORROW the seed class, which is what broke CI on 2026-08-01; now
   -- that it creates one, the teardown has to remove it or the round-trip check

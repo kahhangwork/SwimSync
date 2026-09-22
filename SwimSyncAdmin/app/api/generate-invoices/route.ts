@@ -86,7 +86,14 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${cronSecret}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ mode: "manual", billing_month, tenant_id: tenantId }),
+      // requested_by is for the run log only (billing_runs.ran_by) — the engine
+      // never authorises on it; the caller was verified above.
+      body: JSON.stringify({
+        mode: "manual",
+        billing_month,
+        tenant_id: tenantId,
+        requested_by: userData.user.id,
+      }),
     });
   } catch (e) {
     return NextResponse.json(

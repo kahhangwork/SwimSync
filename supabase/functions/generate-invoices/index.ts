@@ -15,6 +15,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateInvoices, type GenerateOptions } from "./core.ts";
+import { recordRuns, toErrorRows, toRunRows } from "./runLog.ts";
 import {
   emailCreatedInvoices,
   notifyGenerationBlocked,
@@ -51,8 +52,18 @@ Deno.serve(async (req: Request) => {
   }
 
   let blockedAlerts = 0;
+  // Set once the run's own rows are written, so a failure LATER in the handler
+  // (an alert or email step) cannot add an "error" row for a run that billed.
+  let runRecorded = false;
   try {
     const result = await generateInvoices(supabase, opts);
+
+    // Record the attempt BEFORE any email: billing has committed, and a slow or
+    // failing email step must not lose the record of what the run did. This is
+    // also what lets the admin's Billing months card show the truth after a
+    // client-side timeout. Best-effort — never throws (runLog.ts).
+    await recordRuns(supabase, toRunRows(result, opts));
+    runRecorded = true;
 
     // Generation refused: unmarked attendance. Nobody would otherwise find out
     // an unattended run did nothing, so tell the coaches what to mark. Throttled
@@ -132,6 +143,10 @@ Deno.serve(async (req: Request) => {
       blocked_alerts_sent: blockedAlerts,
     });
   } catch (e) {
+    // A scoped run that threw is still an attempt the admin must be able to
+    // see ("last run failed: …"). recordRuns never throws, so this cannot mask
+    // the original error.
+    if (!runRecorded) await recordRuns(supabase, toErrorRows(opts, e));
     return json({ error: (e as Error).message }, 500);
   }
 });

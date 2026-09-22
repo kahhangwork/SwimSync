@@ -100,3 +100,32 @@ export function renameTenant(tenantId: string, displayName: string) {
     .update({ display_name: displayName, updated_at: new Date().toISOString() })
     .eq("id", tenantId);
 }
+
+// ── The billing-months alert (docs/plans/BILLING_MONTHS_PLAN.md D1/D5) ───────
+// The same three reads as the Invoices page's Billing months card, plus the run
+// day. Kept lean — the alert needs each month's state and reason, not the runs'
+// full history.
+export function loadBillingMonthsInput(tenantId: string, fromMonth: string) {
+  return Promise.all([
+    supabase.from("tenants").select("invoice_run_day").eq("id", tenantId).maybeSingle(),
+    supabase
+      .from("billing_periods")
+      .select("billing_month, completed_at, invoices_issued")
+      .eq("tenant_id", tenantId),
+    supabase
+      .from("billing_runs")
+      .select(
+        "id, billing_month, ran_at, mode, status, sealed, invoices_created, unclaimed_billable, earlier_unbilled_month, blocking, unclaimed_students, error"
+      )
+      .eq("tenant_id", tenantId)
+      .order("ran_at", { ascending: false })
+      .limit(200),
+    // ⚠ RISK 10: bounded and newest-first (PostgREST's 1,000-row cap).
+    supabase
+      .from("invoices")
+      .select("billing_month")
+      .eq("tenant_id", tenantId)
+      .gte("billing_month", fromMonth)
+      .order("billing_month", { ascending: false }),
+  ]);
+}

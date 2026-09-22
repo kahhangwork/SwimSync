@@ -180,6 +180,42 @@ check(
   "sealing here would strand the lessons permanently"
 );
 
+// ── ADMIN: the Billing months card keeps the reason (BILLING_MONTHS_PLAN.md) ──
+// The result line and modal above vanish on reload. The card is the record that
+// does not: the month shows OPEN, names why, and reopens the same modal. The
+// driver NEVER re-generates after settling (⚠ RISK 4): that would seal the seed
+// tenant's month — Closed is covered by vitest and the Deno sealed-shape test.
+const MONTH = LESSON_DATE.slice(0, 7);
+check(
+  "the engine RECORDED the run (billing_runs row for the month)",
+  sql(`SELECT count(*) FROM billing_runs WHERE tenant_id = '70000000-0000-0000-0000-000000000001' AND billing_month = '${MONTH}' AND unclaimed_billable > 0`) === "1",
+  "RISK 1 — a silent insert failure leaves the card with nothing to show"
+);
+
+await page.reload();
+await page.waitForTimeout(2500);
+const monthRow = page.getByTestId(`billing-month-${MONTH}`);
+const rowText = (await monthRow.count()) ? await monthRow.innerText() : "";
+check(
+  "after a RELOAD, the card shows the month as Open",
+  (await monthRow.count()) > 0 && (await monthRow.getAttribute("data-state")) === "open",
+  rowText ? "" : "no row for the fixture month"
+);
+check(
+  "…with the reason and when it was last run",
+  /no parent to bill/i.test(rowText) && /as of last run/i.test(rowText),
+  rowText
+);
+await page.screenshot({ path: shot("trial-03b-billing-months-card.png"), fullPage: true });
+
+await tap(monthRow.getByRole("button", { name: /Unclaimed \(1\)/ }), "open Unclaimed from the card");
+await page.waitForTimeout(1500);
+const fromCard = await page.evaluate(() => document.body.innerText);
+check(
+  "the card's Unclaimed button reopens the modal naming the child (D4)",
+  fromCard.includes(WALK_IN) && /Paid outside SwimSync/i.test(fromCard)
+);
+
 // ── ADMIN: settling unblocks it ──────────────────────────────────────────────
 if (/Paid outside SwimSync/i.test(genText)) {
   // The amount is REQUIRED — student_settlements CHECKs that a paid_outside row
@@ -202,6 +238,21 @@ if (/Paid outside SwimSync/i.test(genText)) {
     /Recorded for|Generate again/i.test(settledText)
   );
   await page.screenshot({ path: shot("trial-04-settled.png"), fullPage: true });
+
+  // ⚠ RISK 6 in the UI: the stored run still lists the child, but they are now
+  // settled — the card must not offer them for a second settlement.
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await page.waitForTimeout(2500);
+  const row2 = page.getByTestId(`billing-month-${MONTH}`);
+  await tap(row2.getByRole("button", { name: /Unclaimed \(1\)/ }), "reopen Unclaimed after settling");
+  await page.waitForTimeout(1500);
+  const after = await row2.innerText();
+  check(
+    "RISK 6: a settled child is NOT offered again — the card says to refresh",
+    /claimed or settled since the last run/i.test(after),
+    after
+  );
 }
 
 await browser.close();

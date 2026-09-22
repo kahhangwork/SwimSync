@@ -8,12 +8,14 @@ import { useUnclaimed } from "./domain/useUnclaimed";
 import { useOrphans } from "./domain/useOrphans";
 import { usePendingDebits } from "./domain/usePendingDebits";
 import { useGenerate } from "./domain/useGenerate";
+import { useBillingMonths } from "./domain/useBillingMonths";
 import { InvoiceToolbar } from "./ui/InvoiceToolbar";
 import { InvoiceTable } from "./ui/InvoiceTable";
 import { UnclaimedModal } from "./ui/UnclaimedModal";
 import { OrphanReport } from "./ui/OrphanReport";
 import { PendingDebits } from "./ui/PendingDebits";
 import { GenerationPanel } from "./ui/GenerationPanel";
+import { BillingMonthsCard } from "./ui/BillingMonthsCard";
 import { ConfirmGenerateModal } from "./ui/ConfirmGenerateModal";
 import { BlockedLessonsModal } from "./ui/BlockedLessonsModal";
 import { ReminderQueue } from "./ui/ReminderQueue";
@@ -30,12 +32,16 @@ export default function InvoicesPage() {
   const unclaimed = useUnclaimed();
   const orphans = useOrphans(tenantId);
   const debits = usePendingDebits(tenantId);
+  const months = useBillingMonths();
   const generate = useGenerate({
     tenantId,
     setUnclaimed: unclaimed.setUnclaimed,
     afterGenerate: async () => {
       await list.load();
       if (tenantId) await debits.loadPendingDebits(tenantId);
+    },
+    afterAnyRun: () => {
+      if (tenantId) months.load(tenantId);
     },
   });
 
@@ -47,6 +53,7 @@ export default function InvoicesPage() {
       if (tid) {
         orphans.loadOrphans(tid);
         debits.loadPendingDebits(tid);
+        months.load(tid);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,6 +99,27 @@ export default function InvoicesPage() {
         onSettle={orphans.handleSettleOrphan}
       />
 
+      {/* Which months are closed, which are open and WHY — directly above the
+          Generate button that acts on them (docs/plans/BILLING_MONTHS_PLAN.md). */}
+      <BillingMonthsCard
+        rows={months.rows}
+        loaded={months.loaded}
+        loadError={months.loadError}
+        showAll={months.showAll}
+        setShowAll={months.setShowAll}
+        expanded={months.expanded}
+        setExpanded={months.setExpanded}
+        staleNote={months.staleNote}
+        onSelectMonth={generate.setGenMonth}
+        onOpenUnclaimed={(row) =>
+          months.openUnclaimed(row, generate.setGenMonth, unclaimed.setUnclaimed)
+        }
+        onOpenBlocked={(row) => {
+          generate.setGenMonth(row.month);
+          generate.setBlockedLessons(row.recentRuns[0]?.blocking ?? []);
+        }}
+      />
+
       <GenerationPanel
         genMonth={generate.genMonth}
         setGenMonth={generate.setGenMonth}
@@ -121,9 +149,13 @@ export default function InvoicesPage() {
         settleAmount={unclaimed.settleAmount}
         setSettleAmount={unclaimed.setSettleAmount}
         settleError={unclaimed.settleError}
-        onSettle={(u, kind, amount) =>
-          unclaimed.handleSettle(u, kind, amount, generate.genMonth, generate.setGenResult)
-        }
+        onSettle={async (u, kind, amount) => {
+          await unclaimed.handleSettle(u, kind, amount, generate.genMonth, generate.setGenResult);
+          // The stored run is a snapshot (D3) and does not change; the card's
+          // RISK 6 filter drops a settled child on the next open. Reloading
+          // picks up anything else that moved (e.g. a seal by another admin).
+          if (tenantId) months.load(tenantId);
+        }}
         onClose={unclaimed.close}
       />
 
