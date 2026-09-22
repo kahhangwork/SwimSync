@@ -24,7 +24,7 @@ import {
   isShowingDate,
   type ResolvedSession,
 } from "@/lib/attendanceSession";
-import { toSgDate, todayInSg, type DayOfWeek, formatSgStamp } from "@/lib/lessonDates";
+import { toSgDate, todayInSg, type DayOfWeek } from "@/lib/lessonDates";
 import {
   lessonRole,
   canMark,
@@ -37,88 +37,10 @@ import {
   notifyCreditNoteEmails,
 } from "@/lib/creditNoteEmail";
 import PrimaryButton from "@/components/PrimaryButton";
-
-// "holiday" is READ-ONLY here: a public-holiday void is set by the tenant admin
-// (mark_day_holiday) and the DB guard refuses a coach touching it. The coach sees
-// it, never sets it — so it is excluded from the settable buttons, "Set all", the
-// save validation, and the save payload below.
-type TopStatus = "unmarked" | "present" | "absent" | "cancelled" | "trial" | "holiday";
-type DBStatus =
-  | "present"
-  | "absent"
-  | "cancelled_rain"
-  | "cancelled_coach"
-  | "trial_paid"
-  | "trial_free"
-  | "holiday";
-
-type StudentRow = {
-  id: string;
-  full_name: string;
-  /** On this roster because of an attendance row or a booking, not an
-   *  enrolment. */
-  attendedOnly?: boolean;
-  /** Booked for a trial on this date specifically. */
-  isTrial?: boolean;
-  /** Booked for a make-up on this date specifically — enrolled elsewhere,
-   *  guesting for one lesson. Ordinary statuses only. */
-  isMakeup?: boolean;
-};
-
-type AttState = {
-  top: TopStatus;
-  sub: string | null; // "rain"|"coach" for cancelled; "paid"|"free" for trial
-};
-
-// `existingId` used to live here, carrying the attendance row's primary key so
-// the save could "update in place". It never did that — onConflict on
-// (lesson_session_id, student_id) is what matches an existing row — and sending
-// the PK is what broke every partially-marked lesson (§7.67). Removed rather
-// than left unused, so nothing puts `id` back in the payload.
-
-function toDBStatus(top: TopStatus, sub: string | null): DBStatus | null {
-  if (top === "unmarked") return null;
-  if (top === "present") return "present";
-  if (top === "absent") return "absent";
-  if (top === "cancelled" && sub === "rain") return "cancelled_rain";
-  if (top === "cancelled" && sub === "coach") return "cancelled_coach";
-  if (top === "trial" && sub === "paid") return "trial_paid";
-  if (top === "trial" && sub === "free") return "trial_free";
-  return null;
-}
-
-function fromDBStatus(status: DBStatus): { top: TopStatus; sub: string | null } {
-  switch (status) {
-    case "present":         return { top: "present",   sub: null };
-    case "absent":          return { top: "absent",    sub: null };
-    case "cancelled_rain":  return { top: "cancelled", sub: "rain" };
-    case "cancelled_coach": return { top: "cancelled", sub: "coach" };
-    case "trial_paid":      return { top: "trial",     sub: "paid" };
-    case "trial_free":      return { top: "trial",     sub: "free" };
-    case "holiday":         return { top: "holiday",   sub: null };
-  }
-}
-
-function formatDate(dateStr: string): string {
-  return formatSgStamp(dateStr, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-const TOP_STATUSES: {
-  key: TopStatus;
-  label: string;
-  ring: string;
-  bg: string;
-}[] = [
-  { key: "present",   label: "Present",   ring: "border-green-500",  bg: "bg-green-500"  },
-  { key: "absent",    label: "Absent",    ring: "border-gray-400",   bg: "bg-gray-400"   },
-  { key: "cancelled", label: "Cancelled", ring: "border-orange-500", bg: "bg-orange-500" },
-  { key: "trial",     label: "Trial",     ring: "border-blue-500",   bg: "bg-blue-500"   },
-];
+import type { AttState, DBStatus, StudentRow, TopStatus } from "@/features/mark-attendance/types";
+import { TOP_STATUSES } from "@/features/mark-attendance/constants";
+import { formatDate, fromDBStatus, toDBStatus } from "@/features/mark-attendance/domain/attendanceStatus";
+import { exitHrefOf } from "@/features/mark-attendance/domain/exitHref";
 
 export default function MarkAttendanceScreen() {
   const { id } = useLocalSearchParams<{
@@ -142,32 +64,9 @@ export default function MarkAttendanceScreen() {
     from?: string;
   }>();
 
-  // ── WHERE DOES LEAVING THIS SCREEN GO? (§7.65) ──────────────────────────
-  // Not `router.back()`, which trusts whatever happens to be underneath — and
-  // what is underneath is frequently ANOTHER LESSON'S attendance screen.
-  //
-  // This screen lives in the CLASSES tab's Stack (classes/_layout.tsx) but is
-  // pushed from the SCHEDULE tab as well. Switching tabs does not unwind the
-  // Classes stack, it only hides it, so the stack accumulates:
-  //
-  //   Schedule → tap 845am card    [classes-index, att(845, 26 Jul)]
-  //   back chevron → Schedule      [classes-index, att(845, 26 Jul)]  ← kept
-  //   Schedule → tap 930am card    [classes-index, att(845,26), att(930,26)]
-  //   Save → router.back()         → lands on att(845, 26 Jul)
-  //
-  // Which is what the coach reported: saving the 9:30 class returned them to
-  // the 8:45 one, and the URL still carried the 8:45 session id.
-  //
-  // So the caller says where it came from and we go there EXPLICITLY, with
-  // `replace` rather than `push` — that also drops this screen out of the
-  // history, so nothing can pop back into a lesson the coach has finished.
-  //
-  // ⚠ THE DEFAULT ARM IS THE SAFETY NET — KEEP IT AS `from === "roster" ? … : …`
-  // rather than switching on "schedule". A stale `from=today` (a bookmark, a
-  // driver nobody updated) then still lands on a real screen instead of
-  // nowhere. Narrowing it to an exact match buys nothing and can only break.
-  const exitHref =
-    from === "roster" ? `/(coach)/classes/${id}/roster` : "/(coach)/schedule";
+  // Where leaving goes — the §7.65 rule and its ⚠ default-arm note live with
+  // exitHrefOf (features/mark-attendance/domain/exitHref.ts).
+  const exitHref = exitHrefOf(from, id);
 
   function leaveScreen() {
     router.replace(exitHref as any);
