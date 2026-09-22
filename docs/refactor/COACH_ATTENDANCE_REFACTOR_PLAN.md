@@ -378,13 +378,20 @@ roster. The user: "not a problem, can continue to merge to main once you are rea
 > Stages 1–3 together. Candidate gotcha — §12.
 | 3 | `e50017c` | **9 / 9** | 480 | **Full net = baseline** (attendance-guard 22, stale-screen 22, coach-roster 30, bulk-setall 10, admin-lesson-detail 27, trials 16, makeups 15, trial-onboarding 5/8, schedule-week 21, tz-saturday 6, smoke-app 70/73 — a first run's 69/73 was a one-off 502 from kong on the ROSTER's `markable_window_start`, re-run 70/73). 7 load chains identical to HEAD incl. terminals, both RPCs identical (script). Shared pin commented out → exactly ONE offender (the save's). 5 token checks in order; clear block first; floor + `todayInSg()` unmoved; `ownsClass` verbatim; no `useLocalSearchParams`/`useCallback` in the hook. Temp `[mark] load` log: exactly ONE per visit (2 lessons → 2), removed. Hand-checks: cancelled lesson via the Schedule DONE tap → permanent spinner BEFORE (original code) and AFTER (screenshots); Back to class → roster (`from=roster`) / `/schedule` (none). Route 1,028 → 746 |
 | 4 | `012cf96` | **0** / 5 | 480 | **Full net = baseline** (same 11 counts; smoke-app 70/73 first time). Script: **14 of 14** dao chains identical to HEAD incl. terminals (load + save); the 21-step save ORDER strictly increasing; absences payload keys, both `Promise.resolve` arms, all 4 `session!.id` unchanged; every comment line of `handleSave` preserved; no `useCallback`; the route passes the REF. **Save hand-check 11/11 on Stage 3 code AND on Stage 4** (`handcheck-save.mjs`, DB-verified): (a) Present→Absent on an invoiced lesson → credit_notes +1, ONE `credit-note-emails` request, left to roster; (c) no-change re-save → +0, ZERO requests; (b) first save → exactly one `lesson_sessions` row, attendance attached, audit row, left to Schedule. **Proven able to fail:** with the guard forced `true ||`, (c) went red (`requests=1`, 10/11); reverted, bundle re-checked clean before the net. Route 746 → 536 |
-| 5 | (this commit) | 0 / 3 | 480 | bulk-setall 10/10 (bundle confirmed to carry `useMarking`). setTop/setSub/onSetAll body VERBATIM by script; menu closed FIRST; `confirmAction`, no `Alert` in code. Route 536 → 493 |
+| 5 | `6cc5f12` | 0 / 3 | 480 | bulk-setall 10/10 (bundle confirmed to carry `useMarking`). setTop/setSub/onSetAll body VERBATIM by script; menu closed FIRST; `confirmAction`, no `Alert` in code. Route 536 → 493 |
+| 6 | (this commit) | **0 / 0** | → 484 | 7 `ui/` bodies VERBATIM by script (whitespace-stripped, against the pre-Stage-6 route); JSX string-literal set: nothing missing; `grep` for the prose-prefix trap prints nothing. **Tailwind:** after `expo start --clear`, on a VISIBLE marking screen reached by an in-app tap, `SetAllMenu`'s `top-14` = **56px** (`w-52` = 208px, z 50; control `text-sm` 14px), menu stacks above the list (screenshot). **Read-only hand-check:** as a class SHADOW → *Lesson Attendance*, no Save / Set all / Tap-a-status / Coaches present; as the owner → *Mark Attendance*, all four, the shadow listed. Full net: see L4. Route 493 → **166** lines, **0** `useState`/`useRef`, 13 `@/lib` + `@/store` → **0** |
+| L4 | (this commit) | — | 484 | The Stage 6 full net IS the L4 run (same code). **= baseline on all 11:** attendance-guard 22 · stale-screen 22 · coach-roster 30 · bulk-setall 10 · admin-lesson-detail 27 · trials 16 · makeups 15 · trial-onboarding 5/8 · schedule-week 21 · tz-saturday 6 · smoke-app 70/73 (the two known local-only reds, unchanged). Then a whitespace-only reindent of the 5 fragment-wrapped `ui/` files (still VERBATIM by script) → bulk-setall 10/10 |
 
 **Baseline net (Stage 1 code, 2026-09-22):** attendance-guard 22/22 · stale-screen 22/22 · coach-roster 30/30 ·
 bulk-setall 10/10 · admin-lesson-detail 27/27 · trials 16/16 · makeups 15/15 · trial-onboarding **5/8** ·
 schedule-week 21/21 · tz-saturday 6/6 · smoke-app **70/73**. The two reds are BACKLOG's *"Four UI drivers fail on a
 LOCAL full sweep"* (`BACKLOG.md:1827`) — same scores, same messages (the admin's unclaimed-child generation report;
 `/invoice` + `/package` render). Neither is this screen.
+
+**The route:** 1,183 → **166** lines, 10 `useState` + 2 `useRef` → **0**, 13 `@/lib` + `@/store` → **0**; both ledgers
+EMPTY. Two files beyond §2's plan: `domain/screenState.ts` (`roleView` + a re-export of `isShowingDate`, because the
+route may not import `@/lib` — with a characterisation test) and `ui/StudentMarkList.tsx` (named for what it is — the
+whole list ternary, not one card).
 
 **Deviation (0b):** the scan test asserts every `SCOPE_DIRS` folder EXISTS (roster Stage 1 added that), so
 `features/mark-attendance/.gitkeep` holds the folder open. **Stage 1 deletes it** in the same commit that adds
@@ -398,7 +405,21 @@ _(filled in per stage)_ Known at planning:
   there is nothing to mark) — but a dead end reachable from THREE ordinary taps (Schedule DONE, today's card,
   roster Past Sessions) with no back affordance; the tab bar is the only exit. The fix is one `setResolved({ date, sessionId: sid })`; it then exposes
   the stale `classTitle` in the message (pass `cls.title`). A coach-app driver for the block screen comes with it.
-- BACKLOG: a coach-side credit-note-email driver if Stage 4's hand-check (a) finds none.
+- BACKLOG: a coach-side credit-note-email driver — Stage 4's hand-check (a) found NONE (the only proof is
+  `handcheck-save.mjs`, scratchpad). Its three cases (credit +1 / ONE request; no-change re-save ZERO; first save ONE
+  session row) are the spec, and it was proven able to fail (the guard forced `true ||` → red).
+- BACKLOG: one `check()` in `verify-coach-roster` for the read-only title *Lesson Attendance* (a shadow's view) — no
+  driver asserts it; Stage 6 hand-checked it.
+- **§7 candidate: a coach's full-page deep link to ANY coach screen lands on Schedule, with the target mounted HIDDEN
+  beneath.** `app/_layout.tsx:145` runs `router.replace(landingFor(...))` after `getSession()` on every web load, so
+  `gotoAuthed(…/attendance?…)` ends on `/schedule`. Drivers and hand-checks that "work" by deep link are pressing a
+  hidden screen with DOM clicks (and `innerText` of it is EMPTY — use `textContent`). Met at Stage 6 when a Tailwind
+  probe found no menu. Reach the screen by an in-app tap when anything visual matters. (§7.10/§7.252's family —
+  §7.252 blamed the force-click; the root is the landing replace.) Also a product question for BACKLOG: a coach
+  opening a shared lesson link is silently sent to Schedule.
+- **ARCHITECTURE §6 (the app's shapes, second unit):** a screen whose render branches on `@/lib` predicates gets a
+  tiny `domain/screenState.ts` (re-export or wrap) rather than a route `@/lib` import; `ui/` components wrap
+  multi-block JSX in a fragment so the block moves verbatim.
 - **§7 candidate (found at Stage 3): `CI=1 npx expo start` serves a FROZEN bundle — Metro does not watch files in CI
   mode.** Every local driver run after an edit then tests the code as it was at startup, and passes, because nothing
   changed. Start Expo for local driver work WITHOUT `CI=1` (`< /dev/null` suffices for a non-interactive start), and

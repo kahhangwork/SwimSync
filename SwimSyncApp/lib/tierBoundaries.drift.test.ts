@@ -86,9 +86,7 @@ const PAGES = [
 type Allowed = { file: string; contains: string; why: string };
 
 // (F_ROSTER was deleted with its last ledger entry, roster Stage 5, 2026-09-21.)
-// Attendance, pinned at Stage 0b 2026-09-22 — the ledger only shrinks from here.
-
-const F_ATT = "app/(coach)/classes/[id]/attendance.tsx";
+// (F_ATT was deleted with its last ledger entry, attendance Stage 6, 2026-09-22.)
 
 /**
  * Check 3 — network reaches outside `dao/`. ATTENDANCE Stage 0b pinned 20
@@ -117,9 +115,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: F_ATT, contains: "@/lib/attendanceBulk", why: "Stage 5 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
-  { file: F_ATT, contains: "@/lib/attendanceSession", why: "Stage 6 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
-  { file: F_ATT, contains: "@/lib/coachRoster", why: "Stage 6 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
 ];
 
 /** Blank comments in place, preserving newlines, so line numbers stay true. */
