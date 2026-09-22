@@ -36,6 +36,8 @@
 //
 // SCOPE: the coach roster screen (full track, docs/refactor/
 // COACH_ROSTER_REFACTOR_PLAN.md), 2026-09-21 Stage 0b — the first app unit.
+// + the coach attendance MARKING screen (full track, docs/refactor/
+// COACH_ATTENDANCE_REFACTOR_PLAN.md), 2026-09-22 Stage 0b.
 //
 // §7.25: every check was proven RED by breaking the rule on purpose, then
 // reverted. Roster Stage 0b, 2026-09-21: with the ledgers emptied, checks 3
@@ -50,6 +52,17 @@
 // typo'd PAGES path turned the scan test red (not a TypeError), and
 // corrupting the makeup_bookings pin turned the shrink test AND check 3 red.
 // Breakers removed, 7/7 green.
+//
+// Attendance Stage 0b, 2026-09-22: with the new pins emptied, checks 3 and 4
+// went red on exactly 20 + 14 sites (the plan-review's corrected count). Then,
+// pinned: mark-attendance/ui/Break importing ../dao (1); dao/break importing
+// react-native (2); domain/break importing @/lib/sessionMainCoach AND calling
+// fetch( (3, both named); an unpinned @/lib/timeOfDay on the route (4); a
+// failing domain/zz.test.ts ran (testMatch reaches the folder); a
+// toLocaleDateString() in domain/break went red in BOTH sgDisplay twins; a
+// corrupted trial_bookings pin turned the shrink test AND check 3 red; a
+// typo'd PAGES path and a SCOPE_DIRS/PAGES length mismatch each turned the
+// scan test red (not a TypeError). Breakers removed, 7/7 green.
 
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
@@ -60,31 +73,83 @@ const APP = join(__dirname, "..");
 const SCOPE_DIRS = [
   // Coach roster (full track), 2026-09-21.
   "features/roster",
+  // Coach attendance marking (full track), 2026-09-22.
+  "features/mark-attendance",
 ];
 
 // The route files. Check 4 runs against each; check 3 scans them too.
-const PAGES = ["app/(coach)/classes/[id]/roster.tsx"];
+const PAGES = [
+  "app/(coach)/classes/[id]/roster.tsx",
+  "app/(coach)/classes/[id]/attendance.tsx",
+];
 
 type Allowed = { file: string; contains: string; why: string };
 
 // (F_ROSTER was deleted with its last ledger entry, roster Stage 5, 2026-09-21.)
+// Attendance, pinned at Stage 0b 2026-09-22 — the ledger only shrinks from here.
+
+const F_ATT = "app/(coach)/classes/[id]/attendance.tsx";
 
 /**
- * Check 3 — network reaches outside `dao/`. Roster Stage 0b pinned 9: the
+ * Check 3 — network reaches outside `dao/`. ATTENDANCE Stage 0b pinned 20
+ * sites with 19 entries: the client import, two client-holding helper
+ * imports, 14 `.from()` builders, 2 `.rpc()` and `notifyCreditNoteEmails(
+ * supabase, …)`. ⚠ ONE entry covers TWO lines — :314 (load) and :629 (save)
+ * render identically once joined; see its `why`. Stage 3 removes the load's,
+ * Stage 4 the save's and the client import.
+ *
+ * Roster Stage 0b pinned 9: the
  * client import, the six `.from()` builders, `removeFromClass(supabase, …)`,
  * and the `@/lib/markableFloor` import (a client-holding helper). Stage 3
  * removes the six `.from()` pins and the markableFloor import; Stage 4 the
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
+  { file: F_ATT, contains: "import { supabase } from \"@/lib/supabase\"", why: "Stage 4 — the client import; the last client use leaves with the save" },
+  { file: F_ATT, contains: "import { fetchMarkableFloor } from \"@/lib/markableFloor\"", why: "Stage 3 — client-holding helper; bound in dao/markAttendance.rpc.ts" },
+  { file: F_ATT, contains: "import { fetchIsMainOnSession } from \"@/lib/sessionMainCoach\"", why: "Stage 3 — client-holding helper; bound in dao/markAttendance.rpc.ts" },
+  { file: F_ATT, contains: "supabase .from(\"classes\")", why: "Stage 3 — load: class + enrolments" },
+  { file: F_ATT, contains: "? supabase .from(\"coaches\")", why: "Stage 3 — load: my coach record" },
+  { file: F_ATT, contains: "const { data: existingSession } = await supabase .from(\"lesson_sessions\")", why: "Stage 4 — SHARED by :314 (load) and :629 (save stale re-select) — dataAccess joins one line only, so the two are indistinguishable. Stage 3 removes :314, Stage 4 :629; delete this pin at Stage 4" },
+  { file: F_ATT, contains: "? supabase .from(\"session_coaches\")", why: "Stage 3 — load: my roster row" },
+  { file: F_ATT, contains: "supabase.rpc(\"coach_is_active_class_shadow\"", why: "Stage 3 — load: class-shadow RPC (§7.141)" },
+  { file: F_ATT, contains: "shadowRoster } = await supabase.rpc(", why: "Stage 3 — load: session_shadow_coaches RPC (name is on the next, unjoined line)" },
+  { file: F_ATT, contains: "? await supabase .from(\"attendance\")", why: "Stage 3 — load: attendance rows" },
+  { file: F_ATT, contains: "booked } = await supabase .from(\"trial_bookings\")", why: "Stage 3 — load: trial bookings" },
+  { file: F_ATT, contains: "makeupBooked } = await supabase .from(\"makeup_bookings\")", why: "Stage 3 — load: make-up bookings" },
+  { file: F_ATT, contains: "coach } = await supabase .from(\"coaches\")", why: "Stage 4 — save: coach lookup" },
+  { file: F_ATT, contains: "newSession, error: sessionError } = await supabase .from(\"lesson_sessions\")", why: "Stage 4 — save: lazy session insert" },
+  { file: F_ATT, contains: "upsertError } = await supabase .from(\"attendance\")", why: "Stage 4 — save: the attendance upsert" },
+  { file: F_ATT, contains: "? supabase .from(\"session_coach_absences\")", why: "Stage 4 — save: absences delete" },
+  { file: F_ATT, contains: "? supabase.from(\"session_coach_absences\").upsert(", why: "Stage 4 — save: absences upsert" },
+  { file: F_ATT, contains: "await supabase.from(\"audit_log\").insert(", why: "Stage 4 — save: audit row" },
+  { file: F_ATT, contains: "notifyCreditNoteEmails(supabase, finalSessionId)", why: "Stage 4 — save: credit-note email call (takes the client)" },
 ];
 
 /**
- * Check 4 — route-file imports outside its own tiers. Roster Stage 0b pinned
+ * Check 4 — route-file imports outside its own tiers. ATTENDANCE Stage 0b
+ * pinned 14: thirteen `@/lib/*` modules and `@/store/useAppStore`; all gone at
+ * Stage 6.
+ *
+ * Roster Stage 0b pinned
  * 9: eight `@/lib/*` modules and `@/store/useAppStore`. Each leaves as its
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
+  { file: F_ATT, contains: "@/lib/supabase", why: "Stage 4 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/store/useAppStore", why: "Stage 5 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/confirm", why: "Stage 5 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/attendanceBulk", why: "Stage 5 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/attendanceRoster", why: "Stage 3 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/attendancePayload", why: "Stage 4 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/attendanceSaveError", why: "Stage 4 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/attendanceWindow", why: "Stage 3 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/markableFloor", why: "Stage 3 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/attendanceSession", why: "Stage 6 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/lessonDates", why: "Stage 3 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/coachRoster", why: "Stage 6 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/sessionMainCoach", why: "Stage 3 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
+  { file: F_ATT, contains: "@/lib/creditNoteEmail", why: "Stage 4 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
 ];
 
 /** Blank comments in place, preserving newlines, so line numbers stay true. */
