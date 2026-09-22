@@ -64,82 +64,9 @@ import {
 import { fetchCoveredOutSessions } from "@/lib/sessionMainCoach";
 import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
-
-/**
- * PostgREST caps every response at `max_rows = 1000` (supabase/config.toml) and
- * does it SILENTLY — past the cap you get fewer rows, not an error. An
- * under-reported NEEDS MARKING list looks exactly like being up to date, which
- * is the worst possible failure for a screen whose whole job is to stop a
- * lesson going unbilled. So ask for a bound BELOW the cap and treat hitting it
- * as a condition to shout about (see `truncated`).
- *
- * Do not assume this is unreachable: `markable_floor` falls back to the
- * tenant's `created_at` when a business has NEVER sealed a month, so a school
- * onboarded months ago that has not billed has a floor that far back.
- */
-const ROW_LIMIT = 900;
-
-/**
- * The class columns every card is built from. A COVERED class is fetched with
- * the same shape as an owned one — the substitute needs the title, the times
- * and the location just as much, and `classes_select` now returns it to them
- * (`coach_rostered_in_class`, 20260811000200).
- */
-const CLASS_SELECT = `
-        id,
-        title,
-        day_of_week,
-        start_time,
-        end_time,
-        location_id,
-        locations(name),
-        student_class_enrolments(student_id, is_active, enrolled_at, unenrolled_at)
-      `;
-
-/** One lesson on one date — the unit every section renders. */
-type WeekLesson = {
-  /** scheduleBuckets sorts on these two; the rest is for the card. */
-  classId: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  title: string;
-  location: string;
-  locationId: string | null;
-  sessionId: string | null;
-  progress: LessonProgress;
-  summary: string;
-  students: number;
-  guests: number;
-  /** Who is teaching it. `owner` unless an admin has rostered somebody. */
-  role: LessonRole;
-  /** Cancelled in advance by the admin — shown struck, never marked. */
-  cancelled: boolean;
-};
-
-/** A lesson that should have happened but has no complete attendance. */
-type BacklogItem = {
-  class_id: string;
-  class_title: string;
-  date: string;
-  session_id: string | null;
-  /** Only ever `partial` or `unmarked` — a complete lesson is not here. */
-  progress: LessonProgress;
-  summary: string;
-};
-
-function formatTime(time: string): string {
-  const [h, m] = time.split(":");
-  const hour = parseInt(h, 10);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  const hour12 = hour % 12 || 12;
-  return `${hour12}:${m} ${ampm}`;
-}
-
-const shortDate = (d: string) =>
-  formatSgDate(d, { day: "numeric", month: "short" });
-const dayHeading = (d: string) =>
-  formatSgDate(d, { weekday: "short", day: "numeric", month: "short" });
+import { ROW_LIMIT, CLASS_SELECT } from "@/features/schedule/constants";
+import type { WeekLesson, BacklogItem } from "@/features/schedule/types";
+import { formatTime, shortDate, dayHeading } from "@/features/schedule/domain/scheduleFormat";
 
 /**
  * The status pill. One component for every section, so a state cannot be worded

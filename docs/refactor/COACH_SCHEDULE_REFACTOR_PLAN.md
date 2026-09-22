@@ -334,10 +334,14 @@ shape, no `lib/` module.
 
 | Stage | Commit | Ledger (3 / 4) | jest | Drivers / checks |
 |---|---|---|---|---|
-| 0b | (this commit) | 12 / 12 (24 pins) | 484 → 484 | Empty-ledger red list = **12 + 12 exactly** (the prediction). Proven red: checks 1–4 (helper leg via `markableFloor`, `fetch(`, `@/lib/confirm` for check 4), jest reaching `features/schedule`, BOTH sgDisplay twins, a corrupted pin (shrink + check 3), a typo'd `PAGES` path and a length mismatch (scan test). **Each of the 24 pins removed alone → exactly 1 offender.** Infra lines verified present, not re-added. `.gitkeep` holds the folder |
+| 0b | `b05c53a` | 12 / 12 (24 pins) | 484 → 484 | Empty-ledger red list = **12 + 12 exactly** (the prediction). Proven red: checks 1–4 (helper leg via `markableFloor`, `fetch(`, `@/lib/confirm` for check 4), jest reaching `features/schedule`, BOTH sgDisplay twins, a corrupted pin (shrink + check 3), a typo'd `PAGES` path and a length mismatch (scan test). **Each of the 24 pins removed alone → exactly 1 offender.** Infra lines verified present, not re-added. `.gitkeep` holds the folder |
+| 1 | (this commit) | 12 / 12 | 484 → 488 | — (types + pure helpers). The 3 blocks cut by line range from the route and written with only `export` added (verbatim by construction; each range asserted by its first/last text). `.gitkeep` deleted. Route 1,255 → 1,182 |
 
 ## 12. Findings for `/update-docs`
 _(filled in per stage)_
+- **BACKLOG (Stage 1): `formatTime` is now in TWO `features/*/domain` files** (roster, schedule — byte-identical) plus
+  four route copies (parent attendance/home/child, coach classes — two take `string | null`). Playbook §5: a third
+  feature copy is the trigger to consolidate; kept feature-scoped here (§7.233, not mid-refactor).
 
 ## 13. PRE-COMMIT GATE — walk before EVERY stage commit
 - [ ] `npm run typecheck && npm test` green; jest count ≥ previous stage's
