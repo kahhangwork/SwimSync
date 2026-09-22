@@ -127,20 +127,8 @@ const F_SCHED = "app/(coach)/schedule/index.tsx";
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
   // ── Coach Schedule (docs/refactor/COACH_SCHEDULE_REFACTOR_PLAN.md) — ALL 12 leave at Stage 3 ──
-  { file: F_SCHED, contains: `import { supabase } from "@/lib/supabase"`, why: "the client; Stage 3 (dao/)" },
-  { file: F_SCHED, contains: `from "@/lib/markableFloor"`, why: "client-holding helper; Stage 3 binds it in dao/schedule.rpc.ts" },
-  { file: F_SCHED, contains: `from "@/lib/sessionMainCoach"`, why: "client-holding helper; Stage 3 binds it in dao/schedule.rpc.ts" },
-  { file: F_SCHED, contains: `supabase.from("coaches")`, why: "coach lookup; Stage 3 (dao/schedule.repo.ts)" },
   // ⚠ KEEP THE SPACE: a bare `.from("classes")` also matches the covered and
   // shadowed reads below, so one pin would silently cover three sites.
-  { file: F_SCHED, contains: `supabase .from("classes")`, why: "owned classes; Stage 3" },
-  { file: F_SCHED, contains: `supabase .from("session_coaches")`, why: "roster rows; Stage 3" },
-  { file: F_SCHED, contains: `.in("id", coveredClassIds)`, why: "covered classes; Stage 3" },
-  { file: F_SCHED, contains: `supabase .from("class_shadow_coaches")`, why: "shadow assignments; Stage 3" },
-  { file: F_SCHED, contains: `.in("id", shadowClassIds)`, why: "shadowed classes; Stage 3" },
-  { file: F_SCHED, contains: `supabase .from("lesson_sessions")`, why: "window sessions; Stage 3" },
-  { file: F_SCHED, contains: `supabase .from("trial_bookings")`, why: "trial bookings; Stage 3" },
-  { file: F_SCHED, contains: `supabase .from("makeup_bookings")`, why: "make-up bookings; Stage 3" },
 ];
 
 /**
@@ -158,10 +146,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   // ── Coach Schedule — each leaves when its last symbol moves; all 12 gone at Stage 5 ──
-  { file: F_SCHED, contains: "@/store/useAppStore", why: "session; Stage 3 (useScheduleLoad) / Stage 5 (Greeting)" },
-  { file: F_SCHED, contains: "@/lib/supabase", why: "Stage 3" },
-  { file: F_SCHED, contains: "@/lib/markableFloor", why: "Stage 3" },
-  { file: F_SCHED, contains: "@/lib/sessionMainCoach", why: "Stage 3" },
   { file: F_SCHED, contains: "@/lib/lessonDates", why: "todayInSg/backlogWindowStart -> domain, formatSgDate -> ui; by Stage 5" },
   { file: F_SCHED, contains: "@/lib/timeOfDay", why: "nowMinutesInSg -> useWeek, isNowInRange -> ui; by Stage 5" },
   { file: F_SCHED, contains: "@/lib/attendanceSummary", why: "loop -> domain, chips/labels -> ui; by Stage 5" },
