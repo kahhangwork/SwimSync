@@ -1491,7 +1491,7 @@ row is a month and its state:
 
 | State | Meaning |
 |---|---|
-| **Closed** | The month is sealed: the date it closed and how many invoices it issued. |
+| **Closed** | The month is sealed, and the date it closed. (Not an invoice count: the seal records only the invoices its own run created, so a month billed across several runs would under-report.) |
 | **Open** (red) | Generation has run (or invoices exist) but the month is not sealed. The row says **why**, from the latest run: *N lessons have unmarked attendance*, *N lessons have no parent to bill*, *Bill <month> first*, *No lessons recorded*, *Last run failed: …*, or *Reopened after sealing*. Any other engine status is shown raw, never as a tick. |
 | **Not billed yet** (amber) | The newest billable month, not yet run, once the business's run day has passed — or an earlier month that another month's run says must be billed first. |
 | **Not run yet** (grey) | The newest billable month, before the run day. |

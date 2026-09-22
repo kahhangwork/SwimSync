@@ -133,13 +133,14 @@ function MonthRow({
         </span>
 
         <span className="text-xs text-gray-600">
+          {/* The close date only — NOT billing_periods.invoices_issued, which
+              counts just the SEALING run's invoices (Aug 2026 sealed with 0
+              while 9 existed from an earlier run). */}
           {row.state === "closed" && row.period
-            ? `${formatSgStamp(row.period.completed_at, {
+            ? `Closed on ${formatSgStamp(row.period.completed_at, {
                 day: "numeric",
                 month: "short",
-              })} · ${
-                row.period.invoices_issued
-              } invoice${row.period.invoices_issued === 1 ? "" : "s"}`
+              })}`
             : row.reason}
         </span>
 
