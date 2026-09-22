@@ -105,15 +105,6 @@ const F_ATT = "app/(coach)/classes/[id]/attendance.tsx";
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: F_ATT, contains: "import { supabase } from \"@/lib/supabase\"", why: "Stage 4 — the client import; the last client use leaves with the save" },
-  { file: F_ATT, contains: "const { data: existingSession } = await supabase .from(\"lesson_sessions\")", why: "Stage 4 — SHARED by :314 (load) and :629 (save stale re-select) — dataAccess joins one line only, so the two are indistinguishable. Stage 3 removes :314, Stage 4 :629; delete this pin at Stage 4" },
-  { file: F_ATT, contains: "coach } = await supabase .from(\"coaches\")", why: "Stage 4 — save: coach lookup" },
-  { file: F_ATT, contains: "newSession, error: sessionError } = await supabase .from(\"lesson_sessions\")", why: "Stage 4 — save: lazy session insert" },
-  { file: F_ATT, contains: "upsertError } = await supabase .from(\"attendance\")", why: "Stage 4 — save: the attendance upsert" },
-  { file: F_ATT, contains: "? supabase .from(\"session_coach_absences\")", why: "Stage 4 — save: absences delete" },
-  { file: F_ATT, contains: "? supabase.from(\"session_coach_absences\").upsert(", why: "Stage 4 — save: absences upsert" },
-  { file: F_ATT, contains: "await supabase.from(\"audit_log\").insert(", why: "Stage 4 — save: audit row" },
-  { file: F_ATT, contains: "notifyCreditNoteEmails(supabase, finalSessionId)", why: "Stage 4 — save: credit-note email call (takes the client)" },
 ];
 
 /**
@@ -126,15 +117,11 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: F_ATT, contains: "@/lib/supabase", why: "Stage 4 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
   { file: F_ATT, contains: "@/store/useAppStore", why: "Stage 5 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
   { file: F_ATT, contains: "@/lib/confirm", why: "Stage 5 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
   { file: F_ATT, contains: "@/lib/attendanceBulk", why: "Stage 5 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
-  { file: F_ATT, contains: "@/lib/attendancePayload", why: "Stage 4 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
-  { file: F_ATT, contains: "@/lib/attendanceSaveError", why: "Stage 4 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
   { file: F_ATT, contains: "@/lib/attendanceSession", why: "Stage 6 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
   { file: F_ATT, contains: "@/lib/coachRoster", why: "Stage 6 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
-  { file: F_ATT, contains: "@/lib/creditNoteEmail", why: "Stage 4 — leaves as its symbols move into domain/ or ui/ (Stage 6 at the latest)" },
 ];
 
 /** Blank comments in place, preserving newlines, so line numbers stay true. */

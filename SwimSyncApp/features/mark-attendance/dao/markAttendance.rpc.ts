@@ -8,6 +8,7 @@
 import { supabase } from "@/lib/supabase";
 import { fetchMarkableFloor } from "@/lib/markableFloor";
 import { fetchIsMainOnSession } from "@/lib/sessionMainCoach";
+import { notifyCreditNoteEmails } from "@/lib/creditNoteEmail";
 
 // ⚠ An RPC, not a filtered table read — §7.141; see the call site in useAttendanceLoad.
 export const isActiveClassShadow = (id: string) =>
@@ -25,3 +26,7 @@ export const sessionShadowCoaches = (id: string, date: string) =>
 export const fetchFloor = () => fetchMarkableFloor();
 
 export const isMainOnSession = (sid: string) => fetchIsMainOnSession(sid);
+
+// The credit-note email trigger (edge function `credit-note-emails`), bound so the
+// save hook never holds the client. Strictly equivalent to the route's call.
+export const notifyCreditNotes = (sid: string) => notifyCreditNoteEmails(supabase, sid);
