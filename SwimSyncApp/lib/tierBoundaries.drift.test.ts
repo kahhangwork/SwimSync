@@ -163,7 +163,6 @@ const ALLOWED_PAGE_IMPORTS: Allowed[] = [
   { file: F_SCHED, contains: "@/lib/markableFloor", why: "Stage 3" },
   { file: F_SCHED, contains: "@/lib/sessionMainCoach", why: "Stage 3" },
   { file: F_SCHED, contains: "@/lib/lessonDates", why: "todayInSg/backlogWindowStart -> domain, formatSgDate -> ui; by Stage 5" },
-  { file: F_SCHED, contains: "@/lib/attendanceCompleteness", why: "the loop -> domain/scheduleRows; Stage 2" },
   { file: F_SCHED, contains: "@/lib/timeOfDay", why: "nowMinutesInSg -> useWeek, isNowInRange -> ui; by Stage 5" },
   { file: F_SCHED, contains: "@/lib/attendanceSummary", why: "loop -> domain, chips/labels -> ui; by Stage 5" },
   { file: F_SCHED, contains: "@/lib/scheduleWeek", why: "useWeek / useScheduleSections; by Stage 4" },

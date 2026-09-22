@@ -11,34 +11,14 @@ import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase } from "@/lib/supabase";
-import {
-  todayInSg,
-  backlogWindowStart,
-  toSgDate,
-  formatSgDate,
-  type DayOfWeek,
-} from "@/lib/lessonDates";
+import { todayInSg, backlogWindowStart, formatSgDate } from "@/lib/lessonDates";
 import { fetchMarkableFloor } from "@/lib/markableFloor";
+import { nowMinutesInSg, isNowInRange } from "@/lib/timeOfDay";
 import {
-  type EnrolmentSpan,
-  isLessonFullyMarked,
-  expectedStudentsOn,
-} from "@/lib/attendanceCompleteness";
-import {
-  nowMinutesInSg,
-  isNowInRange,
-  hasLessonEnded,
-} from "@/lib/timeOfDay";
-import {
-  lessonProgress,
-  summariseStatuses,
-  formatSummary,
   progressLabel,
-  splitExpected,
   formatAttendees,
   isFinished,
   type LessonProgress,
-  type DbStatus,
 } from "@/lib/attendanceSummary";
 import {
   mondayForOffset,
@@ -47,7 +27,6 @@ import {
   selectableWeekOffsets,
   canGoBack,
   canGoForward,
-  lessonDatesInRange,
 } from "@/lib/scheduleWeek";
 import { bucketWeek } from "@/lib/scheduleBuckets";
 import { locationChips } from "@/lib/locationFilter";
@@ -55,10 +34,8 @@ import {
   parseAssignments,
   assignmentsByLesson,
   rosteredDatesByClass,
-  lessonRole,
   canMark,
   roleBadge,
-  lessonKey,
   type LessonRole,
 } from "@/lib/coachRoster";
 import { fetchCoveredOutSessions } from "@/lib/sessionMainCoach";
@@ -66,7 +43,23 @@ import Card from "@/components/Card";
 import PrimaryButton from "@/components/PrimaryButton";
 import { ROW_LIMIT, CLASS_SELECT } from "@/features/schedule/constants";
 import type { WeekLesson, BacklogItem } from "@/features/schedule/types";
-import { formatTime, shortDate, dayHeading } from "@/features/schedule/domain/scheduleFormat";
+import {
+  formatTime,
+  shortDate,
+  dayHeading,
+} from "@/features/schedule/domain/scheduleFormat";
+import {
+  coveredClassIdsOf,
+  shadowClassIdsOf,
+  coachClassesOf,
+  sessionIndex,
+  bookedIndex,
+  isTruncated,
+} from "@/features/schedule/domain/scheduleIndex";
+import {
+  buildSchedule,
+  applyCoveredOut,
+} from "@/features/schedule/domain/scheduleRows";
 
 /**
  * The status pill. One component for every section, so a state cannot be worded
@@ -358,9 +351,7 @@ export default function ScheduleScreen() {
     // engine expects attendance for it whatever later happened to the class.
     // Hiding it because the class was since deactivated strands a straggler
     // nobody can clear, and the month blocks with no override (§8i).
-    const coveredClassIds = [...rosteredDates.keys()].filter(
-      (id) => !ownedClassIds.has(id)
-    );
+    const coveredClassIds = coveredClassIdsOf(rosteredDates, ownedClassIds);
     const coveredRes =
       coveredClassIds.length > 0
         ? await supabase.from("classes").select(CLASS_SELECT).in("id", coveredClassIds)
@@ -382,9 +373,7 @@ export default function ScheduleScreen() {
       .limit(ROW_LIMIT);
     if (!current()) return;
 
-    const shadowClassIds = [
-      ...new Set((shadowRows ?? []).map((r: any) => r.class_id as string)),
-    ].filter((id) => !ownedClassIds.has(id) && !coveredClassIds.includes(id));
+    const shadowClassIds = shadowClassIdsOf(shadowRows, ownedClassIds, coveredClassIds);
 
     const shadowRes =
       shadowClassIds.length > 0
@@ -394,22 +383,7 @@ export default function ScheduleScreen() {
 
     const shadowedClassIds = new Set(shadowClassIds);
 
-    /** Every class a card can come from, each carrying whether it is mine and
-     *  whether I merely shadow it. The two flags are never both true — the
-     *  database refuses a shadow assignment on a class the coach owns. */
-    const coachClasses: { cls: any; owned: boolean; shadowed: boolean }[] = [
-      ...ownedClasses.map((cls: any) => ({ cls, owned: true, shadowed: false })),
-      ...((coveredRes.data ?? []) as any[]).map((cls: any) => ({
-        cls,
-        owned: false,
-        shadowed: false,
-      })),
-      ...((shadowRes.data ?? []) as any[]).map((cls: any) => ({
-        cls,
-        owned: false,
-        shadowed: shadowedClassIds.has(cls.id),
-      })),
-    ];
+    const coachClasses = coachClassesOf(ownedClasses, coveredRes, shadowRes, shadowedClassIds);
     const classIds = coachClasses.map((c) => c.cls.id as string);
 
     const sessionsRes = classIds.length > 0
@@ -423,40 +397,7 @@ export default function ScheduleScreen() {
       : { data: [] as any[] };
     const windowSessions = sessionsRes.data ?? [];
 
-    // key: "<class_id>:<session_date>"
-    const sessionByClassDate = new Map<
-      string,
-      {
-        id: string;
-        /** Cancelled in advance by the admin (cancel_lesson): expects nobody
-         *  enrolled, takes no marks (the DB trigger refuses — this is cosmetic). */
-        cancelled: boolean;
-        markedStudentIds: Set<string>;
-        statusByStudent: Map<string, DbStatus>;
-      }
-    >();
-    // Dates that HAVE a session, per class. Needed because a lesson can exist
-    // without being derivable from the class's weekday — an off-schedule lesson
-    // scheduled by the admin (schedule_extra_lesson) is exactly that. Without
-    // this the coach would never see it, while the billing engine's gate DOES
-    // (its datesToCheck unions existing session dates), so the month would
-    // stall with nothing anywhere saying why.
-    const sessionDatesByClass = new Map<string, string[]>();
-    windowSessions.forEach((s: any) => {
-      sessionByClassDate.set(`${s.class_id}:${s.session_date}`, {
-        id: s.id,
-        cancelled: s.cancelled_at != null,
-        markedStudentIds: new Set(
-          (s.attendance ?? []).map((a: any) => a.student_id)
-        ),
-        statusByStudent: new Map(
-          (s.attendance ?? []).map((a: any) => [a.student_id, a.status])
-        ),
-      });
-      const dates = sessionDatesByClass.get(s.class_id as string) ?? [];
-      dates.push(s.session_date as string);
-      sessionDatesByClass.set(s.class_id as string, dates);
-    });
+    const { sessionByClassDate, sessionDatesByClass } = sessionIndex(windowSessions);
 
     // Trial AND make-up bookings. A booked child is expected at ONE lesson and
     // is not enrolled here, so without these an unmarked booking never reaches
@@ -504,209 +445,24 @@ export default function ScheduleScreen() {
     // rendering a quietly short list that reads as "you are up to date".
     if (!current()) return;
     setTruncated(
-      windowSessions.length >= ROW_LIMIT ||
-        bookingRows.length >= ROW_LIMIT ||
-        makeupRows.length >= ROW_LIMIT ||
-        // The roster fetch is capped like the others, and a truncated one drops
-        // lessons a substitute is expected to mark — the same silent shortfall,
-        // one table further on. Counted on the RAW rows, not the parsed ones:
-        // parsing drops a row whose lesson did not come back, which would hide
-        // a response that really did fill its limit.
-        (rosterRes.data?.length ?? 0) >= ROW_LIMIT
+      isTruncated({ windowSessions, bookingRows, makeupRows, rosterRes })
     );
 
-    const bookedByClassDate = new Map<string, Map<string, string[]>>();
-    for (const b of [...bookingRows, ...makeupRows]) {
-      const perClass =
-        bookedByClassDate.get(b.class_id as string) ?? new Map<string, string[]>();
-      const list = perClass.get(b.session_date as string) ?? [];
-      list.push(b.student_id as string);
-      perClass.set(b.session_date as string, list);
-      bookedByClassDate.set(b.class_id as string, perClass);
-    }
+    const bookedByClassDate = bookedIndex(bookingRows, makeupRows);
 
-    const backlogItems: BacklogItem[] = [];
-    const lessons: WeekLesson[] = [];
-    /** Sessions of MY OWN classes that somebody else might have been rostered
-     *  onto — see the probe below for why this list is short. */
-    const probeIds: string[] = [];
-
-    for (const { cls, owned, shadowed } of coachClasses) {
-      const enrolments = cls.student_class_enrolments ?? [];
-      // Who must be marked is a question about the LESSON'S date — a child who
-      // joined last week was not expected at last month's lessons. See
-      // EnrolmentSpan in lib/attendanceCompleteness.ts.
-      const enrolmentSpans: EnrolmentSpan[] = enrolments.map((e: any) => ({
-        studentId: e.student_id as string,
-        from: toSgDate(e.enrolled_at),
-        until: e.unenrolled_at ? toSgDate(e.unenrolled_at) : null,
-      }));
-      const bookedHere =
-        bookedByClassDate.get(cls.id) ?? new Map<string, string[]>();
-      const sessionDates = sessionDatesByClass.get(cls.id) ?? [];
-      const bookedDates = [...bookedHere.keys()];
-      const rosteredHere = rosteredDates.get(cls.id) ?? [];
-
-      /**
-       * Which dates of this class are MINE, inside a range.
-       *
-       * ⚠ THE TWO ARMS ARE NOT INTERCHANGEABLE. For my own class it is the
-       * weekday recurrence, plus booking and session dates that fall off it
-       * (an admin's extra lesson). For a class I am covering it is EXACTLY the
-       * dates an admin rostered me onto — never the recurrence. A substitute
-       * who covers one Tuesday is not owed a card for every Tuesday, and RLS
-       * would return them no session for those dates anyway, so a recurrence
-       * card there would be a permanently unmarkable "unmarked" lesson.
-       */
-      // ⚠ ONE NAMED PREDICATE, NOT TWO `||`s AT THE CALL SITE. A shadow sees
-      // the class's WHOLE schedule, so their date source is the recurrence —
-      // the same arm as an owner and the exact OPPOSITE of a substitute's.
-      // Writing it inline invites somebody to widen the probe guard below to
-      // match, and those are two different questions on adjacent lines.
-      const showsWholeSchedule = owned || shadowed;
-
-      const datesIn = (from: string, to: string): string[] =>
-        showsWholeSchedule
-          ? lessonDatesInRange(
-              cls.day_of_week as DayOfWeek,
-              from,
-              to,
-              bookedDates,
-              sessionDates
-            )
-          : rosteredHere.filter((d) => d >= from && d <= to);
-
-      /** My role on one date of this class, before the covered-out probe —
-       *  one definition, used by the card and by the NEEDS MARKING filter, so
-       *  a lesson cannot be badged one way and nagged the other. */
-      const roleAt = (date: string) =>
-        lessonRole({
-          ownsClass: owned,
-          isSubstitute: assignmentByLesson.has(lessonKey(cls.id, date)),
-          isClassShadow: shadowed,
-        });
-
-      /** One (class, date) -> one card. Exactly ONE expectedStudentsOn call per
-       *  pair in this file: two derivations of "who was expected here" is how
-       *  the client became the only effective billing gate once before (§7.18). */
-      const lessonAt = (date: string): WeekLesson => {
-        const sess = sessionByClassDate.get(`${cls.id}:${date}`);
-        // A lesson the admin cancelled in advance expects nobody ENROLLED — the
-        // spans are withheld, the bookings are not (the same substitution the
-        // engine makes, core.ts `unmarkedOn`; a live guest on a cancelled date
-        // cannot exist, but if it did it must still show as owed a mark).
-        const expected = sess?.cancelled
-          ? expectedStudentsOn(date, [], bookedHere)
-          : expectedStudentsOn(date, enrolmentSpans, bookedHere);
-        // Students vs guests, split out of the SAME array that feeds the chip —
-        // by subtraction, so the head-count and the chip's denominator cannot
-        // disagree (the `2+1`-not-`3` rule, PRD §7.3/§7.17).
-        const split = splitExpected(expected, bookedHere.get(date) ?? []);
-        return {
-          classId: cls.id,
-          date,
-          startTime: cls.start_time,
-          endTime: cls.end_time,
-          title: cls.title,
-          location: cls.locations?.name ?? "—",
-          locationId: cls.location_id ?? null,
-          sessionId: sess?.id ?? null,
-          // Past -> ended; future -> not; today -> ask the clock, keyed to the
-          // class's END time because a coach marks at the end of a lesson.
-          progress: lessonProgress(expected, sess?.markedStudentIds, {
-            hasEnded: hasLessonEnded(date, todayDate, cls.end_time, nowMins),
-          }),
-          summary: formatSummary(
-            summariseStatuses(expected, sess?.statusByStudent ?? new Map())
-          ),
-          students: split.students,
-          guests: split.guests,
-          // Provisional: `covered` is not known yet for my OWN classes — only
-          // the database can answer that, and it is asked once, below, for the
-          // handful of lessons where the answer can still change anything.
-          role: roleAt(date),
-          cancelled: sess?.cancelled ?? false,
-        };
-      };
-
-      // ── THE SELECTED WEEK ────────────────────────────────────────────────
-      // Every lesson in the week, marked or not — DONE needs the marked ones,
-      // and a class with nobody enrolled still gets a card reading "No students"
-      // rather than silently vanishing. (An empty roster is NOT "Marked": the
-      // billing gate calls it complete and a card must not.)
-      for (const date of datesIn(weekStart, weekEnd)) {
-        const card = lessonAt(date);
-        lessons.push(card);
-        // ⚠ `owned`, NOT `showsWholeSchedule`. The covered-out probe answers
-        // "has somebody else been made the main on MY lesson", and a shadowed
-        // class is not mine — putting its sessions in would dilute a
-        // subtraction whose every short answer HIDES a lesson that needs
-        // marking (§7.138). Two different questions, adjacent lines.
-        if (owned && card.sessionId && !isFinished(card.progress)) {
-          probeIds.push(card.sessionId);
-        }
-      }
-
-      // ── NEEDS MARKING — FLOOR-SCOPED, AND DELIBERATELY WEEK-INDEPENDENT ──
-      // ⚠ THIS SET DOES NOT KNOW WHICH WEEK IS ON SCREEN, AND MUST NOT LEARN.
-      // Its range is [class's own backlog floor, today] whatever the selector
-      // says, so a straggler three weeks back is visible without the coach
-      // having to navigate to a week they have no reason to suspect holds one.
-      // Unmarked attendance blocks invoice generation outright with no override
-      // — week-scoping this is the §8i hole reopened.
-      //
-      // Today is NOT skipped here. De-duplication against the TODAY section
-      // happens in the RENDER body, over the same render's inputs, so the two
-      // cannot disagree; doing it here would couple an async fetch to a
-      // render-time fact and could leave today's lesson in neither section.
-      // ⚠ THE LOWER BOUND IS THE BUSINESS-WIDE FLOOR, NOT THE PER-CLASS
-      // ENROLMENT FLOOR — AND GETTING THAT WRONG DROPS A TRIAL.
-      // The old Today screen bounded booking dates ABOVE only
-      // (`[...bookedHere.keys()].filter(d => d <= todayDate)`) while bounding
-      // session dates at both ends; extracting the union into
-      // lessonDatesInRange applied both bounds to bookings too. With the
-      // per-class `max(floor, earliestEnrolment)` as the lower bound, a class
-      // that trialled a child on 15 Jul but took its first enrolment on 1 Aug
-      // loses that unmarked trial from this list entirely — while
-      // generate-invoices/core.ts unions booking dates with NO enrolment floor
-      // and still blocks the month over it. §7.18 and §7.97, which this commit
-      // wrote, reopened through the extraction itself.
-      //
-      // `backlogFrom` (floor only) restores it, and is strictly better than the
-      // pre-extraction behaviour: unbounded-below also surfaced bookings BELOW
-      // the marking floor, which nobody can record — a dead tap. Pre-enrolment
-      // weekday dates are still suppressed, by `expected.length === 0` below.
-      for (const date of datesIn(backlogFrom, todayDate)) {
-        const sess = sessionByClassDate.get(`${cls.id}:${date}`);
-        // Cancelled by the admin: nobody enrolled is owed a mark (see lessonAt).
-        const expected = sess?.cancelled
-          ? expectedStudentsOn(date, [], bookedHere)
-          : expectedStudentsOn(date, enrolmentSpans, bookedHere);
-        if (expected.length === 0) continue; // nobody to mark
-        if (isLessonFullyMarked(expected, sess?.markedStudentIds)) continue;
-        // A lesson that has not ENDED yet is not overdue — today's 5pm class at
-        // midday is Upcoming, not a straggler.
-        if (!hasLessonEnded(date, todayDate, cls.end_time, nowMins)) continue;
-        // A lesson I am only SHADOWING is not mine to clear. The database
-        // refuses my write (attendance_write is `coach_is_main_on_session`), so
-        // nagging me produces a straggler nobody can answer — see canMark().
-        if (!canMark(roleAt(date))) continue;
-        // ⚠ `owned`, NOT `showsWholeSchedule` — see the probe note above.
-        if (owned && sess) probeIds.push(sess.id);
-        backlogItems.push({
-          class_id: cls.id,
-          class_title: cls.title,
-          date,
-          session_id: sess?.id ?? null,
-          progress: lessonProgress(expected, sess?.markedStudentIds, {
-            hasEnded: true,
-          }),
-          summary: formatSummary(
-            summariseStatuses(expected, sess?.statusByStudent ?? new Map())
-          ),
-        });
-      }
-    }
+    const { lessons, backlogItems, probeIds } = buildSchedule({
+      coachClasses,
+      sessionByClassDate,
+      sessionDatesByClass,
+      bookedByClassDate,
+      rosteredDates,
+      assignmentByLesson,
+      weekStart,
+      weekEnd,
+      backlogFrom,
+      todayDate,
+      nowMins,
+    });
 
     // ── AND THE ONE QUESTION ONLY THE DATABASE CAN ANSWER ────────────────────
     // Everything above knows my own roster rows. It cannot know that somebody
@@ -726,22 +482,7 @@ export default function ScheduleScreen() {
     const coveredOut = await fetchCoveredOutSessions(probeIds);
     if (!current()) return;
 
-    // A covered lesson LEAVES my NEEDS MARKING list and appears on the covering
-    // coach's. Leaving it here shows a straggler I am not permitted to clear,
-    // and unmarked attendance blocks the billing month with no override (§8i).
-    const ownBacklog = backlogItems.filter(
-      (b) => !(b.session_id && coveredOut.has(b.session_id))
-    );
-    // The week card STAYS — the lesson is still happening and the coach should
-    // see their own class's day — it simply stops claiming to be theirs to mark
-    // and says so through its badge.
-    const weekCards = lessons.map((l) =>
-      l.role === "owner" && l.sessionId && coveredOut.has(l.sessionId)
-        ? { ...l, role: "covered" as LessonRole }
-        : l
-    );
-
-    ownBacklog.sort((a, b) => b.date.localeCompare(a.date)); // most recent first
+    const { ownBacklog, weekCards } = applyCoveredOut(backlogItems, lessons, coveredOut);
     setNeedsMarking(ownBacklog);
     setWeekLessons(weekCards);
 
