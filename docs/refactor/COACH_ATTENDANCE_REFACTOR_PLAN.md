@@ -356,13 +356,27 @@ store shape, no `lib/` module.
 3. `/commit-review` per stage, then `/deploy` (0 migrations, 0 edge functions → app-only; `main` IS the deploy).
 4. Then one nightly on this unit before `(coach)/schedule/index` starts.
 
+**Nightly gate — ACCEPTED by the user, 2026-09-22:** `35681798827` (on `d3169f2`, the roster code) = **51/52**; the
+one red, `tenant-suspension` 10/12, is its first Expo login's fixed 6 s sleep (`verify-tenant-suspension.mjs:72`)
+on a slow runner — the same parent logs in fine three checks later, and the driver is **12/12 locally**. Not the
+roster. The user: "not a problem, can continue to merge to main once you are ready."
+
 ## 11a. Stage log — what actually landed (branch `refactor/coach-attendance`)
 
 | Stage | Commit | Ledger (3 / 4) | jest | Drivers / checks |
 |---|---|---|---|---|
 | 0b | `79a4d85` | 20 sites, 19 pins / 14 | 462 → 462 | Empty-ledger red list = **20 + 14 exactly** (the corrected prediction). Proven red: checks 1–4 (helper leg via `sessionMainCoach`, `fetch(`), jest reaching `features/mark-attendance`, BOTH sgDisplay twins, a corrupted pin (shrink + check 3), a typo'd `PAGES` path and a length mismatch (scan test, no TypeError). Infra lines verified present, not re-added |
 | 1 | `a86e1b7` | 20 / 14 | → 471 | — (types + pure helpers). 4 bodies VERBATIM by script (types, constants, attendanceStatus, exitHref's comment). `.gitkeep` deleted. Route 1,183 → 1,083. Before any driver: nightly `35681798827` = 51/52, the red `tenant-suspension` 10/12 (first Expo login's fixed 6 s sleep, :72) → **12/12 locally** |
-| 2 | (this commit) | 20 / 14 | → 480 | attendance-guard 22/22, trials 16/16, makeups 15/15, trial-onboarding 5/8 (= baseline). Every logic line of `attendanceRows.ts` exists in the pre-cut route (script; only signatures/returns/renames differ). Names final: `enrolledOn` (not `enrolledOnDate` — the route's local keeps that name) |
+| 2 | `8df463d` | 20 / 14 | → 480 | attendance-guard 22/22, trials 16/16, makeups 15/15, trial-onboarding 5/8 (= baseline). Every logic line of `attendanceRows.ts` exists in the pre-cut route (script; only signatures/returns/renames differ). Names final: `enrolledOn` (not `enrolledOnDate` — the route's local keeps that name) |
+
+> **⚠ CORRECTION to Stage 2's driver evidence (found at Stage 3).** Expo had been started with `CI=1`, which turns
+> Metro's file watcher OFF: it served the bundle frozen at startup (after 0b, before Stage 1) and never rebuilt —
+> `exitHrefOf` was absent from the served bundle. So **Stage 2's four driver runs exercised the ORIGINAL code**, and
+> `8df463d`'s "drivers = baseline" line proves nothing about Stage 2. (The baseline itself is unaffected — it was
+> meant to be the original code.) Restarted without `CI=1`; the watcher proven live (a throwaway string appeared in
+> the served bundle within 4 s and left again). **Stage 2 is re-proven by Stage 3's full net**, which runs on
+> Stages 1–3 together. Candidate gotcha — §12.
+| 3 | (this commit) | **9 / 9** | 480 | **Full net = baseline** (attendance-guard 22, stale-screen 22, coach-roster 30, bulk-setall 10, admin-lesson-detail 27, trials 16, makeups 15, trial-onboarding 5/8, schedule-week 21, tz-saturday 6, smoke-app 70/73 — a first run's 69/73 was a one-off 502 from kong on the ROSTER's `markable_window_start`, re-run 70/73). 7 load chains identical to HEAD incl. terminals, both RPCs identical (script). Shared pin commented out → exactly ONE offender (the save's). 5 token checks in order; clear block first; floor + `todayInSg()` unmoved; `ownsClass` verbatim; no `useLocalSearchParams`/`useCallback` in the hook. Temp `[mark] load` log: exactly ONE per visit (2 lessons → 2), removed. Hand-checks: cancelled lesson via the Schedule DONE tap → permanent spinner BEFORE (original code) and AFTER (screenshots); Back to class → roster (`from=roster`) / `/schedule` (none). Route 1,028 → 746 |
 
 **Baseline net (Stage 1 code, 2026-09-22):** attendance-guard 22/22 · stale-screen 22/22 · coach-roster 30/30 ·
 bulk-setall 10/10 · admin-lesson-detail 27/27 · trials 16/16 · makeups 15/15 · trial-onboarding **5/8** ·
@@ -383,6 +397,11 @@ _(filled in per stage)_ Known at planning:
   roster Past Sessions) with no back affordance; the tab bar is the only exit. The fix is one `setResolved({ date, sessionId: sid })`; it then exposes
   the stale `classTitle` in the message (pass `cls.title`). A coach-app driver for the block screen comes with it.
 - BACKLOG: a coach-side credit-note-email driver if Stage 4's hand-check (a) finds none.
+- **§7 candidate (found at Stage 3): `CI=1 npx expo start` serves a FROZEN bundle — Metro does not watch files in CI
+  mode.** Every local driver run after an edit then tests the code as it was at startup, and passes, because nothing
+  changed. Start Expo for local driver work WITHOUT `CI=1` (`< /dev/null` suffices for a non-interactive start), and
+  prove the bundle is current before trusting a run: `curl` the entry bundle and grep for a string only the new code
+  has. §7.31's served-bundle rule, met on localhost.
 
 ## 13. PRE-COMMIT GATE — walk before EVERY stage commit
 - [ ] `npm run typecheck && npm test` green; jest count ≥ previous stage's
