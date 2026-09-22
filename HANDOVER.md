@@ -393,7 +393,8 @@ Everything below is the monthly loop from here on:
    `SELECT status, count(*) FROM invoices GROUP BY 1;` is the honest scoreboard. The
    WhatsApp queue (Invoices → *WhatsApp reminders*, with the **Claimed** filter) is the
    chasing tool when a future month needs it.
-2. **August 2026 is BILLED AND CLOSED** (2026-09-22, §8.117) — 9 invoices, the unclaimed child settled. Keep
+2. **August 2026 is BILLED AND CLOSED** (2026-09-22, §8.117) — 9 invoices, the unclaimed child settled. The
+   owner confirmed it on the live card on 2026-09-23: *Aug 2026 · Closed on 22 Sep*. Keep
    September marked as it happens (the coach's **NEEDS MARKING** list is the tracker) and bill it in early
    October. **Invoices → Billing months is now the scoreboard**: every open month, why, and its last runs.
    > Marking got two small helps on 2026-08-03 (§8.27): today's card now names **guests

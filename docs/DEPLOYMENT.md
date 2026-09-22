@@ -944,7 +944,8 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     the owner settled the unclaimed child and generated twice; `billing_runs` held exactly the two rows (open →
     sealed), and August sealed 22 Sep 23:58. It exposed §7.259 (a "0 invoices" label) — fixed before the app push.
     (4) apps → `main` (`6c0a5ab`); the `/invoices` chunks carry `Closed on` and the RISK 6 copy, `/dashboard`'s
-    carry `billing-alert`. CI went red once on §7.260 (the midnight test) and was green on re-run.
+    carry `billing-alert`. **Verified by the owner in the live UI on 2026-09-23:** the card reads *Aug 2026 ·
+    Closed on 22 Sep* — the §7.259 fix, on real data. CI went red once on §7.260 (the midnight test) and was green on re-run.
     **Reading prod without a dump:** `supabase db query --linked "<sql>"` runs read-only SQL against prod and
     returns JSON (the last statement's rows only) — far cheaper than §8.107's offline data dump for a one-row
     question. **Rollback cover:** `supabase/rollback/20260922000100_billing_runs_DOWN.sql`, rehearsed; roll back
