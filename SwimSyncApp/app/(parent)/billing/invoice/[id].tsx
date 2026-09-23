@@ -1,429 +1,46 @@
-import React, { useState, useEffect } from "react";
-import { formatSgStamp } from "@/lib/lessonDates";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  ActivityIndicator,
-} from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { supabase } from "@/lib/supabase";
-import { confirmAction } from "@/lib/confirm";
-import { fundingByItem } from "@/lib/invoiceFunding";
-import { invoiceLabel } from "@/lib/invoiceLabel";
-import { useAppStore } from "@/store/useAppStore";
-import StatusBadge from "@/components/StatusBadge";
-import Card from "@/components/Card";
-import PrimaryButton from "@/components/PrimaryButton";
+import React from "react";
+import { ScrollView, SafeAreaView } from "react-native";
+import { useInvoiceDetail } from "@/features/invoice-detail/domain/useInvoiceDetail";
+import { LoadingView } from "@/features/invoice-detail/ui/LoadingView";
+import { NotFoundView } from "@/features/invoice-detail/ui/NotFoundView";
+import { Header } from "@/features/invoice-detail/ui/Header";
+import { SummaryCard } from "@/features/invoice-detail/ui/SummaryCard";
+import { LineItemsCard } from "@/features/invoice-detail/ui/LineItemsCard";
+import { CreditNotesCard } from "@/features/invoice-detail/ui/CreditNotesCard";
+import { PayActions } from "@/features/invoice-detail/ui/PayActions";
 
-type InvoiceItem = {
-  id: string;
-  student_name: string;
-  class_title: string;
-  session_date: string;
-  attendance_status: string;
-  amount: number;
-  /** The package that funded this line (its snapshotted name), or null for an
-   *  ad-hoc line. From the package_applications ledger — a reversed draw
-   *  reads as ad hoc, because that money went back to the package. */
-  funded_by: string | null;
-};
-
-type CreditNoteApplied = {
-  id: string;
-  reference_number: string;
-  amount: number;
-  reason: string | null;
-};
-
-type InvoiceDetail = {
-  id: string;
-  /** `INV-YYYY-NNNN` — what the QR, the reminder and the bank statement say.
-   *  Null only for rows written before the reference trigger existed. */
-  reference_number: string | null;
-  billing_month: string;
-  gross_amount: number;
-  package_applied: number;
-  credit_applied: number;
-  balance_adjustment: number;
-  net_amount: number;
-  status: "outstanding" | "paid";
-  generated_at: string;
-  paid_at: string | null;
-  paid_claimed_at: string | null;
-  items: InvoiceItem[];
-  credit_notes: CreditNoteApplied[];
-  coach_id: string | null;
-  /** The business that issued this invoice — a parent may hold two for the
-   *  same month, one per business, and the totals alone don't say which. */
-  business_name: string;
-};
-
-function formatBillingMonth(ym: string): string {
-  const [year, month] = ym.split("-");
-  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-  return date.toLocaleDateString("en-SG", { month: "long", year: "numeric" });
-}
-
-function formatDate(dateStr: string): string {
-  return formatSgStamp(dateStr, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function capitalize(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, " ");
-}
-
+// The parent Invoice Detail screen — composition only (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-G). The load and the "I've paid" claim live in
+// features/invoice-detail/domain/useInvoiceDetail, markup in …/ui. The two early
+// returns keep their order: loading first, then not-found.
 export default function InvoiceDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [claiming, setClaiming] = useState(false);
-  const showToast = useAppStore((s) => s.showToast);
-
-  function claimPaid() {
-    if (!invoice || claiming) return;
-    confirmAction(
-      "Mark as paid?",
-      "This tells your coach you've made the PayNow transfer. They'll confirm it against their bank account.",
-      async () => {
-        setClaiming(true);
-        const { data, error } = await supabase.rpc("claim_invoice_paid", {
-          p_invoice_id: invoice.id,
-        });
-        setClaiming(false);
-        if (error) {
-          showToast("Couldn't record that — please try again.", "error");
-          return;
-        }
-        setInvoice((prev) =>
-          prev ? { ...prev, paid_claimed_at: data as string } : prev
-        );
-        showToast("Noted — your coach will confirm the payment.", "success");
-      },
-      "I've paid"
-    );
-  }
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-
-      const { data: inv } = await supabase
-        .from("invoices")
-        .select(`
-          id,
-          reference_number,
-          billing_month,
-          gross_amount,
-          package_applied,
-          credit_applied,
-          balance_adjustment,
-          net_amount,
-          status,
-          generated_at,
-          paid_at,
-          paid_claimed_at,
-          tenants(display_name),
-          invoice_items(
-            id,
-            lesson_session_id,
-            amount,
-            class_title,
-            session_date,
-            attendance_status,
-            student_name,
-            students(full_name)
-          )
-        `)
-        .eq("id", id)
-        .single();
-
-      if (!inv) {
-        setLoading(false);
-        return;
-      }
-
-      // Fetch credit notes applied to this invoice
-      const { data: cns } = await supabase
-        .from("credit_notes")
-        .select("id, reference_number, amount, reason")
-        .eq("applied_to_invoice_id", id);
-
-      // Which lines the package funded — the "Package Applied" total,
-      // itemised. RLS scopes the ledger to the parent's own packages; a
-      // failed read just means no tags (fundingByItem is null-tolerant).
-      const itemIds = (inv.invoice_items ?? []).map((it: any) => it.id);
-      const { data: apps } = itemIds.length
-        ? await supabase
-            .from("package_applications")
-            .select("invoice_item_id, reversed_at, parent_packages(name)")
-            .in("invoice_item_id", itemIds)
-        : { data: [] };
-      const funded = fundingByItem(apps ?? []);
-
-      // Get coach id via first invoice item's lesson session.
-      // NB: look up by lesson_session_id (not the invoice_item id).
-      let coachId: string | null = null;
-      if (inv.invoice_items?.length > 0) {
-        const firstItem = inv.invoice_items[0];
-        const { data: ls } = await supabase
-          .from("lesson_sessions")
-          .select("classes(coach_id)")
-          .eq("id", firstItem.lesson_session_id)
-          .single();
-        coachId = (ls as any)?.classes?.coach_id ?? null;
-      }
-
-      setInvoice({
-        id: inv.id,
-        reference_number: (inv as any).reference_number ?? null,
-        billing_month: inv.billing_month,
-        business_name:
-          (Array.isArray((inv as any).tenants)
-            ? (inv as any).tenants[0]
-            : (inv as any).tenants)?.display_name ?? "Your coach",
-        gross_amount: Number(inv.gross_amount),
-        package_applied: Number((inv as any).package_applied ?? 0),
-        credit_applied: Number(inv.credit_applied),
-        balance_adjustment: Number((inv as any).balance_adjustment ?? 0),
-        net_amount: Number(inv.net_amount),
-        status: inv.status,
-        generated_at: inv.generated_at,
-        paid_at: inv.paid_at,
-        paid_claimed_at: (inv as any).paid_claimed_at ?? null,
-        items: (inv.invoice_items ?? [])
-          .map((item: any) => ({
-            id: item.id,
-            // The name AS INVOICED, falling back to the live join only for
-            // rows written before the snapshot existed. Reading the live name
-            // first would let a later rename rewrite an invoice already sent.
-            student_name: item.student_name ?? item.students?.full_name ?? "—",
-            class_title: item.class_title,
-            session_date: item.session_date,
-            attendance_status: item.attendance_status,
-            amount: Number(item.amount),
-            funded_by: funded.get(item.id) ?? null,
-          }))
-          .sort((a: InvoiceItem, b: InvoiceItem) =>
-            a.session_date.localeCompare(b.session_date)
-          ),
-        credit_notes: (cns ?? []).map((cn: any) => ({
-          ...cn,
-          amount: Number(cn.amount),
-        })),
-        coach_id: coachId,
-      });
-
-      setLoading(false);
-    }
-
-    load();
-  }, [id]);
+  const { invoice, loading, claiming, claimPaid } = useInvoiceDetail();
 
   if (loading) {
-    return (
-      <SafeAreaView className="flex-1 bg-sky-50 items-center justify-center">
-        <ActivityIndicator size="large" color="#0ea5e9" />
-      </SafeAreaView>
-    );
+    return <LoadingView />;
   }
 
   if (!invoice) {
-    return (
-      <SafeAreaView className="flex-1 bg-sky-50 items-center justify-center px-6">
-        <Ionicons name="alert-circle-outline" size={40} color="#d1d5db" />
-        <Text className="text-gray-400 mt-3 text-center">
-          Could not load invoice.
-        </Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4">
-          <Text className="text-sky-500 font-semibold">Go Back</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
+    return <NotFoundView />;
   }
 
   const statusLabel = invoice.status === "outstanding" ? "Outstanding" : "Paid";
 
   return (
     <SafeAreaView className="flex-1 bg-sky-50">
-      {/* Header */}
-      <View className="flex-row items-center px-5 pt-4 pb-3">
-        <TouchableOpacity onPress={() => router.back()} className="mr-3">
-          <Ionicons name="chevron-back" size={24} color="#0ea5e9" />
-        </TouchableOpacity>
-        <Text className="text-lg font-bold text-gray-900 flex-1">Invoice Detail</Text>
-        <StatusBadge status={statusLabel} size="sm" />
-      </View>
+      <Header statusLabel={statusLabel} />
 
       <ScrollView
         contentContainerClassName="px-5 pb-10 gap-4"
         showsVerticalScrollIndicator={false}
       >
-        {/* Summary card */}
-        <Card>
-          <Text className="text-base font-bold text-gray-900 mb-1">
-            {formatBillingMonth(invoice.billing_month)}
-          </Text>
-          <Text className="text-xs font-medium text-sky-600 mb-1">
-            From {invoice.business_name}
-          </Text>
-          {/* The reference the parent will actually quote — it is what the QR
-              locks in, what the WhatsApp reminder says, and what lands on their
-              bank statement. Selectable so it can be copied into a transfer
-              made outside the QR. */}
-          <Text selectable className="text-xs font-semibold text-gray-700 mb-1">
-            {invoiceLabel(invoice)}
-          </Text>
-          <Text className="text-xs text-gray-500 mb-1">
-            Generated {formatDate(invoice.generated_at)}
-          </Text>
-          {invoice.paid_at && (
-            <Text className="text-xs text-green-600 mb-3">
-              Paid {formatDate(invoice.paid_at)}
-            </Text>
-          )}
+        <SummaryCard invoice={invoice} />
 
-          <View className="gap-2 mt-2">
-            <View className="flex-row justify-between">
-              <Text className="text-sm text-gray-500">Gross Amount</Text>
-              <Text className="text-sm text-gray-700">
-                S${invoice.gross_amount.toFixed(2)}
-              </Text>
-            </View>
-            {invoice.package_applied > 0 && (
-              <View className="flex-row justify-between">
-                <Text className="text-sm text-blue-500">Package Applied</Text>
-                <Text className="text-sm text-blue-500">
-                  −S${invoice.package_applied.toFixed(2)}
-                </Text>
-              </View>
-            )}
-            {invoice.credit_applied > 0 && (
-              <View className="flex-row justify-between">
-                <Text className="text-sm text-blue-500">Credit Applied</Text>
-                <Text className="text-sm text-blue-500">
-                  −S${invoice.credit_applied.toFixed(2)}
-                </Text>
-              </View>
-            )}
-            {invoice.balance_adjustment > 0 && (
-              <View className="flex-row justify-between">
-                <Text className="text-sm text-red-500">Adjustment from a prior invoice</Text>
-                <Text className="text-sm text-red-500">
-                  +S${invoice.balance_adjustment.toFixed(2)}
-                </Text>
-              </View>
-            )}
-            <View className="flex-row justify-between pt-2 border-t border-gray-100">
-              <Text className="text-base font-bold text-gray-900">Net Payable</Text>
-              <Text
-                className={`text-base font-bold ${
-                  invoice.status === "outstanding"
-                    ? "text-red-600"
-                    : "text-green-600"
-                }`}
-              >
-                S${invoice.net_amount.toFixed(2)}
-              </Text>
-            </View>
-          </View>
-        </Card>
+        <LineItemsCard invoice={invoice} />
 
-        {/* Line items */}
-        <Card>
-          <Text className="text-base font-bold text-gray-900 mb-3">
-            Lesson Breakdown
-          </Text>
-          <View className="gap-2">
-            {invoice.items.map((item) => (
-              <View
-                key={item.id}
-                className="flex-row justify-between py-2 border-b border-gray-50"
-              >
-                <View className="flex-1">
-                  <Text className="text-sm text-gray-700">{item.class_title}</Text>
-                  <Text className="text-xs text-gray-400">
-                    {formatDate(item.session_date)} · {item.student_name}
-                  </Text>
-                  <Text className="text-xs text-gray-400">
-                    {capitalize(item.attendance_status)}
-                  </Text>
-                  {item.funded_by && (
-                    <Text className="text-xs font-semibold text-emerald-600">
-                      Paid by package · {item.funded_by}
-                    </Text>
-                  )}
-                </View>
-                <Text
-                  className={`text-sm font-medium ${
-                    item.funded_by ? "text-emerald-600" : "text-gray-800"
-                  }`}
-                >
-                  S${item.amount.toFixed(2)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </Card>
+        <CreditNotesCard invoice={invoice} />
 
-        {/* Credit notes applied */}
-        {invoice.credit_notes.length > 0 && (
-          <Card>
-            <Text className="text-base font-bold text-gray-900 mb-3">
-              Credit Notes Applied
-            </Text>
-            {invoice.credit_notes.map((cn) => (
-              <View
-                key={cn.id}
-                className="flex-row justify-between py-2 border-b border-gray-50"
-              >
-                <View className="flex-1">
-                  <Text className="text-sm text-gray-700">{cn.reference_number}</Text>
-                  {cn.reason ? (
-                    <Text className="text-xs text-gray-400">{cn.reason}</Text>
-                  ) : null}
-                </View>
-                <Text className="text-sm font-medium text-blue-600">
-                  −S${cn.amount.toFixed(2)}
-                </Text>
-              </View>
-            ))}
-          </Card>
-        )}
-
-        {/* PayNow CTA */}
-        {invoice.status === "outstanding" && (
-          <View className="gap-3">
-            <PrimaryButton
-              label="Pay via PayNow QR"
-              onPress={() =>
-                router.push(
-                  `/(parent)/billing/paynow?invoiceId=${invoice.id}&coachId=${invoice.coach_id ?? ""}`
-                )
-              }
-            />
-            {/* A CLAIM, not a status change — the coach confirms against
-                their bank. Idempotent server-side; first timestamp wins. */}
-            {invoice.paid_claimed_at ? (
-              <Text className="text-sm text-sky-700 text-center">
-                You've told your coach this is paid — they'll confirm it.
-              </Text>
-            ) : (
-              <PrimaryButton
-                label={claiming ? "Saving…" : "I've paid"}
-                variant="outline"
-                onPress={claimPaid}
-              />
-            )}
-          </View>
-        )}
+        <PayActions invoice={invoice} claiming={claiming} claimPaid={claimPaid} />
       </ScrollView>
     </SafeAreaView>
   );

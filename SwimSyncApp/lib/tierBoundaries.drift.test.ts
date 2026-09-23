@@ -191,12 +191,6 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "const { data, error } = await supabase.rpc(\"claim_invoice_paid\", {", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "const { data: inv } = await supabase .from(\"invoices\")", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "const { data: cns } = await supabase .from(\"credit_notes\")", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "? await supabase .from(\"package_applications\")", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "const { data: ls } = await supabase .from(\"lesson_sessions\")", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
   { file: "app/(parent)/billing/paynow.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-G commit paynow: moves to features/paynow/dao/" },
   { file: "app/(parent)/billing/paynow.tsx", contains: "const { data: pkg } = await supabase .from(\"parent_packages\")", why: "L-G commit paynow: moves to features/paynow/dao/" },
   { file: "app/(parent)/billing/paynow.tsx", contains: "const { data: inv } = await supabase .from(\"invoices\")", why: "L-G commit paynow: moves to features/paynow/dao/" },
@@ -277,12 +271,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/lessonDates", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/supabase", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/confirm", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/invoiceFunding", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/invoiceLabel", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
-  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/store/useAppStore", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
   { file: "app/(parent)/billing/paynow.tsx", contains: "qrcode", why: "L-G commit paynow: leaves as its symbols move into features/paynow/" },
   { file: "app/(parent)/billing/paynow.tsx", contains: "@/lib/supabase", why: "L-G commit paynow: leaves as its symbols move into features/paynow/" },
   { file: "app/(parent)/billing/paynow.tsx", contains: "@/lib/paynow", why: "L-G commit paynow: leaves as its symbols move into features/paynow/" },
