@@ -401,6 +401,13 @@ later on the same code) sits in L4-F and L4-Fence: **one red is a re-run; two re
 | 5 edit-child | `ff640d1` | jest 519/40 · deps 1/1 | 5 pins |
 | **L4-F** | — | **14/14 drivers** · retry warnings 0 (baseline 0) · request counts identical (Home 10, Billing 6, Attendance 6, Classes 2) | hand-checks `app-fgh-handchecks-F.mjs` **10/10** (declined-claim dismiss persists; register-with-code → Joined Toast, code cleared, joined once). trial-visibility 11/11 + tenant-suspension 12/12 — the baseline reds were §12 F1 |
 
+| 6 billing | `986e298` | jest 524/41 · vitest 855/87 · deps 7/7 | 14 pins; ReferralSection + referralShare moved; sgDisplay pin repointed both twins |
+| 7 invoice-detail | `3af266f` | jest 526/42 · deps 1/1 | 12 pins; invoiceFunding moved; sgDisplay pin repointed |
+| 8 paynow | `dd22f2b` | jest 527/43 · deps 1/1 | 6 pins; QR build inside its try (R2); sgDisplay pin repointed |
+| 9 public-invoice | `6dc1c0d` | jest 528/44 · deps 2/2 | 4 pins; R2 greps clean; sgDisplay pin repointed |
+| 10 public-package | `71ad197` | jest 529/45 · deps 2/2 | 4 pins; R2 greps clean |
+| **L4-G** | — | **6/6 drivers** (smoke 73, pay-claim 17, packages 21, paynow-fallback 21, branding 6, payment-collection 19) · retry 0 · request counts identical | hand-checks `app-fgh-handchecks-G.mjs` **19/19** — detail "I've paid", referral Copy, /package/<token> logged in AND out with NO auth headers, cancelRequest |
+
 **Hand-check scripts proven on the PRE-change code before their sub-batch** (a red later is the refactor,
 not the script): G **19/19**, H **6/6**, fence **19/19**. Getting there cost four script fixes worth keeping
 (§12 F3).
