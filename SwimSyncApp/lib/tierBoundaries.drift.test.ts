@@ -191,10 +191,6 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: "app/(auth)/register.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit register: moves to features/register/dao/" },
-  { file: "app/(auth)/register.tsx", contains: "const { data, error: signUpError } = await supabase.auth.signUp({", why: "L-H commit register: moves to features/register/dao/" },
-  { file: "app/(auth)/register.tsx", contains: "await supabase .from(\"profiles\")", why: "L-H commit register: moves to features/register/dao/" },
-  { file: "app/(auth)/register.tsx", contains: "await supabase .from(\"parents\")", why: "L-H commit register: moves to features/register/dao/" },
   { file: "app/(auth)/login.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit login: moves to features/login/dao/" },
   { file: "app/(auth)/login.tsx", contains: "const { data, error } = await supabase.auth.signInWithPassword({", why: "fence commit login: moves to features/login/dao/" },
   { file: "app/(auth)/login.tsx", contains: "supabase .from(\"profiles\")", why: "fence commit login: moves to features/login/dao/" },
@@ -247,9 +243,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: "app/(auth)/register.tsx", contains: "@/store/useAppStore", why: "L-H commit register: leaves as its symbols move into features/register/" },
-  { file: "app/(auth)/register.tsx", contains: "@/lib/supabase", why: "L-H commit register: leaves as its symbols move into features/register/" },
-  { file: "app/(auth)/register.tsx", contains: "@/lib/authErrors", why: "L-H commit register: leaves as its symbols move into features/register/" },
   { file: "app/(auth)/login.tsx", contains: "@/store/useAppStore", why: "fence commit login: leaves as its symbols move into features/login/" },
   { file: "app/(auth)/login.tsx", contains: "@/lib/supabase", why: "fence commit login: leaves as its symbols move into features/login/" },
   { file: "app/(auth)/login.tsx", contains: "@/lib/landing", why: "fence commit login: leaves as its symbols move into features/login/" },
