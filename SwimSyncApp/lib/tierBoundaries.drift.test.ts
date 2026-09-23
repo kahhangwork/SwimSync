@@ -40,6 +40,9 @@
 // COACH_ATTENDANCE_REFACTOR_PLAN.md), 2026-09-22 Stage 0b.
 // + the coach SCHEDULE landing tab (full track, docs/refactor/
 // COACH_SCHEDULE_REFACTOR_PLAN.md), 2026-09-22 Stage 0b — the last app giant.
+// + EVERY remaining route file — App L-F / L-G / L-H (13 lite screens) and the
+// app fence track (11 routes), 2026-09-23 L0 (docs/refactor/BATCH_FGH_PLAN.md).
+// After that batch lands, every route file in the app is in PAGES.
 //
 // §7.25: every check was proven RED by breaking the rule on purpose, then
 // reverted. Roster Stage 0b, 2026-09-21: with the ledgers emptied, checks 3
@@ -78,6 +81,27 @@
 // corrupted trial_bookings pin turned the shrink test AND check 3 red; a
 // typo'd PAGES path and a SCOPE_DIRS/PAGES length mismatch each turned the
 // scan test red (not a TypeError). Breakers removed, 7/7 green.
+//
+// App L-F/G/H L0, 2026-09-23: PAGES restructured from two index-paired lists
+// into {page, feature|null} (two routes may share a feature; `null` = no
+// tiers), SCOPE_DIRS derived as the SET of features, and a new test that no
+// features/ folder is orphaned from PAGES. BEFORE any new route was added,
+// with the three giants only, every check re-proved red: ui/Break -> ../dao
+// (1); dao/break -> react-native (2); domain/break importing
+// @/lib/markableFloor AND calling fetch( (3, both lines named); an unpinned
+// @/lib/confirm on the schedule route (4); the roster route importing
+// @/features/schedule/ui (4 — another feature's tier); a features/zzorphan
+// folder (orphan test); a PAGES feature with no folder, and the STRING "null"
+// (scan test); welcome as feature:null went green, then red on importing
+// @/features/schedule/ui (4 — the null branch has no features/ leg); a
+// toLocaleDateString() in domain/break red in BOTH sgDisplay twins; a failing
+// features/roster/domain/zz.test.ts ran. (The old length-mismatch proof no
+// longer exists — the lists are no longer paired.) Then the 24 routes were
+// added with empty ledgers: checks 3 and 4 went red on exactly 107 + 76 sites,
+// the plan's prediction. Pinned as 99 + 76 entries: 7 check-3 entries each
+// cover several sites whose text contains the snippet (named in each `why`);
+// every entry, removed alone, left exactly its named sites. Breakers removed,
+// 8/8 green.
 
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
@@ -85,21 +109,58 @@ import { join, sep } from "node:path";
 // This file lives in SwimSyncApp/lib, so the app root is one level up.
 const APP = join(__dirname, "..");
 
-const SCOPE_DIRS = [
+// The route files, each with the features/<name> it composes. Check 4 runs
+// against each; check 3 scans them too. Two routes MAY share a feature (both
+// change-password routes compose features/change-password); `feature: null`
+// is a route with no tiers at all (welcome) — check 4 then allows only React,
+// RN, expo-router, icons and @/components. Restructured from two index-paired
+// lists at App L-F/G/H L0, 2026-09-23 (docs/refactor/BATCH_FGH_PLAN.md).
+type Page = { page: string; feature: string | null };
+
+const PAGES: Page[] = [
   // Coach roster (full track), 2026-09-21.
-  "features/roster",
+  { page: "app/(coach)/classes/[id]/roster.tsx", feature: "roster" },
   // Coach attendance marking (full track), 2026-09-22.
-  "features/mark-attendance",
+  { page: "app/(coach)/classes/[id]/attendance.tsx", feature: "mark-attendance" },
   // Coach Schedule, the landing tab (full track), 2026-09-22.
-  "features/schedule",
+  { page: "app/(coach)/schedule/index.tsx", feature: "schedule" },
+  // App L-F/G/H + the app fence, 2026-09-23 L0 (docs/refactor/BATCH_FGH_PLAN.md).
+  // Sub-batch F — parent home.
+  { page: "app/(parent)/home/index.tsx", feature: "parent-home" },
+  { page: "app/(parent)/home/add-child.tsx", feature: "add-child" },
+  { page: "app/(parent)/home/child/[id].tsx", feature: "child-profile" },
+  { page: "app/(parent)/home/edit-child.tsx", feature: "edit-child" },
+  // Sub-batch G — parent money.
+  { page: "app/(parent)/billing/index.tsx", feature: "billing" },
+  { page: "app/(parent)/billing/invoice/[id].tsx", feature: "invoice-detail" },
+  { page: "app/(parent)/billing/paynow.tsx", feature: "paynow" },
+  { page: "app/invoice/[token].tsx", feature: "public-invoice" },
+  { page: "app/package/[token].tsx", feature: "public-package" },
+  // Sub-batch H — the rest.
+  { page: "app/(parent)/attendance/index.tsx", feature: "parent-attendance" },
+  { page: "app/(coach)/settings/index.tsx", feature: "coach-settings" },
+  { page: "app/(coach)/classes/index.tsx", feature: "coach-classes" },
+  { page: "app/(auth)/register.tsx", feature: "register" },
+  // The fence sub-batch.
+  { page: "app/(auth)/login.tsx", feature: "login" },
+  { page: "app/(auth)/accept-invite.tsx", feature: "accept-invite" },
+  { page: "app/(auth)/reset-password.tsx", feature: "reset-password" },
+  { page: "app/(auth)/forgot-password.tsx", feature: "forgot-password" },
+  { page: "app/(coach)/classes/[id]/grade.tsx", feature: "grade" },
+  { page: "app/(coach)/pay/index.tsx", feature: "coach-pay" },
+  { page: "app/(parent)/profile/index.tsx", feature: "profile" },
+  { page: "app/(parent)/profile/contact.tsx", feature: "contact" },
+  { page: "app/(parent)/home/join-tenant.tsx", feature: "join-tenant" },
+  { page: "app/(parent)/profile/change-password.tsx", feature: "change-password" },
+  { page: "app/(coach)/settings/change-password.tsx", feature: "change-password" },
+  { page: "app/welcome.tsx", feature: null },
 ];
 
-// The route files. Check 4 runs against each; check 3 scans them too.
-const PAGES = [
-  "app/(coach)/classes/[id]/roster.tsx",
-  "app/(coach)/classes/[id]/attendance.tsx",
-  "app/(coach)/schedule/index.tsx",
-];
+// The folders checks 1-3 walk: the SET of named features, so a shared one is
+// walked once. ⚠ Derived from PAGES — so a features/<x> folder no route names
+// would never be scanned. The scan test asserts there is no such folder.
+const FEATURES = [...new Set(PAGES.flatMap((p) => (p.feature === null ? [] : [p.feature])))];
+const SCOPE_DIRS = FEATURES.map((f) => `features/${f}`);
 
 type Allowed = { file: string; contains: string; why: string };
 
@@ -108,7 +169,11 @@ type Allowed = { file: string; contains: string; why: string };
 // (F_SCHED was deleted with its last ledger entry, schedule Stage 5, 2026-09-22.)
 
 /**
- * Check 3 — network reaches outside `dao/`. SCHEDULE Stage 0b pinned 12: the
+ * Check 3 — network reaches outside `dao/`. APP L-F/G/H L0 (2026-09-23)
+ * pinned 107 sites with 99 entries across the 24 routes; each `why` names the
+ * sub-batch commit that removes it. The fence commit removes the last.
+ *
+ * SCHEDULE Stage 0b pinned 12: the
  * client import, two client-holding helper imports and nine `.from()`
  * builders — one pin each, no pin shared. All leave at Stage 3.
  *
@@ -126,10 +191,114 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
+  { file: "app/(parent)/home/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/index.tsx", contains: "await supabase.rpc(\"dismiss_student_claim\", { p_claim_id: id });", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/index.tsx", contains: "supabase .rpc(\"student_package_coverage\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/index.tsx", contains: "const { data: parent } = await supabase .from(\"parents\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/index.tsx", contains: "supabase .from(\"trial_bookings\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/index.tsx", contains: "supabase .from(\"makeup_bookings\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/index.tsx", contains: "const { data: invoices } = await supabase .from(\"invoices\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/index.tsx", contains: "const { data: claims } = await supabase .from(\"student_claims\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/index.tsx", contains: "const { data: p } = await supabase .from(\"parents\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/index.tsx", contains: "const { data, error } = await supabase.rpc(\"join_tenant_by_code\", {", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/index.tsx", contains: "await supabase.from(\"parents\").update({ signup_join_code: null }).eq(\"id\", p.id);", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
+  { file: "app/(parent)/home/add-child.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-F commit add-child: moves to features/add-child/dao/" },
+  { file: "app/(parent)/home/add-child.tsx", contains: "const { data } = await supabase .from(\"parent_tenants\")", why: "L-F commit add-child: moves to features/add-child/dao/" },
+  { file: "app/(parent)/home/add-child.tsx", contains: "const { data, error } = await supabase.rpc(\"add_child_or_claim\", {", why: "L-F commit add-child: moves to features/add-child/dao/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "supabase .rpc(\"student_package_coverage\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "const { data: student } = await supabase .from(\"students\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "const { data: parentStudentLink } = await supabase .from(\"parent_students\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "const { data: invoices } = await supabase .from(\"invoices\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "const { data: parentRecord } = await supabase .from(\"parents\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "supabase .from(\"skill_grade_levels\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "supabase .from(\"student_skill_progress\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
+  { file: "app/(parent)/home/edit-child.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-F commit edit-child: moves to features/edit-child/dao/" },
+  { file: "app/(parent)/home/edit-child.tsx", contains: "const { data } = await supabase .from(\"students\")", why: "L-F commit edit-child: moves to features/edit-child/dao/" },
+  { file: "app/(parent)/home/edit-child.tsx", contains: "const { error } = await supabase .from(\"students\")", why: "L-F commit edit-child: moves to features/edit-child/dao/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-G commit billing: moves to features/billing/dao/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "const { data, error } = await supabase.rpc(\"claim_invoice_paid\", {", why: "L-G commit billing: moves to features/billing/dao/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "const { data: parent } = await supabase .from(\"parents\")", why: "L-G commit billing: moves to features/billing/dao/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "supabase .from(\"invoices\")", why: "L-G commit billing: moves to features/billing/dao/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "supabase .from(\"credit_notes\")", why: "L-G commit billing: moves to features/billing/dao/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "supabase .from(\"parent_packages\")", why: "L-G commit billing: moves to features/billing/dao/ — ⚠ ONE entry, 3 sites (:202, :314, :341 — the snippet is contained in each); all leave in the same commit" },
+  { file: "app/(parent)/billing/index.tsx", contains: "supabase.rpc(\"package_live_balances\"),", why: "L-G commit billing: moves to features/billing/dao/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "supabase .from(\"package_products\")", why: "L-G commit billing: moves to features/billing/dao/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "supabase.functions", why: "L-G commit billing: moves to features/billing/dao/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "const { data, error } = await supabase.rpc(\"claim_invoice_paid\", {", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "const { data: inv } = await supabase .from(\"invoices\")", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "const { data: cns } = await supabase .from(\"credit_notes\")", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "? await supabase .from(\"package_applications\")", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "const { data: ls } = await supabase .from(\"lesson_sessions\")", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
+  { file: "app/(parent)/billing/paynow.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-G commit paynow: moves to features/paynow/dao/" },
+  { file: "app/(parent)/billing/paynow.tsx", contains: "const { data: pkg } = await supabase .from(\"parent_packages\")", why: "L-G commit paynow: moves to features/paynow/dao/" },
+  { file: "app/(parent)/billing/paynow.tsx", contains: "const { data: inv } = await supabase .from(\"invoices\")", why: "L-G commit paynow: moves to features/paynow/dao/" },
+  { file: "app/invoice/[token].tsx", contains: "const res = await fetch(", why: "L-G commit public-invoice: moves to features/public-invoice/dao/ — ⚠ ONE entry, 2 sites (:65, :125 — the snippet is contained in each); all leave in the same commit" },
+  { file: "app/package/[token].tsx", contains: "const res = await fetch(", why: "L-G commit public-package: moves to features/public-package/dao/ — ⚠ ONE entry, 2 sites (:77, :135 — the snippet is contained in each); all leave in the same commit" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "const { data: parent } = await supabase .from(\"parents\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "const { data: links } = await supabase .from(\"parent_students\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "const { data } = await supabase .from(\"attendance\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "const { data: enrolments } = await supabase .from(\"student_class_enrolments\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "supabase .from(\"tenant_public_holidays\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "supabase .from(\"makeup_bookings\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "? supabase .from(\"lesson_sessions\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/ — ⚠ ONE entry, 2 sites (:284, :296 — the snippet is contained in each); all leave in the same commit" },
+  { file: "app/(coach)/settings/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
+  { file: "app/(coach)/settings/index.tsx", contains: "const { data } = await supabase .from(\"coaches\")", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
+  { file: "app/(coach)/settings/index.tsx", contains: "supabase .from(\"tenants\")", why: "L-H commit coach-settings: moves to features/coach-settings/dao/ — ⚠ ONE entry, 2 sites (:67, :156 — the snippet is contained in each); all leave in the same commit" },
+  { file: "app/(coach)/settings/index.tsx", contains: "supabase .from(\"profiles\")", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
+  { file: "app/(coach)/settings/index.tsx", contains: "const bytes = await (await fetch(asset.uri)).arrayBuffer();", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
+  { file: "app/(coach)/settings/index.tsx", contains: "const { error: upErr } = await supabase.storage", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
+  { file: "app/(coach)/settings/index.tsx", contains: "const { data: pub } = supabase.storage", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
+  { file: "app/(coach)/settings/index.tsx", contains: "await supabase.auth.signOut();", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
+  { file: "app/(coach)/classes/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit coach-classes: moves to features/coach-classes/dao/" },
+  { file: "app/(coach)/classes/index.tsx", contains: "const { data: coach } = await supabase .from(\"coaches\")", why: "L-H commit coach-classes: moves to features/coach-classes/dao/" },
+  { file: "app/(coach)/classes/index.tsx", contains: "const { data } = await supabase .from(\"classes\")", why: "L-H commit coach-classes: moves to features/coach-classes/dao/" },
+  { file: "app/(auth)/register.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit register: moves to features/register/dao/" },
+  { file: "app/(auth)/register.tsx", contains: "const { data, error: signUpError } = await supabase.auth.signUp({", why: "L-H commit register: moves to features/register/dao/" },
+  { file: "app/(auth)/register.tsx", contains: "await supabase .from(\"profiles\")", why: "L-H commit register: moves to features/register/dao/" },
+  { file: "app/(auth)/register.tsx", contains: "await supabase .from(\"parents\")", why: "L-H commit register: moves to features/register/dao/" },
+  { file: "app/(auth)/login.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit login: moves to features/login/dao/" },
+  { file: "app/(auth)/login.tsx", contains: "const { data, error } = await supabase.auth.signInWithPassword({", why: "fence commit login: moves to features/login/dao/" },
+  { file: "app/(auth)/login.tsx", contains: "supabase .from(\"profiles\")", why: "fence commit login: moves to features/login/dao/" },
+  { file: "app/(auth)/login.tsx", contains: "supabase .from(\"coaches\")", why: "fence commit login: moves to features/login/dao/" },
+  { file: "app/(auth)/accept-invite.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
+  { file: "app/(auth)/accept-invite.tsx", contains: "supabase.auth.getSession().then(async ({ data: { session } }) => {", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
+  { file: "app/(auth)/accept-invite.tsx", contains: "const { data: kids } = await supabase .from(\"students\")", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
+  { file: "app/(auth)/accept-invite.tsx", contains: "const { error: updErr } = await supabase.auth.updateUser({ password });", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
+  { file: "app/(auth)/accept-invite.tsx", contains: "const { data: me } = await supabase.auth.getUser();", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
+  { file: "app/(auth)/accept-invite.tsx", contains: "await supabase .from(\"profiles\")", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
+  { file: "app/(auth)/accept-invite.tsx", contains: "await supabase.auth.signOut();", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
+  { file: "app/(auth)/reset-password.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit reset-password: moves to features/reset-password/dao/" },
+  { file: "app/(auth)/reset-password.tsx", contains: "supabase.auth.getSession().then(({ data: { session } }) => {", why: "fence commit reset-password: moves to features/reset-password/dao/" },
+  { file: "app/(auth)/reset-password.tsx", contains: "const { error: updErr } = await supabase.auth.updateUser({ password });", why: "fence commit reset-password: moves to features/reset-password/dao/" },
+  { file: "app/(auth)/reset-password.tsx", contains: "await supabase.auth.signOut();", why: "fence commit reset-password: moves to features/reset-password/dao/" },
+  { file: "app/(auth)/forgot-password.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit forgot-password: moves to features/forgot-password/dao/" },
+  { file: "app/(auth)/forgot-password.tsx", contains: "const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {", why: "fence commit forgot-password: moves to features/forgot-password/dao/" },
+  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit grade: moves to features/grade/dao/" },
+  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "const { data: s } = await supabase .from(\"students\")", why: "fence commit grade: moves to features/grade/dao/" },
+  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "supabase .from(\"skill_grade_levels\")", why: "fence commit grade: moves to features/grade/dao/" },
+  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "supabase .from(\"student_skill_progress\")", why: "fence commit grade: moves to features/grade/dao/" },
+  { file: "app/(coach)/pay/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit coach-pay: moves to features/coach-pay/dao/" },
+  { file: "app/(coach)/pay/index.tsx", contains: "const { data: payoutRows } = await supabase .from(\"coach_payouts\")", why: "fence commit coach-pay: moves to features/coach-pay/dao/" },
+  { file: "app/(coach)/pay/index.tsx", contains: "? await supabase .from(\"coach_payout_items\")", why: "fence commit coach-pay: moves to features/coach-pay/dao/" },
+  { file: "app/(parent)/profile/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit profile: moves to features/profile/dao/" },
+  { file: "app/(parent)/profile/index.tsx", contains: "await supabase.auth.signOut();", why: "fence commit profile: moves to features/profile/dao/" },
+  { file: "app/(parent)/profile/contact.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit contact: moves to features/contact/dao/" },
+  { file: "app/(parent)/profile/contact.tsx", contains: "supabase .from(\"parents\")", why: "fence commit contact: moves to features/contact/dao/ — ⚠ ONE entry, 2 sites (:61, :101 — the snippet is contained in each); all leave in the same commit" },
+  { file: "app/(parent)/profile/contact.tsx", contains: "supabase .from(\"profiles\")", why: "fence commit contact: moves to features/contact/dao/ — ⚠ ONE entry, 2 sites (:66, :108 — the snippet is contained in each); all leave in the same commit" },
+  { file: "app/(parent)/home/join-tenant.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit join-tenant: moves to features/join-tenant/dao/" },
+  { file: "app/(parent)/home/join-tenant.tsx", contains: "const { data, error } = await supabase.rpc(\"join_tenant_by_code\", {", why: "fence commit join-tenant: moves to features/join-tenant/dao/" },
 ];
 
 /**
- * Check 4 — route-file imports outside its own tiers. SCHEDULE Stage 0b
+ * Check 4 — route-file imports outside its own tiers. APP L-F/G/H L0
+ * (2026-09-23) pinned 76 — `@/lib/*`, `@/store/useAppStore`, and three
+ * third-party packages (`qrcode`, `expo-image-picker`, `expo-linking`), which
+ * move into domain/ (plan R2: the QR build keeps its `try`).
+ *
+ * SCHEDULE Stage 0b
  * pinned 12: eleven `@/lib/*` modules and `@/store/useAppStore`; all gone at
  * Stage 5.
  *
@@ -142,6 +311,82 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
+  { file: "app/(parent)/home/index.tsx", contains: "@/store/useAppStore", why: "L-F commit parent-home: leaves as its symbols move into features/parent-home/" },
+  { file: "app/(parent)/home/index.tsx", contains: "@/lib/supabase", why: "L-F commit parent-home: leaves as its symbols move into features/parent-home/" },
+  { file: "app/(parent)/home/index.tsx", contains: "@/lib/packageCoverage", why: "L-F commit parent-home: leaves as its symbols move into features/parent-home/" },
+  { file: "app/(parent)/home/index.tsx", contains: "@/lib/claimCandidates", why: "L-F commit parent-home: leaves as its symbols move into features/parent-home/" },
+  { file: "app/(parent)/home/index.tsx", contains: "@/lib/lessonDates", why: "L-F commit parent-home: leaves as its symbols move into features/parent-home/" },
+  { file: "app/(parent)/home/add-child.tsx", contains: "@/store/useAppStore", why: "L-F commit add-child: leaves as its symbols move into features/add-child/" },
+  { file: "app/(parent)/home/add-child.tsx", contains: "@/lib/supabase", why: "L-F commit add-child: leaves as its symbols move into features/add-child/" },
+  { file: "app/(parent)/home/add-child.tsx", contains: "@/lib/claimCandidates", why: "L-F commit add-child: leaves as its symbols move into features/add-child/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "@/lib/supabase", why: "L-F commit child-profile: leaves as its symbols move into features/child-profile/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "@/lib/lessonDates", why: "L-F commit child-profile: leaves as its symbols move into features/child-profile/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "@/lib/packageCoverage", why: "L-F commit child-profile: leaves as its symbols move into features/child-profile/" },
+  { file: "app/(parent)/home/child/[id].tsx", contains: "@/lib/skillProgress", why: "L-F commit child-profile: leaves as its symbols move into features/child-profile/" },
+  { file: "app/(parent)/home/edit-child.tsx", contains: "@/store/useAppStore", why: "L-F commit edit-child: leaves as its symbols move into features/edit-child/" },
+  { file: "app/(parent)/home/edit-child.tsx", contains: "@/lib/supabase", why: "L-F commit edit-child: leaves as its symbols move into features/edit-child/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "@/lib/lessonDates", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "@/store/useAppStore", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "@/lib/supabase", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "@/lib/invoiceLabel", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
+  { file: "app/(parent)/billing/index.tsx", contains: "@/lib/confirm", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/lessonDates", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/supabase", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/confirm", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/invoiceFunding", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/invoiceLabel", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
+  { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/store/useAppStore", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
+  { file: "app/(parent)/billing/paynow.tsx", contains: "qrcode", why: "L-G commit paynow: leaves as its symbols move into features/paynow/" },
+  { file: "app/(parent)/billing/paynow.tsx", contains: "@/lib/supabase", why: "L-G commit paynow: leaves as its symbols move into features/paynow/" },
+  { file: "app/(parent)/billing/paynow.tsx", contains: "@/lib/paynow", why: "L-G commit paynow: leaves as its symbols move into features/paynow/" },
+  { file: "app/invoice/[token].tsx", contains: "qrcode", why: "L-G commit public-invoice: leaves as its symbols move into features/public-invoice/" },
+  { file: "app/invoice/[token].tsx", contains: "@/lib/confirm", why: "L-G commit public-invoice: leaves as its symbols move into features/public-invoice/" },
+  { file: "app/invoice/[token].tsx", contains: "@/lib/paynow", why: "L-G commit public-invoice: leaves as its symbols move into features/public-invoice/" },
+  { file: "app/package/[token].tsx", contains: "qrcode", why: "L-G commit public-package: leaves as its symbols move into features/public-package/" },
+  { file: "app/package/[token].tsx", contains: "@/lib/confirm", why: "L-G commit public-package: leaves as its symbols move into features/public-package/" },
+  { file: "app/package/[token].tsx", contains: "@/lib/paynow", why: "L-G commit public-package: leaves as its symbols move into features/public-package/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "@/store/useAppStore", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "@/lib/supabase", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "@/lib/lessonDates", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "@/lib/upcomingLessons", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
+  { file: "app/(parent)/attendance/index.tsx", contains: "@/lib/scheduleWeek", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
+  { file: "app/(coach)/settings/index.tsx", contains: "expo-image-picker", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },
+  { file: "app/(coach)/settings/index.tsx", contains: "@/store/useAppStore", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },
+  { file: "app/(coach)/settings/index.tsx", contains: "@/lib/supabase", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },
+  { file: "app/(coach)/settings/index.tsx", contains: "@/lib/confirm", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },
+  { file: "app/(coach)/classes/index.tsx", contains: "@/store/useAppStore", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
+  { file: "app/(coach)/classes/index.tsx", contains: "@/lib/supabase", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
+  { file: "app/(coach)/classes/index.tsx", contains: "@/lib/lessonDates", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
+  { file: "app/(coach)/classes/index.tsx", contains: "@/lib/weekOrder", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
+  { file: "app/(coach)/classes/index.tsx", contains: "@/lib/locationFilter", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
+  { file: "app/(auth)/register.tsx", contains: "@/store/useAppStore", why: "L-H commit register: leaves as its symbols move into features/register/" },
+  { file: "app/(auth)/register.tsx", contains: "@/lib/supabase", why: "L-H commit register: leaves as its symbols move into features/register/" },
+  { file: "app/(auth)/register.tsx", contains: "@/lib/authErrors", why: "L-H commit register: leaves as its symbols move into features/register/" },
+  { file: "app/(auth)/login.tsx", contains: "@/store/useAppStore", why: "fence commit login: leaves as its symbols move into features/login/" },
+  { file: "app/(auth)/login.tsx", contains: "@/lib/supabase", why: "fence commit login: leaves as its symbols move into features/login/" },
+  { file: "app/(auth)/login.tsx", contains: "@/lib/landing", why: "fence commit login: leaves as its symbols move into features/login/" },
+  { file: "app/(auth)/login.tsx", contains: "@/lib/authErrors", why: "fence commit login: leaves as its symbols move into features/login/" },
+  { file: "app/(auth)/accept-invite.tsx", contains: "@/lib/supabase", why: "fence commit accept-invite: leaves as its symbols move into features/accept-invite/" },
+  { file: "app/(auth)/accept-invite.tsx", contains: "@/lib/authErrors", why: "fence commit accept-invite: leaves as its symbols move into features/accept-invite/" },
+  { file: "app/(auth)/accept-invite.tsx", contains: "@/store/useAppStore", why: "fence commit accept-invite: leaves as its symbols move into features/accept-invite/" },
+  { file: "app/(auth)/reset-password.tsx", contains: "@/lib/supabase", why: "fence commit reset-password: leaves as its symbols move into features/reset-password/" },
+  { file: "app/(auth)/reset-password.tsx", contains: "@/lib/authErrors", why: "fence commit reset-password: leaves as its symbols move into features/reset-password/" },
+  { file: "app/(auth)/reset-password.tsx", contains: "@/store/useAppStore", why: "fence commit reset-password: leaves as its symbols move into features/reset-password/" },
+  { file: "app/(auth)/forgot-password.tsx", contains: "expo-linking", why: "fence commit forgot-password: leaves as its symbols move into features/forgot-password/" },
+  { file: "app/(auth)/forgot-password.tsx", contains: "@/lib/supabase", why: "fence commit forgot-password: leaves as its symbols move into features/forgot-password/" },
+  { file: "app/(auth)/forgot-password.tsx", contains: "@/lib/authErrors", why: "fence commit forgot-password: leaves as its symbols move into features/forgot-password/" },
+  { file: "app/(auth)/forgot-password.tsx", contains: "@/store/useAppStore", why: "fence commit forgot-password: leaves as its symbols move into features/forgot-password/" },
+  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "@/lib/supabase", why: "fence commit grade: leaves as its symbols move into features/grade/" },
+  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "@/lib/skillProgress", why: "fence commit grade: leaves as its symbols move into features/grade/" },
+  { file: "app/(coach)/pay/index.tsx", contains: "@/lib/supabase", why: "fence commit coach-pay: leaves as its symbols move into features/coach-pay/" },
+  { file: "app/(coach)/pay/index.tsx", contains: "@/lib/payoutBreakdown", why: "fence commit coach-pay: leaves as its symbols move into features/coach-pay/" },
+  { file: "app/(parent)/profile/index.tsx", contains: "@/store/useAppStore", why: "fence commit profile: leaves as its symbols move into features/profile/" },
+  { file: "app/(parent)/profile/index.tsx", contains: "@/lib/supabase", why: "fence commit profile: leaves as its symbols move into features/profile/" },
+  { file: "app/(parent)/profile/index.tsx", contains: "@/lib/confirm", why: "fence commit profile: leaves as its symbols move into features/profile/" },
+  { file: "app/(parent)/profile/contact.tsx", contains: "@/store/useAppStore", why: "fence commit contact: leaves as its symbols move into features/contact/" },
+  { file: "app/(parent)/profile/contact.tsx", contains: "@/lib/supabase", why: "fence commit contact: leaves as its symbols move into features/contact/" },
+  { file: "app/(parent)/home/join-tenant.tsx", contains: "@/store/useAppStore", why: "fence commit join-tenant: leaves as its symbols move into features/join-tenant/" },
+  { file: "app/(parent)/home/join-tenant.tsx", contains: "@/lib/supabase", why: "fence commit join-tenant: leaves as its symbols move into features/join-tenant/" },
 ];
 
 /** Blank comments in place, preserving newlines, so line numbers stay true. */
@@ -190,7 +435,7 @@ function sources(): Src[] {
   for (const dir of SCOPE_DIRS) walk(join(APP, dir));
   // A missing route file is NOT read (it would throw ENOENT and read as a broken
   // test); the "scans every scoped page" test below goes red on it instead.
-  for (const page of PAGES) if (existsSync(join(APP, page))) found.push(read(join(APP, page)));
+  for (const { page } of PAGES) if (existsSync(join(APP, page))) found.push(read(join(APP, page)));
   return found;
 }
 
@@ -265,14 +510,23 @@ describe("app tier boundaries (route -> ui -> domain -> dao)", () => {
   const srcs = sources();
 
   it("scans every scoped route file at all (not vacuously green)", () => {
-    for (const page of PAGES) expect(srcs.map((s) => s.file)).toContain(page);
-    // featureOf() pairs PAGES[i] with SCOPE_DIRS[i]; a length mismatch would
-    // make check 4 throw instead of fail.
-    expect(PAGES.length).toBe(SCOPE_DIRS.length);
+    for (const { page } of PAGES) expect(srcs.map((s) => s.file)).toContain(page);
     // A scoped dir that does not exist makes checks 1-3 vacuous for it (the
     // walk skips a missing dir). Added at roster Stage 1, when features/roster
     // first existed.
     for (const dir of SCOPE_DIRS) expect(existsSync(join(APP, dir))).toBe(true);
+    // `null` means "no tiers"; the STRING "null" would quietly allow a
+    // features/null folder through check 4's regex.
+    for (const { feature } of PAGES) expect(feature).not.toBe("null");
+  });
+
+  it("scans every features/ folder (none is orphaned from PAGES)", () => {
+    // SCOPE_DIRS is derived from PAGES, so a folder no route names is walked by
+    // nothing — checks 1-3 would be vacuous for it (§7.233's shape).
+    const onDisk = readdirSync(join(APP, "features")).filter((d) =>
+      statSync(join(APP, "features", d)).isDirectory()
+    );
+    expect(onDisk.filter((d) => !FEATURES.includes(d))).toEqual([]);
   });
 
   it("derives the client-holding lib/ helpers (check 3 is not blind to them)", () => {
@@ -315,13 +569,16 @@ describe("app tier boundaries (route -> ui -> domain -> dao)", () => {
   });
 
   it("4. a route file imports its tiers, React, RN, expo-router, icons and @/components — never @/lib or @/store", () => {
-    const offenders = PAGES.flatMap((p) => {
+    const offenders = PAGES.flatMap(({ page: p, feature }) => {
       const page = srcs.find((s) => s.file === p);
       if (!page) return [`${p}  (route file not found — see the scan test)`];
-      const feature = featureOf(p);
+      const base = `^(react$|react-native$|expo-router$|@expo\\/vector-icons$|@\\/components\\/`;
+      // A tier-less route (feature: null) gets NO @/features branch at all —
+      // never an interpolated "null".
       const ok = new RegExp(
-        `^(react$|react-native$|expo-router$|@expo\\/vector-icons$|@\\/components\\/|` +
-          `@\\/features\\/${feature}\\/(ui|domain)\\/|@\\/features\\/${feature}\\/(constants|types)$)`
+        feature === null
+          ? `${base})`
+          : `${base}|@\\/features\\/${feature}\\/(ui|domain)\\/|@\\/features\\/${feature}\\/(constants|types)$)`
       );
       return imports(page)
         .filter((i) => !ok.test(i.text))
@@ -351,9 +608,3 @@ describe("app tier boundaries (route -> ui -> domain -> dao)", () => {
     assertNone(stale, "The code moved. Delete the entry; that is the point.");
   });
 });
-
-/** The features/<name> a route file belongs to — one SCOPE_DIRS entry per PAGES entry, by index. */
-function featureOf(page: string): string {
-  const dir = SCOPE_DIRS[PAGES.indexOf(page)];
-  return dir.replace(/^features\//, "");
-}
