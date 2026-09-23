@@ -395,6 +395,15 @@ later on the same code) sits in L4-F and L4-Fence: **one red is a re-run; two re
 | # | Commit | Gate | Notes |
 |---|---|---|---|
 | L0 | `4852b31` | jest 506/38 · vitest 855/87 · both typechecks | red on exactly 107 + 76; 99 + 76 entries; all 175 proven single-owner (7 multi-site entries named) |
+| 2 parent-home | `eea7d0a` | jest 514/39 · vitest 855/87 · deps 3/3 | 16 pins; homeRows 8 tests, 7/8 mutations red (8th equivalent) |
+| 3 add-child | `f9ded0c` | jest 514/39 · deps 1/1 | 6 pins; `session` unread on main too, kept |
+| 4 child-profile | `b814931` | jest 519/40 · deps 2/2 | 12 pins; childFormat 5 tests, 7/7 mutations red |
+| 5 edit-child | `ff640d1` | jest 519/40 · deps 1/1 | 5 pins |
+| **L4-F** | — | **14/14 drivers** · retry warnings 0 (baseline 0) · request counts identical (Home 10, Billing 6, Attendance 6, Classes 2) | hand-checks `app-fgh-handchecks-F.mjs` **10/10** (declined-claim dismiss persists; register-with-code → Joined Toast, code cleared, joined once). trial-visibility 11/11 + tenant-suspension 12/12 — the baseline reds were §12 F1 |
+
+**Hand-check scripts proven on the PRE-change code before their sub-batch** (a red later is the refactor,
+not the script): G **19/19**, H **6/6**, fence **19/19**. Getting there cost four script fixes worth keeping
+(§12 F3).
 
 **Baseline (pre-branch code, 2026-09-23, L4-F net):** smoke-app 73/73, packages 21, multi-class 17/17,
 makeups 15/15, tenant-branding 6/6, parent-claim 21/21, parent-address 6/6, join-code 7/7,
@@ -416,3 +425,11 @@ were caused by THIS SESSION**, not the product — see §12 F1 — and are re-ru
   hydrate wait that returns `null` (read as FAIL) when the form never appeared. That is the cold-compile
   shape (§7.108), not a product fault. HANDOVER §9's 2026-09-23 note named the wrong checks; corrected at
   close. The plan's R1 prohibition stands for the post-suspend parent checks, not this control.
+- **F3 — Hand-check scripts on the app: four traps, each hit once today.** (a) A deep link leaves the target
+  screen HIDDEN under the landing tab (§7.254), so `pressByText` (visible-only) reports NOT FOUND — reach every
+  screen by TAP. (b) `pressByText` takes the FIRST visible exact match: on /login that is the card heading
+  "Sign In", not the button (index 1). (c) Its synthetic events are not a user gesture, so expo-image-picker's
+  `<input type=file>.click()` never opens — use a trusted `locator('text="…" >> visible=true').click()` for the
+  picker. (d) A Toast is transient: wait for the message, don't read `innerText` after a URL wait.
+- **F4 — The grade screen has been READ-ONLY since `20260829000100`**; the plan's "grade save" hand-check was
+  replaced by "grade viewer renders a real student". There is no coach grade write left to check.
