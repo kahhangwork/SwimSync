@@ -191,14 +191,6 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: "app/(parent)/home/child/[id].tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
-  { file: "app/(parent)/home/child/[id].tsx", contains: "supabase .rpc(\"student_package_coverage\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
-  { file: "app/(parent)/home/child/[id].tsx", contains: "const { data: student } = await supabase .from(\"students\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
-  { file: "app/(parent)/home/child/[id].tsx", contains: "const { data: parentStudentLink } = await supabase .from(\"parent_students\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
-  { file: "app/(parent)/home/child/[id].tsx", contains: "const { data: invoices } = await supabase .from(\"invoices\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
-  { file: "app/(parent)/home/child/[id].tsx", contains: "const { data: parentRecord } = await supabase .from(\"parents\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
-  { file: "app/(parent)/home/child/[id].tsx", contains: "supabase .from(\"skill_grade_levels\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
-  { file: "app/(parent)/home/child/[id].tsx", contains: "supabase .from(\"student_skill_progress\")", why: "L-F commit child-profile: moves to features/child-profile/dao/" },
   { file: "app/(parent)/home/edit-child.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-F commit edit-child: moves to features/edit-child/dao/" },
   { file: "app/(parent)/home/edit-child.tsx", contains: "const { data } = await supabase .from(\"students\")", why: "L-F commit edit-child: moves to features/edit-child/dao/" },
   { file: "app/(parent)/home/edit-child.tsx", contains: "const { error } = await supabase .from(\"students\")", why: "L-F commit edit-child: moves to features/edit-child/dao/" },
@@ -297,10 +289,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: "app/(parent)/home/child/[id].tsx", contains: "@/lib/supabase", why: "L-F commit child-profile: leaves as its symbols move into features/child-profile/" },
-  { file: "app/(parent)/home/child/[id].tsx", contains: "@/lib/lessonDates", why: "L-F commit child-profile: leaves as its symbols move into features/child-profile/" },
-  { file: "app/(parent)/home/child/[id].tsx", contains: "@/lib/packageCoverage", why: "L-F commit child-profile: leaves as its symbols move into features/child-profile/" },
-  { file: "app/(parent)/home/child/[id].tsx", contains: "@/lib/skillProgress", why: "L-F commit child-profile: leaves as its symbols move into features/child-profile/" },
   { file: "app/(parent)/home/edit-child.tsx", contains: "@/store/useAppStore", why: "L-F commit edit-child: leaves as its symbols move into features/edit-child/" },
   { file: "app/(parent)/home/edit-child.tsx", contains: "@/lib/supabase", why: "L-F commit edit-child: leaves as its symbols move into features/edit-child/" },
   { file: "app/(parent)/billing/index.tsx", contains: "@/lib/lessonDates", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
