@@ -408,6 +408,17 @@ later on the same code) sits in L4-F and L4-Fence: **one red is a re-run; two re
 | 10 public-package | `71ad197` | jest 529/45 · deps 2/2 | 4 pins; R2 greps clean |
 | **L4-G** | — | **6/6 drivers** (smoke 73, pay-claim 17, packages 21, paynow-fallback 21, branding 6, payment-collection 19) · retry 0 · request counts identical | hand-checks `app-fgh-handchecks-G.mjs` **19/19** — detail "I've paid", referral Copy, /package/<token> logged in AND out with NO auth headers, cancelRequest |
 
+| 11 parent-attendance | `6d40342` | jest 535/46 · deps 4/4 | 13 pins; upcomingLessons moved (imports repointed) |
+| 12 coach-settings | `b4b5740` | jest 535/46 · deps 2/2 · Alert.alert = 1 | 12 pins; `coachId` unread on main too, kept |
+| 13 coach-classes | `205bee3` | jest 537/47 · deps 2/2 + 3 useMemo by hand | 8 pins; weekOrder moved; scheduleWeek comment paths |
+| 14 register | `25f0bcc` | jest 537/47 | 7 pins; R10 order kept |
+| **L4-H** | — | **14/14 drivers** (smoke 73, parent-attendance 9, attendance-guard 22, paynow-fallback 21, coach-roster 30, stale-screen 22, join-code 7, parent-address 6, branding 6, identity 13, level-skills 14, levels 9, trial-visibility 11, trials 16) · retry 0 · request counts identical | hand-checks `app-fgh-handchecks-H.mjs` **6/6** — QR upload (Storage + tenants row), coach Sign Out persists |
+| **D6 review, F/G/H** | — | an Opus reviewer compared all 13 screens + ReferralSection with main: **0 real changes**, 2 cosmetic (a comment misplaced identically on main; `age` computed while loading, cannot throw) | the four moved lib tests pass in place |
+
+| 15 fence | `969e02b` | jest 537/47 · vitest 855/87 · every dep array identical · 9/9 routes' markup identical + in order | the last 56 pins — **both app ledgers EMPTY**; 0 routes with useState |
+| **L4-Fence** | — | smoke-app **first, alone** 73/73; then coach-wages 10, parent-address 6, join-code 7, coach-disable 13, tenant-suspension 12, payment-collection 19, edit-child 7, schedule-week 21 — **9/9** · retry 0 | hand-checks `app-fgh-handchecks-fence.mjs` **19/19** — ONE-SHOT login parent + coach (R1), wrong-password message, change password ×2 roles, forgot → Mailpit, reset + accept-invite through REAL generated links, grade viewer, parent Sign Out |
+| **D6 review, fence** | — | an Opus reviewer compared commit 969e02b with its parent: **0 real changes**, 2 cosmetic (an extra fragment in PayoutCards; `summary` computed while loading — pure, cannot throw) | login's sequence confirmed byte-identical |
+
 **Hand-check scripts proven on the PRE-change code before their sub-batch** (a red later is the refactor,
 not the script): G **19/19**, H **6/6**, fence **19/19**. Getting there cost four script fixes worth keeping
 (§12 F3).
