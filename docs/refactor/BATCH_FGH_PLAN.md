@@ -392,9 +392,27 @@ later on the same code) sits in L4-F and L4-Fence: **one red is a re-run; two re
 
 ## 11. Stage log
 
-_(filled in as commits land: commit SHA, gate result, pins removed, drivers + RUNTIME check counts,
-hand-check screenshots)_
+| # | Commit | Gate | Notes |
+|---|---|---|---|
+| L0 | `4852b31` | jest 506/38 · vitest 855/87 · both typechecks | red on exactly 107 + 76; 99 + 76 entries; all 175 proven single-owner (7 multi-site entries named) |
+
+**Baseline (pre-branch code, 2026-09-23, L4-F net):** smoke-app 73/73, packages 21, multi-class 17/17,
+makeups 15/15, tenant-branding 6/6, parent-claim 21/21, parent-address 6/6, join-code 7/7,
+student-identity 13/13, level-skills 14/14, levels 9/9. **trial-visibility ✗ and tenant-suspension 10/12
+were caused by THIS SESSION**, not the product — see §12 F1 — and are re-run clean below.
 
 ## 12. Findings for `/update-docs`
 
-_(filled in at close)_
+- **F1 — On RN-web, ANY imported file going missing breaks the WHOLE app bundle, not the screen.** A
+  `git mv lib/referralShare.ts` made while the baseline drivers ran put Expo's error overlay over every
+  route (Metro serves one web bundle); `trial-visibility` died on "error-overlay intercepts pointer
+  events" at its login click, and `tenant-suspension`'s first app login returned `null`. The playbook's
+  "never edit the page while a driver runs" is too narrow: **never move, delete or break-import ANY
+  imported module (lib/, components/, a route) while a driver runs.** Creating NEW, not-yet-imported
+  files is safe. → GOTCHAS candidate + playbook §4.
+- **F2 — The nightly "tenant-suspension flake" is its parent-login CONTROL, not the admin checks.**
+  `35753594101`'s two FAILs were `control: the parent logs in before the suspend` and `…sees children of
+  BOTH businesses` — the driver's FIRST app page load, a one-shot `appLoginDies()` with a fixed 7 s
+  hydrate wait that returns `null` (read as FAIL) when the form never appeared. That is the cold-compile
+  shape (§7.108), not a product fault. HANDOVER §9's 2026-09-23 note named the wrong checks; corrected at
+  close. The plan's R1 prohibition stands for the post-suspend parent checks, not this control.

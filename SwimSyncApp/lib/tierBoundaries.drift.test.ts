@@ -191,17 +191,6 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: "app/(parent)/home/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
-  { file: "app/(parent)/home/index.tsx", contains: "await supabase.rpc(\"dismiss_student_claim\", { p_claim_id: id });", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
-  { file: "app/(parent)/home/index.tsx", contains: "supabase .rpc(\"student_package_coverage\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
-  { file: "app/(parent)/home/index.tsx", contains: "const { data: parent } = await supabase .from(\"parents\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
-  { file: "app/(parent)/home/index.tsx", contains: "supabase .from(\"trial_bookings\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
-  { file: "app/(parent)/home/index.tsx", contains: "supabase .from(\"makeup_bookings\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
-  { file: "app/(parent)/home/index.tsx", contains: "const { data: invoices } = await supabase .from(\"invoices\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
-  { file: "app/(parent)/home/index.tsx", contains: "const { data: claims } = await supabase .from(\"student_claims\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
-  { file: "app/(parent)/home/index.tsx", contains: "const { data: p } = await supabase .from(\"parents\")", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
-  { file: "app/(parent)/home/index.tsx", contains: "const { data, error } = await supabase.rpc(\"join_tenant_by_code\", {", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
-  { file: "app/(parent)/home/index.tsx", contains: "await supabase.from(\"parents\").update({ signup_join_code: null }).eq(\"id\", p.id);", why: "L-F commit parent-home: moves to features/parent-home/dao/" },
   { file: "app/(parent)/home/add-child.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-F commit add-child: moves to features/add-child/dao/" },
   { file: "app/(parent)/home/add-child.tsx", contains: "const { data } = await supabase .from(\"parent_tenants\")", why: "L-F commit add-child: moves to features/add-child/dao/" },
   { file: "app/(parent)/home/add-child.tsx", contains: "const { data, error } = await supabase.rpc(\"add_child_or_claim\", {", why: "L-F commit add-child: moves to features/add-child/dao/" },
@@ -311,11 +300,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: "app/(parent)/home/index.tsx", contains: "@/store/useAppStore", why: "L-F commit parent-home: leaves as its symbols move into features/parent-home/" },
-  { file: "app/(parent)/home/index.tsx", contains: "@/lib/supabase", why: "L-F commit parent-home: leaves as its symbols move into features/parent-home/" },
-  { file: "app/(parent)/home/index.tsx", contains: "@/lib/packageCoverage", why: "L-F commit parent-home: leaves as its symbols move into features/parent-home/" },
-  { file: "app/(parent)/home/index.tsx", contains: "@/lib/claimCandidates", why: "L-F commit parent-home: leaves as its symbols move into features/parent-home/" },
-  { file: "app/(parent)/home/index.tsx", contains: "@/lib/lessonDates", why: "L-F commit parent-home: leaves as its symbols move into features/parent-home/" },
   { file: "app/(parent)/home/add-child.tsx", contains: "@/store/useAppStore", why: "L-F commit add-child: leaves as its symbols move into features/add-child/" },
   { file: "app/(parent)/home/add-child.tsx", contains: "@/lib/supabase", why: "L-F commit add-child: leaves as its symbols move into features/add-child/" },
   { file: "app/(parent)/home/add-child.tsx", contains: "@/lib/claimCandidates", why: "L-F commit add-child: leaves as its symbols move into features/add-child/" },
