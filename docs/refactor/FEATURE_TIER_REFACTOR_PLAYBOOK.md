@@ -289,6 +289,18 @@ rm verify-zz-* fixtures-zz-*                    # before committing anything
 - **A red on a cold dev server is §7.108 first.** `verify-assessment` went 23/27 on the
   first hit of an uncompiled route and 27/27 warm, with zero lines of the assessment page
   changed. Re-run before reading it as a regression.
+- **On the Expo web build, ANY imported file going missing breaks EVERY screen, not the one you
+  are cutting** (App L-F/G/H, 2026-09-23): Metro serves one bundle, so a `git mv lib/x.ts` made while
+  a driver ran put the error overlay over the whole app and two unrelated drivers died at their
+  login click. "Never edit the page while a driver runs" is too narrow — **never move, delete or
+  break-import any imported module while a driver runs**. Writing NEW, not-yet-imported files is safe;
+  hold prepared features OUT of the tree until their commit (`BATCH_FGH_PLAN.md` §12 F1).
+- **App hand-check scripts: four traps** (App L-F/G/H): reach every screen by TAP — a deep link leaves
+  it hidden under the landing tab and `pressByText` (visible-only) reports NOT FOUND (§7.254); on
+  `/login` the first visible "Sign In" is the card heading (the button is index 1); `pressByText`'s
+  synthetic events cannot open expo-image-picker's file input — use a trusted
+  `locator('text="…" >> visible=true').click()` for a picker; a Toast is transient — wait for the
+  message. **Prove every hand-check script on the PRE-change code first**, or its first red is ambiguous.
 - The drivers **reset the shared database** per run (`run-all-drivers.sh`). Own the DB, or
   announce to the session that does, before starting one. **Never edit the page while a
   driver is running against it** — the dev server hot-reloads your half-finished cut into
@@ -456,9 +468,9 @@ move):
 | **Admin L-C** money | `wages` `credit-notes` `referrals` `accounting` | 2,309 | coach-wages, referrals; **credit-notes, accounting: none → smoke** |
 | **Admin L-D** grading | `levels` `trials` `makeups` `assessment` (+ `assessment/[classId]`, fence) | 2,667 | levels, levels-table, level-skills, assessment, trials, contact-details, makeups |
 | **Admin L-E** rest | `dashboard` `locations` `history` | 1,161 | join-code, orphan-report, platform-admin, locations; **history: none → smoke** |
-| **App L-F** parent home | `home` `add-child` `child/[id]` `edit-child` | 1,886 | parent-claim + every parent-role driver that lands on Home |
-| **App L-G** parent money | `billing` `invoice/[id]` `paynow` `invoice/[token]` `package/[token]` | 2,023 | payment-collection, parent-pay-claim, paynow-fallback, package-renewal |
-| **App L-H** rest | `attendance` (parent) `settings` (coach) `classes/index` (coach) `register` | 1,606 | coach-roster; **register, parent attendance: goto-less — see the caveat** |
+| **App L-F** parent home ✅ | `home` `add-child` `child/[id]` `edit-child` | 1,886 | parent-claim + every parent-role driver that lands on Home |
+| **App L-G** parent money ✅ | `billing` `invoice/[id]` `paynow` `invoice/[token]` `package/[token]` | 2,023 | payment-collection, parent-pay-claim, paynow-fallback, package-renewal |
+| **App L-H** rest ✅ | `attendance` (parent) `settings` (coach) `classes/index` (coach) `register` | 1,606 | coach-roster; **register, parent attendance: goto-less — see the caveat** |
 
 **Caveat for the app map:** coach/parent drivers mostly navigate by *tapping tabs* after
 login, not by `goto`, so the route → driver grep under-reports them. For an app batch, read
@@ -507,12 +519,17 @@ Recommended order:
 
 ### 7.5 Definition of done — the programme
 
-- [ ] every route file in both apps is in `SCOPE_DIRS` of its app's boundary test
-- [ ] both ledgers empty in both apps — the fence holds with no exceptions listed
-- [ ] every full-track page meets §6; every lite page has `page.tsx`/`index.tsx` under
-      ~200 lines and zero `useState`; every fence page passes checks 3 and 4
+- [x] every route file in both apps is in `SCOPE_DIRS` of its app's boundary test (admin: every
+      `page.tsx` bar the 5-line `app/page.tsx` redirect; app: every route bar `_layout` and the
+      6-line `app/index.tsx`, as `PAGES` entries) — 2026-09-23, App L-F/G/H + fence
+- [x] both ledgers empty in both apps — the fence holds with no exceptions listed — 2026-09-23
+      (admin since Admin L-E; app at the fence commit `969e02b`)
+- [x] every full-track page meets §6; every lite page has `page.tsx`/`index.tsx` under
+      ~200 lines and zero `useState`; every fence page passes checks 3 and 4 — 2026-09-23 (app:
+      0 route files with `useState`, the largest 166 lines)
 - [x] `jest.config.js` `testMatch` covers `features/`, and `SCAN_DIRS` in both twins of
       `sgDisplay.drift.test.ts` covers it too (§1's table) — and Tailwind `content` — 2026-09-21, roster 0b
-- [ ] the smoke drivers are in `run-all-drivers.sh`'s nightly set
+- [x] the smoke drivers are in `run-all-drivers.sh`'s nightly set (`verify-smoke-admin`,
+      `verify-smoke-app` — the sweep runs every `verify-*.mjs`)
 - [x] the dao three-way split and the "orchestrate, never replace" rule are in
       `docs/ARCHITECTURE.md` §6, and this playbook points at them (§1) — 2026-09-18, Admin L-D

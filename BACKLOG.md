@@ -1241,7 +1241,7 @@ underbill.
 
 ### ~~Upcoming lessons view for parents~~ — **S** — **DONE 2026-08-17**
 Shipped: an **Upcoming** section on the parent Attendance screen, derived from each active
-enrolment's weekday over ~4 weeks (`lib/upcomingLessons.ts`), holidays subtracted. No sessions
+enrolment's weekday over ~4 weeks (`features/parent-attendance/domain/upcomingLessons.ts`), holidays subtracted. No sessions
 pre-generated. PRD §7.5 describes it. Ad-hoc `lesson_session` cancellations are a named
 follow-up (see below); the RISK 4 holiday exclusion is unit-tested.
 
