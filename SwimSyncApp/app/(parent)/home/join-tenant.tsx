@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -9,9 +9,8 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useAppStore } from "@/store/useAppStore";
-import { supabase } from "@/lib/supabase";
 import PrimaryButton from "@/components/PrimaryButton";
+import { useJoinTenant } from "@/features/join-tenant/domain/useJoinTenant";
 
 /**
  * Join a coach or swim school with the code they gave you.
@@ -24,45 +23,17 @@ import PrimaryButton from "@/components/PrimaryButton";
  * The code is redeemed through the `join_tenant_by_code` RPC rather than a
  * direct query: the parent has no read access to a tenant they have not joined,
  * so resolving the code has to happen with policies bypassed, server-side.
+ *
+ * The markup stays here (docs/refactor/BATCH_FGH_PLAN.md, app fence); the code and
+ * the redeem live in features/join-tenant/domain/useJoinTenant.
  */
 export default function JoinTenantScreen() {
-  const [code, setCode] = useState("");
-  const [loading, setLoading] = useState(false);
-  const showToast = useAppStore((s) => s.showToast);
-
-  async function handleJoin() {
-    const entered = code.trim();
-    if (!entered) {
-      showToast("Enter the code your coach gave you.", "error");
-      return;
-    }
-
-    setLoading(true);
-    const { data, error } = await supabase.rpc("join_tenant_by_code", {
-      p_code: entered,
-    });
-    setLoading(false);
-
-    if (error) {
-      // The RPC's message is already parent-facing and deliberately identical
-      // for every failure, so a wrong code cannot be used to probe which codes
-      // are real. Pass it through rather than inventing copy.
-      showToast(error.message || "That code was not recognised.", "error");
-      return;
-    }
-
-    const joined = Array.isArray(data) ? data[0] : data;
-    const name = joined?.display_name ?? "your coach";
-    // A REF- code both joins AND records a referral — say so, so the family
-    // knows their first package will be discounted.
-    showToast(
-      joined?.referred
-        ? `You've joined ${name}. Your first package is discounted!`
-        : `You've joined ${name}.`,
-      "success",
-    );
-    router.back();
-  }
+  const {
+    code,
+    setCode,
+    loading,
+    handleJoin,
+  } = useJoinTenant();
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">

@@ -8,29 +8,15 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useAppStore } from "@/store/useAppStore";
-import { supabase } from "@/lib/supabase";
-import { confirmAction } from "@/lib/confirm";
 import Card from "@/components/Card";
+import { useParentProfile } from "@/features/profile/domain/useParentProfile";
+
+// The parent Profile tab (docs/refactor/BATCH_FGH_PLAN.md, app fence): the markup
+// stays here; the session read and Sign Out live in
+// features/profile/domain/useParentProfile.
 
 export default function ParentProfileScreen() {
-  const session = useAppStore((s) => s.session);
-  const clearSession = useAppStore((s) => s.clearSession);
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    clearSession();
-    router.replace("/(auth)/login");
-  }
-
-  function confirmLogout() {
-    confirmAction(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      handleLogout,
-      "Sign Out"
-    );
-  }
+  const { session, confirmLogout } = useParentProfile();
 
   const initials = session?.fullName?.charAt(0) ?? "?";
 

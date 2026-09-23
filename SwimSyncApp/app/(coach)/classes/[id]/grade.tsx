@@ -17,7 +17,7 @@
 // the top grade, computed every render, never stored — adding a higher grade
 // re-opens a skill (mirrors the migration).
 
-import React, { useState, useCallback } from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Text,
@@ -26,90 +26,16 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from "react-native";
-import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { supabase } from "@/lib/supabase";
 import Card from "@/components/Card";
-import {
-  summariseSkillProgress,
-  type GradeLevel,
-  type LevelSkill,
-} from "@/lib/skillProgress";
+import { useStudentGrades } from "@/features/grade/domain/useStudentGrades";
 
-type StudentInfo = {
-  full_name: string;
-  tenant_id: string;
-  level_label: string | null;
-  level_note: string | null;
-};
+// The load and the n-of-m summary live in features/grade/domain/useStudentGrades
+// (docs/refactor/BATCH_FGH_PLAN.md, app fence); the markup stays here.
 
 export default function StudentSkillsScreen() {
-  const { studentId } = useLocalSearchParams<{ id: string; studentId: string }>();
-
-  const [loading, setLoading] = useState(true);
-  const [student, setStudent] = useState<StudentInfo | null>(null);
-  const [skills, setSkills] = useState<LevelSkill[]>([]);
-  const [scale, setScale] = useState<GradeLevel[]>([]);
-  // skill_id → grade_level_id for every graded skill.
-  const [grades, setGrades] = useState<Record<string, string>>({});
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-
-    const { data: s } = await supabase
-      .from("students")
-      .select(
-        "full_name, tenant_id, tenant_levels(label, note, tenant_level_skills(id, label, sort_order))"
-      )
-      .eq("id", studentId)
-      .single();
-
-    if (!s) {
-      setStudent(null);
-      setLoading(false);
-      return;
-    }
-
-    // PostgREST returns the to-one tenant_levels embed as an object; the
-    // generated types widen it to an array, so cast rather than index (§7.28).
-    const level = (s as any).tenant_levels;
-    setStudent({
-      full_name: (s as any).full_name,
-      tenant_id: (s as any).tenant_id,
-      level_label: level?.label ?? null,
-      level_note: level?.note ?? null,
-    });
-    setSkills(
-      [...((level?.tenant_level_skills as LevelSkill[]) ?? [])].map((sk: any) => ({
-        id: sk.id,
-        label: sk.label,
-        sort_order: sk.sort_order,
-      }))
-    );
-
-    // The tenant's grade scale, and this child's existing grades. Both scoped
-    // by RLS to the coach's own business already; the tenant filter is belt-and-
-    // braces and makes the query self-documenting.
-    const [{ data: scaleRows }, { data: progressRows }] = await Promise.all([
-      supabase
-        .from("skill_grade_levels")
-        .select("id, rank, label")
-        .eq("tenant_id", (s as any).tenant_id)
-        .order("rank"),
-      supabase
-        .from("student_skill_progress")
-        .select("skill_id, grade_level_id")
-        .eq("student_id", studentId),
-    ]);
-
-    setScale((scaleRows as GradeLevel[]) ?? []);
-    setGrades(
-      Object.fromEntries(
-        ((progressRows as any[]) ?? []).map((p) => [p.skill_id, p.grade_level_id])
-      )
-    );
-    setLoading(false);
-  }, [studentId]);
+  const { loading, student, skills, scale, loadData, summary } = useStudentGrades();
 
   useFocusEffect(
     useCallback(() => {
@@ -124,12 +50,6 @@ export default function StudentSkillsScreen() {
       </SafeAreaView>
     );
   }
-
-  const summary = summariseSkillProgress(
-    skills,
-    Object.entries(grades).map(([skill_id, grade_level_id]) => ({ skill_id, grade_level_id })),
-    scale
-  );
 
   return (
     <SafeAreaView className="flex-1 bg-sky-50">

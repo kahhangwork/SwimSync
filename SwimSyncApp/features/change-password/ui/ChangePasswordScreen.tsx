@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -12,45 +12,27 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import PrimaryButton from "@/components/PrimaryButton";
-import { supabase } from "@/lib/supabase";
-import { friendlyAuthError } from "@/lib/authErrors";
+import { useChangePassword } from "../domain/useChangePassword";
 
 // Shared Change Password screen for the logged-in coach and parent. The user is
 // already authenticated, so updateUser({ password }) is enough (no recovery
 // session needed). Uses inline error/success state instead of Alert.alert,
 // which is a no-op on the web build.
+//
+// Moved from components/ChangePasswordScreen.tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// app fence): both change-password routes compose this feature. State and the save
+// live in ../domain/useChangePassword; the markup is unchanged.
 export default function ChangePasswordScreen() {
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
-
-  async function handleSave() {
-    setError(null);
-    if (!password || !confirm) {
-      setError("Please enter and confirm your new password.");
-      return;
-    }
-    if (password !== confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-
-    setLoading(true);
-    const { error: updErr } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-
-    if (updErr) {
-      setError(friendlyAuthError(updErr));
-      return;
-    }
-    setDone(true);
-  }
+  const {
+    password,
+    setPassword,
+    confirm,
+    setConfirm,
+    loading,
+    error,
+    done,
+    handleSave,
+  } = useChangePassword();
 
   return (
     <SafeAreaView className="flex-1 bg-sky-50">

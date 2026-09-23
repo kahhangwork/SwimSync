@@ -102,6 +102,11 @@
 // cover several sites whose text contains the snippet (named in each `why`);
 // every entry, removed alone, left exactly its named sites. Breakers removed,
 // 8/8 green.
+//
+// Both ledgers EMPTIED by the fence commit, 2026-09-23: every route file in the
+// app now composes its own feature (or, for welcome, nothing) with no exception
+// listed. The playbook's §7.5 "both ledgers empty" holds for the app. A new
+// violation from here on is a new violation — there is nothing to pin it beside.
 
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
@@ -170,8 +175,8 @@ type Allowed = { file: string; contains: string; why: string };
 
 /**
  * Check 3 — network reaches outside `dao/`. APP L-F/G/H L0 (2026-09-23)
- * pinned 107 sites with 99 entries across the 24 routes; each `why` names the
- * sub-batch commit that removes it. The fence commit removes the last.
+ * pinned 107 sites with 99 entries across the 24 routes; each `why` named the
+ * sub-batch commit that removed it. The fence commit removed the last — EMPTY.
  *
  * SCHEDULE Stage 0b pinned 12: the
  * client import, two client-holding helper imports and nine `.from()`
@@ -191,44 +196,14 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: "app/(auth)/login.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit login: moves to features/login/dao/" },
-  { file: "app/(auth)/login.tsx", contains: "const { data, error } = await supabase.auth.signInWithPassword({", why: "fence commit login: moves to features/login/dao/" },
-  { file: "app/(auth)/login.tsx", contains: "supabase .from(\"profiles\")", why: "fence commit login: moves to features/login/dao/" },
-  { file: "app/(auth)/login.tsx", contains: "supabase .from(\"coaches\")", why: "fence commit login: moves to features/login/dao/" },
-  { file: "app/(auth)/accept-invite.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
-  { file: "app/(auth)/accept-invite.tsx", contains: "supabase.auth.getSession().then(async ({ data: { session } }) => {", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
-  { file: "app/(auth)/accept-invite.tsx", contains: "const { data: kids } = await supabase .from(\"students\")", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
-  { file: "app/(auth)/accept-invite.tsx", contains: "const { error: updErr } = await supabase.auth.updateUser({ password });", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
-  { file: "app/(auth)/accept-invite.tsx", contains: "const { data: me } = await supabase.auth.getUser();", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
-  { file: "app/(auth)/accept-invite.tsx", contains: "await supabase .from(\"profiles\")", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
-  { file: "app/(auth)/accept-invite.tsx", contains: "await supabase.auth.signOut();", why: "fence commit accept-invite: moves to features/accept-invite/dao/" },
-  { file: "app/(auth)/reset-password.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit reset-password: moves to features/reset-password/dao/" },
-  { file: "app/(auth)/reset-password.tsx", contains: "supabase.auth.getSession().then(({ data: { session } }) => {", why: "fence commit reset-password: moves to features/reset-password/dao/" },
-  { file: "app/(auth)/reset-password.tsx", contains: "const { error: updErr } = await supabase.auth.updateUser({ password });", why: "fence commit reset-password: moves to features/reset-password/dao/" },
-  { file: "app/(auth)/reset-password.tsx", contains: "await supabase.auth.signOut();", why: "fence commit reset-password: moves to features/reset-password/dao/" },
-  { file: "app/(auth)/forgot-password.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit forgot-password: moves to features/forgot-password/dao/" },
-  { file: "app/(auth)/forgot-password.tsx", contains: "const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {", why: "fence commit forgot-password: moves to features/forgot-password/dao/" },
-  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit grade: moves to features/grade/dao/" },
-  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "const { data: s } = await supabase .from(\"students\")", why: "fence commit grade: moves to features/grade/dao/" },
-  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "supabase .from(\"skill_grade_levels\")", why: "fence commit grade: moves to features/grade/dao/" },
-  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "supabase .from(\"student_skill_progress\")", why: "fence commit grade: moves to features/grade/dao/" },
-  { file: "app/(coach)/pay/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit coach-pay: moves to features/coach-pay/dao/" },
-  { file: "app/(coach)/pay/index.tsx", contains: "const { data: payoutRows } = await supabase .from(\"coach_payouts\")", why: "fence commit coach-pay: moves to features/coach-pay/dao/" },
-  { file: "app/(coach)/pay/index.tsx", contains: "? await supabase .from(\"coach_payout_items\")", why: "fence commit coach-pay: moves to features/coach-pay/dao/" },
-  { file: "app/(parent)/profile/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit profile: moves to features/profile/dao/" },
-  { file: "app/(parent)/profile/index.tsx", contains: "await supabase.auth.signOut();", why: "fence commit profile: moves to features/profile/dao/" },
-  { file: "app/(parent)/profile/contact.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit contact: moves to features/contact/dao/" },
-  { file: "app/(parent)/profile/contact.tsx", contains: "supabase .from(\"parents\")", why: "fence commit contact: moves to features/contact/dao/ — ⚠ ONE entry, 2 sites (:61, :101 — the snippet is contained in each); all leave in the same commit" },
-  { file: "app/(parent)/profile/contact.tsx", contains: "supabase .from(\"profiles\")", why: "fence commit contact: moves to features/contact/dao/ — ⚠ ONE entry, 2 sites (:66, :108 — the snippet is contained in each); all leave in the same commit" },
-  { file: "app/(parent)/home/join-tenant.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "fence commit join-tenant: moves to features/join-tenant/dao/" },
-  { file: "app/(parent)/home/join-tenant.tsx", contains: "const { data, error } = await supabase.rpc(\"join_tenant_by_code\", {", why: "fence commit join-tenant: moves to features/join-tenant/dao/" },
 ];
 
 /**
  * Check 4 — route-file imports outside its own tiers. APP L-F/G/H L0
  * (2026-09-23) pinned 76 — `@/lib/*`, `@/store/useAppStore`, and three
  * third-party packages (`qrcode`, `expo-image-picker`, `expo-linking`), which
- * move into domain/ (plan R2: the QR build keeps its `try`).
+ * moved into domain/ (plan R2: the QR build keeps its `try`). All gone by the
+ * fence commit — EMPTY.
  *
  * SCHEDULE Stage 0b
  * pinned 12: eleven `@/lib/*` modules and `@/store/useAppStore`; all gone at
@@ -243,31 +218,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: "app/(auth)/login.tsx", contains: "@/store/useAppStore", why: "fence commit login: leaves as its symbols move into features/login/" },
-  { file: "app/(auth)/login.tsx", contains: "@/lib/supabase", why: "fence commit login: leaves as its symbols move into features/login/" },
-  { file: "app/(auth)/login.tsx", contains: "@/lib/landing", why: "fence commit login: leaves as its symbols move into features/login/" },
-  { file: "app/(auth)/login.tsx", contains: "@/lib/authErrors", why: "fence commit login: leaves as its symbols move into features/login/" },
-  { file: "app/(auth)/accept-invite.tsx", contains: "@/lib/supabase", why: "fence commit accept-invite: leaves as its symbols move into features/accept-invite/" },
-  { file: "app/(auth)/accept-invite.tsx", contains: "@/lib/authErrors", why: "fence commit accept-invite: leaves as its symbols move into features/accept-invite/" },
-  { file: "app/(auth)/accept-invite.tsx", contains: "@/store/useAppStore", why: "fence commit accept-invite: leaves as its symbols move into features/accept-invite/" },
-  { file: "app/(auth)/reset-password.tsx", contains: "@/lib/supabase", why: "fence commit reset-password: leaves as its symbols move into features/reset-password/" },
-  { file: "app/(auth)/reset-password.tsx", contains: "@/lib/authErrors", why: "fence commit reset-password: leaves as its symbols move into features/reset-password/" },
-  { file: "app/(auth)/reset-password.tsx", contains: "@/store/useAppStore", why: "fence commit reset-password: leaves as its symbols move into features/reset-password/" },
-  { file: "app/(auth)/forgot-password.tsx", contains: "expo-linking", why: "fence commit forgot-password: leaves as its symbols move into features/forgot-password/" },
-  { file: "app/(auth)/forgot-password.tsx", contains: "@/lib/supabase", why: "fence commit forgot-password: leaves as its symbols move into features/forgot-password/" },
-  { file: "app/(auth)/forgot-password.tsx", contains: "@/lib/authErrors", why: "fence commit forgot-password: leaves as its symbols move into features/forgot-password/" },
-  { file: "app/(auth)/forgot-password.tsx", contains: "@/store/useAppStore", why: "fence commit forgot-password: leaves as its symbols move into features/forgot-password/" },
-  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "@/lib/supabase", why: "fence commit grade: leaves as its symbols move into features/grade/" },
-  { file: "app/(coach)/classes/[id]/grade.tsx", contains: "@/lib/skillProgress", why: "fence commit grade: leaves as its symbols move into features/grade/" },
-  { file: "app/(coach)/pay/index.tsx", contains: "@/lib/supabase", why: "fence commit coach-pay: leaves as its symbols move into features/coach-pay/" },
-  { file: "app/(coach)/pay/index.tsx", contains: "@/lib/payoutBreakdown", why: "fence commit coach-pay: leaves as its symbols move into features/coach-pay/" },
-  { file: "app/(parent)/profile/index.tsx", contains: "@/store/useAppStore", why: "fence commit profile: leaves as its symbols move into features/profile/" },
-  { file: "app/(parent)/profile/index.tsx", contains: "@/lib/supabase", why: "fence commit profile: leaves as its symbols move into features/profile/" },
-  { file: "app/(parent)/profile/index.tsx", contains: "@/lib/confirm", why: "fence commit profile: leaves as its symbols move into features/profile/" },
-  { file: "app/(parent)/profile/contact.tsx", contains: "@/store/useAppStore", why: "fence commit contact: leaves as its symbols move into features/contact/" },
-  { file: "app/(parent)/profile/contact.tsx", contains: "@/lib/supabase", why: "fence commit contact: leaves as its symbols move into features/contact/" },
-  { file: "app/(parent)/home/join-tenant.tsx", contains: "@/store/useAppStore", why: "fence commit join-tenant: leaves as its symbols move into features/join-tenant/" },
-  { file: "app/(parent)/home/join-tenant.tsx", contains: "@/lib/supabase", why: "fence commit join-tenant: leaves as its symbols move into features/join-tenant/" },
 ];
 
 /** Blank comments in place, preserving newlines, so line numbers stay true. */

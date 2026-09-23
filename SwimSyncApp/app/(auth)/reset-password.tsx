@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -7,72 +7,25 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { router } from "expo-router";
 import PrimaryButton from "@/components/PrimaryButton";
 import Logo from "@/components/Logo";
-import { supabase } from "@/lib/supabase";
-import { friendlyAuthError } from "@/lib/authErrors";
-import { useAppStore } from "@/store/useAppStore";
+import { useResetPassword } from "@/features/reset-password/domain/useResetPassword";
+
+// Reset password (docs/refactor/BATCH_FGH_PLAN.md, app fence): the markup stays
+// here; the recovery-session check and the reset live in
+// features/reset-password/domain/useResetPassword.
 
 export default function ResetPasswordScreen() {
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const showToast = useAppStore((s) => s.showToast);
-
-  // This screen is only valid inside a recovery session (opened via the email
-  // link). If there's no session, the link is invalid or expired.
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        showToast(
-          "This reset link is invalid or has expired. Please request a new one.",
-          "error"
-        );
-        router.replace("/(auth)/forgot-password");
-        return;
-      }
-      setChecking(false);
-    });
-  }, []);
-
-  async function handleReset() {
-    setError(null);
-    if (!password || !confirm) {
-      setError("Please enter and confirm your new password.");
-      return;
-    }
-    if (password !== confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-
-    setLoading(true);
-
-    const { error: updErr } = await supabase.auth.updateUser({ password });
-
-    if (updErr) {
-      setLoading(false);
-      setError(friendlyAuthError(updErr));
-      return;
-    }
-
-    // Force a clean re-login with the new password.
-    await supabase.auth.signOut();
-    setLoading(false);
-
-    showToast(
-      "Password updated. Please sign in with your new password.",
-      "success"
-    );
-    router.replace("/(auth)/login");
-  }
+  const {
+    password,
+    setPassword,
+    confirm,
+    setConfirm,
+    loading,
+    checking,
+    error,
+    handleReset,
+  } = useResetPassword();
 
   if (checking) {
     return (

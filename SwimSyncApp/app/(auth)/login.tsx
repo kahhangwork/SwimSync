@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -9,76 +9,22 @@ import {
   Platform,
 } from "react-native";
 import { router } from "expo-router";
-import { useAppStore } from "@/store/useAppStore";
 import PrimaryButton from "@/components/PrimaryButton";
 import Logo from "@/components/Logo";
-import { supabase } from "@/lib/supabase";
-import { landingFor } from "@/lib/landing";
-import { friendlyAuthError } from "@/lib/authErrors";
+import { useLogin } from "@/features/login/domain/useLogin";
+
+// Sign-in (docs/refactor/BATCH_FGH_PLAN.md, app fence): the markup stays here; the
+// form state and the sign-in sequence live in features/login/domain/useLogin.
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const setSession = useAppStore((s) => s.setSession);
-  const showToast = useAppStore((s) => s.showToast);
-
-  async function handleLogin() {
-    if (!email || !password) {
-      showToast("Please enter your email and password.", "error");
-      return;
-    }
-
-    setLoading(true);
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (error || !data.user) {
-      setLoading(false);
-      showToast(friendlyAuthError(error), "error");
-      return;
-    }
-
-    // Profile + whether they actually teach. A PRIVATE COACH is a tenant_admin
-    // with a coaches row, so the role alone cannot decide where they land.
-    const [{ data: profile, error: profileError }, { data: coachRow }] =
-      await Promise.all([
-        supabase
-          .from("profiles")
-          .select("role, full_name")
-          .eq("id", data.user.id)
-          .single(),
-        supabase
-          .from("coaches")
-          .select("id")
-          .eq("profile_id", data.user.id)
-          .maybeSingle(),
-      ]);
-
-    setLoading(false);
-
-    if (profileError || !profile) {
-      showToast("Could not load your profile. Please try again.", "error");
-      return;
-    }
-
-    setSession({
-      id: data.user.id,
-      email: data.user.email!,
-      role: profile.role,
-      fullName: profile.full_name,
-    });
-
-    const landing = landingFor(profile.role, !!coachRow);
-    if (landing.route) {
-      router.replace(landing.route);
-    } else {
-      showToast(landing.reason, "error");
-    }
-  }
+  const {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    loading,
+    handleLogin,
+  } = useLogin();
 
   return (
     <KeyboardAvoidingView

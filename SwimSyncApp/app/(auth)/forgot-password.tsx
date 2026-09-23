@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -8,50 +8,23 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import PrimaryButton from "@/components/PrimaryButton";
 import Logo from "@/components/Logo";
-import { supabase } from "@/lib/supabase";
-import { friendlyAuthError } from "@/lib/authErrors";
-import { useAppStore } from "@/store/useAppStore";
+import { useForgotPassword } from "@/features/forgot-password/domain/useForgotPassword";
 
-// Where Supabase should redirect the recovery link back to. On web this is the
-// running Expo origin; on native it's the app's custom scheme (swimsync://).
-function resetRedirectTo(): string {
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    return window.location.origin + "/reset-password";
-  }
-  return Linking.createURL("/reset-password");
-}
+// Forgot password (docs/refactor/BATCH_FGH_PLAN.md, app fence): the markup stays
+// here; the send lives in features/forgot-password/domain/useForgotPassword, the
+// redirect target in …/resetRedirectTo.
 
 export default function ForgotPasswordScreen() {
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
-  const showToast = useAppStore((s) => s.showToast);
-
-  async function handleSend() {
-    if (!email.trim()) {
-      showToast("Please enter your email address.", "error");
-      return;
-    }
-
-    setLoading(true);
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: resetRedirectTo(),
-    });
-
-    setLoading(false);
-
-    if (error) {
-      showToast(friendlyAuthError(error), "error");
-      return;
-    }
-
-    setSent(true);
-  }
+  const {
+    email,
+    setEmail,
+    loading,
+    sent,
+    handleSend,
+  } = useForgotPassword();
 
   return (
     <KeyboardAvoidingView
