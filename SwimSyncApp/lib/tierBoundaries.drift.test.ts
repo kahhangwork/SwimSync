@@ -191,7 +191,6 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: "app/package/[token].tsx", contains: "const res = await fetch(", why: "L-G commit public-package: moves to features/public-package/dao/ — ⚠ ONE entry, 2 sites (:77, :135 — the snippet is contained in each); all leave in the same commit" },
   { file: "app/(parent)/attendance/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
   { file: "app/(parent)/attendance/index.tsx", contains: "const { data: parent } = await supabase .from(\"parents\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
   { file: "app/(parent)/attendance/index.tsx", contains: "const { data: links } = await supabase .from(\"parent_students\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
@@ -267,9 +266,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: "app/package/[token].tsx", contains: "qrcode", why: "L-G commit public-package: leaves as its symbols move into features/public-package/" },
-  { file: "app/package/[token].tsx", contains: "@/lib/confirm", why: "L-G commit public-package: leaves as its symbols move into features/public-package/" },
-  { file: "app/package/[token].tsx", contains: "@/lib/paynow", why: "L-G commit public-package: leaves as its symbols move into features/public-package/" },
   { file: "app/(parent)/attendance/index.tsx", contains: "@/store/useAppStore", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
   { file: "app/(parent)/attendance/index.tsx", contains: "@/lib/supabase", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
   { file: "app/(parent)/attendance/index.tsx", contains: "@/lib/lessonDates", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
