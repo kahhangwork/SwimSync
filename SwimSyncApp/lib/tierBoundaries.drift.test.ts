@@ -191,14 +191,6 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: "app/(parent)/attendance/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "const { data: parent } = await supabase .from(\"parents\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "const { data: links } = await supabase .from(\"parent_students\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "const { data } = await supabase .from(\"attendance\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "const { data: enrolments } = await supabase .from(\"student_class_enrolments\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "supabase .from(\"tenant_public_holidays\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "supabase .from(\"makeup_bookings\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "? supabase .from(\"lesson_sessions\")", why: "L-H commit parent-attendance: moves to features/parent-attendance/dao/ — ⚠ ONE entry, 2 sites (:284, :296 — the snippet is contained in each); all leave in the same commit" },
   { file: "app/(coach)/settings/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
   { file: "app/(coach)/settings/index.tsx", contains: "const { data } = await supabase .from(\"coaches\")", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
   { file: "app/(coach)/settings/index.tsx", contains: "supabase .from(\"tenants\")", why: "L-H commit coach-settings: moves to features/coach-settings/dao/ — ⚠ ONE entry, 2 sites (:67, :156 — the snippet is contained in each); all leave in the same commit" },
@@ -266,11 +258,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: "app/(parent)/attendance/index.tsx", contains: "@/store/useAppStore", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "@/lib/supabase", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "@/lib/lessonDates", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "@/lib/upcomingLessons", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
-  { file: "app/(parent)/attendance/index.tsx", contains: "@/lib/scheduleWeek", why: "L-H commit parent-attendance: leaves as its symbols move into features/parent-attendance/" },
   { file: "app/(coach)/settings/index.tsx", contains: "expo-image-picker", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },
   { file: "app/(coach)/settings/index.tsx", contains: "@/store/useAppStore", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },
   { file: "app/(coach)/settings/index.tsx", contains: "@/lib/supabase", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },

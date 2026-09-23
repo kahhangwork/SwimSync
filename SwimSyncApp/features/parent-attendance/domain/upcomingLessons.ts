@@ -12,8 +12,8 @@
 //
 // `today` is passed in, never read from a clock (§7.7).
 
-import { expectedLessonDates, type DayOfWeek } from "./lessonDates";
-import { addDays } from "./scheduleWeek";
+import { expectedLessonDates, type DayOfWeek } from "@/lib/lessonDates";
+import { addDays } from "@/lib/scheduleWeek";
 
 export const UPCOMING_HORIZON_DAYS = 28;
 
