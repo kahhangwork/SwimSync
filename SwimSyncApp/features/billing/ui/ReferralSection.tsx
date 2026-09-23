@@ -3,109 +3,21 @@
 // send friends to the wrong business). Each card carries the code, Copy + Share
 // on WhatsApp, the family's waiting rewards, and the friends they've brought
 // (first names only — my_referrals(), RISK 5).
+//
+// Moved VERBATIM from components/ReferralSection.tsx (docs/refactor/BATCH_FGH_PLAN.md,
+// App L-G) — it had one importer, the Billing tab. Still a self-contained section:
+// it calls useReferral itself, so its load runs when the Packages tab mounts it,
+// exactly as before (plan ⚠ R4).
 
-import React, { useCallback, useEffect, useState } from "react";
-import { Linking, Platform, Text, TouchableOpacity, View } from "react-native";
+import React from "react";
+import { Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { supabase } from "@/lib/supabase";
-import { useAppStore } from "@/store/useAppStore";
 import Card from "@/components/Card";
-import {
-  buildReferralShareText,
-  buildWhatsAppUrl,
-  rewardSummary,
-} from "@/lib/referralShare";
+import { useReferral } from "../domain/useReferral";
+import { rewardSummary } from "../domain/referralShare";
 
-type Membership = {
-  id: string;
-  referral_code: string | null;
-  referral_code_disabled_at: string | null;
-  tenant_id: string;
-  business_name: string;
-};
-
-type Referral = {
-  tenant_id: string;
-  business_name: string;
-  referee_first_name: string | null;
-  status: string;
-};
-
-export default function ReferralSection() {
-  const showToast = useAppStore((s) => s.showToast);
-  const [memberships, setMemberships] = useState<Membership[]>([]);
-  const [rewardsByTenant, setRewardsByTenant] = useState<Record<string, number>>({});
-  const [referrals, setReferrals] = useState<Referral[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const [mRes, rwRes, refRes] = await Promise.all([
-        supabase
-          .from("parent_tenants")
-          .select("id, referral_code, referral_code_disabled_at, tenant_id, tenants(display_name)")
-          .eq("is_active", true),
-        supabase.from("referral_rewards").select("tenant_id, status"),
-        supabase.rpc("my_referrals"),
-      ]);
-      if (cancelled) return;
-
-      setMemberships(
-        ((mRes.data as any[]) ?? []).map((m) => {
-          const t = Array.isArray(m.tenants) ? m.tenants[0] : m.tenants;
-          return {
-            id: m.id,
-            referral_code: m.referral_code ?? null,
-            referral_code_disabled_at: m.referral_code_disabled_at ?? null,
-            tenant_id: m.tenant_id,
-            business_name: t?.display_name ?? "Your coach",
-          };
-        }),
-      );
-
-      const counts: Record<string, number> = {};
-      for (const r of ((rwRes.data as any[]) ?? [])) {
-        if (r.status === "available") counts[r.tenant_id] = (counts[r.tenant_id] ?? 0) + 1;
-      }
-      setRewardsByTenant(counts);
-
-      setReferrals(
-        ((refRes.data as any[]) ?? []).map((r) => ({
-          tenant_id: r.tenant_id,
-          business_name: r.business_name,
-          referee_first_name: r.referee_first_name ?? null,
-          status: r.status,
-        })),
-      );
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const copy = useCallback(
-    async (code: string) => {
-      // Web only (the deployed surface). navigator.clipboard is the admin
-      // precedent; no expo-clipboard for one button. Native: the code is
-      // selectable text, so long-press copies.
-      if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard) {
-        try {
-          await navigator.clipboard.writeText(code);
-          showToast("Referral code copied.", "success");
-          return;
-        } catch {
-          // fall through
-        }
-      }
-      showToast("Long-press the code to copy it.", "info");
-    },
-    [showToast],
-  );
-
-  const share = useCallback((businessName: string, code: string) => {
-    const url = buildWhatsAppUrl(buildReferralShareText(businessName, code));
-    Linking.openURL(url);
-  }, []);
+export function ReferralSection() {
+  const { memberships, rewardsByTenant, referrals, copy, share } = useReferral();
 
   const withCode = memberships.filter((m) => m.referral_code);
   if (withCode.length === 0) return null;

@@ -191,15 +191,6 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: "app/(parent)/billing/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-G commit billing: moves to features/billing/dao/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "const { data, error } = await supabase.rpc(\"claim_invoice_paid\", {", why: "L-G commit billing: moves to features/billing/dao/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "const { data: parent } = await supabase .from(\"parents\")", why: "L-G commit billing: moves to features/billing/dao/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "supabase .from(\"invoices\")", why: "L-G commit billing: moves to features/billing/dao/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "supabase .from(\"credit_notes\")", why: "L-G commit billing: moves to features/billing/dao/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "supabase .from(\"parent_packages\")", why: "L-G commit billing: moves to features/billing/dao/ — ⚠ ONE entry, 3 sites (:202, :314, :341 — the snippet is contained in each); all leave in the same commit" },
-  { file: "app/(parent)/billing/index.tsx", contains: "supabase.rpc(\"package_live_balances\"),", why: "L-G commit billing: moves to features/billing/dao/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "supabase .from(\"package_products\")", why: "L-G commit billing: moves to features/billing/dao/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "supabase.functions", why: "L-G commit billing: moves to features/billing/dao/" },
   { file: "app/(parent)/billing/invoice/[id].tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
   { file: "app/(parent)/billing/invoice/[id].tsx", contains: "const { data, error } = await supabase.rpc(\"claim_invoice_paid\", {", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
   { file: "app/(parent)/billing/invoice/[id].tsx", contains: "const { data: inv } = await supabase .from(\"invoices\")", why: "L-G commit invoice-detail: moves to features/invoice-detail/dao/" },
@@ -286,11 +277,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: "app/(parent)/billing/index.tsx", contains: "@/lib/lessonDates", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "@/store/useAppStore", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "@/lib/supabase", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "@/lib/invoiceLabel", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
-  { file: "app/(parent)/billing/index.tsx", contains: "@/lib/confirm", why: "L-G commit billing: leaves as its symbols move into features/billing/" },
   { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/lessonDates", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
   { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/supabase", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
   { file: "app/(parent)/billing/invoice/[id].tsx", contains: "@/lib/confirm", why: "L-G commit invoice-detail: leaves as its symbols move into features/invoice-detail/" },
