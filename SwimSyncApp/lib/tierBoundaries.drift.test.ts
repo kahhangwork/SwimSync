@@ -191,14 +191,6 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: "app/(coach)/settings/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
-  { file: "app/(coach)/settings/index.tsx", contains: "const { data } = await supabase .from(\"coaches\")", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
-  { file: "app/(coach)/settings/index.tsx", contains: "supabase .from(\"tenants\")", why: "L-H commit coach-settings: moves to features/coach-settings/dao/ — ⚠ ONE entry, 2 sites (:67, :156 — the snippet is contained in each); all leave in the same commit" },
-  { file: "app/(coach)/settings/index.tsx", contains: "supabase .from(\"profiles\")", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
-  { file: "app/(coach)/settings/index.tsx", contains: "const bytes = await (await fetch(asset.uri)).arrayBuffer();", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
-  { file: "app/(coach)/settings/index.tsx", contains: "const { error: upErr } = await supabase.storage", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
-  { file: "app/(coach)/settings/index.tsx", contains: "const { data: pub } = supabase.storage", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
-  { file: "app/(coach)/settings/index.tsx", contains: "await supabase.auth.signOut();", why: "L-H commit coach-settings: moves to features/coach-settings/dao/" },
   { file: "app/(coach)/classes/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit coach-classes: moves to features/coach-classes/dao/" },
   { file: "app/(coach)/classes/index.tsx", contains: "const { data: coach } = await supabase .from(\"coaches\")", why: "L-H commit coach-classes: moves to features/coach-classes/dao/" },
   { file: "app/(coach)/classes/index.tsx", contains: "const { data } = await supabase .from(\"classes\")", why: "L-H commit coach-classes: moves to features/coach-classes/dao/" },
@@ -258,10 +250,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: "app/(coach)/settings/index.tsx", contains: "expo-image-picker", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },
-  { file: "app/(coach)/settings/index.tsx", contains: "@/store/useAppStore", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },
-  { file: "app/(coach)/settings/index.tsx", contains: "@/lib/supabase", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },
-  { file: "app/(coach)/settings/index.tsx", contains: "@/lib/confirm", why: "L-H commit coach-settings: leaves as its symbols move into features/coach-settings/" },
   { file: "app/(coach)/classes/index.tsx", contains: "@/store/useAppStore", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
   { file: "app/(coach)/classes/index.tsx", contains: "@/lib/supabase", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
   { file: "app/(coach)/classes/index.tsx", contains: "@/lib/lessonDates", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
