@@ -1,7 +1,7 @@
 // Week arithmetic for the coach's Schedule tab — Monday-start, SGT-safe.
 //
 // ⚠ NOTHING HERE READS A CLOCK. `today` is always a parameter, the same
-// discipline lib/weekOrder.ts and lib/attendanceWindow.ts follow. §7.7 shipped a
+// discipline features/coach-classes/domain/weekOrder.ts and lib/attendanceWindow.ts follow. §7.7 shipped a
 // real double-billing bug because a screen derived its weekday from a second
 // `new Date()`; the mitigation is that the derivation cannot happen here at all.
 //
@@ -25,7 +25,7 @@ import { expectedLessonDates, type DayOfWeek } from "./lessonDates";
 
 const DAY_MS = 86_400_000;
 
-/** Monday-first, matching lib/weekOrder.ts's WEEK_ORDER and the Postgres
+/** Monday-first, matching features/coach-classes/domain/weekOrder.ts's WEEK_ORDER and the Postgres
  *  `day_of_week` enum declaration order. Index 0 = Monday. */
 const MONDAY_FIRST: DayOfWeek[] = [
   "monday",

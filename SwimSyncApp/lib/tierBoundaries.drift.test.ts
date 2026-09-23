@@ -191,9 +191,6 @@ type Allowed = { file: string; contains: string; why: string };
  * client import and `removeFromClass`.
  */
 const ALLOWED_DATA_ACCESS: Allowed[] = [
-  { file: "app/(coach)/classes/index.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit coach-classes: moves to features/coach-classes/dao/" },
-  { file: "app/(coach)/classes/index.tsx", contains: "const { data: coach } = await supabase .from(\"coaches\")", why: "L-H commit coach-classes: moves to features/coach-classes/dao/" },
-  { file: "app/(coach)/classes/index.tsx", contains: "const { data } = await supabase .from(\"classes\")", why: "L-H commit coach-classes: moves to features/coach-classes/dao/" },
   { file: "app/(auth)/register.tsx", contains: "import { supabase } from \"@/lib/supabase\";", why: "L-H commit register: moves to features/register/dao/" },
   { file: "app/(auth)/register.tsx", contains: "const { data, error: signUpError } = await supabase.auth.signUp({", why: "L-H commit register: moves to features/register/dao/" },
   { file: "app/(auth)/register.tsx", contains: "await supabase .from(\"profiles\")", why: "L-H commit register: moves to features/register/dao/" },
@@ -250,11 +247,6 @@ const ALLOWED_DATA_ACCESS: Allowed[] = [
  * symbols move into domain/ or ui/; all nine are gone at Stage 5.
  */
 const ALLOWED_PAGE_IMPORTS: Allowed[] = [
-  { file: "app/(coach)/classes/index.tsx", contains: "@/store/useAppStore", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
-  { file: "app/(coach)/classes/index.tsx", contains: "@/lib/supabase", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
-  { file: "app/(coach)/classes/index.tsx", contains: "@/lib/lessonDates", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
-  { file: "app/(coach)/classes/index.tsx", contains: "@/lib/weekOrder", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
-  { file: "app/(coach)/classes/index.tsx", contains: "@/lib/locationFilter", why: "L-H commit coach-classes: leaves as its symbols move into features/coach-classes/" },
   { file: "app/(auth)/register.tsx", contains: "@/store/useAppStore", why: "L-H commit register: leaves as its symbols move into features/register/" },
   { file: "app/(auth)/register.tsx", contains: "@/lib/supabase", why: "L-H commit register: leaves as its symbols move into features/register/" },
   { file: "app/(auth)/register.tsx", contains: "@/lib/authErrors", why: "L-H commit register: leaves as its symbols move into features/register/" },

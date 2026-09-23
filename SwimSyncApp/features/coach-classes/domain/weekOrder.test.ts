@@ -4,7 +4,7 @@ import {
   WEEK_ORDER,
   type WeekdayGroup,
 } from "./weekOrder";
-import type { DayOfWeek } from "./lessonDates";
+import type { DayOfWeek } from "@/lib/lessonDates";
 
 type Cls = { id: string; day_of_week: string };
 

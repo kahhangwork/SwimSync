@@ -1,128 +1,25 @@
-import React, { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  ActivityIndicator,
-} from "react-native";
-import { router, useFocusEffect } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { useAppStore } from "@/store/useAppStore";
-import { supabase } from "@/lib/supabase";
-import { todayInSg, dayOfWeekOf } from "@/lib/lessonDates";
-import { groupByWeekday, weekdayLabel } from "@/lib/weekOrder";
-import { locationChips } from "@/lib/locationFilter";
-import Card from "@/components/Card";
+import React, { useCallback } from "react";
+import { ScrollView, SafeAreaView } from "react-native";
+import { useFocusEffect } from "expo-router";
+import { useCoachClasses } from "@/features/coach-classes/domain/useCoachClasses";
+import { Heading } from "@/features/coach-classes/ui/Heading";
+import { LocationChips } from "@/features/coach-classes/ui/LocationChips";
+import { ClassList } from "@/features/coach-classes/ui/ClassList";
 
-type CoachClass = {
-  id: string;
-  title: string;
-  day_of_week: string;
-  start_time: string;
-  end_time: string;
-  location_id: string;
-  location_name: string;
-  price_per_lesson: number;
-  student_count: number;
-};
-
-function formatTime(time: string): string {
-  const [h, m] = time.split(":");
-  const hour = parseInt(h, 10);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  const hour12 = hour % 12 || 12;
-  return `${hour12}:${m} ${ampm}`;
-}
-
+// The coach Classes tab — composition only (docs/refactor/BATCH_FGH_PLAN.md, App L-H).
+// State, the location filter, the weekday grouping and the load live in
+// features/coach-classes/domain/useCoachClasses, markup in …/ui. The one effect is
+// here, keyed on loadClasses' identity.
 export default function ClassesScreen() {
-  const session = useAppStore((s) => s.session);
-  const [classes, setClasses] = useState<CoachClass[]>([]);
-  const [loading, setLoading] = useState(true);
-  // "" = all locations. A coach who teaches at one location never sees the chips.
-  const [locationFilter, setLocationFilter] = useState<string>("");
-
-  // Distinct locations across this coach's classes, for the filter chips.
-  const locationOpts = React.useMemo(
-    () => locationChips(classes.map((c) => ({ id: c.location_id, name: c.location_name }))),
-    [classes]
-  );
-
-  // Clamp to "all" when the selected location is no longer among the options
-  // (e.g. its last class was removed) — otherwise the chips vanish while the
-  // filter keeps hiding every row with no control to clear it.
-  const effLocationFilter = locationOpts.some((o) => o.id === locationFilter)
-    ? locationFilter
-    : "";
-  const shown = React.useMemo(
-    () =>
-      effLocationFilter
-        ? classes.filter((c) => c.location_id === effLocationFilter)
-        : classes,
-    [classes, effLocationFilter]
-  );
-
-  // Today's weekday, in Singapore, read ONCE and passed in as a value. The
-  // grouping helper cannot read a clock at all (lib/weekOrder.ts) — the same
-  // shape lib/timeOfDay.ts forced after §7.7.
-  const todayDow = dayOfWeekOf(todayInSg());
-  const groups = React.useMemo(
-    () => groupByWeekday(shown, (c) => c.day_of_week, todayDow),
-    [shown, todayDow]
-  );
-
-  const loadClasses = useCallback(async () => {
-    if (!session) return;
-    setLoading(true);
-
-    const { data: coach } = await supabase
-      .from("coaches")
-      .select("id")
-      .eq("profile_id", session.id)
-      .single();
-
-    if (!coach) {
-      setLoading(false);
-      return;
-    }
-
-    const { data } = await supabase
-      .from("classes")
-      .select(`
-        id,
-        title,
-        day_of_week,
-        start_time,
-        end_time,
-        location_id,
-        locations(name),
-        price_per_lesson,
-        student_class_enrolments(id, is_active)
-      `)
-      .eq("coach_id", coach.id)
-      .eq("is_active", true)
-      .order("day_of_week", { ascending: true })
-      .order("start_time", { ascending: true });
-
-    setClasses(
-      (data ?? []).map((cls: any) => ({
-        id: cls.id,
-        title: cls.title,
-        day_of_week: cls.day_of_week,
-        start_time: cls.start_time,
-        end_time: cls.end_time,
-        location_id: cls.location_id,
-        location_name: cls.locations?.name ?? "—",
-        price_per_lesson: Number(cls.price_per_lesson),
-        student_count: (cls.student_class_enrolments ?? []).filter(
-          (e: any) => e.is_active
-        ).length,
-      }))
-    );
-
-    setLoading(false);
-  }, [session]);
+  const {
+    classes,
+    loading,
+    setLocationFilter,
+    locationOpts,
+    effLocationFilter,
+    groups,
+    loadClasses,
+  } = useCoachClasses();
 
   useFocusEffect(
     useCallback(() => {
@@ -136,131 +33,11 @@ export default function ClassesScreen() {
         contentContainerClassName="px-5 py-6 pb-10"
         showsVerticalScrollIndicator={false}
       >
-        <View className="mb-6">
-          <Text className="text-2xl font-bold text-gray-900">My Classes</Text>
-          <Text className="text-sm text-gray-500 mt-0.5">
-            All assigned classes
-          </Text>
-        </View>
+        <Heading />
 
-        {locationOpts.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-2 pb-1"
-            className="mb-4 -mx-1 px-1"
-          >
-            {[{ id: "", name: "All locations" }, ...locationOpts].map((opt) => {
-              const active = effLocationFilter === opt.id;
-              return (
-                <TouchableOpacity
-                  key={opt.id || "all"}
-                  onPress={() => setLocationFilter(opt.id)}
-                  activeOpacity={0.8}
-                  className={`rounded-full px-4 py-1.5 ${
-                    active ? "bg-sky-600" : "bg-white border border-gray-200"
-                  }`}
-                >
-                  <Text
-                    className={`text-sm font-medium ${
-                      active ? "text-white" : "text-gray-600"
-                    }`}
-                  >
-                    {opt.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        )}
+        <LocationChips locationOpts={locationOpts} effLocationFilter={effLocationFilter} setLocationFilter={setLocationFilter} />
 
-        {loading ? (
-          <View className="items-center py-16">
-            <ActivityIndicator size="large" color="#0ea5e9" />
-          </View>
-        ) : classes.length === 0 ? (
-          <Card className="items-center py-10">
-            <Ionicons name="calendar-outline" size={40} color="#d1d5db" />
-            <Text className="text-gray-400 mt-3 text-sm">No classes assigned yet</Text>
-          </Card>
-        ) : (
-          <View className="gap-5">
-            {groups.map((group) => (
-              <View key={group.day}>
-                {/* The weekday is a SECTION HEADER now, not a line on every
-                    card — so it reads once per group instead of once per class,
-                    and today is findable without reading any of them. */}
-                <View className="flex-row items-center gap-2 mb-2 px-0.5">
-                  <Text
-                    className={`text-xs font-bold uppercase tracking-wide ${
-                      group.isToday ? "text-sky-600" : "text-gray-400"
-                    }`}
-                  >
-                    {group.isToday
-                      ? `Today · ${weekdayLabel(group.day)}`
-                      : weekdayLabel(group.day)}
-                  </Text>
-                  <View
-                    className={`flex-1 h-px ${
-                      group.isToday ? "bg-sky-100" : "bg-gray-200"
-                    }`}
-                  />
-                </View>
-
-                <View className="gap-3">
-                  {group.items.map((cls) => (
-                    <TouchableOpacity
-                      key={cls.id}
-                      onPress={() => router.push(`/(coach)/classes/${cls.id}/roster`)}
-                      activeOpacity={0.8}
-                    >
-                      <Card className={group.isToday ? "border-sky-200" : ""}>
-                        <View className="flex-row items-start justify-between mb-3">
-                          <View className="flex-1">
-                            <Text className="text-base font-bold text-gray-900">
-                              {cls.title}
-                            </Text>
-                          </View>
-                          <View className="bg-sky-100 rounded-full px-3 py-1">
-                            <Text className="text-xs font-semibold text-sky-700">
-                              {cls.student_count} students
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View className="gap-1.5">
-                          <View className="flex-row items-center gap-2">
-                            <Ionicons name="time-outline" size={14} color="#6b7280" />
-                            <Text className="text-sm text-gray-600">
-                              {formatTime(cls.start_time)} – {formatTime(cls.end_time)}
-                            </Text>
-                          </View>
-                          <View className="flex-row items-center gap-2">
-                            <Ionicons name="location-outline" size={14} color="#6b7280" />
-                            <Text className="text-sm text-gray-600">
-                              {cls.location_name}
-                            </Text>
-                          </View>
-                          <View className="flex-row items-center gap-2">
-                            <Ionicons name="cash-outline" size={14} color="#6b7280" />
-                            <Text className="text-sm text-gray-600">
-                              S${cls.price_per_lesson.toFixed(2)} / lesson
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View className="flex-row items-center justify-end mt-3 gap-1">
-                          <Text className="text-xs text-sky-500">View Roster & Sessions</Text>
-                          <Ionicons name="chevron-forward" size={13} color="#0ea5e9" />
-                        </View>
-                      </Card>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
+        <ClassList loading={loading} classes={classes} groups={groups} />
       </ScrollView>
     </SafeAreaView>
   );

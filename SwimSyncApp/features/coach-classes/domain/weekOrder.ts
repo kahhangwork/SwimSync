@@ -7,7 +7,7 @@
 // number so the device's timezone has no way in. Same shape here — the caller
 // passes `dayOfWeekOf(todayInSg())`.
 
-import type { DayOfWeek } from "./lessonDates";
+import type { DayOfWeek } from "@/lib/lessonDates";
 
 /**
  * Monday-first, matching the declaration order of the Postgres `day_of_week`
