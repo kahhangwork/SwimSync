@@ -2,7 +2,7 @@
 
 _Last updated: 2026-09-23 — **Billing months card + generation run log SHIPPED, `main` `6c0a5ab` (§8.117); AUGUST
 2026 IS BILLED AND CLOSED** (sealed 22 Sep 23:58, 9 invoices, 1 settlement). Migration 158/158, engine v28, apps live.
-**Nightly `35753594101` on `6c0a5ab` is the gate for the next build (§9).**_
+**Gate cleared: nightly `35794406334` 52/52 (§9).**_
 
 _Previously, same day (§8.116) — Coach Schedule tab: 1,255 → 101 lines, the LAST full-track giant._
 
@@ -418,10 +418,11 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-23: `main` is `6c0a5ab` (Billing months, §8.117). Nightly `35753594101` was dispatched on it
-and is the GATE for the next unit (§7.1)** — `trial-onboarding` gained 5 card checks, so a red there bisects here;
-**read it, don't trust this line** (§8.65). The previous run, `35738235448` on `7148f83`, was **52/52**. Locally,
-`trial-onboarding` 15/15 — BACKLOG's local-reds item may be closable.
+**State on 2026-09-23: the gate is GREEN — scheduled nightly `35794406334` on `f87405e` (docs-only over `6c0a5ab`,
+Billing months §8.117) read **52/52** from its log.** The dispatched run before it, `35753594101` on `6c0a5ab`, was
+51/52: **`verify-tenant-suspension` 10/12** (loginAdmin landed on `/dashboard` where `/platform` was expected), NOT
+`trial-onboarding` (15/15, its 5 new card checks held). Same code passed 12/12 six hours later — treat it as a flake
+until it reddens twice (§5 triage rules). **Read the run, don't trust this line** (§8.65).
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
@@ -440,8 +441,8 @@ the fence track — playbook §7.1–§7.2; **re-measure and re-derive each batc
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current stage has (§7.253); reach a screen by TAP for anything visual (§7.254).
 
-**GATE (§7.1): build on a branch, but do NOT merge to `main` until nightly `35753594101` (on `6c0a5ab`) is green —
-read it from the log, not the badge.**
+**GATE (§7.1): cleared — nightly `35794406334` (on `f87405e` = `6c0a5ab` + docs) is 52/52 from the log.** The next
+unit's own gate is the first nightly after it lands.
 
 **No migration is HELD or in flight.** Latest applied is `20260922000100` (billing_runs, §8.117), on prod,
 0 pending (158/158 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
