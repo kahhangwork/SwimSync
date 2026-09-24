@@ -74,11 +74,15 @@ Only after Steps 1–4, create the commit.
   `git diff --cached --name-only` must show only your files.
 - Write a concise message describing the *what/why* of the change.
 - On the default branch (`main`), branch first unless the user said otherwise.
-- End the commit message with the required trailer:
+- End the commit message with the `Co-Authored-By:` trailer **the session's attribution
+  names** (the harness supplies the current model), e.g.:
 
   ```
-  Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+  Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
   ```
+
+  Don't copy a model name from this file or an old commit — this line said "Opus 4.8"
+  long after it stopped being true (fixed 2026-09-24).
 
 Then take it to `main` — **per change, not batched at session end.** Small
 pushes mean small rebases, which matters because `main` moves under you when
