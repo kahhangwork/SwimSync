@@ -223,8 +223,23 @@ try {
     try {
       await page.goto(actionLink(data, `${EXPO}/reset-password`), { waitUntil: "domcontentloaded" });
       await page.getByText("Update Password").last().waitFor({ timeout: 45000 });
-      await page.locator('input[type="password"]').nth(0).fill("password789");
-      await page.locator('input[type="password"]').nth(1).fill("password789");
+      // Nightly 36006182210 pressed Update on two EMPTY fields ("Please enter and
+      // confirm your new password") although both were filled. The fields are
+      // useState, so any re-mount after the fill clears them. SUSPECTED, NOT
+      // PROVEN: the recovery link replaces to /reset-password twice (getSession
+      // and the PASSWORD_RECOVERY event, app/_layout.tsx) — holding the second
+      // one 5 s locally did NOT reproduce it. So: fill, let it settle, confirm
+      // both values survived, refill if not, and LOG when that fires — the log
+      // line is the evidence the next red needs. Re-types input; never re-presses.
+      const pw = () => page.locator('input[type="password"]');
+      for (let i = 0; i < 3; i++) {
+        await pw().nth(0).fill("password789");
+        await pw().nth(1).fill("password789");
+        await page.waitForTimeout(1500);
+        if ((await pw().nth(0).inputValue()) === "password789" &&
+            (await pw().nth(1).inputValue()) === "password789") break;
+        console.log(`4: the reset form was re-mounted and cleared — refilling (${i + 1})`);
+      }
       await pressByText(page, "Update Password");
       check("4: Reset Password returns to /login", await waitOk(page.waitForURL(/\/login/, { timeout: 15000 })), page.url());
       check("4: the reset password works", await anonSignIn(PARENT, "password789"));
