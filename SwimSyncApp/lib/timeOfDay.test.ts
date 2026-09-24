@@ -4,6 +4,7 @@ import {
   isNowInRange,
   hasEndedInSg,
   hasLessonEnded,
+  greetingFor,
 } from "./timeOfDay";
 
 // The instant that proves the point: 23:30 UTC is 07:30 the NEXT DAY in
@@ -151,5 +152,21 @@ describe("hasLessonEnded — the dated generalisation", () => {
     const b = hasLessonEnded("2026-08-09", TODAY, "09:00", MIDDAY);
     expect(a).toBe(b);
     expect(a).toBe(false);
+  });
+});
+
+describe("greetingFor", () => {
+  it("says morning before noon, afternoon before 18:00, evening after", () => {
+    expect(greetingFor(toMinutes("00:00"))).toBe("Good morning");
+    expect(greetingFor(toMinutes("11:59"))).toBe("Good morning");
+    expect(greetingFor(toMinutes("12:00"))).toBe("Good afternoon");
+    expect(greetingFor(toMinutes("17:59"))).toBe("Good afternoon");
+    expect(greetingFor(toMinutes("18:00"))).toBe("Good evening");
+    expect(greetingFor(toMinutes("23:59"))).toBe("Good evening");
+  });
+
+  // The bug this replaced: a hardcoded "Good morning" at 22:06 SGT.
+  it("reads the SINGAPORE hour — 14:06 UTC is 22:06 in Singapore, evening", () => {
+    expect(greetingFor(nowMinutesInSg(new Date("2026-09-24T14:06:00Z")))).toBe("Good evening");
   });
 });

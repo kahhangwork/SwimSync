@@ -175,7 +175,7 @@ try {
 
   console.log("\n[coach] every coach screen");
   await loginExpo(page, "coach@swimsync.test");
-  await visit(page, "/schedule", "Good morning,");
+  await visit(page, "/schedule", /Good (morning|afternoon|evening),/);
   await visit(page, "/classes", "My Classes");
   await visit(page, `/classes/${cls.id}/roster`, "Saturday Beginners");
   await visit(page, `/classes/${cls.id}/attendance?date=${lessonDate}&from=roster`, "Mark Attendance");
@@ -187,7 +187,7 @@ try {
   await visit(page, "/settings", "Account Details");
   // A deep-linked TAB is mounted but hidden once the landing replace lands on
   // /schedule, so to press INTO it the tab is opened from the tab bar first.
-  await visit(page, "/schedule", "Good morning,");
+  await visit(page, "/schedule", /Good (morning|afternoon|evening),/);
   await visitByPress(page, "Settings", "Account Details", "/settings (tab)");
   await visitByPress(page, "Change Password", "Confirm New Password", "/settings/change-password");
 

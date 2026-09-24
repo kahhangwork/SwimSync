@@ -104,3 +104,17 @@ export function hasLessonEnded(
   if (date > today) return false;
   return hasEndedInSg(end, nowMinutes);
 }
+
+/**
+ * "Good morning" / "Good afternoon" / "Good evening" for a Singapore time of
+ * day: before 12:00, before 18:00, otherwise. The Schedule greeting said "Good
+ * morning" at every hour until 2026-09-24.
+ *
+ * Takes a NUMBER, not a Date — see the header. Callers get it from
+ * nowMinutesInSg().
+ */
+export function greetingFor(nowMinutes: number): string {
+  if (nowMinutes < 12 * 60) return "Good morning";
+  if (nowMinutes < 18 * 60) return "Good afternoon";
+  return "Good evening";
+}

@@ -68,7 +68,7 @@ export default function ScheduleScreen() {
         contentContainerClassName="px-5 py-6 pb-10"
         showsVerticalScrollIndicator={false}
       >
-        <Greeting session={session} todayStr={todayStr} />
+        <Greeting session={session} todayStr={todayStr} nowMins={nowMins} />
 
         <WeekSelector weekOffset={weekOffset} setWeekOffset={setWeekOffset} weekStart={weekStart} weekEnd={weekEnd} label={label} bounds={bounds} />
 

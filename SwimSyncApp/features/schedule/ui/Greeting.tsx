@@ -4,21 +4,22 @@
 // (whitespace aside).
 import React from "react";
 import { View, Text } from "react-native";
+import { greetingFor } from "@/lib/timeOfDay";
 import type { useWeek } from "../domain/useWeek";
 import type { useScheduleLoad } from "../domain/useScheduleLoad";
 
 type Week = ReturnType<typeof useWeek>;
 type Load = ReturnType<typeof useScheduleLoad>;
 
-export function Greeting(p: Pick<Load, "session"> & Pick<Week, "todayStr">) {
-  const { session, todayStr } = p;
+export function Greeting(p: Pick<Load, "session"> & Pick<Week, "todayStr" | "nowMins">) {
+  const { session, todayStr, nowMins } = p;
   return (
     <>
       {/* Greeting. The long-form SGT date is also the cheapest possible proof
           that this screen's date is the Singapore one, and verify-tz-saturday
           asserts on it (§7.7). */}
       <View className="mb-4">
-        <Text className="text-gray-500 text-sm">Good morning,</Text>
+        <Text className="text-gray-500 text-sm">{greetingFor(nowMins)},</Text>
         <Text className="text-2xl font-bold text-gray-900">
           Coach {session?.fullName ?? "—"}
         </Text>
