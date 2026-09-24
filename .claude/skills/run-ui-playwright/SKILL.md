@@ -49,6 +49,8 @@ flow. `channel: "chrome"` uses the installed Chrome — no `playwright install`.
 To run **every** driver the way nightly CI does (reset → kong restart → fixture →
 driver, per driver): `drivers/run-all-drivers.sh` — but **never beside a sibling
 worktree**; it resets the shared database repeatedly. `--only <name>` runs one.
+**The full sweep — and dispatching or re-running the CI nightly — happens only when the user
+explicitly asks** (CLAUDE.md → Conventions). `--only` for verifying a change needs no ask.
 
 ## 3. Seed logins (from supabase/seed.sql)
 

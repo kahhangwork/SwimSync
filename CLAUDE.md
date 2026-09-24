@@ -34,6 +34,7 @@ cd SwimSyncApp   && npm test                        # jest-expo
 cd <app> && npm run typecheck                       # tsc --noEmit, enforced in CI
 .claude/skills/run-ui-playwright/drivers/check-fixture-roundtrip.sh  # UI fixtures, in CI
 .claude/skills/run-ui-playwright/drivers/run-all-drivers.sh  # ALL UI drivers (nightly CI) — resets the DB per driver; never beside a worktree
+                                                              # ⚠ full sweep = USER-REQUESTED ONLY (see Conventions)
 ```
 
 Full setup, seed logins and test flows: **`LOCAL_DEV_GUIDE.md`**.
@@ -119,6 +120,11 @@ touching an unfamiliar subsystem.
 
 ## Conventions
 
+- **The nightly runs only when the user explicitly asks for it.** Never dispatch or re-run the CI nightly
+  (`ui-drivers.yml` — `gh workflow run`, `gh run rerun`) and never start the full local sweep
+  (`run-all-drivers.sh` with no `--only`) on your own initiative — not to clear a gate, not after a red. Propose it
+  and wait for a yes. Reading a run (`gh run view`, logs, artifacts) is fine, and so is verifying a change with
+  single drivers (`run-all-drivers.sh --only <driver>`). (User's rule, 2026-09-24.)
 - **Single `main` branch.** Feature branch → implement → verify → merge → push → delete the
   branch. No PRs unless asked.
 - **Worktrees share one database and one set of documents.** A worktree **never authors a
