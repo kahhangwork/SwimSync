@@ -1,11 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-25 — **Ten branches shipped behind one green nightly (§8.120): a refresh keeps a coach on
-their screen, the lesson page shows read errors, the Assessment grid says "moved up", running-low settings live on
-Packages, plus four test/driver fixes.** `main` `75aaa82`, 0 migrations, CI + Vercel green. **Tonight's nightly on
-`75aaa82` is the gate for the next unit.**_
+_Last updated: 2026-09-25 — **Gotchas that were filed twice are now CHECKS (§8.121): a pgTAP scan, a CI UUID grep, a
+CLAUDE.md rule, a topic index, and `/update-docs` searches before filing.** `main` `b021ad8`, 0 migrations, CI green.
+**Tonight's nightly (now on `b021ad8`, same app code as `75aaa82`) is the gate for the next unit.**_
 
-_Previously (§8.119, 2026-09-24) — engine run day (v29), the cancelled-lesson notice, four nightly drivers._
+_Previously (§8.120, 2026-09-25) — ten small units behind one green nightly (refresh keeps you on your screen, et al.)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -348,6 +347,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.121 (2026-09-25) — Gotchas filed twice become checks; `/update-docs` searches before filing
+
+**An audit of all 273 gotchas found eight lessons filed two or three times** — the file is 340 KB and read on
+demand, so a trap that recurred was re-filed rather than recognised, and `/update-docs` said only "append the next
+§7.N". Tooling/tests/docs only — no app code, merged ahead of the nightly gate on the user's call.
+
+- **Now checks:** `recurring_gotchas.test.sql` (second-FK pairs §7.90, `current_user` in DEFINER §7.38) and
+  `check-fixture-ids.sh` in CI (captured UUIDs §7.163) — all proven red. TESTING §5. §7.40 → CLAUDE.md *Rules that bite*.
+- **Write side:** `/update-docs` Step 4 greps first; a repeat is a **Hit again** bullet; bitten twice → promote to a check.
+- **GOTCHAS.md:** topic index at the top; the 10 repeats linked both ways (**↪**), numbers unchanged, nothing deleted;
+  §7.237 notes the §8.120 fix.
+- **Deliberately NOT done:** hollowing the repeats (they hold unique detail and 17 applied migrations cite them); a
+  check for §7.150 (`function_grants.test.sql` already covers the local half; the cloud half is the remote dump).
+
 ## 8.120 (2026-09-24 → 25) — Ten small units, one gate: three §9 items + four BACKLOG S-items + three found on the way
 
 **Serial, root checkout, one branch per unit, all held behind nightly `36006182210`** — attempt 1 red
@@ -364,24 +377,7 @@ user asks (CLAUDE.md Conventions).
 - **Deliberately NOT done:** the step-4 root cause (unproven — BACKLOG, act on the log line); per-keystroke
   threshold saves kept as-was (BACKLOG). **Graduated:** §7.271–§7.273; BACKLOG −7 / +2.
 
-## 8.119 (2026-09-24) — Engine run day, the cancelled-lesson notice, four nightly drivers: three units in parallel
-
-**The first parallel session with a subagent AND a second worktree.** A (root, `/plan-with-confidence` →
-`/plan-review` Opus 5.5) · B (a background subagent in an isolated worktree, code + jest only) · C (a second
-session via `/worktree-start`). One shared DB, taken in turns: C → A's Deno → B's driver. Merged C → A → B, gated by
-ONE nightly (the user's call, over one-per-unit).
-
-- **A — `cece22f`, engine v29.** The auto guard read the global `app_settings.invoice_run_day`; now
-  `tenants.invoice_run_day`, and fails CLOSED (`tenant_unreadable`) on an unreadable row. Prod a no-op (all 7, cron
-  off). **Read `docs/plans/ENGINE_TENANT_RUN_DAY_PLAN.md`** (RISK 1–6 inline, stage log). §7.265, §7.266.
-- **B — `61426c8` + `c8a7f36`.** The cancelled notice (§8.81) finally renders, naming the class. PRD §7.6. §7.267,
-  §7.270. The driver's first real run caught its OWN bug (NEEDS MARKING duplicates DONE's text).
-- **C — `3ff558a`.** 54 hand-checks → 4 `verify-app-*` drivers (TESTING §5). §7.268, §7.269; §7.264 caveat.
-- **Deliberately NOT done:** dropping the dead global row (a migration — BACKLOG); deleting the hand-check source
-  scripts C suggested (siblings keep theirs; 7 files and §7.263 cite them). **Graduated:** DEPLOYMENT §11 #49,
-  WORKTREES + `/worktree-start` (auth drivers need :8081), BACKLOG −3 / +3.
-
-_(§8.118 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.119 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -425,7 +421,7 @@ for one marked inactive.
 > full day after the sweep had gone red beneath it.
 
 **State on 2026-09-25: nightly `36006182210` attempt 2 GREEN (56/56) on `c990a7f`; the ten §8.120 units then
-landed, so tonight's scheduled nightly on `75aaa82` is the first to run them.** Most likely red, if any: the
+landed, so tonight's scheduled nightly (on `b021ad8`, same app code as `75aaa82`) is the first to run them.** Most likely red, if any: the
 drivers whose deep links now show the REAL screen after the landing fix (§7.254 — 13 were re-run locally, green).
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -445,11 +441,12 @@ which mutate shared seed state — are in the same section.
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before
   `supabase test db` (§7.272).
 
-**GATE (§7.1): do NOT merge the next unit to `main` until tonight's nightly on `75aaa82` is green — from the log.**
+**GATE (§7.1): do NOT merge the next unit to `main` until tonight's nightly is green — from the log.** It will run on
+`b021ad8` (§8.121: tests/CI/docs only), which carries the §8.120 app code unchanged.
 
 **No migration is HELD or in flight.** Latest applied is `20260922000100` (billing_runs, §8.117), on prod,
 0 pending (158/158 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116 and §8.118–§8.120 none.
+the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116 and §8.118–§8.121 none.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

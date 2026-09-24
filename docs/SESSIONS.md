@@ -28,6 +28,7 @@ _The rows below are moved verbatim. Their length is the pre-2026-08-10 record, n
 standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.119** | 2026-09-24 | Engine run day per tenant (v29), cancelled-lesson notice, 4 verify-app drivers | docs/plans/ENGINE_TENANT_RUN_DAY_PLAN.md · §7.265–7.270 |
 | **8.118** | 2026-09-23 | App L-F/G/H + fence: refactor programme done in both apps | docs/refactor/BATCH_FGH_PLAN.md · §7.261–7.264 |
 | **8.117** | 2026-09-22 | Billing months card + generation run log; August 2026 closed on prod | docs/plans/BILLING_MONTHS_PLAN.md · §7.255–7.260 |
 | **8.116** | 2026-09-22 | Coach Schedule full track: 1,255 → 101 lines, the last giant | docs/refactor/COACH_SCHEDULE_REFACTOR_PLAN.md · §7.253–7.254 |
