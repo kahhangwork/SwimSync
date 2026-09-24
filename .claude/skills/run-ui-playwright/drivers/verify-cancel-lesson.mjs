@@ -28,7 +28,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, visibleText, pressByText, pressByTextMatch, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, visibleText, pressByText, ADMIN, EXPO } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -39,6 +39,38 @@ const check = (l, p, d = "") => {
 };
 const sql = (q) =>
   execSync(`docker exec -i supabase_db_SwimSync psql -U postgres -d postgres -Atc "${q.replace(/"/g, '\\"')}"`, { encoding: "utf8" }).trim();
+
+// Errors ignored, each with its reason — the same exact entry as
+// verify-smoke-app.mjs. NativeWind 4 throws it on every web load (its own
+// dark-mode probe); matched as a substring, as there — a different throw still fails.
+const IGNORED_ERRORS = ["Cannot manually set color scheme, as dark mode is type 'media'"];
+
+// Press a visible leaf matching `pattern` that comes AFTER the Schedule's
+// "DONE" heading in document order. Returns how many matched there; presses
+// only when exactly one matched, or the first of them with { first: true }.
+// Never a bare .last(): the count is the safety property (§7.101, §7.100).
+async function pressAfterDone(pg, pattern, { first = false } = {}) {
+  const n = await pg.evaluate(({ source, first }) => {
+    const re = new RegExp(source);
+    const leaves = [...document.querySelectorAll("*")].filter((e) => e.children.length === 0);
+    const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const done = leaves.find((e) => e.textContent.trim() === "DONE" && vis(e));
+    if (!done) return 0;
+    const hits = leaves.filter((e) =>
+      vis(e) && re.test(e.textContent.trim()) &&
+      (done.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING));
+    if (hits.length === 1 || (first && hits.length > 1)) {
+      const t = hits[0].parentElement;
+      const o = { bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, button: 0 };
+      t.dispatchEvent(new PointerEvent("pointerdown", o));
+      t.dispatchEvent(new PointerEvent("pointerup", o));
+      t.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    }
+    return hits.length;
+  }, { source: pattern.source, first });
+  console.log(`pressed after DONE: ${pattern} (${n} match${n === 1 ? "" : "es"})`);
+  return n;
+}
 
 const ROSE = "ca1c1a55-0000-0000-0000-000000000001";
 const REASON = "Driver: pool closed for maintenance";
@@ -189,8 +221,14 @@ try {
     // Same day-header matching as step 5, and for the same reasons (§7.101, §7.122).
     const sg2 = (o) => new Date(`${twoWeeksAgo}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Singapore", ...o });
     const doneHeader = new RegExp(`^${sg2({ weekday: "short" })}\\w*,? ${sg2({ day: "numeric" })} ${sg2({ month: "short" })}\\w*$`);
-    const expanded = await pressByTextMatch(spin, doneHeader);
-    check(`coach app: two weeks back, DONE lists the cancelled lesson's day (${doneHeader})`, expanded);
+    // ⚠ SCOPED TO DONE. NEEDS MARKING sits ABOVE it and its cards carry the same
+    // "Thu, 10 Sept" subtitle (and a "Cal Rose Full" title — today's lesson, on a
+    // fresh seed). Unscoped, the header press found 2 and skipped, and the card
+    // press opened TODAY's ordinary lesson (run 2026-09-24).
+    const doneHits = await pressAfterDone(spin, doneHeader);
+    const expanded = doneHits === 1;
+    check(`coach app: two weeks back, DONE lists the cancelled lesson's day (${doneHeader})`, expanded,
+      `matched ${doneHits} under DONE`);
     await spin.waitForTimeout(1500);
     const doneText = await visibleText(spin);
     check("coach app: the DONE card is struck 'Cancelled by your admin'",
@@ -198,7 +236,7 @@ try {
       doneText.match(/.{0,40}Cancelled by your admin/)?.[0] ?? "(not listed)");
 
     // The tap under test. Before the fix this is where the spinner held forever.
-    const opened = await pressByText(spin, "Cal Rose Full");
+    const opened = (await pressAfterDone(spin, /^Cal Rose Full$/, { first: true })) >= 1;
     check("coach app: tapped the cancelled Rose card", opened);
     const notice = spin.getByText("This lesson was cancelled", { exact: true });
     let noticeShown = true;
@@ -226,7 +264,8 @@ try {
     check("coach app: 'Back to class' leaves the notice for Schedule",
       backed && !/This lesson was cancelled/.test(after) && /DONE/.test(after),
       spin.url());
-    check("no uncaught page errors (coach, cancelled lesson)", spinErrors.length === 0, spinErrors.join(" || "));
+    const realErrors = spinErrors.filter((m) => !IGNORED_ERRORS.some((s) => m.includes(s)));
+    check("no uncaught page errors (coach, cancelled lesson)", realErrors.length === 0, realErrors.join(" || "));
     await sctx.close();
 
     // Put it back where step 6 (Restore) and the cleanup expect it.
