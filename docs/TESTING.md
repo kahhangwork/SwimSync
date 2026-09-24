@@ -456,7 +456,9 @@ the day (required choice) and an existing class edits Saturday→Sunday and pers
 UIs — the parent card shows the LIVE count (9 of 10, the un-invoiced lesson already
 subtracted), request → PayNow (the requested package's price, not the held one's) →
 pending → admin confirm → Active, the students "running low" filter obeys its
-per-tenant threshold in both directions, and the **payment-method chip is asserted BY
+per-tenant threshold in both directions (since 2026-09-24 the threshold is SET on the Packages page and
+Students is re-loaded, so the check reads the stored value — typing on Students never refreshed the verdict,
+so the old check could not go red; it also asserts Students' read-only line), and the **payment-method chip is asserted BY
 NAME on the discriminating siblings** (§7.75): Pablo (Group class, covered) wears
 "Package · 9 left" on the parent home / "· 14 left" on the admin Students row after the
 second purchase, while Pia (Private-only, same family) wears "Ad-hoc" on both — the pair
@@ -567,7 +569,9 @@ the admin **Calendar**: two overlapping fixture classes land in two lanes, cards
 with the MAKE-UP chip, click pins, Today/‹/› move the URL date, the time gutter stays at x=0 after a
 horizontal scroll, month/agenda render, the coach filter keeps the substitute's lesson, double-click
 lands on `/lessons/…` — and, read through psql, **the `lesson_sessions` count is unchanged after the
-whole run** (the calendar is read-only by construction; ADMIN_CALENDAR_PLAN RISK 4).
+whole run** (the calendar is read-only by construction; ADMIN_CALENDAR_PLAN RISK 4). Every URL-driven check (›, Today,
+day number, coach filter) WAITS for the URL / re-rendered grid rather than a fixed 400 ms (2026-09-24 — the
+fixed timers failed 5 checks with router fetches slowed 1.5 s).
 `verify-admin-lesson-detail.mjs` (same fixture — it is mapped in `run-all-drivers.sh`; 27 checks;
 needs Expo too) drives the **lesson page** and the **Lessons** list: the **sidebar Lessons badge
 equals the `mode=needs` page-row count** (§7.18 parity — the `tenant_unmarked_lesson_count` RPC vs the
@@ -804,6 +808,9 @@ reactivation the login returning while the class deliberately does NOT. The two 
 coaches are non-admin for the §7.131 reason and the fixture refuses to apply if one has
 become an admin, or if a prior run left the target disabled. ⚠ **Not re-runnable by
 hand** — the class stays with the replacement; apply the teardown and fixture between runs.
+Both share ONE one-shot Expo login, `appLoginDies(page, email)` in `lib.mjs` (2026-09-24): it waits up
+to 45 s for the email field (not a fixed 7 s), presses Sign In ONCE, and returns `null` when the form never
+loaded — which the checks print as `CANNOT SAY — the login form never appeared` (§7.262).
 Personas: `dc-target@` / `dc-replace@swimsync.test`, `password123`, actor `coach@swimsync.test`;
 `verify-multi-class.mjs` (+ `fixtures-multi-class.sql` and its `-teardown.sql`) drives
 **a child in two classes** (Wave 2) across admin, database and parent app — 17 checks. The
@@ -1317,7 +1324,7 @@ with its own fixture + teardown (UUID prefix `ac{1,2,3}00000-…`, emails `app-{
 
 | driver | fixture | checks | covers |
 |---|---|---|---|
-| `verify-app-auth` | `fixtures-app-auth` | 25 | ONE-SHOT login ×2 roles (§7.263), change password, forgot → Mailpit, reset + accept-invite through real `generateLink` links, parent Sign Out. **Needs Expo on exactly :8081** (§7.268) |
+| `verify-app-auth` | `fixtures-app-auth` | 25 | ONE-SHOT login ×2 roles (§7.263), change password, forgot → Mailpit, reset + accept-invite through real `generateLink` links, parent Sign Out. Step 4 fills, settles, re-checks both password fields and logs `4: the reset form was re-mounted and cleared` if it had to refill (cause of nightly `36006182210`'s empty-field red unproven — that log line is the evidence). **Needs Expo on exactly :8081** (§7.268) |
 | `verify-app-home-writes` | `fixtures-app-home-writes` | 10 | dismiss a declined claim; register WITH a join code → the first Home load joins once |
 | `verify-app-money` | `fixtures-app-money` (its OWN tenant) | 19 | Invoice Detail's *I've paid*; referral Copy; `/package/<token>` in and out, request-header NAMES only (§7.264); cancel a package request |
 | `verify-app-coach-settings` | none (restores the seed PayNow QR in `finally`) | 6 | coach QR upload; coach Sign Out |
@@ -1350,6 +1357,11 @@ survived two wrong hypotheses was settled in one look by a button still reading 
 and re-run first. **Then ask which weekday the run actually saw** (§7.122), and whether the
 driver takes an ordinal over a list it does not own (§7.75, §7.101, §7.246) or skips itself on a
 date condition and reports PASS (§7.100).
+
+**Two driver messages are verdicts ABOUT the run, not the product** (2026-09-24): `CANNOT SAY — the login
+form never appeared` (tenant-suspension, coach-disable) is a page that never loaded — §7.108's shape, re-run;
+a red on those checks WITHOUT it is a real login verdict (§7.263). `4: the reset form was re-mounted` in
+`app-auth` is the first evidence of what cleared step 4's fields — read it before re-running.
 
 Then the four rules, all bought with real time:
 

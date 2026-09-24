@@ -968,3 +968,13 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     Prod a no-op: all 3 tenants and the global key = 7, cron off. Apps: `3ff558a` (drivers), `cece22f` (admin
     comment), `c990a7f` (the notice fix) — Vercel on `c990a7f` for both; CI green on all three. Nightly
     `36006182210` on `c990a7f` gates the bundle.
+
+50. **Deploy record (2026-09-25): ten branches, APPS-ONLY, one gate.** 0 migrations, 0 functions. Gate: nightly
+    `36006182210` attempt 2 green (56/56, re-run at the user's request after attempt 1's `db reset` crash + an
+    `app-auth` step-4 red). Pushed in order — docs, 3 driver fixes, pgTAP, 3 admin, 2 coach app (`de9ef41` →
+    `75aaa82`) — each rebased on the moving `main`, its own suites re-run on the merged tree, then
+    fast-forward-only. CI green on all ten; Vercel success on `75aaa82` for both apps. **Proof:** the Expo bundle
+    carries `["schedule","classes","pay","settings"]` (the last commit's; absent from `39497f3`'s source — the
+    greeting string was already live from an intermediate deploy, §7.271); the admin, whose routes can't be
+    grepped, by the user opening Packages and seeing the new *running low* card. Next nightly on `75aaa82` is the
+    driver-level gate.

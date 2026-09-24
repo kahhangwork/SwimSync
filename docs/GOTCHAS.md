@@ -4063,3 +4063,25 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     the PREVIOUS render's value — pass the loaded object (`cls.title`), not the state (`classTitle`). Regression
     test: `features/mark-attendance/domain/useAttendanceLoad.test.ts` (the app has no hook renderer; it records
     `useState` calls, keyed by declaration ORDER). (2026-09-24.)
+
+271. **Vercel deploys EVERY commit of a multi-commit push, so a bundle-grep "before" control can already be
+    after.** Ten commits pushed one by one to `main` on 2026-09-25: the greeting fix (`c4f8173`) was built and
+    served before the last commit landed, so grepping swimsync.sg for "Good afternoon" read 1 before AND after the
+    final deploy — a control that proved nothing (§7.31, §7.51). **Grep for a string only the LAST commit adds**
+    (there: the landing-bounce segment list `["schedule","classes","pay","settings"]`), confirm the old source never
+    held it (`git grep <old-sha>`), and read `gh api repos/…/commits/<sha>/status` for the Vercel contexts.
+    (Ten-branch push, 2026-09-25.)
+
+272. **A driver fixture left loaded breaks `supabase test db`.** `fixtures-packages.sql` inserts student
+    `c5000000-…01`, the same id `makeup_bookings.test.sql` inserts, so after a local `verify-packages` run pgTAP
+    died with `duplicate key … students_pkey` → §7.116's *"planned 26 tests but ran 0"* on a file the change never
+    touched. `run-all-drivers.sh` resets before each driver, but a hand-loaded fixture stays until its
+    `-teardown.sql` runs. **Tear down every fixture you loaded before `supabase test db`.** (2026-09-25.)
+
+273. **To simulate a slow cold hydrate in a driver, never rewrite the Expo bundle, and don't delay it with
+    `page.route` alone.** The bundle is a blocking `<script>`, so a delayed response is absorbed by
+    `goto(…, {waitUntil:"domcontentloaded"})` and the helper under test never sees it. Wrapping the bundle body in
+    `setTimeout` does reproduce the late hydrate, but Expo's HMR client then registers a bogus entry (`./login`)
+    and **crashes Metro** (`UnableToResolveError`) — every later driver fails. Use it once for a proof, then
+    restart Expo; for an admin-panel race, slow the `_rsc` fetches instead (harmless). (appLoginDies hardening,
+    2026-09-24.)

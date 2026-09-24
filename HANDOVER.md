@@ -1,10 +1,11 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-24 (evening) — **Three units, one nightly (§8.119): the engine reads the BUSINESS's run day
-(engine v29 on prod), a coach tapping an admin-cancelled lesson sees its notice, and the hand-checks are four nightly
-drivers.** `main` `c990a7f`, 0 migrations. **Nightly `36006182210` on `c990a7f` is the gate for the next unit.**_
+_Last updated: 2026-09-25 — **Ten branches shipped behind one green nightly (§8.120): a refresh keeps a coach on
+their screen, the lesson page shows read errors, the Assessment grid says "moved up", running-low settings live on
+Packages, plus four test/driver fixes.** `main` `75aaa82`, 0 migrations, CI + Vercel green. **Tonight's nightly on
+`75aaa82` is the gate for the next unit.**_
 
-_Previously (§8.118, 2026-09-23 → 24) — App L-F/G/H + the app fence; the feature-tier refactor programme DONE._
+_Previously (§8.119, 2026-09-24) — engine run day (v29), the cancelled-lesson notice, four nightly drivers._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +28,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.264** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.273** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -347,6 +348,22 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.120 (2026-09-24 → 25) — Ten small units, one gate: three §9 items + four BACKLOG S-items + three found on the way
+
+**Serial, root checkout, one branch per unit, all held behind nightly `36006182210`** — attempt 1 red
+(`level-skills` db-reset crash + an `app-auth` step-4 empty-field red), re-run at the user's request, 56/56 green,
+then ten fast-forward pushes in order (DEPLOYMENT §11 #50). **New standing rule:** the nightly runs only when the
+user asks (CLAUDE.md Conventions).
+
+- **Shipped (user-facing):** refresh/bookmark keeps a coach or parent on their own screen (PRD §7.1, §7.254
+  annotated) · the Schedule greeting follows SGT time of day · the admin lesson page shows a failed read instead
+  of "Not marked" (PRD §7.6) · Assessment "moved up" survives the re-read + re-confirmed grades read fresh (PRD
+  §7.15) · running-low thresholds set on Packages (PRD §7.16).
+- **Shipped (tests):** `appLoginDies` shared + "cannot say" · calendar URL waits · `app-auth` step-4 refill log ·
+  pgTAP #21 midnight (§7.260). TESTING §5.
+- **Deliberately NOT done:** the step-4 root cause (unproven — BACKLOG, act on the log line); per-keystroke
+  threshold saves kept as-was (BACKLOG). **Graduated:** §7.271–§7.273; BACKLOG −7 / +2.
+
 ## 8.119 (2026-09-24) — Engine run day, the cancelled-lesson notice, four nightly drivers: three units in parallel
 
 **The first parallel session with a subagent AND a second worktree.** A (root, `/plan-with-confidence` →
@@ -364,21 +381,7 @@ ONE nightly (the user's call, over one-per-unit).
   scripts C suggested (siblings keep theirs; 7 files and §7.263 cite them). **Graduated:** DEPLOYMENT §11 #49,
   WORKTREES + `/worktree-start` (auth drivers need :8081), BACKLOG −3 / +3.
 
-## 8.118 (2026-09-23 → 24) — App L-F/G/H + the app fence: the refactor programme is DONE in both apps
-
-**24 app route files (13 lite + 11 fence) in one branch, four sub-batches, 17 commits, fast-forwarded to `main`
-(`d7eeeea`) via `/deploy`; app-only.** `/plan-with-confidence` (6 decisions — one branch, fence included, all the way
-to deploy) → `/plan-review` (Opus 5.5, 7 factual errors, 5 spot-checked, all held) → L0 → F / G / H / fence, each with
-its own driver net + hand-checks → two Opus behaviour-drift reviews (0 real changes) → full local sweep 52/52.
-
-- **Read `docs/refactor/BATCH_FGH_PLAN.md` (§0 decisions, the ⚠ R1–R10 blocks, §11 stage log, §12 findings), not this.**
-- **Every route composes its own feature; 0 app routes hold `useState`; both app ledgers EMPTY** — playbook §7.5 ticked.
-- **Deliberately NOT done:** the cancelled-lesson spinner (a behaviour change — its own branch). Pre-existing unread
-  variables (`session`, `coachId`) kept: removing a store subscription changes re-render timing.
-- **Graduated:** §7.261–§7.264; ARCHITECTURE §6 (the `{page, feature|null}` fence, one-importer components move,
-  fence routes keep markup); TESTING §5; DEPLOYMENT §11 #48; playbook §4 + §7.5; BACKLOG +3 / −3. **PRD untouched.**
-
-_(§8.117 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.118 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -421,34 +424,32 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-24 (evening): nightly `36006182210` was dispatched on `c990a7f` (§8.119) — the FIRST nightly
-with the four `verify-app-*` drivers, and the gate for A + B + C together.** Before it: `35967782324` on `d7eeeea`
-green; B's `verify-cancel-lesson` 29/29 locally; C's four drivers green ×3 locally. **A red in a `verify-app-*`
-driver is new-driver noise until proven otherwise** — read it against C's local proofs (TESTING §5).
-**`verify-tenant-suspension`'s recurring red is its FIRST parent-login control on a cold load (§7.262)** — a red
-on the post-suspend parent checks is real (§7.263).
+**State on 2026-09-25: nightly `36006182210` attempt 2 GREEN (56/56) on `c990a7f`; the ten §8.120 units then
+landed, so tonight's scheduled nightly on `75aaa82` is the first to run them.** Most likely red, if any: the
+drivers whose deep links now show the REAL screen after the landing fix (§7.254 — 13 were re-run locally, green).
+`CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
+**The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
 which mutate shared seed state — are in the same section.
 
-### THE NEXT BUILD — pick from BACKLOG; three small ones are ready
+### THE NEXT BUILD — pick from BACKLOG
 
-- **The coach landing bounce** (BACKLOG *Coach workflow*) — a refresh or shared link always lands a coach on
-  Schedule. A real, user-facing bug; a behaviour change, so its own branch + PRD check.
-- **Harden `appLoginDies`** (BACKLOG, S) — the nightly's recurring "flake" (§7.262). Cheap, and it makes the
-  next red worth reading.
+- **A session-less link to `/register` or `/forgot-password` bounces to `/login`** (BACKLOG, S) — same
+  `routeForSession` as §8.120's fix, now landed; widening `PUBLIC_PATHS` widens the auth gate, so weigh it.
 - **Drop the dead `app_settings.invoice_run_day` row** (BACKLOG, S) — a contract migration on a `db/…` branch,
-  root checkout only.
+  root checkout only, `/deploy` to prod.
+- **The running-low fields save per keystroke** (BACKLOG, S) — can store the wrong threshold.
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
-  current change has (§7.253); reach a screen by TAP for anything visual (§7.254); **`verify-app-auth` needs
-  :8081** (§7.268).
+  current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before
+  `supabase test db` (§7.272).
 
-**GATE (§7.1): do NOT merge the next unit to `main` until nightly `36006182210` (on `c990a7f`) is green — from the log.**
+**GATE (§7.1): do NOT merge the next unit to `main` until tonight's nightly on `75aaa82` is green — from the log.**
 
 **No migration is HELD or in flight.** Latest applied is `20260922000100` (billing_runs, §8.117), on prod,
 0 pending (158/158 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116, §8.118 and §8.119 none (§8.119's engine change needed no schema).
+the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116 and §8.118–§8.120 none.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

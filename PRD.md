@@ -3478,7 +3478,9 @@ The following section provides a screen-by-screen reference for each SwimSync us
 
 - *(implemented — changed 2026-08-08)* Bottom tab navigation: **Schedule, Classes, My Pay,
   Settings** — and **My Pay is absent** unless the coach has a payout, so a private coach
-  sees **three** tabs. It was *Today, Classes, Billing, Settings*; the Billing tab held an
+  sees **three** tabs. *(2026-09-24)* The tab is hidden, not the screen: a typed or bookmarked
+  `/pay` now opens it (a refresh no longer bounces to Schedule, §7.1) and shows the coach's own
+  empty state — their own data only, never access control. It was *Today, Classes, Billing, Settings*; the Billing tab held an
   invoice list and a Mark Paid button, both now admin-only (§7.9), and the **Today tab
   became Schedule** (below)
 - **Schedule is the default tab**, and it is a WEEK rather than a day: a week selector
