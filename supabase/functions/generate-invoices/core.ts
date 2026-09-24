@@ -2,7 +2,7 @@
 // so it can be unit/integration-tested directly (see core.test.ts). The
 // Deno.serve handler in index.ts does auth + client creation, then calls this.
 //
-//   • AUTO   — respects the app_settings auto switch, the billing_periods
+//   • AUTO   — respects the business's auto switch and run day, the billing_periods
 //              sealed guard, and the attendance-completeness gate; seals the
 //              month when fully processed.
 //   • MANUAL — ignores the switch/seal/gate; bills whatever is marked now.
@@ -30,7 +30,6 @@ import {
   clampRunDay,
   dateInTimeZone,
   dayOfMonthInTimeZone,
-  DEFAULT_INVOICE_RUN_DAY,
   expectedLessonDates,
   previousBillingMonth,
 } from "./dates.ts";
@@ -282,11 +281,30 @@ async function generateForTenant(
   // ── Auto switch (auto mode only) ──────────────────────────────────────────
   // Per-tenant settings. app_settings held these globally, which meant one
   // school changing its run day changed everyone's.
-  const { data: tenantRow } = await supabase
+  const { data: tenantRow, error: tenantErr } = await supabase
     .from("tenants")
     .select("auto_invoice_enabled, invoice_run_day, suspended_at")
     .eq("id", tenantId)
     .maybeSingle();
+
+  // ── Unreadable settings (auto mode only) ──────────────────────────────────
+  // ⚠ FAIL CLOSED in auto mode when the tenant's settings cannot be read. The
+  // run day below comes from this row; a swallowed error used to mean "use the
+  // default", and on a billing schedule a default is an EARLY bill that then
+  // seals the month (ENGINE_TENANT_RUN_DAY_PLAN.md, RISK 2). Return, never
+  // throw: the cron loop has no per-tenant catch, so a throw would stop every
+  // other tenant's billing. Manual runs ignore the schedule, so they proceed.
+  if (mode === "auto" && (tenantErr || !tenantRow)) {
+    return {
+      tenant_id: tenantId,
+      billing_month: billingMonth,
+      status: "tenant_unreadable",
+      message:
+        `Could not read this business's billing settings` +
+        (tenantErr ? `: ${tenantErr.message}` : " (no such business)") +
+        `. Automatic generation skipped; it will retry on the next run.`,
+    };
+  }
 
   // A suspended tenant gets no new invoicing at all — auto AND manual
   // (WAVE_5_PLAN.md chunk 3, decision 6). Existing receivables were the
@@ -375,14 +393,14 @@ async function generateForTenant(
   //
   // Manual/forced runs ignore this entirely: the admin generating on demand is
   // an explicit instruction and must never be blocked by a schedule.
+  //
+  // The run day is the BUSINESS's (tenants.invoice_run_day — the value the
+  // Invoices page edits and the Billing months card reads). This guard read the
+  // global app_settings key until 2026-09-24, so the card and the engine could
+  // disagree about when a month is late (§8.117 RISK 9). tenantRow is non-null
+  // here: auto mode returned tenant_unreadable above otherwise.
   if (mode === "auto" && !force) {
-    const { data: runDaySetting } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "invoice_run_day")
-      .maybeSingle();
-
-    const runDay = clampRunDay(runDaySetting?.value ?? DEFAULT_INVOICE_RUN_DAY);
+    const runDay = clampRunDay(tenantRow?.invoice_run_day);
     // Day-of-month in the APP timezone, never new Date().getDate() — that is
     // the UTC day and is a day behind in SGT before 08:00 (see dates.ts).
     const today = dayOfMonthInTimeZone(now);

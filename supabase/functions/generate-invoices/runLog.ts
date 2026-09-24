@@ -8,9 +8,9 @@
 // Two properties are load-bearing:
 //   • ATTEMPTS ONLY (⚠ RISK 3). An early return that did not try to bill —
 //     before_run_day, auto_disabled, tenant_suspended, month_not_ended,
-//     already_complete — writes nothing. Once cron is on, every daily tick
-//     returns one of those per tenant; logging them would make every month
-//     look "open" from the 1st and bury the real runs.
+//     already_complete, tenant_unreadable — writes nothing. Once cron is on,
+//     every daily tick returns one of those per tenant; logging them would
+//     make every month look "open" from the 1st and bury the real runs.
 //   • BEST-EFFORT. recordRuns never throws. By the time it runs, invoices have
 //     committed; a failed log write must never fail or undo billing. The cost
 //     is that a broken write is silent — which is why the migration grants
@@ -29,6 +29,7 @@ export const NON_ATTEMPT_STATUSES: ReadonlySet<string> = new Set([
   "tenant_suspended",
   "month_not_ended",
   "already_complete",
+  "tenant_unreadable",
 ]);
 
 /** ⚠ RISK 11: co-admins read this column. Message only, bounded. */

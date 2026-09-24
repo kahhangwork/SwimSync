@@ -280,6 +280,13 @@ Deno.test("shouldRetryTenantEmails: suspended tenant never gets a retry", () => 
   assertEquals(shouldRetryTenantEmails("tenant_suspended", false), false);
 });
 
+Deno.test("shouldRetryTenantEmails: an UNREADABLE tenant never gets a retry", () => {
+  // Its row could not be read, so it may well be suspended — the one case
+  // RISK 3 forbids emailing for. Unknown is treated as suspended.
+  assertEquals(shouldRetryTenantEmails("tenant_unreadable", false), false);
+  assertEquals(shouldRetryTenantEmails("tenant_unreadable", true), false);
+});
+
 Deno.test("shouldRetryTenantEmails: auto-disabled skipped on auto, allowed on manual", () => {
   assertEquals(shouldRetryTenantEmails("auto_disabled", false), false); // auto run
   assertEquals(shouldRetryTenantEmails("auto_disabled", true), true); // manual run

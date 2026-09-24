@@ -34,7 +34,7 @@ you still generate manually every month.
 > manual button is unaffected either way — it always sends an explicit month.
 
 > **The automatic path now waits until a configurable day** —
-> `app_settings.invoice_run_day`, **default 7**, editable on the Invoices page
+> the business's own `tenants.invoice_run_day`, **default 7**, editable on the Invoices page
 > ("Generate automatic invoices from day _N_ of the following month", capped at
 > 28 so it can still fire in February). If cron is ever switched on, a run
 > before that day returns `before_run_day` and does nothing. Billing on the 1st

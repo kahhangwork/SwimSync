@@ -41,7 +41,8 @@ export function dayOfMonthInTimeZone(
   return Number(dateInTimeZone(now, timeZone).split("-")[2]);
 }
 
-/** Fallback when app_settings has no usable invoice_run_day. */
+/** Fallback when a tenant's invoice_run_day is unusable (the column is NOT NULL
+ *  CHECK 1..28, so in practice never — clampRunDay's belt and braces). */
 export const DEFAULT_INVOICE_RUN_DAY = 7;
 
 /**

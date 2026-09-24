@@ -80,8 +80,8 @@ export function useTenantBilling() {
   }
 
   // Capped at 28 to match the engine: 29-31 would never fire in February.
-  // The row is seeded by migration — app_settings has no INSERT policy, so
-  // this can only ever UPDATE.
+  // Writes tenants.invoice_run_day — the value the engine's automatic run-day
+  // guard reads (the global app_settings key is dead since 2026-09-24).
   async function handleSaveRunDay(next: number) {
     if (!tenantId) return;
     const clamped = Math.min(28, Math.max(1, Math.trunc(next)));

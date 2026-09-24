@@ -563,8 +563,8 @@ Billing is based on actual attendance records, not scheduled lesson count.
 SwimSync generates invoices for a month only **after that month has ended**, so a lesson conducted on its last day is still included (§11.1).
 
 *(implemented)* The original spec said the **1st** of the following month. The automatic
-run now waits until a **configurable day** of the following month — `app_settings.invoice_run_day`,
-**default the 7th**. The 1st proved too early in practice: the month's final lessons are
+run now waits until a **configurable day** of the following month — the business's own run day
+(`tenants.invoice_run_day`, edited on the Invoices page), **default the 7th**. The 1st proved too early in practice: the month's final lessons are
 often still unmarked, and a lesson marked *after* the invoice exists can never be added to
 it (§11.6), so billing on the 1st converts a fixable gap into a permanent underbill. A
 **manual** run ignores the run day entirely — the superadmin generating on demand is an
@@ -1444,7 +1444,7 @@ The **completeness gate applies to both** — neither mode can bill around an un
 lesson, and there is no override (see the blocking rule above). What differs is only
 *when* each fires and what it consults:
 
-- **Automatic** — a daily scheduled run (cron) that generates invoices for the previous month from the configured **run day** onward (`app_settings.invoice_run_day`, default the **7th**). It respects a global **Automatic generation** switch (`app_settings.auto_invoice_enabled`), and **defers** any parent whose child sits in a class with incomplete attendance rather than writing a partial invoice a later retry could never top up.
+- **Automatic** — a daily scheduled run (cron) that generates invoices for the previous month from the business's **run day** onward (`tenants.invoice_run_day`, default the **7th**). It respects the business's **Automatic generation** switch (`tenants.auto_invoice_enabled`), skips a business whose settings cannot be read rather than assume a default *(implemented 2026-09-24)*, and **defers** any parent whose child sits in a class with incomplete attendance rather than writing a partial invoice a later retry could never top up.
 - **Manual (on-demand)** — a superadmin action in the web admin panel that generates invoices for a chosen billing month immediately. It **ignores the automatic switch and the run day** — an explicit instruction must not be held back by a schedule — but is **subject to the same completeness gate**.
 
 *(implemented)* **Everything in this section happens per business.** The engine runs one

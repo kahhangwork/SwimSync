@@ -15,6 +15,7 @@ import {
   monthEnded,
   getInvoice,
   checkInvariants,
+  svc,
 } from "./test-helpers.ts";
 
 // THE CLOCK IS PART OF THE FIXTURE, NOT AN AFTERTHOUGHT.
@@ -786,8 +787,10 @@ Deno.test("deferral is reported even when NO class was tallied", async () => {
 });
 
 // ── Configurable run day ───────────────────────────────────────────────────
-// The automatic path waits until app_settings.invoice_run_day. Manual runs
-// ignore it entirely. `now` is injected so these do not depend on the actual
+// The automatic path waits until the BUSINESS's run day (tenants.invoice_run_day;
+// the global app_settings key is dead since 2026-09-24). Manual runs ignore it
+// entirely. ⚠ No test here writes app_settings — the row is shared by every
+// scenario and every sibling session (ENGINE_TENANT_RUN_DAY_PLAN.md, RISK 4). `now` is injected so these do not depend on the actual
 // day of the month.
 
 Deno.test("run day: auto run before the configured day generates nothing", async () => {
@@ -870,10 +873,11 @@ Deno.test("run day: honours a changed setting, and SGT decides the day", async (
   try {
     const a = await s.addSession("2027-06-05"); await s.mark(a, "present");
     await s.completeMonth("2027-06", undefined, new Date("2027-07-14T17:00:00Z"));
+    // The BUSINESS's run day — its own tenant, so nothing to restore.
     await s.db
-      .from("app_settings")
-      .update({ value: 15 })
-      .eq("key", "invoice_run_day");
+      .from("tenants")
+      .update({ invoice_run_day: 15 })
+      .eq("id", s.tenantId);
 
     // Day 14 in SGT -> still too early for a run day of 15.
     const early = await generateInvoices(s.db, {
@@ -894,13 +898,93 @@ Deno.test("run day: honours a changed setting, and SGT decides the day", async (
     });
     assertEquals(due.invoices_created, 1);
   } finally {
-    await s.db
-      .from("app_settings")
-      .update({ value: 7 })
-      .eq("key", "invoice_run_day");
-    await s.db.from("billing_periods").delete().eq("billing_month", "2027-06");
+    // teardown() deletes this tenant's billing_periods; no month-wide delete.
     await s.teardown();
   }
+});
+
+// ⚠ RISK 1 (ENGINE_TENANT_RUN_DAY_PLAN.md): TWO tests in OPPOSITE directions.
+// The old code read the shared global key; one test alone passes on the old
+// code whenever that key happens to sit on the right side of `today`. 2a fails
+// the old code for any global <= 10, 2b for any global > 5 — together, always.
+// Months 2028-05/06 are used by no other Deno test.
+
+Deno.test("run day: reads the BUSINESS's run day — later than the global one", async () => {
+  const s = await newScenario({ price: 30, enrolledAt: "2028-05-01" });
+  const now = new Date("2028-06-10T02:00:00Z"); // SGT day 10
+  try {
+    const a = await s.addSession("2028-05-06"); await s.mark(a, "present");
+    await s.completeMonth("2028-05", undefined, now);
+    await s.db
+      .from("tenants")
+      .update({ invoice_run_day: 15 })
+      .eq("id", s.tenantId);
+
+    const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
+      mode: "auto",
+      billing_month: "2028-05",
+      now,
+    });
+
+    assertEquals(res.status, "before_run_day");
+    assertEquals(await getInvoice(s.db, s.parentId, "2028-05"), null);
+    const { data: sealed } = await s.db
+      .from("billing_periods")
+      .select("billing_month")
+      .eq("tenant_id", s.tenantId)
+      .eq("billing_month", "2028-05")
+      .maybeSingle();
+    assertEquals(sealed, null); // declined to bill -> must not seal
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("run day: reads the BUSINESS's run day — earlier than the global one", async () => {
+  const s = await newScenario({ price: 30, enrolledAt: "2028-06-01" });
+  const now = new Date("2028-07-05T02:00:00Z"); // SGT day 5
+  try {
+    const a = await s.addSession("2028-06-03"); await s.mark(a, "present");
+    await s.completeMonth("2028-06", undefined, now);
+    await s.db
+      .from("tenants")
+      .update({ invoice_run_day: 3 })
+      .eq("id", s.tenantId);
+
+    const res = await generateInvoices(s.db, {
+      tenant_id: s.tenantId,
+      mode: "auto",
+      billing_month: "2028-06",
+      now,
+    });
+
+    assertEquals(res.invoices_created, 1);
+    assertEquals((await getInvoice(s.db, s.parentId, "2028-06"))!.gross, 30);
+  } finally {
+    await s.teardown();
+  }
+});
+
+// ⚠ RISK 2: a tenant whose settings cannot be read must FAIL CLOSED in auto
+// mode — a default run day there is an early bill that then seals the month.
+// A non-existent tenant is the cheap way to make the read come back empty.
+Deno.test("run day: auto run for an unreadable business skips, never defaults", async () => {
+  const db = svc();
+  const ghost = crypto.randomUUID();
+  const res = await generateInvoices(db, {
+    tenant_id: ghost,
+    mode: "auto",
+    billing_month: "2028-05",
+    now: new Date("2028-06-20T02:00:00Z"), // past every possible run day
+  });
+
+  assertEquals(res.status, "tenant_unreadable");
+  const { data: sealed } = await db
+    .from("billing_periods")
+    .select("billing_month")
+    .eq("tenant_id", ghost);
+  assertEquals(sealed ?? [], []);
 });
 
 // ── Sealing a finished month ───────────────────────────────────────────────

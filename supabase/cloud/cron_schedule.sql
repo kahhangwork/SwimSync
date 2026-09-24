@@ -25,7 +25,8 @@
 --
 -- This job runs EVERY DAY, but it does not bill every day. Which day invoices
 -- are actually generated on is decided by the FUNCTION, not by this schedule:
---   • app_settings.invoice_run_day (default 7) — runs before that day of the
+--   • tenants.invoice_run_day, PER BUSINESS (default 7; the engine read the
+--     global app_settings key until 2026-09-24) — runs before that day of the
 --     month return "before_run_day" and do nothing. Editable in the admin
 --     panel; no need to touch this cron expression to change the billing day.
 --   • Once a month is fully billed it is sealed in billing_periods, so every

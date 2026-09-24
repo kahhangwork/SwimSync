@@ -62,8 +62,10 @@ the shape of the system changes:_
   superadmin, PRD §5.2) and no DELETE (history must survive, PRD §11.5; credit untouched,
   §11.8). Permission is interim: when coach type lands, a private coach keeps it and a
   school coach's admin takes it over.
-- **The billing timezone/run-day seam is GLOBAL, not per-tenant** — `APP_TIMEZONE` and
-  `app_settings.invoice_run_day`. Same reasoning as the timezone call (§8a), reaffirmed by
+- **The billing timezone seam is GLOBAL, not per-tenant** — `APP_TIMEZONE`. *The run day was too
+  (`app_settings.invoice_run_day`) until it became `tenants.invoice_run_day` with tenanting; the engine
+  itself read the global key until 2026-09-24 (`docs/plans/ENGINE_TENANT_RUN_DAY_PLAN.md`) — kept as
+  the record of the reasoning, which held.* Same reasoning as the timezone call (§8a), reaffirmed by
   the user for the run day: multi-tenant is a don't-paint-into-a-corner concern with zero
   users today. Promoting one integer to a per-tenant column later is trivial next to the
   RLS rewrite tenanting requires anyway.
@@ -729,7 +731,7 @@ the shape of the system changes:_
 | `SwimSyncAdmin/components/WhatsAppQueue.tsx` | The shared "open next chat" `wa.me` queue shell; `ReminderQueue` (invoices) and the packages renewal queue are both thin wrappers over it — §8.60 |
 | `SwimSyncAdmin/lib/packageOffers.ts` · `SwimSyncApp/app/package/[token].tsx` | Pure offer deciders (`defaultConfirmStart` RISK 3, `pickOfferProduct` Decision 5) · the parent public offer page — §8.60 |
 | `supabase/migrations/20260718000200_coach_close_enrolment.sql` | `close_student_enrolment()` RPC — remove-from-class / set-inactive for the tenant admin **and** the owning coach (§6, §8a) |
-| `supabase/migrations/20260718000100_…invoice_run_day` · `…000300_…invoice_block_notice` | `app_settings` seeds: automatic run day (default 7) + blocked-alert throttle state |
+| `supabase/migrations/20260718000100_…invoice_run_day` · `…000300_…invoice_block_notice` | `app_settings` seeds: automatic run day (default 7 — dead since 2026-09-24, see BACKLOG) + blocked-alert throttle state |
 | `SwimSyncAdmin/lib/studentStatus.ts` · `SwimSyncApp/lib/studentStatus.ts` | **Byte-identical twins** — `removeFromClass` / `setStudentInactive` over the RPC. Edit both (§6) |
 | `supabase/migrations/20260719001200_active_inactive_rpcs.sql` | `set_students_active()` (sole writer), `set_parent_tenant_active()`, `family_active_children()` (the read behind the prompt), join-code reactivation |
 | `supabase/migrations/20260719001300_drop_inactive_assignment_status.sql` | Enum contract, with the `pg_proc` guard that refuses if a function body still casts to the retired value (§7.21) |
