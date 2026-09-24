@@ -3985,13 +3985,18 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     first page load reds `control: the parent logs in before the suspend` + `…sees children of BOTH businesses`
     (nightly `35753594101`, 10/12; green 12/12 on the same code hours later). It is §7.108's cold-compile shape.
     **Triage:** one red on those two controls is a re-run; a red on the POST-suspend parent checks is never a
-    flake — that is a real login regression (§7.263). Hardening the helper is in BACKLOG. (2026-09-23.)
+    flake — that is a real login regression (§7.263). (2026-09-23.)
+    **Hardened 2026-09-24:** one shared `appLoginDies(page, email)` in `drivers/lib.mjs` waits up to 45 s for the
+    email FIELD instead of a fixed 7 s, still ONE press. A form that never appears now prints
+    `CANNOT SAY — the login form never appeared` via `loginVerdictDetail()` — still a FAIL, but it reads as a load
+    failure, not a login verdict. Proven on a 20 s post-DOM hydrate delay: the old helper `null`, the new one logs in.
+    So a red with that text is still §7.108's shape; a red WITHOUT it is a real verdict.
 
 263. **`loginExpo` HIDES a broken post-login redirect — ~25 drivers pass through a login regression.** It tries 3
     times (`lib.mjs:40-72`); once `signInWithPassword` has stored a session, attempt 2's `goto /login` is restored
     by `_layout.tsx`'s `routeForSession` and redirected to the landing tab, so a broken `setSession` /
-    `router.replace` in the login screen still "logs in". Only the one-shot `appLoginDies` helpers
-    (coach-disable, tenant-suspension) would see it. **After touching `app/(auth)/login.tsx` or
+    `router.replace` in the login screen still "logs in". Only the one-shot `appLoginDies` helper
+    (`lib.mjs`; coach-disable, tenant-suspension) would see it. **After touching `app/(auth)/login.tsx` or
     `features/login/`, prove it with a ONE-SHOT login** — fresh context, one press, no reload, URL leaves `/login`
     within 10 s — as `verify-app-auth.mjs` check 1 does in the nightly since 2026-09-24 (promoted from
     `docs/refactor/app-fgh-handchecks-fence.mjs` step 1). (App fence, 2026-09-23.)

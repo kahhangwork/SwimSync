@@ -25,7 +25,7 @@
 
 import os from "node:os";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, loginExpo, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, appLoginDies as appLoginDiesOn, loginVerdictDetail, ADMIN } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => `${SHOT}/tenant-suspension-${n}`;
@@ -55,35 +55,21 @@ async function adminLoginDies(email) {
   return new URL(page.url()).pathname.includes("/login");
 }
 
-/** One Expo login attempt; true if it STAYED on /login (banned/dead). A
- *  form-never-appeared run returns null — "cannot say", not a verdict. */
-async function appLoginDies(email) {
-  await page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
-  await page.evaluate(() => window.localStorage.clear());
-  await page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(7000); // Metro hydrate
-  try {
-    await page.getByPlaceholder("you@email.com").fill(email, { timeout: 10000 });
-    await page.locator('input[type="password"]').fill("password123", { timeout: 5000 });
-  } catch {
-    return null;
-  }
-  await page.getByText("Sign In").last().click();
-  await page.waitForTimeout(6000);
-  return new URL(page.url()).pathname.endsWith("/login");
-}
+// One-shot login, shared in lib.mjs (§7.262, §7.263).
+const appLoginDies = (email) => appLoginDiesOn(page, email);
 
 const row = (text) => page.locator("tr", { hasText: text });
 
 try {
   // ── 1. Positive control: the parent sees BOTH businesses' children ────────
   const parentDied = await appLoginDies("ts-parent@swimsync.test");
-  check("control: the parent logs in before the suspend", parentDied === false);
+  check("control: the parent logs in before the suspend", parentDied === false,
+    loginVerdictDetail(parentDied));
   await page.waitForTimeout(2500);
   let body = await page.evaluate(() => document.body.innerText);
   check("control: the parent sees children of BOTH businesses",
     body.includes("SuspendCov Gone Kid") && body.includes("SuspendCov Keep Kid"),
-    body.slice(0, 400));
+    parentDied === null ? loginVerdictDetail(null) : body.slice(0, 400));
   await page.screenshot({ path: shot("01-parent-before.png"), fullPage: true });
 
   // ── 2. The Platform page, and the confirm dialog's copy ───────────────────
@@ -132,11 +118,13 @@ try {
 
   // ── 5. The parent keeps their OTHER business ──────────────────────────────
   const parentDiedNow = await appLoginDies("ts-parent@swimsync.test");
-  check("the parent still logs in (parents are NEVER banned)", parentDiedNow === false);
+  check("the parent still logs in (parents are NEVER banned)", parentDiedNow === false,
+    loginVerdictDetail(parentDiedNow));
   await page.waitForTimeout(2500);
   body = await page.evaluate(() => document.body.innerText);
   check("…and still sees their child at the OTHER business",
-    body.includes("SuspendCov Keep Kid"), body.slice(0, 400));
+    body.includes("SuspendCov Keep Kid"),
+    parentDiedNow === null ? loginVerdictDetail(null) : body.slice(0, 400));
   check("…and the suspended business's child is GONE (the dark half, in a browser)",
     !body.includes("SuspendCov Gone Kid"), body.slice(0, 400));
   await page.screenshot({ path: shot("05-parent-during.png"), fullPage: true });
@@ -166,8 +154,9 @@ try {
   // ── 7. Staff return; the pre-disabled coach does NOT (⚠ RISK 3) ───────────
   check("the admin's login WORKS again (the unban half)",
     (await adminLoginDies("ts-admin@swimsync.test")) === false);
+  const coachDied = await appLoginDies("ts-coach@swimsync.test");
   check("⚠ RISK 3 — the coach disabled BEFORE the suspend is STILL dead after the unsuspend",
-    (await appLoginDies("ts-coach@swimsync.test")) === true);
+    coachDied === true, loginVerdictDetail(coachDied));
   await page.screenshot({ path: shot("07-coach-still-dead.png"), fullPage: true });
 } finally {
   // ⚠ RISK 9: never leave a suspended tenant on the shared DB, whatever

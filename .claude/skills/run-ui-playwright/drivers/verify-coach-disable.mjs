@@ -18,7 +18,7 @@
 //   dc-replace@swimsync.test   pure coach who inherits the class
 
 import os from "node:os";
-import { launch, loginAdmin, loginExpo, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, appLoginDies as appLoginDiesOn, loginVerdictDetail, ADMIN } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => `${SHOT}/coach-disable-${n}`;
@@ -37,23 +37,8 @@ async function freshAdminLogin() {
   await loginAdmin(page, "coach@swimsync.test");
 }
 
-/** One Expo login attempt; true if it STAYED on /login (banned/dead). A
- *  form-never-appeared run returns null — "cannot say", not a verdict. */
-async function appLoginDies(email) {
-  await page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
-  await page.evaluate(() => window.localStorage.clear());
-  await page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(7000); // Metro hydrate
-  try {
-    await page.getByPlaceholder("you@email.com").fill(email, { timeout: 10000 });
-    await page.locator('input[type="password"]').fill("password123", { timeout: 5000 });
-  } catch {
-    return null;
-  }
-  await page.getByText("Sign In").last().click();
-  await page.waitForTimeout(6000);
-  return new URL(page.url()).pathname.endsWith("/login");
-}
+// One-shot login, shared in lib.mjs (§7.262, §7.263).
+const appLoginDies = (email) => appLoginDiesOn(page, email);
 
 const row = (text) => page.locator("tr", { hasText: text });
 
@@ -102,8 +87,9 @@ check("a disabled row offers Reactivate, not Disable",
 await page.screenshot({ path: shot("03-disabled.png"), fullPage: true });
 
 // ── 4. The ban half, in the real app ────────────────────────────────────────
+const targetDied = await appLoginDies("dc-target@swimsync.test");
 check("the disabled coach's app login DIES (the ban half)",
-  (await appLoginDies("dc-target@swimsync.test")) === true);
+  targetDied === true, loginVerdictDetail(targetDied));
 await page.screenshot({ path: shot("04-login-dead.png"), fullPage: true });
 
 // ── 5. The replacement sees the inherited class ─────────────────────────────
@@ -129,8 +115,9 @@ check("…and the class was NOT handed back — it stays the replacement's",
   (await row("DisableCov Replacement").innerText()).includes("DisableCov Lane"));
 await page.screenshot({ path: shot("06-reactivated.png"), fullPage: true });
 
+const targetDiedNow = await appLoginDies("dc-target@swimsync.test");
 check("the reactivated coach's app login WORKS again (the unban half)",
-  (await appLoginDies("dc-target@swimsync.test")) === false);
+  targetDiedNow === false, loginVerdictDetail(targetDiedNow));
 
 await browser.close();
 

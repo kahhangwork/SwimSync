@@ -72,6 +72,39 @@ export async function loginExpo(page, email, password = "password123") {
   console.log("loginExpo ->", page.url());
 }
 
+/** ONE Expo login attempt; true if it STAYED on /login (banned/dead), false if
+ *  it left. Returns null when the form never appeared — "cannot say", not a
+ *  verdict; pass the result through loginVerdictDetail() so a check prints it.
+ *
+ *  ONE press, no retry, on purpose: retrying is what loginExpo does and why it
+ *  hides a login regression (§7.263). Only the wait for the FORM is generous —
+ *  it waits for the email field itself, not a fixed 7 s, because the nightly's
+ *  first cold load could outlast the timer and red a login control (§7.262). */
+export async function appLoginDies(page, email, password = "password123") {
+  await page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => window.localStorage.clear());
+  await page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
+  const emailField = page.getByPlaceholder("you@email.com");
+  try {
+    await emailField.waitFor({ state: "visible", timeout: 45000 }); // Metro hydrate, cold compile included
+    await emailField.fill(email, { timeout: 5000 });
+    await page.locator('input[type="password"]').fill(password, { timeout: 5000 });
+  } catch {
+    console.log(`appLoginDies: the login form never became fillable for ${email}`);
+    return null;
+  }
+  await page.getByText("Sign In").last().click();
+  await page.waitForTimeout(6000);
+  return new URL(page.url()).pathname.endsWith("/login");
+}
+
+/** A check's detail for an appLoginDies result: names a null as "cannot say",
+ *  so a form that never loaded doesn't read as a login verdict. */
+export const loginVerdictDetail = (died) =>
+  died === null
+    ? "CANNOT SAY — the login form never appeared (a load failure, not a login verdict; §7.262)"
+    : `appLoginDies returned ${died}`;
+
 /** Log into the Next.js admin panel. */
 export async function loginAdmin(page, email = "superadmin@swimsync.test", password = "password123") {
   await page.goto(`${ADMIN}/login`, { waitUntil: "networkidle" });
