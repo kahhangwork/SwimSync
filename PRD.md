@@ -1198,7 +1198,10 @@ enrols between the cancel and the billing run is not expected at it either.
 What a cancelled lesson means, everywhere at once (one rule, five readers — §7.203):
 - **Parent** — Upcoming shows it struck *Cancelled* with the reason (§7.5).
 - **Coach** — the Schedule card is struck *Cancelled by your admin*; it leaves NEEDS MARKING and
-  the class roster's backlog; opening it says the lesson was cancelled and offers nothing to mark.
+  the class roster's backlog; opening it (from Schedule's DONE list, today's card or the roster's
+  Past Sessions) shows *This lesson was cancelled*, naming the class and the admin's reason, with
+  **Back to class** and nothing to mark. *(implemented 2026-09-24 — until then that screen never
+  rendered: the tap spun forever, BACKLOG.)*
   **The refusal is the database's** (`guard_attendance_date()`, §7.204), not the screen's: a
   stale screen, a deep link or a raw request cannot record attendance on it.
 - **Billing** — the engine neither expects nor bills it (it satisfies the completeness gate the way
