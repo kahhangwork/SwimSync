@@ -419,6 +419,8 @@ later on the same code) sits in L4-F and L4-Fence: **one red is a re-run; two re
 | **L4-Fence** | — | smoke-app **first, alone** 73/73; then coach-wages 10, parent-address 6, join-code 7, coach-disable 13, tenant-suspension 12, payment-collection 19, edit-child 7, schedule-week 21 — **9/9** · retry 0 | hand-checks `app-fgh-handchecks-fence.mjs` **19/19** — ONE-SHOT login parent + coach (R1), wrong-password message, change password ×2 roles, forgot → Mailpit, reset + accept-invite through REAL generated links, grade viewer, parent Sign Out |
 | **D6 review, fence** | — | an Opus reviewer compared commit 969e02b with its parent: **0 real changes**, 2 cosmetic (an extra fragment in PayoutCards; `summary` computed while loading — pure, cannot throw) | login's sequence confirmed byte-identical |
 
+| **Ship step 0 (R3)** | `c0a1ed2` | full `run-all-drivers.sh` on the branch head: **50/52**, then the two reds re-run SOLO: admin-calendar **21/21**, coach-wages **10/10** → **52/52** | coach-wages' red spanned the machine SLEEPING mid-driver (71,272 s logged; its admin step timed out on wake). admin-calendar is an admin-panel driver on unchanged admin code: `Today returns the URL date to today` reads the URL a fixed 400 ms after the click — a timing race, green solo |
+
 **Hand-check scripts proven on the PRE-change code before their sub-batch** (a red later is the refactor,
 not the script): G **19/19**, H **6/6**, fence **19/19**. Getting there cost four script fixes worth keeping
 (§12 F3).
