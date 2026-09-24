@@ -3,6 +3,10 @@
 _Split out of `HANDOVER.md` on 2026-07-26. Read this when you are about to touch a
 subsystem, not cover-to-cover — it is a reference, not a narrative._
 
+> **Compressed 2026-09-25 (347 KB → 186 KB).** Every item kept its number, bold title, rule, prohibitions,
+> commands and cross-references; the discovery story was cut. The full original text of any item is at
+> `git show 82dbdb0:docs/GOTCHAS.md`.
+
 > **The section numbers here are load-bearing.** They are cited by bare number
 > (`§7.41`, `§6`) from **781 places** across this repo — including inside **applied
 > migrations** and Playwright drivers, where they can never be corrected. So: items keep
@@ -23,8 +27,8 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
 
 Read the line for the area you are touching, then only those items. A new gotcha adds its
 number to a line here; a trap that bit again goes on its existing item as a **Hit again**
-bullet, not a new number (`/update-docs` Step 5). Items marked **↪** point at the item that
-carries the lesson. Built 2026-09-25 from the headlines; an item may fit two lines.
+bullet, not a new number (`/update-docs` Step 5). Items marked **↪** are one-line stubs folded
+into the item that carries the lesson. Built 2026-09-25 from the headlines; an item may fit two lines.
 
 | Area | Items |
 |---|---|
@@ -51,1393 +55,748 @@ carries the lesson. Built 2026-09-25 from the headlines; an item may fit two lin
 
 1. `insert().select()` under RLS needs the row to pass the SELECT policy immediately
    (see `students.created_by`).
+
 2. Attendance uses `lesson_session_id` (not `session_id`); `marked_by` is a **profile**
    id, not a `coaches.id`. Resolve a coach from an invoice via the item's
    `lesson_session_id` → `classes.coach_id` (a bug used the invoice_item id by mistake).
+
 3. `lesson_sessions.start_time/end_time` are NOT NULL — filled by a BEFORE INSERT
    trigger from the class (`20260309000900`).
+
 4. `useFocusEffect` must get a sync callback, not `async`.
+
 5. `absent` is NOT billable (only `present` + `trial_paid` are — PRD 5.4).
+
 6. When applying credit, draw down notes by the **actual consumed amount** and write a
    `credit_applications` row; only flip a note to `applied` once fully consumed
    (regression-tested in `core.test.ts`).
-7. **`new Date().toISOString().split("T")[0]` is a bug in SGT** — it's the UTC date, a
-   day behind before 08:00 local. Worse, pairing it with a **local** `getDay()` lets the
-   weekday and the date disagree: the Today screen listed Saturday's classes while
-   writing attendance to Friday's date, and re-marking later created a second session
-   that **double-billed everyone**. Use `todayInSg()` + `dayOfWeekOf()` (§6). Pinned by
+
+7. **`new Date().toISOString().split("T")[0]` is a bug in SGT** — the UTC date, a day
+   behind before 08:00; with a **local** `getDay()`, weekday and date disagree (bit:
+   double-billed everyone). Use `todayInSg()` + `dayOfWeekOf()` (§6). Pinned by
    `verify-tz-saturday.mjs`; audit with
    `grep -rn --include="*.ts" --include="*.tsx" -e "toISOString()\.split" -e "toISOString()\.slice" SwimSyncApp SwimSyncAdmin`.
-   **THIS FAMILY INCLUDES TIME OF DAY, AND A SECOND INSTANCE WAS LIVE UNTIL 2026-07-26.**
-   The coach's Today screen computed "is this class happening now?" as
-   `now.getHours() * 60 + now.getMinutes()` — the DEVICE's clock — sitting directly beside a
-   date from `todayInSg()`. Same disagreement, new axis. It only drove a cosmetic "Now"
-   badge, which is why it survived; the moment a card's *status* depended on "has this class
-   ended yet", a device an hour behind SGT would have shown "Upcoming" on a finished lesson
-   and the coach would never have been told to mark it — the hole the Unmarked Lessons net
-   exists to close (§8i). Fixed by `lib/timeOfDay.ts`, whose **shape** is the guard: only
-   `nowMinutesInSg()` knows about timezones, and everything that compares times takes a
-   plain `nowMinutes: number`, so it cannot read a clock and therefore cannot read the wrong
-   one. **Extend the audit:**
+   **THIS FAMILY INCLUDES TIME OF DAY** (a device-clock `now.getHours()` badge, live until
+   2026-07-26; driving status, the coach would never be told to mark a lesson — §8i). Use
+   `lib/timeOfDay.ts`: only `nowMinutesInSg()` reads the clock; comparisons take a plain
+   `nowMinutes: number`. **Extend the audit:**
    `grep -rn "getHours()\|getMinutes()\|getDay()" SwimSyncApp/app SwimSyncAdmin/app`
    — every hit is either a bug or needs a comment saying why not.
+
 8. **~~The engine's completeness gate never fires on the admin path.~~ FIXED 2026-07-18
-   (§8a).** For months, `SwimSyncAdmin/app/api/generate-invoices/route.ts` hardcoded
-   `force: true`, which bypassed the gate, the auto switch and the month seal — so the
-   admin confirm modal's gap report was the *only* thing between a forgotten lesson and an
-   underbill, and it merely warned. The route no longer sends `force`, and unmarked
-   attendance now **blocks** generation outright in every mode. Kept here because the
-   shape of the mistake is worth remembering: **a safety gate that the only live caller
-   bypasses is not a gate.** `force` still means "skip the sealed-month guard" (the
-   documented reopen path) and nothing more — don't re-add it to the route to "make
-   generation work"; if generation refuses, the answer is to mark the lesson.
+   (§8a).** `SwimSyncAdmin/app/api/generate-invoices/route.ts` hardcoded `force: true`,
+   bypassing gate, auto switch and seal; unmarked attendance now **blocks** in every mode.
+   **A safety gate that the only live caller bypasses is not a gate.** `force` only means
+   "skip the sealed-month guard" (the reopen path) — don't re-add it to the route to "make
+   generation work"; if generation refuses, mark the lesson.
+
 9. **`react-native-web` gives EVERY ScrollView `flexGrow: 1`** — horizontal ones
-   included (`commonStyle` in its `ScrollView/index.js`). So a horizontal ScrollView in
-   a column layout **expands to fill the leftover vertical height**, and its row content
-   container then stretches every child to that height (RN's default `alignItems` is
-   `stretch`). The parent Attendance chips shipped as ~180px tall capsules on web while
-   looking perfect on native — same "works on native, broken on web" family as §12a.
-   **Any horizontal ScrollView needs both:** `className="flex-grow-0"` on the ScrollView
-   *and* `items-start` on `contentContainerClassName`. Audit:
-   `grep -rn --include="*.tsx" "horizontal" SwimSyncApp/app`. Pinned by
-   `verify-parent-attendance.mjs`, which measures chip height from the DOM rather than
-   trusting a screenshot.
-10. **A screen you navigate *away* from stays mounted underneath.** The native stack
-    keeps the previous screen in the DOM, so `document.body.innerText` contains both.
-    This produced a **false-passing test**: an assertion for "admin will assign your
-    child soon" passed against the *home* screen's identical copy while the Attendance
-    screen was showing something else entirely. Assert only on strings unique to the
-    target screen. (Also `run-ui-playwright` gotcha #6.)
+   included (`commonStyle` in its `ScrollView/index.js`); children stretch to leftover
+   height (bit: ~180px Attendance chips, web only; §12a family). **Any horizontal ScrollView
+   needs both:** `className="flex-grow-0"` on the ScrollView *and* `items-start` on
+   `contentContainerClassName`. Audit: `grep -rn --include="*.tsx" "horizontal" SwimSyncApp/app`.
+   Pinned by `verify-parent-attendance.mjs`.
+
+10. **A screen you navigate *away* from stays mounted underneath.** `document.body.innerText`
+    contains both (a false-passing test matched the home screen's copy). Assert only on
+    strings unique to the target screen. (`run-ui-playwright` gotcha #6.)
+
 11. **A frontend `tsc` that passes locally can fail in CI — the Next/Expo type stubs are
-    git-ignored.** `SwimSyncAdmin`'s tsconfig `include`s `next-env.d.ts` + `.next/types/**`,
-    and `SwimSyncApp` leans on Expo's `expo-env.d.ts` / `.expo/types` — **all git-ignored**,
-    so they exist on your machine (a prior `npm run dev` / `expo start` generated them) but
-    **not in a fresh CI checkout**. A local `tsc --noEmit` therefore typechecks against stubs
-    CI won't have. Both apps happen to pass without them today (verified), but before trusting
-    any frontend typecheck, reproduce the CI condition: hide the artifacts
-    (`mv .next .next__x; mv next-env.d.ts next-env.d.ts__x`) and re-run. This is why the CI
-    typecheck guard (§8d) was validated against a stubbed-out fresh checkout, not just a local
-    pass.
-12. **The invoice engine's DEFAULT billing month was UTC-derived** — same family as #7,
-    different door. `core.ts` computed the previous month from `new Date().getMonth()`,
-    which is the **UTC** month on Edge Functions. The daily cron POSTs an empty body, so it
-    used this default: at the 1am SGT run (17:00 UTC the day before) it would bill a month
-    early (1 Aug → June, not July). Latent because invoicing is manual (the admin always
-    sends an explicit month) and cron is off. **Fixed** (§8a) — the default now derives the
-    calendar date in `APP_TIMEZONE` via `generate-invoices/dates.ts`. Don't reintroduce a
-    `new Date()`-field month derivation in the engine. Audit:
+    git-ignored.** (`next-env.d.ts`, `.next/types/**`, `expo-env.d.ts`, `.expo/types`.)
+    Reproduce CI first: `mv .next .next__x; mv next-env.d.ts next-env.d.ts__x`, re-run (§8d).
+
+12. **The invoice engine's DEFAULT billing month was UTC-derived** — same family as #7.
+    `new Date().getMonth()` in `core.ts` is UTC on Edge Functions; the 1am SGT cron would bill
+    June on 1 Aug. **Fixed** (§8a) via `APP_TIMEZONE` in `generate-invoices/dates.ts`. Don't
+    reintroduce a `new Date()`-field month derivation in the engine. Audit:
     `grep -rn "getMonth\|getFullYear\|new Date()" supabase/functions/generate-invoices/core.ts`.
 
-13. **Billing must follow ATTENDANCE ROWS, not active enrolments.** `core.ts` used to build
-    its billable student set from `student_class_enrolments … is_active`, so closing an
-    enrolment dropped that child's *already-attended* lessons from the invoice entirely.
-    Latent while nothing could unenrol — then the "Remove from class" button (§8a) made a
-    silent month-sized underbill one tap away. The two questions are genuinely different:
-    **active enrolments answer "who must be marked" (the completeness gate); attendance
-    rows answer "who gets billed."** Don't collapse them back together. Audit:
+13. **Billing must follow ATTENDANCE ROWS, not active enrolments.** Billing from
+    `student_class_enrolments … is_active` dropped attended lessons once "Remove from
+    class" (§8a) closed an enrolment. **Active enrolments answer "who must be marked";
+    attendance rows answer "who gets billed."** Don't collapse them back together. Audit:
     `grep -n "activeStudentIds" supabase/functions/generate-invoices/core.ts`.
+
 14. **`Number(null)` is `0`, so a "missing setting" can clamp to the *most aggressive*
-    value.** `clampRunDay` coerced first and clamped into 1..28, which turned an unset
-    `invoice_run_day` into **day 1** — the earliest possible run, exactly what the setting
-    exists to prevent. Missing/unparseable/out-of-range-low now falls back to the default;
-    only too-*high* values clamp (29–31 → 28, which would otherwise never fire in
-    February). When normalising config, decide separately what "absent" means and what
-    "out of range" means — they are not the same answer.
-15. **A test suite that seals state can pass once and fail on the second run.** Manual runs
-    now seal a month (§8a), so every completing test left a `billing_periods` row and the
-    *next* run short-circuited on `already_complete`. `teardown()` clears the months its
-    sessions fall in. **Run the Deno suite twice** after touching the engine — once proves
-    nothing about leaked state.
-16. **`SET LOCAL ROLE` outside a transaction is a no-op, and psql will not stop you.** An
-    RLS check written without `BEGIN`/`COMMIT` runs as `postgres`, which **bypasses RLS
-    entirely** — so every case "passes", including the ones that should be denied. Wrap
-    RLS probes in an explicit transaction, and make sure at least one case is expected to
-    FAIL, so a silently-superuser session is visible.
+    value.** `clampRunDay` made an unset `invoice_run_day` **day 1**. Missing/unparseable/low
+    now falls back to the default; only too-*high* clamps (29–31 → 28, else never fires in
+    February). Decide separately what "absent" and "out of range" mean.
+
+15. **A test suite that seals state can pass once and fail on the second run.** A leaked
+    `billing_periods` seal (§8a) short-circuits the next run on `already_complete`;
+    `teardown()` clears its months. **Run the Deno suite twice** after touching the engine.
+
+16. **`SET LOCAL ROLE` outside a transaction is a no-op, and psql will not stop you.** The
+    probe runs as `postgres`, **bypassing RLS entirely**, so every case "passes". Wrap RLS
+    probes in `BEGIN`/`COMMIT`, and make at least one case expected to FAIL.
+
 17. **A guard made of "nothing went wrong" conditions fires hardest when nothing happened.**
-    The month seal required no-incomplete-class AND no-deferred-parent AND no-failed-write —
-    every one of which is **vacuously true on an empty run**, so a month where nobody had
-    marked any attendance sealed itself and was locked out of billing (§8a.1). It reached
-    production. **When a terminal/irreversible action is gated on a conjunction of negatives,
-    add a positive: require that the work actually occurred** (here: at least one class
-    genuinely reckoned with). Same shape as §7.14 (`Number(null)` → 0 → the most aggressive
-    value): in both, an *absence* of input silently satisfied a rule written to police
-    *presence* of input. Ask what your guard does on empty input, not just on bad input.
+    The month seal's negatives were vacuously true on an empty run, sealing an unmarked month
+    in production (§8a.1). **Require a positive: that the work actually occurred** (≥1 class
+    reckoned with). Same shape as §7.14.
+
 18. **The engine's completeness gate could not see a lesson nobody touched.** FIXED
-    2026-07-18 (phase 0 of tenanting). `core.ts` selected `lesson_sessions` rows that
-    **exist** and checked those were fully marked — but sessions are created *lazily* by
-    attendance marking (PRD §7.5), so a lesson nobody touched has **no row**, and a class
-    with no rows at all was `continue`d entirely. A month with four lessons where three were
-    marked reported **"complete — billing month sealed"**: it billed three, sealed the month,
-    and the fourth could never be billed (later runs short-circuit on `already_complete`, and
-    the no-double-billing guard skips a parent who already has an invoice). A single
-    forgotten lesson became a permanent, silent underbill — the exact hole §8aD was written to
-    close.
-    **The shape worth remembering:** the rule existed in four hand-written copies and they
-    had *drifted*. The admin's `computeClassCoverage()` derived expected dates from the class
-    weekday and caught this; the engine never did. So the only effective gate was the
-    **client-side** one — gotcha §7.8 inverted (there, the only live caller bypassed the
-    gate; here, the real gate wasn't the server's). **Two implementations of one safety rule
-    is one implementation and one liability.** Now shared — see §6.
-    Pinned by four Deno tests, incl. one that fails on the pre-fix engine with
-    `"complete — billing month sealed"` instead of `"incomplete_attendance"`.
-19. **A type union is not a code path.** Phase 2 added `tenant_admin` to the app's `Role`
-    type but left login branching on `role === "coach"`. The tenancy backfill correctly made
-    the real coach a `tenant_admin`, and they were met with *"Unrecognised role. Please
-    contact support."* — **locked out of production.** The design had always said to route on
-    **which extension rows exist**, not the enum. When you widen a type to admit a new value,
-    grep for every branch that consumes it. Now one pure function (`lib/landing.ts`) used by
-    both call sites.
-20. **A new table does NOT inherit RLS.** `CREATE TABLE` leaves row-level security *off*,
-    and a table with policies but RLS disabled reads as though the policies were never
-    written — they are simply not consulted. Three tenancy tables shipped that way in
-    development, leaving **every join code world-readable**. Always
+    2026-07-18 (phase 0 of tenanting). Sessions are created lazily (PRD §7.5) and `core.ts`
+    checked only existing `lesson_sessions` rows, so an untouched lesson could never be billed
+    (the hole §8aD was written to close); the admin's `computeClassCoverage()` saw it, the
+    engine never did (§7.8 inverted). **Two implementations of one safety rule is one
+    implementation and one liability.** Now shared — see §6. Pinned by four Deno tests, one
+    failing pre-fix with `"complete — billing month sealed"` instead of `"incomplete_attendance"`.
+
+19. **A type union is not a code path.** `tenant_admin` joined `Role` but login branched on
+    `role === "coach"`, locking the real coach out of production. Route on **which extension
+    rows exist**, not the enum; grep every consumer when widening a type. Now `lib/landing.ts`.
+
+20. **A new table does NOT inherit RLS.** With RLS off, policies read as though they were
+    never written (three tenancy tables left every join code world-readable in dev). Always
     `ALTER TABLE … ENABLE ROW LEVEL SECURITY` explicitly. Audit:
     `SELECT relname FROM pg_class WHERE relkind='r' AND relnamespace='public'::regnamespace AND NOT relrowsecurity;`
+
 21. **Postgres does not track function bodies as dependencies.** Dropping
-    `is_superadmin()` errored on the *policies* that used it (good — that is how the storage
-    policies were found) but said nothing about `close_student_enrolment()` and
-    `handle_attendance_update()`, which call it in their bodies. Those would have failed at
-    **runtime**, on a live coach-facing path. After removing a function or column, grep the
-    function bodies too: `grep -rn "<name>" supabase/migrations/`.
-22. **`Number("")` is 0 — again.** A blank wage-rate field passed a `>= 0` guard and saved a
-    **$0 rate**, which is worse than no rate: the coach reads as "on payroll" and earns
-    nothing. Same shape as §7.14 (`Number(null)` → day 1). Check for empty *before*
+    `is_superadmin()` flagged policies but not `close_student_enrolment()` /
+    `handle_attendance_update()`, which would fail at **runtime**. Grep bodies too:
+    `grep -rn "<name>" supabase/migrations/`.
+
+22. **`Number("")` is 0 — again.** A blank wage-rate passed `>= 0` and saved a **$0 rate**
+    (coach "on payroll", earns nothing). Same shape as §7.14. Check for empty *before*
     coercing, every time.
-23. **Watching one app's deploy tells you nothing about the other's.** The mobile app and
-    the admin are **separate Vercel projects**. After a push, `/wages` 404'd while the app
-    bundle had already changed. Compare a known-good route against a known-bad one to tell
-    "not deployed yet" from "broken build", and wait on the surface you actually changed.
+
+23. **Watching one app's deploy tells you nothing about the other's.** They are **separate
+    Vercel projects**. Compare a known-good route with a known-bad one ("not deployed yet" vs
+    "broken build"), and wait on the surface you changed.
 
 24. **A deleted Next.js route leaves a stale generated type behind, so the admin typecheck
-    fails *after* you clean up.** A throwaway `app/logocheck/page.tsx`, added to render a
-    component in isolation and then deleted, left `.next/types/app/logocheck/page.ts`
-    behind — and `SwimSyncAdmin/tsconfig.json` `include`s `.next/types/**`, so
-    `tsc --noEmit` failed with `TS2307: Cannot find module '…/app/logocheck/page.js'`,
-    naming a file that no longer exists. Same family as §7.11 from the opposite direction:
-    there the git-ignored type stubs were *missing* in CI, here a *stale* one lingered
-    locally. It never reaches a commit or CI (`.next` is git-ignored) — it only breaks the
-    local check, confusingly, and looks like your own change broke something. Fix:
-    `rm -rf SwimSyncAdmin/.next/types/app/<route>`. Related: Next treats `_`-prefixed
-    folders as **private**, so a scratch route named `_logocheck` silently 404s.
+    fails *after* you clean up.** `.next/types/app/<route>` lingers and is `include`d, giving
+    `TS2307: Cannot find module '…/app/logocheck/page.js'`. §7.11 in reverse; it never
+    reaches a commit or CI. Fix: `rm -rf SwimSyncAdmin/.next/types/app/<route>`. Next treats
+    `_`-prefixed folders as **private**, so a scratch route named `_logocheck` silently 404s.
 
-25. **A test can pass for the WRONG REASON, and a green suite hides it.** Writing the
-    regression test for the repricing bug (§8), I dated the price change `2026-08-01` —
-    *future* relative to the test clock. The display-sync trigger only tracks rates already
-    in force, so `classes.price_per_lesson` never moved and the **pre-fix engine read the
-    right number by accident**. The test passed on the very code it existed to catch. It was
-    only found by deliberately reverting the fix and re-running. **Every test written for a
-    known bug must be run against the unfixed code before you trust it** — "it passes" is
-    not the claim being made; "it fails without the fix" is. All 26 tests added this session
-    were checked that way, and five of the nine wages tests do *not* discriminate (they are
-    regression guards, and that is written next to them).
-26. **A guard that fires correctly can look like a broken fix.** The new
-    settled-money guard in `set_class_terms()` refused my own test, because the shared wages
-    fixture marks a **December 2026** payout paid while the test clock is July — so
-    "reprice from today" legitimately collides with a later paid period. The instinct is to
-    weaken the guard to make the test pass. **Move the test instead**: `class_terms.test.sql`
-    got its own tenant. A fixture is not a reason to loosen a real rule.
-27. **↪ Superseded by §7.60, which carries this lesson in full.** **`git push` to `main` deploys the WEB APPS but not the database.** Obvious in the
-    abstract, and I still got the order wrong this session: pushing before
-    `supabase db push` shipped an admin panel calling `set_class_terms()` **before the RPC
-    existed**, so class editing was broken in production until the migration landed. The
-    rule from §6 is directional — **adding? migrate first. dropping? deploy the app first**
-    — and it governs the *push*, not just the migration command. Nothing is atomic here.
+25. **A test can pass for the WRONG REASON, and a green suite hides it.** The repricing
+    test (§8) dated the price change in the future, so `classes.price_per_lesson` never moved
+    and the pre-fix engine passed — found only by deliberately reverting the fix. **Every
+    test written for a known bug must be run against the unfixed code before you trust it.**
+    Five of the nine wages tests do *not* discriminate (noted beside them).
+
+26. **A guard that fires correctly can look like a broken fix.** `set_class_terms()`'s
+    settled-money guard refused a test over the shared fixture's paid December 2026 payout.
+    Don't weaken the guard — **move the test instead** (`class_terms.test.sql` got its own
+    tenant). A fixture is not a reason to loosen a real rule.
+
+27. **↪ Folded into §7.60 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 
 28. **A `.select()` result is `any`, so reading a column off the WRONG JOINED TABLE
-    typechecks.** The parent home query nests
-    `students(… student_class_enrolments(is_active …))`, and I added `s.is_active` to the
-    mapping — which resolved to nothing, because `is_active` was on the *enrolment*, not
-    the student. `tsc` was clean; **every child would have rendered as "Inactive"** in
-    production. Only driving the app caught it. When a column name exists on more than one
-    table in a nested select, read the select's shape, not the mapping's. Audit:
-    `grep -n "is_active" <the select block>` and check the nesting level.
+    typechecks.** `s.is_active` on `students(… student_class_enrolments(is_active …))` was
+    undefined — every child "Inactive", `tsc` clean. Read the select's shape, not the
+    mapping. Audit: `grep -n "is_active" <the select block>` and check the nesting level.
+
 29. **Removing a value from an enum silently changes what OTHER screens say.** Dropping
-    `inactive` from `assignment_status` left departed children reading **"Unassigned"** to
-    their own parents, and reappearing in the admin's **Unassigned Children** queue as if
-    awaiting placement — because that is now literally their assignment status. Neither is
-    a type error and neither failed a test. When you retire an enum value, find every
-    screen that *rendered* it and decide what it says now, not just every branch that
-    compared to it (§7.19 is the compile-time half of this; this is the runtime half).
+    `inactive` from `assignment_status` showed departed children as "Unassigned" to parents
+    and in the admin queue. Find every screen that *rendered* the value, not just every
+    branch that compared to it (§7.19 is the compile-time half).
 
 30. **`supabase db push` APPLIES EVERY PENDING MIGRATION, and auto-confirms when it is not
-    on a terminal.** It prints a `[Y/n]` listing them; run non-interactively, that is a
-    yes. This is §7.27's successor and it bit *harder*, because the deploy had been
-    explicitly designed in two phases and the contract migration **renumbered to sort last**
-    an hour earlier specifically so it could be held back. **Renumbering is a convention the
-    tool does not read.** All seven went in together, production dropped
-    `students.swimming_ability` while both live bundles still selected it, and six screens
-    broke. To hold one back it must not be in the directory:
+    on a terminal.** §7.27's successor: a contract migration renumbered to sort last still
+    dropped `students.swimming_ability` under live bundles. **Renumbering is a convention the
+    tool does not read.** To hold one back it must not be in the directory:
     `mv supabase/migrations/<contract>.sql /tmp/hold/` → push → deploy apps → move it back
-    → push again. Recovery is usually **forward** (deploy the app that stopped querying the
-    column), not a rollback.
-31. **An HTTP 200 does not tell you which BUNDLE is being served.** Both web apps are SPAs
-    that return 200 with the old JS. After the push above, the admin's `/levels` had gone
-    404→200 (§7.23's comparison, working) while `swimsync.sg` was **still serving the old
-    bundle including the dropped column's query**. Grep the deployed asset for a string only
-    the new build has:
+    → push again. Recovery is usually **forward**, not a rollback.
+    Recovery is usually **forward** (deploy the app that stopped querying the column), not a rollback.
+
+31. **An HTTP 200 does not tell you which BUNDLE is being served.** Both SPAs return 200
+    with old JS (§7.23 isn't enough). Grep the deployed asset for a new-build-only string:
     `B=$(curl -s https://swimsync.sg | grep -oE '/_expo/static/js/web/[^"]+\.js' | head -1); curl -s "https://swimsync.sg$B" | grep -c "<new-string>"`
 
-32. **A CLAMP THAT MAKES A CHECK FAIR CAN ALSO MAKE IT VACUOUS.** The completeness gate
-    clamps its window to today (`windowTo = todayDate < monthEnd ? todayDate : monthEnd`) so a
-    lesson that has not happened yet is not reported as a gap. Entirely correct in itself —
-    and it meant a run on an **in-progress** month saw only the lessons so far, judged the
-    month **COMPLETE**, billed them, and **sealed** it. Every remaining lesson of that month
-    was then permanently unbillable (later runs short-circuit on the seal; the
-    `already_exists` guard skips the parent even if it is reopened). Nothing validated that
-    the billing month had **ended** — the engine checked only the `YYYY-MM` *format*, and the
-    admin's picker defaulted to the current month with no `max`. Fixed 2026-07-19: the engine
-    refuses `billingMonth > previousBillingMonth(now)` before anything can seal, and `force`
-    cannot reach it. **The shape worth remembering:** when a rule is relaxed to be fair to
-    incomplete input, ask what it now says about input that is *entirely* incomplete. Same
-    family as §7.17 (a conjunction of negatives is satisfied hardest by an empty run) — there
-    the guard was vacuously *true*, here the window was vacuously *small*.
-33. **A test suite that reads the real clock changes meaning as the calendar advances.** The
-    engine suite hardcoded billing months (`2026-07`, `2027-11`, `2028-02`) and mostly did not
-    say what "now" was, so months sat in the *future* of the test clock — where
-    `expectedLessonDates` returns nothing and the completeness gate passes by having nothing
-    to check. Tests were partly inert and nobody could tell, because the suite was green.
-    Correcting the clock made the gate engage for the first time and immediately exposed two
-    fixtures that had never actually been complete. Fixed by making the clock part of the
-    fixture (`monthEnded()` in `test-helpers.ts`), with `newScenario()` **throwing** on a
-    scenario that expects zero lessons. **Never date a test's fixture relative to the wall
-    clock**, and prefer a helper that cannot construct the vacuous case over a comment asking
-    the next person to check for it.
+32. **A CLAMP THAT MAKES A CHECK FAIR CAN ALSO MAKE IT VACUOUS.** The completeness gate clamps its window to
+    today (`windowTo = todayDate < monthEnd ? todayDate : monthEnd`), so a run on an **in-progress** month judged it
+    **COMPLETE** and **sealed** it — the rest permanently unbillable. Nothing checked the month had **ended**.
+    Fixed 2026-07-19: the engine refuses
+    `billingMonth > previousBillingMonth(now)` before anything can seal, and `force` cannot reach it. **When a rule is
+    relaxed to be fair to incomplete input, ask what it says about *entirely* incomplete input.** See §7.17.
+
+33. **A test suite that reads the real clock changes meaning as the calendar advances.** Hardcoded months
+    (`2026-07`, `2027-11`, `2028-02`) in the test clock's future made the completeness gate pass vacuously; two
+    fixtures were never actually complete. Fix: `monthEnded()` in `test-helpers.ts`; `newScenario()` **throws** on
+    zero expected lessons. **Never date a test's fixture relative to the wall clock**; prefer a helper that cannot
+    construct the vacuous case over a comment.
+
 34. **An absolutely-positioned element with NO `left`/`top` is placed at its STATIC position,
-    which is not necessarily the corner.** The auto-generation toggle's knob was
-    `absolute top-0.5` with no `left`, plus `translate-x-5` for the "on" state. A `<button>`
-    **centres its content**, so the knob's static x was already ~22px into a 44px track and
-    the transform pushed it to 42px — **18px outside the track**. Both states were wrong (off
-    sat flush against the *right* edge), which is why the reported symptom was "a blue pill
-    with no knob". Always anchor a transform-driven knob (`left-0`) so the offset is measured
-    from a known origin. Found by **measuring rects from the DOM**, not by looking at a
-    screenshot — `verify-invoice-controls.mjs`, same technique as §7.9. **Run a driver against
-    the unfixed code first**: the 14/21 baseline is what located the cause, and without it the
-    fix would have been a guess that happened to work.
-35. **`CREATE FUNCTION` GRANTS `EXECUTE` TO `PUBLIC` BY DEFAULT — including `anon`.** A
-    `SECURITY DEFINER` function runs as its owner and **bypasses RLS entirely**, so its own
-    body is the whole boundary; there is no policy behind it to catch a mistake. Combined
-    with the default grant, forgetting either layer exposes it to unauthenticated callers.
-    Always **`REVOKE ALL … FROM PUBLIC`** *and* gate the body. And test the gate against
-    **every caller shape that can reach it** — for `platform_tenant_overview()` that is anon,
-    a parent, a coach *and* a tenant admin, not "a non-admin": three of those four arrive
-    through ordinary sessions, and a test that tries only one proves almost nothing. Audit:
-    `grep -n "SECURITY DEFINER" -A 12 supabase/migrations/*.sql` and check each has both.
+    which is not necessarily the corner.** A toggle knob (`absolute top-0.5`, no `left`, `translate-x-5`) in a
+    content-centring `<button>` landed 18px outside the track. Always anchor a transform-driven knob (`left-0`).
+    **Measure rects from the DOM**, not a screenshot (`verify-invoice-controls.mjs`, as §7.9), and **run a driver
+    against the unfixed code first**.
+
+35. **`CREATE FUNCTION` GRANTS `EXECUTE` TO `PUBLIC` BY DEFAULT — including `anon`.** A `SECURITY DEFINER`
+    function **bypasses RLS**, so its body is the whole boundary. Always **`REVOKE ALL … FROM PUBLIC`** *and* gate
+    the body; test **every caller shape** (for `platform_tenant_overview()`: anon, parent, coach, tenant admin).
+    Audit: `grep -n "SECURITY DEFINER" -A 12 supabase/migrations/*.sql` and check each has both.
     **AND THAT IS STILL NOT ENOUGH IN PRODUCTION — see §7.39.**
+
 36. **A shared table component that does not emit its own `<tr>` splits the convention, and
-    the losing half is INVALID HTML.** `<th>` cannot be a child of `<thead>`; React reports
-    it as a **hydration error at runtime**. `Thead` left the row to callers, so nine call
-    sites wrapped their `<Th>`s and three did not — `/wages`, `/levels` and `/platform` were
-    throwing hydration errors **in production** and nobody had noticed, because the page
-    still renders. Fixed by making `Thead` own the `<tr>`, which makes the broken form
-    unrepresentable rather than something each caller must remember. **When a shared
-    component leaves part of a required structure to its callers, the callers will diverge** —
-    put the required part inside. Audit: watch the Next dev overlay's issue count, and check
-    the browser console on a page you have touched; a hydration error is silent otherwise.
+    the losing half is INVALID HTML.** `<th>` under `<thead>` is a runtime **hydration error**; `/wages`, `/levels`,
+    `/platform` threw in production unnoticed. Fixed: `Thead` owns the `<tr>`. **When a shared component leaves part
+    of a required structure to its callers, the callers will diverge** — put it inside. Audit: the Next dev
+    overlay's issue count and the browser console on a touched page; a hydration error is silent otherwise.
+
 37. **A STORED COLUMN THAT NOTHING MAINTAINS IS NOT A FACT — don't display it, derive it.**
-    Two of these shipped together on the new Platform page and the user caught both within a
-    minute of seeing their own row:
-    - `tenants.kind` reads `'private'` because that is its **DEFAULT** and the tenancy
-      backfill hardcoded it. No screen, RPC or admin control has ever set it. Displaying it
-      as "Type" would have said *private* for a genuine swim school and nobody would have
-      questioned it, because it looks like data.
-    - The "no rate" warning fired on a **private coach**, whose absent rate is the state
-      PRD §7.13 calls **correct** — their income is their parents' invoices. A warning about
-      a correct state is noise that never goes away.
-    Both are now derived from *is this coach also the tenant's admin* — a fact something
-    actually maintains. **Before putting a column on a screen, find its writer.** If nothing
-    writes it, either derive the answer or don't show it; a reserved-for-later field rendered
-    as truth is worse than an empty column, because an empty column prompts a question.
-    Audit: `grep -rn "<column>" supabase/migrations/ | grep -i "update\|insert\|set "` — no
-    hits beyond the DDL means nothing maintains it.
+    `tenants.kind` reads `'private'` only as its **DEFAULT**; the "no rate" warning fired on a private coach, whose
+    absent rate PRD §7.13 calls **correct** (noise that never goes away). Both now derive from *is this coach also the
+    tenant's admin*. **Before putting a column on a screen, find its writer**; if none, derive it or don't show it.
+    Audit: `grep -rn "<column>" supabase/migrations/ | grep -i "update\|insert\|set "` — no hits beyond the DDL means
+    nothing maintains it.
 
 38. **A `SECURITY DEFINER` trigger cannot see who the client is — `current_user` inside it
-    is `postgres`, so every current_user-seam check waves everyone through.** The package
-    lifecycle trigger shipped its first draft as DEFINER (to read products "safely") and a
-    parent's request could insert itself as `active` — caught because pgTAP tests the
-    parent role path. `pin_student_tenant()` works precisely because it is NOT definer:
-    client DML arrives as `authenticated`, definer functions as `postgres`, the engine as
-    `service_role`, and a plain trigger sees those differences. If a trigger needs both the
-    seam and privileged reads, it is two functions, not one flag. Audit:
-    `grep -B3 "current_user" supabase/migrations/*.sql | grep -i "definer"` — any hit is
-    this bug.
-    - **Hit again → §7.104 (2026-08-09):** `assign_parent_package_reference()` let a parent squat a reference number. It also holds the opposite rule: a trigger that WRITES through RLS must be DEFINER.
-    - **Hit again → §7.156 (2026-08-15):** `recompute_package_extensions` let every caller take the service branch; the seam that works is `auth.uid() IS NULL`.
+    is `postgres`, so every current_user-seam check waves everyone through.** A DEFINER package-lifecycle draft let a
+    parent insert as `active`. `pin_student_tenant()` works because it is NOT definer (client = `authenticated`,
+    definer = `postgres`, engine = `service_role`). Seam plus privileged reads = two functions. Audit:
+    `grep -B3 "current_user" supabase/migrations/*.sql | grep -i "definer"` — any hit is this bug.
+    - **Folded in from §7.104 (2026-08-09):** `assign_parent_package_reference()` (DEFINER) never fired its seam
+      check, so a parent could squat the next number. **Rule: a DEFINER function may not ask who is calling** — make
+      the rule unconditional, or put the role check in a separate plain trigger. **Opposite direction:** a trigger
+      that WRITES to an RLS-protected table must BE DEFINER (§7.120; the `students` audit trigger, `20260809000200`;
+      the plain-function seam is explained at `20260720000100`). Test as the writing role — a pgTAP write as
+      `postgres` passes against the broken build (`students_audit.test.sql`).
+    - **Folded in from §7.156 (2026-08-15):** `recompute_package_extensions` (`20260815000200`) tested `current_user IN
+      ('postgres','service_role')`, so every caller took the service branch. **The service seam is `auth.uid() IS NULL`;
+      authorise with `auth.uid()` / `can_admin_tenant()` / `current_parent_id()`, never `current_user`.**
     - **Now a CHECK:** `supabase/tests/recurring_gotchas.test.sql` #2 goes red on any DEFINER body that reads `current_user` (2026-09-25).
 
 39. **`REVOKE ALL … FROM PUBLIC` DOES NOT REMOVE ROLE GRANTS, AND THE LOCAL STACK WILL NOT
-    SHOW YOU THE DIFFERENCE.** `provision_tenant()` shipped with the §7.35 recipe —
-    `REVOKE ALL … FROM PUBLIC; GRANT EXECUTE … TO authenticated;` — and local `pg_proc`
-    confirmed it: `{postgres, authenticated}`. A `supabase db dump` of the **remote**, taken
-    straight after `db push`, showed `GRANT ALL … TO "anon"`, `"authenticated"` *and*
-    `"service_role"`. Two causes, both permanent:
-    - **`PUBLIC` is its own grantee, not an umbrella** over `anon`/`authenticated`/
-      `service_role`. Revoking it leaves every role-specific grant untouched.
-    - **Supabase *cloud* carries project-level `ALTER DEFAULT PRIVILEGES` granting EXECUTE
-      on new `public` functions to all three roles.** This repo's `20260309000800_grants.sql`
-      sets default privileges for **TABLES and SEQUENCES only** — the function grants are the
-      platform's, and **the local stack does not reproduce them.**
-    So a grant verified with `pg_proc` locally can be wrong in production, and a pgTAP
-    assertion on it is **vacuous by construction** — it passes locally for the wrong reason.
-    **The only honest check is a dump of the remote after pushing**, which is now a step in
-    every deploy. Write `REVOKE ALL … FROM anon, service_role` explicitly, next to the
-    PUBLIC revoke. Nothing was exposed here (both roles have `auth.uid() = NULL`, so the
-    body gate refused them) — but the second layer was absent while a comment claimed it
-    held. **Still outstanding:** `regenerate_join_code()` and `close_student_enrolment()`
-    have the same grants; backlogged, not swept mid-deploy. Audit:
+    SHOW YOU THE DIFFERENCE.** `provision_tenant()` (§7.35 recipe) looked right locally but the remote dump showed
+    `GRANT ALL` to `"anon"`, `"authenticated"`, `"service_role"`: **`PUBLIC` is its own grantee, not an umbrella**, and
+    **Supabase cloud's `ALTER DEFAULT PRIVILEGES` grants EXECUTE on new `public` functions to all three** (the local
+    stack does not; `20260309000800_grants.sql` covers tables/sequences only). A local grant assertion is
+    **vacuous**; **the only honest check is a dump of the remote after pushing**. Write
+    `REVOKE ALL … FROM anon, service_role` next to the PUBLIC revoke. **Still outstanding:** `regenerate_join_code()`,
+    `close_student_enrolment()`. Audit:
     `supabase db dump --file /tmp/p.sql && grep -E '(GRANT|REVOKE).*ON FUNCTION' /tmp/p.sql | grep '"anon"'`.
+    Nothing leaked only because the body gate refused both roles (`auth.uid()` is NULL for each) — the grant layer was absent while a comment claimed it held.
 
 40. **GET A FUNCTION'S CURRENT DEFINITION FROM THE DATABASE, NOT FROM THE MIGRATION FILE YOU
-    FOUND FIRST.** Extending `platform_tenant_overview()` meant copying its body verbatim —
-    so I copied it from `20260719002300_platform_tenant_overview.sql`, the file whose name
-    matches. But `20260719002400` had already redefined it: `kind` → a derived `shape`,
-    `coaches_without_rate` → `staff_without_rate`. The new migration silently **reverted
-    both**, and the verbatim-diff check I wrote to prevent exactly this passed — **because it
-    diffed against the same wrong file.** It was caught only by dumping the live definition.
-    A function redefined N times has N files and only the last one is true; the filename tells
-    you when it was written, not whether it is current. Same family as the package trigger's
-    "start from `grep -ln … | tail -1`", except `tail -1` is *also* only a heuristic — the
-    database is the fact:
-    `SELECT pg_get_functiondef('public.<fn>()'::regprocedure);`
-    Then diff your new body against **that**, not against a file.
-    - **Hit again → §7.83 (2026-08-04):** a session trusted a migration file and a commit message over the live RPC, and replaced a working column with ~90 lines of workaround.
-    - **Hit again → §7.115 (2026-08-10):** a review cited the creating migration and nearly re-added a guard `book_trial()` already had.
+    FOUND FIRST.** Copying from `20260719002300_platform_tenant_overview.sql` silently reverted `20260719002400`
+    (and the diff check used the same wrong file). Filenames and `tail -1` are heuristics; the database is the fact:
+    `SELECT pg_get_functiondef('public.<fn>()'::regprocedure);` — diff your new body against **that**.
+    - **Folded in from §7.83 (2026-08-04):** the reverse — a session trusted a migration file over the live RPC and
+      wrote a false claim into four documents incl. PRD §4.4 (removed `e03cba6`). The function's own header warning
+      (`20260721000200`) said exactly this, and was not read. **Three oracles, any one settles it:**
+      `pg_get_functiondef` · the pgTAP file asserting the real columns · the RPC's JSON keys over PostgREST.
+    - **Folded in from §7.115 (2026-08-10):** a review of `20260725000800_book_trial.sql` nearly re-added a guard
+      `20260806000200` already had. Command:
+      `docker exec supabase_db_SwimSync psql -U postgres -d postgres -At -c "SELECT pg_get_functiondef('public.<fn>'::regproc);"`
+      — the same one is the §7.93 rollback check.
     - **Now a standing rule:** CLAUDE.md → *Rules that bite* → Database (2026-09-25). A habit, so no check can see it.
 
 41. **AN UNLISTED AUTH REDIRECT IS NOT REJECTED — IT IS SILENTLY REPLACED WITH `site_url`.**
-    The first invite generated came back with `redirect_to=http://127.0.0.1:3000` instead of
-    the `/accept-invite` we asked for, because that URL was not in
-    `[auth].additional_redirect_urls`. Nothing errored: the email sends, the link works, the
-    token is valid — the user just lands on the wrong page, which for a first-time invite is
-    the admin root instead of the form that sets their password. **If an auth email lands
-    somewhere unexpected, suspect the allow-list before the code.** Note it is an **exact**
-    match, so `localhost:3000` and `127.0.0.1:3000` are different entries. Remember it is
-    read only at **boot** (§4): `supabase stop && supabase start`.
-    - **⚠ THE SUSPICION WAS CORRECT, AND IT WAS LIVE FOR WEEKS.** This entry used to say the
-      admin panel's `/reset-password` was unlisted and so the forgot-password flow was
-      "**likely** landing wrong in production too". On **2026-07-27** it was checked:
-      `https://admin.swimsync.sg/reset-password` was **missing from the production
-      dashboard's allow-list**, so every admin password reset had been silently landing on
-      the wrong page. Added, then reset was tested end to end on **both**
-      `https://swimsync.sg` and `https://admin.swimsync.sg` — both work. The parent app's
-      `https://swimsync.sg/reset-password` was also missing from `config.toml` and has been
-      added.
-    - **PRODUCTION AND `config.toml` ARE TWO SEPARATE LISTS AND NOTHING KEEPS THEM IN STEP.**
-      Production's copy lives in the **Supabase dashboard**; no migration touches it, no
-      test reads it, and `supabase db push` does not carry it. That asymmetry is why the
-      two drifted apart unnoticed for weeks, and it is the durable lesson here:
-      **fixing the file does not fix production, and fixing production does not fix the
-      file — do both, every time.** Audit production by hand:
-      `grep -rn "redirectTo\|resetRedirectTo" SwimSyncAdmin/app SwimSyncApp/app` lists every
-      URL an auth email can ask for; each one must appear in the dashboard list *and* here.
+    A URL missing from `[auth].additional_redirect_urls` just lands the user on the wrong page. **If an auth email
+    lands somewhere unexpected, suspect the allow-list before the code.** Matching is **exact** (`localhost:3000` ≠
+    `127.0.0.1:3000`) and read only at **boot** (§4): `supabase stop && supabase start`.
+    - Live for weeks until 2026-07-27: `https://admin.swimsync.sg/reset-password` was missing from production;
+      `https://swimsync.sg/reset-password` from `config.toml`.
+    - **PRODUCTION AND `config.toml` ARE TWO SEPARATE LISTS AND NOTHING KEEPS THEM IN STEP** (production's is in the
+      Supabase dashboard; no migration, test or `supabase db push` touches it). **Fixing the file does not fix production, and fixing
+      production does not fix the file — do both, every time.** Audit:
+      `grep -rn "redirectTo\|resetRedirectTo" SwimSyncAdmin/app SwimSyncApp/app` — each URL must be in both lists.
 
 42. **A `SECURITY DEFINER` WRITER IS EXEMPT FROM `pin_student_tenant()` — AND FROM EVERY
-    TRIGGER THAT USES THE `current_user` SEAM.** §6 records that the tenant boundary on
-    `students` is a trigger rather than a policy, and that the seam is `current_user`
-    "so any new SECURITY DEFINER writer inherits the exemption automatically". That
-    sentence reads like a convenience. It is also a **hole**: such a function can write a
-    student into *any* tenant and nothing downstream will stop it.
-    **So every SECURITY DEFINER function that writes a tenanted row must derive
-    `tenant_id` itself — from the class, the student, the invoice — and must NOT accept it
-    as a parameter.** `add_unclaimed_student()` and `link_invited_parent()`
-    (`20260725000200`/`000300`) both do; copy that shape.
-    Confirmed empirically rather than reasoned: inside a `postgres`-owned SECURITY DEFINER
-    function, `auth.uid()` is the **caller** while `current_user` is **`postgres`**. Both
-    halves matter — the first is what lets `created_by = auth.uid()` record the real coach,
-    the second is what disables the pin.
+    TRIGGER THAT USES THE `current_user` SEAM.** §6's inherited exemption is a **hole**: such a function can write a
+    student into any tenant. **So every SECURITY DEFINER function that writes a tenanted row must derive `tenant_id`
+    itself and must NOT accept it as a parameter** — copy `add_unclaimed_student()` / `link_invited_parent()`
+    (`20260725000200`/`000300`). Inside it `auth.uid()` is the caller; `current_user` is `postgres`.
 
-43. **~~`lesson_sessions` HAS A SECOND WRITER NOW.~~ RETIRED 2026-07-25.** It briefly
-    did — `add_unclaimed_student()`'s trial mode created one — and that is why this
-    gotcha existed. Trials became BOOKINGS (§8.11), which write no session at all, so
-    the attendance save is once again **the only writer in the codebase**, as §6 says.
-    The underlying rule still stands and is why the change was safe: a duplicate
-    `(class_id, session_date)` row double-bills a whole class (§7.7), so any future
-    second writer needs `ON CONFLICT … DO NOTHING` and a date **parameter**, never
-    `now()`.
+43. **~~`lesson_sessions` HAS A SECOND WRITER NOW.~~ RETIRED 2026-07-25.** Trials became BOOKINGS (§8.11); the
+    attendance save is again the only writer (§6). A duplicate `(class_id, session_date)` double-bills a class
+    (§7.7), so any future second writer needs `ON CONFLICT … DO NOTHING` and a date **parameter**, never `now()`.
 
-44. **`supabase db reset` LEAVES KONG POINTING AT A DEAD AUTH CONTAINER.** The reset
-    recreates `supabase_auth_*` but not `supabase_kong_*`, which holds the old upstream —
-    so **every** call through `/auth/v1` returns **502** while `docker ps` shows both
-    containers "Up (healthy)". In the Deno suite this surfaces as
-    `createUser(coach) failed: {}` — an **empty error object** — on all 91 tests at once,
-    which reads like a catastrophic code regression and is not one.
-    **Fix: `docker restart supabase_kong_SwimSync` after any `db reset`.** Cost most of an
-    hour before it was diagnosed by curling the auth endpoint directly.
-    A second-order effect worth knowing: because `newScenario()` throws *after* inserting
-    its tenant, every failed run leaks one. 91 tests × a few runs left **177 orphan
-    tenants**, and `SWIM-` + 4 hex is only 65k codes — so the next run started failing on
-    `tenants_join_code_key` duplicates, a completely unrelated-looking symptom.
+44. **`supabase db reset` LEAVES KONG POINTING AT A DEAD AUTH CONTAINER.** Every `/auth/v1` call returns **502**
+    while `docker ps` says healthy; Deno shows `createUser(coach) failed: {}` on every test — not a regression.
+    Diagnose by curling the auth endpoint.
+    **Fix: `docker restart supabase_kong_SwimSync` after any `db reset`.** Failed runs also leak tenants (thrown
+    after insert by `newScenario()`), eventually colliding on `tenants_join_code_key`.
 
-
-45. **`classes.category_id` IS MUTABLE, AND MONEY NOW DEPENDS ON IT.** Every other input
-    to a price in this schema is effective-dated — `class_rates`, `coach_rates`,
-    `trial_rates`. A class's **category** is a plain column anyone can change. Since a
-    trial is priced through it, re-tagging a class would silently re-value every unbilled
-    trial in it across the five-week gap between a lesson and its invoice run — §7.7's bug
-    through a new door, and exactly what §6 forbids: *a fact about a past lesson is never
-    a live lookup.*
-    **So anything that prices by category must SNAPSHOT it at the moment of sale.**
-    `trial_bookings.category_id` is that snapshot, and the engine is prohibited from
-    joining `classes` to price a trial. The same trap waits for any future feature that
-    prices by category.
+45. **`classes.category_id` IS MUTABLE, AND MONEY NOW DEPENDS ON IT.** Unlike effective-dated rates, re-tagging a
+    class would re-value its unbilled trials — §7.7 again, and against §6: *a fact about a past lesson is never a
+    live lookup.* **So anything that prices by category must SNAPSHOT it at the moment of sale**
+    (`trial_bookings.category_id`); the engine is prohibited from joining `classes` to price a trial.
 
 46. **THE LIST OF WHAT CASCADES FROM A TABLE IS NOT STATIC, AND A STALE COPY OF IT IS A
-    DATA-LOSS BUG.** `BACKLOG.md` asserted for weeks that *"of five FKs into `students`,
-    only `parent_students` cascades … so a mis-aimed merge cannot destroy anything"*, and
-    the merge design rested on that sentence. It was **already false when it was written**:
-    `student_settlements` (`20260725000100`) and `trial_bookings` (`20260725000700`) had
-    been added **in the same session**, both `ON DELETE CASCADE`. `student_claims` then
-    made a fourth in the very migration series that corrected the documentation. So the
-    count went five/one → eight/four while a document confidently stated otherwise.
-    **A comment cannot be the mitigation, because the person who adds the next cascading FK
-    will not read it.** Any function that DELETEs a tenanted row must ask the catalogue and
-    refuse on anything it has not been taught to move:
+    DATA-LOSS BUG.** `BACKLOG.md` said only `parent_students` cascaded from `students`; `student_settlements`
+    (`20260725000100`), `trial_bookings` (`20260725000700`) and `student_claims` did too. **A comment cannot be the
+    mitigation, because the person who adds the next cascading FK will not read it.** Any function that DELETEs a
+    tenanted row must ask the catalogue and refuse on anything it has not been taught to move:
     ```sql
     SELECT string_agg(conrelid::regclass::text, ', ') FROM pg_constraint
      WHERE confrelid = 'students'::regclass AND contype='f' AND confdeltype='c'
        AND conrelid::regclass::text NOT IN (<the ones it handles>);
     ```
-    `merge_students()` does this and `student_merge.test.sql` proves it by **creating a
-    cascading FK at runtime** and asserting the merge refuses. Audit:
+    `merge_students()` does; `student_merge.test.sql` adds a cascading FK at runtime and asserts refusal. Audit:
     `SELECT conrelid::regclass, confdeltype FROM pg_constraint WHERE confrelid='<t>'::regclass AND contype='f';`
 
 47. **A BUSINESS'S OWN ADMIN CANNOT UNLINK A PARENT FROM A CHILD — SO ANY FEATURE THAT
-    CREATES A FAMILY LINK MUST SHIP ITS OWN REVERSAL.** `parent_students_delete` is
-    `USING (parent_id = current_parent_id() OR is_platform_admin())`: the **parent** can
-    unlink and the **platform** admin can, but the tenant admin — the person clicking the
-    button that creates the link — cannot. Found while reviewing the claim-approval flow,
-    where it would have made a mis-approval permanent and fixable only by SQL against
-    production. `undo_student_claim()` (`20260726000400`) is that reversal, and it ships in
-    the **same migration** as approve for exactly this reason.
-    **Do NOT "fix" this by widening `parent_students_delete` to tenant admins** — that
-    grants a blanket delete over every family link in the business to close a one-row
-    problem, and RLS is row-level, so there is no way to say "only the link you just made".
-    - **UPDATE 2026-08-04 — the policy is GONE (`20260804000800`), and the warning above
-      is why it went rather than being widened.** The first sentence of this entry described
-      what the POLICY permitted; `BACKLOG.md` described what the PRODUCT offered — *"once a
-      claim is approved nothing in the product can unlink them except that flow's own
-      undo"* — and the two disagreed. No UI ever called it (21 references to
-      `parent_students` across both apps, not one write verb), so a parent could
-      nonetheless unlink themselves with a single `DELETE`, reversing an approved claim
-      outside the flow built to reverse it. `undo_student_claim()` is now the **only**
-      unlink path, which is what this entry always said it should be.
-    - **`parent_students` is SELECT-only for clients now.** The deleters
-      (`undo_student_claim`, `merge_students`) are SECURITY DEFINER owned by `postgres`,
-      so they bypass RLS and were never affected; the two SECURITY INVOKER readers
-      (`package_live_balances`, `student_package_coverage`) keep the SELECT grant they need.
-    - **The grant had to go with the policy, and nobody had to remember that** —
-      `table_grants.test.sql` assertion 2 (§7.87) fails on a privilege no policy permits,
-      so dropping the policy alone goes red naming `parent_students:DELETE`. That was the
-      invariant's first real catch, on the first change made after it landed.
+    CREATES A FAMILY LINK MUST SHIP ITS OWN REVERSAL.** `undo_student_claim()` (`20260726000400`) ships in the
+    **same migration** as approve. **Do NOT "fix" this by widening `parent_students_delete` to tenant admins** — a
+    blanket delete over every family link; RLS cannot say "only the link you just made".
+    - **UPDATE 2026-08-04 — the policy is GONE (`20260804000800`)**: `undo_student_claim()` is the **only** unlink
+      path. **`parent_students` is SELECT-only for clients**; the DEFINER deleters (`undo_student_claim`,
+      `merge_students`) were never affected, and INVOKER readers (`package_live_balances`,
+      `student_package_coverage`) keep SELECT. The grant had to go with the policy —
+      `table_grants.test.sql` assertion 2 (§7.87) goes red naming `parent_students:DELETE` otherwise.
 
 48. **A PARENT WHO HAS JOINED BY CODE BUT HAS NO CHILD YET IS INVISIBLE TO THE BUSINESS'S
-    ADMIN.** `profiles_select` reaches a parent through
-    `EXISTS (… tenant_serves_parent(p.id))`, and that helper goes via **the parent's
-    children's enrolments**. A parent who has redeemed the join code and added nothing is
-    served by nobody, so the admin cannot read their name, email or phone.
-    This bit the claim queue — the one screen whose entire job is *"who is asking?"* — which
-    showed an em dash for every requester while every RPC underneath was correct. **A join
-    that works under `service_role` in a REST probe can return NULL under the caller's own
-    RLS; test the read path as the actual role.** Only the UI driver caught it. The fix is a
-    narrow `SECURITY DEFINER` reader (`list_student_claims()`), not a sixth branch on the
-    most load-bearing policy in the schema.
-    **IT HAPPENED TWICE MORE THE NEXT DAY, and the shape is worth memorising: A POLICY GAP
-    IS INDISTINGUISHABLE FROM A FEATURE NOBODY WROTE.** The parent's "your trial is on
-    Saturday" card read the right table, rendered the right component, and showed the old
-    text — because `trial_bookings_select` had no parent branch at all
-    (`current_tenant_id()` is NULL for a parent; they are not a coach). Fixed, it then
-    rendered "their class", because `classes_select` asks `parent_has_child_in_class()`,
-    which only knew about ENROLMENTS and a trial is a booking. Two policies, one feature,
-    each failing silently and neither raising anything.
-    **So: when a new screen reads a table its audience has never read before, probe the
-    policy AS THAT ROLE before writing the UI** —
+    ADMIN.** `tenant_serves_parent()` goes via the children's enrolments, so the claim queue showed blanks. **A join
+    that works under `service_role` in a REST probe can return NULL under the caller's own RLS; test the read path as
+    the actual role.** Fix: a narrow DEFINER reader (`list_student_claims()`), not a new policy branch.
+    **A POLICY GAP IS INDISTINGUISHABLE FROM A FEATURE NOBODY WROTE** (again in `trial_bookings_select` and
+    `parent_has_child_in_class()`). **So: when a new screen reads a table its audience has never read before, probe
+    the policy AS THAT ROLE before writing the UI** —
     `SET LOCAL ROLE authenticated; SET LOCAL "request.jwt.claims" TO '{"sub":"<id>"}'; SELECT count(*) FROM <table>;`
-    A count of 0 there is the whole bug, and it takes ten seconds.
+    A count of 0 there is the whole bug.
+    Why: `current_tenant_id()` is NULL for a parent (they are not a coach), and `parent_has_child_in_class()` only knew about ENROLMENTS — a trial is a booking.
 
-49. **NUMBER A CONTRACT MIGRATION *LAST*, OR STAGING THE DEPLOY LEAVES IT OUT OF ORDER.**
-    `supabase db push` applies **everything** pending — there is no "up to migration X"
-    flag — so an expand/contract deploy is staged by physically **moving the contract file
-    out of `supabase/migrations/`**, pushing, then moving it back. That works, but if the
-    held-back file has an **earlier** timestamp than something you did push, the CLI then
-    refuses it as *"local migration files to be inserted before the last migration on
-    remote"* and demands `--include-all`.
-    That happened here: `20260726000600` (the contract) was held while `20260726000700`
-    (an additive function) went out. `--include-all` is correct and safe when the two are
-    independent — verify with `--dry-run` that it would push **only** the intended file —
-    but the cleaner fix is upstream: **give the contract migration the highest timestamp
-    in the batch**, so holding it back never creates a gap. Expand/contract is now the
-    normal shape for this codebase (§6), so this will recur.
+49. **NUMBER A CONTRACT MIGRATION *LAST*, OR STAGING THE DEPLOY LEAVES IT OUT OF ORDER.** `supabase db push` pushes
+    everything, so a contract is held back by moving it out of `supabase/migrations/`. If it is older than a pushed
+    file (`20260726000600` vs `20260726000700`) the CLI demands `--include-all` (safe if independent — `--dry-run`
+    first). **Give the contract migration the highest timestamp in the batch**, so holding it back never creates a
+    gap (§6).
 
 50. **`audit_log.actor_id` STOPS YOU DELETING A PROFILE, AND CANNOT BE CASCADED OR
-    BLANKED.** It is `NOT NULL` and `NO ACTION` against `profiles`, so any account that
-    has ever *done* something — filed a claim, added a child, marked attendance — cannot
-    be deleted until its audit rows go first. Hit while writing the production
-    test-data cleanup: five throwaway accounts had authored six rows between them, and the
-    delete failed with a bare FK error naming a UUID.
-    Delete audit rows **authored by** the doomed accounts only. Rows written by someone
-    else *about* a deleted entity are fine and should be kept — `entity_id` has no foreign
-    key, so they dangle harmlessly and they are the business's own record.
-    This also means **an account can never be fully deleted without losing part of the
-    audit trail** — a real tension worth knowing before promising anyone a clean deletion.
-    Audit:
+    BLANKED.** `NOT NULL`, `NO ACTION`: delete audit rows **authored by** the doomed accounts first; keep rows by
+    others *about* them (`entity_id` has no FK). **An account can never be fully deleted without losing part of the
+    audit trail.** Audit:
     `SELECT count(*) FROM audit_log al JOIN profiles p ON p.id = al.actor_id WHERE p.email = '<addr>';`
 
 51. **A MINIFIED BUNDLE ONLY PROVES WHAT USER-VISIBLE STRINGS SURVIVE — GREPPING FOR AN
-    IDENTIFIER OR A SPLIT LITERAL PROVES NOTHING.** Verifying a Vercel deploy by fetching
-    `/_expo/static/js/web/entry-*.js` and grepping is genuinely necessary (§7.23's
-    app-lags-admin problem needs it), but it lies in two directions:
-    - **Identifiers are renamed.** `upcomingTrials` and `awaitingTrial` both return 0 in a
-      live bundle that contains the feature.
-    - **JSX splits literals.** `Trial{n === 1 ? "" : "s"} coming up` never appears as
-      `"Trials coming up"` anywhere — only `" coming up"` does.
-    Both read as "the deploy failed", and the second nearly sent this session chasing a
-    problem that did not exist. **Grep only for a contiguous user-visible string you can
-    see verbatim in the source**, and sanity-check with one you know was already live.
+    IDENTIFIER OR A SPLIT LITERAL PROVES NOTHING.** Bundle grepping (§7.23) lies: identifiers are renamed
+    (`upcomingTrials` returns 0), and JSX
+    splits literals (`Trial{n === 1 ? "" : "s"} coming up` never appears as `"Trials coming up"`). **Grep only for a
+    contiguous user-visible string you can see verbatim in the source**, and sanity-check one already live.
+
 52. **A NEW EMBED ON A PAGE'S PRIMARY LIST QUERY PUTS THE WHOLE PAGE AT RISK — ADD A
-    SECOND QUERY INSTEAD.** PostgREST returns `null` for the **entire** select when one
-    embed fails — a policy gap, an ambiguous relationship, a typo in the nesting. So
-    bolting a nice-to-have join onto the query that renders the table means a failure
-    **blanks the table** rather than degrading the extra. Fetch supplementary data in its
-    own query, defaulted to empty, and let the page render without it.
-    - Hit while adding the Classes page's "See students" drawer (2026-07-26): the first draft
-      extended `loadClasses()`'s select with `enrolments → students → tenant_levels`, which
-      would have put every class on `/classes` behind a three-level embed resolving. It is
-      now a separate `loadRoster()`, **verified by breaking the roster query on purpose**
-      and confirming the class table still rendered while the drawer said why it could not.
-    - The corollary is a UI rule: a supplementary read that fails must say so. An empty
-      list where the fetch errored is indistinguishable from a class with nobody in it.
+    SECOND QUERY INSTEAD.** One failed PostgREST embed nulls the **entire** select. Fetch supplementary data in its
+    own query defaulted to empty (`loadRoster()` beside `loadClasses()`, 2026-07-26 — verified by breaking the
+    roster query on purpose), and a failed supplementary read must say so — an empty list is
+    indistinguishable from a class with nobody in it.
+
 53. **`ON CONFLICT DO NOTHING` DOES NOT MAKE A FIXTURE IDEMPOTENT WHEN THE ONLY UNIQUE
-    INDEX IS PARTIAL.** Two of this schema's uniqueness rules are deliberately partial —
-    `one_active_enrolment_per_student_class` (`WHERE is_active`; it was
-    `one_active_enrolment_per_student` on `(student_id)` alone until Wave 2,
-    `20260811000100`) and
-    `trial_bookings_live_slot_uniq` (`WHERE cancelled_at IS NULL`) — precisely so that
-    closed enrolments and cancelled bookings may repeat. A fixture row that is *inactive*
-    or *cancelled* therefore conflicts with nothing and **re-inserts on every run**, which
-    is exactly the negative-control row a test is relying on being singular. Use an
-    explicit `WHERE NOT EXISTS` keyed on what "already seeded" means. Caught by running
-    the fixture twice and diffing the row counts — do that for any new fixture.
+    INDEX IS PARTIAL.** `one_active_enrolment_per_student_class` (`WHERE is_active`, `20260811000100`) and
+    `trial_bookings_live_slot_uniq` are deliberately partial, so inactive/cancelled rows re-insert every run. Use
+    `WHERE NOT EXISTS`; run any new fixture twice and diff the row counts.
+
 54. **WHEN A SHARED COMPONENT STARTS EMITTING AN ELEMENT ITS CALLERS USED TO EMIT, THE
-    SWEEP IS NOT THE FIX — A TEST IS.** `42803db` made `Thead` own its `<tr>`, swept the
-    call sites, **missed `levels/page.tsx`**, and left a docblock asserting the broken
-    form was now "unrepresentable". It was not: that page kept its `<Tr>`, rendered
-    `<tr>` inside `<tr>`, collapsed all five headers into one cell in column 1, and
-    shipped a visibly broken table to production **for a week**. Prose in a component
-    cannot enforce a call-site contract. If a shared primitive takes over an element,
-    land a scan test over the call sites *in the same commit* —
-    `SwimSyncAdmin/components/Table.test.tsx` is the one for this contract, and it walks
-    every `app/(admin)/**/page.tsx` so a page that does not exist yet is already covered.
-    - **Every text assertion passes on a table whose columns are misaligned.** The
-      labels were all present, correctly spelled and in the right order — just in the
-      wrong place. That is why nothing caught it and why a human looking at the page is
-      what eventually did. Geometry must be **measured**, not read: §7.34 again, now
-      twice over. `verify-levels-table.mjs` compares each `th`'s rect against its
-      column's `td`.
-    - **React's own `validateDOMNesting` warning is NOT a usable signal here — tested.**
-      Run against the known-broken page React logged **nothing**, so a check on it went
-      green on a page that was plainly wrong. Count `thead tr tr` off the DOM instead.
-      A check that passes on known-broken code is worse than no check.
-    - **A driver that has never been seen to fail proves nothing.** Both new checks were
-      run against the unfixed tree first: the scan test failed naming the file, and the
-      geometry check failed with a worst offset of **488px** (fixed: **0px**). Those two
-      numbers are what set the 2px tolerance — calibrate it, never guess it.
+    SWEEP IS NOT THE FIX — A TEST IS.** `42803db`'s sweep missed `levels/page.tsx` (broken in production a week).
+    Prose cannot enforce a call-site contract: land a scan test in the same commit —
+    `SwimSyncAdmin/components/Table.test.tsx` walks every `app/(admin)/**/page.tsx`.
+    - **Every text assertion passes on a table whose columns are misaligned** — measure geometry (§7.34):
+      `verify-levels-table.mjs` compares each `th`'s rect against its column's `td`.
+    - **React's own `validateDOMNesting` warning is NOT a usable signal here — tested**: it logged nothing on the
+      broken page. Count `thead tr tr` off the DOM. A check that passes on known-broken code is worse than none.
+    - **A driver that has never been seen to fail proves nothing.** Calibrate tolerance on the unfixed tree, never
+      guess it.
+
 55. **GIT WORKTREES SPLIT THE CODE AND SHARE THE DATABASE — SO MIGRATIONS LAND ON `main`,
-    ALONE, ONE AT A TIME.** Every worktree's `supabase/config.toml` says
-    `project_id = "SwimSync"`, and the CLI names its containers from that — so N checkouts
-    address **one** `supabase_db_SwimSync`. Git isolates your files; nothing isolates the
-    schema. Two consequences, and the second is the one that reaches production:
-    - **`supabase db reset` rebuilds the shared DB from whichever worktree ran it.** A
-      migration living only on a feature branch ceases to exist in the running database
-      the moment anyone else resets — the file is still there, the code still looks right,
-      and nothing points at the cause. **Observed live 2026-07-26**: the shared DB held
-      **75** applied migrations while `main` had **74 files**, the extra one existing only
-      as an *untracked* file in one worktree.
-    - **Parallel migrations apply in FILENAME order locally and in MERGE order on
-      production.** Branch A writes `…000100`, branch B writes `…000200`, B merges first:
-      production runs `b → a`, every local `db reset` ran `a → b`. Where both touch the
-      same object the end states differ silently — and most migrations here are
-      `CREATE OR REPLACE FUNCTION` or `DROP POLICY; CREATE POLICY`, i.e. last-writer-wins.
-      The attendance trigger is on its seventh redefinition.
-56. **A FRESH WORKTREE HAS NO `.env` FILES, AND THE FAILURE LOOKS LIKE YOUR CHANGE.**
-    `SwimSyncApp/.env` and `SwimSyncAdmin/.env.local` are git-ignored, so a new worktree
-    gets neither — nor `node_modules`. The admin fails loudly (it will not start), but
-    **the Expo app starts fine and serves a 200**; it simply cannot reach Supabase, so the
-    login screen never renders its fields and any driver dies on
-    `getByPlaceholder('you@email.com')` after a 30s timeout. That reads exactly like "the
-    change under test broke the app."
-    - Cost real time this session: `verify-levels.mjs` failed this way and was initially
-      suspected as a regression in the Levels fix. **What settled it was running the driver
-      against the *unfixed* code and getting the identical failure** — do that before
-      diagnosing anything else, it is two minutes and it partitions the search space.
+    ALONE, ONE AT A TIME.** Every worktree's `config.toml` has `project_id = "SwimSync"`,
+    so all address one `supabase_db_SwimSync`. `supabase db reset` rebuilds it from
+    whichever worktree ran it (a branch-only migration vanishes), and parallel migrations apply in **FILENAME order
+    locally, MERGE order on production** — last-writer-wins objects silently differ.
+
+56. **A FRESH WORKTREE HAS NO `.env` FILES, AND THE FAILURE LOOKS LIKE YOUR CHANGE.** `SwimSyncApp/.env`,
+    `SwimSyncAdmin/.env.local` and `node_modules` are git-ignored. The Expo app still serves a 200 but login never
+    renders its fields — drivers time out on `getByPlaceholder('you@email.com')`, reading like a regression (bit
+    `verify-levels.mjs`). **Run the driver against the *unfixed* code first.**
     - Setup for a new worktree, before any driver:
       `cp <root>/SwimSyncAdmin/.env.local <wt>/SwimSyncAdmin/ && cp <root>/SwimSyncApp/.env <wt>/SwimSyncApp/`
-      then `npm install` in both. **Check the copied file points at `127.0.0.1:54321`**
-      before using it — copying a cloud-pointed env into a worktree aims your drivers at
-      production.
-    - Related: run the admin on a **non-default port** (`npm run dev -- -p 3100`) when
-      siblings may hold 3000. `drivers/lib.mjs` already reads `ADMIN_URL`/`EXPO_URL`, so no
-      driver needs editing — and do not edit it, since it is shared with every worktree.
-    - **The rule:** write migrations in the `main` worktree on a short `db/…` branch, apply,
-      `supabase test db`, merge to `main` **before** anything depends on them; feature
-      branches then `git merge main` to *consume* the schema and never carry it. One in
-      flight at a time. Announce before `db reset` — it wipes every other worktree's
+      then `npm install` in both. **Check the copied file points at `127.0.0.1:54321`** — a cloud-pointed env aims
+      your drivers at production.
+    - Run the admin on a **non-default port** (`npm run dev -- -p 3100`); `drivers/lib.mjs` reads
+      `ADMIN_URL`/`EXPO_URL` — do not edit it, it is shared with every worktree.
+    - **The rule:** write migrations in the `main` worktree on a short `db/…` branch, apply, `supabase test db`,
+      merge to `main` **before** anything depends on them; feature branches `git merge main` to *consume* the schema
+      and never carry it. One in flight at a time. Announce before `db reset` — it wipes every other worktree's
       fixtures.
-    - **Do NOT give each worktree its own stack** by editing `project_id`/ports:
-      `config.toml` is **tracked**, so per-folder values are one `git add -A` from being
-      committed and one `git checkout` from being clobbered.
-    - **`WORKTREE.md` is per-worktree scratch and must stay gitignored** — two worktrees
-      cannot own one path, and committing it makes every sibling's `git merge main` fail
-      with *"untracked working tree files would be overwritten"*. Anything durable in it
-      belongs here or in `BACKLOG.md` **before** the worktree is retired.
-      - **This bit immediately.** The 2026-07-27 worktree branched *before* that rule
-        landed and committed `WORKTREE.md`; it was caught at merge time and removed with
-        `git rm --cached`. If your branch predates `12cf553`, check before you commit.
-    - **`git status` BEFORE `git commit`, not after — a sibling session can move `HEAD`
-      between your checkout and your commit.** On 2026-07-16 a branch was created for six
-      backlog items, a concurrent merge to `main` moved `HEAD` in between, and the commit
-      (`3e1270c`) landed **on `main`** while the branch was left an empty pointer. Docs-only,
-      so no harm — but note the second-order cost: `3e1270c` **has no CI run of its own**,
-      because it was pushed between two other commits and the green run belongs to
-      `b89ca52`, which merely contains it. A commit that never ran CI is invisible to every
-      later "CI was green" claim. Two sessions in one repo also means **check `git log`
-      before assuming an uncommitted file is yours**. (Promoted from §8g/§8h, 2026-07-16.)
+    - **Do NOT give each worktree its own stack** by editing `project_id`/ports: `config.toml` is **tracked**.
+    - **`WORKTREE.md` is per-worktree scratch and must stay gitignored** — committing it makes every sibling's
+      `git merge main` fail. Move anything durable here or to `BACKLOG.md` **before** retiring the worktree. If your
+      branch predates `12cf553`, check before you commit (`git rm --cached`).
+    - **`git status` BEFORE `git commit`, not after — a sibling session can move `HEAD` between your checkout and
+      your commit.** 2026-07-16: `3e1270c` landed on `main` with no CI run of its own (green run is `b89ca52`'s) —
+      a commit that never ran CI is invisible to later "CI was green" claims. **Check `git log` before assuming an
+      uncommitted file is yours** (promoted from §8g/§8h).
 
-57. **A `BEFORE INSERT` TRIGGER ALSO FIRES FOR ROWS THAT RESOLVE TO AN *UPDATE*.**
-    PostgREST emits `.upsert(rows, { onConflict })` as `INSERT … ON CONFLICT DO UPDATE`,
-    and Postgres runs BEFORE INSERT triggers for **every candidate row, before the
-    conflict is detected**. So a guard written as "INSERT only" silently governs updates
-    too.
-    This was one review pass away from shipping: the attendance window guard
-    (`20260727000100`) would have refused **every correction to an already-invoiced
-    lesson** — the credit-note flow (PRD §7.8), which is the exact feature the
-    INSERT/UPDATE split was chosen to protect. Worse, the coach's save sends **every
-    student in ONE statement**, so a single refused row fails the whole class's save with
-    a generic error.
-    **The fix is to detect the update inside the trigger** — if a row already exists for
-    the conflict key, it is a correction, so return early. A client-side "split insert
-    from update" would not do: it leaves direct REST calls unguarded.
-    Confirmed empirically with a throwaway probe table before the guard was written, not
-    reasoned about. Audit: `grep -rn "BEFORE INSERT" supabase/migrations/` — for each, ask
-    whether its table is ever written by `.upsert()`.
+57. **A `BEFORE INSERT` TRIGGER ALSO FIRES FOR ROWS THAT RESOLVE TO AN *UPDATE*.** `.upsert(rows, { onConflict })`
+    is `INSERT … ON CONFLICT DO UPDATE`, and BEFORE INSERT runs for every candidate row before the conflict is
+    detected. The attendance guard (`20260727000100`) nearly refused every correction to an invoiced lesson (credit
+    notes, PRD §7.8) — and one refused row fails the whole class's save. **Detect the update inside the trigger**: if
+    a row exists for the conflict key, return early. A client-side split would not do — it leaves direct REST calls
+    unguarded. Audit: `grep -rn "BEFORE INSERT" supabase/migrations/` — ask whether each table is ever written by
+    `.upsert()`.
 
 58. **A DEEP-LINKED RN-WEB SCREEN CAN BE PHYSICALLY OVERLAID BY THE ONE YOU LEFT, SO
-    `click({force:true})` PRESSES THE WRONG ELEMENT.** §7.10 records that the previous
-    screen stays mounted and pollutes `document.body.innerText`. Reaching a screen by
-    **deep link** is worse: the stale screen is also laid out on top, so
-    `document.elementFromPoint()` at a button's own centre returns a card belonging to the
-    *other* screen. `force: true` skips the actionability check but still clicks those
-    coordinates — the press lands on the overlay, nothing errors, the state never changes,
-    and the driver reads as "the feature is broken".
-    Cost an hour on `verify-attendance-guard.mjs`, where the two save checks failed while
-    the save worked fine by hand. **Diagnose by asking the DOM, not by screenshot:**
+    `click({force:true})` PRESSES THE WRONG ELEMENT.** Worse than §7.10: the stale screen is laid out on top, the
+    press lands on it, nothing errors and the state never changes (bit `verify-attendance-guard.mjs`). **Diagnose by
+    asking the DOM, not by screenshot:**
     ```js
     const r = el.getBoundingClientRect();
     document.elementFromPoint(r.left + r.width/2, r.top + r.height/2) // is it your element?
     ```
-    The fix is to dispatch `pointerdown`/`pointerup`/`click` on the element itself
-    (`pressByText()` in that driver). Prefer in-app navigation where you can; use this
-    when a deep link is the point of the test.
-    - **Hit again → §7.252 (2026-09-21):** the roster hand-check's force-click opened a DIFFERENT lesson on the Schedule screen underneath.
+    Fix: dispatch `pointerdown`/`pointerup`/`click` on the element itself (`pressByText()`). Prefer in-app
+    navigation; use this when a deep link is the point of the test.
+    - **Folded in from §7.252 (2026-09-21, §8.114):** a force-click opened a DIFFERENT lesson on the Schedule screen
+      underneath (root cause §7.254). In a hand-check click the element itself: `locator.evaluate((e) => e.click())`.
+      The Toast lives **3000 ms** — `waitFor` its text right after the action.
 
 59. **A `COUNT(*)` BASELINE IS ROLE-DEPENDENT UNDER RLS, SO "NOTHING WAS WRITTEN" CAN
-    FAIL WHILE BEING TRUE.** A pgTAP fixture captured `SELECT COUNT(*) FROM lesson_sessions`
-    as `postgres` (which sees every row) and compared it later under `SET LOCAL ROLE
-    authenticated`, where the coach sees only their own classes' sessions. The two numbers
-    count different things, so the assertion failed no matter what the code did — and the
-    failure looks like the guard leaking a write, which is the most alarming possible
-    misdiagnosis.
-    **Scope both sides to the same rows** (`WHERE class_id = …`), or take both counts as
-    the same role. This is §7.16's sibling: there the role was silently *wrong*, here it
-    silently *changes between two reads*.
+    FAIL WHILE BEING TRUE.** A pgTAP count of `lesson_sessions` as `postgres`, compared under `SET LOCAL ROLE
+    authenticated`, fails whatever the code does — and looks like a leaked write. **Scope both sides to the same
+    rows** (`WHERE class_id = …`), or take both counts as the same role. Sibling of §7.16.
 
-60. **`git push … :main` IS A DEPLOY STEP. IT IS THE *APP* DEPLOY.** Vercel builds both
-    web apps from `main`, so the moment a branch lands there the new frontend is going
-    live — before any `db push` or `functions deploy` you have not already run.
-    §7.27 says the expand/contract ordering "governs the **push**, not just the migration
-    command". That was written after getting it wrong once. It was got wrong again on
-    2026-07-27 (§8.15) by someone who had *written the deploy order into the plan an hour
-    earlier*: the branch went to `main` first because that felt like source control, and
-    the apps deployed ahead of the schema and the engine.
-    **The reason a note is not enough** is that "merge my branch" and "deploy the
-    frontend" feel like different categories of action, and only one of them sounds
-    risky. They are the same action.
-    **So: for a backend-first change, do `db push` and `functions deploy` BEFORE the push
-    to `main`** — the branch is already tested, and nothing is watching it. Landing on
-    `main` is the last step, not the first. Harmless on 2026-07-27 only because
-    production had zero attendance rows; on a live month it would have been the exact
-    deadlock the change existed to remove.
-    - **First filed as → §7.27** (July); this item is the second time it bit.
+60. **`git push … :main` IS A DEPLOY STEP. IT IS THE *APP* DEPLOY.** Vercel builds both web apps from `main`, so
+    landing there ships the frontend ahead of any pending `db push` / `functions deploy`. Got wrong 2026-07-27
+    (§8.15) despite §7.27 and a written plan: "merge my branch" and "deploy the frontend" are the same action.
+    **So: for a backend-first change, do `db push` and `functions deploy` BEFORE the push to `main`.** Landing on
+    `main` is the last step, not the first.
+    - **Folded in from §7.27 (first filing):** the rule is directional — **adding? migrate first. dropping?
+      deploy the app first** — and it governs the *push*, not just the migration command. Nothing is atomic here.
     - **Now a gated skill (run it — it is not automatic):** `/deploy` refuses the app push while migrations are pending.
 
 61. **FAMILY/CHILD STATUS PROPAGATION IS DELIBERATELY *NOT* A TRIGGER, AND MUST NOT BE
-    "TIDIED" INTO ONE.** Deactivating a family's last active child also marks the family
-    inactive (PRD §7.14). That happens in the **write path** — event-shaped, one-way — and
-    it looks like an invariant begging to be enforced in the database. It is not. Two
-    independent reasons:
-    - **A trigger fires after the write and cannot ask anything.** The UI prompts the user
-      about the sibling effect before committing to it; a trigger would make that prompt a
-      lie, because the decision would already have been taken.
-    - **A trigger maintaining `no active children ⇔ family inactive` BREAKS RE-ACTIVATION.**
-      A returning family has zero active children *by design* — they re-enter the join code
-      first and are assigned to a class afterwards — so the trigger would flip them straight
-      back to inactive on the way in, and the join code (the only re-entry route, PRD §5.1)
-      would silently stop working.
-    The accepted consequence is that a family **can** be inactive while holding an active
-    child; propagation is one-way and nothing reconciles the two. That is the design, not a
-    gap. (Promoted from §8.4, 2026-07-19 — this reasoning existed nowhere else.)
+    "TIDIED" INTO ONE.** Deactivating a family's last active child marks the family inactive (PRD §7.14) in the
+    **write path**, one-way:
+    - **A trigger fires after the write and cannot ask** — the UI's sibling-effect prompt would be a lie.
+    - **A trigger maintaining `no active children ⇔ family inactive` BREAKS RE-ACTIVATION** — a returning family has
+      zero active children by design, so the join code (the only re-entry route, PRD §5.1) would silently stop working.
+    A family **can** be inactive while holding an active child; nothing reconciles them. That is the design, not a
+    gap. (Promoted from §8.4, 2026-07-19.)
 
 62. **A SCHEMA CHANGE CAN SILENTLY BREAK A UI FIXTURE, BECAUSE NO FIXTURE RUNS IN CI.**
-    `20260719000600_students_tenant_not_null.sql` made `students.tenant_id` NOT NULL.
-    `fixtures-attendance-window.sql` and `fixtures-unmarked-lessons.sql` insert students
-    without it, so **from that day both fixtures failed to load** — and nothing said so.
-    CI runs pgTAP, Deno and the two frontend suites; it has never applied a fixture.
-    **The damage is not that the driver fails, it is HOW it fails.** The fixture is a
-    plain `psql` script, so the failing statement aborts and *the rest still runs*: the
-    parent, the class and the sessions land, the children do not. The driver then reports
-    a low score that reads like a product regression, and a half-loaded fixture leaves
-    orphan rows that make the *next* run behave differently again.
-    This is the real reason `verify-attendance-window.mjs` scored **0/4** for a week —
-    not the stale clock assumption that was written down at the time. **A wrong diagnosis
-    in the backlog is worse than none**: it sends the next person to fix the dates.
+    `20260719000600_students_tenant_not_null.sql` made `students.tenant_id` NOT NULL and two fixtures silently stopped
+    loading; CI has never applied a fixture. A `psql` fixture runs past the failed statement (the children do not
+    land), leaves orphans, and the low score reads like a product regression — the real cause of
+    `verify-attendance-window.mjs` scoring 0/4 for a week. **A wrong diagnosis in the backlog is worse than none.**
     **When a migration adds a NOT NULL column or a constraint, grep the fixtures:**
     `grep -l "INSERT INTO <table>" .claude/skills/run-ui-playwright/drivers/fixtures-*.sql`
-    — and run each one it names. Until fixtures run in CI, that grep is the only guard.
-    (Found 2026-07-26 while writing the missing teardowns; the round-trip harness in
-    `docs/WORKTREES.md` Phase 4 is what surfaced it.)
+    — and run each one it names. Until fixtures run in CI, that grep is the only guard. (Surfaced 2026-07-26 by the
+    round-trip harness, `docs/WORKTREES.md` Phase 4.)
 
 63. **A FIXTURE MUST SCOPE EVERY WRITE TO ITS OWN ROWS — `FROM students` WITH NO FILTER
     COLLIDES WITH EVERY OTHER FIXTURE, AND THE COLLISION ABORTS THE STATEMENT.**
-    `fixtures-unmarked-lessons.sql` wrote `FROM students st CROSS JOIN classes c` and
-    `FROM sess CROSS JOIN students st` with no filter on `st`, so it enrolled **and marked
-    present** every student in the database. Measured: 6 children enrolled and marked
-    instead of 2, four of them belonging to another fixture.
-    **The second-order failure is worse than the first.** Enrolling a student who already
-    has an enrolment violated `one_active_enrolment_per_student`, which aborts the whole
-    `INSERT` — so when any sibling fixture was loaded first, this fixture's *own* two
-    children were **never enrolled at all**. It silently produced the exact opposite of the
-    scenario it exists to build, and the driver's low score read as a product regression.
-    **⚠ THAT ABORT NO LONGER HAPPENS FOR THE GENERAL CASE, AND THE ABORT WAS THE
-    DETECTOR.** Wave 2 (`20260811000100`) replaced the index with
-    `(student_id, class_id)`, so a stray child enrolled into a class they are *not*
-    already in inserts **silently**. Re-proven rather than assumed on 2026-08-10:
-    `check-fixture-roundtrip.sh` still catches it on **delta divergence** — a sabotaged
-    `fixtures-class-students.sql` read `student_class_enrolments +6` alone and **+16**
-    stacked, exit 1, naming the fixture. That harness is now the *only* thing standing
-    between an unscoped fixture write and a billable lesson attributed to someone else's
-    child, so it is the pre-commit gate for any change to a fixture's write scope.
-    Attendance is worse still: those rows are what billing is derived from, so a stray
-    `present` is a **billable lesson attributed to someone else's child**.
-    **The rule: every `INSERT … SELECT` in a fixture must be scoped to identifiers the
-    fixture owns** — its own parent's family links, or its own UUID prefix. Never a bare
-    `FROM <table>`. Audit:
+    `fixtures-unmarked-lessons.sql`'s unfiltered `CROSS JOIN`s enrolled and marked present every student; with a
+    sibling loaded first, `one_active_enrolment_per_student` aborted the `INSERT`, so its own children were **never
+    enrolled at all**.
+    **⚠ THAT ABORT NO LONGER HAPPENS FOR THE GENERAL CASE, AND THE ABORT WAS THE DETECTOR.** Wave 2
+    (`20260811000100`) made the index `(student_id, class_id)`, so a stray enrolment inserts **silently**.
+    `check-fixture-roundtrip.sh` (delta divergence) is now the *only* guard — the pre-commit gate for any change to a
+    fixture's write scope. A stray attendance `present`
+    is a **billable lesson attributed to someone else's child**.
+    **The rule: every `INSERT … SELECT` in a fixture must be scoped to identifiers the fixture owns** — its own
+    parent's family links, or its own UUID prefix. Never a bare `FROM <table>`. Audit:
     `grep -n "CROSS JOIN\|FROM students\|FROM classes" .claude/skills/run-ui-playwright/drivers/fixtures-*.sql`
-    and for each hit ask "would this pick up a row another fixture created?"
-    This is §7.62's sibling: there a *schema change* made a fixture statement fail, here a
-    *sibling fixture* does. Both fail the same way — psql aborts the statement, the rest of
-    the script runs, and the fixture half-loads without saying so. (Fixed 2026-07-26.)
+    and ask "would this pick up a row another fixture created?" Sibling of §7.62: psql aborts the statement, the
+    script continues, the fixture half-loads silently. (Fixed 2026-07-26.)
 
 64. **EXPO ROUTER REUSES A MOUNTED SCREEN WHEN ONLY A SEARCH PARAM CHANGES, SO A
     MOUNT-ONLY `useEffect` NEVER RELOADS — AND THIS WROTE ATTENDANCE TO THE WRONG DAY.**
-    Every lesson is marked at one route, `/(coach)/classes/[id]/attendance`, identified
-    only by `?date=`. Today's card, the Unmarked Lessons row and the roster all push that
-    same route with a different date. The screen's loader was `useEffect(() => { load() },
-    [])`, so it ran once per *mount* and never again. `date` comes from
-    `useLocalSearchParams` and IS reactive, so the header repainted to the new lesson while
-    `resolvedSessionId`, `students` and `attendance` still belonged to the previous one.
-    **Measured in production 2026-07-26:** the coach marked Sun 26 Jul, opened Sun 19 Jul
-    from the backlog, marked two children, and got *"Attendance saved."* — the rows landed
-    on the **26 Jul** session. 19 Jul stayed unmarked (correctly: nothing was written to
-    it), while today's lesson silently acquired statuses nobody had entered for it.
-    **Every signal said success.** The `attendance` upsert returned 200, `audit_log`
-    returned 201, the toast was green. The only tells were in DevTools: **no
-    `lesson_sessions` POST at all** (proving the screen held an already-resolved id), and a
-    `lesson_session_id` in the payload belonging to the other date. A billing-correctness
-    bug that reads as a UI annoyance.
-    **`[]` deps are not a style choice on a screen whose identity is a search param.** The
-    other five param-driven screens in the app all depend on theirs (`[id]`,
-    `[invoiceId, packageId]`, `[id, todayDate]`) or use `useFocusEffect`; this one was
-    alone. Audit:
+    `/(coach)/classes/[id]/attendance` is identified only by `?date=`; its loader was `useEffect(() => { load() },
+    [])`, running once per mount and never again, so the header followed the new `date` while `resolvedSessionId`,
+    `students` and `attendance` stayed on the previous lesson. Bit production 2026-07-26: 19 Jul marks landed on
+    26 Jul with a green toast (tell: **no `lesson_sessions` POST**).
+    **`[]` deps are not a style choice on a screen whose identity is a search param.** Depend on the params or use
+    `useFocusEffect`. Audit:
     `grep -rn -A3 "useLocalSearchParams" SwimSyncApp/app --include=*.tsx | grep -B1 "}, \[\])"`
-    **Two more layers, because the deps alone have already been got wrong once.**
-    `lib/attendanceSession.ts` makes a session id inseparable from the date it was
-    resolved FOR — anything not provably about the current date is `stale`, and the save
-    re-resolves from `(class_id, date)` rather than writing what it holds. And the spinner
-    covers the gap between a param change and the reload landing: the effect runs *after*
-    paint, and a tap is faster than a frame.
-    **Only an in-app-navigation driver can catch this.** A deep link mounts a fresh screen
-    and passes, which is why `verify-attendance-guard.mjs` — which navigates by URL
-    throughout — scored **14/14 against the broken build**. `verify-stale-screen.mjs`
-    clicks through Today's card then the backlog row: **4/8 before the fix, 12/12 after**
-    (with §7.65). (Found and fixed 2026-07-26, live the same day.)
+    Two more layers: `lib/attendanceSession.ts` ties a session id to the date it was resolved FOR (else `stale`),
+    and the save re-resolves from `(class_id, date)`; a spinner covers the gap between param change and reload.
+    **Only an in-app-navigation driver can catch this** — a deep link mounts fresh. `verify-stale-screen.mjs`
+    clicks Today's card then the backlog row (with §7.65). (Fixed 2026-07-26.)
 
 65. **`router.back()` ON THE ATTENDANCE SCREEN POPPED INTO A *DIFFERENT LESSON*, BECAUSE
     THE SCREEN LIVES IN A TAB IT IS NOT ALWAYS PUSHED FROM.**
-    `classes/_layout.tsx` puts the attendance screen in the **Classes** tab's `Stack`, but
-    Today's class card and Unmarked Lessons row push it from the **Today** tab. Switching
-    tabs does not unwind the Classes stack — it only hides it — so the stack accumulates
-    one attendance screen per lesson visited:
-    `Today → 845am card` leaves `[classes-index, att(845)]`; the back chevron returns to
-    Today **without popping it**; `Today → 930am card` makes it
-    `[classes-index, att(845), att(930)]`; and saving the 9:30 class popped to the **8:45**
-    screen, its session id still in the URL. Pressing the back chevron first is the step
-    that makes it reproducible — that is what leaves a screen behind.
-    **The fix is to stop asking "what is underneath?".** The caller states where it came
-    from (`&from=today` / `&from=roster`) and the screen leaves with **`replace`, not
-    `back`** — which also drops it out of the history, so nothing can pop back into a
-    lesson the coach has finished.
-    **This compounded with §7.64 and the two are easy to confuse.** §7.64 made the rows
-    land on the wrong lesson; this made the *screen* the wrong lesson. With only §7.64
-    fixed, the driver's "class A's lesson is untouched" check still passes while the
-    navigation check fails — that split is the fastest way to tell which one you are
-    looking at. (Found and fixed 2026-07-26, live the same day.)
+    `classes/_layout.tsx` puts attendance in the **Classes** tab's `Stack`, but Today's card and Unmarked Lessons
+    push it from **Today**; switching tabs only hides the stack, so it accumulates `[classes-index, att(845),
+    att(930)]` and saving 9:30 popped to 8:45 (repro: press the back chevron first).
+    **The fix: stop asking "what is underneath?".** The caller passes `&from=today` / `&from=roster` and the screen
+    leaves with **`replace`, not `back`**, dropping it from history.
+    Easy to confuse with §7.64 (rows on the wrong lesson vs *screen* the wrong lesson): with only §7.64 fixed,
+    "class A's lesson is untouched" passes while the navigation check fails. (Fixed 2026-07-26.)
 
 66. **A DUPLICATE IN ONE UPSERT MAKES POSTGRES REFUSE THE WHOLE STATEMENT, SO A
     DOUBLY-ENROLLED CHILD WOULD BLOCK ATTENDANCE FOR AN ENTIRE CLASS.**
-    The Mark Attendance screen saves the class in a single
-    `.upsert(rows, { onConflict: "lesson_session_id,student_id" })`. Two rows with the same
-    conflict key in one command is not a no-op and not a last-write-wins — it is an error:
-    `ON CONFLICT DO UPDATE command cannot affect row a second time`. The whole save fails,
-    reported to the coach as only *"Failed to save attendance. Please try again."*
-    **Where the duplicate came from.** The screen's roster is built from enrolment ROWS
-    matched by DATE SPAN, not by `is_active`, and a child can hold more than one row for the
-    same class — unenrol then re-enrol keeps history (PRD §11.5). Two spans covering one
-    date therefore listed the child twice. `mergeRoster` deduped the *extras* (attendance
-    rows, trial bookings) but passed `activeStudents` through untouched.
-    **`attendanceCompleteness.ts` had been right all along** — `studentsEnrolledOn` dedupes
-    and its comment says exactly why. The billing gate was correct and the screen was
-    wrong, which is the §7.18 asymmetry in miniature: two places answering "who is in this
-    lesson?" and only one of them careful.
-    **THIS IS A LATENT HAZARD, NOT AN OBSERVED INCIDENT — and the first version of this
-    entry got that wrong.** It was written while diagnosing a "Failed to save attendance"
-    report and asserted it was the cause. It was not: the check
-    `group by student_id, class_id having count(*) > 1` returned **zero rows** on
-    production, so no roster had ever duplicated. The real cause was §7.67. The dedupe is
-    still correct — the billing gate has always done it — but nothing has yet reached it.
-    Reaching it needs two enrolment rows for one child in one class with overlapping spans,
-    which no current write path creates; a hand-written data fix could.
-    **The screens that filter on `is_active` cannot hit this**, because
-    `one_active_enrolment_per_student` is a unique partial index — at most one active
-    enrolment per child. Only a span-based reader can duplicate, and the attendance screen
-    is the only one. So the guard belongs in `mergeRoster`, which owns "who is on this
-    screen", not at the call site. Audit for the next span reader:
+    `.upsert(rows, { onConflict: "lesson_session_id,student_id" })` with two rows sharing a key errors:
+    `ON CONFLICT DO UPDATE command cannot affect row a second time` — shown only as "Failed to save attendance".
+    The roster is built from enrolment ROWS matched by DATE SPAN (not `is_active`), and unenrol/re-enrol keeps
+    history (PRD §11.5), so overlapping spans list a child twice. `mergeRoster` now dedupes `activeStudents`;
+    `attendanceCompleteness.ts` (`studentsEnrolledOn`) always did — the §7.18 asymmetry.
+    **THIS IS A LATENT HAZARD, NOT AN OBSERVED INCIDENT** — `group by student_id, class_id having count(*) > 1`
+    returned zero rows on production (the real cause was §7.67); only a hand-written data fix could create
+    overlapping spans.
+    `is_active` readers cannot hit it (`one_active_enrolment_per_student` partial unique index); only span readers
+    can, so the guard belongs in `mergeRoster`, not the call site. Audit:
     `grep -rn "enrolled_at" SwimSyncApp/app SwimSyncAdmin/app | grep -v is_active`
-    (Found and fixed 2026-07-26, live the same day.)
+    (Fixed 2026-07-26.)
 
 67. **A `.upsert()` WHOSE ROWS HAVE DIFFERENT KEYS SENDS `NULL` FOR THE MISSING ONES — NOT
     THE COLUMN DEFAULT — SO ONE PARTIALLY-MARKED LESSON BECAME PERMANENTLY UNSAVEABLE.**
-    supabase-js derives PostgREST's `columns=` parameter from the **union** of keys across
-    every row in the body. PostgREST then runs the body through
-    `json_populate_recordset` against that column list, and a row that omits a key gets
-    **NULL** — the column DEFAULT never applies.
-    The attendance save attached the row's primary key conditionally:
-    `...(state.existingId ? { id: state.existingId } : {})`. On a lesson where SOME children
-    were already marked and others were not, the key sets differed, `id` joined the column
-    list, and the unmarked children were inserted with `id = NULL` against
-    `attendance.id uuid NOT NULL DEFAULT gen_random_uuid()`:
-    `23502 null value in column "id" of relation "attendance" violates not-null constraint`.
-    **Postgres refuses the whole statement**, and the screen saves a class in ONE upsert, so
-    the lesson could never be completed — and because `handleSave` returns early on the
-    error, the coach was also stranded on the screen. All they saw was "Failed to save
-    attendance. Please try again."
-    **The shape of the symptom is the diagnosis.** A fully unmarked lesson saved fine (no row
-    had `id`) and so did a fully marked one (every row did). Only the partial case failed —
-    which read as "just this one date is broken" and sent two investigations down the wrong
-    path (see §7.66). If one date fails and its neighbours do not, **compare what already
-    exists on those dates**, not what is different about the date.
-    **`id` was never needed.** `onConflict: "lesson_session_id,student_id"` is what matches
-    an existing row — that pair is UNIQUE. Verified against local PostgREST: omitting `id`
-    returns 201, the existing row KEEPS its id (absent from the payload, so absent from the
-    `DO UPDATE SET`), and a new row takes the default. The `existingId` plumbing was
-    removed entirely, including from `attendanceBulk.ts`, whose comment claimed it made the
-    save "update in place rather than duplicating" — it never did.
-    **The rule: build every upsert row from one object literal with no conditional keys.**
-    If a column is genuinely per-row optional, send it as explicit `null`.
-    `lib/attendancePayload.ts` owns this now, and `hasUniformKeys()` asserts it.
-    (Found and fixed 2026-07-26, live the same day.)
+    supabase-js builds `columns=` from the **union** of keys; PostgREST's `json_populate_recordset` gives an omitted
+    key **NULL** — the DEFAULT never applies. `...(state.existingId ? { id: state.existingId } : {})` on a
+    partially-marked lesson inserted `id = NULL`: `23502 null value in column "id" of relation "attendance" violates
+    not-null constraint`, failing the whole one-upsert save, so the lesson could never be completed, and stranding the coach
+    (`handleSave` returns early).
+    **If one date fails and its neighbours do not, compare what already exists on those dates** (see §7.66).
+    **`id` was never needed** — the UNIQUE `onConflict: "lesson_session_id,student_id"` matches; existing rows keep
+    their id, new rows take the default. `existingId` plumbing removed, incl. `attendanceBulk.ts` (its "update in
+    place" comment — it never did).
+    **The rule: build every upsert row from one object literal with no conditional keys.** A genuinely optional
+    column is sent as explicit `null`. `lib/attendancePayload.ts` owns this; `hasUniformKeys()` asserts it.
+    (Fixed 2026-07-26.)
 
 68. **"FULLY MARKED" MEANS TWO DIFFERENT THINGS TO INVOICING AND TO A COACH'S SCREEN, AND
     ONE OF THEM IS LOAD-BEARING FOR MONEY.**
-    `isLessonFullyMarked([], undefined)` returns **true** — a lesson nobody was expected at
-    is complete. That is correct for the billing gate: there is nothing to collect, so it
-    must not block a month. `unmarkedDates()` relies on it to skip dates before a class had
-    anyone in it (§8.15) and the engine relies on it to seal a month (§8a).
-    It is also a **lie on a card**. A class with an empty roster rendering a green "Marked"
-    tells the coach it is done when nobody has touched it — and if a student is added later,
-    that lesson is now silently unmarked behind a green chip.
-    **The tempting fix is to change the shared helper. Do not.** It is duplicated in
-    `SwimSyncAdmin` and in the engine's Deno copy, it has a drift test, and changing it
-    changes which months can be invoiced for every tenant — either blocking one that should
-    bill or sealing one with a lesson unbilled.
-    **The rule: a display concern gets solved in the display layer.**
-    `lib/attendanceSummary.ts` returns a distinct `no-students` state, checked FIRST so an
-    empty expected set cannot fall through to `complete`; `attendanceCompleteness.ts` is
-    untouched. A test in `attendanceCompleteness.test.ts` now pins the vacuous `true` and
-    says why, so the next person to "fix" it breaks something that argues back.
-    **The same asymmetry governs the button.** Only `complete` may quieten the
-    "Mark Attendance" CTA — written `kind === "complete"`, never `kind !== "unmarked"` — so
-    any state added later inherits the LOUD button. A card that stops asking for marks it
-    still needs is a lesson that never gets marked, and that blocks the month with no
-    override. Nagging unnecessarily is annoying; going quiet wrongly costs money. When a
-    default has an asymmetric cost, encode the asymmetry, don't rely on the next reader
-    noticing it. (2026-07-26.)
+    `isLessonFullyMarked([], undefined)` returns **true** — correct for billing, which must not block a month on a
+    lesson nobody was expected at; `unmarkedDates()` (§8.15) and the engine's month seal (§8a) rely on it. On a card
+    it is a lie: an empty roster shows green "Marked".
+    **The tempting fix is to change the shared helper. Do not.** It is duplicated in `SwimSyncAdmin` and the Deno
+    engine, has a drift test, and changes which months invoice for every tenant.
+    **The rule: a display concern gets solved in the display layer.** `lib/attendanceSummary.ts` returns a distinct
+    `no-students` state checked FIRST; `attendanceCompleteness.test.ts` pins the vacuous `true` and says why.
+    **The button:** only `complete` may quieten "Mark Attendance" — written `kind === "complete"`, never
+    `kind !== "unmarked"` — so new states inherit the LOUD button; a lesson that never gets marked blocks the
+    month with no override. Encode an asymmetric-cost default; don't rely on the next reader noticing it. (2026-07-26.)
 
 69. **A DISPLAY FILTER MUST NOT BE REUSED AS A DESTRUCTIVE-ACTION GUARD.**
-    Making the Swimming Levels *Students* column count only **active** children is right —
-    it answers a roster question. Reusing that same number in the level's **removal warning**
-    is not, and it was one line from shipping. `students.level_id` is `ON DELETE SET NULL`
-    (`20260719001800_tenant_levels.sql:70`), so removing a level never errors — it blanks the
-    level for **every** student pointing at it. A level with 0 active and 2 departed children
-    would have said *"No students are on this level."*, the admin deletes it, two children
-    lose a level nothing anywhere records, and reactivating one later cannot restore it.
-    **The rule: the filter that answers "what should I show?" is not the filter that answers
-    "what will this destroy?"** Check what the CONSTRAINT reads — here it does not read
-    `is_active`. `lib/studentCounts.ts` keeps both numbers side by side for this reason.
-    Caught by measuring the modal's text **before and after** the change: the pre-fix string
-    was *correct by accident* because it counted everyone, so only a before/after diff showed
-    a regression being introduced rather than fixed. (2026-07-26.)
+    The Swimming Levels *Students* column rightly counts only **active** children, but the level's **removal
+    warning** must count everyone: `students.level_id` is `ON DELETE SET NULL`
+    (`20260719001800_tenant_levels.sql:70`), so removal never errors — it silently blanks the level for departed children too.
+    **The rule: the filter that answers "what should I show?" is not the filter that answers "what will this
+    destroy?"** Check what the CONSTRAINT reads. `lib/studentCounts.ts` keeps both numbers. Caught one line from
+    shipping by a before/after diff of the modal text. (2026-07-26.)
 
 70. **A CLIENT-SIDE `.length` IS SILENTLY CAPPED AT `max_rows = 1000`, SO IT IS THE WRONG WAY
     TO COUNT ANYTHING.**
-    PostgREST simply returns fewer rows — no error, no header, no warning. Counting a table
-    by fetching it and taking `.length` therefore under-reports past 1000 and looks perfect
-    until it doesn't. Use `.select("id", { count: "exact", head: true })`, which is exact at
-    any size and transfers no rows.
-    This was written up inside `platform/page.tsx`'s own comments, where nobody reads it.
-    The admin Dashboard now uses a head count; **the Students page still counts client-side
-    and deliberately inherits the ceiling**, because that whole page is an unpaginated
-    client-side list — which is why the two surfaces are implemented differently and must not
-    be "tidied" into consistency. (2026-07-26.)
-    - **Do not talk yourself out of it with a steady-state argument.** The coach Schedule
-      tab's plan claimed its backlog range "cannot grow without bound" because
-      `markable_floor` follows `billing_periods` and each billing run pushes it forward.
-      That is true only for a business that HAS billed: when nothing is sealed the floor
-      falls back to the tenant's **`created_at`** (`20260806000200`), so a school onboarded
-      eight months ago that has never billed carries eight months of lessons — and the
-      businesses least able to diagnose a short list are exactly the ones that hit it.
-      Where a head count will not do, ask for an explicit `.limit()` BELOW the cap and
-      render something loud when a result comes back at exactly that length; a silently
-      short "what still needs marking" list reads as *you are up to date*. (2026-08-08.)
+    PostgREST returns fewer rows with no error. Use `.select("id", { count: "exact", head: true })`. The admin
+    Dashboard does; **the Students page deliberately inherits the ceiling** (an unpaginated client-side list), so
+    the two must not be "tidied" into consistency. (2026-07-26.)
+    - **Do not talk yourself out of it with a steady-state argument.** `markable_floor` follows `billing_periods`
+      only once a business has billed; otherwise it falls back to tenant **`created_at`** (`20260806000200`), so a
+      never-billed school carries months of lessons. Where a head count will not do, use an explicit `.limit()`
+      BELOW the cap and render something loud when a result hits exactly that length — a silently short
+      "still needs marking" list reads as *up to date*. (2026-08-08.)
 
 71. **`w-full` ON A TABLE CELL IS A *PREFERRED* WIDTH, NOT A FLOOR — SO THE COLUMN YOU GROW
     IS THE COLUMN THAT GETS CRUSHED.**
-    Marking one column `w-full` while the rest are `w-px whitespace-nowrap` reads as "that
-    column takes the leftover space", and it does — until the columns over-subscribe the
-    table, at which point the percentage column is the only one that CAN shrink and it
-    absorbs the entire shortage. **Measured** on admin Classes at 1600px: seven hugging
-    columns took 1167px of a 1278px table and `Class Name` — the primary column, the one
-    being grown — rendered at **110px, narrower than `Day`**, its title broken mid-phrase.
-    Two consequences: keep such a column `nowrap` so its min-content becomes a floor and the
-    card scrolls instead; and prefer letting the **last** column take the slack via one
-    `[&_th:last-child]:w-full` on the table over a per-table prop, which additionally needs a
-    call-site test to catch a table that nominates none.
-    Found by measuring `getBoundingClientRect()` per column in a Playwright run. **Every
-    class name in the markup was correct**, so reading the diff or the DOM would not have
-    shown it — this is a class of bug only measurement finds. (2026-07-26.)
+    When `w-px whitespace-nowrap` columns over-subscribe the table, the `w-full` column absorbs the entire shortage
+    (admin Classes at 1600px: `Class Name` at 110px, narrower than `Day`). Keep such a column `nowrap` so its
+    min-content is a floor and the card scrolls; prefer one `[&_th:last-child]:w-full` on the table over a
+    per-table prop (which needs a call-site test for tables nominating none). Only measurement finds this —
+    `getBoundingClientRect()` per column in Playwright; the markup was correct. (2026-07-26.)
 
 72. **§7.31 REFINED: NEXT.JS CODE-SPLITS PER ROUTE, SO GREPPING THE WRONG PAGE'S CHUNKS
     REPORTS "NOT DEPLOYED" FOR A BUILD THAT IS ALREADY LIVE.**
-    §7.31 is right that a 200 proves nothing and you must grep the served bundle for a string
-    only the new build has. It is incomplete for the admin panel: `/login`'s HTML never
-    references `/attendance`'s chunk. Cost: **eight consecutive wrong conclusions**, with the
-    tell in plain sight — the chunk hash never changed, because it was never the right chunk.
+    `/login`'s HTML never references `/attendance`'s chunk (tell: the chunk hash never changed).
     - Fetch **the route you changed** and grep
       `_next/static/chunks/app/(admin)/<route>/page-*.js`.
-    - For a **shared** component or lib module, expect the string in a common chunk
-      (`582-*.js`, `789-*.js`) rather than any page chunk — so search every chunk the page
-      references, not just the page's own.
-    - A compiled **CSS** rule (`th:last-child{width:100%}`) is greppable in the stylesheet
-      and is stronger evidence than a class name in the markup, which proves only that the
-      source shipped, not that the rule applies.
-    The Expo app does not have this problem — it serves one `entry-*.js` bundle, which is why
-    §7.31's original recipe kept working there. (2026-07-26.)
+    - A **shared** component/lib lands in a common chunk (`582-*.js`, `789-*.js`) — search every chunk the page
+      references.
+    - A compiled **CSS** rule (`th:last-child{width:100%}`) in the stylesheet is stronger evidence than a class name
+      in markup.
+    The Expo app serves one `entry-*.js` bundle, so §7.31's original recipe works there. (2026-07-26.)
 
 73. **AN UNORDERED `LIMIT 1` OVER A SHARED TABLE IS A BUG THAT CANNOT FIRE UNTIL A SECOND ROW
     EXISTS — AND THEN IT PICKS THE WRONG TENANT.**
-    `fixtures-student-identity.sql` opened with `SELECT id INTO v_tenant FROM tenants LIMIT 1`
-    and took the class on the next line by title, from the seed business. With one tenant in
-    the database the two always agreed, so it was correct for months. The moment
-    `fixtures-phase4-billing.sql` created a second business ('Harbour Swim Club'), the
-    unordered scan could return **that** one: the children were written into one tenant and
-    enrolled into another's class, and `enforce_enrolment_tenant()` refused with
-    `cross-tenant enrolment refused`.
-    **The tell is that nothing changed in the failing file.** The bug was introduced by a
-    *different* fixture starting to work — which is why it appeared the same day
-    `check-fixture-roundtrip.sh` fixed phase4-billing, and why it had never been seen before.
-    - **`LIMIT 1` with no `ORDER BY` has no defined row.** Postgres may return a different one
-      after a vacuum, an index change, or a plan change, with no schema change at all.
-    - **Derive, don't re-look-up.** The fix was `SELECT id, tenant_id INTO v_class, v_tenant
-      FROM classes WHERE title = …` — one query, so the two values cannot disagree by
-      construction. That is strictly better than adding `ORDER BY` to the original, which
-      would only have made the wrong answer *stable*.
-    - Same shape as the `.order("id").limit(500)` in §8.19's table work, which took an
-      arbitrary 500 rows and presented them as the most recent. Audit with
-      `grep -rn "LIMIT 1" .claude/skills/run-ui-playwright/drivers/fixtures-*.sql` and ask of
-      each: "is there more than one row this could match, ever?"
-    Caught by the pass-2 stacked check the first time it ran, not by any driver.
-    (Fixed 2026-08-01.)
----
+    `fixtures-student-identity.sql` did `SELECT id INTO v_tenant FROM tenants LIMIT 1` then took the class by
+    title; once `fixtures-phase4-billing.sql` added 'Harbour Swim Club', `enforce_enrolment_tenant()` refused with
+    `cross-tenant enrolment refused`. Tell: nothing changed in the failing file — another fixture started working, which is why it had never been seen
+    before.
+    - **`LIMIT 1` with no `ORDER BY` has no defined row**, and can change after vacuum/index/plan changes.
+    - **Derive, don't re-look-up:** `SELECT id, tenant_id INTO v_class, v_tenant FROM classes WHERE title = …`.
+      Adding `ORDER BY` only makes the wrong answer *stable*.
+    - Same shape as §8.19's `.order("id").limit(500)`. Audit with
+      `grep -rn "LIMIT 1" .claude/skills/run-ui-playwright/drivers/fixtures-*.sql` — "is there more than one row
+      this could match, ever?"
+    Caught by the pass-2 stacked check. (Fixed 2026-08-01.)
 
 74. **AN "EMPTY STATE" ASSERTION MUST CLAIM THE SIBLING STATE IS *ABSENT*, NOT ONLY THAT ITS
     OWN STRING IS PRESENT — THE PREVIOUS SCREEN IS STILL MOUNTED UNDERNEATH.**
-    The parent Attendance screen has two empty states that mean opposite things:
-    *"No lessons marked yet"* (a lesson happened, the coach is behind) and *"No lessons have
-    taken place yet"* (nothing has happened, nobody is behind). Telling a family the first
-    when the second is true accuses their coach of being late (PRD §5.1) — the distinction
-    IS the feature.
-    A check written as `/No lessons marked yet/.test(text)` can pass on **the other child's
-    panel**: §7.10/§7.58 mean the screen you navigated away from stays mounted and its text
-    is still in `document.body.innerText`, so a mis-tapped chip proves nothing and reads
-    green. That is the §8.19 "assertion passes vacuously" shape, at the assertion layer
-    rather than the fixture layer.
-    - **Assert presence AND sibling-absence**, always, for any pair of states that are
-      mutually exclusive by design. `expected present && sibling absent` cannot be satisfied
-      by a stale overlay showing the other one.
-    - Assert the **selected entity's name** is on screen first, so a mis-tap fails loudly
-      instead of silently reading the wrong panel.
-    - The failure detail should distinguish "expected sentence absent" from "BOTH sentences
-      on screen" — the second names the mis-tap directly.
-    Applied in `verify-attendance-guard.mjs` when it absorbed `verify-attendance-window.mjs`.
-    (2026-08-01.)
+    Parent Attendance's *"No lessons marked yet"* vs *"No lessons have taken place yet"* mean opposite things (PRD
+    §5.1). `/No lessons marked yet/.test(text)` can pass on the other child's still-mounted panel (§7.10/§7.58) —
+    the §8.19 vacuous-pass shape.
+    - **Assert presence AND sibling-absence** for any mutually exclusive pair.
+    - Assert the **selected entity's name** is on screen first, so a mis-tap fails loudly.
+    - Failure detail should distinguish "expected sentence absent" from "BOTH sentences on screen".
+    Applied in `verify-attendance-guard.mjs` (absorbed `verify-attendance-window.mjs`). (2026-08-01.)
 
 75. **A DRIVER THAT DOES `.first()` ON A LIST IT DOES NOT CONTROL SCHEDULES AGAINST THE WRONG
     ROW — AND THE CHECK NEXT TO IT KEEPS PASSING WHILE THREE OTHERS GO RED.**
-    `verify-attendance-guard.mjs` opened the extra-lesson dialog with
-    `getByText("Extra lesson").first()`. Correct while its fixture had exactly one class;
-    the moment a second was added the admin table listed it first and every extra lesson was
-    scheduled **against the wrong class**. Measured: 14/14 → 10/14.
-    **The diagnostic trap is which check survived.** *"admin can schedule an extra lesson"*
-    still **PASSED**, because it only asserted that a confirmation containing `Scheduled for`
-    appeared — and one did, for the other class. The three that failed were the ones that
-    queried the DATABASE by `class_id`. A UI assertion that does not name the entity it acted
-    on cannot tell "it worked" from "it worked on something else".
+    `verify-attendance-guard.mjs`'s `getByText("Extra lesson").first()` hit another class once the fixture had two
+    (14/14 → 10/14). *"admin can schedule an extra lesson"* still passed (it only checked `Scheduled for`); the DB
+    checks by `class_id` failed. A UI assertion that does not name its entity cannot tell "worked on something else".
     - **Scope to the row**: `locator("tr", { hasText: <title> }).getByText("Extra lesson")`.
-    - **Assert the dialog names the entity** — the modal titles itself
-      `Extra lesson — <class>`, so one regex converts a vacuous pass into a real one.
-    - This is §7.73 in the UI layer: never index into a list whose length you do not control.
-      Same audit question — *"is there more than one row this could match, ever?"*
-    Found because the fixture change was made FIRST and the **unchanged** driver re-run
-    before any driver edit, which left exactly one suspect. Do that split; it is cheap.
-    (2026-08-01.)
+    - **Assert the dialog names the entity** (`Extra lesson — <class>`).
+    - §7.73 in the UI layer: never index into a list whose length you do not control.
+    Change the fixture FIRST and re-run the **unchanged** driver to isolate the suspect. (2026-08-01.)
 
 76. **A BARE `as SomeType[]` ON AN RPC RESULT DOES NOT CHECK ANYTHING — RENAME A COLUMN AND
     THE UI RENDERS NOTHING, FOREVER, WITH NO ERROR.**
-    `platform_tenant_overview()` returns `kind` and `coaches_without_rate`. The page declared
-    `shape` and `staff_without_rate` and bridged the two with
-    `setTenants((data ?? []) as TenantRow[])`. A `as` cast is an *assertion*, not a
-    conversion: TypeScript believed it, so both fields were `undefined` at runtime. Result —
-    the "Shape" column rendered **blank** on every row, and the amber
-    `{t.staff_without_rate > 0 && …}` badge was `undefined > 0`, which is **false**, so the
-    warning that exists to catch *a staff coach being paid nothing by payroll* had
-    **never rendered once** since it was written (found 2026-08-01).
-    **Both failures look like "there is nothing to report", which is the answer the reader
-    wants** — an empty column reads as no data, a missing badge reads as no problem. Nothing
-    logs, nothing throws, and the page that exists to surface trouble reports calm.
-    - **Never `as` an RPC result.** Read the migration's `RETURNS TABLE` and match the names,
-      or map field-by-field so a rename is a compile error.
-    - The durable fix is generated types (`BACKLOG.md` → *Generate real Supabase `Database`
-      types*). This is the concrete cost of not having them; it is not hypothetical.
-    - **Audit:** `grep -n "as [A-Z][A-Za-z]*\[\]" **/*.tsx` and check every hit against the
-      RPC that feeds it.
-    - Its sibling: **supabase-js infers a to-one embed as an ARRAY while PostgREST returns an
-      OBJECT.** Verified against the running API — `profiles!inner(role)` yields
-      `"profiles": {"role": "tenant_admin"}`, not `[{…}]`. `tsc` will reject the honest cast
-      here, and the temptation is `as unknown as T`, which silences the compiler and leaves
-      the field undefined if the shape ever moves. Accept both shapes and normalise.
+    `platform_tenant_overview()` returns `kind`/`coaches_without_rate`; the page declared `shape`/`staff_without_rate`
+    via `setTenants((data ?? []) as TenantRow[])`, so the Shape column was blank and the unpaid-staff-coach badge
+    (`undefined > 0`) had **never rendered once** (found 2026-08-01). Both failures look like "nothing to report".
+    - **Never `as` an RPC result.** Match the migration's `RETURNS TABLE` names, or map field-by-field so a rename
+      is a compile error.
+    - Durable fix: generated types (`BACKLOG.md` → *Generate real Supabase `Database` types*).
+    - **Audit:** `grep -n "as [A-Z][A-Za-z]*\[\]" **/*.tsx` and check every hit against its RPC.
+    - Sibling: **supabase-js infers a to-one embed as an ARRAY while PostgREST returns an OBJECT**
+      (`profiles!inner(role)` → `"profiles": {"role": "tenant_admin"}`). Avoid `as unknown as T`; accept both shapes
+      and normalise.
     (2026-08-01.)
 
 77. **A TENANT ADMIN READS A PARENT'S PROFILE (NAME, PHONE) ONLY IF THAT PARENT HAS A CHILD
-    IN THE TENANT — `parent_tenants` MEMBERSHIP ALONE IS NOT ENOUGH.** `profiles_select`'s
-    admin arm goes through `tenant_serves_parent()`, which requires a `parent_students` →
-    `students` chain into the caller's tenant. A fixture (or a real family) with a
-    membership row but no child renders as "—" with no phone on every admin surface — the
-    WhatsApp reminder button showed "no number" for a parent whose phone was right there
-    in `profiles`. Nothing errors; the join silently returns null (found 2026-08-02 by
-    `verify-payment-collection.mjs`, cost ~20 minutes of RLS spelunking).
-    - When an admin page shows "—" for a parent who definitely exists, check the CHILD
-      link before suspecting the fetch.
+    IN THE TENANT — `parent_tenants` MEMBERSHIP ALONE IS NOT ENOUGH.** `profiles_select`'s admin arm goes through
+    `tenant_serves_parent()`, requiring a `parent_students` → `students` chain into the caller's tenant. A
+    membership with no child renders "—" and no phone everywhere, silently (found 2026-08-02 by
+    `verify-payment-collection.mjs`).
+    - When an admin page shows "—" for a parent who exists, check the CHILD link before suspecting the fetch.
     (2026-08-02.)
 
 78. **A FUNCTION CALLED ONLY BY A `SECURITY DEFINER` TRIGGER SHOULD BE REVOKED FROM
     *EVERYONE* — INCLUDING `service_role` — AND THE TRIGGER FUNCTION ITSELF MUST STAY
-    DEFINER, OR PRODUCTION BILLING DIES AT FIRST INSERT.** `next_invoice_ref()` is
-    executable by nobody; the engine (as `service_role`) reaches it only because
-    `assign_invoice_public_fields()` is SECURITY DEFINER and Postgres does not check
-    EXECUTE privilege when *firing* a trigger. Two standing prohibitions
-    (20260802000600): do NOT "clean up" the DEFINER on the trigger function, and do NOT
-    "fix" a future permission error on `next_invoice_ref` by granting — a permission
-    error THERE means the DEFINER hop was flattened, which is the actual bug. The pgTAP
-    suite's service_role-shaped INSERT is the tripwire that goes red first.
-    (2026-08-02.)
+    DEFINER, OR PRODUCTION BILLING DIES AT FIRST INSERT.** `next_invoice_ref()` is executable by nobody; it is reached only
+    via DEFINER `assign_invoice_public_fields()` (no EXECUTE check when *firing* a trigger). Two standing prohibitions (20260802000600): do NOT "clean up" the DEFINER on the trigger
+    function, and do NOT "fix" a future permission error on `next_invoice_ref` by granting — that error means the
+    DEFINER hop was flattened. pgTAP's service_role INSERT is the tripwire. (2026-08-02.)
 
 79. **A DRIVER WITH NO `check()` CALLS AND A SWALLOWING `catch` IS A SCREENSHOT SCRIPT,
-    NOT A TEST — IT REPORTS GREEN FOREVER.** `verify-coach-billing.mjs` had **zero
-    assertions**: it computed booleans, printed them with `console.log`, wrapped
-    everything in `catch (e) { console.error }`, and set no exit code. Nothing it could
-    observe was capable of failing the run. It was deleted on 2026-08-02 with the coach's
-    invoice list.
-    ⚠ **THE FIRST DETECTOR WRITTEN FOR THIS WAS WRONG, AND ITS FALSE POSITIVE WAS WRITTEN
-    UP AS A SECOND INSTANCE.** It grepped for `check(` — the *helper name* this repo
-    happens to use — and flagged `verify-tz-saturday.mjs`, which asserts perfectly well
-    through a local `[label, bool]` array and `process.exit(ok ? 0 : 1)`. That driver was
-    filed in `BACKLOG.md` as "can never fail"; **running it showed 5/5 and a correct exit
-    code** (2026-08-03). Grep for the *property*, never for a naming convention:
+    NOT A TEST — IT REPORTS GREEN FOREVER.** `verify-coach-billing.mjs` had zero assertions, a swallowing
+    `catch`, and no exit code (deleted 2026-08-02).
+    ⚠ **THE FIRST DETECTOR WRITTEN FOR THIS WAS WRONG** — grepping for `check(` falsely flagged
+    `verify-tz-saturday.mjs` (filed in `BACKLOG.md` as "can never fail"; it ran 5/5 with a correct exit code,
+    2026-08-03). Grep for the *property*, never for a naming convention:
     ```bash
     cd .claude/skills/run-ui-playwright/drivers
     # A driver with no non-zero exit path cannot report failure, whatever it prints.
     for f in verify-*.mjs; do grep -q "process.exit" "$f" || echo "CANNOT FAIL: $f"; done
     ```
-    As of 2026-08-03 this returns nothing — every driver can signal failure. **The lesson
-    is bigger than the detector: a heuristic about test quality must be confirmed by
-    running the test.** The first version cost a wrong gotcha and a wrong backlog item.
-    **The subtler half, and the one that bit during the same session:** a driver that DOES
-    assert can still hide a crash, because `finally { … process.exit(passed === results.length) }`
-    runs *before* an exception can surface. Four checks appended to the end of
-    `verify-stale-screen.mjs` threw on their first line; the run printed **"18/18 checks
-    passed" and exited 0**, because the checks never entered `results` and a counter cannot
-    report an assertion that was never made. **The fix is structural: `catch` the exception
-    and record it AS A FAILED CHECK**, so the crash has to travel through the same counter
-    as everything else. That pattern is now in **`verify-stale-screen.mjs` and
-    `verify-tz-saturday.mjs`**; copy it into any driver you extend. Two further guards
-    belong with it, both proven by mutation on 2026-08-03: **close the browser in
-    `finally`** (an escaping exception otherwise leaks a Chrome process), and **treat a run
-    that asserted *nothing* as a failure** — `process.exit(results.length > 0 && passed ===
-    results.length ? 0 : 1)`, or deleting every check turns the driver green. This is the
-    fourth driver-rot finding in a fortnight (§8.20–§8.22). (2026-08-02, corrected
-    2026-08-03.)
+    **A heuristic about test quality must be confirmed by running the test.**
+    **The subtler half:** `finally { … process.exit(passed === results.length) }` hides a crash — four checks in
+    `verify-stale-screen.mjs` threw, never entered `results` (a counter cannot report an assertion never made), and the run printed "18/18" and exited 0. **`catch`
+    the exception and record it AS A FAILED CHECK** (pattern in `verify-stale-screen.mjs` and
+    `verify-tz-saturday.mjs`; copy it). Also, both mutation-proven 2026-08-03: **close the browser in `finally`**,
+    and **treat a run that asserted *nothing* as a failure** — `process.exit(results.length > 0 && passed ===
+    results.length ? 0 : 1)`. See §8.20–§8.22. (2026-08-02, corrected 2026-08-03.)
 
 80. **SWITCHING TABS DOES NOT UNWIND A TAB'S STACK, AND THREE OF THE FOUR OBVIOUS WAYS TO
-    UNWIND IT YOURSELF SILENTLY DO NOTHING.** §7.65 established that the attendance screen
-    lives in the **Classes** tab's `Stack` while being pushed from the **Today** tab, and
-    fixed the within-stack half (attendance exits via `router.replace`). The other half
-    stayed broken for weeks and was reported by the user: because `replace` to a *different
-    tab* resolves to a tab jump, the Classes stack keeps its attendance screen, so pressing
-    **Classes** lands the coach on the last lesson they marked instead of their class list.
-    Fixed in `(coach)/_layout.tsx` with a `tabPress` listener. **What matters is what did
-    NOT work, because each looked correct and changed no behaviour at all:**
+    UNWIND IT YOURSELF SILENTLY DO NOTHING.** After §7.65, **Classes** still landed on the last marked lesson. Fixed in `(coach)/_layout.tsx` with a `tabPress`
+    listener. What did NOT work:
     - `navigation.navigate("classes", { screen: "index" })` — no-op.
-    - `StackActions.popToTop()` targeted at the child stack — **never fires, because
-      expo-router does not populate nested navigator state**: every route in
-      `navigation.getState().routes` has `state: undefined`, so there is no child key to aim
-      at. (Verified by probe, expo-router 4 / RN 0.76.)
+    - `StackActions.popToTop()` on the child stack — never fires: expo-router leaves nested navigator `state:
+      undefined` in `navigation.getState().routes` (expo-router 4 / RN 0.76).
     - `router.dismissAll()` — `router.canDismiss()` is **`false`** for a tab's nested stack.
-    - ✅ `router.replace("/(coach)/classes")`, **deferred by a macrotask** — when `tabPress`
-      fires you are still on the *outgoing* tab, so acting synchronously targets the stack
-      you are leaving.
-    **Two standing prohibitions.** Do NOT move this to `useFocusEffect` or `unmountOnBlur`:
-    both fire on *programmatic* entry, so they would intercept Today's "Mark Attendance"
-    push and turn the most frequent action in the product into a dead tap. And do NOT verify
-    this by unit test or deep link — it is router state, so only in-app navigation reaches
-    it (§7.65's lesson, again). `verify-stale-screen.mjs` now covers both directions: the
-    tab lands on the list, *and* the push still works. (2026-08-02.)
+    - ✅ `router.replace("/(coach)/classes")`, **deferred by a macrotask** — at `tabPress` you are still on the
+      outgoing tab.
+    **Two standing prohibitions.** Do NOT move this to `useFocusEffect` or `unmountOnBlur`: both fire on
+    programmatic entry and would kill Today's "Mark Attendance" push. Do NOT verify by unit test or deep link —
+    only in-app navigation reaches router state (§7.65). `verify-stale-screen.mjs` covers both directions.
+    (2026-08-02.)
 
 81. **EXPO'S DEV SERVER CACHES THE ROUTE MANIFEST, SO A RENAMED ROUTE FOLDER LEAVES A GHOST
-    TAB AND EVERY DRIVER AGAINST IT IS MEASURING THE OLD APP.** After
-    `git mv app/(coach)/billing app/(coach)/pay`, a probe of the live tab bar returned
-    `["/today","/classes","/settings","/billing","/pay"]` — **both** the new route and the
-    deleted one, with the ghost still routable. `verify-coach-wages.mjs` failed against it
-    for a reason that had nothing to do with the code under test. `npx expo start --clear`
-    (a full restart, not a refresh) returned the honest
-    `["/today","/classes","/pay","/settings"]`. **Whenever you add, delete or rename a file
-    under `app/`, restart Metro with `--clear` before trusting any driver run**, and if a
-    tab or route behaves as though your change never landed, check the manifest before
-    debugging the change. Cheap probe:
+    TAB AND EVERY DRIVER AGAINST IT IS MEASURING THE OLD APP.** After `git mv app/(coach)/billing app/(coach)/pay`
+    the tab bar held a ghost `/billing` beside `/pay`. **Whenever you add, delete or
+    rename a file under `app/`, restart Metro with `npx expo start --clear`** (full restart, not refresh) before
+    trusting any driver; if a route behaves as though your change never landed, check the manifest:
     `page.evaluate(() => [...document.querySelectorAll("a")].map(a => a.getAttribute("href")))`.
     (2026-08-02.)
+
 82. **`GRANT … TO authenticated` WITHOUT `REVOKE … FROM PUBLIC` LEAVES `PUBLIC` UNDERNEATH,
-    AND THE MIGRATION READS AS THOUGH IT DIDN'T.** `CREATE FUNCTION` grants `EXECUTE` to
-    `PUBLIC` by default. A migration that then adds an explicit grant looks like it has
-    declared the whole ACL — it has only added a row beside the default. This is §7.39's
-    sibling and it is **worse**, because §7.39 is a cloud-only artefact you cannot see
-    locally, while this one is visible in `pg_proc` the whole time and nobody looks.
-    - **It was live.** `next_credit_note_ref(uuid)` had **no ACL at all** — not even the
-      explicit grant — so it sat on the bare `PUBLIC` default. It is `SECURITY DEFINER`
-      and it WRITES (`UPDATE tenants SET credit_note_counter = credit_note_counter + 1`).
-      An unauthenticated `POST /rest/v1/rpc/next_credit_note_ref` carrying only the anon
-      key returned `CN-2026-0001` and left the counter incremented. Anyone holding a
-      tenant's UUID could burn that business's credit-note numbers indefinitely.
-      Fixed 2026-08-04 (`20260804000200`): granted to **nobody**, since its only callers
-      are inside other definer functions, which run as the owner.
-    - **The clone got it right and the original never did.** `next_invoice_ref` was written
-      in 20260802000600 as a copy of this function *with* correct grants. Copying a
-      function does not copy its ACL — there is nothing to copy from.
-    - **`GRANT`/`REVOKE` on a function is not covered by any test you are likely to have.**
-      Every grant assertion in this repo before 2026-08-04 named ONE function, so none of
-      them could fail for a function nobody thought to name. The replacement asserts over
-      `pg_proc` — *"no function in `public` grants EXECUTE to anon"* —
-      `supabase/tests/function_grants.test.sql`. Written that way it immediately caught a
-      second one (`package_live_balances`) that a named audit had walked past.
-    - **Production numbers, from a remote dump on 2026-08-04:** 49 functions granted
-      `EXECUTE` to `anon` before, **18 after** — and all 18 are trigger / event-trigger
-      functions, which Postgres never privilege-checks against the writing role and
-      PostgREST does not expose. (2026-08-04.)
-83. **↪ Repeat of §7.40 — read that first; this entry is a later time it bit.** **WHAT AN RPC RETURNS IS A QUESTION FOR `pg_get_functiondef()`, NOT FOR A MIGRATION
-    FILE, A COMMIT MESSAGE, OR `BACKLOG.md` — AND GETTING IT BACKWARDS COSTS REAL CODE.**
-    On 2026-08-01 a session concluded that `platform_tenant_overview()` returned `kind` and
-    `coaches_without_rate` while the page declared `shape` and `staff_without_rate`, so the
-    page "was reading fields the RPC has never returned". **It was the exact reverse.** The
-    RPC had returned `shape` and an owner-excluded `staff_without_rate` since
-    `20260719002400`; the page was right. Acting on the reversed reading replaced a correct
-    SQL column with a **2000-row browser scan**, a `STAFF_SCAN_LIMIT` tripwire and a warning
-    banner — ~90 lines working around a column that already worked — and wrote the false
-    claim into a code comment, `BACKLOG.md`, `PRD.md` §4.4 and an immutable commit message.
-    All of it removed 2026-08-04 (`e03cba6`).
-    - **Three cheap oracles, any one of which settles it in seconds:**
-      `pg_get_functiondef('public.fn()'::regprocedure)` · the pgTAP file, which had been
-      asserting the real column names and passing the whole time · calling the RPC over
-      PostgREST and reading the JSON keys.
-    - **This function carries a header warning that says exactly this** (20260721000200:
-      *"get its CURRENT definition from the DATABASE"*), written after the same mistake was
-      caught mid-flight in July. The warning was there; the session did not read it. **A
-      redefined function is where a stale memory is most expensive** — this one has been
-      redefined three times.
-    - The *decision* that came out of that session (don't show a business's "shape" — a
-      one-coach school and a private coach are identical in the data) was sound and
-      stands. A right conclusion reached through a wrong fact still leaves the wrong fact
-      in four documents. (2026-08-04.)
+    AND THE MIGRATION READS AS THOUGH IT DIDN'T.** `CREATE FUNCTION` grants `EXECUTE` to `PUBLIC` by default; an
+    explicit grant only adds beside it. §7.39's sibling, but visible locally in `pg_proc`.
+    - **It was live:** `next_credit_note_ref(uuid)` (SECURITY DEFINER, WRITES the counter) had no ACL; an anon
+      `POST /rest/v1/rpc/next_credit_note_ref` returned `CN-2026-0001`. Fixed 2026-08-04 (`20260804000200`):
+      granted to **nobody** (callers are definer functions).
+    - **Copying a function does not copy its ACL** — `next_invoice_ref` (20260802000600) had correct grants; the
+      original never did.
+    - Named-function grant tests cannot catch unnamed functions. `supabase/tests/function_grants.test.sql` asserts
+      over `pg_proc` — *"no function in `public` grants EXECUTE to anon"* — and caught `package_live_balances`.
+    - Prod 2026-08-04: 49 anon-executable functions before, 18 after — all trigger/event-trigger functions (Postgres
+      never privilege-checks them against the writing role; PostgREST does not expose them). (2026-08-04.)
+
+83. **↪ Folded into §7.40 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
+
 84. **`supabase start` DOES NOT START THE EDGE RUNTIME HERE, SO ANY DRIVER TOUCHING THE
-    PUBLIC INVOICE PAGE FAILS LOOKING EXACTLY LIKE A PRODUCT BUG.** `supabase status`
-    listed `supabase_edge_runtime_SwimSync` under **Stopped services** on a perfectly
-    healthy stack. `verify-payment-collection.mjs` then failed four checks — *"public page:
-    renders the amount with no session"*, the reference, the QR, Save-QR — because
-    `/functions/v1/public-invoice` was returning **503**, not because anything in the app
-    or the database was wrong. The same shape as §7.56: the failure names the feature under
-    test, so it reads as a regression in the change you just made.
-    - Confirm before diagnosing:
-      `curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:54321/functions/v1/public-invoice?token=<any>"`
-      — a **503** means nothing is served, and no amount of app debugging will move it.
+    PUBLIC INVOICE PAGE FAILS LOOKING EXACTLY LIKE A PRODUCT BUG.** `supabase_edge_runtime_SwimSync` sits under
+    **Stopped services**; `verify-payment-collection.mjs` failed four public-page checks on a **503** from
+    `/functions/v1/public-invoice` (same shape as §7.56).
+    - Confirm: `curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:54321/functions/v1/public-invoice?token=<any>"`
+      — **503** means nothing is served.
     - Fix: `supabase functions serve public-invoice --env-file supabase/functions/.env
-      --no-verify-jwt`, then re-run. 19/19.
-    - The driver's own setup notes list the fixture and the two dev servers and **do not
-      mention the edge function**, which is why this is here rather than there. (2026-08-04.)
+      --no-verify-jwt`, then re-run (19/19).
+    - The driver's setup notes do not mention the edge function. (2026-08-04.)
+
 85. **`ALTER DEFAULT PRIVILEGES … IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`
-    SUCCEEDS AND DOES NOTHING.** Two different mechanisms hand a new function to `anon`,
-    and the obvious statement only removes one of them:
-    - **(a) an explicit `pg_default_acl` grant.** On cloud, `ALTER DEFAULT PRIVILEGES FOR
-      ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon` is a real row you can
-      see in a remote dump. Revoking it per-schema works.
-    - **(b) Postgres' own built-in default: a new function is `EXECUTE TO PUBLIC`**, and
-      `anon` is a member of `PUBLIC`. **This one is GLOBAL and is not stored anywhere**, so
-      there is no PUBLIC entry inside the schema-scoped row for a schema-scoped REVOKE to
-      remove. The statement reports `ALTER DEFAULT PRIVILEGES`, changes no row, and the
-      next function is still anon-executable. This is (b), not (a), that made
-      `next_credit_note_ref` reachable on the **local** stack (§7.82) — which is why "it's
-      a cloud-only problem" was wrong.
-    - **Measured, on the local stack (2026-08-04):**
+    SUCCEEDS AND DOES NOTHING.** Two mechanisms hand a new function to `anon`:
+    - **(a) an explicit `pg_default_acl` grant** (cloud: `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA
+      public GRANT ALL ON FUNCTIONS TO anon`). A per-schema revoke works.
+    - **(b) Postgres' built-in `EXECUTE TO PUBLIC`** — **GLOBAL and not stored anywhere**, so a schema-scoped
+      REVOKE changes no row. (b) made `next_credit_note_ref` reachable **locally** (§7.82).
+    - **Measured, local (2026-08-04):**
       ```
       IN SCHEMA public REVOKE … FROM PUBLIC → default row UNCHANGED, new fn anon_can = true
       (no IN SCHEMA)   REVOKE … FROM PUBLIC → new row (global)={postgres=X/postgres},
                                                new fn acl={postgres=X/postgres}, anon_can = false
       ```
-    - **So the global form is the only one that works, and it must be scoped by ROLE
-      instead:** `ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS
-      FROM PUBLIC` (`20260804000400`). `FOR ROLE postgres` reaches only what this repo's
-      migrations create; extension functions belong to `supabase_admin` in the `extensions`
-      schema and keep their own defaults.
-    - **How it was caught, and the general lesson: mutation-test a probe before believing
-      it.** The migration carries `DO` blocks that create a throwaway function/table/
-      sequence, ask whether `anon` can reach it, drop it and `RAISE` if so. Deleting each
-      revoke in turn and re-running proved all three fire. The **first** mutation run is
-      what exposed this — the function probe went red for a revoke that had been written,
-      not one that had been deleted. A self-check you have never seen fail is a decoration.
-    - **Consequence to know before writing the next migration:** a new function in `public`
-      is now callable by **nobody** until its own migration grants it. A forgotten
-      `GRANT EXECUTE … TO authenticated` is now a loud `permission denied for function` in
-      development instead of a silent hole only a remote dump would find. (2026-08-04.)
+    - **Use the global form, scoped by ROLE:** `ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON
+      FUNCTIONS FROM PUBLIC` (`20260804000400`); `supabase_admin`'s `extensions` functions keep their defaults.
+    - **Mutation-test a probe before believing it** (the migration's `DO` blocks `RAISE` if `anon` can reach a
+      throwaway object). A self-check you have never seen fail is a decoration.
+    - **Consequence:** a new function in `public` is callable by **nobody** until its migration grants it — a
+      forgotten `GRANT EXECUTE … TO authenticated` is a loud `permission denied for function`. (2026-08-04.)
 
 86. **A `WITH CHECK` THAT ONLY ASKS "IS THIS ROW MINE?" IS NOT AN AUTHORISATION CHECK — IT
-    MUST ALSO ASK "AM I ENTITLED TO THE THING IT POINTS AT?"** Both halves of a join table
-    are a claim. Checking the half that names you and trusting the client for the other is
-    the whole bug, and it shipped twice in the same migration (`20260718000900`).
+    MUST ALSO ASK "AM I ENTITLED TO THE THING IT POINTS AT?"** Both halves of a join table are a claim; it shipped
+    twice in `20260718000900`.
     - **Reproduced 2026-08-04 with a real anon-key session**, closed by `20260804000500`:
       ```
       POST /rest/v1/parent_tenants  {parent_id: <own>, tenant_id: <any>}  → 201
       POST /rest/v1/parent_students {parent_id: <own>, student_id: <any>} → 201
       PATCH /rest/v1/students?id=eq.<uuid> {full_name, is_active}         → 200
       ```
-      Signup is open, so the attacker is anyone with an email address — not a customer.
-      The first joined a business **with no join code**; the second attached the attacker
-      to someone else's child, bypassing the entire admin-approval claim flow (§8.12); the
-      third then renamed and deactivated that child, because `students_update` legitimately
-      trusts `parent_owns_student()` and ownership had just been forged.
-    - **The reasoning error is preserved in the original comment**, and it is worth reading
-      because it sounds correct: *"The app resolves the code to a tenant id first; this
-      only allows a parent to link THEMSELVES."* The policy enforced the half the sentence
-      names and left the half it assumes to the client. **RLS never sees your UI.**
-    - **What the forged membership bought:** `tenants`, `coaches`, `profiles`,
-      `class_categories` and `tenant_levels` are gated on `parent_in_tenant(tenant_id)`, so
-      it read the business row — **including its `join_code`**, i.e. the attack harvests the
-      credential it bypassed — plus `paynow_uen`/`paynow_mobile` and the coach's contact
-      details. One forged `parent_students` row exposed **six** further tables
-      (`stranger_isolation.test.sql` names them); two were not on the list when the fix was
-      drafted, which is why that file sweeps the catalogue instead of naming tables.
-    - **Mitigating fact, verified non-vacuously** (a second real family was added first,
-      because an empty table proves nothing): student UUIDs are **not enumerable** — the
-      forged member still saw only their own rows. The attack needs a UUID from outside.
-    - **`parent_packages_insert` is the same pattern written correctly** — copy it:
-      `can_admin_tenant(tenant_id) OR (parent_id = current_parent_id() AND
-      parent_in_tenant(tenant_id))`. Both halves.
-    - **The fix was to DELETE the policies, not narrow them.** Every client call site of
-      both tables is a SELECT; the writers are SECURITY DEFINER functions owned by
-      `postgres` (`join_tenant_by_code`, `add_child_or_claim`, `link_invited_parent`,
-      `merge_students`, `undo_student_claim`), which own the tables, bypass RLS and never
-      consult `authenticated`'s grants. **Check for a definer RPC before narrowing a policy
-      — the client may not need the write path at all.** (2026-08-04.)
+      Signup is open: anyone could join a business without a join code, attach to any child (bypassing §8.12's
+      claim flow), then edit it via `parent_owns_student()`.
+    - The original comment assumed the app resolves the code first. **RLS never sees your UI.**
+    - Forged membership exposed the business row **including its `join_code`**, PayNow details and coach contacts;
+      `stranger_isolation.test.sql` sweeps the catalogue rather than naming tables.
+    - Mitigating: student UUIDs are **not enumerable**.
+    - **Correct pattern — copy `parent_packages_insert`:** `can_admin_tenant(tenant_id) OR (parent_id =
+      current_parent_id() AND parent_in_tenant(tenant_id))`. Both halves.
+    - **The fix was to DELETE the policies.** Clients only SELECT; writers are SECURITY DEFINER functions owned by
+      `postgres` (`join_tenant_by_code`, `add_child_or_claim`, `link_invited_parent`, `merge_students`,
+      `undo_student_claim`) that bypass RLS and never consult `authenticated`'s grants. **Check for a definer RPC
+      before narrowing a policy.** (2026-08-04.)
 
 87. **`authenticated` NOW HOLDS A TABLE PRIVILEGE ONLY WHERE A POLICY COULD PERMIT IT, AND
-    THE SHORTCUT ROUND THAT RULE IS THE ONE THING CI IS WATCHING FOR.** `20260804000600`
-    revoked everything and granted back a whitelist derived from `pg_policies`; 50 of the
-    148 (table × command) pairs had no policy behind them at all.
-    - **Consequence for every future migration**, and it is deliberate: a new table is
-      reachable by **nobody** until its migration grants it, and **a migration that adds a
-      policy must add the matching `GRANT`** or the app throws `permission denied` in
-      development. Under deadline the tempting fix is `GRANT ALL ON ALL TABLES … TO
-      authenticated`. **That is the failure mode this was built to catch:**
-      `table_grants.test.sql` assertion 2 fails on any privilege no policy permits, so the
-      workaround goes red in CI rather than quietly restoring the old state.
-    - **Scope the invariant to `authenticated` and `anon` ONLY.** It is false for
-      `service_role` (`rolbypassrls = true` — grants are its entire gate, by design) and
-      meaningless for `postgres` (it owns the tables). Written over all roles the test is
-      red against a correct database, and a test that is red when correct gets disabled.
-    - **The §7.85 trap does NOT apply to tables, and the asymmetry is easy to get backwards.
-      Do not add `… REVOKE … FROM PUBLIC` here.** A new *function* carries a built-in
-      `EXECUTE TO PUBLIC` that only a global revoke removes; a new *table* carries **no**
-      PUBLIC grant at all, so the `FROM authenticated` form is both sufficient and
-      effective. Same statement shape, opposite conclusion, one migration apart.
-    - **`REVOKE ALL ON ALL TABLES` also hits views and matviews, but a policy-derived
-      whitelist cannot see them** — a view has no policies, so it would be stripped of every
-      grant and never granted back. `public` holds none today; the migration `RAISE`s if one
-      ever appears, which is the day the derivation must be extended.
-    - **The migration proves its own whitelist in both directions before committing** —
-      nothing missing, nothing extra — so a typo'd `GRANT` aborts `db push` against
-      **production**, not just CI. All four probes were mutation-tested (delete a GRANT,
-      add a surplus privilege, create a view, restore the default ACL); each fired and
-      named the offending object. (2026-08-04.)
+    THE SHORTCUT ROUND THAT RULE IS THE ONE THING CI IS WATCHING FOR.** `20260804000600` revoked everything and
+    granted back a whitelist derived from `pg_policies` (50 of 148 pairs had no policy).
+    - **Deliberate consequence:** a new table is reachable by **nobody** until its migration grants it, and **a
+      migration that adds a policy must add the matching `GRANT`**. `GRANT ALL ON ALL TABLES … TO authenticated`
+      is the failure mode: `table_grants.test.sql` assertion 2 goes red on any privilege no policy permits.
+    - **Scope the invariant to `authenticated` and `anon` ONLY** — `service_role` bypasses RLS (grants are its
+      gate), `postgres` owns the tables; a test red against a correct DB gets disabled.
+    - **The §7.85 trap does NOT apply to tables. Do not add `… REVOKE … FROM PUBLIC` here** — a new table carries
+      **no** PUBLIC grant, so `FROM authenticated` suffices.
+    - **`REVOKE ALL ON ALL TABLES` also hits views/matviews, which a policy-derived whitelist cannot see** —
+      stripped of every grant and never granted back; the
+      migration `RAISE`s if one appears in `public` — extend the derivation then.
+    - The migration proves its whitelist both ways, so a typo'd `GRANT` aborts `db push` on **production**.
+      (2026-08-04.)
 
 88. **A WRITE THAT RLS USED TO DENY *SILENTLY* NOW RAISES `42501`, AND THAT CHANGES
-    OBSERVABLE BEHAVIOUR — INCLUDING IN TESTS THAT WERE ASSERTING THE SILENCE.** Under RLS
-    with no matching policy, an `UPDATE` matches zero rows and returns success. Once the
-    *grant* is gone too (`20260804000600`), the privilege check fails first and the
-    statement throws.
-    - Caught by `constraints.test.sql`, whose credit-note immutability assertion did
-      `UPDATE credit_notes …` and then read the value back to prove it was unchanged. The
-      rewrite was **not cosmetic**: an error aborts the transaction, so the read-it-back
-      form cannot run at all.
-    - **The guarantee did not change; the enforcement did, and got louder.** Prefer the
-      loud version — a zero-row `UPDATE` is indistinguishable from a successful one at the
-      client, which is how "why didn't my edit save?" hides for months.
-    - **Before shipping a grant narrowing, cross-check every client write verb against the
-      whitelist**, because unit tests run as `postgres` and cannot see this:
+    OBSERVABLE BEHAVIOUR — INCLUDING IN TESTS THAT WERE ASSERTING THE SILENCE.** With no policy an `UPDATE` matches
+    zero rows; with the *grant* gone too (`20260804000600`) it throws.
+    - An error aborts the transaction, so read-it-back tests (`constraints.test.sql`) must be rewritten; the loud
+      form is better — a zero-row `UPDATE` looks like success.
+    - **Before shipping a grant narrowing, cross-check every client write verb against the whitelist** (unit tests
+      run as `postgres`):
       ```bash
       grep -rn 'from("<table>")' -A 4 --include="*.ts" --include="*.tsx" SwimSyncApp SwimSyncAdmin
       ```
-      The one hit that looked like a break — `.delete()` on `tenants` — turned out to be
-      `createAdminClient()`, i.e. `service_role`, which is untouched. **The six UI drivers
-      are the real proof here**; they run as real signed-in users through PostgREST, which
-      is the only path that exercises a grant. (2026-08-04.)
+      (`.delete()` on `tenants` is `createAdminClient()` = `service_role`, untouched.) **The UI drivers are the
+      real proof** — only real signed-in users through PostgREST exercise a grant. (2026-08-04.)
 
 89. **DEFAULT PRIVILEGES ARE A GRID — ROLE × OBJECT TYPE — AND CLOSING IT IN PIECES LEAVES
-    A CELL OPEN THAT NO PROBE IS LOOKING AT.** It took four migrations in one day, and the
-    last one existed only because production was dumped *after* the deploy rather than
-    trusted:
+    A CELL OPEN THAT NO PROBE IS LOOKING AT.** Found only by dumping production after deploy:
 
     | migration | closed | left open |
     |---|---|---|
@@ -1445,2687 +804,1430 @@ carries the lesson. Built 2026-09-25 from the headlines; an item may fit two lin
     | `20260804000600` | tables, sequences ← `authenticated` | **functions ← `authenticated`** |
     | `20260804000700` | functions ← `authenticated` | — |
 
-    - **Each migration's probe tested only what that migration changed**, so all three
-      passed while the row
+    - Each probe tested only its own diff, so all passed while cloud kept
       `ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON
-      FUNCTIONS TO "authenticated"` sat untouched on cloud the whole time. A probe scoped
-      to your own diff cannot see the cell you did not think about.
-    - **It was the dangerous direction of the §7.39 split**, which is why it is worth its
-      own number. LOCAL had no such row, so a new function would have been callable by
-      nobody in development — failing loudly, exactly as promised — while being silently
-      EXECUTE-able by every signed-in user on production. The loud half gets "fixed" by
-      adding the grant you meant; the silent half keeps whatever else the function exposed.
-      §7.82 with `authenticated` in place of `anon` — and since **signup is open**, that is
-      a much smaller reduction in blast radius than it sounds.
-    - **Nothing was actually over-granted**, and the way that was established is the
-      reusable part: diff the remote's authenticated-executable function set against
-      local's. 79 vs 78, and the single difference was `rls_auto_enable`, production's
-      event-trigger function — the known local/cloud exception. So the 78 real ones came
-      from explicit migration grants, and this was the tap rather than a spill.
+      FUNCTIONS TO "authenticated"`.
+    - **The dangerous direction of the §7.39 split:** local has no such row (loud), prod silently EXECUTE-able by
+      every signed-in user — §7.82 with `authenticated` for `anon`, and **signup is open**.
+    - Nothing was over-granted: diff remote vs local authenticated-executable functions (only `rls_auto_enable`
+      differed):
       ```bash
       supabase db dump --linked -f /tmp/prod.sql
       grep -E '^GRANT ALL ON FUNCTION "public"' /tmp/prod.sql | grep '"authenticated"'
       ```
-    - **The check that closes the whole grid**, and the one to run after any migration that
-      touches privileges — expect **zero rows**:
+    - **Run after any migration that touches privileges** — expect **zero rows**:
       ```sql
       SELECT pg_get_userbyid(defaclrole), defaclnamespace::regnamespace, defaclobjtype, defaclacl
         FROM pg_default_acl
        WHERE pg_get_userbyid(defaclrole) = 'postgres'
          AND (defaclacl::text LIKE '%anon=%' OR defaclacl::text LIKE '%authenticated=%');
       ```
-      `table_grants.test.sql` assertion 5 asserts exactly this — but **it runs against
-      local, where the row never existed**, so it passes by construction for the cloud case.
-      Same limitation as `function_grants.test.sql` (§7.39): the remote dump is the honest
-      check, and an apply-time probe in the migration is the only one that executes against
-      production. (2026-08-04.)
+      `table_grants.test.sql` assertion 5 runs locally, where the row never existed; as with
+      `function_grants.test.sql` (§7.39), only the remote dump or an apply-time probe checks production. (2026-08-04.)
 
 90. **A SECOND FOREIGN KEY BETWEEN TWO TABLES BREAKS EVERY *BARE* POSTGREST EMBED BETWEEN
     THEM — IN BOTH DIRECTIONS, EVERYWHERE, THE MOMENT THE MIGRATION APPLIES.**
-    `tenants.owner_profile_id → profiles` (`20260806000100`) was the second relationship
-    between `profiles` and `tenants` (the first: `profiles.tenant_id`). From then on
-    `.from("profiles").select("tenants(display_name)")` is **ambiguous** and PostgREST
-    refuses it with "more than one relationship" — the query that had worked for weeks
-    returns an error, and the UI built on `maybeSingle()` reads that as *no row* and
-    renders its empty state. That is how `/accept-invite` silently lost the business name
-    and the Students page would have lost its low-package threshold.
-    - **The failure is at a distance**: the migration is correct, the query is unchanged,
-      and nothing fails at apply time — only the *read* breaks, only through PostgREST
-      (raw SQL is fine), and only for embeds between that table pair.
-    - **The fix is a hint**: `tenants!tenant_id(display_name)` — hint by **column**, which
-      survives constraint renames, rather than by constraint name.
-    - **The sweep that finds every victim**: grep both apps for embeds of either table
-      name and keep only those whose `.from(...)` is the other table of the pair. Only
-      `profiles`-sourced embeds were ambiguous here; the eight `tenants(...)` embeds from
-      single-FK tables (invoices, parent_tenants, coaches…) were untouched.
-    - Found by `verify-tenant-provisioning.mjs` within the hour, which is the argument for
-      running drivers before deploying a migration that adds an FK. (2026-08-06.)
-    - **Hit again → §7.176 (§8.65):** `20260815000600` added two FKs onto `package_products`; two lists rendered empty for two days behind `?? []`.
+    `tenants.owner_profile_id → profiles` (`20260806000100`) made `.from("profiles").select("tenants(display_name)")`
+    ambiguous ("more than one relationship"); `maybeSingle()` read the error as no row, and `/accept-invite` lost
+    the business name.
+    - Failure at a distance: nothing fails at apply time; only PostgREST reads between that pair break.
+    - **Fix with a hint by column**: `tenants!tenant_id(display_name)` (survives constraint renames).
+    - Sweep: grep both apps for embeds of either table whose `.from(...)` is the other table of the pair.
+    - Found by `verify-tenant-provisioning.mjs` — run drivers before deploying an FK migration. (2026-08-06.)
+    - **Folded in from §7.176 (§8.65):** `20260815000600` added two FKs onto `package_products`; PostgREST answers
+      **PGRST201 on the WHOLE query**, and two `?? []` call sites rendered empty lists for two days. The blast radius is
+      invisible until the data exists. After any FK migration run the ambiguity check (`pg_constraint` grouped by table
+      pair, `HAVING count(*) > 1`) and qualify **every** pair at once — PostgREST reports only the first. Check
+      `.error` wherever emptiness is a plausible real state.
     - **Now a CHECK:** `supabase/tests/recurring_gotchas.test.sql` #1 goes red on any new table pair joined by two FKs (2026-09-25).
 
 91. **"NEVER GATE ON ROLE" (§7.19) NOW HAS EXACTLY ONE DELIBERATE EXCEPTION — ADMIN-PANEL
     *ENTRY* — AND ITS SHAPE IS WHAT KEEPS IT FROM RECREATING §7.19. DO NOT "FIX" IT BACK.**
-    Since co-admins (`20260806000100`), the login page and `RequiresTenant` refuse
-    `coach`/`parent` accounts with "please use the SwimSync app". The old rule ("ask *does
-    this account have a business*, never the role") still governs **which pages** an admin
-    sees — but it cannot answer **may you enter at all**, because a created coach also has
-    a `tenant_id`; before this gate they got a half-working, read-only panel.
-    - **The §7.19 lesson survives as the check's shape**: refuse ONLY a **resolved**
-      profile whose role is affirmatively `coach` or `parent`. Loading, fetch errors and
-      unknown role values must never refuse — refusing on "not yet known" is exactly how
-      the real coach got locked out of production once.
-    - The private coach passes both gates: their role IS `tenant_admin`.
-    - The head comments in `lib/adminNav.ts` and `components/RequiresTenant.tsx` were
-      rewritten to carry the two-question split; if either ever again says "never role",
-      someone has reverted the gate. `verify-admins.mjs` pins the refusal; `verify-tenant-admin.mjs` pins that the production admin shape still enters. (2026-08-06.)
+    Since `20260806000100`, login and `RequiresTenant` refuse `coach`/`parent` (a created coach also has a
+    `tenant_id`). "Ask *does this account have a business*, never the
+    role" still governs **which pages** an admin sees.
+    - **Refuse ONLY a resolved profile whose role is affirmatively `coach` or `parent`.** Loading, fetch errors
+      and unknown roles must never refuse (that locked the real coach out of production once).
+    - Head comments in `lib/adminNav.ts` and `components/RequiresTenant.tsx` carry the two-question split; if
+      either says "never role" again, the gate was reverted. `verify-admins.mjs` pins the refusal;
+      `verify-tenant-admin.mjs` pins that the production admin shape still enters. (2026-08-06.)
+    The private coach passes both gates: their role IS `tenant_admin`.
 
 92. **POSTGRES DECIDES REGEX GREEDINESS FOR THE *WHOLE* EXPRESSION FROM ITS **FIRST**
     QUANTIFIER — SO A `.*?` AFTER A GREEDY `\s*` IS GREEDY, AND IT WILL EAT YOUR WHOLE
-    FUNCTION BODY.** This is not how PCRE, JS, Python or Perl behave, where greediness is
-    per-quantifier, so the mistake survives review by everyone who has used any of them.
-    - Found writing `20260806_markable_floor_DOWN.sql`, which stripped one `IF` block
-      from `book_trial()` with
-      `regexp_replace(def, '\s*IF p_session_date < markable_floor\(v_tenant\) THEN.*?END IF;', '', 'ns')`.
-      The leading `\s*` is greedy, so the `.*?` ran to the **LAST** `END IF;` in the
-      function and **deleted all three of book_trial's other refusals**. The rolled-back
-      function would have accepted a trial on a non-lesson day, for an already-enrolled
-      child, and for a family holding a prepaid package — three guards gone, silently,
-      in the file whose whole job is to restore a known-good state.
-    - The ARE docs say this ("the quantifier that determines greediness is the first one
-      in the RE"), and it is easy to read past because it describes an ordering property,
-      not an obvious hazard.
-    - **Do not fix it by making the first quantifier lazy** (`\s*?`). That works, and it
-      is a one-character difference between correct and catastrophic sitting in a file
-      nobody runs. Prefer a form whose correctness is visible: an exact literal
-      `replace()`, or line-wise removal anchored on a marker. Both are used in that
-      rollback file.
-    - Beware the second-order trap that followed: the literal-`replace()` version *also*
-      failed, because the block's comment rule is drawn with box characters (`──`) that
-      do not survive being retyped. It failed **loudly** — the guard raised and the whole
-      transaction rolled back — which is the only reason it was not shipped. (2026-08-07.)
+    FUNCTION BODY.** Unlike PCRE/JS/Python/Perl.
+    - In `20260806_markable_floor_DOWN.sql`,
+      `regexp_replace(def, '\s*IF p_session_date < markable_floor\(v_tenant\) THEN.*?END IF;', '', 'ns')` ran to the
+      **LAST** `END IF;` and deleted all three of `book_trial()`'s other refusals.
+    - **Do not fix it by making the first quantifier lazy** (`\s*?`) — a one-character difference nobody reviews.
+      Prefer an exact literal `replace()` or line-wise removal anchored on a marker (both used in that file).
+    - Second-order trap: the literal `replace()` failed because box characters (`──`) do not survive retyping —
+      loudly, which is why it did not ship. (2026-08-07.)
 
 93. **A ROLLBACK FILE THAT HAS NEVER BEEN EXECUTED IS NOT A ROLLBACK PLAN. RUN IT, AGAINST
-    A REAL APPLY, BEFORE YOU SHIP THE THING IT ROLLS BACK.** §7.92 and its sequel were
-    both found this way and neither was findable by reading — the first produced valid SQL
-    that created a valid function with three guards missing.
-    - The committed-rollback pattern started 2026-08-04 (`20260804_authenticated_grants_DOWN.sql`)
-      and is the right one; this is the missing half. **Committed ≠ verified.**
-    - The check that catches everything: after `supabase db reset` (migration applied),
-      run the DOWN file, then diff `pg_get_functiondef()` for every function it touches
-      against the pre-migration definitions. `20260806_markable_floor_DOWN.sql` restores
-      all five **byte-identically**, which is a stronger claim than "it ran without error"
-      — and it is what surfaced that three restated functions had silently lost their
-      comments, including the §7.38 seam note and §7.57's upsert-fires-BEFORE-INSERT
-      warning. `pg_get_functiondef()` is the only record of those once a rollback runs.
-    - Then re-run the **pre-migration** test file under the rolled-back schema. If
-      `attendance_window.test.sql` still scores 31 and the new feature's file fails
-      wholesale, the rollback genuinely restored the old world rather than a lookalike.
-    - Budget for it: the round trip is three `supabase db reset` cycles, about ten
-      minutes. (2026-08-07.)
+    A REAL APPLY, BEFORE YOU SHIP THE THING IT ROLLS BACK.** §7.92 and its sequel were only findable this way.
+    - The committed-rollback pattern (`20260804_authenticated_grants_DOWN.sql`) is right; **Committed ≠ verified.**
+    - After `supabase db reset`, run the DOWN file, then diff `pg_get_functiondef()` for every function it touches
+      against pre-migration definitions. `20260806_markable_floor_DOWN.sql` restores all five **byte-identically** —
+      which surfaced lost comments (the §7.38 seam note, §7.57's upsert-fires-BEFORE-INSERT warning).
+    - Then re-run the **pre-migration** test file under the rolled-back schema (`attendance_window.test.sql` still
+      31; the new feature's file fails wholesale).
+    - Budget: three `supabase db reset` cycles, ~ten minutes. (2026-08-07.)
 
 94. **`CURRENT_DATE` IN A FUNCTION IS THE *SESSION'S* TIME ZONE — UTC ON THIS SERVER — SO IT
-    IS §7.7 WITH THE DATABASE HOLDING THE WRONG CLOCK. USE `today_sg()`.** §7.7 taught
-    everyone to distrust dates derived on the CLIENT, and every client here is already
-    correct (`todayInSg()`). Nobody looked at the other end of the wire.
-    - **It was live for three weeks and cost eight hours a day.**
-      `set_class_terms()` refused terms dated in the future via `v_from > CURRENT_DATE`
-      while the admin panel sent `todayInSg()`. Between 00:00 and 08:00 SGT those differ by
-      a day, so **every class edit failed** with `P0001: terms cannot start in the future`.
-      `sync_class_display_price()` had the same clock: a rate effective today did not
-      display until 08:00. Both fixed in `20260807000100`.
-    - **THE REASON A 14-TEST FILE COVERING THAT EXACT FUNCTION MISSED IT — this is the
-      transferable part.** Three independent places had made the same UTC assumption, so
-      they **agreed with each other**: the RPC, `class_terms.test.sql`, and
-      `verify-class-terms.mjs` all said `CURRENT_DATE`. A test that derives its expectation
-      the same wrong way as the code under test will pass. Fixing only the code turned five
-      pgTAP assertions and two driver checks red — they had been green *by agreement with
-      the bug*. When a date is involved, ask whether the test computes it INDEPENDENTLY.
-    - **And the existing guard test could not have caught it anyway:** it dated terms
-      `CURRENT_DATE + 30`, which is future under any clock. The whole bug lives in the
-      one-day gap between two notions of "today". **Test date guards AT the boundary
-      (`today_sg()`, `today_sg() + 1`), never at a comfortable distance from it.**
-    - `class_terms.test.sql` now asserts over `pg_proc` that **no** function in `public`
-      matches `CURRENT_DATE` or `now()::date`, so the next one fails in CI rather than in an
-      8-hour window weeks later. That assertion is the only deterministic one of the three —
-      the behavioural pair passes all day outside the window.
-    - **A green suite proves the code worked AT THE TIME IT RAN.** The nightly sweep found
-      this because it fires at 04:00 SGT; four manual runs the same week went green because
-      they were run in the evening, and §8.30 recorded the pipeline as healthy on that
-      basis. For anything date-derived, *when* a suite runs is part of what it proves.
-      (2026-08-07.)
+    IS §7.7 WITH THE DATABASE HOLDING THE WRONG CLOCK. USE `today_sg()`.** Clients are already
+    correct (`todayInSg()`); the database end was never audited.
+    - **Where it bit (live three weeks):** `set_class_terms()` refused `v_from > CURRENT_DATE`;
+      00:00–08:00 SGT **every class edit failed** with `P0001: terms cannot start in the future`.
+      `sync_class_display_price()` showed today's rate only from 08:00. Both fixed in `20260807000100`.
+    - **Why 14 tests missed it:** the RPC, `class_terms.test.sql` and `verify-class-terms.mjs` all
+      said `CURRENT_DATE`, so they agreed with the bug. When a date is involved, ask whether the
+      test computes it INDEPENDENTLY.
+    - **Test date guards AT the boundary (`today_sg()`, `today_sg() + 1`), never at a comfortable
+      distance from it** — the old test used `CURRENT_DATE + 30`, future under any clock.
+    - `class_terms.test.sql` asserts over `pg_proc` that **no** function in `public` matches
+      `CURRENT_DATE` or `now()::date` — the only deterministic one of the three checks.
+    - **A green suite proves the code worked AT THE TIME IT RAN.** The 04:00 SGT nightly found it;
+      evening manual runs were green and §8.30 recorded the pipeline healthy. (2026-08-07.)
+
 95. **A SCREEN THAT STORES AN ABSOLUTE DATE IN `useState` AT MOUNT GOES STALE ON A
-    LONG-LIVED PWA — HOLD AN OFFSET FROM TODAY, NOT A DATE.** A new axis on §7.7: not a
-    wrong clock, a **frozen** one. The coach Schedule tab shows one week at a time, and
-    the obvious implementation is `useState(startOfWeek(todayInSg()))`. That evaluates
-    **once**. The coach app is a home-screen PWA that stays mounted for days, so the first
-    time it survives a Sunday→Monday boundary the stored Monday is *last* week's: the
-    TODAY section disappears, the header quietly reads "Last week", and today's lessons
-    are missing from the coach's landing tab with nothing saying why.
-    - The fix is structural, not vigilance: store `weekOffset: number` and derive
-      `addDays(startOfWeek(todayDate), weekOffset * 7)` on every render from the same
-      `todayDate` the rest of the screen uses. `weekOffset === 0` then *means* "this week"
-      however long the screen has been mounted, and crossing midnight self-corrects.
-    - **The symptom is indistinguishable from "there is nothing today"**, which is why it
-      would have survived a long time. It is also invisible to a browser driver — nothing
-      in a Playwright run crosses midnight — so the coverage is
-      `lib/scheduleWeek.test.ts`'s "offset 0 self-corrects across a Sunday->Monday
-      boundary", which can move the clock. Found in plan review, before it shipped.
-      (2026-08-08.)
+    LONG-LIVED PWA — HOLD AN OFFSET FROM TODAY, NOT A DATE.** A new axis on §7.7: a **frozen**
+    clock. `useState(startOfWeek(todayInSg()))` evaluates once; across Sunday→Monday on the coach
+    PWA the TODAY section vanishes and the header reads "Last week".
+    - Fix: store `weekOffset: number` and derive `addDays(startOfWeek(todayDate), weekOffset * 7)`
+      every render from the screen's `todayDate`; `weekOffset === 0` always means "this week".
+    - Looks like "nothing today" and no Playwright run crosses midnight, so coverage is
+      `lib/scheduleWeek.test.ts`'s "offset 0 self-corrects across a Sunday->Monday boundary".
+      Found in plan review. (2026-08-08.)
+
 96. **DE-DUPLICATING BETWEEN TWO SECTIONS MUST HAPPEN WHERE BOTH ARE *RENDERED*, NEVER
-    WHERE ONE IS *FETCHED*.** The Schedule tab shows a floor-scoped NEEDS MARKING list and
-    a TODAY section, and today's unmarked lesson belongs in exactly one of them. Doing that
-    filtering inside the async `loadData` couples it to `showsTodaySection`, a render-time
-    fact: a week-arrow press that re-renders without refetching then yields a screen with
-    **no TODAY section and no NEEDS MARKING row for today either**, so today's lesson is
-    unmarkable from the landing tab and the month blocks at invoice time with nothing
-    explaining it.
-    - Derive both from the same render's inputs — `needsMarking.filter(i => !(showsTodaySection && i.date === todayDate))`.
-      Two values derived in one render pass cannot disagree; two derived in different
-      passes eventually always do.
-    - The same rule caught a second, visible instance the same day: an unmarked past
-      lesson rendered under **both** NEEDS MARKING and DONE, because the week buckets were
-      built without subtracting the nag list. A nag filed under a heading that means
-      *finished* is worse than either alone. (2026-08-08.)
+    WHERE ONE IS *FETCHED*.** Filtering today's unmarked lesson out of NEEDS MARKING inside async
+    `loadData` couples it to render-time `showsTodaySection`: a week-arrow re-render left today's
+    lesson in neither TODAY nor NEEDS MARKING — unmarkable, and the month blocks at invoice time.
+    - Derive both in one render — `needsMarking.filter(i => !(showsTodaySection && i.date === todayDate))`.
+    - Same rule, second instance: an unmarked past lesson showed under both NEEDS MARKING and DONE
+      because week buckets didn't subtract the nag list. (2026-08-08.)
+
 97. **A PERFORMANCE FIX THAT ADDS A DATE FILTER TO A QUERY FEEDING A COMPLETENESS CHECK IS
-    A BILLING CHANGE.** §7.18's sibling, arriving through a door nobody guards. The coach
-    screen's `trial_bookings`/`makeup_bookings` queries had no class filter and no date
-    filter at all, so they were the nearest thing to the silent `max_rows = 1000` ceiling
-    and obviously wanted bounding. The tempting bound is the **visible week**. It is wrong:
-    that map feeds `expectedStudentsOn()` for every date in the **floor-scoped** backlog,
-    so a lesson whose only attendee was a trial silently drops out of the coach's
-    needs-marking list while the invoice engine still refuses to close the month over it.
-    - Bound such queries to the **union** of every range they serve, and say so in a
-      comment at the query. Prove it by narrowing them on purpose and watching a
-      trial-only past lesson vanish (§7.25).
-    - `bookedHere.size` is also the guard that keeps a class with **no enrolments but a
-      booking** in the loop at all, so an over-narrow bound removes the class as well as
-      the date. (2026-08-08.)
+    A BILLING CHANGE.** §7.18's sibling. Bounding the coach screen's `trial_bookings`/
+    `makeup_bookings` queries to the **visible week** is wrong: they feed `expectedStudentsOn()`
+    for the **floor-scoped** backlog, so a trial-only lesson drops out of needs-marking while the
+    engine still refuses to close the month.
+    - Bound such queries to the **union** of every range they serve, say so in a comment at the
+      query, and prove it by narrowing on purpose and watching a trial-only past lesson vanish (§7.25).
+    - `bookedHere.size` also keeps a class with **no enrolments but a booking** in the loop; an
+      over-narrow bound drops the class too. (2026-08-08.)
+
 98. **A DRIVER HELPER THAT WALKS UP THE DOM MUST PRESS ONLY ON A *UNIQUE* MATCH, AND TWO
-    DRIVERS' COPIES OF "THE SAME" HELPER MAY NOT BE THE SAME.** Two failures, one root:
-    helpers copied between drivers drift, and consolidating them without reading both
-    breaks one.
-    - **The walk.** `pressClassButton` climbs from a class title looking for its card's
-      action button. Widen the bound and the ancestor eventually becomes the section
-      wrapper, where `find` returns the *first* button in document order — a different
-      card's — and the driver presses a stranger's button while reporting success. Collect
-      **all** matches per level and press only when there is exactly one; more than one
-      means the walk has left the card. Then the bound is just a stop condition. This also
-      exposed a real ambiguity: on the Schedule tab one class legitimately appears twice
-      (NEEDS MARKING and TODAY), so the helper must try **every** occurrence of the title,
-      not just the first.
-    - **The consolidation.** `verify-stale-screen.mjs` filtered `pressByText` to the
-      VISIBLE screen; `verify-attendance-guard.mjs` deliberately did **not**. Both are
-      right: the first navigates in-app, where a stale mounted screen steals the press;
-      the second navigates by **deep link**, where `page.goto` mounts the target and the
-      root layout's session restore then replaces the route with the landing tab — so the
-      screen under test renders fully while sitting inside an `aria-hidden` subtree, and
-      filtering it out presses nothing at all. Merging them into one visible-only helper
-      turned two attendance-guard checks red. The shared helper now takes
-      `includeHidden`, defaulting to the safe filtered behaviour.
-    - **`document.body.innerText` contains the screens you left**, so any assertion a
-      stale mount could satisfy needs `visibleText()`. `verify-stale-screen.mjs:437`
-      asserted `/today\s*·/i` against the Classes tab — and the Schedule screen renders
-      `TODAY · <date>` while mounted underneath, so the Classes tab's weekday grouping
-      could have been deleted outright and that check would have stayed green forever.
-      The one driver written to catch a screen overlaying another was about to be fooled
-      by a screen overlaying another. (2026-08-08.)
+    DRIVERS' COPIES OF "THE SAME" HELPER MAY NOT BE THE SAME.**
+    - **The walk.** `pressClassButton` climbing too far reaches the section wrapper, where `find`
+      returns another card's button. Collect **all** matches per level; press only on exactly one.
+      On Schedule a class appears twice (NEEDS MARKING and TODAY), so try **every** occurrence.
+    - **The consolidation.** `verify-stale-screen.mjs` filtered `pressByText` to the VISIBLE
+      screen; `verify-attendance-guard.mjs` deliberately did **not** — it deep-links, and session
+      restore leaves the screen under test inside an `aria-hidden` subtree. Merging to visible-only
+      turned two checks red. The shared helper takes `includeHidden`, defaulting to filtered.
+    - **`document.body.innerText` contains the screens you left** — use `visibleText()`.
+      `verify-stale-screen.mjs:437`'s `/today\s*·/i` on Classes was satisfied by the mounted
+      Schedule screen's `TODAY · <date>`. (2026-08-08.)
+
 99. **A NESTED `TouchableOpacity` DOES NOT DOUBLE-FIRE ON RN-WEB — THE PRESS STOPS AT THE
-    INNERMOST VIEW.** Filed as a correction, because this was predicted confidently in a
-    plan review, designed around, and then found to be false. The prediction: putting
-    "Pay via PayNow" / "I've paid" buttons inside the parent invoice card's own
-    card-wide `TouchableOpacity` would let the press bubble — and since `confirmAction`
-    is a **synchronous, blocking `window.confirm`** on web (`lib/confirm.ts`), the
-    sequence would be inner `onPress` → confirm blocks → RPC runs → *then* the card's
-    `router.push` fires, landing the parent on the detail screen while the optimistic
-    patch, the success toast and the claimed line were applied to a screen they had
-    already left.
-    - **Tested rather than assumed.** The buttons were deliberately re-nested inside the
-      card's touchable and `verify-parent-pay-claim.mjs` was re-run: **still 16/16**,
-      including "the press did NOT also fire the card's navigation". React Native's
-      responder system grants the responder to the **innermost** view that wants it and
-      does not propagate to ancestor Touchables, so the second handler never runs.
-    - **The layout still puts the action row as a SIBLING of the touchable**, because it
-      reads honestly and does not depend on that behaviour surviving an RN-web upgrade —
-      but the comments no longer state the double-fire as fact, and the driver's "one
-      dialog / no navigation" checks are labelled as **outcome guards, not the nesting
-      guard**: re-nesting cannot turn them red, so per §7.25 they are not that coverage.
-    - **The general lesson is §7.83's, on a new axis:** a confidently-filed mechanism is
-      worth one cheap experiment before you design around it. The mitigation here was
-      harmless, but the *comment* asserting a bug that does not exist would have been
-      copied forward and believed. (2026-08-08.)
+    INNERMOST VIEW.** A correction: plan review predicted PayNow / "I've paid" buttons inside the
+    invoice card's touchable would also fire its `router.push` after `confirmAction`'s blocking
+    `window.confirm` (`lib/confirm.ts`).
+    - **Tested:** buttons deliberately re-nested, `verify-parent-pay-claim.mjs` still 16/16. The
+      responder goes to the **innermost** view and does not propagate to ancestor Touchables, so the second handler never runs.
+    - The action row stays a SIBLING of the touchable (robust to RN-web upgrades), but comments no
+      longer claim double-fire, and the "one dialog / no navigation" checks are **outcome guards,
+      not the nesting guard** — re-nesting can't turn them red, so per §7.25 they aren't that coverage.
+    - §7.83's lesson: run one cheap experiment before designing around a filed mechanism. (2026-08-08.)
+
 100. **A DRIVER THAT SELF-SKIPS ON A DATE CONDITION REPORTS *PASS* WHILE ASSERTING NOTHING —
-    AND `new Date()` IN CI IS UTC, SO IT SKIPS ON THE WRONG DAYS.** Two bugs that only
-    matter together, and the second is what hid the first. `verify-trials.mjs` needed the
-    seed's Saturday class to have a lesson it could book *and* mark, so it exited **0**
-    ("SKIP  today is not a lesson day") on any other day. That is a defensible design. What
-    is not: the day came from `new Date().toLocaleDateString("en-SG", …)` with **no
-    `timeZone`**, which is the *runner's* zone.
-    - **This is §7.7 on the DRIVER's side of the wire.** §7.7 taught this repo to distrust
-      dates derived on the client, and every product client is correct (`todayInSg()`,
-      `today_sg()` after §7.94). The drivers were never audited the same way. **The
-      nightly's cron is `0 20 * * *` — chosen as 04:00 SGT, which means every sweep runs on
-      the PREVIOUS UTC day**, and this driver's turn came 86 minutes in, at 21:26 UTC. So on
-      2026-08-08 it read "Sat, 8 Aug" from UTC while Singapore was already Sunday the 9th,
-      failed to skip, and booked a lesson the coach's screens had moved past. Any driver
-      that asks "what day is it" is on the wrong side of that boundary for the whole run.
-    - **The skip is what made it invisible for two weeks.** The driver had been broken since
-      §8.12 made a parent's contact number **mandatory** on the booking form (2026-07-26):
-      it never filled the phone, so the form refused before `book_trial()` was reached and
-      every later assertion failed for an unrelated reason. **Every scheduled sweep between
-      those dates counted `trials` as PASS** — the two green ones (both 2026-08-07, a UTC
-      Friday) and the red one before them (2026-08-05, a UTC Wednesday) alike, none having
-      reached the first coach check. **A driver that can skip must say what it skipped, and
-      a sweep's PASS is only worth the checks it actually ran.**
-    - **Fix the axis, not the instance.** Compare **ISO option values** against
-      `toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" })` — never rendered
-      labels, which are a locale away from being a different string. Better still, remove
-      the date condition: this driver now reaches marking through the Schedule tab's NEEDS
-      MARKING, which is floor-scoped, so it runs **every day** instead of one in seven.
-    - **A related trap on the way out.** The class ROSTER gates its "Mark Attendance" button
-      on `activeStudentIds.length > 0` — **enrolments only** — so a class whose only
-      attendee on a date is a trial or make-up guest renders no lessons and no button
-      there. The Schedule tab has no such gate (it derives who is expected from
-      `expectedStudentsOn()`, which counts bookings). A driver that reaches marking via the
-      roster cannot test a guest-only lesson at all. (2026-08-09.)
+    AND `new Date()` IN CI IS UTC, SO IT SKIPS ON THE WRONG DAYS.** `verify-trials.mjs` exited
+    **0** ("SKIP  today is not a lesson day") off Saturdays, reading the day via
+    `new Date().toLocaleDateString("en-SG", …)` with **no `timeZone`**.
+    - **§7.7 on the DRIVER's side** (clients use `todayInSg()`, `today_sg()` after §7.94); drivers were never audited. The
+      nightly cron `0 20 * * *` (04:00 SGT) runs on the **PREVIOUS UTC day**, so any driver asking
+      "what day is it" is wrong for the whole run.
+    - **The skip hid a two-week break:** since §8.12 made a parent's phone mandatory (2026-07-26),
+      the driver never filled the phone or reached `book_trial()`, yet every sweep counted `trials` PASS. **A driver
+      that can skip must say what it skipped; a sweep's PASS is only worth the checks it ran.**
+    - **Fix the axis:** compare **ISO option values** against
+      `toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" })` — never rendered labels.
+      Better: remove the condition — it now marks via floor-scoped NEEDS MARKING, every day.
+    - **Related:** the class ROSTER gates "Mark Attendance" on `activeStudentIds.length > 0`
+      (**enrolments only**), so a guest-only lesson shows no button there; the Schedule tab uses
+      `expectedStudentsOn()` (counts bookings). Test guest-only lessons via Schedule. (2026-08-09.)
 
 101. **ON A SHARED DATABASE, `nth(n)` IS A DATA-CORRUPTION BUG, NOT A BRITTLE-SELECTOR
     NIT — IT WRITES TO A ROW YOU DO NOT OWN, AND THE TEARDOWN THEN DESTROYS THAT ROW'S
-    DATA.** `verify-levels.mjs` picked its student with `page.locator("select").nth(2)`,
-    commented *"Maya Tan is the 3rd student alphabetically (Ethan, Ethan, Maya, Noah)"* —
-    true of the bare seed and of nothing else. `fixtures-levels-table.sql` adds three
-    `LvlTbl Child …` rows to the **same tenant**, which shifts the ordering, so `nth(2)`
-    resolved to somebody else's child. The driver set *its* level on that child; its
-    cleanup then deleted that level, and `students.level_id` is `ON DELETE SET NULL`
-    (§7.69), so the victim's level was silently blanked with nothing recording what it had
-    been. **Measured, not theorised: `LvlTbl` children holding a level went 3 → 2**, while
-    the driver still reported its own checks green.
-    - **The ordinal is not the bug; the dependency is.** `nth(n)` over a list whose length
-      depends on which fixtures happen to be loaded is a shared-stack bug (§7.55) wearing a
-      locator's clothes. It is invisible in review because the comment explaining it is
-      *correct about the seed*.
-    - **Fix:** reach the row by something it owns —
-      `page.getByRole("row").filter({ hasText: "Maya Tan" }).locator("select")` — and assert
-      the match count is exactly 1 before writing, so an ambiguous match throws instead of
-      picking. If a row has no name to match on, **that** is the finding.
-    - Applies to **every driver in the suite**, not just this one — the count is
-      `ls drivers/verify-*.mjs`, not a number written here. (2026-08-09.)
+    DATA.** `verify-levels.mjs`'s `page.locator("select").nth(2)` assumed seed ordering;
+    `fixtures-levels-table.sql`'s `LvlTbl Child …` rows shifted it, the driver set and then
+    deleted a level on another child, and `ON DELETE SET NULL` (§7.69) blanked it silently —
+    `LvlTbl` children with a level went 3 → 2 while the driver stayed green.
+    - **The dependency is the bug:** `nth(n)` over a fixture-dependent list is §7.55 in a locator.
+    - **Fix:** `page.getByRole("row").filter({ hasText: "Maya Tan" }).locator("select")` and
+      assert match count is exactly 1 before writing. No name to match on is **the** finding.
+    - Applies to every driver — the count is `ls drivers/verify-*.mjs`. (2026-08-09.)
 
 102. **A `fixtures-*-teardown.sql` WITH NO `fixtures-*.sql` BESIDE IT IS INVISIBLE TO BOTH
     CI GUARDS.** `check-teardowns.sh` and `check-fixture-roundtrip.sh` both open with
-    `for f in fixtures-*.sql; do case "$f" in *-teardown.sql) continue ;; esac` — they
-    iterate **fixtures**, and a teardown is only ever reached as the *sibling* of one. So a
-    lone teardown file is neither required, nor loaded, nor round-tripped: it looks like
-    covered cleanup and is checked by nothing. A plan written on the assumption that
-    committing one buys CI coverage was wrong, and the error survived a review because the
-    two scripts *are* the coverage for every other teardown.
-    - **Consequence for cleanup design:** a SQL teardown is only as good as the human who
-      remembers to run it. Where a driver can undo its own writes **through the UI it
-      already drives**, that is strictly better — it needs no file, no prereq line, and a
-      crashed run self-heals on the next one because the cleanup also runs at *setup*.
-      `verify-levels.mjs`'s `cleanupOwnLevels()` is the pattern.
-    - Adding a paired `fixtures-<name>.sql` *does* buy the coverage — but check
-      `run-all-drivers.sh`'s `fixture_for()` first: its default branch resolves
-      `fixtures-<driver>.sql` by name, so creating one silently changes which fixture the
-      nightly loads for that driver. (2026-08-09.)
+    `for f in fixtures-*.sql; do case "$f" in *-teardown.sql) continue ;; esac` — a teardown is
+    only reached as a fixture's sibling, so a lone one is neither required, loaded nor round-tripped.
+    - Prefer a driver undoing its own writes **through the UI it already drives**, also run at
+      *setup* so a crashed run self-heals — `verify-levels.mjs`'s `cleanupOwnLevels()`.
+    - A paired `fixtures-<name>.sql` does buy coverage, but check `run-all-drivers.sh`'s
+      `fixture_for()`: its default branch resolves `fixtures-<driver>.sql` by name, silently
+      changing what the nightly loads. (2026-08-09.)
 
 103. **A FIXTURE THAT BACK-DATES AN ENROLMENT INVENTS UNMARKED LESSONS, AND UNMARKED
-    ATTENDANCE BLOCKS BILLING WITH NO OVERRIDE.** `fixtures-admin-table-geometry.sql`
-    enrolled its child from `markable_floor(tenant)` — the 1st of last month — on a
-    **weekly** class, while marking exactly one lesson. The engine derives expected lessons
-    from the class weekday across the enrolment span (`expectedLessonDates()` in `core.ts`)
-    and *any* unmarked expected date stops the whole run by design. So merely having that
-    fixture loaded left the **seed tenant unbillable**, on the database every worktree
-    shares (§7.55).
-    - **Neither harness would have caught it.** `run-all-drivers.sh` resets per driver, and
-      `check-fixture-roundtrip.sh` compares row *counts* — a fixture can be perfectly
-      reversible and still put the database in a state no billing run can leave.
-    - **Rule:** enrol on the date of the lesson the fixture actually marks, so expected ==
-      marked. Reach for the marking floor only when the fixture is *about* the floor.
-    - The same asymmetry is why `is_active` and lesson dates are worth a second look in any
-      fixture touching a weekly class. (2026-08-09.)
+    ATTENDANCE BLOCKS BILLING WITH NO OVERRIDE.** `fixtures-admin-table-geometry.sql` enrolled
+    from `markable_floor(tenant)` on a weekly class but marked one lesson; `expectedLessonDates()`
+    (`core.ts`) then left the **seed tenant unbillable** on the shared database (§7.55).
+    - Neither `run-all-drivers.sh` (resets per driver) nor `check-fixture-roundtrip.sh` (compares
+      row counts) catches it.
+    - **Rule:** enrol on the date of the lesson the fixture marks, so expected == marked; use the
+      marking floor only when the fixture is *about* the floor. Check `is_active` and lesson dates
+      in any fixture touching a weekly class. (2026-08-09.)
 
-104. **↪ Repeat of §7.38 — read that first; this entry is a later time it bit.** **`current_user = 'authenticated'` IS DEAD CODE INSIDE A `SECURITY DEFINER` FUNCTION,
-    AND IT FAILS OPEN.** That comparison is the codebase's standard client seam —
-    `pin_invoice_public_fields`, `pin_parent_identity` and `enforce_parent_package_lifecycle`
-    all use it, and all three are deliberately *plain* functions for exactly this reason
-    (`20260720000100:365` says so out loud). Inside a DEFINER function `current_user` is the
-    function's **owner**, so every such branch reads `postgres` and waves the client
-    straight through.
-    - **Where it bit (2026-08-09):** `assign_parent_package_reference()` must be DEFINER —
-      it is the only thing allowed to call `next_package_ref`. Its first version refused a
-      client-supplied `reference_number` with this seam. The refusal never fired; a parent
-      could name their own reference, which does not merely mislabel their row — the
-      tenant's counter stays behind it, so the **next genuine request draws the squatted
-      number and dies on the unique constraint**, breaking the buy-a-package path for that
-      whole business.
-    - **Caught only because the pgTAP case expected a raise and got a successful insert.**
-      A test asserting the happy path would have been green.
-    - **Rule:** a DEFINER function may not ask *who is calling*. Either make the rule
-      unconditional (the fix here: mint the reference always, discarding whatever arrived),
-      or put the role check in a **separate plain trigger** and let the DEFINER one do only
-      the privileged work.
-    - Sibling trap, same shape: `SECURITY DEFINER` also defeats RLS on reads inside the
-      function, which is why the packages lifecycle trigger is plain. (2026-08-09.)
-    - **And the other direction, added the same day: a trigger that WRITES to an
-      RLS-protected table MUST be `SECURITY DEFINER`, or it refuses the write that fired
-      it.** `20260809000200`'s `students` audit trigger inserts into `audit_log`, whose
-      INSERT policy permits `authenticated` exactly one `entity_type` (a coach on a lesson
-      session they own — `20260804000300`). Invoker-rights, that insert is refused with
-      `42501`; a raising trigger kills the whole statement (§7.66, §7.67), so **every
-      student edit in the product** — level picker, contact modal, Assign, the parent's own
-      edit-child screen — stops working. So the two halves of this gotcha bite in opposite
-      directions on the same function, and both are live at once: DEFINER is **required**
-      for the write, **and** it silently kills any `current_user` seam placed inside.
-    - **Corollary for the test, not just the code:** assert as the role that actually makes
-      the write. A pgTAP file that updates as `postgres` passes against the broken build —
-      the owner is exempt from the policy the bug trips over — so it proves nothing.
-      `students_audit.test.sql` writes as `authenticated` for exactly this reason.
-      (2026-08-09.)
+104. **↪ Folded into §7.38 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 
 105. **A BOUNDARY TEST IS ONLY WORTH THE CASES WHERE THE TWO ANSWERS DISAGREE.**
-    `WAVE_1_PLAN.md`'s RISK 6 named the assertion itself: *"a pgTAP case inserting with
-    `requested_at` set to `'2025-12-31 23:30:00+08'` must mint `PKG-2025-…`"*. That case
-    **passes under the bug it was written to catch** — 23:30 SGT on 31 Dec is 15:30 UTC on
-    31 Dec, so the SGT-correct and UTC-broken derivations both answer 2025.
-    - The discriminating case is the other side of midnight: **`'2026-01-01 00:30:00+08'`**
-      is still **2025** in UTC. Written that way it goes red on
-      `to_char(NEW.requested_at, 'YYYY')` and green on
-      `to_char(NEW.requested_at AT TIME ZONE 'Asia/Singapore', 'YYYY')` — verified both ways.
-    - **This generalises past time zones.** §7.94 is the same lesson from the other
-      direction: an RPC, its pgTAP file and its driver all shared the UTC assumption and
-      therefore *agreed*, so 14 tests on that exact function stayed green over a live bug.
-      Before writing a boundary case, ask **which value would differ if the guard were
-      wrong** — if none would, the case is decoration.
-    - Applies to the whole SGT family (§7.7): the interesting window is 00:00–08:00 SGT,
-      where SGT and UTC disagree about the **date**, and 00:00–08:00 SGT on 1 January,
-      where they disagree about the **year**. (2026-08-09.)
+    `WAVE_1_PLAN.md`'s RISK 6 case `'2025-12-31 23:30:00+08'` → `PKG-2025-…` **passes under the
+    bug** — SGT and UTC both say 2025.
+    - Discriminating case: **`'2026-01-01 00:30:00+08'`** — red on
+      `to_char(NEW.requested_at, 'YYYY')`, green on
+      `to_char(NEW.requested_at AT TIME ZONE 'Asia/Singapore', 'YYYY')`, verified both ways.
+    - Same lesson as §7.94. Before writing a boundary case, ask **which value would differ if the
+      guard were wrong** — if none, it is decoration.
+    - SGT family (§7.7): 00:00–08:00 SGT disagrees on the **date**; on 1 January, the **year**.
+      (2026-08-09.)
 
 106. **`.select("a, " + "b")` SILENTLY UNTYPES A SUPABASE QUERY — the error names the
-    wrong thing.** `supabase-js` parses the select string at the *type* level, which needs
-    a string **literal**. TypeScript widens `"a" + "b"` to plain `string`, the parser gives
-    up, and every field access on the result fails with
-    `Property 'total_value' does not exist on type 'GenericStringError'` — which reads like
-    a schema problem and is actually a formatting one.
-    - Wrapping a long select across lines with `+` is the natural thing to do and the
-      existing invoice branch got away with it only because its result was already `any`.
-    - **Rule:** keep a `.select()` on one line however long it gets, or use a template
-      literal with no interpolation. Do not "fix" a `GenericStringError` by casting the
-      row — that is §7.76, where a renamed field then reads blank forever with no error.
-      (2026-08-09.)
+    wrong thing.** supabase-js parses the select at the type level and needs a string
+    **literal**; `+` widens to `string`, giving
+    `Property 'total_value' does not exist on type 'GenericStringError'`.
+    - **Rule:** keep a `.select()` on one line, or use a template literal with no interpolation.
+      Do not "fix" a `GenericStringError` by casting the row — that is §7.76 (a renamed field
+      reads blank forever). (2026-08-09.)
 
 107. **`loginExpo` SHORT-CIRCUITS WHEN THE PAGE IS ALREADY SIGNED IN, SO A DRIVER THAT
-    CHANGES PERSONA KEEPS THE PREVIOUS USER AND REPORTS SUCCESS.** Its `authed()` guard
-    asks only *"are we on the app and off /login"* — correct for its own retry loop
-    (§7.62's fix), wrong for a second call with a different email. It logs
-    `loginExpo -> <current url>` and returns, having done nothing.
-    - **The symptom is not a login error.** The run continues as the wrong role, so the
-      failure surfaces as a missing element several checks later —
-      `verify-paynow-fallback.mjs` died on a 12s `waitFor Settings` while still logged in
-      as a parent, on the PayNow screen.
-    - **Fix:** clear the persisted session first —
-      `page.goto(EXPO + "/login"); page.evaluate(() => window.localStorage.clear());`
-      then `loginExpo`. `verify-admins.mjs` has had the admin-panel half of this as
-      `freshLogin()` since 2026-08-06; the Expo half is the same shape.
-    - **Do NOT "fix" this in `lib.mjs`** by making `loginExpo` compare the signed-in email:
-      it is shared with every worktree (§7.56) and its short-circuit is load-bearing for
-      the slow-attempt race it was written for (§7.62). A local `freshLogin` is the right
-      layer. (2026-08-09.)
+    CHANGES PERSONA KEEPS THE PREVIOUS USER AND REPORTS SUCCESS.** `authed()` checks only "on
+    the app and off /login" (§7.62's fix); it logs `loginExpo -> <current url>` and returns.
+    - Symptom is a missing element later — `verify-paynow-fallback.mjs` timed out on
+      `waitFor Settings` still logged in as a parent.
+    - **Fix:** `page.goto(EXPO + "/login"); page.evaluate(() => window.localStorage.clear());`
+      then `loginExpo` (cf. `verify-admins.mjs`'s `freshLogin()`).
+    - **Do NOT "fix" this in `lib.mjs`** by comparing the signed-in email: it is shared with every
+      worktree (§7.56) and the short-circuit is load-bearing for §7.62's race. (2026-08-09.)
 
 108. **A DRIVER THAT DIES ON `page.goto(admin/login)` WITH A 30s `networkidle` TIMEOUT IS A
-    COLD NEXT.JS COMPILE — NOT DRIVER ROT, AND NOT A PRODUCT BUG.** §7.73's triage question
-    is *"which moved, the product or the driver's assumption?"* and the honest answer here
-    is **neither**: the dev server had simply never compiled that route in this process, and
-    `waitUntil: "networkidle"` gives it 30 seconds to do a first build it cannot finish.
-    - **Where it bit (2026-08-09):** `verify-trial-visibility.mjs` failed at check 9 —
-      after eight green parent/coach checks — on `loginAdmin` (`lib.mjs:77`). Re-running it
-      unchanged, after one `curl http://localhost:3000/login`, gave **11/11**. Nothing about
-      the driver or the product had moved between the two runs.
-    - **Why it hides:** the drivers that ran before it had already warmed the routes *they*
-      use, so the first driver to touch a cold route is the one that fails, and which driver
-      that is depends on the order you happen to run them in. `run-all-drivers.sh` resets the
-      database between drivers but does not restart the dev servers, so a long sweep warms
-      itself and the symptom is worst on a short `--only` run against a fresh `npm run dev`.
-    - **Fix (do this before triaging anything):** `curl -s -o /dev/null http://localhost:3000/login`
+    COLD NEXT.JS COMPILE — NOT DRIVER ROT, AND NOT A PRODUCT BUG.** Neither moved (§7.73's
+    question): the dev server had never compiled the route and `networkidle` gives it 30 s.
+    - **Where it bit (2026-08-09):** `verify-trial-visibility.mjs` check 9, `loginAdmin`
+      (`lib.mjs:77`); 11/11 after one curl. Worst on a short `--only` run against a fresh
+      `npm run dev` — `run-all-drivers.sh` doesn't restart servers, so sweeps warm themselves.
+    - **Fix (before triaging anything):** `curl -s -o /dev/null http://localhost:3000/login`
       and re-run. If it passes, it was this. Only then reach for §7.73.
-    - **Do NOT "fix" it by raising the timeout in `lib.mjs`** — that file is shared with
-      every worktree (§7.56), and a longer timeout buys nothing on CI, where each job starts
-      cold anyway and a genuinely hung page then takes proportionally longer to fail.
-      (2026-08-09.)
+    - **Do NOT "fix" it by raising the timeout in `lib.mjs`** — shared with every worktree
+      (§7.56), and CI starts cold anyway. (2026-08-09.)
 
 109. **WIDENING WHAT THE INVOICE ENGINE *SCANS* WIDENS WHAT *BLOCKS* IT — AND THE CLASS IT
-    BLOCKS ON MAY BE INVISIBLE TO EVERY SCREEN THAT COULD CLEAR IT.** `core.ts`'s classes
-    query does not only decide what gets tallied; it decides which classes enter the
-    **completeness gate**. Predicted in `docs/plans/WAVE_1_PLAN.md` as RISK 1 and confirmed
-    by reading the code, 2026-08-09.
-    - **The chain**, all of it inside one loop: widen the scan → an inactive class with
-      `student_class_enrolments.is_active = true` re-enters it → `activeStudentIds` is
-      non-empty → `expectedDates` is every weekly date in the month → there are no
-      `lesson_sessions` → everyone is unmarked → the month blocks. The block has **no
-      override, by design** (§8a), so there is no way out through the engine.
-    - **Why it is a deadlock and not merely a bug:** the coach class list, the coach
-      Schedule tab and the admin Classes page **all filtered `is_active`**, so nobody could
-      see the class, let alone mark it. `markable_floor()` does not rescue this — that is a
-      *date* gate and the obstruction is *visibility*. It is §8.32's deadlock reached along
-      a new axis, and the blast radius is every parent of that business, for a month.
-    - **The durable rule: before changing what the engine ENUMERATES, find every screen that
-      could clear the resulting block.** `grep -rn 'is_active' <both apps>` is the search;
-      if the answer is "no screen", the UI change ships in the SAME deploy or the engine
-      change does not ship.
-    - **How it was closed (2026-08-09, the shape to copy):** three ways, because the failure
-      is unrecoverable. A `classes.deactivated_at` **date** clamps how far an inactive class
-      is expected to have run, so the unclearable expectation is never generated; the RPC
-      refuses to create the state; and the admin page gained a *Show retired* affordance in
-      the same deploy. A boolean cannot do the first — "was this class running on the 13th?"
-      needs a date. (2026-08-09.)
+    BLOCKS ON MAY BE INVISIBLE TO EVERY SCREEN THAT COULD CLEAR IT.** `core.ts`'s classes query
+    decides which classes enter the **completeness gate** (RISK 1 in `docs/plans/WAVE_1_PLAN.md`).
+    - **Chain:** widen scan → inactive class with `student_class_enrolments.is_active = true`
+      re-enters → every weekly date expected → no `lesson_sessions` → month blocks, with **no
+      override, by design** (§8a).
+    - **Deadlock:** coach class list, Schedule and admin Classes all filtered `is_active`, so no
+      one could mark it; `markable_floor()` is a date gate, not visibility. §8.32's deadlock on a
+      new axis.
+    - **Rule: before changing what the engine ENUMERATES, find every screen that could clear the
+      resulting block** — `grep -rn 'is_active' <both apps>`; if "no screen", the UI change ships
+      in the SAME deploy or the engine change does not ship.
+    - **Closed three ways (2026-08-09):** `classes.deactivated_at` **date** clamps expected
+      lessons so the unclearable one is never generated (a boolean can't); the RPC refuses the state; admin gained *Show retired*.
 
-110. **A TEST CAN BE MADE VACUOUS BY THE FIX IT WAS WRITTEN TO SURVIVE.** §7.25 says prove a
-    test red when you write it. This is the same rule pointed **forward in time**: re-prove
-    it red after any change to the mechanism it depends on.
-    - **Where it bit (2026-08-09):** `makeups.test.ts:370` pinned the `home_class_id` arm of
-      the `class_rates` union — but **only because deactivating the home class was what
-      dropped that class out of the scan**. §7.109's fix stopped the scan filtering
-      `is_active`, so the class was in it either way, and the test kept passing while
-      guarding nothing. Measured, not argued: with the arm deleted the whole file passed
-      **12/12**.
-    - **The tell:** a test whose setup includes the very condition a change is removing.
-      Predicted at planning time here — the plan named the file and the line — and the
-      prediction was right, so this is cheap to spot if you look.
-    - **What to do when it fires:** first ask whether the guarded code is now *unreachable*
-      rather than merely untested. Here it was: `book_makeup()` derives `home_class_id` from
-      the child's own active enrolment, always same-tenant, and the scan now covers every
-      class in the tenant. Dead code in the money engine with no test behind it reads as
-      load-bearing to the next person, so it was **deleted** rather than kept — helped by
-      its failure mode being a LOUD throw (`rateOn()` has no fallback), never a silent
-      underbill. (2026-08-09.)
+110. **A TEST CAN BE MADE VACUOUS BY THE FIX IT WAS WRITTEN TO SURVIVE.** §7.25 pointed
+    forward: re-prove a test red after any change to the mechanism it depends on.
+    - **Where it bit (2026-08-09):** `makeups.test.ts:370` pinned the `home_class_id` arm of the
+      `class_rates` union only because deactivation dropped the class from the scan; after §7.109
+      it passed **12/12** with the arm deleted.
+    - **Tell:** a test whose setup includes the condition a change removes.
+    - **When it fires:** ask if the guarded code is now *unreachable*. Here it was (`book_makeup()`
+      derives `home_class_id` same-tenant), so it was **deleted** — its failure mode was a LOUD
+      throw (`rateOn()` has no fallback), never a silent underbill.
 
 111. **A TEST HELPER THAT SATISFIES THE GATE ALSO SATISFIES YOUR ASSERTION ABOUT THE GATE.**
-    `completeMonth()` marks every still-due lesson `cancelled_rain` — non-billable, so the
-    completeness gate passes. Call it in a test whose point is *"these dates are not
-    expected"* and the test passes against an engine that expects them all.
-    - **Where it bit (2026-08-09), twice in one file:** both `classDeactivation.test.ts`
-      cases about the `deactivated_at` clamp called `completeMonth()` out of habit. Caught
-      only by the sabotage run — the naive-engine patch left them **green**. Removing the
-      call made one of them fail under sabotage, which is what made it a test.
-    - **The rule:** in a test about *what the gate demands*, the fixture may not contain
-      anything that satisfies the gate. Helpers named "complete…", "settle…", "seal…" are
-      the ones to look for. A test about billing AMOUNTS may use them freely — there the
-      helper isolates the number under test, which is what it is for.
-    - **Generalises past this repo:** any helper that puts the system into the state your
-      assertion is about is a vacuity risk, and it is invisible in a green run. (2026-08-09.)
+    `completeMonth()` marks due lessons `cancelled_rain`, passing the completeness gate.
+    - **Where it bit (2026-08-09):** both `classDeactivation.test.ts` `deactivated_at` clamp cases
+      called it and stayed green under sabotage; removing it made one fail.
+    - **Rule:** in a test about *what the gate demands*, the fixture may not contain anything that
+      satisfies the gate — watch helpers named "complete…", "settle…", "seal…". Tests about billing
+      AMOUNTS may use them freely. Any helper producing the asserted state is a vacuity risk.
 
 112. **`throws_ok(…, 'P0001', NULL, …)` ASSERTS ONLY THAT *SOMETHING* RAISED — SO POINT IT AT
-    A SUBJECT WHERE ONLY THE GUARD UNDER TEST CAN RAISE.** A `NULL` message argument matches
-    any message, and every `RAISE EXCEPTION` in PL/pgSQL is `P0001` by default. Two different
-    guards are therefore indistinguishable to the assertion.
-    - **Where it bit (2026-08-09):** `class_deactivation.test.sql`'s cross-tenant assertion
-      called `deactivate_class()` on a class that **also** had a live enrolment. Delete the
-      `is_tenant_admin()` check entirely and the enrolment refusal still raises `P0001` — the
-      test stays green while any business can retire any other business's class. Found by
-      sabotage, not by reading.
-    - **The fix is the SUBJECT, not the assertion.** It was re-pointed at a class already in
-      the terminal state (retired), where the only reachable outcomes are the tenant refusal
-      or the idempotent `RETURN` — so removing the check flips it to `lives_ok`. Choosing a
-      subject that can only fail one way beats matching on message text, which is brittle.
-    - **The general form:** a permission test whose subject also violates a business rule is
-      testing the business rule. Give permission tests a subject that is otherwise
-      **perfectly valid**. (2026-08-09.)
+    A SUBJECT WHERE ONLY THE GUARD UNDER TEST CAN RAISE.** `NULL` matches any message and every
+    `RAISE EXCEPTION` is `P0001`.
+    - **Where it bit (2026-08-09):** `class_deactivation.test.sql`'s cross-tenant
+      `deactivate_class()` target also had a live enrolment; with `is_tenant_admin()` deleted the
+      enrolment refusal kept it green. Found by sabotage.
+    - **Fix the SUBJECT:** use an already-retired class, where only the tenant refusal or the
+      idempotent `RETURN` is reachable, so removing the check flips it to `lives_ok`. Better than
+      matching message text.
+    - Give permission tests a subject that is otherwise **perfectly valid**.
 
 113. **A DRIVER WHOSE MAIN ACT MUTATES STATE MUST HAVE THAT STATE RESET BY ITS FIXTURE, NOT
-    ONLY BY ITS OWN HAPPY PATH.** A driver that retires, disables, archives or seals
-    something and undoes it at the end is hermetic *only when it finishes*. Kill it in the
-    middle — a red check, a timeout, a sabotage run — and it leaves the mutation behind.
-    - **Where it bit (2026-08-09):** `verify-class-deactivation.mjs` retires a class and
-      restores it. A sabotage run died between the two, so the next run failed its own
-      fixture guard with *"Fixture is not in place"* — a message pointing at the fixture
-      when the real cause was the previous run. `ON CONFLICT (id) DO NOTHING` cannot repair
-      it, because the rows exist; only their state is wrong.
-    - **Fix:** `ON CONFLICT (id) DO UPDATE SET <the mutated columns only>`. Re-applying the
-      fixture becomes the reset, and nothing else the fixture does not own is overwritten.
-    - **Why a `finally` block is not enough:** it does not survive a hard kill, and the
-      nightly sweep re-applies fixtures between drivers anyway — so putting the reset in the
-      fixture makes it free. Same family as §8.36's non-hermetic `verify-levels`, reached
-      through a different door: there the second same-day run died, here the run *after a
-      failure* did. (2026-08-09.)
+    ONLY BY ITS OWN HAPPY PATH.** Killed mid-run, it leaves the mutation behind.
+    - **Where it bit (2026-08-09):** a sabotage run of `verify-class-deactivation.mjs` died between
+      retire and restore; next run failed *"Fixture is not in place"*. `ON CONFLICT (id) DO NOTHING`
+      can't repair existing rows.
+    - **Fix:** `ON CONFLICT (id) DO UPDATE SET <the mutated columns only>` — re-applying the fixture
+      is the reset. A `finally` block doesn't survive a hard kill. Same family as §8.36.
 
 114. **`.in("col", [])` IS NOT AN EMPTY FILTER — IT IS A REJECTED REQUEST, AND `?? []`
-    SWALLOWS IT.** supabase-js renders an empty array as PostgREST `col=in.()`, which the
-    server refuses. supabase-js reports that as `data: null`, and the near-universal
-    `(data ?? [])` idiom then turns a failed request into an empty result set that reads
-    exactly like "nothing matched".
-    - **Where it nearly bit (2026-08-10):** widening `core.ts`'s per-class guards let a
-      *guest-only* class — nobody enrolled, nobody marked, one booked guest — reach two
-      queries that had always been protected by an earlier `continue`:
-      `.in("student_id", billableStudentIds)` and `.in("id", billableStudentIds)`. The class
-      would still have blocked the month correctly, so **the broken request would have
-      produced no visible symptom at all** — the worst kind, because the next feature to rely
-      on those rows inherits a silent hole.
-    - **Fix:** skip the query on an empty set, in the shape the file already uses elsewhere —
-      `const { data } = ids.length ? await supabase… : { data: [] as Row[] }`. Do not "fix"
-      it by defaulting the array to a sentinel id; that is a real query returning real
-      nothing, which is slower and lies in a different direction.
-    - **Where else to look:** any `.in()` whose array is built by filtering. The guard that
-      made it non-empty is often several screens away from the query. (2026-08-10.)
+    SWALLOWS IT.** It renders `col=in.()`, the server refuses, supabase-js returns `data: null`,
+    and `(data ?? [])` reads it as "nothing matched".
+    - **Where it nearly bit (2026-08-10):** widened `core.ts` guards let a guest-only class reach
+      `.in("student_id", billableStudentIds)` and `.in("id", billableStudentIds)` — no visible symptom.
+    - **Fix:** `const { data } = ids.length ? await supabase… : { data: [] as Row[] }`. Do not "fix"
+      it by defaulting the array to a sentinel id; that is a real query returning real nothing.
+    - Check any `.in()` whose array is built by filtering.
 
-115. **↪ Repeat of §7.40 — read that first; this entry is a later time it bit.** **READ A FUNCTION BODY FROM `pg_get_functiondef()`, NEVER FROM THE MIGRATION THAT
-    FIRST CREATED IT.** `CREATE OR REPLACE` means the newest definition can live in any
-    later migration, and grep finds the oldest one first.
-    - **Where it bit (2026-08-10):** both `BACKLOG.md` and an adversarial review stated that
-      `book_trial()` had no `markable_floor()` guard, citing `20260725000800_book_trial.sql`.
-      It has had one since `20260806000200_markable_floor.sql`. A planned migration step —
-      "add the floor guard" — was therefore about to re-add a guard that existed, and the
-      review's risk rating was built on it. Caught only because the plan carried its own
-      instruction to take the body from the live database.
-    - **Fix:** `docker exec supabase_db_SwimSync psql -U postgres -d postgres -At -c "SELECT
-      pg_get_functiondef('public.<fn>'::regproc);"` before editing, and diff against it after
-      applying. The same command is the §7.93 rollback check, so it costs nothing extra.
-    - **The general form:** this is §8.38's "ask the code, never inherit a list" applied to a
-      single function. An inherited claim about code is a claim about code *as it once was*.
-      (2026-08-10.)
+115. **↪ Folded into §7.40 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 
 116. **`service_role` BYPASSES RLS, NOT CHECK CONSTRAINTS — AND A NEW CONSTRAINT WILL KILL
-    ANY FIXTURE THAT BUILDS A STATE THE PRODUCT CANNOT.** Test fixtures and seed files write
-    as `postgres` or `service_role` and get used to nothing ever refusing them. A table
-    constraint refuses them exactly like anyone else.
+    ANY FIXTURE THAT BUILDS A STATE THE PRODUCT CANNOT.**
     - **Where it bit (2026-08-10):** `20260810000100` added
-      `CHECK (is_active = true OR deactivated_at IS NOT NULL)` to `classes`.
-      `makeup_bookings.test.sql` had been inserting a retired class with no `deactivated_at`
-      to exercise `book_makeup()`'s refusal. The INSERT raised `23514`, the transaction
-      aborted, and the file reported **"You planned 26 tests but ran 0"** — a parse-error
-      shape that names neither the constraint nor the line.
-    - **How to read that symptom:** `Bad plan. You planned N but ran 0` means the file died
-      before its first assertion, which is almost always the fixture. Run the file directly
-      through `psql` and read the first `ERROR:`; `supabase test db` summarises it away.
-    - **And the finding is worth more than the fix:** a fixture that constructs a state the
-      product can no longer produce is testing a fiction. Fix it by building the state the
-      way a user would — here, adding the date — not by dropping the constraint for tests.
-      (2026-08-10.)
+      `CHECK (is_active = true OR deactivated_at IS NOT NULL)` to `classes`;
+      `makeup_bookings.test.sql`'s retired class without `deactivated_at` raised `23514` →
+      **"You planned 26 tests but ran 0"**.
+    - `Bad plan. You planned N but ran 0` = died before the first assertion (usually the fixture).
+      Run the file through `psql` and read the first `ERROR:`; `supabase test db` hides it.
+    - Build the state the way a user would (add the date), not by dropping the constraint for tests.
 
 117. **A `throws_ok` / `lives_ok` PAIR CAN BE POISONED BY A UNIQUE INDEX WHEN YOU SABOTAGE
-    IT.** The §7.112 fix is to pair every refusal with a `lives_ok` on an otherwise-identical
-    subject, so deleting the guard flips the pair. But if the guarded call WRITES on success,
-    the sabotage run's `throws_ok` now succeeds and inserts a row — and the partner, re-running
-    the identical call, dies on a duplicate key instead of passing.
-    - **Where it bit (2026-08-10):** `booking_class_active.test.sql` paired
-      "`book_trial()` refuses a retired class" with the same call after `reactivate_class()`.
-      `trial_bookings_live_slot_uniq` is `UNIQUE (student_id, class_id, session_date) WHERE
-      cancelled_at IS NULL`, so the sabotage run turned BOTH red. The partner's red was
-      collateral — it says nothing about the guard, and it would mask a genuine regression in
-      the partner itself.
-    - **Fix:** give the partner its own key — here, the same class and weekday one week later.
-      It still proves the subject is otherwise valid, and now only the `throws_ok` moves.
-    - **How to notice:** an idempotent function (`ON CONFLICT DO NOTHING`) has no such problem,
-      so a file with two pairs can show one clean and one poisoned — which is exactly what
-      happened. **Record the measured sabotage signature in the file header** (which assertions
-      go red), so a future change producing a *different* set is visibly not the same change.
-      (2026-08-10.)
+    IT.** §7.112's pair: if the guarded call WRITES on success, sabotage makes `throws_ok` insert
+    a row and the partner dies on a duplicate key.
+    - **Where it bit (2026-08-10):** `booking_class_active.test.sql`'s `book_trial()` pair vs
+      `trial_bookings_live_slot_uniq` (`UNIQUE (student_id, class_id, session_date) WHERE
+      cancelled_at IS NULL`) — both red.
+    - **Fix:** give the partner its own key (same class/weekday one week later).
+    - Idempotent (`ON CONFLICT DO NOTHING`) functions are immune. **Record the measured sabotage
+      signature in the file header** (which assertions go red).
 
 118. **A UI DRIVER THAT LEAVES A ROW BEHIND WILL BREAK ITS OWN NEXT RUN — AND THE FAILURE
-    WILL LOOK LIKE A PRODUCT BUG.** §7.113 is the same lesson for fixtures; this is the case
-    where the driver has **no fixture at all** and treats the seed as one.
-    - **Where it bit (2026-08-10):** `verify-trials.mjs` books a trial with a unique name each
-      run and never removes it. Run 1 marks its guest and passes. Run 2 books a second guest
-      onto the *same lesson*, and the driver's `getByText(/^Present$/).first()` marks only one
-      of them — **the attendance screen refuses to save until every student on the lesson has a
-      status**, so nothing saved and run 2's own guest stayed unmarked. Three consecutive runs
-      failed a check the product was satisfying perfectly.
-    - **Two fixes, both needed.** Use the **"Set all" menu** rather than one row's button, so
-      the step does not depend on how many rows previous runs left. And assert on a **count**
-      (`NEEDS MARKING (N)` before vs after) rather than presence/absence, so the assertion
-      still means something when the backlog holds unrelated leftovers.
-    - **The vacuity trap sitting next to it:** the first version asserted
-      `!afterSave.includes(KID)`. NEEDS MARKING renders the class and the date and **never the
-      child's name**, so that expression was true before marking as well — a check that could
-      not fail. Before asserting a string is absent, confirm it was ever present. (2026-08-10.)
+    WILL LOOK LIKE A PRODUCT BUG.** §7.113 for a driver with no fixture.
+    - **Where it bit (2026-08-10):** `verify-trials.mjs` never removes its trial; run 2's
+      `getByText(/^Present$/).first()` marked one of two guests, and **attendance refuses to save
+      until every student has a status**.
+    - **Fixes:** use the **"Set all" menu**, and assert on a **count** (`NEEDS MARKING (N)`
+      before vs after).
+    - **Vacuity:** `!afterSave.includes(KID)` — NEEDS MARKING never renders the child's name.
+      Before asserting a string is absent, confirm it was ever present.
 
 119. **A RULE WRITTEN AS A *SHAPE* HAS NO SIZE, AND WILL BE OBEYED PERFECTLY WHILE THE THING
-    IT GOVERNS GROWS TEN-FOLD.** This is a documentation gotcha, and it has now cost this repo
-    two full rewrites — `HANDOVER.md` reached **3,972 lines / 290 KB** before the 2026-07-26
-    trim, then **1,001 lines / 91 KB** by 2026-08-10, nine days after being cut to 38 KB.
-    - **The mechanism, and it is not laziness.** Every rule governing the file's growth
-      specified a *shape*: "everything older becomes a ledger **line**", "`_Last updated:` →
-      today's date and a **one-line** summary", "prefer **deleting a stale line** to adding
-      one". Each was followed to the letter the whole way up. A markdown table row is still
-      "one row" at **1,446 characters** — July's rows cost ~130, August's averaged ~1,050. A
-      dateline is still "a summary" at 138 lines. Nothing was violated; the rules simply did
-      not bound anything.
-    - **"Delete what's stale" is not a rule, it is an unbounded judgement call** handed to the
-      person least able to make it — whoever just wrote the material. The proof is exact: a
-      note was added to the top of §3 on 2026-08-08 reading *"§3 is now ~400 lines — half this
-      file... the next graduation candidate... prefer editing a line here to adding one."*
-      §3 was **410 lines** then and **469** four sessions later. The instruction was in the
-      file, at the point of edit, in a section `/session-start` tells you to read — and it was
-      read past every time.
-    - **The fix is a size, countable in one command.** Ledger row ≤200 chars
-      (`awk 'length($0)>200'`), ≤1 `_Previously,_` (`grep -c`), whole file ≤45,000 bytes
-      (`wc -c`). And **measure at the START of the write, not the end**: the old rule asked
-      "did it grow past ~700 lines?" in a *Final check*, which five consecutive sessions
-      answered and waived, because by then the only remedy is a restructure.
-    - **The duplication test that was missing.** The graduation rule tested only whether
-      anything would be *lost* if the session entry were deleted. An entry that faithfully
-      **re-tells** the gotcha it just filed passes that test perfectly — nothing is lost, it is
-      all safely in `docs/` — while duplicating every word. That is precisely what the
-      1,400-character ledger rows were. **Graduating a fact means MOVING it, not copying it.**
-    - **A CI byte-ratchet was built, proven to fail correctly, and then deliberately reverted**
-      (`cb70808`) — gating a build on a documentation byte-count was judged disproportionate.
-      So the rules above are enforced by nothing but the next person to read them, which is
-      the third attempt at discipline-by-instruction. If it regrows a third time, restore
-      `scripts/check-doc-budget.sh` from that commit rather than re-wording the rule again.
-      (2026-08-10.)
+    IT GOVERNS GROWS TEN-FOLD.** `HANDOVER.md` hit **3,972 lines / 290 KB** before the
+    2026-07-26 trim, then **1,001 lines / 91 KB** by 2026-08-10, nine days after a cut to 38 KB.
+    - Rules like "a ledger **line**", "a **one-line** summary", "prefer **deleting a stale
+      line**" bound nothing: rows grew to **1,446 characters**. "Delete what's stale" is an
+      unbounded judgement call; §3's in-file note was read past (410 → 469 lines).
+    - **Fix: a size, countable in one command.** Ledger row ≤200 chars (`awk 'length($0)>200'`),
+      ≤1 `_Previously,_` (`grep -c`), file ≤45,000 bytes (`wc -c`). **Measure at the START of
+      the write, not the end.**
+    - **Graduating a fact means MOVING it, not copying it.**
+    - **A CI byte-ratchet was built, proven, then deliberately reverted** (`cb70808`). If it
+      regrows a third time, restore `scripts/check-doc-budget.sh` from that commit rather than
+      re-wording the rule again. (2026-08-10.)
 
 120. **AN AUDIT TRIGGER THAT WRITES THROUGH AN RLS-PROTECTED TABLE MUST BE `SECURITY
-    DEFINER`, OR IT TAKES THE WRITE IT WAS OBSERVING DOWN WITH IT.** A trigger runs inside
-    the host statement's transaction, so a policy that refuses the *trigger's* INSERT does not
-    merely skip the audit row — it raises, and the original UPDATE dies too.
-    - **Where it bit (2026-08-09, §8.38):** the `AFTER UPDATE … WHEN (OLD.* IS DISTINCT FROM
-      NEW.*)` trigger on `students`. With invoker rights, `audit_log`'s INSERT policy refuses
-      the row and **every student edit in the product stops working** — the admin level
-      picker, the admin contact modal, the admin Assign action, the parent's own edit-child
-      screen. Proven by breaking the live function twice.
-    - **The accepted consequence, and it is deliberate:** a write with no JWT actor
-      (migration, `psql`, seed, edge function) records **nothing and is allowed through**. An
-      audit gap on a backend path is recoverable; a refused student write is not. A reader
-      must therefore render "system", not blank.
-    - **Filed 2026-08-10, and the reason it is this late is the lesson.** §8.38's ledger row
-      claimed this reasoning lived at **§7.108** — which is about a Playwright cold-compile
-      timeout. Nothing was ever written here, and nobody noticed for a day because the row
-      carried the full narrative itself. **Verify a pointer resolves before you write it**
-      (`grep` the target for the number); an unverified pointer does not delegate anything, it
-      just looks like it did. See **§7.119**. (2026-08-10.)
+    DEFINER`, OR IT TAKES THE WRITE IT WAS OBSERVING DOWN WITH IT.** A refused trigger INSERT
+    raises and kills the host UPDATE.
+    - **Where it bit (2026-08-09, §8.38):** the `students` `AFTER UPDATE … WHEN (OLD.* IS DISTINCT
+      FROM NEW.*)` trigger with invoker rights: `audit_log`'s policy refuses → **every student edit
+      stops working**.
+    - **Accepted, on purpose:** a write with no JWT actor (migration, `psql`, seed, edge function)
+      records **nothing and is allowed through**; readers render "system", not blank.
+    - §8.38's row pointed at §7.108 (unrelated). **Verify a pointer resolves before you write it**
+      (`grep` the target). See **§7.119**. (2026-08-10.)
 
 121. **A UI LOCATOR BUILT FROM A DATABASE DATE FORMATTER AGREES WITH THE SCREEN FOR ELEVEN
     MONTHS OF THE YEAR AND THEN MATCHES NOTHING — AND UNDER `exact: true` THAT IS A THROWN
-    DRIVER, NOT A FAILED CHECK.** Postgres `to_char(d,'Mon')` renders September `Sep`; the app
-    renders it through `formatSgDate` → `toLocaleDateString("en-SG",{month:"short"})`, and
-    ICU/CLDR renders English September **`Sept`**. Measured 2026-08-10 for 2026-09-07: PG
-    `Mon, 7 Sep`, Chrome `Mon, 7 Sept`. The other eleven months agree exactly.
-    - **Where it nearly bit:** the first fix for `verify-schedule-week.mjs` computed its
-      day-header label in SQL. It passed 21/21 in August and would have matched **zero**
-      elements from 2026-08-25 to 2026-09-23 — `tap()` waits for visibility and throws, the
-      outer `catch` collapses the run into one `FAIL driver completed without throwing`, and
-      the remaining checks never execute. Caught in pre-commit review, never shipped.
-    - **Substring comparisons hide it, which is why it survived so long.** The same file's
-      existing `PREV_LABEL` and `floorWeek` are also SQL-built, and they are safe **only by
-      luck**: they are consumed with `t.includes(...)` and `Sep` is a prefix of `Sept`. Moving
-      one of them to `exact:` would arm the same landmine.
-    - **The rule: never cross formatter families for a comparison.** If a driver must match
-      rendered text, build the expected string with the **same call the app makes** — for
-      SwimSync that is `new Date(iso+"T00:00:00Z").toLocaleDateString("en-SG", {...,
-      timeZone:"UTC"})`, mirroring `SwimSyncApp/lib/lessonDates.ts`. Node and Chrome ICU were
-      verified to agree on all 12 months. Better still, match on something that is not a label
-      at all: an ISO `testID`, a `value`, a URL. This is §7.100's "compare ISO option values,
-      never rendered labels" in a new place. (2026-08-10.)
+    DRIVER, NOT A FAILED CHECK.** Postgres `to_char(d,'Mon')` gives `Sep`; the app's
+    `formatSgDate` → `toLocaleDateString("en-SG",{month:"short"})` gives ICU **`Sept`**.
+    - **Nearly bit (2026-08-10):** an SQL-built label in `verify-schedule-week.mjs` would match
+      zero elements 2026-08-25 to 2026-09-23 and throw; the remaining checks never execute. Caught in review, never shipped.
+    - `PREV_LABEL` and `floorWeek` are safe **only by luck** (`t.includes(...)`; `Sep` ⊂ `Sept`);
+      moving them to `exact:` arms it.
+    - **Rule: never cross formatter families for a comparison.** Build the expected string with the
+      app's call — `new Date(iso+"T00:00:00Z").toLocaleDateString("en-SG", {...,
+      timeZone:"UTC"})`, mirroring `SwimSyncApp/lib/lessonDates.ts` (Node/Chrome agree on all 12
+      months) — or better, match an ISO `testID`, `value` or URL. §7.100's "never rendered labels" in a new place.
 
 122. **A NIGHTLY CI RUN IS LABELLED IN UTC AND EXECUTES IN SGT, SO THE WEEKDAY IT ACTUALLY
-    SAW IS THE DAY AFTER ITS NAME.** `ui-drivers.yml` is `0 20 * * *` — 20:00 UTC is
-    **04:00 SGT the next day**. The run listed as `2026-08-08` ran on **Sunday 2026-08-09**
-    SGT; the one listed `2026-08-09` ran on **Monday 2026-08-10** SGT.
-    - **Why it matters beyond bookkeeping:** drivers pin their browser to `Asia/Singapore` and
-      compute their dates in SGT, so for any calendar-dependent driver the SGT execution day
-      is the only weekday that explains its result. Reading the UTC label instead inverts the
-      diagnosis by exactly one day — during the 2026-08-10 triage of `verify-schedule-week` it
-      produced the confident and wrong conclusion *"it failed on a Sunday, so the weekday
-      theory is dead"*, when both the green run and the red one fit the theory perfectly.
+    SAW IS THE DAY AFTER ITS NAME.** `ui-drivers.yml` `0 20 * * *` = **04:00 SGT next day**
+    (run `2026-08-08` ran Sunday 2026-08-09 SGT).
+    - Drivers compute dates in SGT; reading the UTC label inverted the 2026-08-10
+      `verify-schedule-week` triage by one day.
     - **Date a nightly by its SGT execution day, with the UTC label in brackets**, in issue
-      comments and in `HANDOVER.md`. Same family as §7.7: the bug is never the timezone, it is
-      two clocks quietly disagreeing about which day it is. (2026-08-10.)
+      comments and `HANDOVER.md`. §7.7 family: the bug is never the timezone, it is two clocks
+      disagreeing. (2026-08-10.)
 
 123. **DROPPING A FUNCTION SIGNATURE BREAKS THE CURRENTLY-DEPLOYED APP FROM THE MOMENT THE
-    MIGRATION LANDS, AND §7.60's "MIGRATIONS FIRST" IS WHAT PUTS YOU THERE.** §7.60 says a
-    backend-first change deploys migrations → engine → apps, with `main` last. That is right
-    for a **backward-compatible** backend change and wrong for one that removes a signature.
-    Wave 2 dropped `close_student_enrolment(uuid, boolean)` and replaced it with a 3-arg form
-    whose new parameter has **no default**. Between `supabase db push` and the push to `main`,
-    the live admin panel and coach app were still calling the 2-arg form — PostgREST could not
-    resolve it, and **"Remove from class" was broken in production** on both. Measured, not
-    theorised: it happened on 2026-08-11.
-    - **`book_makeup` survived the same window** because its new 4th parameter *has* a
-      default, so PostgREST still matched the old 3-argument call. That is the whole
-      difference, and it is the test: **a dropped signature is only safe across the window if
-      the surviving one can be called with the OLD argument list.**
-    - **So decide the order by compatibility, not by layer.** Either (a) keep the old
-      signature as a thin shim through the window and drop it in a follow-up migration — real
-      expand/contract, which `CLAUDE.md` already mandates and which this change skipped — or
-      (b) deploy the apps FIRST and the migration second, the ordering §8's tenancy phase 4
-      used for exactly this reason.
-    - The window is short (a Vercel build) and the blast radius here was one admin action,
-      not billing. It is in this file because **nothing warned about it**: the plan, the
-      adversarial review and the pre-flight all passed, because every one of them checked the
-      migration against the *database* and none checked it against the *deployed client*.
-      (2026-08-11.)
+    MIGRATION LANDS, AND §7.60's "MIGRATIONS FIRST" IS WHAT PUTS YOU THERE.** §7.60's order is
+    right only for **backward-compatible** changes. Wave 2 replaced `close_student_enrolment(uuid,
+    boolean)` with a 3-arg form (no default); between `supabase db push` and `main`, "Remove from
+    class" was broken in production (2026-08-11).
+    - `book_makeup` survived: its new param *has* a default. **A dropped signature is only safe
+      across the window if the surviving one can be called with the OLD argument list.**
+    - **Decide order by compatibility:** (a) keep the old signature as a shim and drop it in a
+      follow-up migration (expand/contract, per `CLAUDE.md`), or (b) apps FIRST, as §8's tenancy
+      phase 4 did.
+    - Plan, review and pre-flight all checked against the *database*, none against the *deployed
+      client*.
 
 124. **ADDING A DEFAULTED PARAMETER DOES NOT REPLACE A POSTGRES FUNCTION — IT CREATES A
     SECOND ONE, AND POSTGREST MAY GO ON CALLING THE OLD BODY.** `CREATE OR REPLACE FUNCTION
-    f(a, b, c DEFAULT NULL)` does not replace `f(a, b)`; overload resolution is by argument
-    *list*, so both now exist. PostgREST resolves an RPC by parameter **name**, so a client
-    still sending the old argument set keeps hitting the old row in `pg_proc`. **Nothing
-    errors.** In Wave 2 that would have left `book_makeup`'s pre-change body live — the one
-    whose home-class `SELECT INTO` was deterministic *only* because of the constraint being
-    dropped in the same migration, and which takes an arbitrary row with no `ORDER BY` on
-    multi-row. Both values it derives are money: the make-up's price (`core.ts` `rateOn`) and
-    its package category.
-    - **Always `DROP FUNCTION <old exact signature>` before creating the new one**, and
-      assert it afterwards: `\df <name>` must show exactly one row. That assertion is in the
-      Wave 2 pre-commit gate for this reason.
-    - **Then re-`GRANT`** — the new signature is a new `pg_proc` row and §7.87 applies.
-    - Related, and the reason this was caught at all: the pgTAP file that probes grants named
-      the OLD signature in `has_function_privilege()`, which **errors** rather than fails once
-      the signature is gone, aborting the whole file with a bad plan. A grant probe is a
-      signature reference; grep for the old one when you change it. (2026-08-11.)
+    f(a, b, c DEFAULT NULL)` leaves `f(a, b)`; PostgREST resolves by parameter **name**, so old
+    callers hit the old body. **Nothing errors.** In Wave 2 that would have kept `book_makeup`'s
+    old non-deterministic home-class `SELECT INTO` live — both derived values are money (`core.ts`
+    `rateOn` price, package category).
+    - **Always `DROP FUNCTION <old exact signature>` before creating the new one**; assert `\df
+      <name>` shows exactly one row (in the Wave 2 pre-commit gate).
+    - **Then re-`GRANT`** — new `pg_proc` row, §7.87 applies.
+    - A `has_function_privilege()` probe naming the OLD signature **errors**, aborting the pgTAP
+      file; grep grant probes for the old signature when you change it. (2026-08-11.)
 
 125. **A TRIGGER FUNCTION THAT ENFORCES A CROSS-ROW RULE MUST BE `SECURITY DEFINER`, OR RLS
-    CAN HIDE THE ROW THAT WOULD HAVE FAILED IT.** A plain `LANGUAGE plpgsql` trigger function
-    runs with the *caller's* privileges, so its `SELECT` over sibling rows is filtered by the
-    same RLS policies the caller sees. A row the caller cannot read is a row the check cannot
-    count — and the check then **silently passes**, which is the exact failure a uniqueness or
-    overlap trigger exists to prevent. Wave 2's `enforce_enrolment_schedule()` scans a child's
-    *other* enrolments while `enrolments_select` can legitimately hide some of them from a
-    coach. It is `SECURITY DEFINER SET search_path = public` for that reason, and the reason
-    is in the migration beside it.
-    - The tell is that the failure is invisible in local testing, where you are usually
-      superuser or the policy happens to permit the read. Same family as §7.16.
+    CAN HIDE THE ROW THAT WOULD HAVE FAILED IT.** A plain `LANGUAGE plpgsql` trigger runs with the caller's privileges,
+    so its `SELECT` over sibling rows is RLS-filtered and the check **silently passes**. Wave 2's
+    `enforce_enrolment_schedule()` scans a child's other enrolments, some hidden by `enrolments_select`; it is
+    `SECURITY DEFINER SET search_path = public`, reason stated in the migration.
+    - Invisible in local testing (superuser, or the policy permits the read). Same family as §7.16.
     - `SET search_path` is not optional on a `SECURITY DEFINER` function. (2026-08-11.)
 
 126. **A `BEFORE INSERT` TRIGGER THAT COMPARES A ROW AGAINST ITS SIBLINGS MUST EXCLUDE THE
     ROW'S OWN NATURAL KEY, OR A DUPLICATE REPORTS A NONSENSE CLASH *AND* MASKS THE UNIQUE
-    VIOLATION.** A `BEFORE INSERT` trigger runs **before** the unique index is checked. Wave
-    2's overlap trigger initially excluded only `e2.id <> NEW.id`, so inserting a child into a
-    class they were already in found the existing row, compared the class against **itself**,
-    and raised *"Mon 5pm clashes with Mon 5pm"* — replacing the `23505` the test suite
-    asserts and the admin would understand. Adding `e2.class_id <> NEW.class_id` restores the
-    division of labour: **the trigger owns "two different rows conflict", the index owns "the
-    same row twice"**. Found by smoke-testing the migration's ten cases before writing any
-    pgTAP, which is the cheap way to find it. (2026-08-11.)
+    VIOLATION.** It runs **before** the unique index is checked. Excluding only `e2.id <> NEW.id` made a re-enrolment
+    raise *"Mon 5pm clashes with Mon 5pm"* instead of `23505`. Add `e2.class_id <> NEW.class_id`: **the trigger owns
+    "two different rows conflict", the index owns "the same row twice"**. Smoke-test cases before pgTAP. (2026-08-11.)
 
-127. **BEFORE YOU DROP A CONSTRAINT, ASK WHAT WAS RELYING ON IT TO *FAIL*.** A constraint is
-    not only a product rule; other machinery quietly uses its rejections as a detector, and
-    removing it removes the detector silently — no test goes red, because the thing that used
-    to raise now succeeds. §7.63's fixture bug (an unscoped `CROSS JOIN students` that enrolled
-    and marked present **every child in the database**, i.e. billable attendance attributed to
-    someone else's child) was caught in the first place because
-    `one_active_enrolment_per_student` **aborted** the statement. Wave 2 replaced that index
-    with `(student_id, class_id)`, so a stray child enrolled into a class they are *not*
-    already in now inserts without complaint.
-    - **Re-prove the dependent guard, do not reason about it.** Done on 2026-08-11 by
-      sabotaging a fixture with an unscoped `CROSS JOIN` and re-running
-      `check-fixture-roundtrip.sh`: it still catches it, on **delta divergence** rather than
-      on the abort — `student_class_enrolments +6` alone versus **+16** stacked, exit 1,
-      naming the fixture. Had that come back green, the wave would have removed a live guard
-      against stray billable rows.
-    - The sabotage must be the shape the *new* schema cannot catch. The first attempt
-      cross-joined into a class a sibling fixture also used, so the new unique index fired and
-      the run "passed" — proving nothing about the divergence detector. Target a class no
-      sibling touches. (2026-08-11.)
+127. **BEFORE YOU DROP A CONSTRAINT, ASK WHAT WAS RELYING ON IT TO *FAIL*.** Dropping a detector turns no test red. §7.63's unscoped `CROSS JOIN` was caught by
+    `one_active_enrolment_per_student` aborting; Wave 2's `(student_id, class_id)` index lets it insert.
+    - **Re-prove the dependent guard, do not reason about it.** Sabotage a fixture with an unscoped `CROSS JOIN` and
+      re-run `check-fixture-roundtrip.sh`: it still catches it on **delta divergence** (exit 1, naming the fixture).
+    - The sabotage must be the shape the *new* schema cannot catch — target a class no sibling fixture touches, or
+      the new unique index fires and proves nothing about the detector. (2026-08-11.)
 
 128. **macOS `date -j` CANNOT CONVERT BETWEEN TIMEZONES — IT IS A FORMATTER, AND IT ANSWERS A
-    UTC→SGT QUESTION WITH THE INPUT HOUR AND A STRAIGHT FACE.** `date -j` parses *and* formats
-    in one zone, so `TZ=` and `-u` move both halves together and the conversion never happens.
-    The trailing `Z` in the format string is consumed as a literal character, not read as UTC.
-    Verified on 2026-08-11:
+    UTC→SGT QUESTION WITH THE INPUT HOUR AND A STRAIGHT FACE.** It parses and formats in one zone, so `TZ=` and `-u`
+    move both halves and the conversion never happens; the trailing `Z` is a literal, not UTC. Verified on 2026-08-11:
     ```bash
     TZ=Asia/Singapore date -jf "%Y-%m-%dT%H:%M:%SZ" "2026-08-10T20:49:39Z" "+%A %F %H:%M"
     #   -> Monday 2026-08-10 20:49          ← WRONG, and -u gives the same answer
     python3 -c "import datetime;d=datetime.datetime.fromisoformat('2026-08-10T20:49:39').replace(tzinfo=datetime.timezone.utc);print(d.astimezone(datetime.timezone(datetime.timedelta(hours=8))))"
     #   -> Tuesday 2026-08-11 04:49 SGT     ← the truth
     ```
-    - **The tell costs one glance: the output hour equals the input hour.** A real conversion
-      to SGT moves it by 8. If they match, no conversion happened. `gdate` is not installed on
-      this machine, so **use `python3`** — it is the only correct tool here by default.
-    - This is **§7.122's tool-shaped twin**, and it bites in the same place: reading the real
-      weekday of a nightly sweep, whose GitHub label is a day behind its SGT execution. It came
-      within one command of writing a wrong weekday into `HANDOVER.md` §9, which is a file
-      other sessions then trust.
-    - **When a cross-check disagrees with your arithmetic, suspect the tool before the
-      arithmetic.** The arithmetic was right and the "check" was wrong — the instinct to defer
-      to the command is exactly what makes this one land. (2026-08-11.)
+    - **The tell: output hour equals input hour** — no conversion happened. `gdate` is not installed; **use
+      `python3`**.
+    - **§7.122's twin**: bit reading a nightly's SGT weekday for `HANDOVER.md` §9.
+    - **When a cross-check disagrees with your arithmetic, suspect the tool before the arithmetic.** (2026-08-11.)
 
 129. **A FUNCTION THAT ANSWERS "WHAT WOULD THIS ACTOR'S RATE PRODUCE" CANNOT DRIVE A
-    CLAWBACK — IT MUST ANSWER "WHAT IS THIS ACTOR OWED".** Wave 3's
-    `session_pay_amount(session, coach)` computed any coach's rate × duration for any
-    session, ignoring whether that coach was attributed to it. Every forward path looked
-    right, because the *selection* query filtered by attribution first. The adjustment loop
-    does not: it asks what an already-paid coach is owed **now**, and got their full rate
-    back for a lesson somebody else had taken over — difference zero, no clawback, and the
-    business pays twice. Measured before any pgTAP existed: **A 30.00 + B 50.00 on one 50.00
-    lesson.**
-    - The fix is one predicate (`coach_attributed_to_session`) shared by the pay function
-      **and** the selection query, so the two cannot disagree. Two copies of the same rule is
-      the bug waiting to happen.
-    - **The general shape: a "what is owed" function must encode entitlement, not
-      arithmetic.** Any caller that asks about a *past* state — corrections, reversals,
-      audits — sees the difference; forward-only callers never will. (2026-08-11.)
+    CLAWBACK — IT MUST ANSWER "WHAT IS THIS ACTOR OWED".** Wave 3's `session_pay_amount(session, coach)` ignored
+    attribution, so the adjustment loop paid a replaced coach in full (**A 30.00 + B 50.00 on one 50.00 lesson**).
+    - Fix: one predicate (`coach_attributed_to_session`) shared by the pay function **and** the selection query, so
+      they cannot disagree.
+    - **A "what is owed" function must encode entitlement, not arithmetic** — callers asking about past state
+      (corrections, reversals, audits) expose it; forward-only callers never will. (2026-08-11.)
 
 130. **REWRITING AN AGGREGATE CAN DELETE A GUARD WHOSE ENTIRE PURPOSE IS TO REFUSE, AND
-    NOTHING LOOKS DIFFERENT.** `generate_coach_payouts` opens with a pre-flight that raises
-    if any lesson in the period has no class terms — its own comment says the failure "must
-    not be reintroduced by a quiet skip". Wave 3's first draft moved attribution into the
-    selection query's `WHERE`, where a NULL `paid_coach_id` simply fails to match: the lesson
-    left payroll in silence, which is precisely the skip the guard forbids.
-    - **Read the WHOLE function before replacing it.** The rewrite was written having read
-      from line 55 of 170; the guard was at 33–46. `pg_get_functiondef` output is not a
-      diff — scroll to the top.
-    - It was caught only because `coach_wages.test.sql` 33 asserts the *refusal*. **A test
-      that asserts an error is the one that survives a rewrite**; the happy-path tests all
-      stayed green. (2026-08-11.)
+    NOTHING LOOKS DIFFERENT.** `generate_coach_payouts` pre-flight raises if a lesson has no class terms — "must not be
+    reintroduced by a quiet skip". Wave 3's draft moved attribution into a `WHERE`, so a NULL `paid_coach_id` silently
+    left payroll.
+    - **Read the WHOLE function before replacing it** — scroll `pg_get_functiondef` to the top.
+    - Caught by `coach_wages.test.sql` 33 asserting the *refusal*. **A test that asserts an error is the one that
+      survives a rewrite.** (2026-08-11.)
 
 131. **THE SEED COACH IS ALSO THE TENANT ADMIN, SO NO RLS *NARROWING* CAN BE DEMONSTRATED ON
-    SEED DATA.** `coach@swimsync.test` is deliberately both (`LOCAL_DEV_GUIDE.md` — it models
-    a private coach). Any policy of the form `coach_branch OR can_admin_tenant(...)` therefore
-    passes for him through the admin branch, whatever the coach branch says. A Wave 3 probe
-    "proved" the substitute narrowing had failed; `coach_is_main_on_session()` was returning
-    FALSE correctly all along.
-    - **To test a coach narrowing you must create a NON-admin coach.** pgTAP does; the seed
-      cannot.
-    - **The production consequence is the valuable half:** production *is* a private coach who
-      is also the admin, so the Wave 3 narrowing can never lock them out of a covered lesson.
-      It only bites a business with non-admin coaches — none exists yet. (2026-08-11.)
+    SEED DATA.** `coach@swimsync.test` is deliberately both (`LOCAL_DEV_GUIDE.md`), so `coach_branch OR
+    can_admin_tenant(...)` always passes via admin
+    - **To test a coach narrowing you must create a NON-admin coach.** pgTAP does; the seed cannot.
+    - Production is a private coach-admin, so the Wave 3 narrowing can never lock them out; it only bites businesses with
+      non-admin coaches. (2026-08-11.)
 
 132. **A RESOLVE-OR-CREATE RPC MAKES A FIXTURE TEARDOWN INCOMPLETE BY CONSTRUCTION.**
-    `assign_session_coach()` creates the `lesson_sessions` row when none exists, so a driver
-    assigning a cover to an unmarked date produces rows the fixture never named. A teardown
-    keyed to the fixture's own fixed UUIDs left **two orphan empty lesson rows** behind, found
-    only by listing the roster *before* tearing down rather than after.
+    `assign_session_coach()` creates `lesson_sessions` rows the fixture never named; an id-keyed teardown left two
+    orphan lesson rows.
     - **Scope the teardown to `(class, month)`, not to ids, whenever the surface under test
       calls an RPC that can create rows.**
-    - **`check-fixture-roundtrip.sh` does NOT catch this** — it diffs the fixture, and the
-      orphans come from the *driver*. (2026-08-11, wt-admin.)
+    - **`check-fixture-roundtrip.sh` does NOT catch this** — orphans come from the *driver*. (2026-08-11, wt-admin.)
 
 133. **A REFETCH THAT RUNS OUTSIDE ITS EFFECT'S STALENESS GUARD CAN ROUTE THE NEXT *WRITE* TO
-    THE WRONG ENTITY.** Not merely a stale table: a `reload()` after save repainted class X's
-    dates while the picker had already moved to Y, and the next assignment called
-    `assign_session_coach(Y, X's date)`. Two classes on the same weekday both satisfy
-    `assert_class_runs_on`, so it lands **silently** and the wrong lesson gets a coach.
-    - **One generation counter must cover every load path, not one per effect.** A guard on
-      the mount effect and none on the post-save refetch is the same as no guard.
-      (2026-08-11, wt-admin.)
+    THE WRONG ENTITY.** A post-save `reload()` repainted class X's dates after the picker moved to Y, so the next write
+    was `assign_session_coach(Y, X's date)` — same weekday passes `assert_class_runs_on`, lands **silently**.
+    - **One generation counter must cover every load path, not one per effect.** (2026-08-11, wt-admin.)
 
 134. **A POLICY THAT NARROWS A TABLE TO "YOUR OWN ROWS" SILENTLY REMOVES THE ABILITY TO DETECT
-    THE ABSENCE YOU CARE ABOUT.** `session_coaches_select` is `admin OR coach_id =
-    current_coach_id()`. Correct — and it means the coach who was *replaced* can never derive
-    "somebody else has my Tuesday" from any query, because the row naming the substitute is
-    not theirs. Yet theirs is the screen that must stop nagging them to mark it.
-    - The only answer is a `SECURITY DEFINER` probe (`coach_is_main_on_session()`) that sees
-      the row RLS hides — which costs **one round trip per session**. Bound the set before
-      you loop it.
-    - Ask this at design time: *whose screen needs to know about a row they cannot see?*
-      (2026-08-11, wt-coach.)
+    THE ABSENCE YOU CARE ABOUT.** `session_coaches_select` (`admin OR coach_id = current_coach_id()`) means a replaced
+    coach can never derive "somebody else has my Tuesday", yet their screen must stop nagging them.
+    - Only answer: a `SECURITY DEFINER` probe (`coach_is_main_on_session()`) — one round trip per session; bound the
+      set before looping.
+    - Ask at design time: *whose screen needs to know about a row they cannot see?* (2026-08-11, wt-coach.)
 
 135. **A HAND-INSERTED *DRAFT* `coach_payouts` ROW DOES NOT SURVIVE A SIBLING WORKTREE.**
-    `generate_coach_payouts` deletes and rebuilds draft payout items for the period, and every
-    worktree shares one `supabase_db_SwimSync` (§7.55). A fixture payout vanished twice
-    mid-session because the sibling ran payroll. **Any fixture standing in for generated pay
-    must be `status = 'paid'`** (which freezes it), or be re-inserted immediately before the
-    assertion. (2026-08-11, wt-coach.)
+    `generate_coach_payouts` rebuilds draft items and worktrees share one `supabase_db_SwimSync` (§7.55). **Any fixture
+    standing in for generated pay must be `status = 'paid'`**, or be re-inserted right before the assertion.
+    (2026-08-11, wt-coach.)
 
 136. **`WORKTREE.md`'S GRADUATE LIST DIES WITH THE WORKTREE, AND NOTHING FORWARDS IT — BUT IT
-    IS RECOVERABLE FROM THE SESSION TRANSCRIPT.** The file is gitignored on purpose, so it is
-    in no commit and no reflog; sessions do not share context, so a worktree session's
-    findings reach nobody. Two Wave 3 worktrees closed with their lists intact **in their own
-    conversations only**, and the root session had no way to see them.
-    - **Recovery, and it worked completely:** transcripts live at
-      `~/.claude/projects/<path-mangled-repo>/<session-uuid>.jsonl`. A session that ran
-      `/worktree-start` keeps writing to the **root** project directory, not a worktree one —
-      identify it by the first user message, then extract the assistant messages containing
-      "graduate list".
-    - **The cheap prevention is `/worktree-close` step 4, done literally**: paste the list
-      into the root session, or write it to a file *outside* the worktree, before
-      `ExitWorktree`. (2026-08-11.)
+    IS RECOVERABLE FROM THE SESSION TRANSCRIPT.** It is gitignored on purpose (no commit, no reflog), and sessions
+    do not share context.
+    - **Recovery:** transcripts at `~/.claude/projects/<path-mangled-repo>/<session-uuid>.jsonl`. A `/worktree-start`
+      session writes to the **root** project directory — identify it by the first user message, extract assistant
+      messages containing "graduate list".
+    - **Prevention: `/worktree-close` step 4, done literally** — paste the list into the root session or a file
+      *outside* the worktree before `ExitWorktree`. (2026-08-11.)
 
 137. **A PRE-CHECK THAT GUARDS AN UPSERT IS TOCTOU BY CONSTRUCTION — THE GUARD BELONGS INSIDE
-    THE STATEMENT THAT TAKES THE LOCK.** `assign_session_coach`'s shadow branch had to stop
-    demoting a lesson's main. The obvious form is `IF EXISTS (… role='main') THEN RAISE`, and
-    it refuses the easy case while letting the hard one through: admin A promotes X to main
-    while admin B adds X as a shadow; B's `EXISTS` cannot see A's uncommitted row, B's INSERT
-    then blocks on the unique index, A commits, and `DO UPDATE` demotes the main B was just
-    told did not exist.
-    - The race-free form is one statement — `ON CONFLICT … DO UPDATE SET … WHERE
-      session_coaches.role <> 'main'` — because `ON CONFLICT` waits on the conflicting row's
-      **lock**, so the `WHERE` sees the committed row. Then `IF NOT FOUND THEN RAISE`.
-    - **Measured, so nobody has to re-derive it** (2026-08-12, local stack, rolled back):
-      fresh insert → `FOUND`; re-insert over an existing `shadow` → `FOUND`; insert over an
-      existing `main`, `DO UPDATE` excluded by its `WHERE` → **`NOT FOUND`**, row unchanged.
-    - **Nothing may sit between the INSERT and the `IF NOT FOUND`**: `FOUND` is clobbered by
-      the next `SELECT`/`PERFORM`, and a clobbered `FOUND` is a guard that still looks like one.
-    - Without the `IF NOT FOUND` the RPC returns success having done nothing — `ON CONFLICT DO
-      NOTHING` wearing a different hat, which `set_session_main_coach` already refuses. (2026-08-12.)
+    THE STATEMENT THAT TAKES THE LOCK.** In `assign_session_coach`'s shadow branch, `IF EXISTS (… role='main') THEN
+    RAISE` cannot see a concurrent uncommitted promotion, so `DO UPDATE` demotes the new main.
+    - Race-free: `ON CONFLICT … DO UPDATE SET … WHERE session_coaches.role <> 'main'` (waits on the row **lock**, so
+      `WHERE` sees the committed row), then `IF NOT FOUND THEN RAISE`.
+    - **Measured:** fresh/over `shadow` → `FOUND`; over `main` → **`NOT FOUND`**, row unchanged.
+    - **Nothing may sit between the INSERT and the `IF NOT FOUND`**: the next `SELECT`/`PERFORM` clobbers `FOUND`.
+    - Without `IF NOT FOUND` the RPC returns success having done nothing (`set_session_main_coach` refuses that). (2026-08-12.)
 
 138. **WHEN A PER-ITEM PROBE BECOMES A BATCH, THE FAIL-LOUD DIRECTION INVERTS — AND "ABSENT
-    FROM THE ANSWER" SILENTLY BECOMES THE UNSAFE VERDICT.** `fetchIsMainOnSession` failed
-    towards TRUE ("I am the main coach"), per session, and every failure path reached it.
-    Batched as `sessions_i_am_main_on(uuid[])`, the caller computes *covered out = asked minus
-    returned* — so every way the response can be short or reshaped now HIDES a lesson from the
-    coach's NEEDS MARKING list, and unmarked attendance blocks the billing month with no
-    override (§8i).
-    - Four ways the response is an array and still wrong: elements are objects rather than ids
-      (`RETURNS TABLE` instead of `RETURNS SETOF`); PostgREST truncated it (`max-rows`, 1000
-      on this stack); an id appears that was never asked about; a null element.
-    - **The rule: validate that the answer is about exactly what was asked BEFORE subtracting
-      anything from it**, and collapse anything unvouchable to the empty set. Do not "filter
-      out" the bad elements — a filter turns a wrong-shaped response into a *confident* wrong
-      answer, which is the whole failure.
-    - Deleting the old `CHUNK = 8` does not remove a bound, it hands the bound to PostgREST,
-      which enforces it by truncating. A caller-side cap that refuses to send is the
-      replacement. (2026-08-12.)
+    FROM THE ANSWER" SILENTLY BECOMES THE UNSAFE VERDICT.** `fetchIsMainOnSession` failed towards TRUE; batched
+    `sessions_i_am_main_on(uuid[])` computes *covered out = asked minus returned*, so any short/reshaped response HIDES
+    a lesson from NEEDS MARKING — and unmarked attendance blocks billing with no override (§8i).
+    - Wrong shapes: objects (`RETURNS TABLE` vs `RETURNS SETOF`); `max-rows` truncation (1000); an id never asked
+      about; a null element.
+    - **Validate that the answer is about exactly what was asked BEFORE subtracting anything from it**; collapse
+      anything unvouchable to the empty set. Do not "filter out" bad elements — that yields a *confident* wrong answer.
+    - Deleting `CHUNK = 8` hands the bound to PostgREST truncation; replace it with a caller-side cap that refuses to
+      send. (2026-08-12.)
 
 139. **A CLIENT-SIDE FILTER THAT REMOVES AN OPTION MAKES THE CORRESPONDING DRIVER CHECK
-    UNREACHABLE — AND AN UNREACHABLE CHECK REPORTS PASS.** `assignableShadows()` drops the
-    lesson's effective main from the shadow dropdown, so no click path in one tab can offer
-    it. A driver written to "pick the main from the shadow dropdown" either throws on a
-    missing option or — worse — takes a neighbour by ordinal and passes while testing nothing
-    (§7.101).
-    - Split it: assert the **absence from the options** (reachable, and it is what protects a
-      real admin), and reach the server guard through a genuine **stale-tab race** in a second
-      page, which is what two admins working at once actually produce (§7.133).
-    - **Both stale selections must be armed BEFORE the state changes.** The filter drops the
-      coach the moment they become main, so a tab opened afterwards cannot select the coach
-      whose demotion is under test at all.
-    - Assert the **server's own sentence**, never the shared `Could not assign:` prefix — both
-      guards render through that line, so it cannot say which one fired. (2026-08-12.)
+    UNREACHABLE — AND AN UNREACHABLE CHECK REPORTS PASS.** `assignableShadows()` drops the effective main from the
+    shadow dropdown; a driver can pass by ordinal (§7.101).
+    - Assert the **absence from the options**, and reach the server guard via a real **stale-tab race** in a second
+      page (§7.133).
+    - **Both stale selections must be armed BEFORE the state changes.**
+    - Assert the **server's own sentence**, never the shared `Could not assign:` prefix. (2026-08-12.)
 
 140. **A DRIVER'S ABSENCE CHECK CAN PASS FOR A SECOND REASON, AND ORDER IS WHAT DECIDES IT.**
-    `verify-coach-roster`'s "the covered lesson has left the class coach's NEEDS MARKING list"
-    scored green with `sessions_i_am_main_on` **dropped entirely** — because the substitute had
-    already marked the lesson two checks earlier, and a fully marked lesson leaves the backlog
-    whatever its roster says.
-    - **Run the absence check while the lesson is still unmarked.** Reordering was the whole
-      fix; no assertion changed.
-    - Its sibling failed the same way for a different reason: the Schedule tab only PROBES a
-      backlog lesson that already has a `lesson_sessions` row, so with no row the covered-out
-      answer cannot affect it — sabotaging the client to hide *everything* changed nothing on
-      screen and the driver scored full marks over a broken client.
-    - **Both were found only by measuring the sabotage signature**, and neither is visible by
-      reading the driver. Name the sabotages, run them, and paste the scores into the header.
-      (2026-08-12.)
+    `verify-coach-roster`'s NEEDS MARKING absence check passed with `sessions_i_am_main_on` dropped, because the lesson
+    was already marked.
+    - **Run the absence check while the lesson is still unmarked.** Reordering was the whole fix.
+    - Sibling: Schedule only PROBES lessons with a `lesson_sessions` row; without one, sabotage scored full marks.
+    - **Found only by measuring the sabotage signature.** Name the sabotages, run them, paste the scores into the
+      header. (2026-08-12.)
 
-141. **A DEEP-LINKED RN-WEB SCREEN CAN RENDER PERFECTLY AND STILL NOT BE OPERABLE.** The coach
-    attendance screen reached by `page.goto(.../attendance?date=…)` shows the roster and the
-    guest correctly, and a press on a status button does nothing at all — normal click, forced
-    click and `dispatchEvent` alike. Reached by tapping the NEEDS MARKING row instead, the same
-    press works. Every driver in this repo that marks attendance navigates in-app.
-    - **`pressByText`, not a Playwright click.** RN-web's handler lives on the Pressable and
-      `getByText` resolves to the Text CHILD; a click there is swallowed silently.
-    - **The default 1280×900 viewport, not `mobile: true`.** Every marking driver uses it.
-    - **`handleSave()` refuses the whole save if ANY student is unmarked**, with a toast — and
-      on RN-web that is easy to miss. Marking one of two students wrote zero rows and looked
-      exactly like an RLS refusal of the substitute, which was the thing under test.
-    - A bare `page.reload()` of a nested route bounces to `/login` while the session
-      rehydrates; `gotoAuthed` retries it. (2026-08-12.)
+141. **A DEEP-LINKED RN-WEB SCREEN CAN RENDER PERFECTLY AND STILL NOT BE OPERABLE.** Coach attendance via
+    `page.goto(.../attendance?date=…)` renders, but status presses do nothing (click, forced, `dispatchEvent`). Navigate
+    in-app (tap the NEEDS MARKING row), as every marking driver does.
+    - **`pressByText`, not a Playwright click** — `getByText` hits the Text CHILD, not the Pressable.
+    - **The default 1280×900 viewport, not `mobile: true`.**
+    - **`handleSave()` refuses the whole save if ANY student is unmarked** (easy-to-miss toast)
+    - A bare `page.reload()` of a nested route bounces to `/login`; `gotoAuthed` retries it. (2026-08-12.)
 
 142. **A GREP NARROWER THAN THE CALL FORM MISSES EXACTLY THE CALL SITES THAT MATTER, AND
-    "I GREPPED FOR IT" THEN READS AS PROOF.** `HANDOVER.md` carried a prohibition naming the
-    coach app's RPC callers. It said "no RPCs at all" (false, and that is why §7.123's live
-    breakage was not anticipated), was corrected to a list, and the list was stale one day
-    later. Replacing it with a command was the right move — and the first command written was
-    `grep -rn 'supabase.rpc(' SwimSyncApp`, which returns 9 hits and **misses 6**, including
-    `close_student_enrolment()`: four call sites go through an injected client (`db.rpc`,
-    `lib/studentStatus.ts`, a thenable-query-builder wrapper). The missed call is the very one
-    whose dropped signature took down the live admin.
+    "I GREPPED FOR IT" THEN READS AS PROOF.** `grep -rn 'supabase.rpc(' SwimSyncApp` returned 9 hits and **missed 6**
+    including `close_student_enrolment()` (§7.123).
     - **The pattern is `\.rpc(`.** 13 distinct RPCs, 15 call sites, as of 2026-08-12.
-    - **The general shape: grep for the METHOD, not for the receiver.** A receiver is a local
-      variable name and can be anything — `supabase`, `db`, `client`, a parameter. Any
-      dependency-injected or wrapped client defeats a receiver-anchored pattern silently, and
-      silence from grep is indistinguishable from absence.
-    - **Sanity-check a "complete" grep against one call site you already know exists.** That
-      is a two-second check and it is what caught this. (2026-08-12.)
+    - **Grep for the METHOD, not for the receiver** — injected/wrapped clients defeat it silently.
+    - **Sanity-check a "complete" grep against one call site you already know exists.** (2026-08-12.)
 
 143. **A SEAL IS ONLY A SEAL IF EVERY WRITER THAT CAN CHANGE THE ANSWER IS BEHIND IT — AND
-    "EVERY WRITER" INCLUDES POSTGREST.** `20260812000200` made a coach's pay a function of
-    **two** tables (`class_shadow_coaches`, the dated assignment, and `session_coach_absences`,
-    the per-lesson tick). It sealed a settled month against both — but the assignment's seal,
-    the "the class's own coach cannot shadow it" refusal and the never-`DELETE` rule all lived
-    **inside `assign_class_shadow()` / `end_class_shadow()`**, while the table itself carried
-    `FOR ALL … can_admin_tenant(tenant_id)` and the matching DML grants, because a tenant admin
-    genuinely does own those rows.
-    - **Measured, not theorised:** as the seed tenant admin, one direct `INSERT` put the
-      class's own coach on its own shadow roster **inside a sealed month**, and one direct
-      `DELETE` destroyed the row the pay history depends on. Both are ordinary PostgREST calls
-      any admin's browser can make.
-    - The sibling table got its seal as a **trigger** for exactly this reason. The asymmetry
-      was invisible because each guard was individually correct.
-    - **The rule generalises past this wave: whenever a payment becomes a function of two
-      tables, the freeze belongs on BOTH, as a trigger, not in the RPC that happens to be the
-      polite way in.** An RPC guard protects the caller you thought of.
-    - Found by `/commit-review`, in the migration that *graduated this very rule* to §7.
-      (2026-08-12.)
+    "EVERY WRITER" INCLUDES POSTGREST.** `20260812000200` made pay depend on `class_shadow_coaches` and
+    `session_coach_absences`, but the former's seal, own-coach refusal and never-`DELETE` rule lived only in
+    `assign_class_shadow()` / `end_class_shadow()` while the table had `FOR ALL … can_admin_tenant(tenant_id)` + DML
+    grants.
+    - **Measured:** a seed admin's direct `INSERT`/`DELETE` bypassed both in a sealed month.
+    - The sibling table's seal is a **trigger** for this reason.
+    - **Whenever a payment becomes a function of two tables, the freeze belongs on BOTH, as a trigger, not in the RPC
+      that happens to be the polite way in.** Found by `/commit-review`, in the migration that graduated this rule to §7. (2026-08-12.)
 
-144. **TWO DEFINITIONS OF "SETTLED" IN ONE ENGINE IS A HOLE, NOT A DUPLICATION.** The new
-    backdate guard first tested `coach_payouts … coach_id = <this coach> AND status = 'paid'`.
-    Adjustments B's own settled test (`20260811000200`) has **no `coach_id` filter** — a month
-    is settled if *any* coach in the tenant was paid for it. A coach with **no payout row at
-    all** falls between the two: the per-coach guard says "open", the engine says "closed", so
-    an admin could backdate an assignment into a month nothing will ever pay them for. That is
-    a permanent, silent underpayment, and the new feature *creates* exactly that coach (a
-    trainee added mid-term). **Write the new guard against the engine's existing definition,
-    not a reasonable-looking narrower one** — and if you must narrow it, change both together.
-    (2026-08-12.)
+144. **TWO DEFINITIONS OF "SETTLED" IN ONE ENGINE IS A HOLE, NOT A DUPLICATION.** The backdate guard tested
+    `coach_payouts … coach_id = <this coach> AND status = 'paid'`; Adjustments B (`20260811000200`) has **no
+    `coach_id` filter**. A coach with no payout row falls between them — silent
+    permanent underpayment. **Write the new guard against the engine's existing definition, not a
+    reasonable-looking narrower one** — if you must narrow it, change both together. (2026-08-12.)
 
 145. **DROPPING A COLUMN SILENTLY BREAKS EVERY CLASSIC STRING-BODY FUNCTION THAT READS IT, AND
-    POSTGRES WILL NOT STOP YOU.** `ALTER TABLE session_coaches DROP COLUMN role` succeeded
-    without a word while **six** live function bodies still said `sc.role`. A `plpgsql`/`sql`
-    body is a string: no dependency is recorded, so the failure is a runtime
-    `column … does not exist` — and for `coach_is_main_on_session()` that is evaluated inside
-    `attendance_write`'s USING **and** WITH CHECK, i.e. **no coach in any business can save
-    attendance**, which blocks the billing month with no override (§8i).
+    POSTGRES WILL NOT STOP YOU.** `ALTER TABLE session_coaches DROP COLUMN role` succeeded with six bodies still
+    reading `sc.role` (no dependency recorded); via
+    `attendance_write`, no coach could save attendance — billing blocked with no override (§8i).
     - **Enumerate mechanically, before and after:**
       `SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
        WHERE n.nspname='public' AND p.prosrc ~ '<table>';` — the after-list must not mention
       the dropped column.
-    - **`npm run typecheck` cannot see the client half either.** Three `.select("… role …")`
-      calls in the two apps return a PostgREST **400**, not a type error. Grep the call sites.
-    - Both halves were caught before deploy; the client half was found by the review, not by
-      the compiler. (2026-08-12.)
+    - **`npm run typecheck` cannot see the client half** — `.select("… role …")` returns PostgREST **400**. Grep the
+      call sites. (2026-08-12.)
 
 146. **`me` IS NULL ON A DEEP-LINKED SCREEN, SO A CLIENT-SIDE `coach_id = me.id` FILTER
-    MATCHES NOTHING — AND THE SCREEN THEN FAILS *OPEN*.** Sibling of §7.141, different
-    failure. The coach app resolves `me` from a session that is not hydrated when a screen is
-    reached by URL, so a new "am I a shadow of this class?" query filtered on `me.id`
-    returned zero rows and the coach silently resolved to *"Another coach is teaching this
-    lesson"*. Measured on the live app; invisible to every unit test, because they pass `me`.
-    - **Ask the SERVER who you are.** `coach_is_active_class_shadow()` reads
-      `current_coach_id()`, which cannot be absent, and is admin-proof in a way a table read
-      filtered by a client-held id is not.
-    - **The corollary is a PRECEDENCE rule, and it bit immediately.** `attendance.tsx`
-      computes `ownsClass` as `!me?.id || cls.coach_id === me.id` — deliberately fail-OPEN, so
-      a null `me` makes every coach "own" every class. Reordering `lessonRole()` to check
-      `ownsClass` before the server-answered `isClassShadow` turned a shadow's read-only
-      screen into a marking screen the database then refused: driver check 18 went red on the
-      next run. **When two inputs disagree, trust the one answered server-side over the one
-      that fails open** — even when the fail-open one looks more authoritative.
-    - The unit test that should have pinned this asserted `"shadow"` under a title that said
-      `keeps the OWNER role`. A test whose name contradicts its assertion is worse than either
-      answer; read the two together. (2026-08-12.)
+    MATCHES NOTHING — AND THE SCREEN THEN FAILS *OPEN*.** Sibling of §7.141. Zero rows resolved a shadow to
+    *"Another coach is teaching this lesson"*; unit tests pass `me`.
+    - **Ask the SERVER who you are:** `coach_is_active_class_shadow()` reads `current_coach_id()`.
+    - **Precedence rule:** `attendance.tsx`'s `ownsClass` (`!me?.id || cls.coach_id === me.id`) is deliberately
+      fail-OPEN; checking it before `isClassShadow` in `lessonRole()` broke driver check 18. **When two inputs
+      disagree, trust the one answered server-side over the one that fails open.**
+    - A test named `keeps the OWNER role` asserted `"shadow"` — read test names and assertions together. (2026-08-12.)
 
 147. **A pgTAP GATE PROBE UNDER `SET LOCAL ROLE authenticated` CAN TEST THE WRONG REFUSAL
-    TWO WAYS, AND A MESSAGE-BLIND `throws_ok` CALLS BOTH A PASS.** Found writing
-    `coach_disable.test.sql` (2026-08-13); the same latent shape exists in older suites.
-    - **An inline subselect resolves under the CALLER's RLS.** `disable_coach((SELECT id
-      FROM coaches WHERE …))` run as a parent passes **NULL** — the parent cannot see the
-      row — so the RPC answers `no such coach` and the gate is never reached. Four gate
-      probes "passed" against the wrong refusal until the messages were pinned. Capture
-      probe ids in a TEMP TABLE **while still postgres** (`_foreign_coach` in
-      `class_shadow_coaches.test.sql` is the precedent) and add a non-NULL control.
-    - **A postgres-owned temp table is unreadable by `authenticated`** — the probe then
-      dies on `42501: permission denied for table _c`, which a `throws_ok(…, NULL, NULL,
-      …)` **also calls a PASS**. `GRANT SELECT ON <temp> TO authenticated` after creating
-      it. The `_foreign_coach` probe has this exact hole: its refusal is asserted
-      message-blind, so it has been green on `permission denied` since the day it was
-      written — the *refusal it names* is real (pgTAP pins it elsewhere), but that one
-      probe proves nothing.
-    - **The rule both bugs share: pin the refusal MESSAGE, not just `P0001`** (the
-      owner-transfer suite's post-review lesson, now with two more ways to be wrong).
+    TWO WAYS, AND A MESSAGE-BLIND `throws_ok` CALLS BOTH A PASS.** Found in `coach_disable.test.sql` (2026-08-13);
+    latent in older suites.
+    - **An inline subselect resolves under the CALLER's RLS** — `disable_coach((SELECT id FROM coaches WHERE …))` as a
+      parent passes NULL → `no such coach`; the gate is never reached. Capture probe ids in a TEMP TABLE **while still postgres** (`_foreign_coach`,
+      `class_shadow_coaches.test.sql`) and add a non-NULL control.
+    - **A postgres-owned temp table is unreadable by `authenticated`** → `42501: permission denied for table _c`, which
+      `throws_ok(…, NULL, NULL, …)` calls a PASS. `GRANT SELECT ON <temp> TO authenticated`. `_foreign_coach` has this hole.
+    - **Pin the refusal MESSAGE, not just `P0001`.**
 
 148. **THE PARENT SIDE HAS NO SINGLE CHOKE POINT, AND A TEXT GREP UNDER-COUNTS IT TWO
-    WAYS.** Found executing Wave 5 chunk 3 (2026-08-13): the plan's own risk review had
-    already raised the first draft's "4 parent paths" to "≥12"; the live enumeration
-    found **21 policy arms plus 2 RPC gates**, and then review found a whole fourth
-    family the grep could never see.
-    - **Enumerate from `pg_policies` on the LIVE database, never from migration files** —
-      policies are recreated over time and grep finds every historical copy plus zero
-      proof of which is current (`20260804000500` had silently *removed* one of the
-      paths the plan told chunk 3 to fix).
-    - **A grep for `current_parent_id` misses arms composed through OTHER helpers.**
-      `parent_in_tenant()` resolves `current_parent_id()` *internally*, so seven policy
-      arms and two RPC gates (`add_child_or_claim`, `find_student_candidates` — a
-      suspended tenant's parent could still CREATE a student) matched nothing. After the
-      policy enumeration, ask which *helpers* are parent-only by construction and audit
-      their callers (`pg_get_functiondef` over every function whose body names them).
-    - The full working method and the arm-by-arm matrix live in
-      `supabase/tests/tenant_suspension.test.sql` — the test list IS the enumeration; a
-      missed arm fails silent.
+    WAYS.** Wave 5 chunk 3 (2026-08-13): **21 policy arms plus 2 RPC gates**, plus a family grep could never see.
+    - **Enumerate from `pg_policies` on the LIVE database, never from migration files** (`20260804000500` had
+      silently removed a path the plan listed).
+    - **A grep for `current_parent_id` misses arms composed through OTHER helpers** — `parent_in_tenant()` hid seven
+      arms and two RPC gates (`add_child_or_claim`, `find_student_candidates`). Audit parent-only helpers' callers.
+    - Method and matrix: `supabase/tests/tenant_suspension.test.sql` — a missed arm fails silent; the grep could never
+      see it.
 
 149. **INSIDE A POLICY OR AN INVOKER-RIGHTS TRIGGER, EVERY SUBQUERY RUNS UNDER THE
     CALLER'S OWN RLS — AND A ROW YOUR OWN CHANGE JUST HID READS AS NULL, WHICH CAN PASS
-    THE CHECK.** Two faces, both hit on 2026-08-13:
-    - `parent_students_select`'s first draft judged suspension via
-      `(SELECT s.tenant_id FROM students s WHERE s.id = student_id)`. Post-suspension
-      the caller's own `students_select` hides that row, the subselect returns NULL,
-      `tenant_suspended(NULL)` is deliberately FALSE (fail-open for legacy rows), and
-      **the arm PASSES — the policy defeated by the sibling policy it shipped with.**
-      Caught by the suite's own dark-matrix case; fixed by delegating the arm to a
-      `SECURITY DEFINER` helper (`parent_owns_student()`), which is the general fix:
-      **a policy arm that needs a fact from another RLS'd table must get it through a
-      DEFINER helper, never an inline subselect.**
-    - The same blindness moves REFUSALS to surprising places: `parent_packages`'
-      invoker-rights lifecycle trigger could no longer *see* the suspended tenant's
-      product, so the insert died on `Unknown package product` (23514) **before** the
-      WITH CHECK's 42501 was ever reached. Harmless here (both walls are
-      suspension-driven) but pin the error you actually get, and re-ask which wall fired
-      whenever an RLS cut lands near an invoker trigger.
+    THE CHECK.** (2026-08-13.)
+    - `parent_students_select`'s `(SELECT s.tenant_id FROM students s WHERE s.id = student_id)` returned NULL once
+      `students_select` hid the row; `tenant_suspended(NULL)` is deliberately FALSE, so the arm PASSED. Fixed via
+      `SECURITY DEFINER` `parent_owns_student()`: **a policy arm that needs a fact from another RLS'd table must get it
+      through a DEFINER helper, never an inline subselect.**
+    - It moves refusals too (`parent_packages`: 23514 before 42501). Pin the error you actually get; re-ask which wall
+      fired near an invoker trigger.
 
 150. **A FUNCTION WHOSE RETURN TYPE MUST CHANGE CANNOT GO THROUGH `CREATE OR REPLACE` —
-    IT MUST BE DROPPED, AND THE DROP DESTROYS ITS GRANTS *AND ITS COMMENT*.** Hit by
-    `platform_tenant_overview()` gaining `suspended_at` (2026-08-13). Restate the full
-    grant triple **adjacent to the DROP in the same migration** — post-`20260804000400`
-    default privileges mean a forgotten regrant fails CLOSED (the page errors rather
-    than leaks), but a broken platform page is still broken, silently, for the one
-    admin who uses it. `COMMENT ON FUNCTION` needs restating too. The post-deploy grant
-    dump (§7.39) is the proof; chunk 3's came back exactly `REVOKE PUBLIC` + `GRANT
-    authenticated`.
-    - **Hit again → §7.168 (§8.61):** `join_tenant_by_code`; on the cloud the DROP re-grants `anon`, so a local pass proves nothing.
+    IT MUST BE DROPPED, AND THE DROP DESTROYS ITS GRANTS *AND ITS COMMENT*.** Hit by `platform_tenant_overview()`
+    (2026-08-13). Restate the full grant triple **adjacent to the DROP in the same migration** (post-`20260804000400` a
+    forgotten regrant fails CLOSED), and restate `COMMENT ON FUNCTION`. Proof: the grant dump (§7.39).
+    - **Folded in from §7.168 (§8.61, `join_tenant_by_code`):** on Supabase cloud the recreated function is re-granted
+      to `anon` by project default privileges, so "works locally" is the failure mode. Next to the DROP: re-`REVOKE`
+      from PUBLIC/anon/service_role, `GRANT` to authenticated, restore the COMMENT; the remote dump must show no `anon` row.
     - **Partly checked:** `function_grants.test.sql` #1 catches a function left open to `anon` LOCALLY; the cloud half is still the remote grant dump (§7.39).
 
 151. **CUTTING AN IDENTITY HELPER DOES NOT CUT THE MEMBERSHIP-SCOPED ARMS — the
     `current_tenant_id()` residue is ACCEPTED, TWICE, and the auth-layer ban is the
-    enforcement.** A disabled coach (`20260813000200`) and a suspended tenant's staff
-    (`20260813000300`) both keep every `tenant_id = current_tenant_id()` read for the
-    lifetime of their current token: that helper reads `profiles.tenant_id`, which no
-    disable touches. Closing it for real is one clause in `current_tenant_id()`, but its
-    call sites include audit stamping (`20260804000300`) and were deliberately not
-    audited in Wave 5 — a future decision, not an oversight. **Both pgTAP suites pin the
-    residue as EXPECTED** ("still passes a `current_tenant_id()` read = TRUE — accepted,
-    token-lifetime, ban enforces") so a future session finds a documented decision, not
-    a leak. Don't "fix" it by editing the helper without auditing those call sites.
+    enforcement.** A disabled coach (`20260813000200`) and suspended tenant's staff (`20260813000300`) keep every
+    `tenant_id = current_tenant_id()` read for their token's lifetime. Its call sites
+    include audit stamping (`20260804000300`), deliberately not audited in Wave 5. **Both pgTAP suites pin the residue
+    as EXPECTED.** Don't "fix" it by editing the helper without auditing those call sites.
 
 152. **`classes.coach_id` IS THE WRONG ANSWER TO "WHO TAUGHT THIS LESSON" — IT IS THE
-    ACCESS AXIS, AND ANYTHING ABOUT MONEY MUST USE THE DATED ONE.** The column is
-    **mutable and undated**: it says who teaches the class *now*, not who taught it in
-    July. `20260812000200`'s header states the split (lines 23-24) and
-    `sessionRoster.ts:16-24` repeats it — ACCESS follows the roster + `classes.coach_id`;
-    MONEY follows `class_rate_on().paid_coach_id` + "was I a shadow ON THAT DATE?" — and
-    `20260719000800` exists because the two were once one query and handing a class over
-    **re-priced its entire unpaid history**. Both files say so, and a plan written with
-    both open still picked the access axis for the Attendance page's Coach column, whose
-    entire purpose is reconciling a payout. The failure is quiet and reversed: a class
-    handed from A to B on 1 August pays every July lesson to A, the screen names B, and
-    the admin "corrects" a correct payout. **Filed 2026-08-13 without shipping the fix**
-    (`BACKLOG.md` → *The Attendance page's Coach column…*, re-sized S → M), so the trap
-    is still live in `attendance/page.tsx`. The rule to carry: **a display-only change
-    reaches money the moment it names a person next to an amount.** The money-side twin
-    `wages/domain/payoutItems.ts` reads `classes.coach_id` nowhere at all — copy that, not the
-    roster.
+    ACCESS AXIS, AND ANYTHING ABOUT MONEY MUST USE THE DATED ONE.** It is mutable, undated. ACCESS follows roster +
+    `classes.coach_id`; MONEY follows `class_rate_on().paid_coach_id` + "was I a shadow ON THAT DATE?"
+    (`20260812000200` L23-24, `sessionRoster.ts:16-24`;
+    `20260719000800`). The Attendance page's Coach column uses access, so a handover shows B beside A's pay. **Filed 2026-08-13 unfixed** (`BACKLOG.md` → *The Attendance page's Coach column…*) — still
+    live in `attendance/page.tsx`. **A display-only change reaches money the moment it names a person next to an
+    amount.** Copy `wages/domain/payoutItems.ts`, which reads `classes.coach_id` nowhere.
+    Why `20260719000800` exists: handing a class over **re-priced its entire unpaid history** when money read `classes.coach_id`.
 
 153. **A SUITE CAN BE GREEN BECAUSE IT ONLY EVER TESTS THE ONE RECORD THE RULE CANNOT
-    REACH.** Before `20260813000400`, both suites covering admin deletion exercised a
-    profile that had **never acted**: pgTAP seeded an audit row purely to watch
-    `prepare_admin_delete()` purge it, and `verify-admins.mjs` deletes
-    `admindelete@swimsync.test`, seeded expressly as "pure, unreferenced" and never used
-    as an actor. Changing what "has recorded activity" means would have passed both,
-    unchanged, while proving nothing whatsoever about the product — the deletion path is
-    *only* reachable for a traceless profile, so a suite built around that profile is
-    structurally blind to every rule about history. The tell is a fixture described by
-    what it **lacks** ("unreferenced", "disposable", "never signs in"): that is the
-    happy path, and the rule under test almost always lives on the other side of it.
-    **The fix is a second persona differing in exactly the one attribute** — here
-    `adminhistory@` (a005), identical to a003 except that an audit row names it ACTOR —
-    not a cleverer assertion on the first. It also caught what pgTAP structurally cannot:
-    that the refusal reaches the modal as a *sentence* rather than
-    `audit_log.actor_id`, and that the route's compensating unban leaves the account able
-    to sign in, since it bans **before** it calls the RPC.
+    REACH.** Before `20260813000400`, pgTAP and `verify-admins.mjs` (`admindelete@swimsync.test`) only deleted a profile
+    that had never acted; it was
+    never used as an actor — structurally blind to rules about history. Tell: a fixture described
+    by what it **lacks** ("unreferenced", "never signs in"). **The fix is a second persona
+    differing in exactly the one attribute** — `adminhistory@` (a005), a003 plus an audit row naming it ACTOR. It also
+    caught the modal needing a *sentence* and the compensating unban (it bans **before** the RPC).
 
 154. **`students_identity_uniq` DOES NOT FIRE ON A NULL DATE OF BIRTH — so the unique index
-    alone is NOT a duplicate guard for any code that writes `students.full_name`.** The index
-    is `(tenant_id, lower(trim(full_name)), date_of_birth)`, and Postgres treats NULLs as
-    distinct, so two active children of one business with the same name and **no DOB** coexist
-    happily — which is *exactly* why coach-added and parent-added rows become duplicates in the
-    first place (`20260719001400`'s own comment says so). `rename_student` (`20260814000100`)
-    would have recreated that duplicate silently on the index alone; it must **probe**
-    explicitly — `lower(btrim(full_name)) = v_name AND date_of_birth IS NOT DISTINCT FROM …
-    AND is_active AND id <> self` — the same `IS NOT DISTINCT FROM` shape `add_child_or_claim`
-    already uses, with the index kept only as the backstop for the non-NULL / inactive case.
-    **The rule to carry: any new write to `full_name` (or a new same-identity insert path) needs
-    its own NULL-safe probe; do not trust the index.** Proven by the pgTAP that goes red — the
-    duplicate slips through — the moment the probe is removed.
+    alone is NOT a duplicate guard for any code that writes `students.full_name`.** `(tenant_id, lower(trim(full_name)),
+    date_of_birth)` treats NULLs as distinct (see `20260719001400`). `rename_student` (`20260814000100`) must **probe**
+    — `lower(btrim(full_name)) = v_name AND date_of_birth IS NOT DISTINCT FROM … AND is_active AND id <> self` — as
+    `add_child_or_claim` does; the index is only the backstop. **Any new write to `full_name` (or a new same-identity
+    insert path) needs its own NULL-safe probe; do not trust the index.** pgTAP goes red without the probe.
 
 155. **THE INVOICE EMAIL READS LIVE `students.full_name`, unlike every other invoice surface —
-    so a future RESEND would diverge from the issued document.** The snapshot boundary is
-    otherwise clean: `invoice_items.student_name` is captured at generation and the parent
-    invoice view reads it, so renaming a child (`rename_student`, 2026-08-14) never rewrites a
-    sent invoice/credit note (§7.7). But `supabase/functions/generate-invoices/email.ts`
-    (~L323-330) builds its itemised lines from a **live** `students.full_name` read. This is
-    harmless *today* only because the email is sent in the same engine run that issues the
-    invoice — live == snapshot at that instant — and there is **no resend path** (grep-confirmed).
-    **If an invoice-resend feature is ever built, it MUST read `invoice_items.student_name`, not
-    `students.full_name`**, or a renamed child's resent email will not match the document it
-    claims to reproduce. Named here because the trigger (resend) does not exist yet, so nothing
-    else will remind the person who builds it.
+    so a future RESEND would diverge from the issued document.** `invoice_items.student_name` is snapshotted, so a
+    rename never rewrites a sent invoice/credit note (§7.7), but `supabase/functions/generate-invoices/email.ts`
+    (~L323-330) reads live `students.full_name`; harmless only while there is **no resend path**. **If an invoice-resend feature is ever built, it MUST read
+    `invoice_items.student_name`, not `students.full_name`.**
 
-156. **↪ Repeat of §7.38 — read that first; this entry is a later time it bit.** **A SECURITY DEFINER function CANNOT tell a service/nightly caller from a client one
-    via `current_user` — inside a definer function it is ALWAYS the owner (`postgres`). The
-    seam is `auth.uid()`: NULL only when there is no JWT (service_role key / a direct
-    `psql`/cron call), the caller's uid otherwise.** `recompute_package_extensions`
-    (`20260815000200`) first shipped with `current_user IN ('postgres','service_role')` as its
-    "is this the trusted service path?" test — so *every* caller, including an authenticated
-    parent reaching it through PostgREST, took the full-access branch and the tenant/parent
-    authz below it never ran. A pgTAP case (a parent recomputing another tenant → expected
-    `42501`) caught it: "caught: no exception". Fixed to `v_is_service := auth.uid() IS NULL`.
-    **The rule to carry: in any DEFINER function, authorise with `auth.uid()` /
-    `can_admin_tenant()` / `current_parent_id()`, never `current_user`** — `current_user` only
-    works in a plain (invoker) trigger like `enforce_parent_package_lifecycle`, which is exactly
-    why the wrong instinct feels right. Proven by the pgTAP that goes green only after the seam
-    changes.
+156. **↪ Folded into §7.38 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 
 157. **A new column on a table whose UPDATE policy is ROW-scoped is client-writable the moment
     it exists — the policy authorises the ROW, the trigger must pin the COLUMN.**
-    `parent_packages_update` allows `parent_id = current_parent_id()`, so a parent can PostgREST
-    any column of their own row that no trigger clause holds still. Every money-adjacent column
-    added in `20260815*` (`start_date`, `validity_weeks`, `ph_extension_weeks`,
-    `manual_extension_days`, `ph_ack_weeks_*`) had to be named in
-    `enforce_parent_package_lifecycle`'s authenticated-DML branch or a parent could set
-    `manual_extension_days = 365` or pre-acknowledge an announcement nobody made. The subtle
-    one: `start_date` had to be pinned on a **pending** row too, not just once active — a parent
-    could otherwise park a start date on their own request that the admin's confirm step would
-    then adopt (the definer RPCs, arriving as `postgres`, still write these columns; same seam
-    as §7.156). **The rule: every new `parent_packages`-family column gets a pin clause in the
-    same migration that adds it, and a pgTAP that proves a parent's direct UPDATE of it fails
-    (shown red first).** The UPDATE *policy* is not column-scoped and will not save you.
+    `parent_packages_update` allows `parent_id = current_parent_id()`. The `20260815*` columns (`start_date`, `validity_weeks`, `ph_extension_weeks`,
+    `manual_extension_days`, `ph_ack_weeks_*`) had to be named in `enforce_parent_package_lifecycle`'s
+    authenticated-DML branch. `start_date` must be pinned on a **pending** row too (the admin's confirm would adopt
+    it; definer RPCs, as `postgres`, still write these — same seam as §7.156). **The rule: every new
+    `parent_packages`-family column gets a pin clause in the same migration that adds it, and a pgTAP that proves a
+    parent's direct UPDATE of it fails (shown red first).**
 
 158. **A trigger that must UPDATE a SIBLING row on behalf of a parent-initiated INSERT has to
     be SECURITY DEFINER — and then it MUST carry explicit tenant/parent scoping, because
-    DEFINER bypasses RLS.** `supersede_open_package_offer` (AFTER INSERT on `parent_packages`)
-    cancels a family's open UNCLAIMED offer when a newer request arrives. As SECURITY INVOKER it
-    runs as `authenticated` on the parent's insert, and the §7.157 pin on `superseded_by` then
-    rejects the system's own UPDATE. Made DEFINER, it works — but DEFINER sees every tenant, so
-    the UPDATE is filtered `tenant_id = NEW.tenant_id AND parent_id = NEW.parent_id AND id <>
-    NEW.id AND status='pending' AND offered_by IS NOT NULL AND paid_claimed_at IS NULL`, never a
-    bare "same reference". Same DEFINER-hop-past-the-pins shape as the reference trigger (§7.156).
+    DEFINER bypasses RLS.** `supersede_open_package_offer` (AFTER INSERT on `parent_packages`) as INVOKER is
+    rejected by the §7.157 pin on `superseded_by`. As DEFINER the UPDATE is filtered `tenant_id = NEW.tenant_id AND
+    parent_id = NEW.parent_id AND id <> NEW.id AND status='pending' AND offered_by IS NOT NULL AND paid_claimed_at IS
+    NULL`, never a bare "same reference". Same shape as §7.156.
 
 159. **NEVER auto-cancel a row that carries a payment CLAIM (`paid_claimed_at`). Cancelled is
     terminal, and the `PKG-`/`INV-` reference on the bank statement then points at a dead row.**
-    The supersede trigger (§7.158) deliberately excludes `paid_claimed_at IS NOT NULL`: a parent
-    who tapped "I've paid" on one offer and then requested a different package must keep the
-    claimed one live, or the admin has to hand-`recordSale` against a reference that no longer
-    resolves. The named prohibition: an offer with a payment claim is cancelled ONLY by the
-    admin's explicit Decline — no trigger, RPC or supersede touches it.
+    The supersede trigger (§7.158) deliberately excludes `paid_claimed_at IS NOT NULL`. An offer with a payment claim is cancelled ONLY by the admin's
+    explicit Decline — no trigger, RPC or supersede touches it.
 
 160. **Minting a secret from `extensions.gen_random_bytes` inside a SECURITY INVOKER trigger
     fails for the client role (`permission denied for gen_random_bytes`); mint it from a DEFINER
-    trigger, and mint UNCONDITIONALLY on any table a parent can INSERT into.** `public_token` on
-    `parent_packages` is minted in `assign_parent_package_reference` (already DEFINER, already
-    unconditional) — NOT in the invoker lifecycle trigger, and NOT with an `IS NULL` guard (a
-    when-NULL mint is parent-writable: the parent supplies the value and the guard skips). This
-    is exactly why invoice tokens work (`assign_invoice_public_fields` is DEFINER + unconditional)
-    and the instinct to "only mint when empty" is wrong on any parent-insertable table.
+    trigger, and mint UNCONDITIONALLY on any table a parent can INSERT into.** `public_token` on `parent_packages`
+    is minted in `assign_parent_package_reference` (DEFINER, unconditional) — NOT in the invoker lifecycle trigger,
+    and NOT with an `IS NULL` guard (the parent supplies the value and the guard skips).
 
 161. **`student_package_coverage().lessons_remaining` is a per-student, category-scoped FAMILY
     SUM — "the covering package" is a DIFFERENT question, and the FIFO skips exhausted ones.**
-    The Students "Left" column reads the sum (two Group packages 9+5 → Pablo shows 14); the
-    "Package"/"Expires" columns read ONE package — the earliest-expiring covering package with
-    `live_lessons_remaining > 0` (fallback earliest). Don't conflate them: the sum can be
-    non-zero while every individual package that could pay for THIS child's class is exhausted.
-    The coverage function must contain NO affordability comparison (`coverage.test.sql` greps
-    the source for it) — display is category+date only; the engine owns "can this package pay".
+    "Left" reads the sum; "Package"/"Expires" read ONE — earliest-expiring with `live_lessons_remaining > 0`
+    (fallback earliest). Don't conflate them. The coverage function must contain NO affordability comparison (`coverage.test.sql` greps for it) — the engine owns "can this package pay".
 
 162. **Parents link to a tenant via `parent_tenants` (many-to-many), NOT `profiles.tenant_id` —
-    that column is NULL for a parent (it names a STAFF member's home tenant).** A server-side
-    "is this family in my business?" check written as `profiles.tenant_id = <tenant>` refuses
-    every real parent (`create_package_offer` shipped this bug; the pgTAP fixture caught it with
-    "That family is not in this business."). Use `EXISTS (SELECT 1 FROM parent_tenants WHERE
-    parent_id = … AND tenant_id = …)`.
+    that column is NULL for a parent (it names a STAFF member's home tenant).** A check written as
+    `profiles.tenant_id = <tenant>` refuses every real parent (bit `create_package_offer`).
+    Use `EXISTS (SELECT 1 FROM parent_tenants WHERE parent_id = … AND tenant_id = …)`.
 
 163. **A Playwright driver that HARDCODES a seed row's id (a class, a coach) breaks the day the
-    DB is reset — `seed.sql` regenerates those UUIDs (`gen_random_uuid`) on every reset.** The
-    §7.73 family, fresh instance: `verify-package-renewal` borrowed a class id captured from a
-    live DB and passed once, then failed on the next reset with an enrolment-guard error. The
-    fix is §7.73's rule — a driver OWNS its fixtures: create the class (coach looked up by the
-    stable `coach@swimsync.test` email; the Default-category ids `7c000000…` ARE stable seed
-    constants) with a fixed id, and tear it down. Only borrow ids that are fixed in `seed.sql`.
-    - **Hit again → §7.224 (2026-08-30):** `fixtures-assessment.sql`, plus why `check-fixture-roundtrip.sh` cannot catch it.
+    DB is reset — `seed.sql` regenerates those UUIDs (`gen_random_uuid`) on every reset.** Bit
+    `verify-package-renewal` (§7.73 family). A driver OWNS its fixtures: create the class (coach by
+    `coach@swimsync.test`; Default-category ids `7c000000…` ARE stable) with a fixed id, and tear it down. Only
+    borrow ids fixed in `seed.sql`.
+    - **Folded in from §7.224 (2026-08-30, `fixtures-assessment.sql`):** resolve a seed row by stable identity —
+      `SELECT id INTO v FROM classes WHERE title = 'Saturday Beginners' ORDER BY created_at, id LIMIT 1;` + `RAISE`
+      when NULL (the `ORDER BY` is §7.73). A `<NULL>` tenant in `cross-tenant enrolment refused` means a MISSING ROW,
+      not a tenancy fault. `check-fixture-roundtrip.sh` cannot catch this — it never resets; only a reset-first run can.
     - **Now a CHECK:** `drivers/check-fixture-ids.sh` (CI, repo-invariants) goes red on any UUID literal without `0000` in a fixture or driver (2026-09-25).
 
 164. **An FK written from inside a BEFORE INSERT trigger points at a row that does not exist
     yet — the RI check fires at the end of the INNER statement, not the outer INSERT.** Make it
-    `DEFERRABLE INITIALLY DEFERRED` or don't write it there. `apply_referral_reward` (BEFORE
-    INSERT on `parent_packages`) does `UPDATE referral_rewards SET reserved_package_id = NEW.id`
-    — but `NEW`'s row is not in `parent_packages` until the outer INSERT completes, so a
-    non-deferrable `reserved_package_id → parent_packages(id)` FK raises at the end of that inner
-    UPDATE and **every package purchase in the product dies**. `referral_rewards.reserved_package_id`
-    and `used_package_id` are therefore `DEFERRABLE INITIALLY DEFERRED`; the pgTAP pins that a
-    bare parent INSERT with a reward available inserts one row and reserves the reward with no FK
-    error. (REFERRAL_PLAN.md RISK 2 · §8.61)
+    `DEFERRABLE INITIALLY DEFERRED` or don't write it there. `apply_referral_reward` (BEFORE INSERT on
+    `parent_packages`) does `UPDATE referral_rewards SET reserved_package_id = NEW.id`, killing every purchase. `referral_rewards.reserved_package_id` and `used_package_id` are
+    `DEFERRABLE INITIALLY DEFERRED`; pgTAP pins it. (REFERRAL_PLAN.md RISK 2 · §8.61)
+    pgTAP pins it: a bare parent INSERT with a reward available inserts one row and reserves the reward with no FK error.
 
 165. **A resource reserved by a BEFORE INSERT trigger is invisible to the AFTER INSERT trigger
     that would free it — the same-statement handoff must resolve inside the BEFORE trigger's own
-    predicate.** When a parent requests a package over an open admin OFFER, `apply_referral_reward`
-    (BEFORE) must re-use the reward the offer already reserved, because `create_package_offer`
-    REFUSES on an open offer (it never supersedes) and `supersede_open_package_offer` (AFTER)
-    fires too late to release it in time. The fix: apply's candidate set is `available` rewards
-    OR rewards `reserved` by a to-be-superseded offer of the same family; it re-points
-    `reserved_package_id` to the new row. `settle_referral_reward`'s release arm is then guarded
-    `AND reserved_package_id = OLD.id`, so the supersede-cancel of the old offer does NOT release
-    a reward the new row now holds. (RISK 4 · §8.61)
+    predicate.** `apply_referral_reward` (BEFORE) re-uses a reward reserved by an open admin offer
+    (`create_package_offer` never supersedes; `supersede_open_package_offer` (AFTER) is too late): candidate set is `available` OR `reserved` by a to-be-superseded offer of the same family, re-pointing `reserved_package_id`. `settle_referral_reward`'s release arm is guarded `AND reserved_package_id = OLD.id`, so
+    the supersede-cancel does NOT release the new row's reward. (RISK 4 · §8.61)
 
-166. **A discount is a PRICE concept, not a VALUE concept** — `total_value` / `value_remaining` /
-    invoice `package_applied` never move; only `amount_payable` (= `total_value − discount_amount`)
-    does. Grep every `total_value` render and classify it PRICE vs VALUE: the in-app PayNow QR
-    (`SwimSyncApp/app/(parent)/billing/paynow.tsx`) is a **second** price surface distinct from the
-    tokenised `/package/[token]` pay page, and both must lock `amount_payable`; the "N lessons ·
-    S$r each" line is VALUE and no longer sums to the headline, so an explicit "− discount" line
-    is mandatory beside it. Never re-price a row that carries `paid_claimed_at` — the family
-    already used that amount and reference (the §7.159 family, on the amount axis). (RISK 3/6/11 · §8.61)
+166. **A discount is a PRICE concept, not a VALUE concept** — `total_value` / `value_remaining` / invoice
+    `package_applied` never move; only `amount_payable` (= `total_value − discount_amount`) does. The in-app PayNow QR (`SwimSyncApp/app/(parent)/billing/paynow.tsx`) and the
+    `/package/[token]` pay page both must lock `amount_payable`; the "N lessons · S$r each" line is VALUE, so an
+    explicit "− discount" line is mandatory beside it. Never re-price a row that carries `paid_claimed_at` (§7.159,
+    amount axis). (RISK 3/6/11 · §8.61)
+    Audit: grep every `total_value` render and classify it PRICE vs VALUE — the in-app PayNow QR (`SwimSyncApp/app/(parent)/billing/paynow.tsx`) is a second price surface.
 
 167. **Two BEFORE INSERT triggers on one table run in ALPHABETICAL order by trigger name — a
     trigger that reads another's `NEW.*` must sort after it, and a pgTAP assertion should pin
-    that.** `apply_referral_reward` reads `NEW.total_value` (set by `enforce_parent_package_lifecycle`),
-    so its trigger is named `trg_zz_apply_referral_reward` to sort after `trg_parent_package_lifecycle`.
-    Same rule already inline at `20260815000500` for the reference trigger (§6, ARCHITECTURE);
-    graduated here as the general one. (§8.61)
+    that.** `trg_zz_apply_referral_reward` reads `NEW.total_value`, so sorts after `trg_parent_package_lifecycle`.
+    Same rule as `20260815000500`'s reference trigger (§6, ARCHITECTURE). (§8.61)
 
-168. **↪ Repeat of §7.150 — read that first; this entry is a later time it bit.** **Changing a function's `RETURNS TABLE` shape is a SECURITY event, not a refactor** — a
-    fold into §7.150. Postgres cannot `CREATE OR REPLACE` a result-type change, so it forces
-    `DROP FUNCTION` + recreate, which **destroys the ACL and the COMMENT**; on Supabase cloud the
-    project-level default privileges then re-grant EXECUTE to `anon`, so "it still works locally"
-    is exactly the failure mode. Adding `referred` to `join_tenant_by_code`'s result forced the
-    DROP; the migration re-`REVOKE`s from PUBLIC/anon/service_role, re-`GRANT`s to authenticated
-    and restores the COMMENT ADJACENT to the DROP, and the post-deploy remote grant dump must
-    show no `anon` row for it. (RISK 8 · §8.61)
+168. **↪ Folded into §7.150 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 
 169. **RLS on `parents`/`parent_tenants` hides OTHER families' rows from a role-scoped pgTAP
     probe, so a driver/test that resolves another family's code under `SET LOCAL ROLE
-    authenticated` reads NULL and the RPC then reports the wrong error.** In `referrals.test.sql`
-    the join-failure probes needed each referrer's random `REF-` code, but a fresh joiner cannot
-    SELECT another parent's `parent_tenants` row — the lookup returned NULL and
-    `join_tenant_by_code(NULL)` raised "enter a join code" instead of the anti-probing "not
-    recognised". The fix: capture the needed codes into a NON-RLS temp table as `postgres` BEFORE
-    switching roles, and `GRANT SELECT` the temp helpers to `authenticated`. (§8.61)
+    authenticated` reads NULL and the RPC then reports the wrong error.** Bit `referrals.test.sql`
+    (`join_tenant_by_code(NULL)` → "enter a join code"). Fix: capture needed codes into a NON-RLS temp table as
+    `postgres` BEFORE switching roles, and `GRANT SELECT` the temp helpers to `authenticated`. (§8.61)
 
 170. **A re-run of `generate-invoices` on a SEALED month is no longer a no-op — it RE-SENDS any
-    invoice email that never went out.** Since 2026-08-16 the handler runs
-    `retryUnsentInvoiceEmails` per (tenant, month) AFTER generation, on the `already_complete`
-    path too. Anyone reasoning "sealed month ⇒ nothing happens" or "re-running generate is inert"
-    is now wrong for email: a parent whose earlier send failed WILL be emailed on the next run.
-    It never double-sends (per-invoice atomic claim then stamp), resets a failed send back to
-    unsent, and skips suspended/auto-disabled tenants. Plan:
-    `docs/plans/INVOICE_EMAIL_RETRY_PLAN.md`. (§8.63)
+    invoice email that never went out.** Since 2026-08-16 `retryUnsentInvoiceEmails` runs per (tenant, month) after
+    generation, `already_complete` path too. Never double-sends (atomic claim then stamp); skips
+    suspended/auto-disabled tenants. Plan: `docs/plans/INVOICE_EMAIL_RETRY_PLAN.md`.
+    (§8.63)
 
 171. **A completeness backfill on a best-effort DELIVERY column can permanently seal genuine
-    misses — scope it against real data, never blanket by reflex.** Back-stamping every existing
-    invoice as "email sent" when adding `invoice_email_sent_at` would mark as done any invoice
-    whose best-effort send had silently failed since the email path shipped (2026-07-16) — the
-    exact misses the retry exists to heal. Blanket was correct HERE only because the prod count
-    showed all 7 existing invoices PAID (a paid invoice needs no re-email). The rule generalizes
-    to any future delivery-tracking column: run the count, decide the WHERE clause against it.
-    Plan ⚠ RISK 2. (§8.63)
+    misses — scope it against real data, never blanket by reflex.** Back-stamping `invoice_email_sent_at` would seal
+    silent send failures since 2026-07-16. Blanket was correct only because prod's 7 invoices were all PAID. For any
+    delivery-tracking column: run the count, decide the WHERE clause against it. Plan ⚠ RISK 2. (§8.63)
 
 172. **`service_role` holds EXECUTE on almost every RPC — but NOT all of them, and a
-    `svc.rpc()` whose `error` you discard FAILS OPEN.** This shipped a live bug on
-    2026-08-17, caught in review and not by any test. `credit-note-emails` gated on
-    `tenant_suspended()` via `const { data: suspended } = await svc.rpc(...)`. `proacl` for
-    that function is `{postgres=X,authenticated=X}` — **no `service_role`** — so every call
-    raised `permission denied`, `data` came back `null`, `null === true` evaluated `false`,
-    and the gate concluded "not suspended" on **every invocation**. A suspended business
-    would have emailed parents about credits its own RLS hides from them. The predicate was
-    never at fault; its input always said false.
-    **Two rules.** (a) **Prefer reading the COLUMN** with the service client —
-    `tenants.suspended_at`, as `generate-invoices/core.ts:275-285` already did — and **fail
-    CLOSED** on an unreadable row. **Do NOT fix it by granting EXECUTE to `service_role`**
-    (§7.87): a plain column read needs no new privilege, and the post-deploy grant dump on
-    2026-08-17 confirmed the absence is the *correct* production state. (b) **Never
-    destructure only `data` off an RPC that gates a decision.** `const { data }` silently
-    converts "permission denied" into "the answer is null", and for any boolean gate written
-    as `data === true`, null means *allow*. Check `error`, or don't use an RPC.
-    **Why no test caught it: the gate lived inside the `Deno.serve` closure.** A handler
-    closure is unreachable from a test, so every assertion targeted `core.ts`/`email.ts`
-    while the mitigation sat where only a reviewer could read it. The per-note loop was
-    extracted to `core.ts` for exactly this reason. **A mitigation only a reviewer can read
-    is not a mitigation** — if a guard matters, it has to live somewhere a test can call it.
-    Plan ⚠ RISK 10. (§8.64)
+    `svc.rpc()` whose `error` you discard FAILS OPEN.** Live bug 2026-08-17: `credit-note-emails` gated on
+    `const { data: suspended } = await svc.rpc('tenant_suspended'…)`; `proacl` lacks `service_role`, so `data` was
+    `null` and the gate read "not suspended" every time.
+    **Two rules.** (a) **Prefer reading the COLUMN** — `tenants.suspended_at`, as `generate-invoices/core.ts:275-285`
+    does — and **fail CLOSED** on an unreadable row. **Do NOT fix it by granting EXECUTE to `service_role`** (§7.87);
+    the 2026-08-17 grant dump confirmed the absence is correct. (b) **Never destructure only `data` off an RPC that
+    gates a decision** — for `data === true`, null means *allow*. Check `error`, or don't use an RPC.
+    **A guard inside the `Deno.serve` closure is untestable** — never leave one there; the per-note loop moved to
+    `core.ts`. **A mitigation only a reviewer can read is not a mitigation.** Plan ⚠ RISK 10. (§8.64)
 
 173. **`can_admin_tenant()` includes `is_platform_admin()`, so it is the WRONG check for
-    anything that acts, or sends mail, in a single tenant's name.** It is literally
-    `SELECT is_platform_admin() OR is_tenant_admin(p_tenant_id)`. Admin pages routinely
-    `select` unfiltered and lean on RLS, which hands a platform admin **every** tenant's
-    rows — so gating a per-tenant action on `can_admin_tenant` lets the operator on
-    `admin.swimsync.sg` act as any business (for credit-note emails: send
-    `From: <someone else's business>` to that business's parents). Use
-    **`is_tenant_admin()`** when the action belongs to one business, and note it *also*
-    requires `role = 'tenant_admin'`, `admin_disabled_at IS NULL` and a non-suspended
-    tenant — so a UI check that only compares `tenant_id` is looser than the server and
-    renders a button that 403s. `can_admin_tenant` is correct where a POLICY already uses
-    it (`attendance_write`), because then you are inheriting an existing authority, not
-    inventing one. **Do not widen a per-tenant check to make a platform admin's 403 go
-    away — that 403 is the feature.** Plan ⚠ RISK 4. (§8.64)
+    anything that acts, or sends mail, in a single tenant's name.** It is
+    `SELECT is_platform_admin() OR is_tenant_admin(p_tenant_id)`. Use **`is_tenant_admin()`** for per-business actions; it also requires `role = 'tenant_admin'`,
+    `admin_disabled_at IS NULL` and a non-suspended tenant, so a UI check on `tenant_id` alone renders a button that
+    403s. `can_admin_tenant` is correct where a POLICY already uses it (`attendance_write`). **Do not widen a
+    per-tenant check to make a platform admin's 403 go away — that 403 is the feature.** Plan ⚠ RISK 4. (§8.64)
 
 174. **A test fixture that creates shared-database state and then throws BEFORE returning
-    leaks it, and the damage surfaces as an unrelated pgTAP failure.** Cost real time on
-    2026-08-17. A Deno helper built a scenario (tenant + coach + parent + invoices), then
-    threw on its own vacuous-fixture guard; the caller's `try/finally { teardown() }` only
-    starts protecting once the helper **returns**, so all 9 tests leaked a tenant holding a
-    2026-05 invoice. That broke `supabase/tests/tenant_isolation.test.sql` **test 18**,
-    which asserts `SELECT COUNT(*) FROM invoices` = 2 **globally** — a pgTAP red with no
-    visible connection to the Deno suite that caused it, and nearly undebuggable from the
-    pgTAP end. **Rule: everything after the fixture is created goes inside a `try` that
-    tears down before rethrowing**, and fold a teardown failure into the original error
-    rather than letting it replace it. Same reason `Promise.allSettled` beats sequential
-    `await`s when tearing down two scenarios: `teardown()` throws if anything still
-    references its tenant, and the first throw would skip the second. **If pgTAP reddens on
-    a global COUNT assertion, suspect Deno-suite debris before suspecting the product** —
-    `SELECT count(*) FROM tenants WHERE display_name LIKE 'Test Tenant%'` is the check.
-    (§8.64)
+    leaks it, and the damage surfaces as an unrelated pgTAP failure.** 2026-08-17: a Deno helper threw on its own
+    guard before returning, so `try/finally { teardown() }` never ran; the leaked 2026-05 invoice broke
+    `supabase/tests/tenant_isolation.test.sql` **test 18** (global `COUNT(*) FROM invoices` = 2). **Rule: everything
+    after the fixture is created goes inside a `try` that tears down before rethrowing**, folding a teardown failure
+    into the original error.  Tear down multiple scenarios with `Promise.allSettled`. **If
+    pgTAP reddens on a global COUNT, suspect Deno-suite debris** —
+    `SELECT count(*) FROM tenants WHERE display_name LIKE 'Test Tenant%'` is the check. (§8.64)
 
 175. **`psql` renders `timestamptz` in the SESSION timezone, which is UTC here — reading it
-    as SGT is 8 hours of wrong diagnosis.** On 2026-08-17 a `to_char(created_at,'... HH24:MI')`
-    read `10:10`, which was concluded to be "hours before this session started" and therefore
-    somebody else's debris. It was **18:10 SGT — seventeen minutes earlier**, inside the
-    session, and the debris was this session's own (§7.174). `SHOW TimeZone` on the local
-    container returns `UTC`. This is §7.7 wearing different clothes: the same UTC-vs-SGT
-    confusion that shipped a double-billing bug, now on the *diagnostic* side, where it
-    produces a confident wrong answer instead of a wrong invoice. **When a timestamp decides
-    a conclusion, render it explicitly in both zones** —
-    `to_char(x AT TIME ZONE 'UTC', ...)` and `to_char(x AT TIME ZONE 'Asia/Singapore', ...)`
-    — and sanity-check against `now()` in the same query. (§8.64)
+    as SGT is 8 hours of wrong diagnosis.** 2026-08-17: `10:10` was read as old debris; it was 18:10 SGT, this
+    session's own (§7.174). §7.7 on the diagnostic side. **When a timestamp decides a
+    conclusion, render it explicitly in both zones** — `to_char(x AT TIME ZONE 'UTC', ...)` and
+    `to_char(x AT TIME ZONE 'Asia/Singapore', ...)` — and sanity-check against `now()` in the same query. (§8.64)
 
-176. **↪ Repeat of §7.90 — read that first; this entry is a later time it bit.** **A second FK between two tables silently breaks EVERY PostgREST embed between them —
-    and the failure renders as "there is nothing here".** `20260815000600_default_packages`
-    added `class_categories.default_product_id` and `tenants.default_package_product_id`,
-    both pointing back at `package_products`. Neither the parent app's "Buy a package" list
-    nor the admin's product catalogue mentions those columns, and both stopped working
-    anyway: with two relationships available PostgREST refuses to choose and answers
-    **PGRST201 on the WHOLE query**, not on the one ambiguous embed. Both call sites did
-    `?? []`, so for two days the parent's "Buy a package" list and the admin's catalogue
-    rendered empty, with no error anywhere. **Adding a column can break a query that does not
-    name it.** *(It cost nothing in the end — prod held 0 `package_products`, so both lists
-    were correctly empty regardless. Note what that means for detection: **the blast radius
-    of this class of bug is invisible until the data exists**, so the dormant feature you
-    are not watching is exactly where it hides until first use.)* After any migration that adds an FK, run the ambiguity check —
-    `pg_constraint` grouped by table pair, `HAVING count(*) > 1` — and qualify every embed
-    on a pair it returns as `table!fkey_name(cols)`. **Fix them ALL at once:** PostgREST
-    reports only the first, so `class_categories` was qualified, the query re-run, and it
-    failed again on `tenants`. Four pairs are ambiguous around `package_products` /
-    `parent_packages` today. **And the deeper rule: a `?? []` on a fetch makes a broken
-    query indistinguishable from an empty result.** Check `.error` wherever emptiness is a
-    plausible real state — that silence is what turned a two-line fix into a two-day live
-    outage. (§8.65)
+176. **↪ Folded into §7.90 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 
 177. **A fixture date that means "in the future" must be COMPUTED, never typed.**
-    `coach_disable.test.sql` called a lesson "a FUTURE one" and dated it `'2026-08-15'`.
-    `disable_coach()` deletes overrides with `session_date > today_sg()`, so the assertion
-    was true for one week and false for ever after — it expired on 2026-08-15 SGT and
-    reddened **every push for 20 commits** (2026-08-14 → 08-17), gating the Deno suite
-    behind it the whole time. The product code was correct throughout. Rule: if an
-    assertion is about a date's RELATION to today, derive it from `today_sg()`; only pin a
-    literal when the assertion is about a fixed month that stays in the past (that file's
-    July payout dates are correctly literal, and the comment now says why for each).
-    ⚠ **Watch the boundary when deriving**: the obvious "next Saturday" spelling `6 - dow`
-    returns 0 when today IS Saturday, re-creating the bug on one day in seven. Use an
-    offset that cannot be zero and sweep all seven weekdays before believing it.
-    **Related but distinct from §7.122** — that one is about which weekday a CI run
-    happened to see; this is about a date that stops meaning what its name says. (§8.65)
-    - **Hit again → §7.194 (2026-08-20):** two new pgTAP files pinned dates that later fell below the rolling billing floor.
+    `coach_disable.test.sql` dated a "FUTURE" lesson `'2026-08-15'` against `disable_coach()`'s
+    `session_date > today_sg()`; it expired and reddened every push for 20 commits (2026-08-14 → 08-17). Derive
+    date-relative-to-today from `today_sg()`; pin a literal only for a fixed past month. ⚠ `6 - dow` returns 0 on
+    Saturday — use an offset that cannot be zero and sweep all seven weekdays. Distinct from §7.122. (§8.65)
+    - **Folded in from §7.194 (2026-08-20):** `markable_floor()` rolls forward monthly, so literal booking dates
+      (`class_capacity_limit`, `tenant_unmarked_lesson_count`) fall below it and `supabase test db` reddens with no
+      code change. House style: `today_sg() - 14`. Smell: a literal `'2026-` inside a `.test.sql` booking or span.
 
 178. **"Designed to redden" only pays if someone bumps it the next morning.**
-    `verify-platform-admin-scope.mjs` pins the admin sidebar at an exact page count
-    precisely so a dropped entry cannot pass — and it reddens by design when a page is
-    legitimately added. Holidays took it 17 → 18 and Referrals 18 → 19, and the nightly was
-    left red for **three consecutive sweeps** instead. A counter nobody bumps is not an
-    alarm, it is noise that hides the two real failures underneath it — which is exactly
-    what happened: the `packages` regression (§7.176) sat in the same rot issue, unread,
-    the whole time. **When the nightly reddens, triage it that day even if you are certain
-    which check it is** — the certainty is about one driver, and the sweep reports several.
-    (§8.65)
+    `verify-platform-admin-scope.mjs` pins the sidebar page count and reddens when a page is added (17 → 18 → 19); left red,
+    it hid the `packages` regression (§7.176). **When the nightly reddens, triage it that day even if
+    you are certain which check it is** — the sweep reports several. (§8.65)
 
 179. **A CSV export of user-entered text has TWO ways to lie, and quoting fixes neither.**
-    Wave C added `lib/csv.ts` for the admin tables. (a) **Formula injection**: a
-    parent-entered name like `=HYPERLINK(...)` or `+cmd|...` EXECUTES when the admin opens
-    the file in Excel, and RFC-4180 quoting does **not** stop it — Excel evaluates quoted
-    formulas. A leading `'` does; `toCsv` prefixes any STRING field whose first char is
-    `= + - @ TAB CR`. **Numbers are passed through untouched** — a JS number cannot
-    stringify to a formula, and guarding one would turn a real `-5` credit into text and
-    break the accountant's SUM. (b) **Silent truncation**: the admin pages cap their fetch
-    (~1000 rows), so exporting a capped array yields a file that SUMS WRONG with no on-file
-    warning. `exportCsv` refuses to emit when the source was capped — keyed on the
-    **unfiltered fetch count (`sourceCount`), NOT the filtered `visible` length**: a client
-    filter that shrinks 1000 capped rows to 50 does not make the export complete, it just
-    hides that the fetch already dropped the rest. A blocked download is recoverable; a
-    wrong revenue figure is not. UTF-8 BOM so Excel opens unicode names. (§8.66)
+    `lib/csv.ts`: (a) **Formula injection** — Excel evaluates quoted formulas; `toCsv` prefixes `'` to any STRING
+    field starting `= + - @ TAB CR`. **Numbers are passed through untouched** (guarding `-5` breaks SUM).
+    (b) **Silent truncation** — pages cap fetch (~1000 rows); `exportCsv` refuses when capped, keyed on the
+    **unfiltered fetch count (`sourceCount`), NOT the filtered `visible` length**. UTF-8 BOM for unicode names. (§8.66)
+    A blocked download is recoverable; a wrong revenue figure is not.
 
 180. **"Skip the guard, it can't apply here" — CHECK what the guard actually queries first.**
-    Convert-a-trial (Wave C) reuses the Unassigned Children enrolment insert, which carries
-    a two-press guard. The first plan skipped it: "the trial is the reason to convert." That
-    premise was WRONG about the guard — it queries only *future* trials
-    (`.gte("session_date", today).is("cancelled_at", null)`), so it never fires on the past
-    trial being converted anyway. What it catches is the real hazard: a child who rebooked a
-    *second, upcoming* trial. Enrolling then stacks a permanent enrolment on a live unmarked
-    booking, and an unmarked trial blocks the whole tenant's billing month with **no
-    override** (§7.15). The guard was ported into the convert handler, and the past trial row
-    deliberately STAYS on the needs-marking list — converting is not marking. Rule: before
-    dropping a guard you inherited, read its predicate; "it can't apply here" is a claim about
-    code you may not have read. (`trials/domain/trialConvert.ts`, was `lib/` until Admin L-D; §8.66)
+    Convert-a-trial reuses the enrolment two-press guard, which queries only *future* trials
+    (`.gte("session_date", today).is("cancelled_at", null)`), so it never fires on the converted past trial; it
+    catches a rebooked upcoming trial whose unmarked booking would block the tenant's billing month with **no override** (§7.15). Ported into the convert handler; the
+    past trial deliberately STAYS on the needs-marking list — converting is not marking. Read a guard's predicate before dropping it. (`trials/domain/trialConvert.ts`, was `lib/` until Admin L-D; §8.66)
 
 181. **A `*/` inside a CSS comment closes it — Tailwind class patterns are booby-trapped.**
-    A block comment in `globals.css` documenting the responsive scaling wrote the class pair
-    as `h-*/w-*`; the `*/` ended the comment mid-sentence and the rest parsed as broken CSS.
-    `tsc` and the dev server both passed — PostCSS only runs at build — so only `npm run
-    build` caught it, with a webpack error pointing INTO the comment text. Never write `*/`
-    (nor a bare `*` before `/`) inside a CSS comment: say "height/width", not `h-*/w-*`.
-    Build, not typecheck, is the check that finds it. (§8.67)
+    `h-*/w-*` in a `globals.css` comment broke parsing; `tsc` and dev passed, only `npm run build` caught it. Never
+    write `*/` (nor a bare `*` before `/`) inside a CSS comment: say "height/width", not `h-*/w-*`. Build, not
+    typecheck, is the check. (§8.67)
 
 182. **`next build` while `next dev` is running corrupts the shared `.next` — the dev server
-    then serves 200 with an empty page.** Verifying the production build while the dev server
-    stayed up for Playwright screenshots left the running server returning 200 on `/login`
-    with NO form in the HTML, so a driver timed out on the email input and looked like a
-    login regression. It is neither — both processes write the same `.next/`. Fix:
+    then serves 200 with an empty page.** Fix:
     `pkill -f 'next dev'; rm -rf .next; npm run dev`, then re-poll for the actual form
-    (`curl … | grep 'type="email"'`), not merely the 200. Don't run `build` and `dev` against
-    one checkout at once. (§8.67)
+    (`curl … | grep 'type="email"'`), not merely the 200. Don't run `build` and `dev` against one checkout at once.
+    (§8.67)
 
 183. **The admin sidebar's grouping is PRESENTATIONAL — never nest `NAV` to build it.**
-    `scopeForPath()` (route-level tenant/platform gating in RequiresTenant) prefix-matches the
-    FLAT `NAV` array in `lib/adminNav.ts`. The 2026-08-17 collapsible groups add a SECOND
-    declaration (`NAV_GROUPS` + `groupedNavFor`) that only references hrefs; `NAV` is
-    untouched, so grouping cannot move a route's security scope. A "cleanup" that refactors
-    `NAV` into nested groups — tempting, and `/simplify` might propose it — would break the
-    gate silently. That the `navFor`/`scopeForPath` unit tests still pass unchanged is the
-    proof it didn't move; keep them that way. (§8.67)
+    `scopeForPath()` (RequiresTenant gating) prefix-matches the FLAT `NAV` in `lib/adminNav.ts`; groups are a separate
+    `NAV_GROUPS` + `groupedNavFor` referencing hrefs. Nesting `NAV` (e.g. via `/simplify`) would break the gate
+    silently. The unchanged `navFor`/`scopeForPath` unit tests prove scope didn't move; keep them that way. (§8.67)
 
 184. **A one-time dedup that marks rows and a NON-partial `UNIQUE` index in the same
-    migration collide — and a 0-row local DB hides it completely.** The credit-note
-    double-credit fix (`20260818000100`) first wrote its dedup to mark younger duplicate
-    notes `status='reversed'` (keeping their `invoice_item_id`), then added
-    `CREATE UNIQUE INDEX ON credit_notes(invoice_item_id)` — non-partial, so the kept row and
-    its reversed twin still collide and the whole (transactional) migration ABORTS on prod,
-    exactly for the data it exists to repair. `supabase db reset` passed because production
-    holds 0 credit notes, so no duplicate was ever built locally. Fix: the dedup **DELETEs**
-    the duplicates (they were undrawn → no `credit_applications` FK), leaving one row per item
-    TOTAL, which the full unique index needs. Do NOT "fix" it with a partial index instead —
-    the trigger's `SELECT … WHERE invoice_item_id = …` would then match 1-live + N-reversed
-    and could re-activate the wrong row. Verified by replaying steps 3→5 on synthetic
-    duplicates. Lesson: a migration whose repair path is unreachable locally must be tested on
-    hand-built dirty data before it ships. (§8.68)
+    migration collide — and a 0-row local DB hides it completely.** `20260818000100` first marked duplicate credit
+    notes `status='reversed'` then `CREATE UNIQUE INDEX ON credit_notes(invoice_item_id)` — would ABORT on prod;
+    `db reset` passed (0 local rows). Fix: the dedup **DELETEs** duplicates.
+    Do NOT "fix" it with a partial index instead — the trigger's `SELECT … WHERE invoice_item_id = …` would match
+    1-live + N-reversed and re-activate the wrong row. A migration whose repair path is unreachable locally must be
+    tested on hand-built dirty data before it ships. (§8.68)
+    Deleting the duplicates is safe only because they were undrawn (no `credit_applications` FK).
 
 185. **A column can exist on the running DB but be created by NO migration — schema DRIFT —
-    so a bare `DROP COLUMN` breaks `db reset` and would error on prod.** `tenants.suspend` was
-    present in the local Postgres (some earlier hand-edit) yet no migration file creates it;
-    `information_schema` on prod showed it absent entirely. A plain `ALTER TABLE … DROP COLUMN
-    suspend` therefore fails on a fresh `db reset` ("column does not exist") AND on prod. Use
-    `DROP COLUMN IF EXISTS`. More broadly: local and cloud disagree by construction (§7.39,
-    §7.89) — verify a column's existence in `information_schema`, never assume the running DB
-    equals the migration history. (§8.68)
+    so a bare `DROP COLUMN` breaks `db reset` and would error on prod.** `tenants.suspend` existed locally, created by
+    no migration, absent on prod. Use `DROP COLUMN IF EXISTS`. Local and cloud disagree by construction (§7.39,
+    §7.89) — verify in `information_schema`, never assume the running DB equals the migration history. (§8.68)
 
 186. **A `FOR EACH ROW` trigger that RAISEs aborts the WHOLE batch upsert, not just its row —
-    and the app shows a useless generic toast unless it decodes the SQLSTATE.** The coach
-    attendance save is one `.upsert(rows)` of the entire roster; when the credit-note trigger
-    RAISEs `CN001` (refusing to un-correct a spent credit) on one student's row, PostgREST
-    rolls back every row and supabase-js returns one error. The old handler discarded
-    `error.message` and showed "please try again" — a retry-forever trap. Fix: raise with a
-    distinct `ERRCODE` and map `error.code` to a real message
-    (`SwimSyncApp/lib/attendanceSaveError.ts`). Any refusing trigger on a batch-written table
-    needs this pairing, or the refusal is indistinguishable from a transient failure. (§8.68)
+    and the app shows a useless generic toast unless it decodes the SQLSTATE.** Bit the coach attendance `.upsert(rows)` on
+    credit-note `CN001`.
+    Fix: raise with a distinct `ERRCODE` and map `error.code` (`SwimSyncApp/lib/attendanceSaveError.ts`). Any refusing
+    trigger on a batch-written table needs this pairing. (§8.68)
 
-187. **To prove an EDGE FUNCTION deploy actually shipped your code, `supabase functions
-    download <slug>` then check `git status` is clean.** §7.31/§7.51 say a 200 proves nothing —
-    grep the served bundle for a string only the new build has. For edge functions there is
-    nothing public to grep (they run behind auth/JWT), but `functions download` **overwrites the
-    local function directory with the DEPLOYED source**, so a **clean `git status` afterward is
-    proof the live bundle byte-matches your committed branch** — and a diff is proof it does not.
-    Pair it with `supabase functions list` (the `version` bumps on each deploy). Used to confirm
-    `generate-invoices` v24 and `credit-note-emails` v2 on 2026-08-18. Note the download mutates
-    your working tree, so do it on a clean tree you can inspect, not mid-edit. (§8.69)
+187. **To prove an EDGE FUNCTION deploy actually shipped your code, `supabase functions download <slug>` then check
+    `git status` is clean.** No public bundle to grep (§7.31/§7.51); `functions download` **overwrites the local
+    directory with the DEPLOYED source**, so clean = live matches branch, a diff = it does not. Pair with `supabase
+    functions list` (`version` bumps). It mutates your tree — run on a clean tree, not mid-edit. (`generate-invoices`
+    v24, `credit-note-emails` v2, 2026-08-18; §8.69)
 
-188. **Transition tables are SINGLE-EVENT only — a trigger with `REFERENCING ... TABLE` and
-    more than one event is rejected** (`ERROR: transition tables cannot be specified for
-    triggers with more than one event`). So a statement-level trigger that must reconcile on
-    INSERT *and* UPDATE *and* DELETE is **three triggers sharing one function**, not one
-    `AFTER INSERT OR UPDATE OR DELETE`. The function branches on `TG_OP` and reads whichever of
-    `newtab`/`oldtab` exists for that event; make it idempotent, because a single `.upsert`
-    fires both the INSERT trigger (new rows) and the UPDATE trigger (conflicted rows) in one
-    statement. (Holiday reconcile, `20260818000700`; §8.70.)
+188. **Transition tables are SINGLE-EVENT only — a trigger with `REFERENCING ... TABLE` and more than one event is
+    rejected** (`ERROR: transition tables cannot be specified for triggers with more than one event`). Use **three
+    triggers sharing one function**, branching on `TG_OP` over `newtab`/`oldtab`. Make it idempotent: one `.upsert`
+    fires INSERT and UPDATE triggers together. (`20260818000700`; §8.70.)
 
-189. **`CREATE OR REPLACE FUNCTION` cannot rename an input parameter** (`ERROR: cannot change
-    name of input parameter`), just as it cannot change the result type (§7.150). Renaming a
-    param — e.g. `p_ph_ext_weeks`→`p_holiday_days` when a formula's meaning flips weeks→days —
-    forces **`DROP FUNCTION` + `CREATE` + re-`GRANT` in the same migration**: a recreated
-    function is callable by nobody until granted (§7.87), and a missing grant breaks every
-    caller (here, every package sale via the invoker lifecycle trigger). If the type signature
-    is unchanged, existing callers still resolve — but census them and re-run their suite,
-    because a same-typed arg whose *meaning* changed (weeks→days) is a silent ×7 error in any
-    caller you miss. (`package_effective_end` rework, `20260818000600`; §8.70.)
+189. **`CREATE OR REPLACE FUNCTION` cannot rename an input parameter** (`ERROR: cannot change name of input
+    parameter`), nor change the result type (§7.150). Do **`DROP FUNCTION` + `CREATE` + re-`GRANT` in the same
+    migration** — callable by nobody until granted (§7.87); a missing grant broke every package sale. Census callers
+    and re-run their suites: a same-typed arg whose *meaning* changed (weeks→days) is a silent ×7 error.
+    (`package_effective_end`, `p_ph_ext_weeks`→`p_holiday_days`, `20260818000600`; §8.70.)
 
-190. **A coverage/attribution resolver lifted from the billing engine must carry the engine's
-    TENANT filter, or it leaks across businesses.** The engine draws packages with
-    `.eq("tenant_id", …)` FIRST; a resolver that copied only the category+window+FIFO rules but
-    dropped the tenant scope would extend a parent's category-NULL package (held in business A)
-    because of a holiday in business B — a package the engine would never draw for that lesson.
-    A parent spanning two tenants is the trigger. Any function that reuses the draw predicate
-    for a side effect (extension, credit, report) needs the tenant clause too. Caught in review
-    before ship; `holiday_covering_package` takes `p_tenant_id`. (§8.70.)
+190. **A coverage/attribution resolver lifted from the billing engine must carry the engine's TENANT filter, or it
+    leaks across businesses.** The engine filters `.eq("tenant_id", …)` FIRST; without it a two-tenant parent gets a
+    package extended that the engine would never draw. Any reuse of the draw predicate (extension, credit, report)
+    needs the tenant clause; `holiday_covering_package` takes `p_tenant_id`. (§8.70.)
 
-191. **Tailwind only generates classes it can SEE in `content` — and `SwimSyncAdmin`'s globs scanned
-    `app/` and `components/` only, so literal class strings in `lib/` were purged.** The class
-    colour palette (`lib/classColours.ts`, `"bg-rose-100 border-rose-500 …"`) rendered as blank
-    swatches with no error anywhere. Fixed by adding `./lib/**/*.{ts,tsx}` to `tailwind.config.ts`
-    — and **a `content` change needs the dev server restarted** (`rm -rf .next`), HMR does not
-    re-scan. The page was visually verified before the restart and looked broken *after* the
-    fix, which is what made it cost time. (§8.71.)
+191. **Tailwind only generates classes it can SEE in `content` — and `SwimSyncAdmin`'s globs scanned `app/` and
+    `components/` only, so literal class strings in `lib/` were purged.** `lib/classColours.ts` swatches rendered
+    blank. Fix: `./lib/**/*.{ts,tsx}` in `tailwind.config.ts`; **a `content` change needs a dev-server restart** (`rm
+    -rf .next`) — HMR does not re-scan. (§8.71.)
 
-192. **`audit_log_insert` was COACH-SHAPED** (`actor_id = auth.uid() AND entity_type =
-    'lesson_session' AND coach_owns_session(entity_id)`, `20260804000300`), so the first
-    non-coach client writer of an attendance audit row — the admin lesson page — was refused
-    **42501** on exactly that step while `lesson_sessions`/`attendance` accepted the same admin.
-    Proven red in pgTAP before the policy was widened by one disjunct (`can_admin_tenant(
-    session_tenant(entity_id))`, `20260819000100`). Any NEW actor that writes a client-side audit
-    row needs its own disjunct; the INSERT grant already exists, so `table_grants` stays green
-    either way — which is also why the gap was invisible to every grant check. The coach app's
-    `await supabase.from("audit_log").insert(…)` is UNCHECKED, so on that path the refusal would
-    have been silent; the admin save checks it and reports step `"audit"`. (§8.71.)
+192. **`audit_log_insert` was COACH-SHAPED** (`actor_id = auth.uid() AND entity_type = 'lesson_session' AND
+    coach_owns_session(entity_id)`, `20260804000300`); the admin lesson page's audit write got **42501**. Widened by
+    `can_admin_tenant(session_tenant(entity_id))` (`20260819000100`), red-first. Any NEW client audit writer needs its
+    own disjunct — the INSERT grant exists, so `table_grants` stays green and no grant check sees it. The coach app's
+    `await supabase.from("audit_log").insert(…)` is UNCHECKED (silent); the admin save reports step `"audit"`.
+    (§8.71.)
 
-193. **The admin panel auto-scales its ROOT FONT-SIZE below 1536px wide** (`globals.css`, `43bef0c`:
-    16 → 15 → 14 → 13px at 1536/1280/1152), and every Tailwind size is rem-based, so **a driver that
-    pins a pixel size is pinning the viewport**. `verify-invoice-controls` asserted the toggle at
-    `44x24` (= `w-11 h-6` at 16px); at the drivers' 1280px viewport the root is 14px, the track
-    renders 38.5x21, and the sweep was red three nights (2026-08-17..19) on a product that had not
-    changed. Read `getComputedStyle(document.documentElement).fontSize` in the same `evaluate` and
-    assert in rem (±0.5px for sub-pixel layout). `verify-admin-table-geometry` measures ratios and
-    was unaffected. (§8.72.)
+193. **The admin panel auto-scales its ROOT FONT-SIZE below 1536px wide** (`globals.css`, `43bef0c`: 16 → 15 → 14 →
+    13px at 1536/1280/1152); Tailwind is rem, so **a driver pinning pixels pins the viewport**.
+    `verify-invoice-controls`' `44x24` was red 2026-08-17..19 at 1280px. Read
+    `getComputedStyle(document.documentElement).fontSize` in the same `evaluate`, assert in rem (±0.5px). (§8.72.)
 
-194. **↪ Repeat of §7.177 — read that first; this entry is a later time it bit.** **A pgTAP FIXTURE WITH FIXED CALENDAR DATES IS A TIME-BOMB — IT GOES RED ON ITS OWN AS
-    THE BILLING FLOOR ROLLS FORWARD, WITH NO CODE CHANGE.** `markable_floor()` is "1st of last
-    month" (or the month after the latest sealed month), so a never-sealed test tenant's window
-    moves on the 1st of every month. Two new files this session (`class_capacity_limit`,
-    `tenant_unmarked_lesson_count`) pinned `book_makeup`/`book_trial` dates and enrolment spans to
-    literal dates like `2026-08-24` / `2026-07-06`; those pass in the month they were written and
-    fall **below the floor** a month or two later — `book_makeup` then refuses with "that month has
-    been billed", or the unmarked-count window drops the lesson, and `supabase test db` (the fact
-    every session starts from) goes red on a product nobody touched. Caught in the pre-deploy review,
-    before it detonated. **The house style is dates RELATIVE to `today_sg()`** (`today_sg() - 14`,
-    `today_sg() + 4`, weekday computed from the same) — the same §7.7 family as client date bugs,
-    on the fixture's side of the wire. Audit: a literal `'2026-` inside a `.test.sql` booking or
-    span is the smell. (2026-08-20.)
+194. **↪ Folded into §7.177 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 
-195. **A TIMESTAMPTZ BOUNDARY HAS TWO AXES — TIMEZONE *AND* INCLUSIVITY — AND A PREDICATE CAN
-    DRIFT ON BOTH WHILE ITS SIBLING SIX LINES AWAY IS RIGHT.** `mark_day_holiday`'s "is this class
-    still running on `p_date`?" test read `deactivated_at::date > p_date`: the bare `::date` is the
-    server's UTC date (§7.7), so a class retired 00:00–08:00 SGT counted as running one extra day;
-    and `>` is exclusive, while the engine clamps a retired class's expected dates at the SGT
-    retirement date **inclusive** (`core.ts` `expectedTo = lastScheduledDate`, `dates.ts` `ms <= end`).
-    Two independent drifts in one comparison — and the enrolment predicate in the *same function*
-    already cast SGT and carried a comment naming the hazard. Fixing the timezone without the
-    inclusivity, or vice versa, would have left it half-wrong and passing most tests. When you touch
-    a date/timestamp comparison, check BOTH: which zone the `::date` lands in, and whether the
-    endpoint is `>`/`>=`. Fixed SGT + `>=` in `20260820000100`. (2026-08-20.)
+195. **A TIMESTAMPTZ BOUNDARY HAS TWO AXES — TIMEZONE *AND* INCLUSIVITY — AND A PREDICATE CAN DRIFT ON BOTH WHILE ITS
+    SIBLING SIX LINES AWAY IS RIGHT.** `mark_day_holiday`'s `deactivated_at::date > p_date` used the UTC date (§7.7)
+    and exclusive `>`, while the engine clamps **inclusive** at the SGT date (`core.ts` `expectedTo =
+    lastScheduledDate`, `dates.ts` `ms <= end`). Check BOTH the `::date` zone and `>`/`>=`; one alone still passes
+    most tests. Fixed in `20260820000100`. (2026-08-20.)
 
-196. **A UI FIXTURE WRITTEN WITH `ON CONFLICT … DO NOTHING` DOES NOT RESTORE A COLUMN A DRIVER
-    MUTATED — SO A DRIVER THAT WRITES TO FIXTURE ROWS MUST RESTORE THEM ITSELF.** `verify-admin-
-    lesson-detail` now raises a class's `capacity` mid-run (to prove the hard limit's escape hatch),
-    and `fixtures-admin-calendar.sql` re-inserts that class with `ON CONFLICT (id) DO NOTHING` — so a
-    plain fixture RE-LOAD (the driver's documented between-runs step) leaves the mutated `capacity`
-    in place, and a sibling `verify-admin-calendar` run without a full `supabase db reset` then reads
-    `3/4` instead of `3/3 · FULL` and fails. Two fixes, both needed: the fixture's conflict clause
-    became `DO UPDATE SET capacity = EXCLUDED.capacity` (and its trailing SELECT asserts the value),
-    and the driver restores the column (and deletes the row it booked) in a `finally`. The general
-    rule: a `DO NOTHING` fixture is only idempotent for rows nothing else writes; the moment a driver
-    writes fixture rows, a re-load is not a reset. (2026-08-20.)
+196. **A UI FIXTURE WRITTEN WITH `ON CONFLICT … DO NOTHING` DOES NOT RESTORE A COLUMN A DRIVER MUTATED — SO A DRIVER
+    THAT WRITES TO FIXTURE ROWS MUST RESTORE THEM ITSELF.** `verify-admin-lesson-detail` raises `capacity`;
+    `fixtures-admin-calendar.sql`'s re-load kept it and `verify-admin-calendar` failed. Both fixes: `DO UPDATE SET
+    capacity = EXCLUDED.capacity` (SELECT asserts it), and the driver restores the column and deletes its booked row
+    in a `finally`. A re-load is not a reset. (2026-08-20.)
 
 197. **A "NO-OP SUBSTITUTE" REFUSAL COMPARES THE PAID COACH (`class_rate_on().paid_coach_id`), NEVER
-    `classes.coach_id` — BECAUSE `is_cover` DOES.** `assign_session_coach` installs a per-lesson
-    substitute; assigning the coach who already teaches the lesson records no cover
-    (`lessonAttribution.is_cover` is `subCoach != termsCoach`, false) and leaves only a dead-end "Remove
-    substitute" control — a private coach hit exactly that assigning themselves. The guard added in
-    `20260821000100` refuses it, and the predicate is the MONEY axis (the class rate's paid coach on that
-    date), not the access axis (`classes.coach_id`). The two coincide for a private coach but **diverge
-    after a handover**: on a past date the old paid coach is still `class_rate_on().paid_coach_id` while
-    `classes.coach_id` is the new coach — so a "fix" that compared `classes.coach_id` would refuse a
-    legitimate handover-correction cover (pinning the old coach back) *and* allow the real no-op. The UI
-    pickers exclude the same coach: lesson-detail via `termsCoachOn(rates,…)` (exact); the Substitutes
-    page via `classes.coach_id` (it is an access-axis tool that never loads rates — identical in prod,
-    and the DB is the backstop for the unreachable handover cell). The guard sits **before** the
-    resolve-or-create so a refusal leaves no `lesson_sessions` row. To revert to the class's own coach you
+    `classes.coach_id` — BECAUSE `is_cover` DOES.** Assigning a lesson's own coach (`assign_session_coach`) records no
+    cover (`lessonAttribution.is_cover` is `subCoach != termsCoach`); `20260821000100` refuses it on the MONEY axis.
+    After a handover the axes diverge on past dates, so `classes.coach_id` would refuse a legitimate correction and
+    allow the no-op. Pickers: lesson-detail `termsCoachOn(rates,…)`; Substitutes `classes.coach_id` (it never loads
+    rates; DB is backstop). Guard runs **before** resolve-or-create (no `lesson_sessions` row on refusal). To revert,
     REMOVE the substitute, never assign them. (2026-08-21.)
 
 198. **A "HARD" CAPACITY LIMIT IS A CHECK-THEN-INSERT, SO IT NEEDS A CLASS-ROW LOCK OR IT IS NOT HARD.**
-    `book_makeup`, `book_trial` and the `enforce_class_capacity` enrolment trigger each read `count(*)` of
-    the expected set / active roster, compare to the effective maximum, then INSERT. Under READ COMMITTED
-    (PostgREST's default) two writers for the LAST seat each run their count before either commits, both
-    read cap−1, both pass, both insert → cap+1, silently. The unique indexes only stop DUPLICATE rows for
-    the SAME child, not two DISTINCT children racing. Fixed in `20260821000200`:
-    `PERFORM 1 FROM classes WHERE id = <class> FOR UPDATE` before every count, inside the `v_cap IS NOT
-    NULL` branch — a class with no cap never locks, so unlimited classes never contend. The second writer
-    blocks on the lock, then re-reads the count under a fresh statement snapshot and is refused. ⚠ A true
-    two-writer race is NOT provable in single-session pgTAP (one transaction, rolled back); the pin in
-    `class_capacity_lock.test.sql` asserts the lock STATEMENT is present on each path — a genuine stress
-    test would need a Deno/bash two-connection harness. The general rule: any "hard" limit enforced as a
-    read-then-write across sessions needs the contended row locked first. (2026-08-21.)
+    `book_makeup`, `book_trial`, `enforce_class_capacity`: under READ COMMITTED two last-seat writers → cap+1.
+    `20260821000200`: `PERFORM 1 FROM classes WHERE id = <class> FOR UPDATE` before every count, in the `v_cap IS NOT
+    NULL` branch (uncapped classes never lock). ⚠ Races are NOT provable in single-session pgTAP;
+    `class_capacity_lock.test.sql` pins the lock STATEMENT per path. Any read-then-write limit needs the row locked
+    first. (2026-08-21.)
 
-199. **A `FOR ALL` RLS WRITE POLICY + A TABLE `UPDATE` GRANT MEANS AN RPC'S REFUSALS ARE BYPASSABLE BY A
-    RAW PostgREST UPDATE — CLOSE IT WITH A `BEFORE UPDATE` TRIGGER, NOT BY NARROWING THE POLICY.**
-    `deactivate_class()` refuses to retire a class with children on its roster, future guests, or unmarked
-    lessons — but `classes_write` is `FOR ALL TO authenticated` and `20260804000600` grants UPDATE, so a
-    tenant admin could send `UPDATE classes SET is_active=false, deactivated_at=now()` straight over
-    PostgREST and skip all three. The `classes_inactive_requires_deactivated_at` CHECK only blocked the
-    NO-DATE shape — the `20260810000100` header's claim that "a raw UPDATE cannot supply the date" was
-    WRONG. You CANNOT fix this by narrowing the policy: an RLS UPDATE policy's `WITH CHECK` sees only the
-    NEW row, never OLD, so it cannot forbid an `is_active` FLIP. `20260821000300` extracts the three
-    refusals into one `assert_class_retirable()` (SECURITY DEFINER, callable by nobody) and fires it from a
-    `BEFORE UPDATE` trigger on any true→false transition — every path, RPC or raw. ⚠ THE TRUST BOUNDARY IS
-    `auth.uid() IS NOT NULL`: the guard enforces for an authenticated user (RLS has already scoped that
-    write to their own tenant), and EXEMPTS a no-user context — service_role (edge functions AND the Deno
-    engine tests, whose `retire()` helper forces retired-class states the engine must still read) and
-    superuser (seed, migrations, pgTAP fixtures). ⚠ `RESET ROLE` does NOT clear a lingering
-    `SET LOCAL request.jwt.claims`, so a pgTAP fixture forcing a retired state must also
-    `SET LOCAL "request.jwt.claims" TO ''` to make `auth.uid()` null. reactivate_class() (false→true) is
-    never guarded, by standing prohibition. The same trigger also refuses a false→false raw UPDATE that
-    MOVES `deactivated_at` — a sibling hole, since the engine reads that date as how far the class ran, so
-    shifting it on an already-retired class widens its expectation window (found in the pre-commit review;
-    a fabricated FIRST date on a raw retire is accepted — the load-bearing invariant is that a set date does
-    not move). (2026-08-21.)
+199. **A `FOR ALL` RLS WRITE POLICY + A TABLE `UPDATE` GRANT MEANS AN RPC'S REFUSALS ARE BYPASSABLE BY A RAW PostgREST
+    UPDATE — CLOSE IT WITH A `BEFORE UPDATE` TRIGGER, NOT BY NARROWING THE POLICY.** A raw `UPDATE classes SET
+    is_active=false, deactivated_at=now()` skipped `deactivate_class()` (`classes_write` `FOR ALL`, `20260804000600`
+    grant); refusals: roster children, future guests, unmarked lessons. The `20260810000100` header's claim otherwise
+    was WRONG. You CANNOT fix it in the policy: `WITH CHECK` sees NEW, never OLD. `20260821000300`:
+    `assert_class_retirable()` (SECURITY DEFINER, callable by nobody) from a `BEFORE UPDATE` trigger on true→false. ⚠
+    Enforced only when `auth.uid() IS NOT NULL`; service_role (edge functions, Deno `retire()`) and superuser are
+    exempt. ⚠ `RESET ROLE` does NOT clear `SET LOCAL request.jwt.claims` — also `SET LOCAL "request.jwt.claims" TO
+    ''`. reactivate_class() is never guarded, by standing prohibition. It also refuses a false→false UPDATE that MOVES
+    `deactivated_at`; a first date is accepted. (2026-08-21.)
+    Once set, `deactivated_at` must not move — the engine reads that date as how far the class ran, so shifting it widens the expectation window.
 
-200. **A BOOKING MUST RE-READ `is_active` UNDER THE CLASS-ROW LOCK, AND THE LOCK MUST BE UNCONDITIONAL — OR
-    IT RACES A CONCURRENT RETIRE AND LANDS A GUEST IN A DEAD CLASS.** `book_makeup`/`book_trial` read
-    `classes.is_active` at the top WITHOUT a lock, refuse a retired host, then insert a guest. A
-    `deactivate_class()` committing in that gap left the guest in a now-retired class — unmarkable (no coach
-    screen renders one), month-blocking with no override, breaking the "a retired class holds zero live
-    guests" invariant the calendar and Lessons badge lean on. §7.198's `FOR UPDATE` lock did NOT close this:
-    it was taken only for a CAPPED class and AFTER the is_active read, so (a) an UNCAPPED class took no lock
-    at all — the `makeup_bookings`/`trial_bookings` FK on `class_id` takes only FOR KEY SHARE, which does
-    NOT serialise against the non-key `is_active` UPDATE — and (b) even capped, is_active was never re-read.
-    `20260821000400` takes the class-row `FOR UPDATE` UNCONDITIONALLY, re-reads `is_active` under it (refuse
-    if now retired), and reads `class_effective_capacity()` under it too (closing §7.198's stale-`v_cap`
-    half — a concurrent capacity DECREASE is now seen). The REVERSE direction (a retire racing an in-flight
-    booking) needs no change: `trg_class_retirement_guard` (§7.199) re-runs `assert_class_retirable` when the
-    booking's lock releases, and its count then sees the committed guest and refuses the retire — safe both
-    ways round. ⚠ Taking the lock unconditionally trades §7.198's "unlimited classes never lock" optimisation
-    and WIDENS the accepted make-up cross-reference deadlock (40P01, retryable) from capped-only to every
-    class — both deliberate. ⚠ THE ROSTER AXIS HAS THE SAME RACE via `enforce_enrolment_schedule` (reads
-    is_active unlocked) + `enforce_class_capacity` (locks only when capped, never re-checks is_active) — NOT
-    fixed here, filed in `BACKLOG.md`; the booking axis was the one the review named. Concurrency can't be
-    shown in pgTAP's single rolled-back txn, so `booking_retire_race.test.sql` is a STRUCTURAL pin (lock
-    present on both paths, is_active re-check present, lock precedes the capacity read, ordering
-    lock→recheck→INSERT), proven red-first. (2026-08-21.)
+200. **A BOOKING MUST RE-READ `is_active` UNDER THE CLASS-ROW LOCK, AND THE LOCK MUST BE UNCONDITIONAL — OR IT RACES A
+    CONCURRENT RETIRE AND LANDS A GUEST IN A DEAD CLASS.** §7.198's lock missed it: uncapped classes took none (the
+    FK's FOR KEY SHARE does NOT serialise against `is_active`) and is_active was never re-read. `20260821000400` locks
+    UNCONDITIONALLY, re-reads `is_active` and `class_effective_capacity()` under it. Reverse race:
+    `trg_class_retirement_guard` (§7.199). ⚠ Drops "uncapped never locks" and widens the 40P01 deadlock to every class
+    — deliberate. ⚠ Roster axis (`enforce_enrolment_schedule` + `enforce_class_capacity`, which never re-checks
+    is_active) NOT fixed here — `BACKLOG.md`. Structural pin `booking_retire_race.test.sql`, red-first. (2026-08-21.)
 
-201. **THE ENROLMENT AXIS HAS THE SAME RETIRE RACE AS §7.200 — LOCK THE ENTERED CLASS BEFORE READING
-    `is_active`.** `enforce_enrolment_schedule()` refuses an enrolment into a RETIRED class, but read
-    `classes.is_active` with an UNLOCKED SELECT — so a `deactivate_class()` committing in the gap could land
-    an ACTIVE enrolment in a now-retired class, breaking the "a retired class holds zero active enrolments"
-    invariant (an inactive class is invisible to every role who could clear it, §7.109). §7.198's lock did
-    NOT cover this: capacity and is_active are TWO DIFFERENT triggers on `student_class_enrolments`
-    (`trg_class_capacity` fires first, then `trg_enrolment_schedule`), and on an UNCAPPED class the capacity
-    one returns early WITHOUT locking. `20260821000500` adds `FOR UPDATE` to this trigger's own class read
-    (`… WHERE c.id = NEW.class_id FOR UPDATE`), so is_active is read UNDER the lock, unconditionally. ⚠ THE
-    LOCK IS ON `NEW.class_id` ONLY — the class being ENTERED. The half-two overlap check reads sibling
-    classes (`c2`) and must stay lock-free and `is_active`-BLIND, a standing prohibition (HANDOVER §3): an
-    inactive counterparty provably holds no enrolment BECAUSE entry to a retired class is refused, so the
-    overlap check must not consult `c2.is_active`. The reverse direction (a retire racing the enrolment) is
-    already caught by `trg_class_retirement_guard` (§7.199) re-running `assert_class_retirable` once this lock
-    releases — its roster count then sees the committed enrolment. No new deadlock: the trigger locks exactly
-    one row, so it cannot be in a lock cycle. Structural pin `enrolment_retire_race.test.sql`, red-first.
-    (2026-08-21.)
+201. **THE ENROLMENT AXIS HAS THE SAME RETIRE RACE AS §7.200 — LOCK THE ENTERED CLASS BEFORE READING `is_active`.**
+    Else an active enrolment lands in a retired class (§7.109). §7.198's lock missed it: `trg_class_capacity` returns
+    early unlocked on uncapped classes. `20260821000500`: `… WHERE c.id = NEW.class_id FOR UPDATE`. ⚠ `NEW.class_id`
+    ONLY — `c2` stays lock-free and `is_active`-BLIND (standing prohibition, HANDOVER §3): must not consult
+    `c2.is_active`. Reverse race: `trg_class_retirement_guard` (§7.199). Pin `enrolment_retire_race.test.sql`. One row
+    locked, so no new deadlock. (2026-08-21.)
 
-202. **`add_unclaimed_student`'s ONGOING arm is ADMIN-ONLY — do NOT re-add the coach arm.** The `'ongoing'`
-    branch once permitted the class's OWN coach (`c.coach_id = current_coach_id()`) as well as the tenant
-    admin — a carve-out from §7.17 ("coaches must not add students"), justified as "the coach notices the
-    weekly regular first". CLOSED 2026-08-21 (`20260821000600`): `'ongoing'` now requires `is_tenant_admin()`,
-    so BOTH kinds are admin-only (`'trial'` always was). This is a DECISION, not a bug fix — every new child
-    goes through the admin, the same delegation refused the SAME DAY for parent self-enrolment and
-    coach-assisted assignment (`BACKLOG.md` → *Deliberately not doing*; PRD §7.17). No UI ever reached the
-    coach arm — **both live callers are the admin panel** (`SwimSyncAdmin/app/(admin)/{trials,students}/page.tsx`),
-    the coach app reaches it by no path — so prod behaviour is unchanged (one coach who IS the admin; the arm
-    could not have fired). ⚠ Don't rediscover the coach arm as a missing feature and re-add it. Same-signature
-    CREATE OR REPLACE, so no grant moved. Tests flipped **red-first**: `trial_onboarding` (own coach refused,
-    the admin does the add, `created_by`=admin) and `class_capacity_limit` 16a (the coach now hits the AUTH
-    gate, never capacity). Committed DOWN (`supabase/rollback/20260821000600…DOWN.sql`) restores the arm,
-    rehearsed. (2026-08-21.)
+202. **`add_unclaimed_student`'s ONGOING arm is ADMIN-ONLY — do NOT re-add the coach arm.** `20260821000600` requires
+    `is_tenant_admin()` (was also `c.coach_id = current_coach_id()`, a §7.17 carve-out: "coaches must not add
+    students"). A DECISION, not a bug fix (every new child goes through the admin; `BACKLOG.md` → *Deliberately not
+    doing*; PRD §7.17). Callers: `SwimSyncAdmin/app/(admin)/{trials,students}/page.tsx`. ⚠ Don't rediscover the coach
+    arm and re-add it. Tests: `trial_onboarding`, `class_capacity_limit` 16a (AUTH gate, never capacity). DOWN:
+    `supabase/rollback/20260821000600…DOWN.sql`. (2026-08-21.)
 
-203. **A cancelled-date subtraction is the `bookingsByDate` clamp under a new name — subtract from
-    `expectedDates` ONLY, never from the union.** Advance-cancel (`cancel_lesson`, `20260821000700`) marks a
-    `lesson_sessions` row `cancelled_at`; the engine must then neither block on it nor bill it. The tempting
-    edit is to drop the date from `datesToCheck` — and that is §7.18's shape exactly: a cancelled date that
-    ALSO carries a live make-up/trial booking, or real attendance rows, must still reach the gate, or the
-    month SEALS over the guest (a silent permanent underbill, §11.6) where it should block, loudly.
-    `core.ts` therefore (1) filters `cancelledDates` out of `expectedDates` — the weekday PROJECTION, a guess —
-    and (2) makes `unmarkedOn()` call `expectedStudentsOn(date, [], bookingsByDate)` for a cancelled date:
-    spans withheld, bookings kept, still the ONE shared definition so the booking half cannot drift. The row
-    stays in `sessionIds`/`sessionByDate`, so attendance rows on it still bill (the engine does not depend on
-    the RPC refusing to create that state). The SQL copies of "owed a mark" (`class_unmarked_lesson_dates`,
-    `tenant_unmarked_lesson_count`), the admin calendar builder and both coach screens make the SAME
-    substitution — five answers, one rule. Pinned by `cancelledLessons.test.ts` ("cancelled date WITH a live
-    make-up booking ⇒ `incomplete_attendance`, NOT sealed"). `cancel_lesson()` refuses today/past (the coach's
-    `cancelled_rain`/`cancelled_coach` mark is that path), a marked session, and a date holding live guests —
-    NAMED, under the §7.198/§7.200 class-row lock; `book_makeup`/`book_trial`/`schedule_extra_lesson` refuse a
-    cancelled date under the same lock. `restore_lesson()` refuses a month sealed in `billing_periods` — the
-    marking floor does NOT cover that (it is LEAST(calendar, month-after-seal), so a sealed month inside the
-    calendar window is still markable by design, §8.48). (2026-08-21.)
+203. **A cancelled-date subtraction is the `bookingsByDate` clamp under a new name — subtract from `expectedDates`
+    ONLY, never from the union.** (`cancel_lesson`, `20260821000700`.) Dropping it from `datesToCheck` is §7.18: a
+    cancelled date that also carries a live make-up/trial booking, OR real attendance rows, must still reach the gate,
+    or the month SEALS (underbill, §11.6). `unmarkedOn()` calls
+    `expectedStudentsOn(date, [], bookingsByDate)`; the row stays in `sessionIds`/`sessionByDate`. Same rule in
+    `class_unmarked_lesson_dates`, `tenant_unmarked_lesson_count`, admin calendar, coach screens. Pin
+    `cancelledLessons.test.ts`. `cancel_lesson()` refuses today/past, a marked session, live guests;
+    `book_makeup`/`book_trial`/`schedule_extra_lesson` refuse a cancelled date — all under the §7.198/§7.200 lock.
+    `restore_lesson()` refuses a sealed month — the marking floor does NOT (§8.48). (2026-08-21.)
 
-204. **A cancelled-session mark-refusal belongs in `guard_attendance_date()`, not the UI** — §7.199's
-    raw-PostgREST lesson on the attendance axis. The coach app hiding a cancelled lesson (Schedule card
-    struck, NEEDS MARKING excluding it, the attendance screen showing "This lesson was cancelled") is
-    COSMETIC: a screen loaded before the cancel, a deep link, or a raw POST still reaches the `attendance`
-    table, where `attendance_write` is a `FOR ALL` policy plus a table grant. `20260821000700` extends the
-    BEFORE INSERT trigger: after the existing correction carve-out (an existing row is always editable — the
-    credit-note flow must never be closed by a flag), a NEW row whose session has `cancelled_at` is refused,
-    and the check sits BEFORE `assert_markable_date` so a future cancelled lesson says "cancelled", not "has
-    not happened yet". The clients cannot write the cancel columns either (`guard_session_date` refuses set
-    AND clear — a raw clear would restore past `restore_lesson()`'s sealed-month refusal), and a CHECK ties
-    `status = 'cancelled'` to `cancelled_at` so the old enum column and the new flag cannot disagree. Pinned
-    red-first by `advance_cancel_lesson.test.sql` 19: a PAST cancelled session refuses a raw INSERT — on the
-    pre-migration trigger body that INSERT SUCCEEDS. (2026-08-21.)
+204. **A cancelled-session mark-refusal belongs in `guard_attendance_date()`, not the UI** — §7.199 on attendance;
+    hiding it is COSMETIC. `20260821000700`: after the correction carve-out (an existing row is always editable — the
+    credit-note flow must never be closed by a flag), a NEW row on a `cancelled_at` session is refused, before
+    `assert_markable_date`. `guard_session_date` refuses client set AND clear (a raw clear would bypass
+    `restore_lesson()`'s sealed-month refusal); a CHECK ties `status = 'cancelled'` to `cancelled_at`. Pin
+    `advance_cancel_lesson.test.sql` 19. (2026-08-21.)
 
-205. **A reconcile that reads TIME-VARYING state must be scoped to the ONE unit whose change fired it — never
-    to a shared key.** The holiday reconcile (`20260818000700`) is date-scoped and sound ONLY because its
-    source, `'holiday'` attendance rows, is an immutable fact once written. The advance-cancel package
-    extension (`20260821000800`) draws its covered set from LIVE ENROLMENTS instead, so a date-scoped
-    "recompute desired truth for this date" is UNSOUND: cancelling or restoring a DIFFERENT class on the same
-    date re-runs the reconcile over every cancelled lesson on it against *current* enrolments, retro-extending
-    a family that enrolled AFTER the first cancel and retro-*retracting* one that unenrolled — silently, and
-    nondeterministically (it only fires when some other lesson on the date flips). Caught by an adversarial
-    review as a HIGH finding, not in testing. **Fix: key the state per (package, cancelled LESSON) and scope
-    `apply_cancel_reconcile(class, date)` to that one lesson**, so each cancel is an independent snapshot no
-    later flip can touch; a 3-trigger fan (ins/upd/**del**) also retracts a raw-deleted cancelled session
-    (§7.199's shape). Red-first pinned by `cancel_package_extension.test.sql` 14 (an unrelated same-date
-    cancel must NOT move another package): the date-scoped version turns it red. Corollary: "snapshot at
-    cancel time" means NO enrolment trigger and no re-fire on package activation — both documented and pinned,
-    not accidental. (2026-08-22.)
+205. **A reconcile that reads TIME-VARYING state must be scoped to the ONE unit whose change fired it — never to a
+    shared key.** Date scope was sound for `20260818000700` (immutable input) but not `20260821000800` (live
+    enrolments). **Key per (package, cancelled LESSON), scope `apply_cancel_reconcile(class, date)` to it**; a
+    3-trigger fan (ins/upd/**del**) retracts a raw-deleted session (§7.199). Pin `cancel_package_extension.test.sql`
+    14 (must NOT move another package). NO enrolment trigger, no re-fire on activation — deliberate. (2026-08-22.)
 
-206. **A post-payment DEBIT is a SEPARATE `debit_balance` column, NEVER a signed `credit_balance`.** When
-    partial-payment shipped (`20260822000100`, §8.83), the obvious model — let `credit_balance` go negative to
-    mean "the parent owes us" — is UNSAFE and was caught by an adversarial `/plan-review` (fable), not by
-    testing. `credit_balance` is welded to the credit-note ledger: `apply_credit_to_invoice`'s idempotency and
-    per-note used-sums, the correction trigger's three spend-signals, and `void_credit_note`'s undrawn-remainder
-    math all assume `pool = Σ(note amount − live draws)` and `pool ≥ 0`. A negative `credit_balance` lets a
-    note's value be consumed by netting **with no `credit_applications` row**, after which un-correct / admin-void
-    / the credit emails fire on stale ledger state and **overcharge the parent**. So the debit lives in its own
-    `parent_tenant_balances.debit_balance` (CHECK ≥ 0), `credit_balance` keeps its ≥ 0 corruption guard, and the
-    two **coexist and NET at invoice-application time** (`apply` folds the debit into the cash base — `gross −
-    package + debit` — and draws credit against that), never in the balance. Corollaries, all pinned by
-    `partial_payment.test.sql`: a void against a **paid** invoice marks its application `debited_at` ONLY (not
-    `reversed_at`, so the paid invoice's `credit_applied` still reconciles), and **re-correcting a
-    voided-and-debited note is REFUSED (`CN002`)** — the multi-flip debit state machine is deferred (`BACKLOG.md`).
-    **Don't "simplify" this to one signed column.** (2026-08-22.) *(§7.206's blanket `CN002` was later refined:
-    the PENDING case auto-unwinds — §7.207, §8.84.)*
+206. **A post-payment DEBIT is a SEPARATE `debit_balance` column, NEVER a signed `credit_balance`.**
+    (`20260822000100`, §8.83.) The ledger assumes `pool = Σ(note amount − live draws)`, `pool ≥ 0`; negative consumes
+    a note **with no `credit_applications` row** and **overcharges the parent**. They **NET at invoice-application
+    time**, never in the balance. So `parent_tenant_balances.debit_balance` (CHECK ≥ 0) is separate and
+    `credit_balance` keeps its ≥ 0 guard. `partial_payment.test.sql`: a void against a **paid** invoice sets
+    `debited_at` ONLY (not `reversed_at`); **re-correcting is REFUSED (`CN002`)** (`BACKLOG.md`). **Don't "simplify"
+    this to one signed column.** (2026-08-22.) *(§7.206's blanket `CN002` was later refined: the PENDING case
+    auto-unwinds — §7.207, §8.84.)*
+    The two coexist and NET at invoice-application time: `apply` folds the debit into the cash base (`gross − package + debit`), never in the balance.
 
-207. **The auto-unwind of a pending debit MUST take the balance row `FOR UPDATE` BEFORE it reads whether the draw
-    is still pending — reading first is a silent DOUBLE REFUND.** `20260822000200` (§8.84) made re-correcting a
-    voided-and-debited note AUTO-UNWIND the debit while it is still pending (refining §7.206). The first cut ran
-    its reversibility check and its drawn-sum SELECT with NO lock on `parent_tenant_balances`; a senior-engineer
-    review caught it before merge. Under READ COMMITTED a concurrent `apply_credit_to_invoice` (a billing run —
-    exactly when debits fold) or `write_off_parent_balance` committing BETWEEN the check and the SUM makes the
-    guard pass on the pre-commit snapshot while the SUM reads 0 on the post-commit snapshot → the note is
-    re-credited IN FULL against a charge already billed/settled. The `debit_balance ≥ 0` CHECK does NOT save you
-    (subtracting 0 is legal). Fix: `PERFORM 1 FROM parent_tenant_balances … FOR UPDATE` at the top of the debited
-    branch, before any read — it serialises against `apply`'s and `write_off`'s own balance locks (`apply` already
-    stamps `folded_at` only after its own `FOR UPDATE`). The clearing UPDATE must ALSO carry `AND folded_at IS NULL
-    AND written_off_at IS NULL` so it can never strip a billed/settled draw. Pinned by
-    `partial_payment_followups.test.sql`. (2026-08-23.)
+207. **The auto-unwind of a pending debit MUST take the balance row `FOR UPDATE` BEFORE it reads whether the draw is
+    still pending — reading first is a silent DOUBLE REFUND.** (`20260822000200`, §8.84, §7.206.) Fix: `PERFORM 1 FROM
+    parent_tenant_balances … FOR UPDATE` first. The clearing UPDATE must carry `AND folded_at IS NULL AND
+    written_off_at IS NULL` so it can never strip a settled draw. A concurrent `apply_credit_to_invoice` /
+    `write_off_parent_balance` between check and SUM re-credits IN FULL; the `debit_balance ≥ 0` CHECK does NOT save
+    you. Pin `partial_payment_followups.test.sql`. (2026-08-23.)
 
 208. **A standalone/adjustment invoice in the CURRENT month collides with `UNIQUE(parent_id, tenant_id,
-    billing_month)` and makes the engine SKIP the whole month — a silent permanent underbill.** Designing "collect
-    a pending debit now" (§8.84) as a second same-month invoice hit this: the constraint (`20260718001100`) forbids
-    two invoices per parent per month, and the engine's re-run guard (`core.ts` ~:1266) skips a parent who already
-    has ANY invoice that month (`already_exists`) — so a collect-now invoice would make the monthly run skip that
-    family's real lessons, seal the month, and never reprocess. Any future second-invoice-per-month feature needs
-    an `invoices.kind` discriminator (`'lessons'`/`'adjustment'`), a partial unique index per kind, and the
-    engine's already-exists guard filtered to `kind='lessons'` — an ENGINE change, not just a new RPC. Caught in a
-    `/plan-review` (fable); collect-now was dropped for a write-off ramp instead. (2026-08-23.)
+    billing_month)` and makes the engine SKIP the whole month — a silent permanent underbill.** One invoice per parent
+    per month (`20260718001100`); `core.ts` ~:1266 `already_exists` skips, seals, and will never reprocess.) Needs
+    `invoices.kind` (`'lessons'`/`'adjustment'`), a partial unique index per kind, and the guard filtered to
+    `kind='lessons'` — an ENGINE change. (§8.84; 2026-08-23.)
+    Decision: collect-now was dropped in favour of a write-off ramp.
 
-209. **To block an action several RPCs can trigger, guard the shared TABLE write, not each RPC.** The offboard
-    guard (§8.84 — a family owing a pending debit cannot be set inactive) was first scoped to
-    `set_parent_tenant_active`. But the everyday offboard (deactivate the last child) flips `parent_tenants.is_active`
-    via `set_students_active`'s "no active children left" consequence rule (`20260719001200`), and
-    `close_student_enrolment` delegates to it — a coach path too. A per-RPC guard is bypassable by all of them. The
-    guard is a `BEFORE UPDATE` trigger on `parent_tenants` (WHEN is_active true→false), so EVERY path inherits it;
-    its balance read is `FOR UPDATE` (no TOCTOU vs a concurrent void). DEBIT-ONLY — credit is preserved across
-    offboard by design. Pinned by `partial_payment_followups.test.sql` (deactivating the last child with a debit
-    RAISEs). (2026-08-23.)
+209. **To block an action several RPCs can trigger, guard the shared TABLE write, not each RPC.** (§8.84.) First
+    scoped to `set_parent_tenant_active`, but `set_students_active` (`20260719001200`) and `close_student_enrolment`
+    also flip `parent_tenants.is_active`, so use a `BEFORE UPDATE` trigger (WHEN true→false), balance read `FOR
+    UPDATE`. DEBIT-ONLY — credit preserved by design. Pin `partial_payment_followups.test.sql`. (2026-08-23.)
 
-210. **`mailer_otp_exp` is ONE global knob for EVERY email-link lifetime — there is no invite-only expiry.** The
-    tenant-admin invite (`generateLink({type:'invite'})`, `provision-tenant/route.ts`), the co-admin invite,
-    magic-links and password-recovery links ALL share Supabase auth's `mailer_otp_exp` (`otp_expiry` in
-    `config.toml`). Raising it to give the invite 24h gives password-reset 24h too — that is the trade, and there
-    is no per-type override. **Change it on PROD via the Management API** (`PATCH
-    /v1/projects/{ref}/config/auth` with `{"mailer_otp_exp": N}`), **NOT `supabase config push`** — that CLI verb
-    is push-only and overwrites the WHOLE remote auth config from local `config.toml`, clobbering anything set in
-    the dashboard. The CLI cannot READ the remote value either (`supabase config` has only `push`); read it via
-    the same endpoint with GET, or the dashboard (Authentication → Email → OTP expiry). The invite email's
-    "expires 24 hours" copy (`inviteEmail.ts`) is COUPLED to this value — change both together or the email lies.
-    Set to 86400 (24h) 2026-08-23. (§8.85.)
+210. **`mailer_otp_exp` is ONE global knob for EVERY email-link lifetime — there is no invite-only expiry.**
+    (`generateLink({type:'invite'})`, `provision-tenant/route.ts`; `otp_expiry` in `config.toml`.) **Change it on PROD
+    via** `PATCH /v1/projects/{ref}/config/auth` with `{"mailer_otp_exp": N}`, **NOT `supabase config push`** — it
+    overwrites the WHOLE remote auth config from local `config.toml`. Invites, magic-links and password recovery all
+    share it. The CLI cannot READ it; use GET or the dashboard. `inviteEmail.ts` copy is COUPLED — change both. 86400
+    since 2026-08-23. (§8.85.)
 
 211. **Dropping a column breaks every SECURITY DEFINER function BODY that writes it and every `SELECT t.* INTO rec`
-    that later reads a field of it — NOT just the client `.select()` lists.** The §7.123/§7.145 family covers dropped
-    *signatures* and app `.select()` 400s; this is the other half. When the location-entity CONTRACT migration drops
-    `classes.location_name`, `set_class_terms`'s body (which `UPDATE classes SET location_name = …`) breaks, and
-    `disable_coach` — which does `SELECT c.* INTO v_class` then passes `v_class.location_name` positionally — throws
-    `record "v_class" has no field "location_name"` at RUNTIME (plpgsql binds record fields at execution, so it
-    compiles clean and fails only when that branch runs). A fable senior review caught it pre-merge. So an
-    expand/contract column-drop sweep must grep function **bodies** and **record-field reads**
-    (`grep -rn location_name supabase/migrations`), not only client `.select()` strings — and redefine every writer
-    in the same migration. (2026-08-24, §8.88, the held `..._contract.sql.hold`.)
+    that later reads a field of it — NOT just the client `.select()` lists.** (§7.123/§7.145.) `set_class_terms`,
+    `disable_coach` (`SELECT c.* INTO v_class`) failed at RUNTIME only (plpgsql binds record fields at execution)
+    (`record "v_class" has no field "location_name"`). Sweep with `grep -rn location_name supabase/migrations` (bodies
+    and record-field reads); redefine writers in the same migration. (§8.88, `..._contract.sql.hold`.)
 
 212. **A PostgREST embedded-to-one join hidden by RLS returns `null`, not an error — a policy/grant gap ships as
-    silently blank UI, invisible in testing.** When a screen reads `classes.select("…, locations(name)")`, a missing
-    SELECT policy or grant on the joined `locations` table does NOT raise `permission denied` — the embed just comes
-    back `location: null` and the field renders empty. So the mobile/admin location displays could have shipped blank
-    for coaches or parents with nothing in the logs. Same silence family as §7.16/§7.125 but a distinct client-side
-    shape. Cover it by asserting the embedded join is **non-null as the coach role AND as the parent role** in pgTAP
-    (`locations.test.sql` does), and keep the joined table's policy + GRANT in the same migration. (2026-08-24, §8.88.)
+    silently blank UI, invisible in testing.** `classes.select("…, locations(name)")` gave `location: null` (§7.16,
+    §7.125). Assert **non-null as coach AND parent** (`locations.test.sql`); policy + GRANT in one migration. (§8.88.)
 
 213. **An expand/contract sync trigger for a column→FK promotion must choose its direction by WHAT CHANGED (OLD vs
-    NEW), not by "is the FK set" — and be created AFTER the backfill, not before.** Promoting `classes.location_name`
-    to a `locations` FK used a bidirectional trigger so both the old app (writes name) and new app (writes id) work
-    through the deploy window. Two traps a review caught: (1) keying direction on `NEW.location_id IS NOT NULL` is
-    wrong because after the backfill EVERY row has a non-NULL id, so an old-app rename (name changed, id unchanged)
-    goes down the mirror path and is SILENTLY REVERTED — key on `NEW.location_id IS NOT DISTINCT FROM OLD.location_id
-    AND NEW.location_name IS DISTINCT FROM OLD.location_name` instead. (2) creating the trigger BEFORE the backfill
-    makes the backfill's `UPDATE … SET location_id` fire the mirror path and rewrite every row's free-text columns
-    (trimmed name, MIN address) at expand time — breaking the DOWN's "columns untouched" guarantee; create the
-    trigger AFTER the backfill so only the FK-guard fires there. (2026-08-24, §8.88.)
+    NEW), not by "is the FK set" — and be created AFTER the backfill, not before.** Key on `NEW.location_id IS NOT
+    DISTINCT FROM OLD.location_id AND NEW.location_name IS DISTINCT FROM OLD.location_name`, else a rename SILENTLY
+    REVERTS (after backfill every row has an id). Created before the backfill, the backfill fires the mirror path and
+    rewrites free text, breaking the DOWN's "columns untouched" guarantee — create it AFTER. (§8.88.)
 
-214. **An expand/contract column DROP must sweep the UI DRIVER fixtures too — not only `supabase/tests`.** The
-    location contract's `.hold` checklist listed `supabase/tests` (~50 pgTAP) + `seed.sql` + `disable_coach`, and
-    CI's `check-fixture-roundtrip` step went red anyway: the 14 `.claude/skills/run-ui-playwright/drivers/fixtures-*.sql`
-    (+ their teardowns) and three `verify-*.mjs` drivers ALSO insert classes naming the dropped column. Two failure
-    modes, and the first was pre-existing: on the EXPAND schema these fixtures had been LEAKING an auto-created
-    `locations` row past teardown for the whole deploy window (the sync trigger created it, the teardown never
-    deleted it) — a red hiding under a docs-only commit; on the CONTRACT schema the INSERT hard-errors on a dropped
-    column. Sweep them the same way — an explicit `locations` row before the class INSERT → `location_id`, and the
-    teardown DELETEs it AFTER the classes (ON DELETE RESTRICT) — and translate any driver that UPDATEs the dropped
-    column into another non-schedule attribute (`colour`, a palette key). `grep -rln location_name .claude` is the
-    fact the checklist should have named. (2026-08-24, §8.89.)
+214. **An expand/contract column DROP must sweep the UI DRIVER fixtures too — not only `supabase/tests`.** The 14
+    `.claude/skills/run-ui-playwright/drivers/fixtures-*.sql` + three `verify-*.mjs`; the teardown never deleted a
+    leaked `locations` row (EXPAND); on CONTRACT the INSERT hard-errors. Insert an explicit `locations` row →
+    `location_id`, teardown deletes it AFTER classes (ON DELETE RESTRICT); translate driver UPDATEs of the dropped
+    column to another non-schedule attribute (`colour`). Check: `grep -rln location_name .claude`. (§8.89.)
 
-215. **A UI driver that builds a date-header regex from Node's `toLocaleDateString` will silently stop matching
-    the app's rendering the month it disagrees — and for September it DOES: Node's en-US short month is "Sep",
-    the browser's CLDR is "Sept".** `verify-cancel-lesson.mjs` anchored the coach-app COMING UP day header as
-    `^${weekday},? ${day} ${month}$` with `month` from `toLocaleDateString(...,{month:"short"})`. Node (v25 ICU)
-    emits "Sep"; the Expo-web app (browser ICU/CLDR) renders "Sept", so the anchored `Sep$` failed, `headerCount`
-    fell to 0, the day was never expanded and the card never entered the DOM — **two checks red from one string**,
-    and the driver read as a coach-app regression when the feature was fine (every DB assertion passed). It went
-    red on the 2026-08-24..27 nightlies — the first runs whose `today+7` crossed into September — which made it
-    look like fallout from the location deploy that shipped 08-24, a pure calendar coincidence. The trap is
-    general: **the driver (Node) and the app (browser) can format the same date differently**; September is just
-    the case that bites in en-US. Fix: match weekday and month as PREFIXES (`${weekday}\w*`, `${month}\w*`) so
-    "Sep"/"Sept" and "Thu"/"Thursday" both pass, rather than trusting Node's string to equal the app's. Same
-    calendar-assumption family as §7.122. (2026-08-27.)
+215. **A UI driver that builds a date-header regex from Node's `toLocaleDateString` will silently stop matching the
+    app's rendering the month it disagrees — and for September it DOES: Node's en-US short month is "Sep", the
+    browser's CLDR is "Sept".** The driver (Node) and app (browser) can format one date differently;
+    `verify-cancel-lesson.mjs`'s card never entered the DOM (red 2026-08-24..27, looked like an app regression). Match
+    prefixes (`${weekday}\w*`, `${month}\w*`). §7.122. (2026-08-27.)
 
 216. **A PostgREST filter on an EMBEDDED column restricts the parent rows ONLY when the embed is `!inner` — over a
     plain (left) embed it returns EVERY parent row with the embed nulled, a silent wrong answer worse than the cap.**
-    Scoped admin search (Wave C Piece 1) pushes a term into the DB as `.ilike("parent_students.parents.profiles.
-    full_name", …)` to reach past `max_rows=1000` (§7.70). Verified against the live DB: over a PLAIN embed the query
-    returned all three students — one matched, two with `parents:null`/`[]`; over `parent_students!inner(parents!inner
-    (profiles!inner(…)))` it returned only the real match, and a BASE-column search still found the parentless child.
-    So make the embed `!inner` **only while that field is the active search** (a permanent `!inner` would drop
-    parentless/unlinked rows from the default list); a base column needs no embed change. **Corollary — a to-MANY
-    embed NARROWS too:** `.ilike("invoice_items.student_name", …)` over `invoice_items!inner` strips the non-matching
-    items from each returned invoice, so a multi-child invoice's derived student list collapses to the searched child
-    and then MISSTATES the WhatsApp reminder + CSV. Push a to-many search only where the display does not depend on the
-    full set; invoices keep STUDENT search client-side for exactly this (parent search is a to-ONE embed and pushes
-    cleanly). Sibling of §7's "PostgREST returns null for the ENTIRE select when one embed fails". (2026-08-28, §8.91.)
+    (§7.70.) Use `parent_students!inner(parents!inner(profiles!inner(…)))` **only while that field is searched**. A
+    permanent `!inner` drops parentless rows; a base column needs no change. **A to-MANY embed NARROWS too**
+    (`invoice_items!inner` strips non-matching items, misstating the WhatsApp reminder + CSV) — push to-many only
+    where the display does not need the full set; invoices keep STUDENT search client-side (parent search is to-ONE).
+    Sibling of §7's "PostgREST returns null for the ENTIRE select when one embed fails". (§8.91.)
 
 217. **In a PostgREST `.or()` quoted value, a single-backslash wildcard escape (`\%`) still matches EVERYTHING — the
-    backslash must be DOUBLED (`\\%`) to survive the parser's unquoting.** The scoped family search (Piece 2) builds
-    `full_name.ilike."*<term>*"` and double-quotes the value so `,()` in a name stay literal. But PostgREST unescapes
-    `\x`→`x` inside a quoted value BEFORE the `*`→`%` mapping, so `\%` unescapes back to a bare `%` wildcard and a
-    search for a literal "%" matches every row. Verified against the live DB: `"*\%*"` matched every profile; `"*\\%*"`
-    matched none (literal). Escape wildcards as `\\`+char (`orValue`, `SwimSyncAdmin/lib/tableSearch.ts`). The unit
-    test asserts the string SHAPE only, so it cannot catch this — the DB probe is the proof. (2026-08-28, §8.91.)
+    backslash must be DOUBLED (`\\%`) to survive the parser's unquoting.** Values are quoted so `,()` stay literal,
+    but PostgREST unescapes `\x`→`x` before `*`→`%`. `"*\%*"` matched all; `"*\\%*"` none. Use `orValue`
+    (`SwimSyncAdmin/lib/tableSearch.ts`); the unit test checks string SHAPE only — the DB probe is the proof. (§8.91.)
 
 218. **A `SECURITY DEFINER` RPC does NOT skip triggers, so changing `tenant_id` while a cross-tenant FK (`level_id`)
     is still set trips the tenant-guard trigger — this SHIPPED a live production bug.** `reassign_student_tenant()`
-    updated `students.tenant_id` without clearing `level_id`, so `trg_student_level_tenant` (fires on `UPDATE OF
-    level_id, tenant_id`) saw the level still pointing at the OLD tenant's ladder and raised `check_violation` — every
-    move of a LEVELLED student failed in prod, silently, from the day levels shipped. SECURITY DEFINER changes the
-    ROLE (bypassing RLS), never trigger firing. Fix: clear the cross-tenant FK in the SAME update (the old tenant's
-    vocabulary is meaningless at the new one). Whenever an RPC moves a row across the tenant boundary, null every
-    cross-tenant FK it carries. (2026-08-28, §8.91.)
+    left `level_id` set, so `trg_student_level_tenant` (`UPDATE OF level_id, tenant_id`) raised `check_violation` —
+    every move of a levelled student failed silently in prod. SECURITY DEFINER changes the ROLE (bypassing RLS), never
+    trigger firing. Rule: whenever an RPC moves a row across the tenant boundary, null every cross-tenant FK it carries
+    in the SAME update. (2026-08-28, §8.91.)
 
 219. **A completeness count over an EMPTY list is vacuously COMPLETE — `done === total` is true at `0 === 0`, and it
-    reports "finished" for exactly the records nobody can act on.** The Assessment tab (§8.93) tells an assessor which
-    children are still to grade. A child with no level, or on a level with no skills yet, has zero gradeable skills —
-    so the natural `freshCount === total` marked them **fully assessed** and sent the assessor straight past them,
-    inside the tool built to stop children being skipped. The twin is worse: "every skill is at the top grade" is also
-    vacuously true over `[]`, so the same child was offered a **promotion out of a level they are not in**. Both are
-    now explicit refusals (`!noSkills && …`), the empty case is rendered as its OWN state ("Needs a level") rather
-    than folded into done or outstanding, and vitest pins both — RED-proven against the obvious implementation.
-    **The general rule: before writing `done === total`, ask what the predicate means when the list is empty**, and
-    make the empty case a distinguishable third answer rather than a silent yes. Cousin of §7.100 (a driver that
-    skips itself on a date condition and reports PASS). (2026-08-29, §8.93.)
+    reports "finished" for exactly the records nobody can act on.** Bit the Assessment tab (§8.93): a child with no
+    level / no skills showed **fully assessed**, and "every skill at top grade" (vacuous over `[]`) offered a
+    promotion out of a level they are not in. Now explicit refusals (`!noSkills && …`), the empty case is its OWN
+    state ("Needs a level"), vitest pins both. **Rule: before writing `done === total`, ask what the predicate means
+    when the list is empty**, and make it a distinguishable third answer. Cousin of §7.100. (2026-08-29, §8.93.)
 
 220. **A `NOW()`-stamping trigger cannot be tested for "the timestamp advanced" inside a pgTAP transaction — and the
-    naive test passes against the unfixed code.** `NOW()` is the TRANSACTION timestamp and the whole suite runs in one
-    `BEGIN…ROLLBACK` (§7.16), so a row inserted and then re-written in the same test both read `NOW()`: comparing them
-    can never observe an advance, and the assertion is green with or without the fix. Backdating the fixture with a
-    plain `UPDATE` does not rescue it either — the very trigger under test clobbers the backdate on the way in. The
-    only way to make the RED proof observable is to plant the old timestamp under a disabled trigger:
+    naive test passes against the unfixed code.** `NOW()` is the TRANSACTION timestamp and the suite is one
+    `BEGIN…ROLLBACK` (§7.16), so comparing them can never observe an advance; backdating with a plain `UPDATE` is clobbered by the trigger
+    under test. Plant the old timestamp under a disabled trigger:
     `ALTER TABLE … DISABLE TRIGGER <name>; UPDATE … SET graded_at = NOW() - interval '90 days'; ALTER TABLE … ENABLE
-    TRIGGER <name>;`. Worked examples: `skill_progress.test.sql`, `student_merge.test.sql`, and
-    `drivers/fixtures-assessment.sql` (which needs the same trick, for the same reason, to seed a stale row).
-    **Corollary:** once a trigger stamps on every non-exempt write, a future `service_role` backfill correcting that
-    column will be clobbered too — such a fix must `DISABLE TRIGGER` as well, which is recorded in the migration's own
-    comment because nothing structural can enforce it. (2026-08-29, §8.93.)
+    TRIGGER <name>;`. Examples: `skill_progress.test.sql`, `student_merge.test.sql`, `drivers/fixtures-assessment.sql`.
+    **Corollary:** a future `service_role` backfill of that column must `DISABLE TRIGGER` too — recorded in the
+    migration's comment, since nothing structural enforces it. (2026-08-29, §8.93.)
 
 221. **An `ON CONFLICT DO UPDATE` array upsert REFUSES THE WHOLE STATEMENT if the array names one conflict key twice**
-    ("cannot affect row a second time"), so batching an optimistic UI's gesture must DEDUPE before it sends. The
-    Assessment grid's paint mode collects a stroke and flushes it as a single request; a finger crossing one cell
-    twice — routine — would otherwise fail every cell in the stroke while the screen already showed them all painted.
-    Two consequences worth carrying: **(a)** the failure is atomic, so a failed batch must restore the WHOLE-stroke
-    snapshot and refetch, never just the last cell — local state is no longer evidence of what the server holds;
-    **(b)** a "clear" action is a DELETE, not an upsert, so it cannot ride in the batch at all — the Assessment grid
-    therefore has a named prohibition that **paint mode never paints "not set"**, because a half-succeeding
-    upsert+delete pair is worse than a second click. (2026-08-29, §8.93.)
+    ("cannot affect row a second time"), so batching an optimistic UI's gesture must DEDUPE before it sends. Bit the
+    Assessment grid's paint mode (a stroke crossing one cell twice). **(a)** the failure is atomic: restore the
+    WHOLE-stroke snapshot and refetch, never just the last cell; **(b)** "clear" is a DELETE and cannot ride in the
+    batch — hence the prohibition that **paint mode never paints "not set"**. (2026-08-29, §8.93.)
 
 222. **The admin panel's sidebar is a hard `w-64` with no breakpoint, so EVERY admin page has ~70px of content at
-    390px portrait.** Found by `verify-assessment.mjs`, which runs at a phone viewport deliberately. It is
-    pre-existing and panel-wide (`components/Sidebar.tsx`, `app/(admin)/layout.tsx`'s `p-8`), not a property of any
-    one page, and no horizontal-overflow assertion catches it — the page does not scroll sideways, the content is
-    simply squeezed. It matters now because the Assessment tab is the first admin surface intended for phone use
-    poolside (grading left the mobile app in §8.93). Usable in landscape and on a tablet; cramped in portrait.
-    **RESOLVED THE SAME DAY, AND NOT BY FIXING IT: the admin panel is a desktop/tablet surface BY INTENT** — the
-    user's call, *"I don't intend on making the admin webapp a mobile app, only the coach app might become a mobile
-    app"* — so portrait-phone width is not a case it has to serve, and Assessment is done on a tablet. **So this is
-    not a latent bug waiting to be fixed; it is a boundary.** Two things still follow from it: **(a) do not "fix" it
-    page-by-page** — a per-page workaround spreads the problem across the panel while leaving the sidebar as it is;
-    and **(b) the measurement lesson stands regardless** — no horizontal-overflow assertion can catch a squeezed
-    layout, so if you ever *do* care about a narrow viewport, assert on the content column's width, not on
-    `scrollWidth`. `BACKLOG.md` → *Deliberately not doing* holds the decision. (2026-08-29, §8.93.)
+    390px portrait.** Found by `verify-assessment.mjs`, which runs at a phone viewport deliberately; panel-wide (`components/Sidebar.tsx`,
+    `app/(admin)/layout.tsx`'s `p-8`). **RESOLVED BY DECISION, not a fix: the admin panel is a desktop/tablet surface
+    BY INTENT** (user: *"I don't intend on making the admin webapp a mobile app"*; Assessment is done on a tablet). **Not a latent bug; a boundary.** **(a) do not "fix" it
+    page-by-page**; **(b)** no horizontal-overflow assertion catches a squeezed layout — to test a narrow viewport,
+    assert the content column's width, not `scrollWidth`. `BACKLOG.md` → *Deliberately not doing* holds the decision.
+    (2026-08-29, §8.93.)
 
 223. **A UI copy change silently breaks any Playwright driver asserting that string — and PLURALISING A VERB is
-    the case a substring regex misses.** `verify-assessment.mjs`'s highest-value check tested `/need a level/i`;
-    the fix that made the badge read "1 child **needs** a level" does not match it, because the literal requires
-    `need` immediately followed by ` a level`. A one-word grammar fix would have reddened the nightly sweep on a
-    check about something else entirely, and §8.65's rule then applies — the red names the driver, not the copy,
-    so the triage starts in the wrong place. **Before changing any user-visible string, grep the whole repo for
-    it** (`grep -rn "<string>" . --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git`): this one
-    had **four** call sites, not the one that prompted the fix — two pages with the same bug, the driver, and
-    `docs/DEPLOYMENT.md`'s record of a served-bundle grep. Two rules follow. **(a) Write the driver's regex to
-    tolerate the inflection it is not asserting** — `/needs? a level/` — because the check exists to prove
-    unlevelled children are *surfaced*, not to police grammar; a check that fails on a legitimate copy edit is a
-    check that will be edited out. **(b) A deploy record is NOT a call site to update.** DEPLOYMENT §11.46 still
-    quotes the old string because it is an account of what was grepped on a given day; rewriting it to match
-    today's code falsifies the record, and the next person re-verifying that deploy would be checking a string
-    that was never served. (2026-08-29, §8.94.)
+    the case a substring regex misses.** "1 child **needs** a level" broke `verify-assessment.mjs`'s `/need a level/i`
+    (the red names the driver, not the copy — §8.65). **Before changing any user-visible string, grep the whole repo
+    for it** (`grep -rn "<string>" . --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git`) — it had four
+    call sites. **(a) Write the driver's regex to tolerate the inflection it is not asserting** — `/needs? a level/`.
+    **(b) A deploy record is NOT a call site to update:** DEPLOYMENT §11.46 quotes the old string as what was grepped
+    that day; rewriting it falsifies the record — a re-verifier would check a string that was never served. (2026-08-29, §8.94.)
 
-224. **↪ Repeat of §7.163 — read that first; this entry is a later time it bit.** **NEVER hardcode a seed row's id in a fixture — `supabase/seed.sql` names no `id` on its `classes` INSERT, so
-    Postgres mints a FRESH uuid on every `db reset`.** `fixtures-assessment.sql` carried a literal
-    `'2ce0a523-…'` for the seed's *Saturday Beginners*, captured from the one database it was authored against.
-    It loaded there forever and failed on the **first reset** — so the driver passed 27/27 the day it was written
-    and could never have passed in CI. Resolve by a stable identity instead:
-    `SELECT id INTO v FROM classes WHERE title = 'Saturday Beginners' ORDER BY created_at, id LIMIT 1;` with a
-    `RAISE EXCEPTION` when it comes back NULL — the `ORDER BY` is load-bearing (§7.73), and the exception is what
-    turns a silent no-op into a message that names the cause. **The error it actually produces names the wrong
-    subsystem**: `cross-tenant enrolment refused: … class … is in tenant <NULL>` reads as a tenancy bug, because
-    the trigger looked up a class that is not there and compared against NULL. A `<NULL>` tenant in that message
-    means a MISSING ROW, not a tenancy fault — check the id exists before you go near the tenancy code.
-    ⚠ **`check-fixture-roundtrip.sh` STRUCTURALLY CANNOT CATCH THIS, and passed 26/26 twice on the day it was
-    broken.** That script snapshots row counts, loads, tears down, and proves the counts return — it never resets,
-    so it happily loaded this fixture against a database that still held yesterday's class row. It tests
-    load/teardown SYMMETRY, not seed-independence. **The only thing that catches a reset-fragile fixture is a
-    reset-first run** — `run-all-drivers.sh`, which resets per driver, or CI. So a fixture whose header says
-    *"do NOT run `supabase db reset`"* (this one did) has never been proven against the thing that will run it.
-    A repo-wide scan found this was the ONLY fixture with a non-convention hardcoded uuid; every other one either
-    creates its rows with `…-0000-0000-…` literals it owns, or looks them up. (2026-08-30, §8.95.)
+224. **↪ Folded into §7.163 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 
 225. **A driver must never RESTATE a date its fixture computes from `now()` — ask the database what it
-    inserted.** `verify-trial-visibility.mjs` asserted `/\d{1,2}\s+Aug/` against a trial the fixture books on the
-    **strictly next Saturday in SGT**. Those two facts agree for about three weeks a month and disagree in the
-    last one: it went red on **2026-08-30**, a Sunday whose next Saturday is 5 Sep. Nothing changed in the
-    product, nothing changed in the fixture, and no code was edited — **the calendar moved**, which is the
-    §7.122 question ("which weekday did the run actually see?") arriving through a month boundary rather than a
-    weekday one. The repair is not a better regex, it is deleting the second copy: the driver already had a
-    `sql()` helper, so it now reads `to_char(session_date,'FMDD')`/`'Mon'` off the row the fixture wrote and
-    builds the pattern from that. Keep `\w*` on the month — 'Sep' and 'Sept' must both pass (§8.90's ICU trap).
-    ⚠ **The distinguishing question when auditing for this is whether the FIXTURE's date is absolute or
-    relative, not whether the DRIVER's assertion looks hardcoded.** A repo-wide scan turned up two more
-    hardcoded dates that are entirely safe — `verify-bulk-setall`'s `11 Jul` and `verify-class-students`'
-    `4 May 2026` — because their fixtures insert literal `'2026-07-04'` / `'2026-05-04 12:00:00+08'`, so the
-    assertion cannot drift. Only a `now()`-derived fixture makes a hardcoded assertion a time bomb, and only
-    `trial-visibility` had one. **This is the third instance in one day of one failure shape: a fact written down
-    twice drifts.** §7.223 was a copy string in a page and in a driver; §7.224 a seed id in the seed and in a
-    fixture; this is a date in a fixture and in a driver. In each the fix was to keep ONE copy and derive the
-    other. (2026-08-30, §8.95.)
+    inserted.** `verify-trial-visibility.mjs` asserted `/\d{1,2}\s+Aug/` against a fixture booking the next Saturday
+    in SGT; red on 2026-08-30 when that fell in Sep — the calendar moved (§7.122's question via a month boundary).
+    Fix: the driver's `sql()` helper reads `to_char(session_date,'FMDD')`/`'Mon'` off the fixture row. Keep `\w*` on
+    the month — 'Sep' and 'Sept' must both pass (§8.90). ⚠ **When auditing, ask whether the FIXTURE's date is absolute
+    or relative, not whether the DRIVER's assertion looks hardcoded** — `verify-bulk-setall`'s `11 Jul` and
+    `verify-class-students`' `4 May 2026` are safe (fixtures insert literal `'2026-07-04'` /
+    `'2026-05-04 12:00:00+08'`). A fact written down twice drifts (§7.223, §7.224): keep ONE copy, derive the other.
+    (2026-08-30, §8.95.)
 
 226. **A Playwright `clock.install()` CANNOT fake `markable_floor` — it is client-side, and the floor is Postgres
-    reading the real clock.** `verify-bulk-setall` and `verify-unmarked-lessons` froze their browsers at 15 Jul
-    2026 against a fixture with lessons on 4 and 11 Jul, and the comment in one of them claimed the fake was what
-    made it *"keep working whatever today's real date is"*. **Exactly backwards.** Freezing the client pins one
-    end of a comparison whose other end keeps moving: the backlog's lower bound is `markable_floor` = the 1st of
-    LAST month, so on 2026-09-01 those July lessons drop out of the needs-marking window. Both drivers were
-    proven to break by pinning `session_window_start()` to `2026-08-01` and re-running — 10/10 → 9/10 and
-    12/12 → 10/12, with a control at `2026-07-01` passing, so the floor was the only variable. **The failure is
-    invisible in a screenshot**: an empty backlog is a normal screen, not an error.
-    ⚠ **THE FIX IS "LAST MONTH", NOT "THE LAST FEW DAYS", AND THE REASON IS A SECOND CONSTRAINT.** The obvious
-    repair — derive the two most recent Saturdays — passes every coach check and fails every ADMIN one, because
-    that fixture also drives the invoice-generation block and **a billing month must have ENDED to be billable**
-    (PRD §7.7); the most recent Saturday is usually in the unfinished current month. The last two Saturdays of
-    the PREVIOUS month satisfy both at once: that month is over, and `markable_floor` IS its 1st. It is also safe
-    by arithmetic — the last Saturday of any month is the 22nd or later, so minus seven is still the same month.
-    ⚠ **Also watch the ENROLMENT date.** The backlog's bound is `max(server floor, earliest enrolment)`, so
-    back-dating the enrolment "to be safe" drags EXTRA unmarked Saturdays into the list and "the backlog clears"
-    can never pass. It must sit just before the marked lesson (here `missing_sat - 10`).
-    ⚠ **When auditing for this, grep ISO dates too, not just month names.** A month-name scan missed
-    `/date=2026-07-11/` — a driver asserting a URL. And a fixture whose dates are correctly derived can no longer
-    be validated by the floor-override trick, because overriding the floor without moving `now()` makes the two
-    disagree by construction; test those against the real clock. (2026-08-30, §8.95.)
+    reading the real clock.** `verify-bulk-setall` / `verify-unmarked-lessons` froze the browser at 15 Jul 2026 with
+    July lessons; on 2026-09-01 `markable_floor` (1st of LAST month) dropped them. Proven by pinning
+    `session_window_start()` to `2026-08-01` (control `2026-07-01` passes). **Invisible in a screenshot**: an empty
+    backlog is a normal screen.
+    ⚠ **THE FIX IS "LAST MONTH", NOT "THE LAST FEW DAYS", AND THE REASON IS A SECOND CONSTRAINT.** The fixture also
+    drives invoice generation and **a billing month must have ENDED to be billable** (PRD §7.7). Use the last two
+    Saturdays of the PREVIOUS month (last Saturday is ≥ the 22nd, so minus seven stays in-month).
+    ⚠ **Also watch the ENROLMENT date.** The bound is `max(server floor, earliest enrolment)`; back-dating enrolment
+    drags extra unmarked Saturdays in and "the backlog clears" can never pass. Put it just before the marked lesson (`missing_sat - 10`).
+    ⚠ **When auditing, grep ISO dates too, not just month names** (missed `/date=2026-07-11/`). A correctly derived
+    fixture cannot be validated by the floor-override trick (floor and `now()` disagree by construction); test those
+    against the real clock. (2026-08-30, §8.95.)
 
 227. **A Singapore calendar date compared against a `timestamptz` through a ZONELESS `T00:00:00` puts the
-    boundary at the VIEWER's midnight, not Singapore's** — §7.7's axis, reached through a surface nobody had
-    connected to it. `isFreshGrade(gradedAt, since)` in `SwimSyncAdmin/lib/assessment.ts` decides whether a
-    grade belongs to the current assessment round. `since` is a Singapore date (`todayInSg()`, or the date the
-    assessor typed); `gradedAt` is `NOW()` stamped by Postgres. The comparison parsed `` `${since}T00:00:00` ``
-    with no zone, so west of Singapore the boundary lands LATER than the SGT day it names and grades made in the
-    first hours of the Singapore day read as a PREVIOUS round's — the assessor is told to re-grade children they
-    just graded, inside the tool built to stop children being skipped. Fix: `` `${since}T00:00:00+08:00` ``
-    (Singapore is +08:00 year-round, no DST). Found by the nightly sweep on 2026-08-29 at 22:42Z = 06:42 SGT the
-    next morning: `verify-assessment` 21/27, six checks red.
-    ⚠ **THE REPRODUCTION IS A TIMEZONE, NOT A CLOCK — this is the reusable half.** The condition was written up
-    as *"run inside UTC 16:00–24:00, or fake the clock into it"*, which is one INSTANCE of the real condition:
-    **the device's calendar date differs from Singapore's.** A far-western zone satisfies that at almost any hour
-    — `TZ=Pacific/Midway` (UTC−11) does for 19 hours a day — so `TZ=Pacific/Midway node verify-assessment.mjs`
-    reproduced 21/27 with the identical six checks and the identical `· 29 Aug` text, at 16:20 SGT, with no clock
-    faking and no stack surgery. **Reach for a zone before reaching for `clock.install()`** (which cannot fake a
-    server timestamp anyway — §7.226). A `TZ=UTC` run alone proves nothing: at 16:00 SGT the two dates agree.
-    ⚠ **DO NOT "FIX" THIS BY PINNING `timezoneId` IN THE DRIVER.** The triage note called `verify-assessment`
-    *"the only driver that does not pin `timezoneId: Asia/Singapore`"* and read that as the defect. **It is not
-    true — 43 of the 50 drivers do not pin it** — and it has the causation backwards: the UNPINNED driver on a
-    UTC runner is precisely what caught a real product bug that every SGT-local run passed 27/27 through. The
-    unpinned default is an asset; pinning it would have hidden the defect and shipped it to any admin grading
-    from outside Singapore.
-    ⚠ **The display half is the same axis and needs the house helpers.** `new Date(ts).toLocaleDateString("en-SG",
-    …)` on a `timestamptz` with no `timeZone` renders the DEVICE's date — which is why the failing output read
-    `· 29 Aug` for a grade made on 30 Aug SGT. `toSgDate()` then `formatSgDate()` (`lib/lessonDates.ts`) are the
-    zone-correct pair and cannot be opted out of.
-    ⚠ **The driver is TIME-DEPENDENT coverage; the deterministic pin belongs in vitest.** On a UTC runner the
-    disagreement window is only 8 hours a day, so the driver would have gone green again by itself on the next
-    night's run — an alarm that silences itself. `assessment.test.ts` now asserts the boundary across five zones
-    via `process.env.TZ`, the `lessonDates.test.ts` / `tableSort.test.ts` pattern. **The old test that looked
-    like it pinned the boundary did not**: it passed `"2026-09-01T00:00:00"`, a zoneless literal the database
-    never produces, so both sides moved together and every zone agreed. (2026-08-30.)
+    boundary at the VIEWER's midnight, not Singapore's** — §7.7's axis. `isFreshGrade(gradedAt, since)`
+    (`SwimSyncAdmin/lib/assessment.ts`) parsed `` `${since}T00:00:00` ``, so west of Singapore fresh grades read as a
+    previous round's. Fix: `` `${since}T00:00:00+08:00` `` (no DST). Nightly 2026-08-29: `verify-assessment` 21/27.
+    ⚠ **THE REPRODUCTION IS A TIMEZONE, NOT A CLOCK.** The condition is "the device's date differs from Singapore's":
+    `TZ=Pacific/Midway node verify-assessment.mjs` reproduces 19 h/day. **Reach for a zone before reaching for
+    `clock.install()`** (which cannot fake a server timestamp — §7.226). A `TZ=UTC` run alone proves nothing.
+    ⚠ **DO NOT "FIX" THIS BY PINNING `timezoneId` IN THE DRIVER.** 43 of 50 drivers do not pin it; the unpinned driver
+    on a UTC runner caught this bug. Pinning would have hidden it.
+    ⚠ **The display half is the same axis and needs the house helpers.** `toLocaleDateString("en-SG", …)` with no
+    `timeZone` renders the DEVICE's date; use `toSgDate()` then `formatSgDate()` (`lib/lessonDates.ts`).
+    ⚠ **The driver is TIME-DEPENDENT coverage; the deterministic pin belongs in vitest.** `assessment.test.ts` asserts
+    the boundary across five zones via `process.env.TZ` (as `lessonDates.test.ts` / `tableSort.test.ts`). A zoneless
+    literal like `"2026-09-01T00:00:00"` (which the database never produces) in a test pins nothing — both sides move together. (2026-08-30.)
 
 228. **The nightly uploads its SCREENSHOTS, and nobody had ever opened them — do that FIRST when a UI driver
-    reddens.** `gh run download <run-id> -n ui-driver-run -D <dir>` pulls every driver's log *and* its
-    `shots-<driver>/` PNGs. `verify-tenant-provisioning` was red for two nights and cost two wrong hypotheses
-    (below); the artifact settled it in one look, because `prov-created.png` showed the submit button still
-    reading **"Creating…"**. The page state at the moment of failure is a fact, and it is already being
-    collected — reading a log and theorising while an authoritative screenshot sits unopened is the expensive
-    way round. **Run this before forming any hypothesis about a driver red.**
-    ⚠ **THE CAUSE: a fixed `waitForTimeout` after an action that round-trips an API route.** The driver clicked
-    *Create & invite*, slept a flat 2500 ms, then read the page. Provisioning is a Next API route that also
-    mints an auth invite link, and on a cold CI runner it had not returned. **A fixed sleep converts a slower
-    machine into a fake PRODUCT failure.** Fix: wait for the OUTCOME — `page.waitForFunction` on the success
-    panel *or* any error copy, generous timeout — never for a duration. Proven both ways: shortening the sleep
-    to 200 ms locally reproduced the CI signature exactly (5/8, same three failures, same `SWIM-TEST` and
-    `sent` details), and after the fix an injected **8 s** delay on the route still passes 15/15.
-    ⚠ **DO NOT READ TOTAL WALL TIME AS RUNNER SPEED — this is what made the first diagnosis wrong.** Local
-    took 47 s, CI 49 s, which looks like "the runner is not slower" and was used to *rule out* timing. It is
-    a trap: CI ran **8 checks** and local ran **15**, because the red bailed out of a block containing ~11 s
-    of sleeps plus a second browser context. **Compare like segments, or compare nothing** — a driver whose
-    runtime is dominated by fixed sleeps has a near-constant wall time that says nothing about the machine.
-    ⚠ **A whole-body regex can PASS on a row the driver does not own.** *"a join code is shown on creation"*
-    matched `/SWIM-[A-Z2-9]{4}/` against `innerText("body")` — which includes the businesses TABLE — so it
-    reported **PASS `SWIM-TEST`**, the *seed's* code, on a run where no business had been created and no panel
-    existed (§7.75, §7.101). Scope an assertion to the element the action produced, so a missing panel fails
-    every dependent check together instead of one of them passing on someone else's data.
-    ⚠ **A detail string must not print the failure case as a success branch.** The delivery check logged
-    `noKey ? "warned + link shown" : "sent"`, so it printed **`— sent`** whenever the no-key branch was absent
-    — *including on failure, where nothing was sent*. That single word is what produced the first wrong theory
-    ("CI has a working RESEND key"); CI sets no such key at all. Print what was actually observed, and give the
-    neither-branch case its own words.
+    reddens.** `gh run download <run-id> -n ui-driver-run -D <dir>` pulls logs *and* `shots-<driver>/` PNGs.
+    `verify-tenant-provisioning`: two wrong hypotheses, settled by `prov-created.png` showing "Creating…". **Run this
+    before forming any hypothesis about a driver red.**
+    ⚠ **THE CAUSE: a fixed `waitForTimeout` after an action that round-trips an API route.** **A fixed sleep converts a
+    slower machine into a fake PRODUCT failure.** Wait for the OUTCOME — `page.waitForFunction` on success *or* error
+    copy, generous timeout — never for a duration.
+    ⚠ **DO NOT READ TOTAL WALL TIME AS RUNNER SPEED.** CI ran 8 checks vs local 15 (the red bailed out of a
+    sleep-heavy block). **Compare like segments, or compare nothing.**
+    ⚠ **A whole-body regex can PASS on a row the driver does not own.** `/SWIM-[A-Z2-9]{4}/` over `innerText("body")`
+    matched the seed's `SWIM-TEST` in the table (§7.75, §7.101). Scope an assertion to the element the action produced.
+    ⚠ **A detail string must not print the failure case as a success branch.** `noKey ? "warned + link shown" :
+    "sent"` printed `sent` on failure. Print what was observed; give the neither-branch case its own words.
     ⚠ **A fallback that reads an attribute the app never renders is DEAD CODE that silently disables the
-    driver.** The recovery path claimed the driver "works either way" by minting a link over
-    `/api/resend-invite`, keyed on `data-tenant-id` from the table row — **an attribute that exists nowhere in
-    the admin panel**. So `tenantId` was always null and the fetch never ran, which is why a slow response
-    cost **seven** checks rather than three: everything after it sat inside `if (inviteLink)`, including the
-    sign-in assertion this driver's own header calls load-bearing (§7.100's shape). Replaced with a named
-    precondition (`RESEND_API_KEY` must be UNSET) and a loud skip notice, because **a shrinking denominator is
-    not a signal anyone reads** — 5/8 looks like a small failure and was in fact seven unrun checks.
+    driver.** `data-tenant-id` exists nowhere in the admin panel, so the `/api/resend-invite` fallback never ran and
+    checks inside `if (inviteLink)` went unrun (§7.100's shape). Replaced with a named precondition (`RESEND_API_KEY`
+    must be UNSET) and a loud skip: **a shrinking denominator is not a signal anyone reads.**
     ⚠ **When auditing for the dead-attribute shape:** `grep -o 'getAttribute("data-[a-z-]*"' drivers/*.mjs`,
-    then grep the app for each name. One other driver uses one (`data-status`, `verify-admin-lesson-detail`)
-    and it is real. (2026-08-30.)
+    then grep the app for each name (`data-status` in `verify-admin-lesson-detail` is real). (2026-08-30.)
 
 229. **`toSgDate()` THROWS on a malformed value ON PURPOSE — display and logic need DIFFERENT helpers, and
-    "hardening" the shared one is how a loud crash becomes a silently wrong answer.** `lessonDates.ts` has
-    **34 `toSgDate()` call sites, and they are overwhelmingly LOGIC, not display**: `attendanceCompleteness.ts`
-    converts `enrolled_at`/`unenrolled_at` and compares them **lexically** to build the coach's unmarked-attendance
-    backlog; `classCoverage.ts` builds `from`/`until` bounds; `AssessmentGrid.tsx` feeds `isFreshGrade`'s round
-    boundary (§7.227's own mechanism). A 2026-08-30 plan proposed the obvious kindness — return the raw input
-    instead of throwing, so a bad value renders `"Invalid Date"` in a cell rather than taking down a React
-    subtree. **`/plan-review` caught it before it was written.** The raw string flows into `parseDate` → `NaN` →
-    `expectedLessonDates` returns `[]`, and the screen says **"nothing expected"**: coverage looks complete,
-    grades misclassify, a billing month is quietly blocked with no visible reason. Nothing throws, so nothing is
-    noticed. ⚠ **PROHIBITION: never add a NaN guard, a try/catch, or any degrade path to `toSgDate`,
-    `todayInSg`, or `parseDate`.** A date primitive that guesses is worse than one that stops. The display need
-    is real, so it got its own front door: **`formatSgStamp(iso, opts)`** — degrades, never throws, DISPLAY ONLY,
-    correct for a `timestamptz` **and** a bare `"YYYY-MM-DD"` (the date string round-trips because UTC midnight is
-    08:00 SGT the same day, and Singapore is east of Greenwich so it never wraps). Use it for every rendered date;
-    `formatSgDate` still takes a `"YYYY-MM-DD"` you already hold. (2026-08-30.)
-
-230. **A source-scanning guard is only as good as its PARSER, and all three of its ways to lie are silent** —
-    learned building `sgDisplay.drift.test.ts` (both apps), which stops an eleventh zoneless date render being
-    added. Every one of these was found by **enumerating and classifying the reds before fixing anything**, not
-    by reading the scanner:
-    ⚠ **Blanking a comment must PRESERVE LENGTH.** Dropping line-comment characters instead of overwriting them
-    with spaces shifted every match after the first `//` in a file, which made the scanner accuse
-    `history/page.tsx` — the one file that was already **correct** — while the real offenders sat unreported.
-    ⚠ **A template literal's `${…}` is CODE, not text.** Blanking whole backtick strings hid a real call site
-    rendering a date inside a `title={…}` template. Blank the literal segments; step over the substitutions.
-    ⚠ **An allowlist matched by PROXIMITY is not an allowlist.** The receiver expression sits *before* the
-    `.toLocale…` token, so the snippet has to be matched against preceding source — and a flat 400-character
-    window reached into the **neighbouring function** and silently exempted two genuine offenders. Bound the
-    window to the enclosing block. Pin every entry to file **and** content snippet, never file-level.
-    ⚠ **Presence of an option is not correctness.** `timeZone: "UTC"` on a `timestamptz` satisfies a naive
-    "has `timeZone`" check while rendering the wrong date 8 hours out of 24 — §7.227's bug with a green light
-    over it. The guard rejects UTC too, except where the `Date` was itself built as UTC. **And add a vacuity
-    test**: assert the scanner finds call sites at all, or a parser bug empties the list and every assertion
-    passes forever. (2026-08-30.)
-
-231. **A guard lies in TWO directions, and testing it only one way proves half of it.** §7.230 is about a
-    scanner's *parser*; this is about its *verdicts*. Every guard has a false RED (it fires when nothing is
-    wrong) and an invisible HOLE (it stays green when something is), and the RED-proof ritual of §7.25 only
-    ever exercises the second. Found building `authEmailConfig.drift.test.ts`, where both were live in the
-    first draft:
-    ⚠ **The false red lands on the line most likely to be EDITED.** The guard compared a raw TOML value, so
-    `enable_confirmations = false # do not change` failed the test **while the value was still false**, with a
-    message that read as though the toggle had been flipped. The single most safety-critical assertion in the
-    file would have cried wolf at the person doing the sensible thing. §8.65 is the cost of that: a red nobody
-    believes stops being an alarm. **Strip inline comments quote-aware, before unquoting.**
-    ⚠ **The hole hides where the pattern's ANCHOR does not appear.** `/\{\{\s*\.(\w+)/` reads Go template vars
-    but a conditional opens `{{ if .Emial }}` — no dot after the braces, so the scan captured **nothing** and a
-    typo'd var was invisible. Conversely `{{ .Data.foo }}` captured **both** `Data` and `foo`, arming a false
-    red the moment anyone used a legitimate dotted path. **Find the enclosing constructs first, then the roots
-    inside them** (`(?<![\w.])\.(\w+)`).
-    ⚠ **A file that DOCUMENTS the rule it is scanned for trips its own guard.** Both email templates warn, in
-    their header comment, that "email clients strip `<style>`" — so a no-external-assets scan that reads
-    comments flags the sentence warning against the thing as the thing. Proven: 1 hit raw, 0 stripped, in both
-    files. **Strip comments before scanning**, and note that this bites hardest on well-documented files.
-    ⚠ **So: for every assertion, mutate BOTH ways** — break it and watch it redden, then make the benign edit a
-    maintainer would plausibly make and watch it stay green. The second half is not optional; it is the half
-    that decides whether anyone still trusts the guard in six months. (2026-08-30.)
-
-232. **A Supabase AUTH email template cannot be rendered through the live path without its own feature flag —
-    there is no admin backdoor.** Discovered brand-building `confirmation.html` while `enable_confirmations`
-    stayed deliberately false (it stranded web parents; see `BACKLOG.md` → the shipped email-confirmation item).
-    Every route was checked and none emits it: **`auth.admin.generateLink()` mints a link and sends NOTHING**
-    (which is exactly why SwimSync's own invite paths pair it with a hand-built Resend email —
-    `SwimSyncAdmin/lib/inviteEmail.ts`); `auth.resend({type:'signup'})` needs an already-unconfirmed user, which
-    needs the flag; `admin.createUser()` does not send. So the only way to see the email GoTrue would actually
-    build is to turn the flag on, which is the one thing forbidden. ⚠ **Do not read "the template shipped" as
-    "the template was sent."** What stands in for an end-to-end render is a **structural diff against a template
-    already proven in production** — `confirmation.html`'s markup is byte-identical to `recovery.html`, only the
-    copy differs — plus an offline substitution render. State that limit out loud wherever the work is recorded;
-    a dormant template described as "verified" is how the first real send becomes the first real test.
-    ⚠ **The hosted FLAG can be read back; the hosted TEMPLATE cannot.** `supabase config` has only `push`, no
-    pull — but GoTrue serves its own settings, so one unauthenticated GET answers the question that matters:
-    `curl -s https://<ref>.supabase.co/auth/v1/settings -H "apikey: <anon>"`. ⚠⚠ **The field is INVERTED and
-    the inversion is the trap: `"mailer_autoconfirm": true` means confirmations are OFF** (auto-confirm the
-    user, send nothing). `true` is the safe state — the exact opposite reading of `config.toml`'s
-    `enable_confirmations = false`, so anyone who sees `mailer_autoconfirm: false` and concludes "off" has it
-    backwards. Confirmed `true` on prod 2026-08-30. The **template body** still has no read-back and stays a
-    dashboard check, and a `config push` would still carry the whole local config surface, toggle included.
+    "hardening" the shared one is how a loud crash becomes a silently wrong answer.** Its 34 call sites are mostly
+    LOGIC compared **lexically** (`attendanceCompleteness.ts` backlog, `classCoverage.ts` bounds, `AssessmentGrid.tsx` →
+    `isFreshGrade`, §7.227). A degrade → `parseDate` `NaN` → `expectedLessonDates` `[]` → "nothing expected", grades
+    misclassify, billing silently blocked (caught by `/plan-review`, 2026-08-30). ⚠ **PROHIBITION: never add a NaN
+    guard, a try/catch, or any degrade path to `toSgDate`, `todayInSg`, or `parseDate`.** For display use
+    **`formatSgStamp(iso, opts)`** — degrades, never throws, DISPLAY ONLY, correct for a `timestamptz` **and** a bare
+    `"YYYY-MM-DD"` (UTC midnight is 08:00 SGT the same day; east of Greenwich it never wraps). Use it for every
+    rendered date; `formatSgDate` still takes a `"YYYY-MM-DD"` you already hold.
     (2026-08-30.)
 
+230. **A source-scanning guard is only as good as its PARSER, and all three of its ways to lie are silent** —
+    from `sgDisplay.drift.test.ts` (both apps). Enumerate and classify the reds before fixing anything.
+    ⚠ **Blanking a comment must PRESERVE LENGTH** (overwrite with spaces), or every later match offset shifts.
+    ⚠ **A template literal's `${…}` is CODE, not text.** Blank the literal segments; step over the substitutions.
+    ⚠ **An allowlist matched by PROXIMITY is not an allowlist.** A flat 400-char window reached into a neighbouring
+    function. Bound the window to the enclosing block. Pin every entry to file **and** content snippet, never
+    file-level.
+    ⚠ **Presence of an option is not correctness.** `timeZone: "UTC"` on a `timestamptz` is wrong 8 h/day (§7.227);
+    the guard rejects UTC except where the `Date` was built as UTC. **And add a vacuity test**: assert the scanner
+    finds call sites at all. (2026-08-30.)
+
+231. **A guard lies in TWO directions, and testing it only one way proves half of it.** §7.230 is the parser; this
+    is verdicts: a false RED and an invisible HOLE; §7.25's RED-proof only exercises the hole. From
+    `authEmailConfig.drift.test.ts`:
+    ⚠ **The false red lands on the line most likely to be EDITED.** `enable_confirmations = false # do not change`
+    failed a raw-TOML compare (§8.65: a red nobody believes stops being an alarm). **Strip inline comments
+    quote-aware, before unquoting.**
+    ⚠ **The hole hides where the pattern's ANCHOR does not appear.** `/\{\{\s*\.(\w+)/` misses `{{ if .Emial }}` and
+    double-captures `{{ .Data.foo }}`. **Find the enclosing constructs first, then the roots inside them**
+    (`(?<![\w.])\.(\w+)`).
+    ⚠ **A file that DOCUMENTS the rule it is scanned for trips its own guard** (email templates' "email clients strip
+    `<style>`" comment). **Strip comments before scanning.**
+    ⚠ **So: for every assertion, mutate BOTH ways** — break it and watch it redden, then make a plausible benign edit
+    and watch it stay green. The second half is not optional. (2026-08-30.)
+
+232. **A Supabase AUTH email template cannot be rendered through the live path without its own feature flag —
+    there is no admin backdoor.** (`confirmation.html`, while `enable_confirmations` stays deliberately false — see
+    `BACKLOG.md`.) **`auth.admin.generateLink()` mints a link and sends NOTHING** (hence
+    `SwimSyncAdmin/lib/inviteEmail.ts`); `auth.resend({type:'signup'})` needs the flag; `admin.createUser()` does not
+    send. ⚠ **Do not read "the template shipped" as "the template was sent."** Substitute: a structural diff against
+    a production-proven template (`confirmation.html` markup is byte-identical to `recovery.html`) plus an offline
+    render — and state that limit wherever the work is recorded.
+    ⚠ **The hosted FLAG can be read back; the hosted TEMPLATE cannot.** `supabase config` has only `push`:
+    `curl -s https://<ref>.supabase.co/auth/v1/settings -H "apikey: <anon>"`. ⚠⚠ **The field is INVERTED and
+    the inversion is the trap: `"mailer_autoconfirm": true` means confirmations are OFF** — `true` is the safe state
+    (confirmed on prod 2026-08-30). The template body stays a dashboard check, and a `config push` would carry the
+    whole local config, toggle included. (2026-08-30.)
+    `enable_confirmations` stays deliberately false — it stranded web parents (see `BACKLOG.md` → the shipped email-confirmation item).
+
 233. **A source-scanning guard silently NARROWS when code moves to a new top-level folder — it does not fail,
-    it just stops looking.** `SwimSyncAdmin` has no ESLint; structural rules (a tier's boundaries, the
-    SGT-display helper, the auth-email flags) are enforced by vitest source-scanning tests with a fixed path
-    list. Move a file OUT of the scanned set and the rule still passes — now proving nothing about the moved
-    code. This is why the Students refactor put its tiers UNDER `app/(admin)/students/` (feature-scoped) rather
-    than in new top-level `ui/`/`domain/`/`dao/` folders: the existing `sgDisplay.drift.test.ts` scan is
-    inherited for free instead of being quietly defeated. When you add a guard OR relocate code, ask what each
-    scanning test's path list still covers. `tierBoundaries.drift.test.ts` is the pattern — a shrinking
-    allowlist pinned by file AND content snippet, never file-level. (2026-09-12, the admin refactor.)
+    it just stops looking.** `SwimSyncAdmin` has no ESLint; structural rules are vitest source scans over a fixed path
+    list. Hence the Students refactor's tiers live UNDER `app/(admin)/students/`, not top-level `ui/`/`domain/`/`dao/`,
+    inheriting `sgDisplay.drift.test.ts`. When you add a guard OR relocate code, ask what each scan's path list still
+    covers. Pattern: `tierBoundaries.drift.test.ts` — shrinking allowlist pinned by file AND content snippet, never
+    file-level. (2026-09-12, the admin refactor.)
 
 234. **Making a fixture now()-derived is only HALF the fix — the PAIRED DRIVER's own hardcoded dates rot the
     same day, and a hardcoded month can stay GREEN by matching UNRELATED dated data (green for the wrong
-    reason).** `fixtures-unmarked-lessons.sql` was made to derive its dates from now() on 2026-08-30, but
-    `verify-unmarked-lessons.mjs` still filled the admin billing-month picker with a hardcoded "2026-07" — red
-    every night from 2026-09-01, once the derived data left July. Worse: `verify-trial-visibility.mjs` asserted
-    `/\d{1,2}\s+Aug/` on the coach panel and stayed green in September, because it was matching an unrelated
-    August session date elsewhere on the page, not the guest's trial — masking whether the date rendered at all.
-    The parent-side copy of that same assertion HAD been derived from the DB; the coach-side copy was missed
-    (§7.225's two-copies-drift, arriving through a driver not a fixture). Rule: when a fixture goes now()-derived,
-    grep the WHOLE driver for every date literal — form-fills AND assertions, on BOTH role-sides — and derive
-    each from the fixture row. Weekday-dependent drivers carry a THIRD trap: a booking `<= today` lands on TODAY
-    on the class's own weekday, which the app files under TODAY, not NEEDS MARKING (§7.122); book strictly-past.
-    (2026-09-12, nightly triage.)
+    reason).** `verify-unmarked-lessons.mjs` kept a hardcoded "2026-07" month picker (red from 2026-09-01);
+    `verify-trial-visibility.mjs`'s coach-side `/\d{1,2}\s+Aug/` stayed green on an unrelated August date (§7.225).
+    Rule: when a fixture goes now()-derived, grep the WHOLE driver for every date literal — form-fills AND assertions,
+    on BOTH role-sides — and derive each from the fixture row. Weekday-dependent drivers: a booking `<= today` lands on
+    TODAY, not NEEDS MARKING (§7.122); book strictly-past. (2026-09-12, nightly triage.)
+
 235. **A `lib/` helper that takes the supabase client AS AN ARGUMENT is still a network reach from the caller —
-    moving every `.from()` and `.rpc()` off a page does not get the client off it.** After Stages 2–3 of the
-    Students decomposition had moved all 23 direct calls into `dao/`, `page.tsx` still imported `@/lib/supabase`
-    for three `lib/studentStatus` helpers (`familyActiveChildren(supabase, …)` and friends) that call `db.rpc()`
-    themselves. The tier rule is "only `dao/` touches the client", and a page handing the client to a helper
-    breaks it just as surely as calling `.from()`. Fix: bind such helpers in `dao/<feature>.rpc.ts`
-    (`export const familyActiveChildren = (id) => studentStatus.familyActiveChildren(supabase, id)`) — the lib
-    module does not move (it is drift-pinned to SwimSyncApp), the client leaves the page, and the check-3 ledger
-    hit zero at Stage 3 instead of Stage 11. The coach app's screens will hit this harder: most of their reads
-    already go through client-taking `lib/` helpers. (`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md` §1.
-    2026-09-12.)
+    moving every `.from()` and `.rpc()` off a page does not get the client off it.** Students `page.tsx` still
+    imported `@/lib/supabase` for `lib/studentStatus` helpers (`familyActiveChildren(supabase, …)`) that call
+    `db.rpc()`, breaking "only `dao/` touches the client". Fix: bind them in `dao/<feature>.rpc.ts`
+    (`export const familyActiveChildren = (id) => studentStatus.familyActiveChildren(supabase, id)`); the lib module
+    does not move (drift-pinned to SwimSyncApp). The coach app's screens will hit this harder.
+    (`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md` §1. 2026-09-12.)
 
 236. **Grep a UI driver for the page's URL before crediting it with coverage — a driver's NAME says what it
-    tests, not WHERE.** The Students refactor plan's coverage table credited `verify-student-identity` with
-    rename, merge and add-unclaimed on the admin Students page. It is a coach-app (Expo) driver: it never opens
-    `/students` at all. The drivers that do were `contact-details`, `active-inactive`, `multi-class`,
-    `parent-claim`, `levels`, `level-skills` and `class-students`, and NO driver covers Merge or Rename on that
-    page (both were verified by hand, and a driver is queued in `BACKLOG.md`). Found only because each slice
-    was verified by running its "covering" driver and reading what it clicked. Rule:
-    `grep -lE '/<route>"' drivers/verify-*.mjs` is the coverage map; a table written from memory is a guess.
-    Companion: three of those drivers hardcode ports and need a port-substituted copy to run against a
-    worktree (BACKLOG). (2026-09-12.)
+    tests, not WHERE.** `verify-student-identity` was credited with admin Students coverage but is a coach-app driver
+    that never opens `/students`; NO driver covers Merge or Rename there (queued in `BACKLOG.md`). Rule:
+    `grep -lE '/<route>"' drivers/verify-*.mjs` is the coverage map; a table written from memory is a guess. Three
+    such drivers hardcode ports and need a port-substituted copy for a worktree (BACKLOG). (2026-09-12.)
 
 237. **A deep link into the Expo app is REPLACED by the landing tab, so the screen you asked for is mounted
     but hidden — assert its render by polling, and reach a nested-stack screen by PRESSING from the tab bar.**
-    `app/_layout.tsx` restores the session on every load and then `router.replace(landing)`; the deep-linked
-    screen survives inside an `aria-hidden` subtree (lib.mjs's `includeHidden` note) — unless it lives on the
-    landing tab's own stack, where the replace pops it. Three costs, all paid on 2026-09-13 building
-    `verify-smoke-app.mjs`: a one-read `innerText` check on `/profile/contact` was green, then red, with no
-    change (the screen renders nothing until its session-keyed effect runs — poll up to ~10 s); `pressByText`
-    into a deep-linked tab found nothing (hidden = unpressable, correctly); and `/home/child/<id>` was popped
-    outright because Home IS the landing. The tab-bar label ("Profile", "Settings") is always visible — press
-    it, then press into the stack. (`docs/TESTING.md` §5. 2026-09-13.)
+    `app/_layout.tsx` does `router.replace(landing)`; the deep-linked screen survives `aria-hidden` (lib.mjs
+    `includeHidden`) unless it is on the landing tab's stack, where it is popped (`/home/child/<id>`). Poll up to
+    ~10 s (session-keyed effects); hidden = unpressable. Press the always-visible tab-bar label, then into the stack.
+    (`verify-smoke-app.mjs`; `docs/TESTING.md` §5. 2026-09-13.)
     **Product half FIXED 2026-09-24 (§8.120)** — see §7.254: a deep link inside your own area is no longer
     replaced, so the requested screen is the visible one. `/login`, `/` and the other role's screens still redirect.
 
 238. **Metro can serve a STALE bundle after an edit — grep the served bundle for a marker before believing a
-    fix "didn't work".** After editing `contact.tsx` the smoke driver still reported the old behaviour twice;
-    the bundle variant the page actually loads (`…&unstable_transformProfile=hermes-stable`) did not contain
-    the new comment while the plain `lazy=true` variant did. `npx expo start --web --clear` fixed it in one
-    restart. It is §7.31's rule on a different server: a 200 (or a hot-reload message) proves nothing —
-    `curl` the bundle URL from the page's `<script src>` and grep for a string only the new code has.
-    (2026-09-13.)
+    fix "didn't work".** The `…&unstable_transformProfile=hermes-stable` variant lacked the edit while `lazy=true` had
+    it; `npx expo start --web --clear` fixed it. §7.31's rule: `curl` the bundle URL from the page's `<script src>`
+    and grep for a string only the new code has. (2026-09-13.)
 
 239. **Running a UI driver needs Docker + the Supabase stack + BOTH dev servers + Playwright at once, and on
     a tight machine that OOM-kills the Postgres container mid-run (exit 137) — recover with `supabase stop &&
-    supabase start`, never a bare re-`start`.** Symptom while driving the packages drivers on 2026-09-15:
-    `supabase status` says `supabase_db_SwimSync container is not running: exited`, and re-running
-    `supabase start` says "supabase start is already running" (a stale lock) while the DB stays down. The
-    clean `stop` clears the lock and the next `start` comes up `healthy` in ~30 s; then re-run the driver.
-    Two companions: the drivers' own runner hard-requires :3000 AND :8081 to answer (it is not enough for the
-    one app the driver touches to be up), and the dev servers themselves get reclaimed under the same
-    pressure — close what you are not using and expect to restart mid-session. `run-all-drivers.sh --only
-    <name>` runs one driver's reset+seed+run in ~90 s, so prefer it to the full sweep when checking one page.
-    (2026-09-15.)
+    supabase start`, never a bare re-`start`.** Symptom: `supabase_db_SwimSync container is not running: exited`,
+    and `supabase start` says "supabase start is already running" (stale lock). The runner hard-requires :3000 AND
+    :8081; dev servers get reclaimed too — close what you don't use. Prefer `run-all-drivers.sh --only
+    <name>` (~90 s) to the full sweep for one page. (2026-09-15.)
 
 240. **A Playwright `waitFor({ state: "detached" })` (or an `exact:true` `getByRole`) on a button whose LABEL
     CHANGES on click resolves INSTANTLY — the relabel makes the locator match nothing, and "matches nothing"
-    is reported as "detached".** So waiting for a confirm button to "finish" this way returned in ~40 ms while
-    the request was still in flight; the follow-up `page.goto()` then ABORTED the in-flight POST, the mutation
-    never landed, and three downstream checks failed with no error (it looked like the feature was broken, or
-    the local env, when neither was). Wait on the RESULT, not the button: register
-    `page.waitForResponse(r => r.url().includes("/api/x"))` BEFORE the click, `await` it, then read settled
-    state. Hit while de-flaking `verify-tenant-suspension` on 2026-09-16: the confirm button re-labels
-    "Suspend this business" → "Suspending…", and the nightly's ACTUAL flake was a different one — a fixed
-    `waitForTimeout(4000)` asserting the suspended badge before the RPC returned (the DB change had already
-    succeeded; a §7.228-style "button still mid-action" red on a slow runner). Diagnosed with a Fable 5.1
-    subagent; the response-wait fix verified 12/12 locally. (`docs/TESTING.md` §5. 2026-09-16.)
+    is reported as "detached".** A following `page.goto()` then aborted the in-flight POST and the mutation never landed. Wait on the RESULT:
+    register `page.waitForResponse(r => r.url().includes("/api/x"))` BEFORE the click, `await` it, then read state.
+    Bit `verify-tenant-suspension` (2026-09-16), whose nightly flake was a fixed `waitForTimeout(4000)` (§7.228).
+    (`docs/TESTING.md` §5. 2026-09-16.)
 
 241. **`sgDisplay.drift.test.ts` has a TWIN in each app, and BOTH scan `SwimSyncAdmin/app` — so a `toLocaleDateString`
     that MOVES between admin files must be repointed in the app twin's allowlist too, in the same commit, and you must
-    run BOTH `npm test` suites.** During the invoices refactor `formatBillingMonth` moved from
-    `invoices/page.tsx` to `invoices/domain/invoiceRows.ts`; the admin twin's allowlist entry was repointed and the
-    admin vitest ran green, but the SwimSyncApp twin still pinned the old path and only the admin suite was run
-    locally — so it passed the local gate and went **red on `main`** (CI `frontend-tests (SwimSyncApp)`, run
-    35108878874) after landing. The playbook §2 gate is explicit — `cd SwimSyncAdmin && npm test` **AND**
-    `cd SwimSyncApp && npm test` at every stage — and skipping the second suite is exactly what this hides, because
-    the app twin only fails on an admin-file move it can't see locally. Fix was a one-line repoint of
-    `SwimSyncApp/lib/sgDisplay.drift.test.ts` (`6fe19e6`, jest 429/429). Same family as the §1-table "both twins of
-    `sgDisplay.drift.test.ts`" note in the refactor playbook. (`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`. 2026-09-16.)
+    run BOTH `npm test` suites.** Moving `formatBillingMonth` to `invoices/domain/invoiceRows.ts` went red on `main`
+    (CI `frontend-tests (SwimSyncApp)`, run 35108878874). Playbook §2 gate: `cd SwimSyncAdmin && npm test` **AND**
+    `cd SwimSyncApp && npm test` at every stage. Fix: repoint `SwimSyncApp/lib/sgDisplay.drift.test.ts` (`6fe19e6`).
+    See the playbook §1-table "both twins" note. (`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`.
+    2026-09-16.)
 
 242. **A `git add <pathspec>` that names a file `git mv` already moved fails the WHOLE `add`, and staging nothing
     else — so a stage commits only the rename and strands its real content on disk, where every gate still passes.**
-    During the classes refactor a per-stage commit ran `git add -A '<page>/' lib/tierBoundaries.drift.test.ts
-    lib/locationOptions.ts lib/locationOptions.test.ts 2>/dev/null` — but `locationOptions.{ts,test.ts}` had just been
-    `git mv`d into `<page>/domain/`, so those two pathspecs no longer matched. `git add` errored and aborted,
-    staging none of the listed paths; only the `git mv`'s already-staged rename got committed. `typecheck`, `vitest`
-    and the 11-driver net all ran against the working tree (correct), so nothing flagged it — the incomplete commit
-    surfaced only as a dirty tree at merge (`git status` showed page.tsx modified + 3 untracked files). **The
-    `2>/dev/null` is the trap: it hid the pathspec error.** Rules: after a `git mv`, do NOT re-list the moved paths in
-    a later `git add` (the mv already staged them); never pipe a `git add` to `/dev/null`; and **`git status` must be
-    clean after every commit** — a stray modified/untracked file is a stage that didn't fully commit. Recovered by
-    staging + committing the stranded content as a fixup (`7b19d8d`); zero content lost. (Classes refactor, 2026-09-17.)
+    Classes refactor: `git add -A '<page>/' lib/tierBoundaries.drift.test.ts lib/locationOptions.ts
+    lib/locationOptions.test.ts 2>/dev/null` after `git mv` of `locationOptions.*`. **The `2>/dev/null` is the trap.**
+    Rules: after a `git mv`, do NOT re-list the moved paths in a later `git add`; never pipe a `git add` to
+    `/dev/null`; **`git status` must be clean after every commit**. Recovered by fixup `7b19d8d`. (Classes refactor,
+    2026-09-17.)
 
 243. **A plan's grep assertion of the form "X must appear 0 times" MATCHES ITS OWN PROHIBITION COMMENT, forever.**
-    Three assertions in `PLATFORM_REFACTOR_PLAN.md` read false-high the moment the code they governed was written:
-    `strandedRes.error` = 1 not 0, `!inner` = 3 not 2, `useEffect` = 3 not 0. Every extra hit was a comment
-    *forbidding or explaining the very string being counted* — `// Do NOT check strandedRes.error` matches
-    `grep strandedRes.error`, and it always will, because a good prohibition names the thing it forbids. The trap is
-    that the count looks like a real violation, so you go hunting for code that does not exist. **The fix is
-    structural, not vigilance: count over comment-stripped source.** The repo already ships the stripper —
-    `stripComments()` in `SwimSyncAdmin/lib/tierBoundaries.drift.test.ts`, which is why the fence's own checks never
-    had this problem. A throwaway `codegrep.py` doing the same was used from Stage 4 of the platform refactor
-    onward and every assertion then read its true value. Write plan assertions as "N in CODE" and say which tool
+    E.g. `// Do NOT check strandedRes.error` matches `grep strandedRes.error` (`PLATFORM_REFACTOR_PLAN.md`) — a
+    phantom violation. **Count over comment-stripped source**: `stripComments()` in
+    `SwimSyncAdmin/lib/tierBoundaries.drift.test.ts` (why the fence's own checks never had this problem). Write plan assertions as "N in CODE" and name the tool that
     produced the number. (Platform refactor, 2026-09-18.)
 
 244. **A bare `page.selectOption("select", …)` in a driver is a ONE-`<select>` DOM CONTRACT on the page under test,
-    and nothing at either end says so.** `verify-platform-admin` drives the student-move picker that way. It works
-    only because `@/components/Modal` renders `null` when closed, so the platform page happens to expose exactly one
-    `<select>` while no modal is open. Add a second one that renders unconditionally — a filter, a page-size picker,
-    a form left mounted — and the driver silently drives the wrong control: Playwright's strict mode does not fire
-    for `selectOption`'s string form, so it resolves the first match and the assertion fails later, somewhere else,
-    for a reason that looks like a product bug. Recorded in `platform/ui/StudentMoveSection.tsx`'s header. Related:
-    the same page has TWO "Search" buttons, so the driver uses `.first()` — which makes the DOM ORDER of the
-    student-move and family-status cards a contract too. (Platform refactor, 2026-09-18.)
+    and nothing at either end says so.** `verify-platform-admin` relies on `@/components/Modal` rendering `null` when
+    closed. A second unconditional `<select>` makes it silently drive the wrong control (strict mode does not fire for
+    `selectOption`'s string form). Recorded in `platform/ui/StudentMoveSection.tsx`'s header. Its two "Search" buttons
+    use `.first()`, so the student-move / family-status card DOM ORDER is a contract too. (Platform refactor,
+    2026-09-18.)
 
 245. **`verify-smoke-admin`'s exact-`h1` check cannot tell a page's REFUSAL branch from its content when both render
     `PageHeader` with the same title — so it is never evidence that an access gate works.** `/platform` renders
-    `<h1>Platform</h1>` both when the platform admin sees the real page and when a tenant admin is refused
-    ("This page is for the SwimSync platform admin"). The smoke driver passes on either. It is a route-renders,
-    no-console-error check and that is all it is; the gate itself is asserted by `verify-platform-admin-scope` and
-    `verify-platform-admin`, which match on the refusal TEXT. Don't count a smoke pass toward a gate change.
-    (Platform refactor, 2026-09-18.)
+    `<h1>Platform</h1>` for both. The gate is asserted by `verify-platform-admin-scope` and `verify-platform-admin`
+    (refusal TEXT). Don't count a smoke pass toward a gate change. (Platform refactor, 2026-09-18.)
 
 246. **On a page that renders tenant names in TWO tables, `locator("tr", { hasText: <tenant name> })` is ambiguous
-    and silently resolves to the FIRST one.** The platform page shows every business in the Businesses overview
-    *and* again in family status. A Stage 10 hand-check filtered rows by "Twoside Swim" and got the overview row —
-    so it failed with a message about a missing child, which reads exactly like a broken tenant-narrowing, i.e. the
-    bug it was written to detect. Scope with a second `hasText` (the parent's name) or with a container locator.
-    Same family as §7.75/§7.101: a locator taken over a list it does not own. (Platform refactor, 2026-09-18.)
+    and silently resolves to the FIRST one.** The platform page's Businesses overview matched first, and the failure
+    read like broken tenant-narrowing. Scope with a second `hasText` (the parent's name) or a container locator.
+    §7.75/§7.101. (Platform refactor, 2026-09-18.)
 
 247. **Adding a route's PARENT directory to `SCOPE_DIRS` does not fence its nested `[param]/page.tsx` — each route
     unit needs its OWN entry, and nothing tells you it is missing.** `sources()` in `tierBoundaries.drift.test.ts`
-    deliberately skips any subdirectory that holds its own `page.tsx` (so `lessons/[classId]/[date]` is not dragged
-    into `lessons`' ledger). The Admin L-D plan widened `assessment` "which covers `[classId]`" — it would not have:
-    the class page and all its future tiers would have sat outside every check, and the vacuity test cannot notice,
-    because `PAGES` is derived from the same `SCOPE_DIRS`. Caught by `/plan-review` before any code. Prove a nested
-    scope is live with a breaker INSIDE it (`assessment/[classId]/ui/Break` → `../dao`). (Admin L-D, 2026-09-18.)
+    deliberately skips subdirectories holding their own `page.tsx`; the vacuity test cannot notice (`PAGES` derives
+    from `SCOPE_DIRS`). Caught by `/plan-review`. Prove a nested scope is live with a breaker INSIDE it
+    (`assessment/[classId]/ui/Break` → `../dao`). (Admin L-D, 2026-09-18.)
 
 248. **A source-scanning test keyed on `page.tsx` loses coverage every time the tier refactor decomposes a page —
-    silently, and while staying green.** `components/Table.test.tsx`'s §7.54 guard ("no `<Tr>` inside `<Thead>`")
-    walked `page.tsx` files only; by Admin L-D the refactor had moved **24** tables into `<page>/ui/*.tsx`, every one
-    outside the guard. Widened to every non-test `.tsx` under `app/(admin)` (`b3bf04b`), proven red with a planted
-    `<Thead><Tr>` in a `ui/` file. Same family as §7.233 (a scan that misses a folder checks less while passing).
+    silently, and while staying green.** `components/Table.test.tsx`'s §7.54 guard missed 24 tables moved to
+    `<page>/ui/*.tsx`; widened to every non-test `.tsx` under `app/(admin)` (`b3bf04b`), RED-proven. §7.233's family.
     Before a refactor unit, `git grep -n 'page\.tsx' -- '*.test.ts*'` for any other. (2026-09-18.)
 
 249. **Anything held in a component that renders BELOW a page's loading switch is destroyed on every reload, not
-    just the first load.** A page whose `load()` flips `loading` on RELOAD (after every write — `makeups`,
-    `trials`, `levels`, `assessment/[classId]`) unmounts whatever `if (loading) return …` / `loading ? … :` hides.
-    Two consequences met in Admin L-D: (1) **a `useTableSort` moved into a `ui/` table would reset the admin's
-    sort after every Book / Cancel / Save** — so on such a page the sort stays in the `domain/` hook (as
-    `attendance`/`invoices` already did); (2) **`AssessmentGrid`'s "moved up to" flash never shows** — it is grid
-    state, and promote's `onReload` unmounts the grid (pre-existing; BACKLOG). Before moving state into a child,
-    check whether its parent unmounts it on reload. (Admin L-D, 2026-09-18.)
+    just the first load.** Where `load()` flips `loading` on RELOAD (`makeups`, `trials`, `levels`,
+    `assessment/[classId]`), `if (loading) return …` unmounts the child: keep `useTableSort` in the `domain/` hook,
+    not a `ui/` table; `AssessmentGrid`'s "moved up to" flash never shows (BACKLOG). Before moving state into a
+    child, check whether its parent unmounts it on reload. (Admin L-D, 2026-09-18.)
 
 250. **A sole-importer `lib/` PAIR must move in ONE commit — moving half of it makes `lib/` import a route folder,
-    and nothing stops it.** `lib/adminAttendanceSave.ts` was imported by the lesson page AND by its sibling
-    `lib/adminAttendanceSaveDeps.ts` (a type import). The lesson-detail plan moved the first at Stage 1 and the
-    second at Stage 6 — for five commits `lib/` would have imported `@/app/(admin)/lessons/[classId]/[date]/domain/…`.
-    `tsc` *forces* that import rather than flagging it, and the fence never scans `lib/`. Caught at `/plan-review`,
-    not in code. When the sole-importer grep (playbook §2) names a `lib/` sibling as the other importer, the two
-    are one unit: move them together (the Deps half into `dao/`). Assert every stage:
+    and nothing stops it.** (`lib/adminAttendanceSave.ts` + `lib/adminAttendanceSaveDeps.ts`.) `tsc` forces the
+    import and the fence never scans `lib/`. When the sole-importer grep (playbook §2) names a `lib/` sibling, move
+    both together (Deps half into `dao/`). Assert every stage:
     `git grep -nE "from ['\"](@/app/|.*\(admin\)/)" -- 'SwimSyncAdmin/lib/*.ts'` → 0. (Lesson detail, 2026-09-18.)
 
 251. **A hand-check that reports a product failure is wrong about as often as the product is — verify the
-    CHECK before you believe it, and make its fixture writes THROW.** Admin L-E's 18 hand-checks produced two
-    "failures", both in the check: (1) the six dashboard metric cards were compared against counts read with the
-    **service-role** key, which spans every tenant, while the page is RLS-scoped to the admin's own business —
-    `card=0 sql=1` looked like a regression and was a leftover `Pay Driver Swim` tenant from another driver's
-    fixtures; scope the SQL by the same `tenant_id` the page sees. (2) The retired-location fixture set
-    `is_active = false` **without `deactivated_at`**, which `classes_inactive_requires_deactivated_at` refuses —
-    the `update()` error was never read, so the fixture silently did nothing, the location had no retired class,
-    and the page's *generic* removal copy rendered exactly as it should. The check called that a product bug.
-    **Both are the same failure: an unverified fixture makes correct behaviour look broken**, and it costs the
-    time of a real regression. The fix is structural, not vigilance — `if (error) throw` on every fixture write,
-    so a refused write fails as a fixture error and can never be read as a product one. The script is kept at
-    `docs/refactor/batch-e-handchecks.mjs` as the shape to copy. (Admin L-E, 2026-09-21.)
+    CHECK before you believe it, and make its fixture writes THROW.** Both Admin L-E "failures" were the check:
+    **service-role** counts span every tenant (scope by the page's `tenant_id`), and a fixture error never read
+    (`is_active = false` without `deactivated_at`). `if (error) throw` on every fixture write, so a refused write can
+    never be read as a product one. Shape: `docs/refactor/batch-e-handchecks.mjs`. (Admin L-E, 2026-09-21.)
 
-252. **↪ Repeat of §7.58 — read that first; this entry is a later time it bit.** **A force-click on a DEEP-LINKED coach screen can land on the Schedule screen mounted underneath it — and
-    open a DIFFERENT lesson, with no error.** The roster hand-check (§8.114) reached the screen by `gotoAuthed`
-    rather than by tab taps, and its setup had added a Sunday class; `tap(getByText("What Toddler 1 covers"))`
-    (`click({force:true})` at the element's coordinates) hit that class's Mark card on the still-mounted
-    Schedule screen and opened `/attendance` for Sunday. The same tap passes in `verify-level-skills`, which
-    arrives by tabs. §7.10's shape, met from a new direction: the underlay is whatever the landing route
-    rendered, so a fixture that adds rows can move a card under your target. **In a hand-check, click the
-    exact element: `locator.evaluate((e) => e.click())`.** Second trap, same script: the Toast lives **3000 ms**
-    (`components/Toast.tsx`) — a `waitForTimeout(3500)` before reading the page misses it every time; `waitFor`
-    the toast text immediately after the action. (Coach roster, 2026-09-21; the corrected script is
-    `docs/refactor/coach-roster-handchecks.mjs`.)
+252. **↪ Folded into §7.58 (2026-09-25)** — a repeat of that lesson; its unique detail now lives there.
 
 253. **`CI=1 npx expo start` serves a FROZEN bundle — Metro does not watch files in CI mode — so every local
-    driver run after an edit tests the code as it was at startup, and passes.** Started that way for a
-    non-interactive shell during the coach attendance refactor (§8.115); Stage 2's four driver runs all hit the
-    original code and matched baseline, which proved nothing. Found only because a Stage 3 temp `console.log`
-    never printed: the served entry bundle lacked `exitHrefOf`, a Stage 1 symbol. **Start Expo for local driver
-    work WITHOUT `CI=1`** — `npx expo start --web --port 8081 < /dev/null` is non-interactive and still watches.
-    **And prove the bundle is current before trusting a run:** `curl` the entry bundle
-    (`/node_modules/expo-router/entry.bundle?platform=web&dev=true&…`) and grep for a string only the new code
-    has — a throwaway edit that appears and disappears within seconds proves the watcher. §7.31's
-    served-bundle rule, met on localhost. **The source was `/worktree-start`'s own instructions**, which said
-    `CI=1 npx expo start` "to stop the keypress wait" — corrected the same day to `< /dev/null`. (Coach
-    attendance, 2026-09-22.)
+    driver run after an edit tests the code as it was at startup, and passes.** Found when a temp log never printed
+    (§8.115). **Start Expo WITHOUT `CI=1`:** `npx expo start --web --port 8081 < /dev/null`. **Prove the bundle is
+    current:** `curl` `/node_modules/expo-router/entry.bundle?platform=web&dev=true&…` and grep for a string only
+    the new code has (§7.31). (Coach attendance, 2026-09-22.)
+    A throwaway edit that appears and disappears within seconds proves the watcher.
 
 254. **A coach's full-page load of ANY coach URL ends on Schedule, with the requested screen mounted HIDDEN
-    beneath it — the root of §7.252.** `app/_layout.tsx`'s `routeForSession` runs `router.replace(landingFor(…))`
-    after `getSession()` on every web load, and `landingFor` returns `/(coach)/schedule` for anyone with a
-    `coaches` row. The requested route still mounts in the Classes stack, so `gotoAuthed(…/attendance?…)`
-    "works" for DOM clicks — the element exists and `el.click()` reaches it — while `page.url()` reads
-    `/schedule`, `innerText` of the hidden screen is **empty** (use `textContent`), and anything VISUAL
-    (computed layout, a screenshot, a coordinate click) is about the Schedule screen on top. Met at attendance
-    Stage 6 when a Tailwind probe found no menu. **For anything visual, reach the screen by an in-app tap**
-    (Schedule → NEEDS MARKING → the lesson). The same replace is a product behaviour — a refresh or a shared
-    link bounces a coach to Schedule — filed in `BACKLOG.md`. (Coach attendance, 2026-09-22.)
-    **Product half FIXED 2026-09-24:** `routeForSession` now skips the replace when the path is already inside
-    the user's own area (`isInsideLanding`, `lib/landing.ts`), so a deep link to a coach screen shows THAT
-    screen and `page.url()` keeps it. `/login`, `/` and the other role's screens still redirect. The tap-to-reach
-    advice above is now caution, not a requirement.
+    beneath it — the root of §7.252.** `routeForSession` (`app/_layout.tsx`) replaced to `landingFor(…)`:
+    `el.click()` works, but `page.url()` reads `/schedule`, `innerText` is empty (use `textContent`), and anything
+    VISUAL is Schedule — reach the screen by an in-app tap. (2026-09-22.)
+    **Product half FIXED 2026-09-24:** `isInsideLanding` (`lib/landing.ts`) skips the replace inside the user's own
+    area; `/login`, `/` and the other role's screens still redirect. The tap advice is now caution only.
 
 255. **A new table the ENGINE writes needs an explicit `GRANT … TO service_role` — its default privileges on new
     tables were revoked in `20260814000300`, and `table_grants.test.sql` deliberately does not cover service_role.**
-    Combined with a best-effort write (a log that must never fail billing, so it never throws), a missing grant is
-    a **silent no-op in every environment** — the feature ships and records nothing. The billing-months plan's first
-    draft said "confirm default privileges cover it"; `/plan-review` caught it. **Grant it in the migration, pin it
-    in pgTAP (`has_table_privilege('service_role', …, 'INSERT')`), and make the Deno test read the row BACK** — a
-    returned result proves nothing. Then check the remote grant dump. (Billing months, 2026-09-22 —
-    `billing_runs.test.sql`, `runLog.test.ts`.)
+    With a never-throwing log write it is a silent no-op everywhere. Grant in the migration, pin with
+    `has_table_privilege('service_role', …, 'INSERT')`, make the Deno test read the row BACK, check the remote
+    grant dump. (2026-09-22; `billing_runs.test.sql`, `runLog.test.ts`.)
 
 256. **Any FK onto `profiles(id)` must be `ON DELETE SET NULL` (or `CASCADE`) — a plain FK makes that admin
-    undeletable.** `delete-admin` deletes the auth user and relies on `auth.users → profiles` cascading; a RESTRICT
-    reference from any row that admin ever created fails the cascade. The route's header warned about it; the
-    schema does not enforce it. `billing_runs.ran_by` is SET NULL, pinned by a pgTAP delete. (Billing months,
-    2026-09-22.)
+    undeletable.** `delete-admin` relies on the `auth.users → profiles` cascade; the schema does not enforce it.
+    `billing_runs.ran_by` is SET NULL, pinned by a pgTAP delete. (2026-09-22.)
 
 257. **The billing engine's early returns are REFUSALS TO ATTEMPT, not attempts** — `before_run_day`,
-    `auto_disabled`, `tenant_suspended`, `month_not_ended`, `already_complete`. Any run log, metric or "last run"
-    display must skip them: once cron is on, every daily tick returns one per tenant, and a log that keeps them
-    marks every month "open" from the 1st and buries the real runs. The skip list is ONE exported constant,
-    `NON_ATTEMPT_STATUSES` in `generate-invoices/runLog.ts` — a new early-return status joins it there. (Billing
-    months, 2026-09-22.)
+    `auto_disabled`, `tenant_suspended`, `month_not_ended`, `already_complete`. Run logs / metrics / "last run" must
+    skip them (daily cron would bury real runs). One list: `NON_ATTEMPT_STATUSES` in `generate-invoices/runLog.ts`
+    — new early-return statuses join it. (2026-09-22.)
 
-258. **A table with an FK onto `tenants` breaks the Deno suite's teardown unless the FK cascades.** `teardown()`
-    deletes its scenario tenant as **service_role**; a leftover child row fails that delete, the tenant LEAKS, and
-    the second `test.sh` pass runs on leaked state (§7.15). Seen for real: running the RISK 5 mutation (plain FK)
-    left two `test-…` tenants behind. An append-only table can't be cleaned by an explicit delete either (no DELETE
-    grant, by design) — so **`ON DELETE CASCADE` is the structural answer**, as `billing_runs.tenant_id` does.
-    (Billing months, 2026-09-22.)
+258. **A table with an FK onto `tenants` breaks the Deno suite's teardown unless the FK cascades.** The
+    service_role tenant delete fails, the tenant LEAKS, and the second `test.sh` pass runs on leaked state (§7.15).
+    Append-only tables have no DELETE grant — use `ON DELETE CASCADE`, as `billing_runs.tenant_id`. (2026-09-22.)
 
 259. **`billing_periods.invoices_issued` counts only the invoices the SEALING run created — not the month's
-    total.** August 2026 sealed on prod with `invoices_issued = 0` while 9 invoices existed from the 14 Sep run
-    that left it open. Never display it as "N invoices for the month"; count `invoices` instead. The Billing months
-    card shows the close date only for this reason. Found on the prod smoke test, one commit before the app push.
-    (Billing months, 2026-09-22.)
+    total.** (Aug 2026 sealed on prod with 0 beside 9.) Never display it as "N invoices for the month"; count
+    `invoices`. (2026-09-22.)
 
-260. **`advance_cancel_lesson.test.sql` #21 fails when CI starts between 00:00 and 00:01 SGT.** Its fixture class
-    runs 00:00–00:01 so that "today's lesson" always counts as ENDED — except during that first minute of the SGT
-    day, when it has not ended yet (`have: 0, want: 1`). A push at 23:59 SGT (CI `35751015146`, pgTAP at
-    00:00:53) went red on an unrelated change. (Billing months deploy, 2026-09-22.) **FIXED 2026-09-25:** #21's
-    expected count is now derived from the same transaction clock the function reads (`now()` is fixed for the
-    whole file), so it expects 0 in that first minute and 1 after. A red on #21 is now always real. **The general
-    rule:** a pgTAP check whose answer depends on the time of day must compute its expectation from `now()`, not
-    hardcode the answer for "most of the day".
+260. **`advance_cancel_lesson.test.sql` #21 fails when CI starts between 00:00 and 00:01 SGT.** (CI
+    `35751015146`.) **FIXED 2026-09-25:** expectation now derives from `now()`; a red on #21 is always real. **Rule:**
+    a pgTAP check whose answer depends on the time of day must compute its expectation from `now()`, not hardcode
+    the answer for "most of the day".
 
 261. **On the Expo WEB build, moving or deleting ANY imported file while a UI driver runs breaks EVERY screen, not
-    just yours.** Metro serves one web bundle; a `git mv lib/referralShare.ts` made mid-run put Expo's error
-    overlay over the whole app, and two unrelated drivers died at their LOGIN click ("error-overlay intercepts
-    pointer events", and a one-shot login returning `null`) — both read like product reds. The old rule, "never
-    edit the page while a driver runs", is too narrow: **never move, delete or break-import any imported module
-    while a driver runs.** New, not-yet-imported files are safe, so prepare them freely and hold them OUT of the
-    tree until their commit. (App L-F/G/H, 2026-09-23; playbook §4.)
+    just yours.** (A mid-run `git mv lib/referralShare.ts` overlaid the error screen; drivers died at login.)
+    **Never move, delete or break-import any imported module while a driver runs** ("never edit the page" is too
+    narrow). Not-yet-imported files are
+    safe; hold them OUT of the tree until their commit. (2026-09-23; playbook §4.)
 
 262. **The nightly's "tenant-suspension flake" is its FIRST parent-login control, not the admin checks.**
-    `appLoginDies()` (`verify-tenant-suspension.mjs:58`) is one attempt with a FIXED 7 s hydrate wait and returns
-    `null` when the form never appeared; `check(… parentDied === false)` reads that `null` as FAIL, so a slow
-    first page load reds `control: the parent logs in before the suspend` + `…sees children of BOTH businesses`
-    (nightly `35753594101`, 10/12; green 12/12 on the same code hours later). It is §7.108's cold-compile shape.
-    **Triage:** one red on those two controls is a re-run; a red on the POST-suspend parent checks is never a
-    flake — that is a real login regression (§7.263). (2026-09-23.)
-    **Hardened 2026-09-24:** one shared `appLoginDies(page, email)` in `drivers/lib.mjs` waits up to 45 s for the
-    email FIELD instead of a fixed 7 s, still ONE press. A form that never appears now prints
-    `CANNOT SAY — the login form never appeared` via `loginVerdictDetail()` — still a FAIL, but it reads as a load
-    failure, not a login verdict. Proven on a 20 s post-DOM hydrate delay: the old helper `null`, the new one logs in.
-    So a red with that text is still §7.108's shape; a red WITHOUT it is a real verdict.
+    `appLoginDies()` (`verify-tenant-suspension.mjs:58`) returned `null` when the form never appeared, read as FAIL
+    (nightly `35753594101`) — §7.108's shape. **Triage:** one red on those two controls is a re-run; a red on the POST-suspend parent checks is never a flake
+    (§7.263). (2026-09-23.) **Hardened 2026-09-24:** `appLoginDies(page, email)` in `drivers/lib.mjs` waits 45 s,
+    ONE press; a form that never appears prints `CANNOT SAY — the login form never appeared` via
+    `loginVerdictDetail()`. A red WITHOUT that text is a real verdict.
 
-263. **`loginExpo` HIDES a broken post-login redirect — ~25 drivers pass through a login regression.** It tries 3
-    times (`lib.mjs:40-72`); once `signInWithPassword` has stored a session, attempt 2's `goto /login` is restored
-    by `_layout.tsx`'s `routeForSession` and redirected to the landing tab, so a broken `setSession` /
-    `router.replace` in the login screen still "logs in". Only the one-shot `appLoginDies` helper
-    (`lib.mjs`; coach-disable, tenant-suspension) would see it. **After touching `app/(auth)/login.tsx` or
-    `features/login/`, prove it with a ONE-SHOT login** — fresh context, one press, no reload, URL leaves `/login`
-    within 10 s — as `verify-app-auth.mjs` check 1 does in the nightly since 2026-09-24 (promoted from
-    `docs/refactor/app-fgh-handchecks-fence.mjs` step 1). (App fence, 2026-09-23.)
+263. **`loginExpo` HIDES a broken post-login redirect — ~25 drivers pass through a login regression.** Its retries
+    (`lib.mjs:40-72`) restore the session via `routeForSession`. **After touching `app/(auth)/login.tsx` or
+    `features/login/`, prove it with a ONE-SHOT login** (fresh context, one press, no reload; URL leaves `/login` within 10 s) — `verify-app-auth.mjs`
+    check 1, from `docs/refactor/app-fgh-handchecks-fence.mjs`. (2026-09-23.)
 
 264. **The `public-invoice` / `public-package` Edge Functions allow ONLY `content-type` — an added header breaks
-    the page silently.** `Access-Control-Allow-Headers: content-type` (both `index.ts:27`). Swap their `fetch(`
-    for `supabase.functions.invoke` or add `apikey`/`Authorization` and the browser's CORS preflight fails —
-    and a failed fetch renders **exactly** the "Invoice not found" / "Package not found" a bad link shows, so
-    `verify-smoke-app` (which asserts the not-found state) stays green. Keep the bare `fetch` with
-    `content-type` only, and `FUNCTIONS_URL` in its literal `process.env.EXPO_PUBLIC_SUPABASE_URL` form (Expo
-    inlines only that exact member access). A throwing QR payload renders not-found too — keep the QR build
-    inside the load's `try`. (App L-G, 2026-09-23.) *Caveat, 2026-09-24:* LOCALLY, with `x-client-info`
-    added, `/package/<token>` still rendered — the local functions runtime answers the preflight itself — so a local
-    render proves nothing either way; `verify-app-money`'s request-header-NAME check is the only guard, and the
-    deployed function's CORS is the fact (BACKLOG).
+    the page silently.** (`index.ts:27`.) A failed preflight renders "Invoice/Package not found", so
+    `verify-smoke-app` stays green. Keep the bare `fetch`, `content-type` only, `FUNCTIONS_URL` as literal
+    `process.env.EXPO_PUBLIC_SUPABASE_URL`, QR build inside the `try`. Local runtime answers preflight itself —
+    `verify-app-money`'s header-NAME check is the only guard (BACKLOG). (2026-09-23.)
 
 265. **Moving a setting from a global row to a per-tenant row, a read that swallows its `error` becomes a hidden
-    DEFAULT — and on a billing schedule a default is an early bill that then seals the month.** The engine's
-    `tenants` read (`generate-invoices/core.ts`) destructured `data` only; once the run day came from that row, a
-    failed read would have meant "day 7" for every tenant. **Auto mode now FAILS CLOSED** with the non-attempt
-    status `tenant_unreadable`; it RETURNS, never throws — the cron loop over tenants has no per-tenant catch, so
-    one throw stops every business's billing. Any per-tenant setting the automatic path reads needs the same
-    shape. (Engine run day, 2026-09-24; `docs/plans/ENGINE_TENANT_RUN_DAY_PLAN.md` RISK 2.)
+    DEFAULT — and on a billing schedule a default is an early bill that then seals the month.** Auto mode now
+    FAILS CLOSED (`tenant_unreadable`, `generate-invoices/core.ts`); it RETURNS, never throws — one throw stops every
+    business's billing. (2026-09-24; `docs/plans/ENGINE_TENANT_RUN_DAY_PLAN.md`.)
 
 266. **A new engine early-return status has TWO registries, and the second one sends email.**
-    `NON_ATTEMPT_STATUSES` (`runLog.ts`) decides what the run log records; `shouldRetryTenantEmails`
-    (`email.ts`) decides whether the self-heal pass RESENDS invoice emails for that tenant — and it runs on
-    EVERY per-tenant status, defaulting to *yes*. `tenant_unreadable` passed the first and the `/plan-review`,
-    and was caught only by `/commit-review`: an unreadable tenant may be suspended, and emailing for a suspended
-    tenant is exactly what the email-retry plan's RISK 3 forbids. **Adding a status → decide it in both, with a
-    test in `email.test.ts`.** (2026-09-24.)
+    `NON_ATTEMPT_STATUSES` (`runLog.ts`) and `shouldRetryTenantEmails` (`email.ts`, defaults to resend). Adding a
+    status → decide it in both, with a test in `email.test.ts`. (2026-09-24.)
+    `shouldRetryTenantEmails` runs on EVERY per-tenant status, defaulting to *yes* — an unreadable tenant may be suspended, so a new status must opt out explicitly.
 
 267. **On the coach Schedule, NEEDS MARKING repeats DONE's text — scope any DONE-section press to after the
-    "DONE" heading.** NEEDS MARKING sits ABOVE DONE, and its cards carry the same date subtitle ("Thu, 10 Sept")
-    and class title ("Cal Rose Full" — today's ordinary lesson on a fresh seed). An unscoped day-header press
-    matched 2 and skipped; the card press then opened TODAY's lesson, and every assertion after it failed for a
-    reason unrelated to the change. `verify-cancel-lesson.mjs`'s `pressAfterDone()` filters visible leaves by
-    `compareDocumentPosition` against the heading and returns the COUNT (§7.101 — never a bare `.last()`/`nth`).
-    (Cancelled-lesson spinner, 2026-09-24.)
+    "DONE" heading.** Use `pressAfterDone()` (`verify-cancel-lesson.mjs`, `compareDocumentPosition`, returns the
+    COUNT; §7.101 — never a bare `.last()`/`nth`). (2026-09-24.)
 
-268. **Auth links cannot be driven from an Expo on a non-default port.** `supabase/config.toml`'s
-    `additional_redirect_urls` lists only `localhost:8081`, and GoTrue silently swaps an unlisted `redirect_to`
-    for `site_url` (§7.41) — so a recovery / invite link generated for `:8082` lands on `127.0.0.1:3000`
-    (`ERR_CONNECTION_REFUSED`). `verify-app-auth.mjs` needs Expo on **exactly :8081**, and fails with a message
-    naming this. A worktree running it must hold :8081, not the usual "claim 8082" (`docs/WORKTREES.md`).
-    (Hand-check drivers worktree, 2026-09-24.)
+268. **Auth links cannot be driven from an Expo on a non-default port.** Only `localhost:8081` is in
+    `additional_redirect_urls`; GoTrue silently swaps an unlisted `redirect_to` for `site_url` (§7.41). `verify-app-auth.mjs` needs **exactly :8081** (`docs/WORKTREES.md`).
+    (2026-09-24.)
 
-269. **Mailpit is shared by every session on the stack — never `DELETE /api/v1/messages`.** The fence
-    hand-check cleared the inbox before its forgot-password step, which deletes every sibling's mail too; a
-    sibling waiting on a message then times out for no reason of its own. Filter by recipient AND `Created`
-    after your own send instead, as `verify-app-auth.mjs` does. (Hand-check drivers worktree, 2026-09-24.)
+269. **Mailpit is shared by every session on the stack — never `DELETE /api/v1/messages`.** Filter by recipient
+    AND `Created` after your send, as `verify-app-auth.mjs` does. (2026-09-24.)
 
-270. **Every early-return branch of a screen's load hook must set what the route's render guard checks.** The
-    coach marking screen's guard is `isShowingDate(resolved, date)`; `useAttendanceLoad`'s cancelled branch set
-    `blocked` but not `resolved`, so the notice written for exactly that case never rendered and the tap spun
-    forever (live from §8.81 until 2026-09-24). And inside that same `load()`, a state it just `set…` still holds
-    the PREVIOUS render's value — pass the loaded object (`cls.title`), not the state (`classTitle`). Regression
-    test: `features/mark-attendance/domain/useAttendanceLoad.test.ts` (the app has no hook renderer; it records
-    `useState` calls, keyed by declaration ORDER). (2026-09-24.)
+270. **Every early-return branch of a screen's load hook must set what the route's render guard checks.**
+    `useAttendanceLoad`'s cancelled branch skipped `resolved`, so its notice never rendered (since §8.81). In
+    `load()`, pass `cls.title`, not state `classTitle`. Test:
+    `features/mark-attendance/domain/useAttendanceLoad.test.ts`. (2026-09-24.)
 
 271. **Vercel deploys EVERY commit of a multi-commit push, so a bundle-grep "before" control can already be
-    after.** Ten commits pushed one by one to `main` on 2026-09-25: the greeting fix (`c4f8173`) was built and
-    served before the last commit landed, so grepping swimsync.sg for "Good afternoon" read 1 before AND after the
-    final deploy — a control that proved nothing (§7.31, §7.51). **Grep for a string only the LAST commit adds**
-    (there: the landing-bounce segment list `["schedule","classes","pay","settings"]`), confirm the old source never
-    held it (`git grep <old-sha>`), and read `gh api repos/…/commits/<sha>/status` for the Vercel contexts.
-    (Ten-branch push, 2026-09-25.)
+    after.** (`c4f8173`; §7.31, §7.51.) Grep for a string only the LAST commit adds, confirm the old source never
+    held it (`git grep <old-sha>`), read `gh api repos/…/commits/<sha>/status`. (2026-09-25.)
 
-272. **A driver fixture left loaded breaks `supabase test db`.** `fixtures-packages.sql` inserts student
-    `c5000000-…01`, the same id `makeup_bookings.test.sql` inserts, so after a local `verify-packages` run pgTAP
-    died with `duplicate key … students_pkey` → §7.116's *"planned 26 tests but ran 0"* on a file the change never
-    touched. `run-all-drivers.sh` resets before each driver, but a hand-loaded fixture stays until its
-    `-teardown.sql` runs. **Tear down every fixture you loaded before `supabase test db`.** (2026-09-25.)
+272. **A driver fixture left loaded breaks `supabase test db`.** `fixtures-packages.sql` and `makeup_bookings.test.sql`
+    share student `c5000000-…01` → §7.116, on a file never touched. Tear down every fixture you loaded (its
+    `-teardown.sql`) before `supabase test db`. (2026-09-25.)
 
 273. **To simulate a slow cold hydrate in a driver, never rewrite the Expo bundle, and don't delay it with
-    `page.route` alone.** The bundle is a blocking `<script>`, so a delayed response is absorbed by
-    `goto(…, {waitUntil:"domcontentloaded"})` and the helper under test never sees it. Wrapping the bundle body in
-    `setTimeout` does reproduce the late hydrate, but Expo's HMR client then registers a bogus entry (`./login`)
-    and **crashes Metro** (`UnableToResolveError`) — every later driver fails. Use it once for a proof, then
-    restart Expo; for an admin-panel race, slow the `_rsc` fetches instead (harmless). (appLoginDies hardening,
-    2026-09-24.)
+    `page.route` alone.** `domcontentloaded` absorbs it, so the helper never sees it; `setTimeout`-wrapping
+    **crashes Metro** — restart Expo after. Admin races: slow `_rsc`. (2026-09-24.)
+    The `setTimeout` wrap makes Expo's HMR register a bogus `./login` entry and Metro dies with `UnableToResolveError` — every later driver fails. Use it once for a proof, then restart Expo.

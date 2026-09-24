@@ -349,17 +349,18 @@ inside a file read at the start of every session.
 
 ## 8.121 (2026-09-25) — Gotchas filed twice become checks; `/update-docs` searches before filing
 
-**An audit of all 273 gotchas found eight lessons filed two or three times** — the file is 340 KB and read on
+**An audit of all 273 gotchas found eight lessons filed two or three times** — the file was 347 KB and read on
 demand, so a trap that recurred was re-filed rather than recognised, and `/update-docs` said only "append the next
 §7.N". Tooling/tests/docs only — no app code, merged ahead of the nightly gate on the user's call.
 
 - **Now checks:** `recurring_gotchas.test.sql` (second-FK pairs §7.90, `current_user` in DEFINER §7.38) and
   `check-fixture-ids.sh` in CI (captured UUIDs §7.163) — all proven red. TESTING §5. §7.40 → CLAUDE.md *Rules that bite*.
 - **Write side:** `/update-docs` Step 4 greps first; a repeat is a **Hit again** bullet; bitten twice → promote to a check.
-- **GOTCHAS.md:** topic index at the top; the 10 repeats linked both ways (**↪**), numbers unchanged, nothing deleted;
-  §7.237 notes the §8.120 fix.
-- **Deliberately NOT done:** hollowing the repeats (they hold unique detail and 17 applied migrations cite them); a
-  check for §7.150 (`function_grants.test.sql` already covers the local half; the cloud half is the remote dump).
+- **GOTCHAS.md 347 KB → 186 KB:** topic index at the top; the 10 repeats folded to one-line **↪** stubs (their unique
+  detail moved into the original); every item cut to rule + prohibitions + commands + refs, story dropped — every §-ref,
+  migration id and SHA verified kept. Full old text: `git show 82dbdb0:docs/GOTCHAS.md`. §7.237 notes the §8.120 fix.
+- **Deliberately NOT done:** a check for §7.150 (`function_grants.test.sql` already covers the local half; the cloud
+  half is the remote dump).
 
 ## 8.120 (2026-09-24 → 25) — Ten small units, one gate: three §9 items + four BACKLOG S-items + three found on the way
 

@@ -1,6 +1,6 @@
 -- pgTAP: two schema traps that were each filed as a gotcha TWICE.
 --
--- WHY THIS FILE EXISTS. docs/GOTCHAS.md is 340 KB and is read on demand, not in
+-- WHY THIS FILE EXISTS. docs/GOTCHAS.md is large and is read on demand, not in
 -- full — so a trap that bites again gets re-discovered and re-filed instead of
 -- recognised. Both of these were: §7.90 and §7.176 are the same lesson, and so
 -- are §7.38, §7.104 and §7.156. A second filing is the signal that a note is
