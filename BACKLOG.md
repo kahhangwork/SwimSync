@@ -1063,13 +1063,6 @@ worked by hand. This is the parent-side, no-admin-action version. **Notes:** all
 exist — `package_renewal_candidates()` is the "who", `package-emails` the delivery — so it
 is a scheduled check away, gated on cron (same blocker as the invoice reminder chain).
 
-### `advance_cancel_lesson.test.sql` #21 is red for the first minute of every SGT day — **S** `[raised 2026-09-22]`
-The fixture class runs 00:00–00:01 so today's lesson has always ENDED — except between 00:00 and 00:01 SGT.
-
-**Why:** a CI run starting in that minute goes red on any change (it did on the billing-months push), and a red
-that "fixes itself on re-run" trains everyone to re-run instead of read. **Notes:** §7.260. Make the fixture's
-lesson a date that has certainly ended (yesterday), or pin the probe's clock — not a wider window.
-
 ### Drop the dead `app_settings.invoice_run_day` row — **S** `[raised 2026-09-24]`
 Since 2026-09-24 nothing reads it: the engine's run-day guard reads `tenants.invoice_run_day`, like every admin
 surface (`docs/plans/ENGINE_TENANT_RUN_DAY_PLAN.md`). The row was deliberately left in place so that change

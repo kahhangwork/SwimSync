@@ -215,8 +215,17 @@ SELECT throws_like(
 RESET ROLE;
 SELECT is(class_unmarked_lesson_dates('ac400000-0000-0000-0000-000000000001'),
   ARRAY[today_sg()]::date[], '20. class_unmarked_lesson_dates skips the cancelled date (today remains)');
+-- Today's lesson is owed only once it has ENDED (end_time <= now in SGT), and
+-- Class A ends 00:01 — so between 00:00 and 00:01 SGT it is not owed yet and
+-- the right count is 0, not 1 (§7.260: CI at 00:00:53 went red on this). The
+-- expectation reads the SAME clock the function does: now() is the transaction
+-- start, fixed for this whole file, so the two cannot disagree. What #21 pins
+-- is unchanged at any hour: the cancelled d_past adds nothing — without the
+-- fix the count is one higher than this expectation.
 SELECT is(tenant_unmarked_lesson_count('ac000000-0000-0000-0000-000000000001'),
-  1, '21. tenant_unmarked_lesson_count skips the cancelled date (today remains — class ends 00:01)');
+  (SELECT CASE WHEN c.end_time <= (now() AT TIME ZONE 'Asia/Singapore')::time THEN 1 ELSE 0 END
+     FROM classes c WHERE c.id = 'ac400000-0000-0000-0000-000000000001'),
+  '21. tenant_unmarked_lesson_count skips the cancelled date (today counts once it has ended)');
 
 -- ── 22-24. restore_lesson refusals ───────────────────────────────────────────
 SET LOCAL ROLE authenticated;

@@ -3968,8 +3968,11 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
 260. **`advance_cancel_lesson.test.sql` #21 fails when CI starts between 00:00 and 00:01 SGT.** Its fixture class
     runs 00:00–00:01 so that "today's lesson" always counts as ENDED — except during that first minute of the SGT
     day, when it has not ended yet (`have: 0, want: 1`). A push at 23:59 SGT (CI `35751015146`, pgTAP at
-    00:00:53) went red on an unrelated change. **Re-run the failed job after 00:01** — it passed. Fixing the
-    fixture is in BACKLOG. (Billing months deploy, 2026-09-22.)
+    00:00:53) went red on an unrelated change. (Billing months deploy, 2026-09-22.) **FIXED 2026-09-25:** #21's
+    expected count is now derived from the same transaction clock the function reads (`now()` is fixed for the
+    whole file), so it expects 0 in that first minute and 1 after. A red on #21 is now always real. **The general
+    rule:** a pgTAP check whose answer depends on the time of day must compute its expectation from `now()`, not
+    hardcode the answer for "most of the day".
 
 261. **On the Expo WEB build, moving or deleting ANY imported file while a UI driver runs breaks EVERY screen, not
     just yours.** Metro serves one web bundle; a `git mv lib/referralShare.ts` made mid-run put Expo's error
