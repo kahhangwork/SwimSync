@@ -602,19 +602,6 @@ workspaces arrive for another reason.
 
 ## Coach workflow
 
-### A refresh or shared link bounces a coach to Schedule — **S** `[found by the attendance refactor 2026-09-22]`
-Every full-page load of a coach URL ends on Schedule: `app/_layout.tsx`'s `routeForSession` calls
-`router.replace(landingFor(…))` after `getSession()` regardless of where the coach already is (§7.254). The
-requested screen still mounts, hidden underneath.
-
-**Why:** on the web app (the only app today), a coach who refreshes mid-marking, or opens a bookmarked roster,
-loses their place and lands on Schedule, with nothing on screen saying why.
-
-**Notes:** the redirect exists for login and the bare `/` — keep it there. The likely fix is to replace only when
-the current path is outside the role's own group (a coach already under `/(coach)/…` stays put). Check the
-parent side the same way (`/(parent)/home`). §7.254 is the test-harness half: drivers that deep-link rely on
-DOM clicks reaching the hidden screen, so read them after the fix — some may start seeing the real screen.
-
 ### ~~Makeup lessons~~ — SHIPPED 2026-08-02 as the guest-pass model (PRD §7.20)
 The two invariants it was expected to break held un-broken: a make-up is a **booking**
 (the trial_bookings shape), never a second enrolment, and billing still follows

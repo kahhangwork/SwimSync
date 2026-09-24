@@ -62,3 +62,29 @@ export function landingFor(
     reason: "Unrecognised role. Please contact support.",
   };
 }
+
+// Each landing's area in a WEB URL. Route groups are invisible there —
+// `/(coach)/schedule` is served at `/schedule` — so a path is matched on its
+// FIRST segment. landing.test.ts pins these lists to the folders under app/,
+// so a new tab cannot silently fall outside its own area.
+export const LANDING_SEGMENTS: Record<NonNullable<Landing["route"]>, readonly string[]> = {
+  "/(parent)/home": ["home", "attendance", "billing", "profile"],
+  "/(coach)/schedule": ["schedule", "classes", "pay", "settings"],
+};
+
+/**
+ * Whether `pathname` is already a screen of `route`'s area — in which case the
+ * session restore must leave it alone. Without this, every full-page load (a
+ * refresh, a bookmark, a shared link) was replaced with the landing tab, and
+ * the requested screen stayed mounted HIDDEN underneath (§7.254).
+ *
+ * `/login`, the bare `/` and the OTHER role's screens are outside, so they
+ * still redirect — that is what the redirect is for.
+ */
+export function isInsideLanding(
+  pathname: string,
+  route: NonNullable<Landing["route"]>
+): boolean {
+  const first = pathname.split("/").filter(Boolean)[0];
+  return first !== undefined && LANDING_SEGMENTS[route].includes(first);
+}

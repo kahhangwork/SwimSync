@@ -5,7 +5,7 @@ import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Linking from "expo-linking";
 import { supabase } from "@/lib/supabase";
-import { landingFor } from "@/lib/landing";
+import { landingFor, isInsideLanding } from "@/lib/landing";
 import { useAppStore } from "@/store/useAppStore";
 import Toast from "@/components/Toast";
 
@@ -141,8 +141,19 @@ export default function RootLayout() {
       // redirect-to-home must not steal the page they asked for.
       if (onPublicRoute()) return;
 
+      // Already on one of this user's own screens (a refresh, a bookmark, a
+      // shared link)? Stay there — replacing it with the landing tab lost the
+      // coach's place and left the screen they asked for mounted hidden
+      // beneath Schedule (§7.254). /login, the bare / and the other role's
+      // screens still redirect. Web only: native keeps the old always-replace
+      // (its deep links are the auth ones handled above).
       const landing = landingFor(profile.role, !!coachRow);
-      if (landing.route) router.replace(landing.route);
+      if (!landing.route) return;
+      const onOwnScreen =
+        Platform.OS === "web" &&
+        typeof window !== "undefined" &&
+        isInsideLanding(window.location.pathname, landing.route);
+      if (!onOwnScreen) router.replace(landing.route);
     }
 
     // Restore session on app launch

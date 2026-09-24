@@ -3929,6 +3929,10 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     Stage 6 when a Tailwind probe found no menu. **For anything visual, reach the screen by an in-app tap**
     (Schedule → NEEDS MARKING → the lesson). The same replace is a product behaviour — a refresh or a shared
     link bounces a coach to Schedule — filed in `BACKLOG.md`. (Coach attendance, 2026-09-22.)
+    **Product half FIXED 2026-09-24:** `routeForSession` now skips the replace when the path is already inside
+    the user's own area (`isInsideLanding`, `lib/landing.ts`), so a deep link to a coach screen shows THAT
+    screen and `page.url()` keeps it. `/login`, `/` and the other role's screens still redirect. The tap-to-reach
+    advice above is now caution, not a requirement.
 
 255. **A new table the ENGINE writes needs an explicit `GRANT … TO service_role` — its default privileges on new
     tables were revoked in `20260814000300`, and `table_grants.test.sql` deliberately does not cover service_role.**

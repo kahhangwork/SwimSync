@@ -786,6 +786,13 @@ business itself is created, and sets their own password from an emailed invite (
 There is **no public signup on the admin panel** — its only self-service flow is password
 reset.
 
+*(implemented 2026-09-24)* **A refresh keeps you where you were.** On the web app, a signed-in
+user who reloads the page, opens a bookmark, or follows a shared link to one of their **own**
+screens stays on it — a coach on a class roster, a parent on their profile. Only the login
+screen, the bare `swimsync.sg/` and the *other* role's screens send them to their landing tab
+(a coach's Schedule, a parent's home). Until this date every full-page load bounced to the
+landing tab, so a coach who refreshed mid-marking lost their place with nothing saying why.
+
 #### Password Reset *(implemented)*
 
 Self-service password reset runs on the mobile app for parent **and** coach
