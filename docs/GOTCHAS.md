@@ -3970,3 +3970,37 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     day, when it has not ended yet (`have: 0, want: 1`). A push at 23:59 SGT (CI `35751015146`, pgTAP at
     00:00:53) went red on an unrelated change. **Re-run the failed job after 00:01** — it passed. Fixing the
     fixture is in BACKLOG. (Billing months deploy, 2026-09-22.)
+
+261. **On the Expo WEB build, moving or deleting ANY imported file while a UI driver runs breaks EVERY screen, not
+    just yours.** Metro serves one web bundle; a `git mv lib/referralShare.ts` made mid-run put Expo's error
+    overlay over the whole app, and two unrelated drivers died at their LOGIN click ("error-overlay intercepts
+    pointer events", and a one-shot login returning `null`) — both read like product reds. The old rule, "never
+    edit the page while a driver runs", is too narrow: **never move, delete or break-import any imported module
+    while a driver runs.** New, not-yet-imported files are safe, so prepare them freely and hold them OUT of the
+    tree until their commit. (App L-F/G/H, 2026-09-23; playbook §4.)
+
+262. **The nightly's "tenant-suspension flake" is its FIRST parent-login control, not the admin checks.**
+    `appLoginDies()` (`verify-tenant-suspension.mjs:58`) is one attempt with a FIXED 7 s hydrate wait and returns
+    `null` when the form never appeared; `check(… parentDied === false)` reads that `null` as FAIL, so a slow
+    first page load reds `control: the parent logs in before the suspend` + `…sees children of BOTH businesses`
+    (nightly `35753594101`, 10/12; green 12/12 on the same code hours later). It is §7.108's cold-compile shape.
+    **Triage:** one red on those two controls is a re-run; a red on the POST-suspend parent checks is never a
+    flake — that is a real login regression (§7.263). Hardening the helper is in BACKLOG. (2026-09-23.)
+
+263. **`loginExpo` HIDES a broken post-login redirect — ~25 drivers pass through a login regression.** It tries 3
+    times (`lib.mjs:40-72`); once `signInWithPassword` has stored a session, attempt 2's `goto /login` is restored
+    by `_layout.tsx`'s `routeForSession` and redirected to the landing tab, so a broken `setSession` /
+    `router.replace` in the login screen still "logs in". Only the one-shot `appLoginDies` helpers
+    (coach-disable, tenant-suspension) would see it. **After touching `app/(auth)/login.tsx` or
+    `features/login/`, prove it with a ONE-SHOT login** — fresh context, one press, no reload, URL leaves `/login`
+    within 10 s — as `docs/refactor/app-fgh-handchecks-fence.mjs` step 1 does. (App fence, 2026-09-23.)
+
+264. **The `public-invoice` / `public-package` Edge Functions allow ONLY `content-type` — an added header breaks
+    the page silently.** `Access-Control-Allow-Headers: content-type` (both `index.ts:27`). Swap their `fetch(`
+    for `supabase.functions.invoke` or add `apikey`/`Authorization` and the browser's CORS preflight fails —
+    and a failed fetch renders **exactly** the "Invoice not found" / "Package not found" a bad link shows, so
+    `verify-smoke-app` (which asserts the not-found state) stays green. Keep the bare `fetch` with
+    `content-type` only, and `FUNCTIONS_URL` in its literal `process.env.EXPO_PUBLIC_SUPABASE_URL` form (Expo
+    inlines only that exact member access). A throwing QR payload renders not-found too — keep the QR build
+    inside the load's `try`. (App L-G, 2026-09-23.)
+

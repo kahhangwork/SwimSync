@@ -950,3 +950,11 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     returns JSON (the last statement's rows only) — far cheaper than §8.107's offline data dump for a one-row
     question. **Rollback cover:** `supabase/rollback/20260922000100_billing_runs_DOWN.sql`, rehearsed; roll back
     apps + engine first (the engine's write is best-effort, the card's read is not).
+
+48. **Deploy record (2026-09-24): App L-F/G/H + the app fence — APP-ONLY.** `/deploy` classified it: 0
+    `supabase/` paths in 21 commits, `migration list --linked` 0 pending, so no backend gate. Before the push:
+    the full local sweep 52/52 (two reds green solo). `git push refactor/app-lite-fgh:main` fast-forward
+    `f87405e..d7eeeea`; both Vercel builds green; swimsync.sg's entry bundle changed `b4bb734b…` → `aee451a3…` in
+    90 s and carries the new hook names (a refactor has no new user-visible string — the bundle hash + symbol grep
+    is the check); live `/login`, `/welcome`, `/package/<bad>`, `/invoice/<bad>` rendered with 0 page errors; CI
+    `35967311672` green. Nightly `35967782324` dispatched on `d7eeeea`.

@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-23 — **Billing months card + generation run log SHIPPED, `main` `6c0a5ab` (§8.117); AUGUST
-2026 IS BILLED AND CLOSED** (sealed 22 Sep 23:58, 9 invoices, 1 settlement). Migration 158/158, engine v28, apps live.
-**Gate cleared: nightly `35794406334` 52/52 (§9).**_
+_Last updated: 2026-09-24 — **App L-F/G/H + the app fence SHIPPED, `main` `d7eeeea` (§8.118): the feature-tier
+refactor programme is DONE in both apps** — every route file fenced, both ledgers empty in both apps. App-only, 0
+migrations (158/158). **Nightly `35967782324` on `d7eeeea` is the gate for the next unit (§9).**_
 
-_Previously, same day (§8.116) — Coach Schedule tab: 1,255 → 101 lines, the LAST full-track giant._
+_Previously (§8.117, 2026-09-23) — Billing months card + run log; August 2026 billed and closed on prod._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.254** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.264** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -347,6 +347,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.118 (2026-09-23 → 24) — App L-F/G/H + the app fence: the refactor programme is DONE in both apps
+
+**24 app route files (13 lite + 11 fence) in one branch, four sub-batches, 17 commits, fast-forwarded to `main`
+(`d7eeeea`) via `/deploy`; app-only.** `/plan-with-confidence` (6 decisions — one branch, fence included, all the way
+to deploy) → `/plan-review` (Opus 5.5, 7 factual errors, 5 spot-checked, all held) → L0 → F / G / H / fence, each with
+its own driver net + hand-checks → two Opus behaviour-drift reviews (0 real changes) → full local sweep 52/52.
+
+- **Read `docs/refactor/BATCH_FGH_PLAN.md` (§0 decisions, the ⚠ R1–R10 blocks, §11 stage log, §12 findings), not this.**
+- **Every route composes its own feature; 0 app routes hold `useState`; both app ledgers EMPTY** — playbook §7.5 ticked.
+- **Deliberately NOT done:** the cancelled-lesson spinner (a behaviour change — its own branch). Pre-existing unread
+  variables (`session`, `coachId`) kept: removing a store subscription changes re-render timing.
+- **Graduated:** §7.261–§7.264; ARCHITECTURE §6 (the `{page, feature|null}` fence, one-importer components move,
+  fence routes keep markup); TESTING §5; DEPLOYMENT §11 #48; playbook §4 + §7.5; BACKLOG +3 / −3. **PRD untouched.**
+
 ## 8.117 (2026-09-22) — Billing months card + generation run log; August 2026 closed on prod
 
 **The admin could not see which months were closed, nor WHY one stayed open** (BACKLOG, raised billing August).
@@ -360,22 +374,7 @@ inside a file read at the start of every session.
 - **Graduated:** §7.255–§7.260; ARCHITECTURE §6y + §10; TESTING §5; DEPLOYMENT §11 #47 (incl. `supabase db query
   --linked` for read-only prod SQL); INVOICE_RUNBOOK; BACKLOG +2 (run-day source, the midnight test), −1 (shipped).
 
-## 8.116 (2026-09-22) — Coach Schedule full track: 1,255 → 101 lines, 0 hooks declared — the LAST giant
-
-**Six commits on `refactor/coach-schedule` (0b, 1–5), fast-forwarded to `main` (`7148f83`) via `/deploy` after
-nightly `35712884217` (attendance) was read 52/52 from its log; 0 migrations (157/157 on prod), 0 edge functions;
-CI + both Vercel deploys green, the live bundle carries the screen. Zero behaviour change.** `/plan-with-confidence`
-(4 questions) → `/plan-review` (Fable 5.1, 12 findings, 5 spot-checked, all held) → stages → L4. 484 → 505 jest.
-
-- **Read `docs/refactor/COACH_SCHEDULE_REFACTOR_PLAN.md` (§6 ⚠ blocks, §11a stage log, §12), not this.**
-- **NEEDS MARKING — which feeds billing — is now a pure, tested function** (`buildSchedule`); five deliberate
-  mutations of its guards were each caught. The full 17-driver net = baseline on Stage 1, Stage 3 and the finished
-  screen; role badges, location chips + clamp and a DONE tap (no driver) hand-checked 9/9 before and after.
-- **Graduated:** ARCHITECTURE §6 (the third app unit's shapes) · TESTING §5 (suites + the 17-driver net) · playbook
-  §2/§4/§5/§7 (import rebuild, ordered-JSX check, mutate each guard, click targeting; the full track is DONE) ·
-  BACKLOG (a Schedule driver; the local-reds item now GREEN locally). **PRD untouched** — nothing user-visible changed.
-
-_(§8.115 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.116 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -418,35 +417,35 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-23: the gate is GREEN — scheduled nightly `35794406334` on `f87405e` (docs-only over `6c0a5ab`,
-Billing months §8.117) read **52/52** from its log.** The dispatched run before it, `35753594101` on `6c0a5ab`, was
-51/52: **`verify-tenant-suspension` 10/12** (loginAdmin landed on `/dashboard` where `/platform` was expected), NOT
-`trial-onboarding` (15/15, its 5 new card checks held). Same code passed 12/12 six hours later — treat it as a flake
-until it reddens twice (§5 triage rules). **Read the run, don't trust this line** (§8.65).
+**State on 2026-09-24: nightly `35967782324` was dispatched on `d7eeeea` (§8.118) and is the GATE for the next unit
+(§7.1) — read it from the log, not the badge.** Before it: the full LOCAL sweep on the same code was 52/52 (two reds
+green solo — a machine sleep and admin-calendar's 400 ms race, BACKLOG), and the last scheduled nightly on `main`
+before the merge (`35930522207`) was green. **`verify-tenant-suspension`'s recurring red is its FIRST parent-login
+control on a cold load (§7.262), not the admin checks** — a red on the post-suspend parent checks is real (§7.263).
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
 which mutate shared seed state — are in the same section.
 
-### THE NEXT BUILD — the full track is DONE; the app's lite batches next
+### THE NEXT BUILD — the feature-tier refactor programme is FINISHED
 
-**Every giant in both apps has taken the full track** (the last three: roster §8.114, attendance §8.115, schedule
-§8.116). What remains is the app's lite batches **L-F** (parent home) / **L-G** (parent money) / **L-H** (rest), then
-the fence track — playbook §7.1–§7.2; **re-measure and re-derive each batch's driver net before planning** (§7.236).
+**There is no refactor unit left in either app** (§8.118; playbook §7.5 all ticked). A new page or screen takes the
+shape from day one — the fence's check 4 will refuse anything else. Pick from:
 
+- **Fix the cancelled-lesson spinner** — a small, real, user-facing bug (BACKLOG *Coach workflow*), one line plus a
+  test update; a behaviour change, so its own branch and its own PRD check.
+- **Promote the App L-F/G/H hand-check scripts to drivers** (BACKLOG, M) — 54 proven checks the nightly does not run
+  today, including the only one-shot login (§7.263).
 - **Or the engine's run-day source** (BACKLOG, §8.117's RISK 9) — small, but it changes billing timing: its own
   branch and Deno coverage, and it must land before cron is ever enabled.
-- **Or fix the cancelled-lesson spinner first** — a small, real, user-facing bug (BACKLOG *Coach workflow*), one line
-  plus a test update, and a behaviour change, so its own branch and its own PRD check — not inside a refactor.
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current stage has (§7.253); reach a screen by TAP for anything visual (§7.254).
 
-**GATE (§7.1): cleared — nightly `35794406334` (on `f87405e` = `6c0a5ab` + docs) is 52/52 from the log.** The next
-unit's own gate is the first nightly after it lands.
+**GATE (§7.1): do NOT merge the next unit to `main` until nightly `35967782324` (on `d7eeeea`) is green — from the log.**
 
 **No migration is HELD or in flight.** Latest applied is `20260922000100` (billing_runs, §8.117), on prod,
 0 pending (158/158 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116 none (pure refactors).
+the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116 and §8.118 none (pure refactors).
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

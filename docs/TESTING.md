@@ -1300,6 +1300,26 @@ identity` is a coach-app driver and never opens the page.** Merge and Rename hav
 `active-inactive`, `levels` and `level-skills` hardcode ports and need a port-substituted copy to run
 against a worktree (playbook §4).
 
+### App L-F/G/H + the app fence (2026-09-23)
+
+**The app fence now covers every route** (`SwimSyncApp/lib/tierBoundaries.drift.test.ts`, 8 tests): `PAGES` is
+`{page, feature|null}`, `SCOPE_DIRS` the set of features, and a NEW test fails on any `features/` folder no route
+names. Both ledgers EMPTY. **Characterisation tests added** (headers say so; §7.25 cannot apply; each guarded line
+was mutated once and a named case went red): `parent-home/domain/homeRows` (8), `child-profile/domain/childFormat`
+(5), `billing/domain/billingFormat` (5), `invoice-detail/domain/invoiceDetailFormat` (2),
+`paynow/domain/embeddedTenant` (1), `public-invoice/domain/monthLabel` (1), `public-package/domain/formatDate` (1),
+`parent-attendance/domain/attendanceFormat` (6), `coach-classes/domain/classesFormat` (2). **Moved with their
+modules** (sole importers): `referralShare`, `invoiceFunding`, `upcomingLessons`, `weekOrder` tests →
+`features/*/domain/`. jest 505 → **537 / 47 suites**.
+
+**Hand-check scripts — driver skeletons for what no driver presses** (`docs/refactor/app-fgh-handchecks-{F,G,H,
+fence}.mjs`, run from the drivers folder; each proven green on the PRE-change code): F — dismiss a declined claim;
+register WITH a join code → the first Home load joins once. G — Invoice Detail's own *I've paid*; referral Copy;
+`/package/<valid token>` logged in and out with no auth headers (§7.264); cancel a package request. H — the coach
+QR upload; coach Sign Out. Fence — one-shot login (§7.263), change password ×2 roles, forgot → Mailpit, reset +
+accept-invite through REAL `generateLink` links, the grade viewer, parent Sign Out. `docs/refactor/app-fgh-idle.mjs`
+counts each screen's requests (load / idle) — a hook-extraction fetch loop shows as a changed count.
+
 ### Reading a RED nightly sweep — the four triage rules
 
 *(Graduated from `HANDOVER.md` §9 on 2026-09-18. They had sat inside "Next steps", which is

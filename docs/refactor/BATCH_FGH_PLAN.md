@@ -434,6 +434,10 @@ were caused by THIS SESSION**, not the product — see §12 F1 — and are re-ru
 
 ## 12. Findings for `/update-docs`
 
+**Graduated 2026-09-24:** F1 → GOTCHAS §7.261 + playbook §4 · F2 → §7.262 + BACKLOG *Harden `appLoginDies`* ·
+F3 → playbook §4 · F4 → noted here (no coach grade write exists). Plan-review's R1 → §7.263, R2 → §7.264. The
+hand-check scripts → BACKLOG *Promote … to real drivers*; admin-calendar's race → BACKLOG.
+
 - **F1 — On RN-web, ANY imported file going missing breaks the WHOLE app bundle, not the screen.** A
   `git mv lib/referralShare.ts` made while the baseline drivers ran put Expo's error overlay over every
   route (Metro serves one web bundle); `trial-visibility` died on "error-overlay intercepts pointer

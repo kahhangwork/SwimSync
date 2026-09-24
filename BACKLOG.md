@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-23 — **Billing months card SHIPPED** (§8.117): the "cannot see WHY a month is open" item removed; filed the **engine run-day source** (before cron) and the **midnight pgTAP flake** (§7.260). Earlier, 2026-09-22 — **Coach Schedule (the LAST full-track giant) SHIPPED** (§8.116); a **Schedule driver** item filed (role badges, location chips + clamp, DONE tap), and the local-reds item updated (`smoke-app` / `trial-onboarding` GREEN locally). Earlier same day — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-24 — **App L-F/G/H + the app fence SHIPPED** (§8.118): the feature-tier programme is DONE in both apps, so its item is removed, with the stale struck *Smoke drivers* entry and the *four local driver reds* item (all four GREEN in the 2026-09-24 full local sweep). Filed: **promote the hand-check scripts to drivers**, **harden `appLoginDies`** (§7.262), the **admin-calendar 400 ms race**. Earlier, 2026-09-23 — **Billing months card SHIPPED** (§8.117): the "cannot see WHY a month is open" item removed; filed the **engine run-day source** (before cron) and the **midnight pgTAP flake** (§7.260). Earlier, 2026-09-22 — **Coach Schedule (the LAST full-track giant) SHIPPED** (§8.116); a **Schedule driver** item filed (role badges, location chips + clamp, DONE tap), and the local-reds item updated (`smoke-app` / `trial-onboarding` GREEN locally). Earlier same day — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -1585,50 +1585,38 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### Feature-tier decomposition of EVERY page, both apps — **17 units, ~15 sessions** `[from the Students pilot 2026-09-12; scope widened 2026-09-13]`
-Students (`page.tsx`, was 2,284 lines) was decomposed into `ui/`/`domain/`/`dao/` tiers over 12
-stages (§8.100, closed out). **Decided 2026-09-13: the end state is every page and screen in both apps
-on the same shape** — not only the giants. The ceremony scales with size (playbook §7), the shape and the
-boundary test do not:
+### Promote the App L-F/G/H hand-check scripts to real drivers — **M** `[from App L-F/G/H 2026-09-23]`
+Turn `docs/refactor/app-fgh-handchecks-{F,G,H,fence}.mjs` (54 checks) into `verify-*.mjs` drivers with fixtures,
+so the nightly covers them.
 
-- **Full track** (the existing 12 stages, one page per nightly) — the 7 giants: admin `packages` (2,014),
-  `invoices` (1,748), `classes` (1,714), `platform` (1,395), `lessons/[classId]/[date]` (912); coach app
-  `schedule/index` (1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905). ~11,100 lines.
-- **Lite track** (3 commits per page, batched 3–5 pages / ≤2,500 lines, drivers once per batch, one nightly
-  per batch) — 21 admin pages + 13 app screens in the 250–900 range, ~16,200 lines. Eight suggested batches
-  by driver net are in playbook §7.1.
-- **Fence track** (no folders required; the page must pass "no client, no `lib/`"; one commit per app) —
-  15 small pages/screens, ~2,600 lines.
+**Why:** these are the app actions NO driver presses — Invoice Detail's own *I've paid*, `/package/<valid token>`
+(logged in and out, content-type only — §7.264), cancelling a package request, the coach QR upload, both Sign
+Outs, change password, forgot/reset/accept-invite through real links, a declined-claim dismiss, register-with-a-
+join-code. Today a regression in any of them is invisible until a parent reports it; the one-shot login is the only
+thing that catches §7.263.
 
-**Why:** the giants are the files every change pays a tax on. The rest are cheap individually, but a
-codebase that is half one shape and half another is a codebase where the boundary test guards half of it.
-The pilot proved the tax is payable with zero behaviour change; the lite track is that proof at lower
-ceremony.
+**Notes:** every script already passed on BOTH the pre-change and the refactored code, so they are proven, not
+drafts. Reach screens by TAP (§7.254) and follow the playbook §4 hand-check traps. Links come from
+`auth.admin.generateLink` (the admin invite route's own call); the forgot-password mail lands in Mailpit (:54324).
+Separate from *A driver for the `reset-password` recovery path* below — that one is the ADMIN panel's screen.
 
-**Notes:** the method is written down once for both apps — `docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`
-(§7 for the tracks and the order; the coach app differs: tiers go under `SwimSyncApp/features/`, and jest's
-`testMatch` and both `sgDisplay.drift` twins must gain that folder in the same commit). **Order:** the smoke
-drivers (shipped 2026-09-13), then **Admin L-A "people" (SHIPPED 2026-09-13** — 5 pages, dfe4cad, both
-ledgers back to empty, 8/8 drivers green; folded L1–L3 per page, see playbook §7.1), then **`packages`
-(full) SHIPPED 2026-09-16** — all 12 stages (`69b9683`…`f0cbcb5`), 2,014 → 244 lines / 0 `useState`, both
-ledgers empty, nightly `35032652395` green on `f0cbcb5`; own plan `docs/refactor/PACKAGES_REFACTOR_PLAN.md`.
-Then **Admin L-B "calendar" (SHIPPED 2026-09-16** — 5 pages attendance/substitutes/holidays/calendar/lessons,
-`927a8b4`…`a773058`, 2,387 → 440 lines / 0 `useState`, both ledgers empty, L4 net 6/6 + holidays hand-check 9/9;
-nightly `35095280475` running; own plan `docs/refactor/BATCH_B_PLAN.md`).
-Then alternate. Never two units in flight; each survives a nightly before the next starts. Tiers stay
-feature-scoped, never new top-level folders (§7.233). The dao three-way split and *orchestrate, never
-replace* are now in `docs/ARCHITECTURE.md` §6 (2026-09-18, Admin L-D).
+### Harden `appLoginDies` in verify-tenant-suspension / verify-coach-disable — **S** `[from App L-F/G/H 2026-09-23]`
+Replace the fixed 7 s hydrate wait with a wait for the login form (as `loginExpo` does), and report a form that
+never appeared as its own "cannot say" failure, not as `parentDied !== false`.
 
-**Done:** Students, `packages`, `invoices`, `classes`, `platform` (full); Admin L-A, L-B, L-C, **L-D** (lite).
-**Remaining — 1 admin giant** `lessons/[classId]/[date]` (912), **3 coach-app giants** `schedule/index`
-(1,255), `classes/[id]/attendance` (1,183), `classes/[id]/roster` (905); **lite** Admin L-E (`dashboard`
-`locations` `history`) and App L-F/L-G/L-H; the two **fence** commits. The coach-app units are a different
-KIND (the `features/` layout, the jest twin, RN-web quirks — playbook §1), so the first is not routine.
+**Why:** it is the nightly's recurring "flake" (§7.262) — the FIRST parent-login control reds on a slow cold load.
+A red that is usually noise trains the next session to wave it through, and the same helper is the ONLY
+one-shot login in the suite (§7.263), i.e. the one check that would catch a real login regression.
 
-### ~~Smoke drivers — open every route once, assert it rendered~~ — **SHIPPED 2026-09-13**
-`verify-smoke-admin.mjs` (64 checks) + `verify-smoke-app.mjs` (73 checks); green in the nightly of
-2026-09-13. `docs/TESTING.md` §5 describes them; playbook §7.3 is why they exist. The first run found the
-`/profile/contact` `eq.undefined` 400s (fixed, `b93d986`) and filed the two items below.
+**Notes:** keep it ONE attempt — retrying is exactly what `loginExpo` does and why it hides regressions. Only the
+wait for the form should change.
+
+### `verify-admin-calendar` "Today" check races a fixed 400 ms — **S** `[from App L-F/G/H 2026-09-24]`
+`Today returns the URL date to today` reads `page.url()` 400 ms after clicking Today; wait for the URL instead
+(`page.waitForURL(u => u.searchParams.get("date") === today)`).
+
+**Why:** it went 20/21 in a full local sweep on UNCHANGED admin code and 21/21 solo straight after — a timing race
+that will eventually red a nightly and cost a triage.
 
 ### NativeWind throws on every web page load — **S** `[found by verify-smoke-app 2026-09-13]`
 Every load of the Expo app on web raises an uncaught `Cannot manually set color scheme, as dark mode is
@@ -1878,26 +1866,6 @@ vanish between loads** (weekly recurrence means week navigation never empties a 
 deactivates them (`is_active=false` needs `deactivated_at`, a CHECK) and refocuses. Target a DONE card by
 `div.text-sm.font-bold` and a day by its EXACT label — a day-shaped regex hits NEEDS MARKING rows, and
 `getByText(title).last()` hit a TODAY title on a screen mounted underneath (§7.254).
-
-### Four UI drivers fail on a LOCAL full sweep but pass in CI — **S** `[found by Admin L-E's L4 2026-09-21]`
-`run-all-drivers.sh` run locally on 2026-09-21 returned 48/52. The four reds — `payment-collection` (times out
-waiting for the parent app's *I've paid*), `referrals` (1/13: the `/package` pay-page headline), `smoke-app`
-(70/73: `/invoice/<id>` and `/package/<id>` render + console errors), `trial-onboarding` (5/8: the unclaimed-child
-generation report) — were re-run **on `main`** and failed **identically**, same scores and messages. The nightly
-on that same `main` commit was GREEN the night before (`35541254420`, 14acd6d). So this is local-environment
-drift, not code, and not the L-E branch.
-
-**Why:** a local sweep is the pre-merge gate for every refactor unit. Four permanent local reds train the next
-session to wave failures through, which is precisely how §8.65's live regression sat unread beneath a stale pin.
-
-**Notes:** all four are parent-app/billing surfaces, which suggests leftover tenant rows rather than a code
-difference — a `Pay Driver Swim` tenant from `fixtures-payment-collection.sql` was still present and visible to
-cross-tenant queries during the hand-checks. Start with a clean `supabase db reset` and re-run just those four;
-compare against the CI job's env (`SERVICE_ROLE_KEY`, `RESEND_API_KEY` UNSET — `verify-tenant-provisioning`
-requires the latter). **Evidence against the leftover-rows theory (2026-09-21, coach roster):** `smoke-app` ran
-four times through `run-all-drivers.sh --only`, which resets the DB before each driver, and failed 70/73 on the
-same three checks every time — so a clean reset alone does not fix it; look at env/config next. **Still identical on 2026-09-22** (coach attendance: `smoke-app` 70/73 and `trial-onboarding` 5/8 at every one of five stage runs, same messages). **Then GREEN later the same day** (coach schedule: `smoke-app` **73/73** and `trial-onboarding` **10/10** — note 10 checks, not 8 — at every one of three full 17-driver runs; `payment-collection` and `referrals` were not run). Nothing in the repo changed between the two sessions except the schedule refactor, so the likeliest cause is local state (the dev servers were restarted fresh). **Re-run all four once before quoting this item; it may be closable.** The triage method that settled it is `docs/TESTING.md` §5's fourth rule: re-run the driver
-at the suspect's parent before blaming the branch.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the

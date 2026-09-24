@@ -620,6 +620,18 @@ the shape of the system changes:_
   `domain/screenState.ts`** (a wrapper or a re-export) rather than a route `@/lib` import, and a `ui/` component
   that owns several sibling JSX blocks wraps them in a fragment so they move verbatim.
 
+  **The rest of the app, 2026-09-23 — App L-F/G/H + the app fence** (`docs/refactor/BATCH_FGH_PLAN.md`, 24 route
+  files): **the programme is DONE in both apps** — every route composes its own `features/<x>/`, both boundary
+  ledgers are empty. Shapes it added: the app fence's `PAGES` is `{ page, feature | null }` — **two routes may
+  share a feature** (both change-password routes compose `features/change-password`) and **`feature: null` is a
+  tier-less route** (welcome) whose check 4 has no `@/features` leg; `SCOPE_DIRS` is derived as the SET of
+  features, and a test fails on any `features/` folder no route names (§7.233's shape). A component with ONE
+  importer MOVES into that feature (`ReferralSection` → `features/billing/ui/`) rather than taking the
+  `AssessmentGrid` injection, and **a component that mounts only conditionally keeps its own load hook inside
+  it** (`useReferral`) — hoisting it would change when it fetches. **Fence routes keep their markup** and move only
+  data (`dao/`) and state (one hook); a block that reads a `@/lib` helper in JSX becomes one `ui/` component
+  (`coach-pay/ui/PayoutCards`). Auth calls get their own `dao/<x>.auth.ts`, Storage `dao/<x>.storage.ts`.
+
   **The third and last app giant, the coach SCHEDULE tab, 2026-09-22** (`docs/refactor/COACH_SCHEDULE_REFACTOR_PLAN.md`,
   1,255 → 101 lines), added three more. **Keep the load's identity semantics, whichever they are**: here `loadData`
   was a `useCallback` whose deps `[session, todayDate, weekOffset]` decide when the focus effect refetches, so the
