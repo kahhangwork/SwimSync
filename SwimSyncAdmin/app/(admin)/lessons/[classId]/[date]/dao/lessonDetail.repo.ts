@@ -3,10 +3,9 @@
 // docs/refactor/LESSON_DETAIL_REFACTOR_PLAN.md.
 //
 // ORCHESTRATE, NEVER REPLACE. Each function returns the raw results: no
-// mapping, no error handling, no defaulting. The load's error handling is
-// deliberately ASYMMETRIC (plan §5 RISK 2 — eight results are checked, the
-// tenants/students/getSession and the three session-scoped reads are not), and a
-// dao that "tidied" that would change behaviour while looking like a move.
+// mapping, no error handling, no defaulting. The load's error handling lives in
+// the hook (domain/lessonLoadErrors.ts): since 2026-09-24 it checks EVERY read
+// here, so a failed read can never render as an empty one.
 //
 // dao/ is transport only: no React, no ui/, no @/components (fence check 2).
 

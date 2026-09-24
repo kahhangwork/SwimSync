@@ -7,8 +7,9 @@
 // ⚠ Plan §5 RISK 2 — keep all of these exactly as they are:
 //   • fetchMarkableFloor() starts BEFORE the Promise.all and is awaited LAST;
 //   • `stale` is checked after each of the three awaits;
-//   • the error chain is `??` over EIGHT results in this order, and the tenants,
-//     students, getSession and session-scoped reads are deliberately unchecked;
+//   • the error chain checks the original EIGHT results first, in this order —
+//     then, since 2026-09-24, getSession, tenants, students and the three
+//     session-scoped reads too (domain/lessonLoadErrors.ts says why);
 //   • setLoading(true) on EVERY reload — the page unmounts everything below its
 //     loading switch (§7.249), so no state may move into a ui/ component;
 //   • `today` / `validDate` are plain per-render expressions — never memoised
@@ -21,6 +22,7 @@ import { attributeLessons, termsCoachOn, type AbsenceRow, type ClassRateRow, typ
 import { fetchMarkableFloor, loadLessonReads, loadSessionReads } from "../dao/lessonDetail.repo";
 import { lessonMarkability, type DbStatus } from "./lessonMarking";
 import { buildRoster, classInfoFrom, coachListFrom, eligibleKidsFrom, trialKidsFrom } from "./lessonDetailRows";
+import { firstLoadError, SIGNED_OUT_MESSAGE } from "./lessonLoadErrors";
 import type { ClassInfo, CoachOpt, EligibleKid, RosterRow } from "../types";
 
 export function useLessonDetail(classId: string, date: string) {
@@ -57,18 +59,30 @@ export function useLessonDetail(classId: string, date: string) {
     setLoadError(null);
     (async () => {
       const floorP = fetchMarkableFloor();
-      const [{ data: sess }, clsRes, sessionRes, coachesRes, enrolRes, trialsRes, makeupsRes, ratesRes, shadowsRes, tenantRes, kidsRes] =
+      const [sessRes, clsRes, sessionRes, coachesRes, enrolRes, trialsRes, makeupsRes, ratesRes, shadowsRes, tenantRes, kidsRes] =
         await loadLessonReads(classId, date);
       if (stale) return;
 
-      const firstErr = clsRes.error ?? sessionRes.error ?? coachesRes.error ?? enrolRes.error ?? trialsRes.error ?? makeupsRes.error ?? ratesRes.error ?? shadowsRes.error;
+      const firstErr = firstLoadError([
+        clsRes, sessionRes, coachesRes, enrolRes, trialsRes, makeupsRes, ratesRes, shadowsRes,
+        sessRes, tenantRes, kidsRes,
+      ]);
       if (firstErr) {
-        setLoadError(firstErr.message);
+        setLoadError(firstErr);
         setLoading(false);
         return;
       }
       if (!clsRes.data) {
         setLoadError("That class does not exist, or is not in your business.");
+        setLoading(false);
+        return;
+      }
+      // No signed-in user leaves actorId null, and a null actorId makes Save a
+      // silent no-op (useAttendanceSave). Say so instead of rendering a page
+      // whose Save does nothing.
+      const sess = sessRes.data;
+      if (!sess.session) {
+        setLoadError(SIGNED_OUT_MESSAGE);
         setLoading(false);
         return;
       }
@@ -94,6 +108,15 @@ export function useLessonDetail(classId: string, date: string) {
       if (sid) {
         const [attRes, subRes, absRes] = await loadSessionReads(sid);
         if (stale) return;
+        // A failed attendance read must not render as "nothing marked" (see
+        // lessonLoadErrors.ts) — and a failed session_coaches read hides a live
+        // substitute. Fail the page instead.
+        const sessionErr = firstLoadError([attRes, subRes, absRes]);
+        if (sessionErr) {
+          setLoadError(sessionErr);
+          setLoading(false);
+          return;
+        }
         marks = new Map(((attRes.data ?? []) as any[]).map((a) => [a.student_id, a.status as DbStatus]));
         subs = ((subRes.data ?? []) as any[]).map((s) => ({ lesson_session_id: s.lesson_session_id, coach_id: s.coach_id }));
         subRowId = ((subRes.data ?? []) as any[])[0]?.id ?? null;

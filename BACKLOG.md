@@ -1767,20 +1767,6 @@ any of them is silent until an invoice run.
 Rose (an enrolment-less child reads "(0)" in the picker). To make assign FAIL, pick a shape the RPC refuses (a
 cancelled lesson, or a coach the class rate already pays via SQL) — the picker hides the latter on purpose.
 
-### The lesson page's load swallows six read errors — a failed attendance read looks like "nothing marked" — **S** `[found by the lesson-detail refactor 2026-09-18]`
-`useLessonDetail` checks eight results (`??` chain) and ignores the rest: `tenants`, `students`, `getSession`, and
-the three session-scoped reads (`attendance`, `session_coaches`, `session_coach_absences`). Preserved verbatim by the
-refactor (rule 0) and filed here.
-
-**Why:** a failed `attendance` read renders every row **Not marked**. An admin who re-marks and saves then upserts
-over the real statuses — the save sends `prevStatus: null`, so the changed-rows filter cannot protect them, and a
-billed `present` turned into anything else issues a credit note. A failed `students` read shows empty make-up/trial
-pickers indistinguishable from "nobody eligible"; a failed `session_coaches` read hides a live substitute.
-
-**Notes:** the fix is to fold the session-scoped errors (at least `attendance`) into the same `loadError` path —
-a behaviour change, so its own commit, never inside a refactor. `getSession` failing leaves `actorId` null, which
-already makes `doSave` a silent no-op; say so in the UI rather than doing nothing.
-
 ### A driver for the `reset-password` recovery path — **S** `[from the Admin L-E fence commit 2026-09-21]`
 `/reset-password` (admin) is opened by **one** driver, `verify-smoke-admin`, and only on its INVALID branch:
 logged out, no token, "checking…" → "invalid" after 3s. The whole valid path — a real recovery link parsed from

@@ -1273,6 +1273,13 @@ session id — the row may not exist yet). There the admin:
   the admin included (§7.3).
 - **Does not** write shadow absences — that stays the coach's "coaches present" checklist; a
   missing row means *present and paid*, the recoverable direction.
+- *(enforced 2026-09-24)* **Shows an error, never a guess, when a read fails.** If any of the
+  page's reads fails — the lesson's attendance, its substitute, the eligible children, the
+  business's holiday setting — the page shows the error instead of the lesson. Before this a
+  failed attendance read rendered every child **Not marked**, and re-marking and saving would
+  have overwritten the real statuses (a billed *present* changed that way issues a credit note).
+  A signed-out admin sees *"Your sign-in has expired…"* rather than a Save that silently does
+  nothing.
 
 #### Bulk "Set all to…" *(implemented)*
 
