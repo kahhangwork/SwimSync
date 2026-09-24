@@ -3993,7 +3993,8 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `router.replace` in the login screen still "logs in". Only the one-shot `appLoginDies` helpers
     (coach-disable, tenant-suspension) would see it. **After touching `app/(auth)/login.tsx` or
     `features/login/`, prove it with a ONE-SHOT login** — fresh context, one press, no reload, URL leaves `/login`
-    within 10 s — as `docs/refactor/app-fgh-handchecks-fence.mjs` step 1 does. (App fence, 2026-09-23.)
+    within 10 s — as `verify-app-auth.mjs` check 1 does in the nightly since 2026-09-24 (promoted from
+    `docs/refactor/app-fgh-handchecks-fence.mjs` step 1). (App fence, 2026-09-23.)
 
 264. **The `public-invoice` / `public-package` Edge Functions allow ONLY `content-type` — an added header breaks
     the page silently.** `Access-Control-Allow-Headers: content-type` (both `index.ts:27`). Swap their `fetch(`
@@ -4002,5 +4003,51 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `verify-smoke-app` (which asserts the not-found state) stays green. Keep the bare `fetch` with
     `content-type` only, and `FUNCTIONS_URL` in its literal `process.env.EXPO_PUBLIC_SUPABASE_URL` form (Expo
     inlines only that exact member access). A throwing QR payload renders not-found too — keep the QR build
-    inside the load's `try`. (App L-G, 2026-09-23.)
+    inside the load's `try`. (App L-G, 2026-09-23.) *Caveat, 2026-09-24:* LOCALLY, with `x-client-info`
+    added, `/package/<token>` still rendered — the local functions runtime answers the preflight itself — so a local
+    render proves nothing either way; `verify-app-money`'s request-header-NAME check is the only guard, and the
+    deployed function's CORS is the fact (BACKLOG).
 
+265. **Moving a setting from a global row to a per-tenant row, a read that swallows its `error` becomes a hidden
+    DEFAULT — and on a billing schedule a default is an early bill that then seals the month.** The engine's
+    `tenants` read (`generate-invoices/core.ts`) destructured `data` only; once the run day came from that row, a
+    failed read would have meant "day 7" for every tenant. **Auto mode now FAILS CLOSED** with the non-attempt
+    status `tenant_unreadable`; it RETURNS, never throws — the cron loop over tenants has no per-tenant catch, so
+    one throw stops every business's billing. Any per-tenant setting the automatic path reads needs the same
+    shape. (Engine run day, 2026-09-24; `docs/plans/ENGINE_TENANT_RUN_DAY_PLAN.md` RISK 2.)
+
+266. **A new engine early-return status has TWO registries, and the second one sends email.**
+    `NON_ATTEMPT_STATUSES` (`runLog.ts`) decides what the run log records; `shouldRetryTenantEmails`
+    (`email.ts`) decides whether the self-heal pass RESENDS invoice emails for that tenant — and it runs on
+    EVERY per-tenant status, defaulting to *yes*. `tenant_unreadable` passed the first and the `/plan-review`,
+    and was caught only by `/commit-review`: an unreadable tenant may be suspended, and emailing for a suspended
+    tenant is exactly what the email-retry plan's RISK 3 forbids. **Adding a status → decide it in both, with a
+    test in `email.test.ts`.** (2026-09-24.)
+
+267. **On the coach Schedule, NEEDS MARKING repeats DONE's text — scope any DONE-section press to after the
+    "DONE" heading.** NEEDS MARKING sits ABOVE DONE, and its cards carry the same date subtitle ("Thu, 10 Sept")
+    and class title ("Cal Rose Full" — today's ordinary lesson on a fresh seed). An unscoped day-header press
+    matched 2 and skipped; the card press then opened TODAY's lesson, and every assertion after it failed for a
+    reason unrelated to the change. `verify-cancel-lesson.mjs`'s `pressAfterDone()` filters visible leaves by
+    `compareDocumentPosition` against the heading and returns the COUNT (§7.101 — never a bare `.last()`/`nth`).
+    (Cancelled-lesson spinner, 2026-09-24.)
+
+268. **Auth links cannot be driven from an Expo on a non-default port.** `supabase/config.toml`'s
+    `additional_redirect_urls` lists only `localhost:8081`, and GoTrue silently swaps an unlisted `redirect_to`
+    for `site_url` (§7.41) — so a recovery / invite link generated for `:8082` lands on `127.0.0.1:3000`
+    (`ERR_CONNECTION_REFUSED`). `verify-app-auth.mjs` needs Expo on **exactly :8081**, and fails with a message
+    naming this. A worktree running it must hold :8081, not the usual "claim 8082" (`docs/WORKTREES.md`).
+    (Hand-check drivers worktree, 2026-09-24.)
+
+269. **Mailpit is shared by every session on the stack — never `DELETE /api/v1/messages`.** The fence
+    hand-check cleared the inbox before its forgot-password step, which deletes every sibling's mail too; a
+    sibling waiting on a message then times out for no reason of its own. Filter by recipient AND `Created`
+    after your own send instead, as `verify-app-auth.mjs` does. (Hand-check drivers worktree, 2026-09-24.)
+
+270. **Every early-return branch of a screen's load hook must set what the route's render guard checks.** The
+    coach marking screen's guard is `isShowingDate(resolved, date)`; `useAttendanceLoad`'s cancelled branch set
+    `blocked` but not `resolved`, so the notice written for exactly that case never rendered and the tap spun
+    forever (live from §8.81 until 2026-09-24). And inside that same `load()`, a state it just `set…` still holds
+    the PREVIOUS render's value — pass the loaded object (`cls.title`), not the state (`classTitle`). Regression
+    test: `features/mark-attendance/domain/useAttendanceLoad.test.ts` (the app has no hook renderer; it records
+    `useState` calls, keyed by declaration ORDER). (2026-09-24.)

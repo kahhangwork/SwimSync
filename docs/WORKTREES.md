@@ -388,6 +388,9 @@ cd $WT/SwimSyncAdmin && npm run dev -- -p 3100
 EXPO_URL=http://localhost:8082 node .claude/skills/run-ui-playwright/drivers/<driver>.mjs
 ```
 
+**Except auth-link drivers** (`verify-app-auth`): GoTrue redirects only to `localhost:8081`, so on 8082 the
+recovery / invite link lands on `127.0.0.1:3000` (§7.268). Run those while holding :8081.
+
 If you add a fixture, write its teardown **in the same commit** — CI enforces it
 (`drivers/check-teardowns.sh`).
 

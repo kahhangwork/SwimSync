@@ -1312,13 +1312,29 @@ was mutated once and a named case went red): `parent-home/domain/homeRows` (8), 
 modules** (sole importers): `referralShare`, `invoiceFunding`, `upcomingLessons`, `weekOrder` tests →
 `features/*/domain/`. jest 505 → **537 / 47 suites**.
 
-**Hand-check scripts — driver skeletons for what no driver presses** (`docs/refactor/app-fgh-handchecks-{F,G,H,
-fence}.mjs`, run from the drivers folder; each proven green on the PRE-change code): F — dismiss a declined claim;
-register WITH a join code → the first Home load joins once. G — Invoice Detail's own *I've paid*; referral Copy;
-`/package/<valid token>` logged in and out with no auth headers (§7.264); cancel a package request. H — the coach
-QR upload; coach Sign Out. Fence — one-shot login (§7.263), change password ×2 roles, forgot → Mailpit, reset +
-accept-invite through REAL `generateLink` links, the grade viewer, parent Sign Out. `docs/refactor/app-fgh-idle.mjs`
-counts each screen's requests (load / idle) — a hook-extraction fetch loop shows as a changed count.
+**The App L-F/G/H hand-checks are NIGHTLY DRIVERS since 2026-09-24** (`3ff558a`) — four `verify-app-*.mjs`, each
+with its own fixture + teardown (UUID prefix `ac{1,2,3}00000-…`, emails `app-{auth,home,money}-*@swimsync.test`):
+
+| driver | fixture | checks | covers |
+|---|---|---|---|
+| `verify-app-auth` | `fixtures-app-auth` | 25 | ONE-SHOT login ×2 roles (§7.263), change password, forgot → Mailpit, reset + accept-invite through real `generateLink` links, parent Sign Out. **Needs Expo on exactly :8081** (§7.268) |
+| `verify-app-home-writes` | `fixtures-app-home-writes` | 10 | dismiss a declined claim; register WITH a join code → the first Home load joins once |
+| `verify-app-money` | `fixtures-app-money` (its OWN tenant) | 19 | Invoice Detail's *I've paid*; referral Copy; `/package/<token>` in and out, request-header NAMES only (§7.264); cancel a package request |
+| `verify-app-coach-settings` | none (restores the seed PayNow QR in `finally`) | 6 | coach QR upload; coach Sign Out |
+
+Mutation-proven (§7.25) except auth's "old password no longer works" (needs a GoTrue change). Not yet pressed by
+any driver: the package page's own *I've paid* POST (BACKLOG). The source scripts stay in `docs/refactor/` as
+provenance (`app-fgh-handchecks-{F,G,H,fence}.mjs`), like every sibling refactor's; `app-fgh-idle.mjs` still
+counts each screen's requests (load / idle).
+
+**`verify-cancel-lesson.mjs` step 5b (2026-09-24)** — the admin's UI cancel is AGED two weeks back as postgres
+(`cancel_lesson` refuses today and earlier), the coach taps it from Schedule's DONE list, and the driver asserts
+*This lesson was cancelled*, the class name + reason, and *Back to class*. 29 checks; on the pre-fix hook the four
+notice checks go RED (permanent spinner). Presses are scoped to after the DONE heading (§7.267).
+
+**Deno, 2026-09-24:** 251 tests. The run-day guard is pinned from BOTH sides (a business run day later AND
+earlier than the global one — together they fail the old code for any global value), plus `tenant_unreadable`
+in auto mode and its email-retry skip (§7.265, §7.266). No run-day test writes `app_settings` any more.
 
 ### Reading a RED nightly sweep — the four triage rules
 

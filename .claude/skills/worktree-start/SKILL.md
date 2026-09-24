@@ -148,6 +148,8 @@ supabase functions serve --env-file supabase/functions/.env --no-verify-jwt   # 
 **Three drivers hardcode `localhost:3000` / `8081`** (`active-inactive`, `levels`,
 `level-skills` — BACKLOG) and will aim at the sibling's servers. Run those through a
 port-substituted copy, deleted before commit (`FEATURE_TIER_REFACTOR_PLAYBOOK.md` §4).
+**`verify-app-auth` cannot run on 8082 at all** — its auth links only redirect to `localhost:8081`
+(§7.268). Run it when you can hold :8081.
 
 `drivers/lib.mjs` already reads `ADMIN_URL` / `EXPO_URL`, so **no driver needs editing** —
 and do not edit it; it is shared with every worktree.

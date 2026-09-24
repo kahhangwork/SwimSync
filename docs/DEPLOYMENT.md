@@ -958,3 +958,13 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     90 s and carries the new hook names (a refactor has no new user-visible string — the bundle hash + symbol grep
     is the check); live `/login`, `/welcome`, `/package/<bad>`, `/invoice/<bad>` rendered with 0 page errors; CI
     `35967311672` green. Nightly `35967782324` dispatched on `d7eeeea`.
+
+49. **Deploy record (2026-09-24): engine run day + the cancelled-lesson notice + four new drivers — three units,
+    ONE nightly.** 0 migrations (`migration list --linked` 0 pending). **Engine FIRST from `main`, not the
+    branch** (a branch deploy that outlives its merge is reverted by the next deploy from `main`): `cece22f`
+    fast-forwarded, then `supabase functions deploy generate-invoices` from that checkout — v28 → **v29**;
+    `supabase functions download` showed 0 `eq("key", "invoice_run_day")` and `tenant_unreadable` in `core.ts` +
+    `email.ts`. **No auto-mode call against prod** (day 24 is past every run day — a probe could really bill).
+    Prod a no-op: all 3 tenants and the global key = 7, cron off. Apps: `3ff558a` (drivers), `cece22f` (admin
+    comment), `c990a7f` (the notice fix) — Vercel on `c990a7f` for both; CI green on all three. Nightly
+    `36006182210` on `c990a7f` gates the bundle.

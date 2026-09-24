@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-24 — **App L-F/G/H + the app fence SHIPPED, `main` `d7eeeea` (§8.118): the feature-tier
-refactor programme is DONE in both apps** — every route file fenced, both ledgers empty in both apps. App-only, 0
-migrations (158/158). **Nightly `35967782324` on `d7eeeea` is the gate for the next unit (§9).**_
+_Last updated: 2026-09-24 (evening) — **Three units, one nightly (§8.119): the engine reads the BUSINESS's run day
+(engine v29 on prod), a coach tapping an admin-cancelled lesson sees its notice, and the hand-checks are four nightly
+drivers.** `main` `c990a7f`, 0 migrations. **Nightly `36006182210` on `c990a7f` is the gate for the next unit.**_
 
-_Previously (§8.117, 2026-09-23) — Billing months card + run log; August 2026 billed and closed on prod._
+_Previously (§8.118, 2026-09-23 → 24) — App L-F/G/H + the app fence; the feature-tier refactor programme DONE._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +347,23 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.119 (2026-09-24) — Engine run day, the cancelled-lesson notice, four nightly drivers: three units in parallel
+
+**The first parallel session with a subagent AND a second worktree.** A (root, `/plan-with-confidence` →
+`/plan-review` Opus 5.5) · B (a background subagent in an isolated worktree, code + jest only) · C (a second
+session via `/worktree-start`). One shared DB, taken in turns: C → A's Deno → B's driver. Merged C → A → B, gated by
+ONE nightly (the user's call, over one-per-unit).
+
+- **A — `cece22f`, engine v29.** The auto guard read the global `app_settings.invoice_run_day`; now
+  `tenants.invoice_run_day`, and fails CLOSED (`tenant_unreadable`) on an unreadable row. Prod a no-op (all 7, cron
+  off). **Read `docs/plans/ENGINE_TENANT_RUN_DAY_PLAN.md`** (RISK 1–6 inline, stage log). §7.265, §7.266.
+- **B — `61426c8` + `c8a7f36`.** The cancelled notice (§8.81) finally renders, naming the class. PRD §7.6. §7.267,
+  §7.270. The driver's first real run caught its OWN bug (NEEDS MARKING duplicates DONE's text).
+- **C — `3ff558a`.** 54 hand-checks → 4 `verify-app-*` drivers (TESTING §5). §7.268, §7.269; §7.264 caveat.
+- **Deliberately NOT done:** dropping the dead global row (a migration — BACKLOG); deleting the hand-check source
+  scripts C suggested (siblings keep theirs; 7 files and §7.263 cite them). **Graduated:** DEPLOYMENT §11 #49,
+  WORKTREES + `/worktree-start` (auth drivers need :8081), BACKLOG −3 / +3.
+
 ## 8.118 (2026-09-23 → 24) — App L-F/G/H + the app fence: the refactor programme is DONE in both apps
 
 **24 app route files (13 lite + 11 fence) in one branch, four sub-batches, 17 commits, fast-forwarded to `main`
@@ -361,20 +378,7 @@ its own driver net + hand-checks → two Opus behaviour-drift reviews (0 real ch
 - **Graduated:** §7.261–§7.264; ARCHITECTURE §6 (the `{page, feature|null}` fence, one-importer components move,
   fence routes keep markup); TESTING §5; DEPLOYMENT §11 #48; playbook §4 + §7.5; BACKLOG +3 / −3. **PRD untouched.**
 
-## 8.117 (2026-09-22) — Billing months card + generation run log; August 2026 closed on prod
-
-**The admin could not see which months were closed, nor WHY one stayed open** (BACKLOG, raised billing August).
-`/plan-with-confidence` (6 decisions) → `/plan-review` (Fable 5.1, 11 findings, 5 spot-checked, 1 partly wrong) →
-3 commits: `acbe0fe` migration, `1259ea3` engine + admin, `6c0a5ab` a label fix. Deployed in order via `/deploy`.
-
-- **Read `docs/plans/BILLING_MONTHS_PLAN.md` (D1–D7, the ⚠ RISK blocks, §11 stage log), PRD §7.7 + §9.24.**
-- **The prod smoke test WAS the real August close:** the owner settled the unclaimed child and generated; the log
-  held exactly the two runs (open → sealed). It also caught §7.259 one commit before the app push.
-- **The review's worst finding would have shipped silently:** the engine had no INSERT on the new table (§7.255).
-- **Graduated:** §7.255–§7.260; ARCHITECTURE §6y + §10; TESTING §5; DEPLOYMENT §11 #47 (incl. `supabase db query
-  --linked` for read-only prod SQL); INVOICE_RUNBOOK; BACKLOG +2 (run-day source, the midnight test), −1 (shipped).
-
-_(§8.116 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.117 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -417,35 +421,34 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-24: nightly `35967782324` was dispatched on `d7eeeea` (§8.118) and is the GATE for the next unit
-(§7.1) — read it from the log, not the badge.** Before it: the full LOCAL sweep on the same code was 52/52 (two reds
-green solo — a machine sleep and admin-calendar's 400 ms race, BACKLOG), and the last scheduled nightly on `main`
-before the merge (`35930522207`) was green. **`verify-tenant-suspension`'s recurring red is its FIRST parent-login
-control on a cold load (§7.262), not the admin checks** — a red on the post-suspend parent checks is real (§7.263).
+**State on 2026-09-24 (evening): nightly `36006182210` was dispatched on `c990a7f` (§8.119) — the FIRST nightly
+with the four `verify-app-*` drivers, and the gate for A + B + C together.** Before it: `35967782324` on `d7eeeea`
+green; B's `verify-cancel-lesson` 29/29 locally; C's four drivers green ×3 locally. **A red in a `verify-app-*`
+driver is new-driver noise until proven otherwise** — read it against C's local proofs (TESTING §5).
+**`verify-tenant-suspension`'s recurring red is its FIRST parent-login control on a cold load (§7.262)** — a red
+on the post-suspend parent checks is real (§7.263).
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
 §7.108's cold compile, then the four triage rules). Hand-run caveats — which drivers are not re-runnable,
 which mutate shared seed state — are in the same section.
 
-### THE NEXT BUILD — the feature-tier refactor programme is FINISHED
+### THE NEXT BUILD — pick from BACKLOG; three small ones are ready
 
-**There is no refactor unit left in either app** (§8.118; playbook §7.5 all ticked). A new page or screen takes the
-shape from day one — the fence's check 4 will refuse anything else. Pick from:
-
-- **Fix the cancelled-lesson spinner** — a small, real, user-facing bug (BACKLOG *Coach workflow*), one line plus a
-  test update; a behaviour change, so its own branch and its own PRD check.
-- **Promote the App L-F/G/H hand-check scripts to drivers** (BACKLOG, M) — 54 proven checks the nightly does not run
-  today, including the only one-shot login (§7.263).
-- **Or the engine's run-day source** (BACKLOG, §8.117's RISK 9) — small, but it changes billing timing: its own
-  branch and Deno coverage, and it must land before cron is ever enabled.
+- **The coach landing bounce** (BACKLOG *Coach workflow*) — a refresh or shared link always lands a coach on
+  Schedule. A real, user-facing bug; a behaviour change, so its own branch + PRD check.
+- **Harden `appLoginDies`** (BACKLOG, S) — the nightly's recurring "flake" (§7.262). Cheap, and it makes the
+  next red worth reading.
+- **Drop the dead `app_settings.invoice_run_day` row** (BACKLOG, S) — a contract migration on a `db/…` branch,
+  root checkout only.
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
-  current stage has (§7.253); reach a screen by TAP for anything visual (§7.254).
+  current change has (§7.253); reach a screen by TAP for anything visual (§7.254); **`verify-app-auth` needs
+  :8081** (§7.268).
 
-**GATE (§7.1): do NOT merge the next unit to `main` until nightly `35967782324` (on `d7eeeea`) is green — from the log.**
+**GATE (§7.1): do NOT merge the next unit to `main` until nightly `36006182210` (on `c990a7f`) is green — from the log.**
 
 **No migration is HELD or in flight.** Latest applied is `20260922000100` (billing_runs, §8.117), on prod,
 0 pending (158/158 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116 and §8.118 none (pure refactors).
+the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116, §8.118 and §8.119 none (§8.119's engine change needed no schema).
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

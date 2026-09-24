@@ -28,6 +28,7 @@ _The rows below are moved verbatim. Their length is the pre-2026-08-10 record, n
 standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
+| **8.117** | 2026-09-22 | Billing months card + generation run log; August 2026 closed on prod | docs/plans/BILLING_MONTHS_PLAN.md · §7.255–7.260 |
 | **8.116** | 2026-09-22 | Coach Schedule full track: 1,255 → 101 lines, the last giant | docs/refactor/COACH_SCHEDULE_REFACTOR_PLAN.md · §7.253–7.254 |
 | **8.115** | 2026-09-22 | Coach attendance full track: 1,183 → 166 lines, the marking screen | docs/refactor/COACH_ATTENDANCE_REFACTOR_PLAN.md · §7.253–7.254 |
 | **8.114** | 2026-09-21 | Coach roster full track: 905 → 64 lines, the first app unit + the app fence | docs/refactor/COACH_ROSTER_REFACTOR_PLAN.md · §7.252 |

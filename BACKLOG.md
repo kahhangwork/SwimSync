@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-24 — **The cancelled-lesson spinner FIXED** (a coach tapping an admin-cancelled lesson now sees the notice): that item removed. Earlier same day — **The engine now reads the BUSINESS's run day** (`ENGINE_TENANT_RUN_DAY_PLAN.md`): that item removed; filed **drop the dead `app_settings.invoice_run_day` row**. Earlier same day — **App L-F/G/H + the app fence SHIPPED** (§8.118): the feature-tier programme is DONE in both apps, so its item is removed, with the stale struck *Smoke drivers* entry and the *four local driver reds* item (all four GREEN in the 2026-09-24 full local sweep). Filed: **promote the hand-check scripts to drivers**, **harden `appLoginDies`** (§7.262), the **admin-calendar 400 ms race**. Earlier, 2026-09-23 — **Billing months card SHIPPED** (§8.117): the "cannot see WHY a month is open" item removed; filed the **engine run-day source** (before cron) and the **midnight pgTAP flake** (§7.260). Earlier, 2026-09-22 — **Coach Schedule (the LAST full-track giant) SHIPPED** (§8.116); a **Schedule driver** item filed (role badges, location chips + clamp, DONE tap), and the local-reds item updated (`smoke-app` / `trial-onboarding` GREEN locally). Earlier same day — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-24 — **The hand-check scripts are four nightly drivers** (`3ff558a`): that item removed; filed a driver for the **package page's *I've paid*** and a **deployed `public-package` CORS check**. Earlier same day — **The cancelled-lesson spinner FIXED** (a coach tapping an admin-cancelled lesson now sees the notice): that item removed. Earlier same day — **The engine now reads the BUSINESS's run day** (`ENGINE_TENANT_RUN_DAY_PLAN.md`): that item removed; filed **drop the dead `app_settings.invoice_run_day` row**. Earlier same day — **App L-F/G/H + the app fence SHIPPED** (§8.118): the feature-tier programme is DONE in both apps, so its item is removed, with the stale struck *Smoke drivers* entry and the *four local driver reds* item (all four GREEN in the 2026-09-24 full local sweep). Filed: **promote the hand-check scripts to drivers**, **harden `appLoginDies`** (§7.262), the **admin-calendar 400 ms race**. Earlier, 2026-09-23 — **Billing months card SHIPPED** (§8.117): the "cannot see WHY a month is open" item removed; filed the **engine run-day source** (before cron) and the **midnight pgTAP flake** (§7.260). Earlier, 2026-09-22 — **Coach Schedule (the LAST full-track giant) SHIPPED** (§8.116); a **Schedule driver** item filed (role badges, location chips + clamp, DONE tap), and the local-reds item updated (`smoke-app` / `trial-onboarding` GREEN locally). Earlier same day — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -1563,20 +1563,24 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### Promote the App L-F/G/H hand-check scripts to real drivers — **M** `[from App L-F/G/H 2026-09-23]`
-Turn `docs/refactor/app-fgh-handchecks-{F,G,H,fence}.mjs` (54 checks) into `verify-*.mjs` drivers with fixtures,
-so the nightly covers them.
+### A driver for the package page's own *I've paid* — **S** `[from the hand-check drivers 2026-09-24]`
+`/package/<token>`'s *I've paid* (`postPublicPackageClaim`) is pressed by no driver. `verify-app-money` loads the
+page logged in and out and checks its request headers, but stops short of the claim POST.
 
-**Why:** these are the app actions NO driver presses — Invoice Detail's own *I've paid*, `/package/<valid token>`
-(logged in and out, content-type only — §7.264), cancelling a package request, the coach QR upload, both Sign
-Outs, change password, forgot/reset/accept-invite through real links, a declined-claim dismiss, register-with-a-
-join-code. Today a regression in any of them is invisible until a parent reports it; the one-shot login is the only
-thing that catches §7.263.
+**Why:** it is how a parent with no account tells the business they paid for a package; a regression there is
+invisible until the admin notices payments never arrive. **Notes:** extend `verify-app-money` (its own tenant,
+`ac300000-…`) rather than a new fixture. The POST must stay a bare `fetch` with `content-type` only (§7.264).
 
-**Notes:** every script already passed on BOTH the pre-change and the refactored code, so they are proven, not
-drafts. Reach screens by TAP (§7.254) and follow the playbook §4 hand-check traps. Links come from
-`auth.admin.generateLink` (the admin invite route's own call); the forgot-password mail lands in Mailpit (:54324).
-Separate from *A driver for the `reset-password` recovery path* below — that one is the ADMIN panel's screen.
+### Check the deployed `public-package` CORS against §7.264's comment — **S** `[from the hand-check drivers 2026-09-24]`
+`publicPackage.api.ts`'s header comment (and §7.264) say any added request header fails CORS and renders
+"Package not found". Locally, with `x-client-info` added, the page still rendered: the local functions runtime
+answers the preflight itself.
+
+**Why:** if the deployed function ALSO accepts extra headers, the comment is wrong and scares people off a safe
+change; if it doesn't, the local stack cannot catch the regression, and only `verify-app-money`'s header-NAME
+check does. **Notes:** a read-only probe is enough: `curl -X OPTIONS` the deployed `public-package` with
+`Access-Control-Request-Headers: x-client-info` and read `Access-Control-Allow-Headers`. Then correct the comment
+or §7.264's caveat, whichever is wrong.
 
 ### Harden `appLoginDies` in verify-tenant-suspension / verify-coach-disable — **S** `[from App L-F/G/H 2026-09-23]`
 Replace the fixed 7 s hydrate wait with a wait for the login form (as `loginExpo` does), and report a form that
