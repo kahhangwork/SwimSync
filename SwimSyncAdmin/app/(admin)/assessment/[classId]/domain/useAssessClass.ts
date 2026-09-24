@@ -42,6 +42,8 @@ export function useAssessClass() {
   const [scale, setScale] = useState<GradeLevel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** The class the held rows belong to — see gridVisibleWhileLoading. */
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,6 +83,7 @@ export function useAssessClass() {
     }
 
     setRoster(toRoster(students, progRes.data));
+    setLoadedFor(classId);
     setLoading(false);
   }, [classId]);
 
@@ -91,7 +94,7 @@ export function useAssessClass() {
   const progress = roundProgress(groupRosterByLevel(roster, levels, scale, since));
   const pct = percentGraded(progress.gradedSkills, progress.totalSkills);
 
-  return { since, setSince, info, roster, levels, scale, loading, error, load, progress, pct, gradeWrites };
+  return { since, setSince, info, roster, levels, scale, loading, error, load, progress, pct, gradeWrites, classId, loadedFor };
 }
 
 export type AssessClassState = ReturnType<typeof useAssessClass>;

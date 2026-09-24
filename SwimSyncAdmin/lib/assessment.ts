@@ -354,3 +354,35 @@ export function dedupeStroke(cells: StrokeCell[]): StrokeCell[] {
     (c, i) => lastIndex.get(`${c.student_id}:${c.skill_id}`) === i
   );
 }
+
+/**
+ * The `graded_at` the grid shows for a cell while its write is in flight or
+ * just landed. A cell written THIS session is fresh — even when the grade is
+ * the one it already held: re-confirming an old grade is a real write that
+ * advances `graded_at` on the server, and treating it as unchanged left the row
+ * stale (no "Move up") until a reload. Otherwise the server's own date stands.
+ */
+export function optimisticGradedAt(
+  existing: { grade_level_id: string; graded_at: string } | undefined,
+  gradeLevelId: string,
+  writtenThisSession: boolean,
+  nowIso: string
+): string {
+  if (writtenThisSession) return nowIso;
+  if (existing && existing.grade_level_id === gradeLevelId) return existing.graded_at;
+  return nowIso;
+}
+
+/**
+ * Whether a screen may keep the grid mounted while it (re)loads. A reload of
+ * the SAME class or child keeps it — unmounting it swallowed the grid's own
+ * "moved up to …" and "could not save … reloaded" messages. Loading a DIFFERENT
+ * one never does: the grid would show the previous subject's rows as this one's.
+ */
+export function gridVisibleWhileLoading(
+  loading: boolean,
+  loadedFor: string | null,
+  current: string
+): boolean {
+  return !loading || loadedFor === current;
+}

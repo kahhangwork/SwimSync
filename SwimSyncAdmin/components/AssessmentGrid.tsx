@@ -40,6 +40,7 @@ import {
   canPromote,
   nextLevel,
   dedupeStroke,
+  optimisticGradedAt,
   type GradeLevel,
   type GradeWrites,
   type Level,
@@ -97,6 +98,11 @@ export function AssessmentGrid({
   const stroke = useRef<StrokeCell[]>([]);
   const strokeSnapshot = useRef<Record<string, Record<string, string>> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // `${student}:${skill}` for every cell written since the roster was last
+  // read. Such a cell is fresh even if its grade did not change (see
+  // optimisticGradedAt). Cleared when a new roster arrives — the server's
+  // graded_at then says it for itself.
+  const writtenThisSession = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const seeded: Record<string, Record<string, string>> = {};
@@ -106,6 +112,7 @@ export function AssessmentGrid({
       );
     }
     setGrades(seeded);
+    writtenThisSession.current = new Set();
   }, [roster]);
 
   // Escape disarms. A mode you cannot see is a mode that mis-records a grade,
@@ -173,6 +180,8 @@ export function AssessmentGrid({
   }
 
   function applyLocal(studentId: string, skillId: string, gradeId: string | null) {
+    if (gradeId) writtenThisSession.current.add(`${studentId}:${skillId}`);
+    else writtenThisSession.current.delete(`${studentId}:${skillId}`);
     setGrades((g) => {
       const forStudent = { ...(g[studentId] ?? {}) };
       if (gradeId) forStudent[skillId] = gradeId;
@@ -255,11 +264,14 @@ export function AssessmentGrid({
       return {
         skill_id,
         grade_level_id,
-        // A grade the assessor just changed is by definition from this round.
-        graded_at:
-          existing && existing.grade_level_id === grade_level_id
-            ? existing.graded_at
-            : new Date().toISOString(),
+        // A grade the assessor just wrote — changed OR re-confirmed — is by
+        // definition from this round.
+        graded_at: optimisticGradedAt(
+          existing,
+          grade_level_id,
+          writtenThisSession.current.has(`${s.id}:${skill_id}`),
+          new Date().toISOString()
+        ),
       };
     });
     return { ...s, progress };

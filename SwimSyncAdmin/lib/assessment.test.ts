@@ -16,6 +16,8 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  optimisticGradedAt,
+  gridVisibleWhileLoading,
   isFreshGrade,
   topGradeOf,
   buildStudentRow,
@@ -432,5 +434,34 @@ describe("dedupeStroke", () => {
 
   it("handles an empty stroke", () => {
     expect(dedupeStroke([])).toEqual([]);
+  });
+});
+
+describe("optimisticGradedAt", () => {
+  const NOW = "2026-09-24T10:00:00.000Z";
+  const OLD = { grade_level_id: "g2", graded_at: "2026-06-01T00:00:00.000Z" };
+
+  it("keeps the server's date for an untouched cell", () => {
+    expect(optimisticGradedAt(OLD, "g2", false, NOW)).toBe(OLD.graded_at);
+  });
+  it("is now for a changed grade", () => {
+    expect(optimisticGradedAt(OLD, "g1", false, NOW)).toBe(NOW);
+    expect(optimisticGradedAt(undefined, "g1", false, NOW)).toBe(NOW);
+  });
+  it("is now for a RE-CONFIRMED grade written this session — the bug", () => {
+    expect(optimisticGradedAt(OLD, "g2", true, NOW)).toBe(NOW);
+  });
+});
+
+describe("gridVisibleWhileLoading", () => {
+  it("shows the grid once loaded", () => {
+    expect(gridVisibleWhileLoading(false, "c1", "c1")).toBe(true);
+  });
+  it("keeps it mounted through a reload of the SAME class or child", () => {
+    expect(gridVisibleWhileLoading(true, "c1", "c1")).toBe(true);
+  });
+  it("never shows another subject's rows while loading a new one", () => {
+    expect(gridVisibleWhileLoading(true, "c1", "c2")).toBe(false);
+    expect(gridVisibleWhileLoading(true, null, "c1")).toBe(false);
   });
 });

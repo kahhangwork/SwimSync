@@ -10,6 +10,7 @@
 import { Modal } from "@/components/Modal";
 import { AssessmentGrid } from "@/components/AssessmentGrid";
 import { todayInSg } from "@/lib/lessonDates";
+import { gridVisibleWhileLoading } from "@/lib/assessment";
 import { gradeWrites, type GradingState } from "../domain/useGrading";
 
 export function GradingModal(p: { grading: GradingState; tenantId: string | null }) {
@@ -25,10 +26,13 @@ export function GradingModal(p: { grading: GradingState; tenantId: string | null
           Could not load this child&apos;s skills: {g.gradeError}. Close and try
           again — an empty list here is a failed query, not an ungraded child.
         </div>
-      ) : g.gradeLoading ? (
+      ) : g.gradingFor &&
+        !gridVisibleWhileLoading(g.gradeLoading, g.gradeRoster[0]?.id ?? null, g.gradingFor.id) ? (
+        // A reload of THIS child keeps the grid (and its messages) mounted.
         <p className="py-6 text-center text-sm text-gray-400">Loading…</p>
       ) : p.tenantId && g.gradingFor ? (
-        <div className="space-y-3">
+        // Visible but click-proof while it re-reads (see ClassGridSection).
+        <div aria-busy={g.gradeLoading} className={`space-y-3${g.gradeLoading ? " pointer-events-none opacity-60" : ""}`}>
           <p className="text-sm text-gray-600">
             Click a grade to cycle it. Changes save straight away. Grades from
             before today show greyed with the date they were given.

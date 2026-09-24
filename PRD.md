@@ -2000,7 +2000,11 @@ and nothing to lose by closing the tab.
 one of those grades is from this round**, the grid offers *Move up to <next level>*. The
 freshness condition is deliberate: promoting off months-old grades would move a child
 nobody has looked at today. A child promoted mid-tour is marked *Promoted this round* so
-they are not mistaken for one still to assess.
+they are not mistaken for one still to assess. *(2026-09-24)* Moving a child up says so —
+*"Maya moved up to Dolphin."* stays on screen while the grid re-reads, rather than the child
+silently vanishing from one sub-table. And **re-confirming** a grade counts as grading it this
+round: painting last round's *Mastered* again makes the row fresh at once, so *Move up*
+appears without reloading the page.
 
 A single child can also be graded from the **Students** page's Actions drawer — the same
 grid, for the one-off correction rather than the tour.

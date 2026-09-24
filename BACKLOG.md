@@ -1732,23 +1732,6 @@ book both through the form (new child, then "a child already in SwimSync"). **Pr
 reload** when the painted grade equals the held one (see the grid item below) — reload before looking for it.
 Unit coverage already exists for the grid's writes (`components/AssessmentGrid.test.tsx`).
 
-### Assessment grid: the promote confirmation never shows, and a re-confirmed grade reads stale until reload — **S** `[found by the Admin L-D hand-checks 2026-09-18]`
-Two feedback gaps in `components/AssessmentGrid.tsx`, both pre-existing (unchanged by the refactor, which was
-verbatim). **(1)** "X moved up to Y." is set as grid state, then `onReload` flips the class page to "Loading…",
-which UNMOUNTS the grid and the message with it — the assessor sees a child vanish from one sub-table with no
-word about it, the exact thing the grid's own comment calls "disorienting". **(2)** Painting a cell with the grade
-it ALREADY holds keeps the old `graded_at` in the optimistic roster, so the row neither turns fresh nor offers
-"Move up" until the page is re-read — though the write did advance `graded_at` (`verify-assessment` proves it
-after a reload).
-
-**Why:** the only real assessor grades poolside on a phone; both gaps make a correct action look like it did
-nothing, which invites a second tap or a skipped promotion.
-
-**Notes:** (1) is fixable by keeping the grid mounted during reload (render it under the loading state rather
-than instead of it) or by lifting the flash to the page — either is a behaviour change, so its own commit,
-never inside a refactor. (2) is one line in `optimisticRoster` (treat a grade written THIS session as fresh
-regardless of equality) — check it against `isFreshGrade` and the §7.221 stroke rules first.
-
 ### A `verify-lesson-detail-guests` driver for the lesson page's uncovered actions — **S** `[from the lesson-detail refactor 2026-09-18]`
 The four-driver net for `/lessons/[classId]/[date]` (129/129, §8.112) presses none of these: **book a TRIAL** into a
 lesson and **Cancel booking** on a guest row; **Set all**; the **Rain/Coach** and **Paid/Free** sub-toggles; a

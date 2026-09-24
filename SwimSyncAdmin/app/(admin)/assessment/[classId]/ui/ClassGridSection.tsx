@@ -1,4 +1,5 @@
 import { AssessmentGrid } from "@/components/AssessmentGrid";
+import { gridVisibleWhileLoading } from "@/lib/assessment";
 import type { AssessClassState } from "../domain/useAssessClass";
 
 export function ClassGridSection(p: { s: AssessClassState }) {
@@ -11,20 +12,27 @@ export function ClassGridSection(p: { s: AssessClassState }) {
         </div>
       ) : null}
 
-      {p.s.loading ? (
+      {/* A RELOAD of this class keeps the grid mounted, so its "moved up to …"
+          and "could not save … reloaded" messages survive the re-read. Only a
+          first load (or another class's) shows Loading. */}
+      {!gridVisibleWhileLoading(p.s.loading, p.s.loadedFor, p.s.classId) ? (
         <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-400">
           Loading…
         </p>
       ) : p.s.info ? (
-        <AssessmentGrid
-          tenantId={p.s.info.tenant_id}
-          roster={p.s.roster}
-          levels={p.s.levels}
-          scale={p.s.scale}
-          since={p.s.since}
-          onReload={p.s.load}
-          writes={p.s.gradeWrites}
-        />
+        // While it re-reads, the grid stays visible but takes no clicks: a
+        // click landing mid-reload would be re-seeded away by the new roster.
+        <div aria-busy={p.s.loading} className={p.s.loading ? "pointer-events-none opacity-60" : undefined}>
+          <AssessmentGrid
+            tenantId={p.s.info.tenant_id}
+            roster={p.s.roster}
+            levels={p.s.levels}
+            scale={p.s.scale}
+            since={p.s.since}
+            onReload={p.s.load}
+            writes={p.s.gradeWrites}
+          />
+        </div>
       ) : null}
     </>
   );

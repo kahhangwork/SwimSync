@@ -50,14 +50,14 @@ function fakeWrites(fail = false) {
   } satisfies GradeWrites;
 }
 
-function mount(roster: RosterStudent[], writes: GradeWrites, onReload = vi.fn()) {
+function mount(roster: RosterStudent[], writes: GradeWrites, onReload = vi.fn(), since = SINCE) {
   const view = render(
     <AssessmentGrid
       tenantId={T}
       roster={roster}
       levels={LEVELS}
       scale={SCALE}
-      since={SINCE}
+      since={since}
       onReload={onReload}
       writes={writes}
     />
@@ -166,5 +166,37 @@ describe("AssessmentGrid — injected writes", () => {
     expect(w.promoteStudent).toHaveBeenCalledWith("s1", "L2");
     expect(onReload).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Maya moved up to Dolphin.")).toBeTruthy();
+  });
+});
+
+describe("AssessmentGrid — a re-confirmed grade reads fresh at once", () => {
+  // The bug: painting a cell with the grade it ALREADY holds kept the old
+  // graded_at in the optimistic roster, so a child graded last round stayed
+  // stale — no "Move up" — until a reload, though the server had advanced it.
+  it("re-painting last round's Mastered offers Move up without a reload", async () => {
+    vi.useFakeTimers();
+    const w = fakeWrites();
+    const OLD = "2026-06-01T02:00:00.000Z";
+    mount(
+      child([
+        { skill_id: "k1", grade_level_id: "g2", graded_at: OLD },
+        { skill_id: "k2", grade_level_id: "g2", graded_at: OLD },
+      ]),
+      w,
+      vi.fn(),
+      "2026-09-01"
+    );
+    expect(screen.queryByRole("button", { name: /Move up to Dolphin/ })).toBeNull(); // stale
+
+    fireEvent.click(screen.getByRole("button", { name: "Mastered" }));
+    const cells = Array.from(document.querySelectorAll("tbody td button")).slice(0, 2);
+    fireEvent.click(cells[0]);
+    fireEvent.click(cells[1]);
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+
+    expect(w.upsertGrades).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /Move up to Dolphin/ })).toBeTruthy();
   });
 });
