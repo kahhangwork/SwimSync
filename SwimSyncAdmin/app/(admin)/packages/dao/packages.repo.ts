@@ -21,6 +21,14 @@ export const loadTenantSettings = (tenantId: string) =>
     .eq("id", tenantId)
     .single();
 
+// The two "running low" thresholds (moved from the Students page 2026-09-24).
+export const loadLowSettings = (tenantId: string) =>
+  supabase
+    .from("tenants")
+    .select("low_package_lessons, package_expiry_warning_days")
+    .eq("id", tenantId)
+    .single();
+
 export const loadCategories = () =>
   supabase
     .from("class_categories")
@@ -96,6 +104,12 @@ export const updateTenantDefaultProduct = (
     .from("tenants")
     .update({ default_package_product_id: defaultProductId })
     .eq("id", tenantId);
+
+export const updateLowPackageLessons = (tenantId: string, value: number) =>
+  supabase.from("tenants").update({ low_package_lessons: value }).eq("id", tenantId);
+
+export const updatePackageExpiryDays = (tenantId: string, value: number) =>
+  supabase.from("tenants").update({ package_expiry_warning_days: value }).eq("id", tenantId);
 
 // ── Product writes ───────────────────────────────────────────────────────────
 

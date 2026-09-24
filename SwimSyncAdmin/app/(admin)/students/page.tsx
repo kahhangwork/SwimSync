@@ -107,9 +107,7 @@ export default function StudentsPage() {
         lowOnly={lowOnly}
         onToggleLow={() => setLowOnly(!lowOnly)}
         threshold={packages.threshold}
-        onThreshold={packages.saveThreshold}
         expiryDays={packages.expiryDays}
-        onExpiryDays={packages.saveExpiryDays}
       />
 
       <DuplicateBanner pairs={merge.dupPairs} onReview={merge.review} />

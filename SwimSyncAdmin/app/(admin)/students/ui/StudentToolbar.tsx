@@ -2,10 +2,11 @@
 // docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md. Markup lifted verbatim from
 // page.tsx; every value and handler arrives as a prop.
 //
-// The "running low" threshold inputs render here because they sit inside the
-// toggle's label, but they are TENANT PACKAGE SETTINGS (plan §10) — the
-// handlers come from the package-settings domain, not from this slice.
+// The "running low" thresholds are TENANT PACKAGE SETTINGS, edited on the
+// Packages page since 2026-09-24. They are shown here READ-ONLY beside the
+// filter, because the filter means nothing without them.
 
+import Link from "next/link";
 import { STATUS_FILTERS } from "../constants";
 import type { SearchField } from "../types";
 
@@ -22,9 +23,7 @@ export type StudentToolbarProps = {
   lowOnly: boolean;
   onToggleLow: () => void;
   threshold: string;
-  onThreshold: (v: string) => void;
   expiryDays: string;
-  onExpiryDays: (v: string) => void;
 };
 
 export function StudentToolbar(p: StudentToolbarProps) {
@@ -95,25 +94,12 @@ export function StudentToolbar(p: StudentToolbarProps) {
           Package running low
         </button>
         {p.lowOnly && (
-          <label className="flex items-center gap-1.5 text-xs text-gray-600">
-            at
-            <input
-              value={p.threshold}
-              onChange={(e) => p.onThreshold(e.target.value)}
-              inputMode="numeric"
-              className="w-12 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-xs"
-              aria-label="Low-package threshold in lessons"
-            />
-            lessons or fewer, or expiring within
-            <input
-              value={p.expiryDays}
-              onChange={(e) => p.onExpiryDays(e.target.value)}
-              inputMode="numeric"
-              className="w-12 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-xs"
-              aria-label="Expiry warning window in days"
-            />
-            days
-          </label>
+          <span className="text-xs text-gray-600">
+            at {p.threshold} lessons or fewer, or expiring within {p.expiryDays} days ·{" "}
+            <Link href="/packages" className="font-semibold text-sky-600 hover:underline">
+              Change on Packages
+            </Link>
+          </span>
         )}
       </div>
     </div>

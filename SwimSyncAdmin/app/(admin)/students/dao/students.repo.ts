@@ -194,7 +194,7 @@ export const countConvertedReferrals = (parentId: string) =>
     .eq("referrer_parent_id", parentId)
     .eq("status", "converted");
 
-// ── Tenant package settings (plan §10: belongs on Packages, extracted in place)
+// ── Tenant package settings — READ only (edited on the Packages page since 2026-09-24)
 
 /** !tenant_id disambiguates: tenants also references profiles via
  *  owner_profile_id (20260806000100), so a bare embed is refused. */
@@ -207,14 +207,3 @@ export const fetchTenantPackageSettings = (userId: string | undefined) =>
     .eq("id", userId)
     .single();
 
-export const updateLowPackageLessons = (tenantId: string, value: number) =>
-  supabase
-    .from("tenants")
-    .update({ low_package_lessons: value })
-    .eq("id", tenantId);
-
-export const updatePackageExpiryDays = (tenantId: string, value: number) =>
-  supabase
-    .from("tenants")
-    .update({ package_expiry_warning_days: value })
-    .eq("id", tenantId);

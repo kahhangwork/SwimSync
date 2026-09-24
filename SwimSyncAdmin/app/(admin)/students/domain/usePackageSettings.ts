@@ -1,9 +1,10 @@
-// Tenant package settings and the per-child coverage verdict. Stage 10 of
-// docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md. Lifted from page.tsx intact.
+// The per-child coverage verdict, and the business's "running low" thresholds
+// READ for display beside the filter. Stage 10 of
+// docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md.
 //
-// ⚠ PLAN §10: this is TENANT-LEVEL PACKAGE CONFIGURATION living on the
-// Students screen. It belongs on Packages. Moving it is a behaviour change,
-// not a refactor, so it is extracted here IN PLACE and left. (BACKLOG.)
+// The thresholds are EDITED on the Packages page since 2026-09-24 (plan §10's
+// BACKLOG item: tenant package configuration does not belong on Students).
+// Nothing here writes them.
 //
 // `tenantId` is read here as a by-product of the settings fetch and is also
 // what the grading grid and the add-student duplicate check key on.
@@ -38,23 +39,6 @@ export function usePackageSettings() {
     setCovMap(coverageByStudent(cov ?? []));
   }
 
-  async function saveThreshold(value: string) {
-    setThreshold(value);
-    // Empty BEFORE coercing (§7.22): an empty field must not save 0.
-    if (value.trim() === "" || !Number.isInteger(Number(value)) || Number(value) < 0)
-      return;
-    if (!tenantId) return;
-    await repo.updateLowPackageLessons(tenantId, Number(value));
-  }
-
-  async function saveExpiryDays(value: string) {
-    setExpiryDays(value);
-    if (value.trim() === "" || !Number.isInteger(Number(value)) || Number(value) < 0)
-      return;
-    if (!tenantId) return;
-    await repo.updatePackageExpiryDays(tenantId, Number(value));
-  }
-
   // ⚠ RISK 10 — "running low" is now the SQL `low` verdict (lessons OR expiry,
   // minus families with an open row), so this filter AGREES with Generate-all's
   // candidate list. No TS re-derivation.
@@ -66,8 +50,6 @@ export function usePackageSettings() {
     tenantId,
     covMap,
     loadPackages,
-    saveThreshold,
-    saveExpiryDays,
     runningLow,
   };
 }

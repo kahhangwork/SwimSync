@@ -28,6 +28,7 @@ import { useProductForm } from "./domain/useProductForm";
 import { useExtend } from "./domain/useExtend";
 import { useSale } from "./domain/useSale";
 import { useGenerateOffers } from "./domain/useGenerateOffers";
+import { useLowSettings } from "./domain/useLowSettings";
 import { ListNotices } from "./ui/ListNotices";
 import { ProductModal } from "./ui/ProductModal";
 import { ExtendModal } from "./ui/ExtendModal";
@@ -39,6 +40,7 @@ import { CancelModal } from "./ui/CancelModal";
 import { PendingPanel } from "./ui/PendingPanel";
 import { ProductsTable } from "./ui/ProductsTable";
 import { HeldTable } from "./ui/HeldTable";
+import { LowSettingsCard } from "./ui/LowSettingsCard";
 
 export default function PackagesPage() {
   // Slice 1 (list-core): all loaded data, held-search, the WhatsApp queue, and
@@ -118,6 +120,8 @@ export default function PackagesPage() {
     reload: load,
   });
   const { openGenerateAll, genBusy } = gen;
+  // The "running low" thresholds — Generate renewal offers reads them.
+  const low = useLowSettings();
 
   return (
     <div>
@@ -131,6 +135,8 @@ export default function PackagesPage() {
           {genBusy ? "Loading…" : "Generate renewal offers"}
         </Button>
       </div>
+
+      <LowSettingsCard low={low} />
 
       <ListNotices error={error} />
 

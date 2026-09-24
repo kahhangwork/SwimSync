@@ -123,13 +123,28 @@ try {
 
   // ── Admin: the per-tenant "running low" filter ────────────────────────────
   console.log("\n[admin] students low-balance filter, both directions");
-  await page.goto(`${ADMIN}/students`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(2000);
-
-  await tap(page.getByRole("button", { name: "Package running low" }), "filter on");
-  await page.waitForTimeout(800);
-
-  const threshold = page.getByLabel("Low-package threshold in lessons");
+  // The thresholds are EDITED on Packages (moved from Students 2026-09-24) and
+  // shown read-only beside the Students filter. Set one there, then load
+  // Students FRESH — its coverage verdict is read at page load, so this proves
+  // the stored value is what the filter actually uses.
+  async function setThresholdOnPackages(v) {
+    await page.goto(`${ADMIN}/packages`, { waitUntil: "networkidle" });
+    const field = page.getByLabel("Low-package threshold in lessons");
+    // Disabled until the stored values load; fill() waits for it to enable.
+    await field.waitFor({ timeout: 15000 });
+    const saved = page.waitForResponse(
+      (r) => r.url().includes("/rest/v1/tenants") && r.request().method() === "PATCH", { timeout: 10000 });
+    await field.fill(v);
+    await saved;
+  }
+  async function studentsLowFilter() {
+    await page.goto(`${ADMIN}/students`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(2000);
+    await tap(page.getByRole("button", { name: "Package running low" }), "filter on");
+    await page.waitForTimeout(800);
+    return page.evaluate(() => document.body.innerText);
+  }
+  const threshold = { fill: async (v) => { await setThresholdOnPackages(v); text = await studentsLowFilter(); } };
   // ⚠ THE TOP-UP JUST BOUGHT DOES NOT COUNT YET, AND THAT IS RISK 2 WORKING.
   // Since 20260814…/20260815000600 a package carries a START DATE, and
   // suggest_package_start sequences a second one to begin when the first runs
@@ -144,16 +159,15 @@ try {
   // underneath the PGRST201 embed break, which killed the driver 15 checks
   // earlier — fixing that one is what exposed these.
   await threshold.fill("20");
-  await page.waitForTimeout(1200);
-  text = await page.evaluate(() => document.body.innerText);
+  check(/at 20 lessons or fewer/.test(text) && /Change on Packages/.test(text),
+    "Students shows the Packages-set threshold read-only, with a link to change it",
+    text.slice(0, 300));
   check(!/Pablo Package/.test(text),
     "⚠ RISK 2: at threshold 20 the family is NOT flagged — a future-start top-up already answers the nag",
     text.slice(0, 300));
 
   // …and at 2 they are not (and no package-less family ever appears).
   await threshold.fill("2");
-  await page.waitForTimeout(1200);
-  text = await page.evaluate(() => document.body.innerText);
   check(!/Pablo Package/.test(text) && /No students found/.test(text),
     "at threshold 2 nobody is flagged");
 

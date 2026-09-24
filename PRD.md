@@ -2051,7 +2051,8 @@ cash paid always equals value granted — nothing to reconcile.
   rate**, on the same invoice — nobody is blocked at poolside and nothing is lost. A
   family with no package takes exactly the pre-package path.
 - **Live everywhere it is shown**: the parent's card, the admin's tables and the
-  students-page **"running low" filter** (threshold per business, admin-set) all read
+  students-page **"running low" filter** (threshold per business, admin-set on the **Packages** page — the Students
+  page shows it read-only beside the filter, *2026-09-24*) all read
   one database derivation that subtracts lessons attended but not yet invoiced — the
   count drops the evening of the lesson, though the money settles monthly.
 - **Every child's name carries their payment method** *(implemented 2026-08-01)*:
@@ -2141,7 +2142,7 @@ cash paid always equals value granted — nothing to reconcile.
   family never holds two live pay links; a **claimed** offer is never auto-cancelled (the
   bank reference must keep resolving). Confirming *Payment received* activates the package
   **with the offered start date**. "Low" is one definition — lessons ≤ threshold or expiring
-  within N days (both admin-set), minus families that already have an open row — used
+  within N days (both admin-set, on the Packages page), minus families that already have an open row — used
   identically by *Generate all* and by the Students page's **Package / Left / Expires**
   columns and its "running low" filter. Renewals are for package HOLDERS only; ad-hoc
   families stay on monthly invoices. *(No cron: `wa.me` is worked by hand. The public page
