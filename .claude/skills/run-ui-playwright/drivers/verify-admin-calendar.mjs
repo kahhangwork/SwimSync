@@ -89,13 +89,17 @@ try {
   check("Escape unpins", (await tip.count()) === 0);
 
   // ── Navigation moves the URL date ─────────────────────────────────────────
+  // Wait for the URL itself, not a fixed 400 ms: the fixed wait read page.url()
+  // before the router landed and went 20/21 in a full local sweep on unchanged
+  // code (2026-09-24). A timeout falls through so the check reports the URL it saw.
+  const urlDate = (u) => u.searchParams.get("date");
   await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.waitForTimeout(400);
+  await page.waitForURL((u) => urlDate(u) !== null && urlDate(u) > today, { timeout: 10000 }).catch(() => {});
   const nextDate = new URL(page.url()).searchParams.get("date");
   check("› moves the URL date forward one day", nextDate !== null && nextDate > today, `${today} → ${nextDate}`);
   await page.getByRole("button", { name: "Today", exact: true }).click();
-  await page.waitForTimeout(400);
-  check("Today returns the URL date to today", new URL(page.url()).searchParams.get("date") === today);
+  await page.waitForURL((u) => urlDate(u) === today, { timeout: 10000 }).catch(() => {});
+  check("Today returns the URL date to today", urlDate(new URL(page.url())) === today, page.url());
 
   // ── Sticky gutter: scroll the grid sideways (force a wide grid via zoom) ──
   await page.setViewportSize({ width: 700, height: 800 });
@@ -128,7 +132,7 @@ try {
   const todayCell = page.locator(`[data-testid="month-cell"][data-date="${today}"]`);
   check("month view has today's cell with chips", (await todayCell.getByTestId("lesson-chip").count()) >= 2);
   await todayCell.getByTitle("Open this day").click();
-  await page.waitForTimeout(400);
+  await page.waitForURL((u) => u.searchParams.get("view") === "day", { timeout: 10000 }).catch(() => {});
   const u = new URL(page.url());
   check("day number jumps to the day view of that date", u.searchParams.get("view") === "day" && u.searchParams.get("date") === today);
 
@@ -143,12 +147,18 @@ try {
   await page.goto(`${ADMIN}/calendar?view=day&date=${today}`, { waitUntil: "networkidle" });
   await page.getByTestId("lesson-card").first().waitFor({ timeout: 15000 });
   await page.getByLabel("Coach").selectOption({ label: "Calendar Sub" });
-  await page.waitForTimeout(500);
+  // The URL first, then the grid re-rendering to it — each a wait, not a timer.
+  // A timeout falls through so the checks report what they saw.
+  await page.waitForURL((u) => !!u.searchParams.get("coach"), { timeout: 10000 }).catch(() => {});
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-testid="lesson-card"]').length === 1, null, { timeout: 10000 }
+  ).catch(() => {});
   const filtered = await page.getByTestId("lesson-card").count();
   check("coach filter keeps only the lesson that coach teaches (the substitute's)", filtered === 1, `${filtered} cards`);
   check("coach filter is in the URL", (new URL(page.url()).searchParams.get("coach") ?? "").length > 0);
   await page.getByLabel("Coach").selectOption({ label: "All coaches" });
-  await page.waitForTimeout(400);
+  await page.waitForURL((u) => !u.searchParams.get("coach"), { timeout: 10000 }).catch(() => {});
+  await page.getByTestId("lesson-card").filter({ hasText: "Cal Rose Full" }).first().waitFor({ timeout: 10000 });
 
   // ── Double-click → lesson page ───────────────────────────────────────────
   await page.getByTestId("lesson-card").filter({ hasText: "Cal Rose Full" }).first().dblclick();
