@@ -186,7 +186,7 @@ each one:
 
 | What you found | Where it goes |
 |---|---|
-| A trap that cost real time / could bite again | **`docs/GOTCHAS.md`** — append as the next §7.N |
+| A trap that cost real time / could bite again | **`docs/GOTCHAS.md`** — **search it first** (below), then append as the next §7.N |
 | A decision a future session could accidentally undo | **`docs/ARCHITECTURE.md`** (§6) |
 | A consequence you accepted deliberately | the feature's plan in **`docs/plans/`**, its "known consequences" section |
 | Something you chose *not* to build | **`BACKLOG.md`** — item, or *Deliberately not doing* |
@@ -199,6 +199,25 @@ each one:
 reuse a number** — 781 references cite these by bare number, including from **applied
 migrations** that can never be corrected. Retire an item by striking it in place. The bar
 is "cost real time or shipped a bug", not "was mildly surprising".
+
+**Search BEFORE you append — a trap that bit again is a REPEAT, not a new gotcha.** The file
+is read on demand, never in full, so a trap that recurs gets re-discovered and re-filed: on
+2026-09-25 an audit found eight lessons filed two or three times (§7.40/§7.83/§7.115,
+§7.90/§7.176, §7.38/§7.104/§7.156, …), and one filing even called itself "a fold into §7.150"
+and still took a new number.
+
+1. Grep `docs/GOTCHAS.md` for the trap's 2–3 key terms — the function, the Postgres or
+   PostgREST keyword, the error text (`grep -n -i 'second.*foreign\|PGRST201' docs/GOTCHAS.md`).
+   Skim the topic index at the top of the file too.
+2. **If it is already there**, do NOT take a new number. Add a `- **Hit again (YYYY-MM-DD, §8.N):**`
+   bullet to the existing item — what it cost this time, and why the item did not stop it.
+3. **If an item now has a "Hit again" line, the trap has bitten twice and the note has failed:
+   promote it to a CHECK** — a pgTAP scan over the catalog (`supabase/tests/recurring_gotchas.test.sql`), a CI
+   grep (`drivers/check-fixture-ids.sh`), or, if it is a habit no check can see, a line in
+   CLAUDE.md's *Rules that bite*. Record the promotion on the item. If it cannot be done this
+   session, file it in `BACKLOG.md` as an S-item.
+4. **If it is genuinely new**, append the next number AND add it to the right line of the topic
+   index at the top of the file.
 
 **Test 1 — nothing LOST.** After this step, the session log entry you are about to write
 should contain **nothing that would be lost if you deleted it.** If it would, you haven't

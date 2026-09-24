@@ -19,6 +19,32 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
 > A bare `§11.6`-style number inside a PRD sentence means the **PRD's** §11 (edge cases) —
 > check which document the sentence is about before following it.
 
+### Topic index — scan THIS, not the file
+
+Read the line for the area you are touching, then only those items. A new gotcha adds its
+number to a line here; a trap that bit again goes on its existing item as a **Hit again**
+bullet, not a new number (`/update-docs` Step 5). Items marked **↪** point at the item that
+carries the lesson. Built 2026-09-25 from the headlines; an item may fit two lines.
+
+| Area | Items |
+|---|---|
+| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260 |
+| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255 |
+| `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167 |
+| PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217 |
+| Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214 |
+| Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272 |
+| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270 |
+| Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269 |
+| Source-scanning guards | 230, 231, 233, 241, 247, 248 |
+
+**Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
+`supabase/tests/recurring_gotchas.test.sql` · §7.163 → `drivers/check-fixture-ids.sh` ·
+§7.87 → `table_grants.test.sql` · §7.35/§7.82 → `function_grants.test.sql` · §7.60 → `/deploy` (a skill you run, not automatic).
+
 ---
 
 ## 7. Gotchas already hit (don't re-introduce)
@@ -210,7 +236,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     "reprice from today" legitimately collides with a later paid period. The instinct is to
     weaken the guard to make the test pass. **Move the test instead**: `class_terms.test.sql`
     got its own tenant. A fixture is not a reason to loosen a real rule.
-27. **`git push` to `main` deploys the WEB APPS but not the database.** Obvious in the
+27. **↪ Superseded by §7.60, which carries this lesson in full.** **`git push` to `main` deploys the WEB APPS but not the database.** Obvious in the
     abstract, and I still got the order wrong this session: pushing before
     `supabase db push` shipped an admin panel calling `set_class_terms()` **before the RPC
     existed**, so class editing was broken in production until the migration landed. The
@@ -334,6 +360,9 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     seam and privileged reads, it is two functions, not one flag. Audit:
     `grep -B3 "current_user" supabase/migrations/*.sql | grep -i "definer"` — any hit is
     this bug.
+    - **Hit again → §7.104 (2026-08-09):** `assign_parent_package_reference()` let a parent squat a reference number. It also holds the opposite rule: a trigger that WRITES through RLS must be DEFINER.
+    - **Hit again → §7.156 (2026-08-15):** `recompute_package_extensions` let every caller take the service branch; the seam that works is `auth.uid() IS NULL`.
+    - **Now a CHECK:** `supabase/tests/recurring_gotchas.test.sql` #2 goes red on any DEFINER body that reads `current_user` (2026-09-25).
 
 39. **`REVOKE ALL … FROM PUBLIC` DOES NOT REMOVE ROLE GRANTS, AND THE LOCAL STACK WILL NOT
     SHOW YOU THE DIFFERENCE.** `provision_tenant()` shipped with the §7.35 recipe —
@@ -370,6 +399,9 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     database is the fact:
     `SELECT pg_get_functiondef('public.<fn>()'::regprocedure);`
     Then diff your new body against **that**, not against a file.
+    - **Hit again → §7.83 (2026-08-04):** a session trusted a migration file and a commit message over the live RPC, and replaced a working column with ~90 lines of workaround.
+    - **Hit again → §7.115 (2026-08-10):** a review cited the creating migration and nearly re-added a guard `book_trial()` already had.
+    - **Now a standing rule:** CLAUDE.md → *Rules that bite* → Database (2026-09-25). A habit, so no check can see it.
 
 41. **AN UNLISTED AUTH REDIRECT IS NOT REJECTED — IT IS SILENTLY REPLACED WITH `site_url`.**
     The first invite generated came back with `redirect_to=http://127.0.0.1:3000` instead of
@@ -704,6 +736,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     The fix is to dispatch `pointerdown`/`pointerup`/`click` on the element itself
     (`pressByText()` in that driver). Prefer in-app navigation where you can; use this
     when a deep link is the point of the test.
+    - **Hit again → §7.252 (2026-09-21):** the roster hand-check's force-click opened a DIFFERENT lesson on the Schedule screen underneath.
 
 59. **A `COUNT(*)` BASELINE IS ROLE-DEPENDENT UNDER RLS, SO "NOTHING WAS WRITTEN" CAN
     FAIL WHILE BEING TRUE.** A pgTAP fixture captured `SELECT COUNT(*) FROM lesson_sessions`
@@ -732,6 +765,8 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `main` is the last step, not the first. Harmless on 2026-07-27 only because
     production had zero attendance rows; on a live month it would have been the exact
     deadlock the change existed to remove.
+    - **First filed as → §7.27** (July); this item is the second time it bit.
+    - **Now a gated skill (run it — it is not automatic):** `/deploy` refuses the app push while migrations are pending.
 
 61. **FAMILY/CHILD STATUS PROPAGATION IS DELIBERATELY *NOT* A TRIGGER, AND MUST NOT BE
     "TIDIED" INTO ONE.** Deactivating a family's last active child also marks the family
@@ -1234,7 +1269,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       `EXECUTE` to `anon` before, **18 after** — and all 18 are trigger / event-trigger
       functions, which Postgres never privilege-checks against the writing role and
       PostgREST does not expose. (2026-08-04.)
-83. **WHAT AN RPC RETURNS IS A QUESTION FOR `pg_get_functiondef()`, NOT FOR A MIGRATION
+83. **↪ Repeat of §7.40 — read that first; this entry is a later time it bit.** **WHAT AN RPC RETURNS IS A QUESTION FOR `pg_get_functiondef()`, NOT FOR A MIGRATION
     FILE, A COMMIT MESSAGE, OR `BACKLOG.md` — AND GETTING IT BACKWARDS COSTS REAL CODE.**
     On 2026-08-01 a session concluded that `platform_tenant_overview()` returned `kind` and
     `coaches_without_rate` while the page declared `shape` and `staff_without_rate`, so the
@@ -1465,6 +1500,8 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
       single-FK tables (invoices, parent_tenants, coaches…) were untouched.
     - Found by `verify-tenant-provisioning.mjs` within the hour, which is the argument for
       running drivers before deploying a migration that adds an FK. (2026-08-06.)
+    - **Hit again → §7.176 (§8.65):** `20260815000600` added two FKs onto `package_products`; two lists rendered empty for two days behind `?? []`.
+    - **Now a CHECK:** `supabase/tests/recurring_gotchas.test.sql` #1 goes red on any new table pair joined by two FKs (2026-09-25).
 
 91. **"NEVER GATE ON ROLE" (§7.19) NOW HAS EXACTLY ONE DELIBERATE EXCEPTION — ADMIN-PANEL
     *ENTRY* — AND ITS SHAPE IS WHAT KEEPS IT FROM RECREATING §7.19. DO NOT "FIX" IT BACK.**
@@ -1747,7 +1784,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     - The same asymmetry is why `is_active` and lesson dates are worth a second look in any
       fixture touching a weekly class. (2026-08-09.)
 
-104. **`current_user = 'authenticated'` IS DEAD CODE INSIDE A `SECURITY DEFINER` FUNCTION,
+104. **↪ Repeat of §7.38 — read that first; this entry is a later time it bit.** **`current_user = 'authenticated'` IS DEAD CODE INSIDE A `SECURITY DEFINER` FUNCTION,
     AND IT FAILS OPEN.** That comparison is the codebase's standard client seam —
     `pin_invoice_public_fields`, `pin_parent_identity` and `enforce_parent_package_lifecycle`
     all use it, and all three are deliberately *plain* functions for exactly this reason
@@ -1969,7 +2006,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     - **Where else to look:** any `.in()` whose array is built by filtering. The guard that
       made it non-empty is often several screens away from the query. (2026-08-10.)
 
-115. **READ A FUNCTION BODY FROM `pg_get_functiondef()`, NEVER FROM THE MIGRATION THAT
+115. **↪ Repeat of §7.40 — read that first; this entry is a later time it bit.** **READ A FUNCTION BODY FROM `pg_get_functiondef()`, NEVER FROM THE MIGRATION THAT
     FIRST CREATED IT.** `CREATE OR REPLACE` means the newest definition can live in any
     later migration, and grep finds the oldest one first.
     - **Where it bit (2026-08-10):** both `BACKLOG.md` and an adversarial review stated that
@@ -2563,6 +2600,8 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     admin who uses it. `COMMENT ON FUNCTION` needs restating too. The post-deploy grant
     dump (§7.39) is the proof; chunk 3's came back exactly `REVOKE PUBLIC` + `GRANT
     authenticated`.
+    - **Hit again → §7.168 (§8.61):** `join_tenant_by_code`; on the cloud the DROP re-grants `anon`, so a local pass proves nothing.
+    - **Partly checked:** `function_grants.test.sql` #1 catches a function left open to `anon` LOCALLY; the cloud half is still the remote grant dump (§7.39).
 
 151. **CUTTING AN IDENTITY HELPER DOES NOT CUT THE MEMBERSHIP-SCOPED ARMS — the
     `current_tenant_id()` residue is ACCEPTED, TWICE, and the auth-layer ban is the
@@ -2639,7 +2678,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     claims to reproduce. Named here because the trigger (resend) does not exist yet, so nothing
     else will remind the person who builds it.
 
-156. **A SECURITY DEFINER function CANNOT tell a service/nightly caller from a client one
+156. **↪ Repeat of §7.38 — read that first; this entry is a later time it bit.** **A SECURITY DEFINER function CANNOT tell a service/nightly caller from a client one
     via `current_user` — inside a definer function it is ALWAYS the owner (`postgres`). The
     seam is `auth.uid()`: NULL only when there is no JWT (service_role key / a direct
     `psql`/cron call), the caller's uid otherwise.** `recompute_package_extensions`
@@ -2719,6 +2758,8 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     fix is §7.73's rule — a driver OWNS its fixtures: create the class (coach looked up by the
     stable `coach@swimsync.test` email; the Default-category ids `7c000000…` ARE stable seed
     constants) with a fixed id, and tear it down. Only borrow ids that are fixed in `seed.sql`.
+    - **Hit again → §7.224 (2026-08-30):** `fixtures-assessment.sql`, plus why `check-fixture-roundtrip.sh` cannot catch it.
+    - **Now a CHECK:** `drivers/check-fixture-ids.sh` (CI, repo-invariants) goes red on any UUID literal without `0000` in a fixture or driver (2026-09-25).
 
 164. **An FK written from inside a BEFORE INSERT trigger points at a row that does not exist
     yet — the RI check fires at the end of the INNER statement, not the outer INSERT.** Make it
@@ -2758,7 +2799,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     Same rule already inline at `20260815000500` for the reference trigger (§6, ARCHITECTURE);
     graduated here as the general one. (§8.61)
 
-168. **Changing a function's `RETURNS TABLE` shape is a SECURITY event, not a refactor** — a
+168. **↪ Repeat of §7.150 — read that first; this entry is a later time it bit.** **Changing a function's `RETURNS TABLE` shape is a SECURITY event, not a refactor** — a
     fold into §7.150. Postgres cannot `CREATE OR REPLACE` a result-type change, so it forces
     `DROP FUNCTION` + recreate, which **destroys the ACL and the COMMENT**; on Supabase cloud the
     project-level default privileges then re-grant EXECUTE to `anon`, so "it still works locally"
@@ -2862,7 +2903,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     `to_char(x AT TIME ZONE 'UTC', ...)` and `to_char(x AT TIME ZONE 'Asia/Singapore', ...)`
     — and sanity-check against `now()` in the same query. (§8.64)
 
-176. **A second FK between two tables silently breaks EVERY PostgREST embed between them —
+176. **↪ Repeat of §7.90 — read that first; this entry is a later time it bit.** **A second FK between two tables silently breaks EVERY PostgREST embed between them —
     and the failure renders as "there is nothing here".** `20260815000600_default_packages`
     added `class_categories.default_product_id` and `tenants.default_package_product_id`,
     both pointing back at `package_products`. Neither the parent app's "Buy a package" list
@@ -2898,6 +2939,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     offset that cannot be zero and sweep all seven weekdays before believing it.
     **Related but distinct from §7.122** — that one is about which weekday a CI run
     happened to see; this is about a date that stops meaning what its name says. (§8.65)
+    - **Hit again → §7.194 (2026-08-20):** two new pgTAP files pinned dates that later fell below the rolling billing floor.
 
 178. **"Designed to redden" only pays if someone bumps it the next morning.**
     `verify-platform-admin-scope.mjs` pins the admin sidebar at an exact page count
@@ -3064,7 +3106,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     assert in rem (±0.5px for sub-pixel layout). `verify-admin-table-geometry` measures ratios and
     was unaffected. (§8.72.)
 
-194. **A pgTAP FIXTURE WITH FIXED CALENDAR DATES IS A TIME-BOMB — IT GOES RED ON ITS OWN AS
+194. **↪ Repeat of §7.177 — read that first; this entry is a later time it bit.** **A pgTAP FIXTURE WITH FIXED CALENDAR DATES IS A TIME-BOMB — IT GOES RED ON ITS OWN AS
     THE BILLING FLOOR ROLLS FORWARD, WITH NO CODE CHANGE.** `markable_floor()` is "1st of last
     month" (or the month after the latest sealed month), so a never-sealed test tenant's window
     moves on the 1st of every month. Two new files this session (`class_capacity_limit`,
@@ -3477,7 +3519,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     today's code falsifies the record, and the next person re-verifying that deploy would be checking a string
     that was never served. (2026-08-29, §8.94.)
 
-224. **NEVER hardcode a seed row's id in a fixture — `supabase/seed.sql` names no `id` on its `classes` INSERT, so
+224. **↪ Repeat of §7.163 — read that first; this entry is a later time it bit.** **NEVER hardcode a seed row's id in a fixture — `supabase/seed.sql` names no `id` on its `classes` INSERT, so
     Postgres mints a FRESH uuid on every `db reset`.** `fixtures-assessment.sql` carried a literal
     `'2ce0a523-…'` for the seed's *Saturday Beginners*, captured from the one database it was authored against.
     It loaded there forever and failed on the **first reset** — so the driver passed 27/27 the day it was written
@@ -3751,6 +3793,8 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     into a deep-linked tab found nothing (hidden = unpressable, correctly); and `/home/child/<id>` was popped
     outright because Home IS the landing. The tab-bar label ("Profile", "Settings") is always visible — press
     it, then press into the stack. (`docs/TESTING.md` §5. 2026-09-13.)
+    **Product half FIXED 2026-09-24 (§8.120)** — see §7.254: a deep link inside your own area is no longer
+    replaced, so the requested screen is the visible one. `/login`, `/` and the other role's screens still redirect.
 
 238. **Metro can serve a STALE bundle after an edit — grep the served bundle for a marker before believing a
     fix "didn't work".** After editing `contact.tsx` the smoke driver still reported the old behaviour twice;
@@ -3894,7 +3938,7 @@ subsystem, not cover-to-cover — it is a reference, not a narrative._
     so a refused write fails as a fixture error and can never be read as a product one. The script is kept at
     `docs/refactor/batch-e-handchecks.mjs` as the shape to copy. (Admin L-E, 2026-09-21.)
 
-252. **A force-click on a DEEP-LINKED coach screen can land on the Schedule screen mounted underneath it — and
+252. **↪ Repeat of §7.58 — read that first; this entry is a later time it bit.** **A force-click on a DEEP-LINKED coach screen can land on the Schedule screen mounted underneath it — and
     open a DIFFERENT lesson, with no error.** The roster hand-check (§8.114) reached the screen by `gotoAuthed`
     rather than by tab taps, and its setup had added a Sunday class; `tap(getByText("What Toddler 1 covers"))`
     (`click({force:true})` at the element's coordinates) hit that class's Mark card on the still-mounted

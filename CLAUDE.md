@@ -111,6 +111,9 @@ touching an unfamiliar subsystem.
   role × object-type grid while every probe passed. (§7.39, §7.89, `docs/DEPLOYMENT.md` §11.7)
 - A `BEFORE INSERT` trigger **also fires for rows that resolve to an UPDATE** via
   `.upsert()`. Detect the update inside the trigger. (§7.57)
+- **Read a function's body from the database, never from a migration file** — `CREATE OR
+  REPLACE` means the newest body can be in any later migration, and grep finds the oldest:
+  `SELECT pg_get_functiondef('public.<fn>'::regproc);`. Filed three times. (§7.40)
 
 **React Native web**
 - **`Alert.alert` is a no-op on RN-web** — it silently does nothing on the deployed app.

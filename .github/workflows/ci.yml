@@ -30,6 +30,11 @@ jobs:
       - name: Every UI fixture has a teardown
         run: .claude/skills/run-ui-playwright/drivers/check-teardowns.sh
 
+      # A UUID copied out of a live database breaks on the first `db reset`,
+      # and the roundtrip check never resets. Filed twice (§7.163, §7.224).
+      - name: No UI fixture or driver carries a captured UUID
+        run: .claude/skills/run-ui-playwright/drivers/check-fixture-ids.sh
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:
