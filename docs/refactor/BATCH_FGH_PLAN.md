@@ -421,6 +421,8 @@ later on the same code) sits in L4-F and L4-Fence: **one red is a re-run; two re
 
 | **Ship step 0 (R3)** | `c0a1ed2` | full `run-all-drivers.sh` on the branch head: **50/52**, then the two reds re-run SOLO: admin-calendar **21/21**, coach-wages **10/10** → **52/52** | coach-wages' red spanned the machine SLEEPING mid-driver (71,272 s logged; its admin step timed out on wake). admin-calendar is an admin-panel driver on unchanged admin code: `Today returns the URL date to today` reads the URL a fixed 400 ms after the click — a timing race, green solo |
 
+| **SHIPPED** | `d7eeeea` on `main` | `/deploy`: app-only (0 `supabase/` paths; `migration list --linked` 0 pending). `git push refactor/app-lite-fgh:main` fast-forward `f87405e..d7eeeea`. Both Vercel builds green; swimsync.sg entry bundle changed `b4bb734b…` → `aee451a3…` (up in 90 s) and carries this branch's hook names; live /login, /welcome, /package/<bad>, /invoice/<bad> render with 0 page errors. CI `35967311672` green (4/4 jobs) | **Nightly `35967782324` dispatched on `d7eeeea` — the gate for the next unit; read it from the log** |
+
 **Hand-check scripts proven on the PRE-change code before their sub-batch** (a red later is the refactor,
 not the script): G **19/19**, H **6/6**, fence **19/19**. Getting there cost four script fixes worth keeping
 (§12 F3).
