@@ -111,18 +111,27 @@ describe("attendanceRows (characterisation)", () => {
     expect(guestRows(undefined)).toEqual([]);
   });
 
-  it("8. cancelledBlock: '' -> 'this lesson'; a reason gets ' — '; no reason, no dash", () => {
-    const cold = cancelledBlock("", "2026-09-05", null);
-    expect(cold).toEqual({
+  // Was pinned as "a cold open reads 'this lesson'" — the caller passed the stale
+  // `classTitle` state. load() passes cls.title since 2026-09-24
+  // (useAttendanceLoad.test.ts proves it), so the class's name is the ordinary
+  // case and '' is only the empty-title fallback.
+  it("8. cancelledBlock: names the class; a reason gets ' — '; no reason, no dash; '' -> 'this lesson'", () => {
+    const named = cancelledBlock("Tadpoles", "2026-09-05", null);
+    expect(named).toEqual({
       ok: false,
       title: "This lesson was cancelled",
       detail:
-        "Your business's admin cancelled this lesson on Sat, 5 Sept 2026. Nothing is marked for a cancelled lesson; if it is going ahead after all, ask them to restore it.",
+        "Your business's admin cancelled Tadpoles on Sat, 5 Sept 2026. Nothing is marked for a cancelled lesson; if it is going ahead after all, ask them to restore it.",
     });
-    const warm = cancelledBlock("Tadpoles", "2026-09-05", "Pool closed");
-    expect(warm.ok).toBe(false);
-    if (!warm.ok) {
-      expect(warm.detail).toContain("cancelled Tadpoles on Sat, 5 Sept 2026 — Pool closed. Nothing");
+    const withReason = cancelledBlock("Tadpoles", "2026-09-05", "Pool closed");
+    expect(withReason.ok).toBe(false);
+    if (!withReason.ok) {
+      expect(withReason.detail).toContain("cancelled Tadpoles on Sat, 5 Sept 2026 — Pool closed. Nothing");
+    }
+    const untitled = cancelledBlock("", "2026-09-05", null);
+    expect(untitled.ok).toBe(false);
+    if (!untitled.ok) {
+      expect(untitled.detail).toContain("cancelled this lesson on Sat, 5 Sept 2026. Nothing");
     }
   });
 });

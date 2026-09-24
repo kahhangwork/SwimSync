@@ -4,9 +4,9 @@
 //
 // ⚠ load is returned as a PLAIN FUNCTION, recreated every render, exactly as it was on
 // the route: the route's [id, date] effect calls it (§7.64 — those deps are
-// load-bearing and stay on the route, byte-identical). NO useCallback: the cancelled
-// notice reads `classTitle` from this render's closure, and the save hooks read
-// render-time state. ⚠ This hook never calls useLocalSearchParams — the route reads
+// load-bearing and stay on the route, byte-identical). NO useCallback: the save hooks
+// read render-time state. (The cancelled notice once read the `classTitle` state
+// from this closure — the previous render's value; it takes cls.title now.) ⚠ This hook never calls useLocalSearchParams — the route reads
 // the params once and passes the same `id`/`date` everywhere (§7.64's header/roster
 // split re-enters through a second read).
 import { useRef, useState } from "react";
@@ -142,8 +142,14 @@ export function useAttendanceLoad(id: string, date: string) {
     // write whatever this screen shows, so a stale screen cannot mark it.
     if (existingSession?.cancelled_at) {
       const reason = (existingSession as any).cancellation_reason as string | null;
-      // ⚠ `classTitle` is the STATE from this closure, not cls.title — see cancelledBlock.
-      setBlocked(cancelledBlock(classTitle, date, reason));
+      // ⚠ cls.title, NOT the `classTitle` state: setClassTitle above has not
+      // re-rendered yet, so the state is the PREVIOUS lesson's title — "" on a
+      // cold open ("cancelled this lesson"), the OLD class on a change in place.
+      setBlocked(cancelledBlock(cls.title, date, reason));
+      // ⚠ AND RESOLVE THE DATE, like the `!cls` branch. The route's render guard
+      // is isShowingDate(resolved, date); without this the notice was set but
+      // the spinner held forever (BACKLOG, fixed 2026-09-24).
+      setResolved({ date, sessionId: sid });
       setLoading(false);
       return;
     }

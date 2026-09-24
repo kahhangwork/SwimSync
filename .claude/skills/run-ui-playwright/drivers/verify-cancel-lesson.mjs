@@ -13,6 +13,10 @@
 //   • the coach app's Schedule shows next week's Rose card struck "Cancelled by
 //     your admin" (the cosmetic half of §7.204; the trigger is the load-bearing
 //     half, pinned in pgTAP);
+//   • once that cancel has PASSED (aged two weeks back by psql — a cancel can
+//     only be made in advance), tapping its DONE card on Schedule opens the
+//     "This lesson was cancelled" notice naming the class, with "Back to class"
+//     — not the permanent spinner it used to be (BACKLOG, fixed 2026-09-24);
 //   • Restore clears the flag: the banner goes, Cancel is offered again, the DB
 //     row is a plain scheduled session.
 //
@@ -24,7 +28,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, visibleText, pressByText, pressByTextMatch, ADMIN, EXPO } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -150,6 +154,86 @@ try {
     t.match(/.{0,60}Cancelled by your admin.{0,20}/)?.[0] ?? "(no 'Cancelled by your admin' text)");
   await cctx.close();
 
+  // ── 5b. The cancelled lesson, once it has PASSED: DONE card → the notice ──
+  // BACKLOG "A coach opening an admin-CANCELLED lesson gets a permanent spinner":
+  // load()'s cancelled branch set `blocked` but never `resolved`, so the screen
+  // spun forever; and the notice read the stale `classTitle` state ("cancelled
+  // this lesson"). A cancel can only be made in ADVANCE (cancel_lesson refuses
+  // p_date <= today), so the row the admin just cancelled through the UI is AGED
+  // into the past by psql — as postgres, which guard_session_date exempts —
+  // to the Rose weekday two weeks back (the fixture's own Rose rows are -7 and
+  // -140, so -14 is free; asserted). It is moved back before step 6's Restore.
+  // Reached by TAP (Schedule → week-prev ×2 → DONE → the card), not deep link:
+  // a full-page load of the attendance URL leaves it mounted HIDDEN (§7.254).
+  const twoWeeksAgo = shift(today, -14);
+  const freeSlot = sql(`SELECT count(*) FROM lesson_sessions WHERE class_id='${ROSE}' AND session_date='${twoWeeksAgo}'`) === "0";
+  check(`DB: no Rose session exists on ${twoWeeksAgo} (the aged cancel's landing slot)`, freeSlot);
+  if (freeSlot) {
+    sql(`UPDATE lesson_sessions SET session_date='${twoWeeksAgo}' WHERE class_id='${ROSE}' AND session_date='${nextWeek}'`);
+    check("DB: the admin's cancel now sits two weeks back, still cancelled with its reason",
+      sql(`SELECT status::text || ':' || coalesce(cancellation_reason,'') FROM lesson_sessions WHERE class_id='${ROSE}' AND session_date='${twoWeeksAgo}'`) === `cancelled:${REASON}`);
+
+    const sctx = await browser.newContext({ viewport: { width: 420, height: 900 } });
+    const spin = await sctx.newPage();
+    const spinErrors = [];
+    spin.on("pageerror", (e) => spinErrors.push(e.message));
+    spin.on("dialog", (d) => d.accept().catch(() => {}));
+    await loginExpo(spin, "coach@swimsync.test", "password123");
+    await gotoAuthed(spin, `${EXPO}/schedule`);
+    await spin.waitForTimeout(2500);
+    await tap(spin.getByTestId("week-prev"), "week-prev");
+    await spin.waitForTimeout(2000);
+    await tap(spin.getByTestId("week-prev"), "week-prev (2 weeks back)");
+    await spin.waitForTimeout(2500);
+
+    // Same day-header matching as step 5, and for the same reasons (§7.101, §7.122).
+    const sg2 = (o) => new Date(`${twoWeeksAgo}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Singapore", ...o });
+    const doneHeader = new RegExp(`^${sg2({ weekday: "short" })}\\w*,? ${sg2({ day: "numeric" })} ${sg2({ month: "short" })}\\w*$`);
+    const expanded = await pressByTextMatch(spin, doneHeader);
+    check(`coach app: two weeks back, DONE lists the cancelled lesson's day (${doneHeader})`, expanded);
+    await spin.waitForTimeout(1500);
+    const doneText = await visibleText(spin);
+    check("coach app: the DONE card is struck 'Cancelled by your admin'",
+      /Cal Rose Full/.test(doneText) && /Cancelled by your admin/.test(doneText),
+      doneText.match(/.{0,40}Cancelled by your admin/)?.[0] ?? "(not listed)");
+
+    // The tap under test. Before the fix this is where the spinner held forever.
+    const opened = await pressByText(spin, "Cal Rose Full");
+    check("coach app: tapped the cancelled Rose card", opened);
+    const notice = spin.getByText("This lesson was cancelled", { exact: true });
+    let noticeShown = true;
+    try {
+      await notice.waitFor({ state: "visible", timeout: 15000 });
+    } catch {
+      noticeShown = false;
+    }
+    await spin.screenshot({ path: shot("cancel-lesson-coach-notice.png"), fullPage: true });
+    const nt = await visibleText(spin);
+    check("coach app: the marking screen shows 'This lesson was cancelled' (no permanent spinner)", noticeShown,
+      nt.slice(0, 160).replace(/\n/g, " | "));
+    // cls.title, not the stale classTitle state: a cold open used to read "cancelled this lesson".
+    check("coach app: the notice names the class and carries the admin's reason",
+      /cancelled Cal Rose Full on /.test(nt) && nt.includes(REASON) && !/cancelled this lesson on/.test(nt),
+      nt.match(/Your business's admin cancelled.{0,120}/)?.[0] ?? "(no notice detail)");
+    check("coach app: a 'Back to class' control is offered",
+      (await spin.getByText("Back to class", { exact: true }).count()) >= 1 && /Back to class/.test(nt));
+    check("coach app: no roster or Save is rendered for a cancelled lesson", !/Save Attendance/i.test(nt));
+
+    // And it is a way OUT: from=schedule, so Back to class returns to Schedule.
+    const backed = await pressByText(spin, "Back to class");
+    await spin.waitForTimeout(2500);
+    const after = await visibleText(spin);
+    check("coach app: 'Back to class' leaves the notice for Schedule",
+      backed && !/This lesson was cancelled/.test(after) && /DONE/.test(after),
+      spin.url());
+    check("no uncaught page errors (coach, cancelled lesson)", spinErrors.length === 0, spinErrors.join(" || "));
+    await sctx.close();
+
+    // Put it back where step 6 (Restore) and the cleanup expect it.
+    sql(`UPDATE lesson_sessions SET session_date='${nextWeek}' WHERE class_id='${ROSE}' AND session_date='${twoWeeksAgo}' AND cancellation_reason='${REASON}'`);
+    check("DB: the aged cancel is back on next week", rowState() === `cancelled:true:${REASON}`, rowState());
+  }
+
   // ── 6. Restore ────────────────────────────────────────────────────────────
   await page.goto(`${ADMIN}/lessons/${ROSE}/${nextWeek}`, { waitUntil: "networkidle" });
   await page.getByTestId("restore-lesson").waitFor({ timeout: 15000 });
@@ -165,6 +249,10 @@ try {
   // next week (restore keeps it, flag cleared) — remove it so the calendar
   // fixture's session count is unchanged for a sibling driver.
   try {
+    // Step 5b ages the cancel two weeks back; if it died before moving it home,
+    // bring it back first so the deletes below catch it.
+    const twoBack = shift(today, -14);
+    sql(`UPDATE lesson_sessions SET session_date='${nextWeek}' WHERE class_id='${ROSE}' AND session_date='${twoBack}' AND cancellation_reason='${REASON}' AND NOT EXISTS (SELECT 1 FROM lesson_sessions x WHERE x.class_id='${ROSE}' AND x.session_date='${nextWeek}')`);
     sql(`DELETE FROM audit_log WHERE entity_type='lesson_session' AND entity_id IN (SELECT id FROM lesson_sessions WHERE class_id='${ROSE}' AND session_date='${nextWeek}')`);
     sql(`DELETE FROM lesson_sessions WHERE class_id='${ROSE}' AND session_date='${nextWeek}' AND NOT EXISTS (SELECT 1 FROM attendance a WHERE a.lesson_session_id = lesson_sessions.id)`);
     check("cleanup: next week's driver-created session row removed", rowState() === "", rowState());

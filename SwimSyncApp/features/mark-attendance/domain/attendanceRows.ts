@@ -94,12 +94,12 @@ export function shadowRows(
 }
 
 /** The notice for a lesson the admin cancelled in advance.
- *  ⚠ `classTitle` is whatever the CALLER passes, and the route passes the
- *  `classTitle` STATE from load()'s closure — the previous render's value, not
- *  this class's (setClassTitle has not re-rendered yet). A cold open therefore
- *  reads "this lesson". Preserved (rule 0); never visible today anyway, because
- *  the cancelled branch never sets `resolved` and the spinner holds (plan §6
- *  Stage 3, BACKLOG). */
+ *  ⚠ The caller must pass the title of the class it just LOADED (cls.title),
+ *  never the `classTitle` state from load()'s closure — that is the previous
+ *  render's value, so a cold open read "this lesson" and a class change in
+ *  place named the OLD class. It shipped that way, hidden behind a permanent
+ *  spinner (the branch never set `resolved`); both fixed 2026-09-24. The
+ *  "this lesson" fallback remains for a class with an empty title. */
 export function cancelledBlock(
   classTitle: string,
   date: string,
