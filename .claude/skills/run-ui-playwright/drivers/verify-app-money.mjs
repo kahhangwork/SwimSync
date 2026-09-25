@@ -11,6 +11,9 @@
 //      page renders price + a data:image QR + "I've paid", logged IN and logged
 //      OUT, and no request to public-package carries an auth header (§7.264 —
 //      a non-safelisted header forces a CORS preflight the function refuses).
+//   C2. That page's own "I've paid", logged OUT (postPublicPackageClaim) — ONE
+//      confirm, one bare POST, paid_claimed_at stamped, status stays pending,
+//      the claimed line survives a reload.
 //   D. Billing → Packages → Cancel on that request (cancelRequest) → cancelled.
 //
 // Setup:
@@ -150,6 +153,39 @@ try {
       const extra = outHeaders.flat().filter((h) => AUTH_HEADERS.includes(h));
       check("C (logged out): public-package requests carry no auth header", outHeaders.length > 0 && extra.length === 0, `${outHeaders.length} req, extra: ${extra.join(",") || "none"}`);
       await out.page.screenshot({ path: shot("C-out") });
+
+      // ── C2. the page's own "I've paid", logged OUT — how a parent with no
+      // session tells the business they paid (postPublicPackageClaim). It is a
+      // CLAIM: paid_claimed_at is stamped, the request stays pending.
+      const outDialogs = [];
+      out.page.on("dialog", (d) => outDialogs.push(d.message())); // record only — launch() accepts
+      const claimPosts = [];
+      out.page.on("request", (r) => {
+        if (r.method() === "POST" && r.url().includes("/functions/v1/public-package")) {
+          claimPosts.push({ headers: Object.keys(r.headers()).map((h) => h.toLowerCase()), body: r.postData() ?? "" });
+        }
+      });
+      const claimedLine = out.page.getByText(/You've told us this is paid/).first();
+      check("C2: I've paid is pressed", await pressByText(out.page, "I've paid"));
+      check("C2: the claimed line replaces the button", await waitOk(claimedLine.waitFor({ timeout: 15000 })));
+      check("C2: exactly one confirm dialog", outDialogs.length === 1, JSON.stringify(outDialogs));
+      check(
+        "C2: exactly one claim POST, action=claim",
+        claimPosts.length === 1 && /"action"\s*:\s*"claim"/.test(claimPosts[0].body),
+        JSON.stringify(claimPosts.map((p) => p.body))
+      );
+      {
+        const extra = claimPosts.flatMap((p) => p.headers).filter((h) => AUTH_HEADERS.includes(h));
+        check("C2: the claim POST carries no auth header (§7.264)", claimPosts.length > 0 && extra.length === 0, extra.join(",") || "none");
+      }
+      check(
+        "C2: paid_claimed_at is set, status stays pending (a claim, not a payment)",
+        psql(`SELECT (paid_claimed_at IS NOT NULL) || '|' || status FROM parent_packages WHERE public_token = '${token}'`) === "true|pending"
+      );
+      await out.page.screenshot({ path: shot("C2-claimed") });
+      await out.page.reload({ waitUntil: "domcontentloaded" });
+      check("C2: …and survives a reload", await waitOk(claimedLine.waitFor({ timeout: 30000 })));
+      check("C2: no I've paid button after the reload", (await out.page.getByText("I've paid", { exact: true }).count()) === 0);
       await out.browser.close();
     }
     // Logged in is the case that matters: the app HAS a session to leak into the call.

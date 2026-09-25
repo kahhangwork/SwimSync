@@ -1523,14 +1523,6 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### A driver for the package page's own *I've paid* — **S** `[from the hand-check drivers 2026-09-24]`
-`/package/<token>`'s *I've paid* (`postPublicPackageClaim`) is pressed by no driver. `verify-app-money` loads the
-page logged in and out and checks its request headers, but stops short of the claim POST.
-
-**Why:** it is how a parent with no account tells the business they paid for a package; a regression there is
-invisible until the admin notices payments never arrive. **Notes:** extend `verify-app-money` (its own tenant,
-`ac300000-…`) rather than a new fixture. The POST must stay a bare `fetch` with `content-type` only (§7.264).
-
 ### Check the deployed `public-package` CORS against §7.264's comment — **S** `[from the hand-check drivers 2026-09-24]`
 `publicPackage.api.ts`'s header comment (and §7.264) say any added request header fails CORS and renders
 "Package not found". Locally, with `x-client-info` added, the page still rendered: the local functions runtime

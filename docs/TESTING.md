@@ -1336,11 +1336,11 @@ with its own fixture + teardown (UUID prefix `ac{1,2,3}00000-…`, emails `app-{
 |---|---|---|---|
 | `verify-app-auth` | `fixtures-app-auth` | 25 | ONE-SHOT login ×2 roles (§7.263), change password, forgot → Mailpit, reset + accept-invite through real `generateLink` links, parent Sign Out. Step 4 fills, settles, re-checks both password fields and logs `4: the reset form was re-mounted and cleared` if it had to refill (cause of nightly `36006182210`'s empty-field red unproven — that log line is the evidence). **Needs Expo on exactly :8081** (§7.268) |
 | `verify-app-home-writes` | `fixtures-app-home-writes` | 10 | dismiss a declined claim; register WITH a join code → the first Home load joins once |
-| `verify-app-money` | `fixtures-app-money` (its OWN tenant) | 19 | Invoice Detail's *I've paid*; referral Copy; `/package/<token>` in and out, request-header NAMES only (§7.264); cancel a package request |
+| `verify-app-money` | `fixtures-app-money` (its OWN tenant) | 27 | Invoice Detail's *I've paid*; referral Copy; `/package/<token>` in and out, request-header NAMES only (§7.264); that page's own *I've paid* logged OUT (one bare POST, `paid_claimed_at` stamped, stays `pending`, survives reload); cancel a package request |
 | `verify-app-coach-settings` | none (restores the seed PayNow QR in `finally`) | 6 | coach QR upload; coach Sign Out |
 
-Mutation-proven (§7.25) except auth's "old password no longer works" (needs a GoTrue change). Not yet pressed by
-any driver: the package page's own *I've paid* POST (BACKLOG). The source scripts stay in `docs/refactor/` as
+Mutation-proven (§7.25) except auth's "old password no longer works" (needs a GoTrue change); the package page's
+*I've paid* was proven red by sending `action: "claimX"` (5 checks fail). The source scripts stay in `docs/refactor/` as
 provenance (`app-fgh-handchecks-{F,G,H,fence}.mjs`), like every sibling refactor's; `app-fgh-idle.mjs` still
 counts each screen's requests (load / idle).
 
