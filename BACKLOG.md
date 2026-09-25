@@ -1965,17 +1965,6 @@ that half remains a manual dashboard check.
 
 ---
 
-### Find what clears `verify-app-auth` step 4's password fields — **S** `[from nightly 36006182210, 2026-09-24]`
-Attempt 1 pressed *Update Password* on two EMPTY fields. The suspected trigger (the recovery link's two
-replaces to `/reset-password`) did NOT reproduce with the second one held 5 s. The driver now refills and logs
-`4: the reset form was re-mounted and cleared`.
-
-**Why:** the fields are `useState`, so whatever re-mounted the screen would also clear a real parent's typing
-on a slow phone. **Notes:** act when that log line first appears in a nightly — it names the moment; until
-then there is nothing to chase (TESTING §5).
-**First appearance: nightly `36071084202` (2026-09-25, on `29bfe15`)** — `refilling (1)`, and the refilled press then
-passed. So the screen IS re-mounted mid-fill (not cleared some other way); chase what re-mounts `/reset-password`.
-
 ## Deliberately not doing
 
 Kept so the reasoning doesn't get re-litigated.

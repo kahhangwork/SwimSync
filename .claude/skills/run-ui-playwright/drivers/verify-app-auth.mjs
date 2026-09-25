@@ -108,6 +108,24 @@ if (psql(`SELECT count(*) FROM auth.users WHERE email = '${PARENT}'`) !== "1") {
   process.exit(1);
 }
 
+/** Hold the page's profiles READ 4 s. The layout's routeForSession replaces to
+ *  the recovery / invite screen only after that read, and a replace to the route
+ *  already showing re-mounted it, wiping what was typed (§7.274). Locally the read
+ *  beats the form; CI and slow phones don't — this makes every run the slow one.
+ *  GETs only: accept-invite's own submit PATCHes profiles. `returned()` resolves
+ *  once the held read is answered, plus 1.5 s for any replace it triggers. */
+const holdProfilesRead = async (page) => {
+  const PROFILES = /\/rest\/v1\/profiles/;
+  await page.route(PROFILES, async (r) => {
+    if (r.request().method() === "GET") await new Promise((z) => setTimeout(z, 4000));
+    await r.continue().catch(() => {});
+  });
+  const back = page
+    .waitForResponse((res) => PROFILES.test(res.url()) && res.request().method() === "GET", { timeout: 45000 })
+    .then(() => true, () => false);
+  return { returned: async () => (await back) && (await page.waitForTimeout(1500), true) };
+};
+
 const browsers = [];
 const fresh = async () => {
   const b = await launch();
@@ -221,25 +239,19 @@ try {
     if (error) throw error;
     const { browser, page } = await fresh();
     try {
+      // Nightlies 36006182210 / 36071084202 found the fields EMPTY after a fill
+      // (§7.274). Fill ONCE; never refill — a refill hides the bug.
+      const held = await holdProfilesRead(page);
       await page.goto(actionLink(data, `${EXPO}/reset-password`), { waitUntil: "domcontentloaded" });
       await page.getByText("Update Password").last().waitFor({ timeout: 45000 });
-      // Nightly 36006182210 pressed Update on two EMPTY fields ("Please enter and
-      // confirm your new password") although both were filled. The fields are
-      // useState, so any re-mount after the fill clears them. SUSPECTED, NOT
-      // PROVEN: the recovery link replaces to /reset-password twice (getSession
-      // and the PASSWORD_RECOVERY event, app/_layout.tsx) — holding the second
-      // one 5 s locally did NOT reproduce it. So: fill, let it settle, confirm
-      // both values survived, refill if not, and LOG when that fires — the log
-      // line is the evidence the next red needs. Re-types input; never re-presses.
       const pw = () => page.locator('input[type="password"]');
-      for (let i = 0; i < 3; i++) {
-        await pw().nth(0).fill("password789");
-        await pw().nth(1).fill("password789");
-        await page.waitForTimeout(1500);
-        if ((await pw().nth(0).inputValue()) === "password789" &&
-            (await pw().nth(1).inputValue()) === "password789") break;
-        console.log(`4: the reset form was re-mounted and cleared — refilling (${i + 1})`);
-      }
+      await pw().nth(0).fill("password789");
+      await pw().nth(1).fill("password789");
+      check("4: the held profiles read returned", await held.returned());
+      check(
+        "4: the typed passwords survive the late session restore (no re-mount)",
+        (await pw().nth(0).inputValue()) === "password789" && (await pw().nth(1).inputValue()) === "password789"
+      );
       await pressByText(page, "Update Password");
       check("4: Reset Password returns to /login", await waitOk(page.waitForURL(/\/login/, { timeout: 15000 })), page.url());
       check("4: the reset password works", await anonSignIn(PARENT, "password789"));
@@ -259,6 +271,7 @@ try {
     });
     if (error) throw new Error(`generateLink(invite): ${error.message} — reload fixtures-app-auth.sql`);
     const { browser, page } = await fresh();
+    const held = await holdProfilesRead(page); // same late replace, to /accept-invite (§7.274)
     await page.goto(actionLink(data, `${EXPO}/accept-invite`), { waitUntil: "domcontentloaded" });
     const form = await waitOk(page.getByPlaceholder("Sarah Lim").waitFor({ timeout: 45000 }));
     check("5: the invite link opens the Accept Invite form", form, page.url());
@@ -267,6 +280,12 @@ try {
       await page.getByPlaceholder("9123 4567").fill("91230000");
       await page.locator('input[type="password"]').nth(0).fill("password123");
       await page.locator('input[type="password"]').nth(1).fill("password123");
+      check("5: the held profiles read returned", await held.returned());
+      check(
+        "5: the typed form survives the late session restore (no re-mount)",
+        (await page.getByPlaceholder("Sarah Lim").inputValue()) === "Invited Parent" &&
+          (await page.locator('input[type="password"]').nth(1).inputValue()) === "password123"
+      );
       await pressByText(page, "Set Password");
       check("5: Set Password returns to /login", await waitOk(page.waitForURL(/\/login/, { timeout: 15000 })), page.url());
       check("5: the invited parent can sign in with the password they set", await anonSignIn(INVITEE, "password123"));

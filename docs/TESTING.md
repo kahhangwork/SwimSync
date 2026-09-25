@@ -1334,7 +1334,7 @@ with its own fixture + teardown (UUID prefix `ac{1,2,3}00000-…`, emails `app-{
 
 | driver | fixture | checks | covers |
 |---|---|---|---|
-| `verify-app-auth` | `fixtures-app-auth` | 25 | ONE-SHOT login ×2 roles (§7.263), change password, forgot → Mailpit, reset + accept-invite through real `generateLink` links, parent Sign Out. Step 4 fills, settles, re-checks both password fields and logs `4: the reset form was re-mounted and cleared` if it had to refill (cause of nightly `36006182210`'s empty-field red unproven — that log line is the evidence). **Needs Expo on exactly :8081** (§7.268) |
+| `verify-app-auth` | `fixtures-app-auth` | 29 | ONE-SHOT login ×2 roles (§7.263), change password, forgot → Mailpit, reset + accept-invite through real `generateLink` links, parent Sign Out. Steps 4 and 5 HOLD the layout's `profiles` read 4 s and assert the typed form survives the late session restore (§7.274 — proven red without `showAuthScreen`, 7 checks). **Needs Expo on exactly :8081** (§7.268) |
 | `verify-app-home-writes` | `fixtures-app-home-writes` | 10 | dismiss a declined claim; register WITH a join code → the first Home load joins once |
 | `verify-app-money` | `fixtures-app-money` (its OWN tenant) | 27 | Invoice Detail's *I've paid*; referral Copy; `/package/<token>` in and out, request-header NAMES only (§7.264); that page's own *I've paid* logged OUT (one bare POST, `paid_claimed_at` stamped, stays `pending`, survives reload); cancel a package request |
 | `verify-app-coach-settings` | none (restores the seed PayNow QR in `finally`) | 6 | coach QR upload; coach Sign Out |
@@ -1370,8 +1370,8 @@ date condition and reports PASS (§7.100).
 
 **Two driver messages are verdicts ABOUT the run, not the product** (2026-09-24): `CANNOT SAY — the login
 form never appeared` (tenant-suspension, coach-disable) is a page that never loaded — §7.108's shape, re-run;
-a red on those checks WITHOUT it is a real login verdict (§7.263). `4: the reset form was re-mounted` in
-`app-auth` is the first evidence of what cleared step 4's fields — read it before re-running.
+a red on those checks WITHOUT it is a real login verdict (§7.263). A red on `app-auth`'s *typed form survives*
+(step 4 or 5) is a real re-mount verdict (§7.274), not a flake.
 
 Then the four rules, all bought with real time:
 

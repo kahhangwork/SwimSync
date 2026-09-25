@@ -63,6 +63,15 @@ function onPublicRoute(): boolean {
   const path = currentPath();
   return path !== null && isPublicPage(path);
 }
+// Send a recovery/invite session to its screen — unless it is ALREADY showing.
+// A replace to the same route mounts a fresh instance and wipes its useState,
+// and routeForSession's replace lands only after a profiles read: on a slow
+// phone (or CI) that is after the parent has typed the new password (§7.274).
+function showAuthScreen(href: "/(auth)/reset-password" | "/(auth)/accept-invite") {
+  const path = currentPath();
+  if (path !== null && path.replace(/\/+$/, "") === href.replace("/(auth)", "")) return;
+  router.replace(href);
+}
 
 export default function RootLayout() {
   const setSession = useAppStore((s) => s.setSession);
@@ -117,7 +126,7 @@ export default function RootLayout() {
 
       // A recovery session must go to the reset screen regardless of role.
       if (recovery.current) {
-        router.replace("/(auth)/reset-password");
+        showAuthScreen("/(auth)/reset-password");
         return;
       }
 
@@ -125,7 +134,7 @@ export default function RootLayout() {
       // Landing them on the home tab would leave an account nobody can sign
       // back into once this one-time session expires.
       if (invite.current) {
-        router.replace("/(auth)/accept-invite");
+        showAuthScreen("/(auth)/accept-invite");
         return;
       }
 
@@ -167,7 +176,7 @@ export default function RootLayout() {
       async (event, session) => {
         if (event === "PASSWORD_RECOVERY") {
           recovery.current = true;
-          router.replace("/(auth)/reset-password");
+          showAuthScreen("/(auth)/reset-password");
           return;
         }
         if (event === "SIGNED_OUT" || !session) {
