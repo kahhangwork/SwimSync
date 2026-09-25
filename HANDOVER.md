@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-26 — **Both §9 S-items shipped (§8.125):** a recovery / invite link no longer wipes what the
-parent typed (`showAuthScreen`, §7.274 — the `app-auth` step-4 cause), and `verify-app-money` presses the package
-page's own *I've paid*. Gate overridden by the user again; **tonight's nightly covers §8.123–§8.125.**_
+_Last updated: 2026-09-26 — **The deployed `public-package` CORS is checked (§8.126):** prod allows only `content-type`,
+so the code comment and §7.264 were right; a docs-only session, no code merged. **Tonight's nightly still covers
+§8.123–§8.125.**_
 
-_Previously (§8.124, 2026-09-25) — the dead `auto_invoice_enabled` row dropped; no driver hardcodes an app port._
+_Previously (§8.125, 2026-09-26) — a recovery / invite link no longer wipes the typed form; `app-money` C2 driven._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.273** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.274** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -347,6 +347,14 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.126 (2026-09-26) — The deployed CORS probe: §7.264 holds
+
+**The §9 CORS item, read-only, docs-only** (`eb95259`). Prod `public-package` and `public-invoice` answer
+`Allow-Headers: content-type` whatever is requested; the local gateway echoes every header. Recorded on §7.264; the
+BACKLOG item removed.
+
+- **Not done:** no code merged — the §7.1 gate still waits on tonight's nightly.
+
 ## 8.125 (2026-09-26) — A late session restore wiped the reset form; the package page's *I've paid* is driven
 
 **Both §9 S-items, each on its own branch, merged drivers-first then the app fix, on the user's override of the §7.1
@@ -357,18 +365,7 @@ gate.** Deploy record: DEPLOYMENT §11 #53.
 - **`verify-app-money` C2** (`954e82f`): the logged-out claim POST. TESTING §5.
 - **Not done:** one harmless pre-form mount remains unexplained (§7.274). No driver ran beyond these two.
 
-## 8.124 (2026-09-25) — The dead `auto_invoice_enabled` row, and no driver hardcodes a port
-
-**Both §9 S-items, each on its own branch, shipped migration-first; the user overrode the §7.1 nightly gate** (neither
-touches app code). Deploy record: DEPLOYMENT §11 #52.
-
-- **`20260925000200`** drops the dead global row (deployed engine v29 and prod `pg_proc` checked first). Review found
-  prod held `false`, not the seed's `true` → the DOWN restores `false`; the lesson is a bullet on §7.93.
-- **Driver ports** (`c81b32f`): the item said three drivers, the grep found **eight**; all read `ADMIN`/`EXPO` now,
-  and `check-driver-ports.sh` (CI `repo-invariants`) holds it. TESTING §5 · ARCHITECTURE §10.
-- **Not done:** the other six changed drivers were not run locally (two were: 17/17, 10/10) — tonight's nightly is their run.
-
-_(§8.123 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.124 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -426,8 +423,8 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-- **Check the deployed `public-package` CORS against §7.264** (BACKLOG, S) — a read-only `curl -X OPTIONS`; the sibling
-  of §8.125's C2 driver.
+- **Give `isPublicPage`'s prefix match a segment boundary** (BACKLOG, S) — the next Foundations item; app code, so it
+  waits for the gate below.
 - Any other uncovered-actions driver item, or `BACKLOG.md` Build order.
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before
