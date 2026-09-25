@@ -1,0 +1,23 @@
+-- ============================================================
+-- CONTRACT: drop the dead global app_settings.auto_invoice_enabled row.
+--
+-- The switch moved to tenants.auto_invoice_enabled when the engine became
+-- per-tenant (20260718000600_tenant_backfill.sql copied the value across).
+-- Since then the engine's automatic-mode guard and the admin Invoices card
+-- read only the tenant column; this row was left behind.
+--
+-- Why it goes rather than lingers: the same trap 20260925000100 closed for
+-- invoice_run_day — a dead global switch with a live-looking name, beside a
+-- live per-tenant one of the same name.
+--
+-- Verified before writing (2026-09-25): no app, engine, test, cloud SQL or
+-- SQL function body reads it (pg_proc bodies checked, local AND prod), and the DEPLOYED
+-- engine's source (`supabase functions download generate-invoices`, v29)
+-- reads only tenants.auto_invoice_enabled. Prod held `false` (the rollback
+-- restores that, not the seed's `true`).
+--
+-- Data only: no schema, grant or policy changes. Idempotent.
+-- Rollback: supabase/rollback/20260925000200_drop_app_settings_auto_invoice_enabled_DOWN.sql
+-- ============================================================
+
+DELETE FROM public.app_settings WHERE key = 'auto_invoice_enabled';

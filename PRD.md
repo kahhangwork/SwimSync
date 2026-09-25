@@ -3125,11 +3125,12 @@ Below is the detailed SwimSync MVP entity structure with field-level definitions
 *Key/value store for **platform-level** switches. **(implemented — narrowed)** The billing
 schedule (`auto_invoice_enabled`, `invoice_run_day`) moved onto `tenants` when generation
 became per-business; leaving it here would have meant one school changing its run day
-changing everyone's. Readable only by the platform admin.*
+changing everyone's; both dead global rows are dropped (`20260925000100`,
+`20260925000200`). Readable only by the platform admin.*
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| **key** | String | Yes | Primary key (e.g. `auto_invoice_enabled`) |
+| **key** | String | Yes | Primary key (e.g. `invoice_block_notified`) |
 | **value** | JSON | Yes | Setting value |
 | **updated_at** | Timestamp | Yes | Last update timestamp |
 
