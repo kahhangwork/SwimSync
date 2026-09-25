@@ -134,7 +134,10 @@ try {
     await field.waitFor({ timeout: 15000 });
     const saved = page.waitForResponse(
       (r) => r.url().includes("/rest/v1/tenants") && r.request().method() === "PATCH", { timeout: 10000 });
+    // Saved on LEAVING the field, not per keystroke (2026-09-25) — so exactly
+    // one PATCH, carrying the whole value. Blur is what sends it.
     await field.fill(v);
+    await field.blur();
     await saved;
   }
   async function studentsLowFilter() {

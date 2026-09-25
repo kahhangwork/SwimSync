@@ -2058,7 +2058,8 @@ cash paid always equals value granted — nothing to reconcile.
   rate**, on the same invoice — nobody is blocked at poolside and nothing is lost. A
   family with no package takes exactly the pre-package path.
 - **Live everywhere it is shown**: the parent's card, the admin's tables and the
-  students-page **"running low" filter** (threshold per business, admin-set on the **Packages** page — the Students
+  students-page **"running low" filter** (threshold per business, admin-set on the **Packages** page and saved when
+  the admin leaves the field or presses Enter, never per keystroke, *2026-09-25* — the Students
   page shows it read-only beside the filter, *2026-09-24*) all read
   one database derivation that subtracts lessons attended but not yet invoiced — the
   count drops the evening of the lesson, though the money settles monthly.

@@ -1,7 +1,13 @@
 // "Running low" — the two thresholds that decide which families Generate
-// renewal offers picks up, and what the Students page flags. Saved as typed.
+// renewal offers picks up, and what the Students page flags. Saved when the
+// admin leaves the field (blur, or Enter) — never per keystroke.
 
+import type { KeyboardEvent } from "react";
 import type { LowSettingsState } from "../domain/useLowSettings";
+
+const blurOnEnter = (e: KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === "Enter") e.currentTarget.blur();
+};
 
 export function LowSettingsCard({ low }: { low: LowSettingsState }) {
   return (
@@ -13,7 +19,9 @@ export function LowSettingsCard({ low }: { low: LowSettingsState }) {
       <label className="mt-3 flex flex-wrap items-center gap-1.5 text-sm text-gray-700">
         <input
           value={low.threshold}
-          onChange={(e) => low.saveThreshold(e.target.value)}
+          onChange={(e) => low.setThreshold(e.target.value)}
+          onBlur={low.commitThreshold}
+          onKeyDown={blurOnEnter}
           inputMode="numeric"
           disabled={!low.loaded}
           className="w-14 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-sm"
@@ -22,7 +30,9 @@ export function LowSettingsCard({ low }: { low: LowSettingsState }) {
         lessons or fewer left, or expires within
         <input
           value={low.expiryDays}
-          onChange={(e) => low.saveExpiryDays(e.target.value)}
+          onChange={(e) => low.setExpiryDays(e.target.value)}
+          onBlur={low.commitExpiryDays}
+          onKeyDown={blurOnEnter}
           inputMode="numeric"
           disabled={!low.loaded}
           className="w-14 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-sm"
