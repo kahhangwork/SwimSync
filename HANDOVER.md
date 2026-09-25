@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-25 — **All three §9 builds shipped (§8.123):** running-low fields save on leaving the field
-(`e011a9c`), `/register` + `/forgot-password` open signed-out (`08685c2`), the dead `app_settings.invoice_run_day` row
-dropped on prod (`20260925000100`, 159/159). **Tonight's nightly is the first to cover all three.**_
+_Last updated: 2026-09-25 (late) — **Two dead-weight items shipped, gate overridden by the user (§8.124):** the dead
+`app_settings.auto_invoice_enabled` row dropped on prod (`20260925000200`, 160/160), and no driver hardcodes an app port
+(eight fixed, CI guard `check-driver-ports.sh`). **Tonight's nightly covers §8.123 AND §8.124.**_
 
-_Previously (§8.122, 2026-09-25) — nightly `36071084202` red on one `app-auth` check; a local 25/25 accepted as the gate._
+_Previously (§8.123, 2026-09-25) — save-on-leave running-low fields, signed-out `/register`, the dead run-day row dropped._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +347,17 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.124 (2026-09-25) — The dead `auto_invoice_enabled` row, and no driver hardcodes a port
+
+**Both §9 S-items, each on its own branch, shipped migration-first; the user overrode the §7.1 nightly gate** (neither
+touches app code). Deploy record: DEPLOYMENT §11 #52.
+
+- **`20260925000200`** drops the dead global row (deployed engine v29 and prod `pg_proc` checked first). Review found
+  prod held `false`, not the seed's `true` → the DOWN restores `false`; the lesson is a bullet on §7.93.
+- **Driver ports** (`c81b32f`): the item said three drivers, the grep found **eight**; all read `ADMIN`/`EXPO` now,
+  and `check-driver-ports.sh` (CI `repo-invariants`) holds it. TESTING §5 · ARCHITECTURE §10.
+- **Not done:** the other six changed drivers were not run locally (two were: 17/17, 10/10) — tonight's nightly is their run.
+
 ## 8.123 (2026-09-25) — The three §9 builds: save-on-leave, signed-out `/register`, the dead run-day row
 
 **Three units, each reviewed, proven red without its fix, and shipped on its own — all merged before tonight's
@@ -362,18 +373,7 @@ after §8.122's gate opened). Planning skills skipped for each: specified by the
 - **Filed:** drop the dead `app_settings.auto_invoice_enabled` row (BACKLOG, S). **Not done:** `isPublicPage`'s
   prefix match has no segment boundary (pre-existing; every page it admits is token-gated).
 
-## 8.122 (2026-09-25) — The gate nightly went red on one check; a local re-run cleared it
-
-**Nightly `36071084202` (scheduled, on `29bfe15`) — 55/56; `app-auth` 24/25.** Check 1: the parent's one-shot login sat
-10019 ms on `/login` with no error shown; the coach's took 168 ms, and the parent logged in fine three times later in the same
-run. `run-all-drivers.sh --only app-auth` locally, bundle confirmed current (`LANDING_SEGMENTS` served): **25/25, parent 191 ms.**
-**The user accepted the local green as the gate** — no nightly was re-run. No code changed.
-
-- **Graduated:** the red and its "a second one is real" rule → §7.263. Step 4's first `re-mounted … refilling (1)` log line →
-  BACKLOG *Find what clears `verify-app-auth` step 4*.
-- **Caveat, not a finding:** the local bundle was warm, so it could not reproduce a cold first login.
-
-_(§8.121 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.122 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -416,10 +416,12 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-25: nightly `36071084202` RED 55/56 (`app-auth` check 1, the parent one-shot login) — cleared by a local
-25/25 the user accepted (§8.122).** Tonight's scheduled nightly is the next real signal, and the FIRST on §8.123's three
-units: **a second check-1 red is a real verdict, not a flake** (§7.263); a red in `smoke-app`, `verify-packages` or
-`app-auth` points at §8.123 first. `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
+**State on 2026-09-25: nightly `36071084202` RED 55/56 (`app-auth` check 1) — cleared by a local 25/25 the user accepted
+(§8.122).** Tonight's scheduled nightly is the next real signal, and the FIRST on §8.123's three units AND §8.124's two:
+**a second check-1 red is a real verdict, not a flake** (§7.263); a red in `smoke-app`, `verify-packages` or `app-auth`
+points at §8.123 first; a red in one of the eight port-fixed drivers (`active-inactive`, `bulk-setall`, `class-edit`,
+`class-terms`, `levels`, `level-skills`, `tenant-provisioning`, `unmarked-lessons`) points at `c81b32f` first.
+`CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
@@ -428,20 +430,20 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-- **Drop the dead `app_settings.auto_invoice_enabled` row** (BACKLOG, S) — `20260925000100`'s exact shape; download
-  and grep the DEPLOYED engine first (not yet done for this key).
-- **Driver ports are hardcoded in three drivers** (BACKLOG, S) — driver hygiene, no app risk.
+- **Find what clears `verify-app-auth` step 4's password fields** (BACKLOG, S) — the one open nightly-reliability item.
+- **A driver for the package page's own *I've paid*** (BACKLOG, S) — or any of the uncovered-actions driver items beside it.
 - Anything else: `BACKLOG.md` Build order.
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before
   `supabase test db` (§7.272).
 
-**GATE (§7.1): read tonight's nightly before the next unit merges** — three units (§8.123) went in on §8.122's opened gate,
-so tonight's run is their shared driver-level check.
+**GATE (§7.1): read tonight's nightly before the next unit merges** — five units (§8.123 + §8.124) went in, the last two
+on the user's override of this gate, so tonight's run is their shared driver-level check.
 
-**No migration is HELD or in flight.** Latest applied is `20260925000100` (drop the dead run-day row, §8.123), on prod,
-0 pending (159/159 on 2026-09-25), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.123 authored `20260925000100`, §8.117 `20260922000100`; §8.118–§8.122 none.
+**No migration is HELD or in flight.** Latest applied is `20260925000200` (drop the dead `auto_invoice_enabled` row,
+§8.124), on prod, 0 pending (160/160 on 2026-09-25), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list
+--linked` is the fact; a prose status is a hint.** §8.124 authored `20260925000200`, §8.123 `20260925000100`. Prod
+`app_settings` now holds one row, `invoice_block_notified`.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

@@ -988,3 +988,10 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `app_settings` holding only `auto_invoice_enabled` + `invoice_block_notified`. Precondition checked, not
     assumed: the DEPLOYED engine (v29, `functions download`) reads only `tenants.invoice_run_day`. No grants
     touched → no dump. Rollback: `supabase/rollback/20260925000100_…_DOWN.sql`, rehearsed (test red/green/red/green).
+
+52. **Deploy record (2026-09-25, late): one data-only contract migration, then a drivers/CI-only push.**
+    Nightly gate §7.1 overridden by the user (neither unit touches app code). (1) `20260925000200_drop_app_settings_auto_invoice_enabled`
+    → `supabase db push` → `migration list --linked` **160/160, 0 pending**; prod `app_settings` now holds only
+    `invoice_block_notified`. Preconditions: DEPLOYED engine v29 and prod `pg_proc` bodies read no global key.
+    Prod held `false` → the DOWN restores `false` (§7.93). Then `152b142` → `main`. (2) `c81b32f` (drivers + CI
+    guard) rebased and → `main`. CI green on both; no app diff, so no bundle grep.

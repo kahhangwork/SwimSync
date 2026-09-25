@@ -873,6 +873,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     - Then re-run the **pre-migration** test file under the rolled-back schema (`attendance_window.test.sql` still
       31; the new feature's file fails wholesale).
     - Budget: three `supabase db reset` cycles, ~ten minutes. (2026-08-07.)
+    - **A DATA-only DOWN (a re-INSERT of a deleted row) must restore PROD's value — read it with
+      `supabase db query --linked` BEFORE the push — not the seed's.** The local rehearsal cannot catch this:
+      local holds the seed, so a DOWN that re-inserts the seed goes red/green/red/green perfectly. Found in
+      review on `20260925000200` (prod held `false`, the seed `true`). (2026-09-25, §8.124.)
 
 94. **`CURRENT_DATE` IN A FUNCTION IS THE *SESSION'S* TIME ZONE — UTC ON THIS SERVER — SO IT
     IS §7.7 WITH THE DATABASE HOLDING THE WRONG CLOCK. USE `today_sg()`.** Clients are already
