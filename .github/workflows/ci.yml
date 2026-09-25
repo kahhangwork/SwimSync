@@ -35,6 +35,11 @@ jobs:
       - name: No UI fixture or driver carries a captured UUID
         run: .claude/skills/run-ui-playwright/drivers/check-fixture-ids.sh
 
+      # A hardcoded localhost:3000/8081 drives whatever is on the default port —
+      # a sibling worktree's build, or nothing. The backlog counted 3; there were 8.
+      - name: No UI driver hardcodes a port
+        run: .claude/skills/run-ui-playwright/drivers/check-driver-ports.sh
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:

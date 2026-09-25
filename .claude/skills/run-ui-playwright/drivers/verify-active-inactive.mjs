@@ -8,7 +8,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -40,7 +40,7 @@ const { browser, page } = await launch();
 await loginAdmin(page, "coach@swimsync.test", "password123");
 
 // ── 1. The Parents page exists and lists the family ─────────────────────────
-await page.goto("http://localhost:3000/parents");
+await page.goto(`${ADMIN}/parents`);
 await page.waitForTimeout(1800);
 let body = await page.innerText("body");
 check("the new Parents page renders", /Parents/.test(body) && !/404/.test(body));
@@ -48,14 +48,14 @@ check("the family is listed with its active-child count", /Tan Family/.test(body
 await page.screenshot({ path: shot("ai-parents.png"), fullPage: true });
 
 // ── 2. Both children appear in the Unassigned queue while active ────────────
-await page.goto("http://localhost:3000/unassigned");
+await page.goto(`${ADMIN}/unassigned`);
 await page.waitForTimeout(1500);
 body = await page.innerText("body");
 check("both children are in the Unassigned queue while active",
   /Ethan Tan/.test(body) && /Maya Tan/.test(body));
 
 // ── 3. Setting one child inactive OFFERS the sibling, and says what follows ─
-await page.goto("http://localhost:3000/students");
+await page.goto(`${ADMIN}/students`);
 await page.waitForTimeout(1500);
 // Set inactive now lives in the per-row Actions drawer (Decision 10): open it,
 // then click the drawer's Set inactive, which opens the confirm modal.
@@ -92,7 +92,7 @@ check("the family stays active while a sibling attends",
        WHERE p.profile_id='a0000000-0000-0000-0000-00000000dddd'`) === "t");
 
 // ── 4. THE REGRESSION: a departed child must not look like a new signup ─────
-await page.goto("http://localhost:3000/unassigned");
+await page.goto(`${ADMIN}/unassigned`);
 await page.waitForTimeout(1500);
 body = await page.innerText("body");
 check("an INACTIVE child is gone from the Unassigned queue",
@@ -100,7 +100,7 @@ check("an INACTIVE child is gone from the Unassigned queue",
 check("their active sibling is still in it", /Maya Tan/.test(body));
 
 // ── 5. Deactivating the last child takes the family with it ─────────────────
-await page.goto("http://localhost:3000/students");
+await page.goto(`${ADMIN}/students`);
 await page.waitForTimeout(1500);
 await page.locator("tr", { hasText: "Maya Tan" }).getByRole("button", { name: /^Actions$/ }).click();
 await page.waitForTimeout(400);
@@ -117,7 +117,7 @@ check("the family is now inactive at this business",
        WHERE p.profile_id='a0000000-0000-0000-0000-00000000dddd'`) === "f");
 
 // ── 6. The Parents page shows it, and can reactivate ────────────────────────
-await page.goto("http://localhost:3000/parents");
+await page.goto(`${ADMIN}/parents`);
 await page.waitForTimeout(1800);
 body = await page.innerText("body");
 check("the Parents page shows the family as Inactive", /Tan Family/.test(body) && /Inactive/.test(body));

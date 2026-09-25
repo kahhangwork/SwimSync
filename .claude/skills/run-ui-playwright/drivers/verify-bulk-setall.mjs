@@ -31,7 +31,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, tap, dumpText } from "./lib.mjs";
+import { launch, loginExpo, tap, dumpText, EXPO } from "./lib.mjs";
 
 const sql = (q) =>
   execSync(
@@ -85,7 +85,7 @@ await loginExpo(coach, "coach@swimsync.test", "password123");
 await coach.waitForTimeout(3000);
 
 async function openMissingSaturday() {
-  await coach.goto("http://localhost:8081/schedule");
+  await coach.goto(`${EXPO}/schedule`);
   await coach.waitForTimeout(4000);
   await tap(coach.getByText(missingLabel).first(), `backlog row → ${missingLabel}`);
   await coach.waitForTimeout(3000);
@@ -141,7 +141,7 @@ await coach.screenshot({ path: shot("setall-cancelled-rain.png"), fullPage: true
 // mark screen stays mounted under Today and pollutes body.innerText.)
 await tap(coach.getByText(/Save/).first(), "Save Attendance");
 await coach.waitForTimeout(4000);
-await coach.goto("http://localhost:8081/schedule");
+await coach.goto(`${EXPO}/schedule`);
 await coach.waitForTimeout(4000);
 text = await dumpText(coach);
 check(`After bulk save, ${missingLabel} clears the unmarked backlog`, !/NEEDS MARKING/i.test(text));

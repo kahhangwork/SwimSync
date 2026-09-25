@@ -33,7 +33,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, loginAdmin, tap, dumpText } from "./lib.mjs";
+import { launch, loginExpo, loginAdmin, tap, dumpText, ADMIN, EXPO } from "./lib.mjs";
 
 const sql = (q) =>
   execSync(
@@ -84,7 +84,7 @@ const admin = await adminCtx.newPage();
 await loginAdmin(admin, "coach@swimsync.test", "password123");
 
 async function openCoverageModal() {
-  await admin.goto("http://localhost:3000/invoices");
+  await admin.goto(`${ADMIN}/invoices`);
   await admin.waitForTimeout(2500);
   // The billing month must TRACK the fixture, which derives its dates from now()
   // (fixtures-unmarked-lessons.sql:38). This read a hardcoded "2026-07" and so
@@ -147,7 +147,7 @@ await tap(coach.getByText(/Save/).first(), "Save");
 await coach.waitForTimeout(4000);
 
 // ── 4. Backlog clears, admin goes green ──────────────────────────────────────
-await coach.goto("http://localhost:8081/schedule");
+await coach.goto(`${EXPO}/schedule`);
 await coach.waitForTimeout(4000);
 text = await dumpText(coach);
 await coach.screenshot({ path: shot("coach-today-cleared.png"), fullPage: true });

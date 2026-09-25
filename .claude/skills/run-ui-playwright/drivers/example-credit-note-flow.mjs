@@ -8,7 +8,7 @@
 // This is a TEMPLATE showing the mechanics (UI navigation, force-tap, assert
 // against the DB out-of-band). Copy + adapt for other flows.
 
-import { launch, tap, loginExpo, loginAdmin, dumpText, EXPO } from "./lib.mjs";
+import { launch, tap, loginExpo, loginAdmin, dumpText, EXPO, ADMIN } from "./lib.mjs";
 
 const COACH = process.env.COACH_EMAIL || "coach@swimsync.test";
 const PARENT = process.env.PARENT_EMAIL || "cn-test-parent@swimsync.test";
@@ -55,7 +55,7 @@ const SHOT_DIR = process.env.SHOT_DIR || "/tmp";
   const { browser, page } = await launch({ mobile: false });
   try {
     await loginAdmin(page);
-    await page.goto("http://localhost:3000/credit-notes", { waitUntil: "networkidle" });
+    await page.goto(`${ADMIN}/credit-notes`, { waitUntil: "networkidle" });
     await page.waitForTimeout(2000);
     await dumpText(page, 1500); // expect the ref + student + parent + amount
     await page.screenshot({ path: `${SHOT_DIR}/cn-admin.png`, fullPage: true });

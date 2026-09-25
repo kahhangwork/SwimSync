@@ -14,7 +14,7 @@
 // SEVEN checks cannot run — the driver says so and fails rather than skipping.
 import os from "node:os";
 import path from "node:path";
-import { launch, loginAdmin } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (name) => path.join(SHOT, name);
@@ -31,7 +31,7 @@ const NEW_PASSWORD = "dolphin-pass-123";
 
 const { browser, page } = await launch();
 await loginAdmin(page, "superadmin@swimsync.test", "password123");
-await page.goto("http://localhost:3000/platform");
+await page.goto(`${ADMIN}/platform`);
 await page.waitForTimeout(1500);
 
 // ── 1. The form refuses mismatched emails ────────────────────────────────────
@@ -182,7 +182,7 @@ if (inviteLink) {
   check("the password is accepted", /You&apos;re all set|You're all set/i.test(await invitee.innerText("body")));
 
   // ── 5. THE ONE THAT MATTERS: they can actually sign in ────────────────────
-  await invitee.goto("http://localhost:3000/login");
+  await invitee.goto(`${ADMIN}/login`);
   await invitee.waitForTimeout(800);
   await invitee.fill('input[type="email"]', ADMIN_EMAIL);
   await invitee.fill('input[type="password"]', NEW_PASSWORD);

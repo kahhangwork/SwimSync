@@ -7,7 +7,7 @@
 //
 //   docker exec ... < drivers/fixtures-student-identity.sql
 //   node drivers/verify-level-skills.mjs
-import { launch, loginAdmin, loginExpo, tap, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, tap, ADMIN, EXPO } from "./lib.mjs";
 
 let pass = 0, fail = 0;
 const check = (ok, label, detail = "") => {
@@ -118,7 +118,7 @@ try {
 
     console.log("\n[parent] what is my child working towards");
     await mob.page.evaluate(() => window.localStorage.clear());
-    await mob.page.goto("http://localhost:8081/login", { waitUntil: "domcontentloaded" });
+    await mob.page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
     await mob.page.waitForTimeout(2500);
     await loginExpo(mob.page, "identity@test.local");
     await tap(mob.page.getByText("Maya Tan").first(), "Maya Tan");

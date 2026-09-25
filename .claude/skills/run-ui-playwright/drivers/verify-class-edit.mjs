@@ -4,7 +4,7 @@
 // Setup: supabase running + seed ("Saturday Beginners"); cd SwimSyncAdmin && npm run dev
 import os from "node:os";
 import path from "node:path";
-import { launch, loginAdmin } from "./lib.mjs";
+import { launch, loginAdmin, ADMIN } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (name) => path.join(SHOT, name);
@@ -18,7 +18,7 @@ const { browser, page } = await launch();
 // coach@swimsync.test is the TENANT admin (superadmin@ became the cross-tenant
 // platform admin on 2026-07-19 and has no Classes page — §8.7).
 await loginAdmin(page, "coach@swimsync.test", "password123");
-await page.goto("http://localhost:3000/classes");
+await page.goto(`${ADMIN}/classes`);
 await page.waitForTimeout(1500);
 
 // ── 1. New-class form no longer defaults the day to Saturday ──────────────────

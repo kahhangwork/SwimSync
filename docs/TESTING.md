@@ -373,6 +373,11 @@ still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 > (CI, `repo-invariants`) fails on any UUID literal without `0000` in it — a hand-made id is mostly
 > zeros, one copied out of a live database is random and breaks on the first `db reset` (§7.163).
 >
+> **No driver hardcodes a port** (2026-09-25). `drivers/check-driver-ports.sh` (CI, `repo-invariants`)
+> fails on any `localhost:<port>` in a driver outside `lib.mjs`: import `ADMIN` / `EXPO` from `lib.mjs`,
+> which read `ADMIN_URL` / `EXPO_URL`, so a worktree on its own ports drives its OWN build. The backlog
+> item counted three offenders; the grep found eight.
+>
 > **Every fixture is now LOADED by CI too** (2026-08-01), by
 > `drivers/check-fixture-roundtrip.sh` — a step in `backend-tests`, which already boots a
 > Supabase stack. It runs **two passes**:

@@ -28,7 +28,7 @@
 // real children's levels silently, recording nothing. Hence the prefix below:
 // cleanup is scoped to it, and foreign levels make this driver FAIL and say so
 // rather than tidy them away.
-import { launch, loginAdmin, loginExpo, tap, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, tap, ADMIN, EXPO } from "./lib.mjs";
 
 // Every level this driver creates carries this prefix, and cleanup deletes
 // nothing else. Distinct from fixtures-levels-table.sql's 'LvlTbl '.
@@ -176,7 +176,7 @@ try {
 
     console.log("\n[parent] the child detail shows the level, read-only");
     await mob.page.evaluate(() => window.localStorage.clear());
-    await mob.page.goto("http://localhost:8081/login", { waitUntil: "domcontentloaded" });
+    await mob.page.goto(`${EXPO}/login`, { waitUntil: "domcontentloaded" });
     await mob.page.waitForTimeout(2500);
     await loginExpo(mob.page, "identity@test.local");
     await tap(mob.page.getByText("Maya Tan").first(), "Maya Tan");
