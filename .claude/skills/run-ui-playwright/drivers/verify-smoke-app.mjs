@@ -21,8 +21,7 @@
 //   • deep link, signed in — most tabs and detail screens;
 //   • IN-APP press — the Home stack (child / edit-child / join-tenant), because
 //     the landing tab IS /home and the replace pops a nested screen off the
-//     same stack; and Register / Forgot password, because a session-less load
-//     of anything outside PUBLIC_PATHS bounces to /login;
+//     same stack;
 //   • a `#type=recovery` / `#type=invite` hash on a signed-in load — the two
 //     token screens, which the root layout routes to on that flag alone.
 //
@@ -231,9 +230,12 @@ try {
   console.log("\n[logged out] the auth and public pages");
   await signOut(page);
   await visit(page, "/login", "Sign In", { authed: false });
-  await visitByPress(page, "Register", "Create Account", "/register");
-  await visit(page, "/login", "Sign In", { authed: false });
-  await visitByPress(page, "Forgot password?", "Reset Password", "/forgot-password");
+  // DEEP-LINKED, signed out: swimsync.sg/register is the link a coach sends a
+  // new family, and it used to bounce to Sign In (lib/publicRoutes.ts,
+  // 2026-09-25). Reaching these by pressing the login page's links would hide
+  // that regression.
+  await visit(page, "/register", "Create Account", { authed: false });
+  await visit(page, "/forgot-password", "Reset Password", { authed: false });
   await visit(page, "/welcome", "Welcome to SwimSync", { authed: false });
   await visit(page, `/invoice/${TOKEN}`, "Amount due", { authed: false });
   // No package in the fixture: the not-found state is the rendered screen.

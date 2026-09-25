@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import * as Linking from "expo-linking";
 import { supabase } from "@/lib/supabase";
 import { landingFor, isInsideLanding } from "@/lib/landing";
+import { allowsNoSession, isPublicPage } from "@/lib/publicRoutes";
 import { useAppStore } from "@/store/useAppStore";
 import Toast from "@/components/Toast";
 
@@ -45,22 +46,22 @@ function parseAuthTokens(
   return null;
 }
 
-// Public routes that must render without a session. The session-restore below
-// otherwise bounces every session-less load to /login, which would hide the
-// parent-facing /welcome onboarding page.
-// ⚠ Widening this list widens the auth gate — weigh every addition. There are
-// exactly TWO tokenized public PAYMENT pages, and both earn their place because
-// the caller is a sessionless parent who clicked a WhatsApp/email link and the
-// 128-bit token in the URL is the whole access control:
-//   • /invoice — the public invoice page (a month's bill).
-//   • /package — the public package-OFFER page (a renewal to pre-pay).
-// The AUTHED equivalents live under /billing/…, which startsWith does not match.
-const PUBLIC_PATHS = ["/welcome", "/invoice", "/package"];
+// The auth gate's session-less allowances live in lib/publicRoutes.ts, pinned
+// by its test. ⚠ Widening them widens the auth gate.
+function currentPath(): string | null {
+  return Platform.OS === "web" && typeof window !== "undefined"
+    ? window.location.pathname
+    : null;
+}
+// A session-less load may stay here (a public page, or /register etc.).
+function allowedWithoutSession(): boolean {
+  const path = currentPath();
+  return path !== null && allowsNoSession(path);
+}
+// A signed-in user opening this page stays on it.
 function onPublicRoute(): boolean {
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    return PUBLIC_PATHS.some((p) => window.location.pathname.startsWith(p));
-  }
-  return false;
+  const path = currentPath();
+  return path !== null && isPublicPage(path);
 }
 
 export default function RootLayout() {
@@ -91,7 +92,7 @@ export default function RootLayout() {
     >["data"]["session"]) {
       if (!session) {
         clearSession();
-        if (!onPublicRoute()) router.replace("/(auth)/login");
+        if (!allowedWithoutSession()) router.replace("/(auth)/login");
         return;
       }
 
@@ -171,7 +172,7 @@ export default function RootLayout() {
         }
         if (event === "SIGNED_OUT" || !session) {
           clearSession();
-          if (!onPublicRoute()) router.replace("/(auth)/login");
+          if (!allowedWithoutSession()) router.replace("/(auth)/login");
         }
       }
     );

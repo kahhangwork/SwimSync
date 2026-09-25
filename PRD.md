@@ -474,6 +474,9 @@ but has not yet signed in.
 ### 5.1 Parent Registration and Child Creation
 
 - Parents can self-register on SwimSync using email/password
+- *(implemented 2026-09-25)* **`swimsync.sg/register` opens the Register screen directly** for a
+  signed-out visitor — it is the link a coach sends a new family (it used to land on Sign In). A
+  signed-in user opening it is sent to their home, as `/login` does. `/forgot-password` behaves the same.
 - Parent account may exist before any child is created
 - A newly registered parent may create one or more child/student profiles
 - **Student profile includes:** child name, age/date of birth, gender, optional notes. *(implemented: parents do **not** set a swimming ability/level. Levels are **coach-defined per business** and set by the business's admin — see §7.15; the parent sees their child's level read-only.)*

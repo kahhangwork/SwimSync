@@ -1,5 +1,5 @@
 // The tokenized public invoice page — where a parent lands from the WhatsApp
-// reminder link, with or without a session (PUBLIC_PATHS in app/_layout.tsx).
+// reminder link, with or without a session (isPublicPage in lib/publicRoutes.ts).
 //
 // Data comes from the public-invoice edge function (the 128-bit token in the
 // URL is the whole access control); the PayNow QR is computed CLIENT-SIDE

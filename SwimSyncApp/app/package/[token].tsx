@@ -1,6 +1,6 @@
 // The tokenized public PACKAGE-OFFER page — where a parent lands from the
-// WhatsApp/email renewal link, with or without a session (PUBLIC_PATHS in
-// app/_layout.tsx). The package mirror of invoice/[token].tsx.
+// WhatsApp/email renewal link, with or without a session (isPublicPage in
+// lib/publicRoutes.ts). The package mirror of invoice/[token].tsx.
 //
 // Data comes from the public-package edge function (the 128-bit token in the
 // URL is the whole access control); the PayNow QR is computed CLIENT-SIDE from
