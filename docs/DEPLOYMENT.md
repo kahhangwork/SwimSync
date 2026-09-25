@@ -995,3 +995,8 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `invoice_block_notified`. Preconditions: DEPLOYED engine v29 and prod `pg_proc` bodies read no global key.
     Prod held `false` → the DOWN restores `false` (§7.93). Then `152b142` → `main`. (2) `c81b32f` (drivers + CI
     guard) rebased and → `main`. CI green on both; no app diff, so no bundle grep.
+53. **Deploy record (2026-09-26): a drivers-only push, then one app fix.** 0 migrations, 0 functions. Nightly gate
+    §7.1 overridden by the user. (1) `954e82f` (`verify-app-money` C2) → `main`. (2) `56fbf81` (`showAuthScreen`,
+    §7.274) rebased onto it, both drivers re-run on the merged tree (27/27, 29/29) → `main`. Vercel app+admin
+    `success` on `56fbf81`, CI green; live `swimsync.sg` entry bundle contains `.replace("/(auth)","")`, absent
+    from `8f34881`'s source (§7.271).
