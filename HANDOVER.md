@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-25 — **Gotchas that were filed twice are now CHECKS (§8.121): a pgTAP scan, a CI UUID grep, a
-CLAUDE.md rule, a topic index, and `/update-docs` searches before filing.** `main` `b021ad8`, 0 migrations, CI green.
-**Tonight's nightly (now on `b021ad8`, same app code as `75aaa82`) is the gate for the next unit.**_
+_Last updated: 2026-09-25 — **The §8.121 nightly (`36071084202`) went RED on one check, cleared by a local re-run the user
+accepted (§8.122).** `app-auth` check 1 (parent one-shot login, 10 s timeout) → local 25/25. `main` `29bfe15`, 0 migrations.
+**The gate is OPEN: the next unit may merge.**_
 
-_Previously (§8.120, 2026-09-25) — ten small units behind one green nightly (refresh keeps you on your screen, et al.)._
+_Previously (§8.121, 2026-09-25) — gotchas filed twice became checks; GOTCHAS.md 347 KB → 186 KB._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +347,17 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.122 (2026-09-25) — The gate nightly went red on one check; a local re-run cleared it
+
+**Nightly `36071084202` (scheduled, on `29bfe15`) — 55/56; `app-auth` 24/25.** Check 1: the parent's one-shot login sat
+10019 ms on `/login` with no error shown; the coach's took 168 ms, and the parent logged in fine three times later in the same
+run. `run-all-drivers.sh --only app-auth` locally, bundle confirmed current (`LANDING_SEGMENTS` served): **25/25, parent 191 ms.**
+**The user accepted the local green as the gate** — no nightly was re-run. No code changed.
+
+- **Graduated:** the red and its "a second one is real" rule → §7.263. Step 4's first `re-mounted … refilling (1)` log line →
+  BACKLOG *Find what clears `verify-app-auth` step 4*.
+- **Caveat, not a finding:** the local bundle was warm, so it could not reproduce a cold first login.
+
 ## 8.121 (2026-09-25) — Gotchas filed twice become checks; `/update-docs` searches before filing
 
 **An audit of all 273 gotchas found eight lessons filed two or three times** — the file was 347 KB and read on
@@ -362,23 +373,7 @@ demand, so a trap that recurred was re-filed rather than recognised, and `/updat
 - **Deliberately NOT done:** a check for §7.150 (`function_grants.test.sql` already covers the local half; the cloud
   half is the remote dump).
 
-## 8.120 (2026-09-24 → 25) — Ten small units, one gate: three §9 items + four BACKLOG S-items + three found on the way
-
-**Serial, root checkout, one branch per unit, all held behind nightly `36006182210`** — attempt 1 red
-(`level-skills` db-reset crash + an `app-auth` step-4 empty-field red), re-run at the user's request, 56/56 green,
-then ten fast-forward pushes in order (DEPLOYMENT §11 #50). **New standing rule:** the nightly runs only when the
-user asks (CLAUDE.md Conventions).
-
-- **Shipped (user-facing):** refresh/bookmark keeps a coach or parent on their own screen (PRD §7.1, §7.254
-  annotated) · the Schedule greeting follows SGT time of day · the admin lesson page shows a failed read instead
-  of "Not marked" (PRD §7.6) · Assessment "moved up" survives the re-read + re-confirmed grades read fresh (PRD
-  §7.15) · running-low thresholds set on Packages (PRD §7.16).
-- **Shipped (tests):** `appLoginDies` shared + "cannot say" · calendar URL waits · `app-auth` step-4 refill log ·
-  pgTAP #21 midnight (§7.260). TESTING §5.
-- **Deliberately NOT done:** the step-4 root cause (unproven — BACKLOG, act on the log line); per-keystroke
-  threshold saves kept as-was (BACKLOG). **Graduated:** §7.271–§7.273; BACKLOG −7 / +2.
-
-_(§8.119 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.120 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -421,10 +416,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-25: nightly `36006182210` attempt 2 GREEN (56/56) on `c990a7f`; the ten §8.120 units then
-landed, so tonight's scheduled nightly (on `b021ad8`, same app code as `75aaa82`) is the first to run them.** Most likely red, if any: the
-drivers whose deep links now show the REAL screen after the landing fix (§7.254 — 13 were re-run locally, green).
-`CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
+**State on 2026-09-25: nightly `36071084202` RED 55/56 (`app-auth` check 1, the parent one-shot login) — cleared by a local
+25/25 the user accepted (§8.122).** Tonight's scheduled nightly is the next real signal: **a second check-1 red is a real
+verdict, not a flake** (§7.263). `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
@@ -442,12 +436,12 @@ which mutate shared seed state — are in the same section.
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before
   `supabase test db` (§7.272).
 
-**GATE (§7.1): do NOT merge the next unit to `main` until tonight's nightly is green — from the log.** It will run on
-`b021ad8` (§8.121: tests/CI/docs only), which carries the §8.120 app code unchanged.
+**GATE (§7.1): OPEN** — the user accepted a local green for `36071084202` (§8.122). The next unit may merge; read tonight's
+nightly before the one after it.
 
 **No migration is HELD or in flight.** Latest applied is `20260922000100` (billing_runs, §8.117), on prod,
 0 pending (158/158 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116 and §8.118–§8.121 none.
+the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116 and §8.118–§8.122 none.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

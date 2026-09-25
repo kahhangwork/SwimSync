@@ -28,6 +28,8 @@ _The rows below are moved verbatim. Their length is the pre-2026-08-10 record, n
 standard — measure new ones against the 200-character cap, not against these._
 
 | # | Date | What shipped | Where its reasoning lives now |
+|---|---|---|---|
+| **8.120** | 2026-09-24 | Ten small units behind one nightly: refresh keeps your screen, SGT greeting, et al. | PRD §7.1/§7.6/§7.15/§7.16 · §7.271–7.273 |
 | **8.119** | 2026-09-24 | Engine run day per tenant (v29), cancelled-lesson notice, 4 verify-app drivers | docs/plans/ENGINE_TENANT_RUN_DAY_PLAN.md · §7.265–7.270 |
 | **8.118** | 2026-09-23 | App L-F/G/H + fence: refactor programme done in both apps | docs/refactor/BATCH_FGH_PLAN.md · §7.261–7.264 |
 | **8.117** | 2026-09-22 | Billing months card + generation run log; August 2026 closed on prod | docs/plans/BILLING_MONTHS_PLAN.md · §7.255–7.260 |
@@ -47,7 +49,6 @@ standard — measure new ones against the 200-character cap, not against these._
 | **8.103** | 2026-09-14 | Admin L-A lite batch: 5 "people" pages (coaches/admins/parents/unassigned/claims) to tiers, 0 useState, zero behaviour change, dfe4cad on prod | docs/refactor/BATCH_A_PLAN.md · playbook §7.1 |
 | **8.102** | 2026-09-13 | Smoke drivers for every route, both apps (admin 64 + app 73 checks); feature-tier rollout set to every page, 3 tracks | §7.237 · §7.238 · docs/TESTING.md §5 |
 | **8.101** | 2026-09-12 | The nightly's two reds were driver date-rot, not product bugs; fixed driver-only (7667643) | §7.234 (date-rot family) · §7.122 · §7.98 |
-|---|---|---|---|
 | **8.100** | 2026-09-12 | Admin Students page decomposed into ui/domain/dao tiers, 12 stages, zero behaviour change; now a playbook | §7.233–236 · refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md |
 | **8.99** | 2026-08-30 | A branded signup-confirmation email that is never sent (dormant by design), + a CI guard on the stranding toggle | §7.231, §7.232 · `authEmailConfig.drift.test.ts` |
 | **8.98** | 2026-08-30 | Every displayed date is Singapore's: 15 sites → a display-only `formatSgStamp()`, held by a source-scanning guard | §7.229, §7.230 · plans/SGT_DISPLAY_PLAN.md |

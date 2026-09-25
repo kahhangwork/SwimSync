@@ -2186,6 +2186,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     (`lib.mjs:40-72`) restore the session via `routeForSession`. **After touching `app/(auth)/login.tsx` or
     `features/login/`, prove it with a ONE-SHOT login** (fresh context, one press, no reload; URL leaves `/login` within 10 s) — `verify-app-auth.mjs`
     check 1, from `docs/refactor/app-fgh-handchecks-fence.mjs`. (2026-09-23.)
+    - **Red once (2026-09-25, nightly `36071084202`):** parent check 1 sat 10019 ms on `/login`, no error on screen; coach
+      168 ms, the parent's later logins fine; local re-run 191 ms, 25/25 — accepted as a cold-load flake by the user. The
+      first nightly carrying `75aaa82` (the `isInsideLanding` redirect change). **A second check-1 red is a real verdict.**
 
 264. **The `public-invoice` / `public-package` Edge Functions allow ONLY `content-type` — an added header breaks
     the page silently.** (`index.ts:27`.) A failed preflight renders "Invoice/Package not found", so
