@@ -2198,7 +2198,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     the page silently.** (`index.ts:27`.) A failed preflight renders "Invoice/Package not found", so
     `verify-smoke-app` stays green. Keep the bare `fetch`, `content-type` only, `FUNCTIONS_URL` as literal
     `process.env.EXPO_PUBLIC_SUPABASE_URL`, QR build inside the `try`. Local runtime answers preflight itself —
-    `verify-app-money`'s header-NAME check is the only guard (BACKLOG). (2026-09-23.)
+    `verify-app-money`'s header-NAME check is the only guard. (2026-09-23.)
+    **Probed against prod 2026-09-26, both functions:** a preflight asking for `x-client-info` (or, on `public-package`,
+    `authorization, apikey`) gets `Allow-Headers: content-type` back, so a browser refuses the request. The local gateway
+    answers the same preflight with `Allow-Origin: *` and echoes every requested header, so a local run cannot fail this
+    way. Re-probe only if `corsHeaders` changes.
 
 265. **Moving a setting from a global row to a per-tenant row, a read that swallows its `error` becomes a hidden
     DEFAULT — and on a billing schedule a default is an early bill that then seals the month.** Auto mode now
