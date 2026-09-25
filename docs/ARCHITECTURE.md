@@ -663,6 +663,7 @@ the shape of the system changes:_
 | `supabase/tests/tenant_isolation.test.sql` | Cross-tenant isolation — two full tenants proving they cannot see each other |
 | `supabase/tests/coach_wages.test.sql` | The pay-decision table, pro-rata, effective dating, draft→freeze, adjustments |
 | `SwimSyncApp/lib/landing.ts` | Where a signed-in user lands. Routes on **extension rows**, not the role enum (§7.19) |
+| `SwimSyncApp/lib/publicRoutes.ts` | The auth gate's session-less allowances, two lists: **public pages** (`/welcome`, `/invoice`, `/package` — any session, signed-in stays) and **signed-out screens** (`/register`, `/forgot-password` — exact match, signed-in still redirected). `/reset-password` + `/accept-invite` deliberately OUT (token session). ⚠ widening either widens the gate |
 | `SwimSyncApp/lib/attendanceCompleteness.ts` | The completeness rule, shared. **Twin in SwimSyncAdmin; a third copy in the Deno engine — three edits** |
 | `SwimSyncApp/lib/coachRoster.ts` | Pure role resolution for a lesson: am I the main, a shadow, or covered? No I/O. ⚠ Its input order is a safety rule, not a style — §7.146 |
 | `SwimSyncApp/lib/sessionMainCoach.ts` | The `SECURITY DEFINER` probe behind §7.134 — a coach cannot *see* the roster row that replaced them, so this asks the database. **Fails towards "I am the main coach"**, so a probe outage leaves the coach able to mark rather than silently locked out |
@@ -767,7 +768,7 @@ the shape of the system changes:_
 | `supabase/seed.sql` | Local seed (superadmin, coach, one class) |
 | `SwimSyncApp/app/` | Expo Router screens: `(auth)/ (parent)/ (coach)/`, each tab folder has a nested `_layout.tsx` |
 | `…/(auth)/forgot-password.tsx` · `reset-password.tsx` | Password-reset flow (request link + set new password) |
-| `SwimSyncApp/app/_layout.tsx` | Root: session restore + `PASSWORD_RECOVERY` routing + native recovery deep-link handler |
+| `SwimSyncApp/app/_layout.tsx` | Root: session restore + `PASSWORD_RECOVERY` routing + native recovery deep-link handler; which paths skip the /login bounce is `lib/publicRoutes.ts` |
 | `SwimSyncApp/lib/authErrors.ts` | Maps raw Supabase auth errors to friendly copy |
 | `SwimSyncApp/lib/attendanceBulk.ts` · `.test.ts` | Bulk "Set all to…" helper (`applyBulkStatus` + options) for the coach attendance screen (§8e) |
 | `SwimSyncApp/lib/lessonDates.ts` · `SwimSyncAdmin/lib/lessonDates.ts` | **Byte-identical twins** — SG-safe date strings + expected lesson dates. Edit both (§6) |

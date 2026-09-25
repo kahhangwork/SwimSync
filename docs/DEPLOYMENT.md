@@ -978,3 +978,13 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     greeting string was already live from an intermediate deploy, §7.271); the admin, whose routes can't be
     grepped, by the user opening Packages and seeing the new *running low* card. Next nightly on `75aaa82` is the
     driver-level gate.
+
+51. **Deploy record (2026-09-25): two app fixes, then one data-only contract migration.** (1) `e011a9c`
+    (admin, running-low save-on-leave) and `08685c2` (app, signed-out `/register`) → `main`, apps-only, 0
+    pending; CI + both Vercel builds green on each. Proof for `08685c2`: live `swimsync.sg/register` and
+    `/forgot-password` rendered *Create Account* / *Reset Password* signed out, URL unchanged (a real browser —
+    no new string to grep). (2) `20260925000100_drop_app_settings_invoice_run_day` → `main` (`f60ed8d`) →
+    `supabase db push`; `migration list --linked` **159/159, 0 pending**; `supabase db query --linked` shows
+    `app_settings` holding only `auto_invoice_enabled` + `invoice_block_notified`. Precondition checked, not
+    assumed: the DEPLOYED engine (v29, `functions download`) reads only `tenants.invoice_run_day`. No grants
+    touched → no dump. Rollback: `supabase/rollback/20260925000100_…_DOWN.sql`, rehearsed (test red/green/red/green).

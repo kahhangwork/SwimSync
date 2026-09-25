@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-25 — **The §8.121 nightly (`36071084202`) went RED on one check, cleared by a local re-run the user
-accepted (§8.122).** `app-auth` check 1 (parent one-shot login, 10 s timeout) → local 25/25. `main` `29bfe15`, 0 migrations.
-**The gate is OPEN: the next unit may merge.**_
+_Last updated: 2026-09-25 — **All three §9 builds shipped (§8.123):** running-low fields save on leaving the field
+(`e011a9c`), `/register` + `/forgot-password` open signed-out (`08685c2`), the dead `app_settings.invoice_run_day` row
+dropped on prod (`20260925000100`, 159/159). **Tonight's nightly is the first to cover all three.**_
 
-_Previously (§8.121, 2026-09-25) — gotchas filed twice became checks; GOTCHAS.md 347 KB → 186 KB._
+_Previously (§8.122, 2026-09-25) — nightly `36071084202` red on one `app-auth` check; a local 25/25 accepted as the gate._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +347,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.123 (2026-09-25) — The three §9 builds: save-on-leave, signed-out `/register`, the dead run-day row
+
+**Three units, each reviewed, proven red without its fix, and shipped on its own — all merged before tonight's
+nightly, which is therefore the first driver-level read of all three together** (the user's call to keep going
+after §8.122's gate opened). Planning skills skipped for each: specified by their BACKLOG items, one named risk each.
+
+- **Running-low fields** (`e011a9c`, admin): typing only edits; blur/Enter saves once, saves queue per field, a
+  thrown write can't wedge the queue. PRD §7.16 · TESTING §5.
+- **Signed-out `/register` + `/forgot-password`** (`08685c2`, app): `lib/publicRoutes.ts` splits the gate into
+  public pages vs signed-out screens (exact match; a signed-in user still redirected; token screens stay gated).
+  Live-checked on swimsync.sg. PRD §5.1 · ARCHITECTURE §10.
+- **`20260925000100`** drops the dead `app_settings.invoice_run_day` row; deployed engine checked first. DEPLOYMENT §11 #51.
+- **Filed:** drop the dead `app_settings.auto_invoice_enabled` row (BACKLOG, S). **Not done:** `isPublicPage`'s
+  prefix match has no segment boundary (pre-existing; every page it admits is token-gated).
+
 ## 8.122 (2026-09-25) — The gate nightly went red on one check; a local re-run cleared it
 
 **Nightly `36071084202` (scheduled, on `29bfe15`) — 55/56; `app-auth` 24/25.** Check 1: the parent's one-shot login sat
@@ -358,22 +373,7 @@ run. `run-all-drivers.sh --only app-auth` locally, bundle confirmed current (`LA
   BACKLOG *Find what clears `verify-app-auth` step 4*.
 - **Caveat, not a finding:** the local bundle was warm, so it could not reproduce a cold first login.
 
-## 8.121 (2026-09-25) — Gotchas filed twice become checks; `/update-docs` searches before filing
-
-**An audit of all 273 gotchas found eight lessons filed two or three times** — the file was 347 KB and read on
-demand, so a trap that recurred was re-filed rather than recognised, and `/update-docs` said only "append the next
-§7.N". Tooling/tests/docs only — no app code, merged ahead of the nightly gate on the user's call.
-
-- **Now checks:** `recurring_gotchas.test.sql` (second-FK pairs §7.90, `current_user` in DEFINER §7.38) and
-  `check-fixture-ids.sh` in CI (captured UUIDs §7.163) — all proven red. TESTING §5. §7.40 → CLAUDE.md *Rules that bite*.
-- **Write side:** `/update-docs` Step 4 greps first; a repeat is a **Hit again** bullet; bitten twice → promote to a check.
-- **GOTCHAS.md 347 KB → 186 KB:** topic index at the top; the 10 repeats folded to one-line **↪** stubs (their unique
-  detail moved into the original); every item cut to rule + prohibitions + commands + refs, story dropped — every §-ref,
-  migration id and SHA verified kept. Full old text: `git show 82dbdb0:docs/GOTCHAS.md`. §7.237 notes the §8.120 fix.
-- **Deliberately NOT done:** a check for §7.150 (`function_grants.test.sql` already covers the local half; the cloud
-  half is the remote dump).
-
-_(§8.120 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.121 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -417,8 +417,9 @@ for one marked inactive.
 > full day after the sweep had gone red beneath it.
 
 **State on 2026-09-25: nightly `36071084202` RED 55/56 (`app-auth` check 1, the parent one-shot login) — cleared by a local
-25/25 the user accepted (§8.122).** Tonight's scheduled nightly is the next real signal: **a second check-1 red is a real
-verdict, not a flake** (§7.263). `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
+25/25 the user accepted (§8.122).** Tonight's scheduled nightly is the next real signal, and the FIRST on §8.123's three
+units: **a second check-1 red is a real verdict, not a flake** (§7.263); a red in `smoke-app`, `verify-packages` or
+`app-auth` points at §8.123 first. `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
 **How to read a red one → `docs/TESTING.md` §5, "Reading a RED nightly sweep"** (screenshots FIRST, then
@@ -427,21 +428,20 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-- **A session-less link to `/register` or `/forgot-password` bounces to `/login`** (BACKLOG, S) — same
-  `routeForSession` as §8.120's fix, now landed; widening `PUBLIC_PATHS` widens the auth gate, so weigh it.
-- **Drop the dead `app_settings.invoice_run_day` row** (BACKLOG, S) — a contract migration on a `db/…` branch,
-  root checkout only, `/deploy` to prod.
-- **The running-low fields save per keystroke** (BACKLOG, S) — can store the wrong threshold.
+- **Drop the dead `app_settings.auto_invoice_enabled` row** (BACKLOG, S) — `20260925000100`'s exact shape; download
+  and grep the DEPLOYED engine first (not yet done for this key).
+- **Driver ports are hardcoded in three drivers** (BACKLOG, S) — driver hygiene, no app risk.
+- Anything else: `BACKLOG.md` Build order.
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before
   `supabase test db` (§7.272).
 
-**GATE (§7.1): OPEN** — the user accepted a local green for `36071084202` (§8.122). The next unit may merge; read tonight's
-nightly before the one after it.
+**GATE (§7.1): read tonight's nightly before the next unit merges** — three units (§8.123) went in on §8.122's opened gate,
+so tonight's run is their shared driver-level check.
 
-**No migration is HELD or in flight.** Latest applied is `20260922000100` (billing_runs, §8.117), on prod,
-0 pending (158/158 on 2026-09-22), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
-the fact; a prose status is a hint.** §8.117 authored `20260922000100`; §8.113–§8.116 and §8.118–§8.122 none.
+**No migration is HELD or in flight.** Latest applied is `20260925000100` (drop the dead run-day row, §8.123), on prod,
+0 pending (159/159 on 2026-09-25), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list --linked` is
+the fact; a prose status is a hint.** §8.123 authored `20260925000100`, §8.117 `20260922000100`; §8.118–§8.122 none.
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers

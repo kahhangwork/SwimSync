@@ -441,7 +441,7 @@ in `finally`, and **exits non-zero on a run that asserted nothing**. All three g
 proven by mutation;
 `verify-smoke-admin.mjs` + `verify-smoke-app.mjs` (added 2026-09-13, playbook §7.3) open **every**
 route in each app once — 32 admin routes as tenant admin / platform admin / logged out; every app
-screen as coach / parent / logged out — and assert the page's own `<h1>` (admin, exact) or a
+screen as coach / parent / logged out (Register and Forgot password by deep link since 2026-09-25) — and assert the page's own `<h1>` (admin, exact) or a
 screen-unique literal (app), plus no `pageerror` and no `console.error` while it loaded (failed
 request URLs attached). The app twin reaches nested-stack screens by PRESSING from the landing tab,
 not by deep link: the root layout's session restore replaces a deep link with the landing tab, so the
@@ -1396,6 +1396,18 @@ Then the four rules, all bought with real time:
 
 **One more, learned 2026-08-30:** `check-fixture-roundtrip.sh` run straight after a UI driver
 reports failures that are just the driver's own UI writes — reset before believing it.
+
+### Save-on-leave, signed-out deep links, the dead run-day row (2026-09-25, §8.123)
+
+- **vitest `packages/ui/LowSettingsCard.test.tsx`** (6) — the running-low fields save on blur/Enter only, once
+  per changed value; empty never saves 0 (§7.22); a second save queues behind the first; a failed OR thrown write
+  shows the error and does not wedge the queue. 5 red on the per-keystroke hook.
+- **jest `lib/publicRoutes.test.ts`** (23) — `/register` + `/forgot-password` open signed-out (exact match, no
+  prefix smuggling); `/reset-password` + `/accept-invite` stay gated; a signed-in user is not kept on them.
+- **pgTAP `app_settings_dead_keys.test.sql`** (2) — the dead global `invoice_run_day` row stays gone; the
+  `tenants` column it was replaced by exists. Red before `20260925000100` and after its DOWN.
+- **Drivers:** `smoke-app` now DEEP-LINKS `/register` and `/forgot-password` signed out (69/71 on the old layout,
+  exactly those two red); `verify-packages` blurs after `fill()` so its PATCH wait sees the one save.
 
 ### Billing months + the run log (2026-09-22)
 
