@@ -1,0 +1,21 @@
+-- ============================================================
+-- CONTRACT: drop the dead global app_settings.invoice_run_day row.
+--
+-- Since 2026-09-24 nothing reads it. The engine's automatic run-day guard reads
+-- the BUSINESS's run day (tenants.invoice_run_day), like every admin surface —
+-- docs/plans/ENGINE_TENANT_RUN_DAY_PLAN.md. The row was left in place so that
+-- change could ship with 0 migrations; this is its contract half.
+--
+-- Why it goes rather than lingers: a dead global setting with a live-looking
+-- name is how the engine came to read the wrong one for two months.
+--
+-- Verified before writing (2026-09-25): no app, engine, test or SQL function
+-- reads it (pg_proc bodies checked), and the DEPLOYED engine's source
+-- (`supabase functions download generate-invoices`, v29) reads only
+-- tenants.invoice_run_day.
+--
+-- Data only: no schema, grant or policy changes. Idempotent.
+-- Rollback: supabase/rollback/20260925000100_drop_app_settings_invoice_run_day_DOWN.sql
+-- ============================================================
+
+DELETE FROM public.app_settings WHERE key = 'invoice_run_day';

@@ -731,7 +731,7 @@ the shape of the system changes:_
 | `SwimSyncAdmin/components/WhatsAppQueue.tsx` | The shared "open next chat" `wa.me` queue shell; `ReminderQueue` (invoices) and the packages renewal queue are both thin wrappers over it — §8.60 |
 | `SwimSyncAdmin/lib/packageOffers.ts` · `SwimSyncApp/app/package/[token].tsx` | Pure offer deciders (`defaultConfirmStart` RISK 3, `pickOfferProduct` Decision 5) · the parent public offer page — §8.60 |
 | `supabase/migrations/20260718000200_coach_close_enrolment.sql` | `close_student_enrolment()` RPC — remove-from-class / set-inactive for the tenant admin **and** the owning coach (§6, §8a) |
-| `supabase/migrations/20260718000100_…invoice_run_day` · `…000300_…invoice_block_notice` | `app_settings` seeds: automatic run day (default 7 — dead since 2026-09-24, see BACKLOG) + blocked-alert throttle state |
+| `supabase/migrations/20260718000100_…invoice_run_day` · `…000300_…invoice_block_notice` | `app_settings` seeds: automatic run day (default 7 — dead since 2026-09-24, the row DROPPED by `20260925000100`) + blocked-alert throttle state |
 | `SwimSyncAdmin/lib/studentStatus.ts` · `SwimSyncApp/lib/studentStatus.ts` | **Byte-identical twins** — `removeFromClass` / `setStudentInactive` over the RPC. Edit both (§6) |
 | `supabase/migrations/20260719001200_active_inactive_rpcs.sql` | `set_students_active()` (sole writer), `set_parent_tenant_active()`, `family_active_children()` (the read behind the prompt), join-code reactivation |
 | `supabase/migrations/20260719001300_drop_inactive_assignment_status.sql` | Enum contract, with the `pg_proc` guard that refuses if a function body still casts to the retired value (§7.21) |
