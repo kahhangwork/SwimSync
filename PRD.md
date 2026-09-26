@@ -2064,7 +2064,7 @@ cash paid always equals value granted — nothing to reconcile.
   rate and the invoice records `package applied` beside credit — and the parent's
   invoice detail marks **each funded line** ("Paid by package · *name*", from the
   `package_applications` ledger; a **reversed** draw reads ad hoc, because that money
-  went back to the package) *(implemented 2026-08-02)*. When a package runs out
+  went back to the package) *(implemented 2026-08-02)*. That parent detail is the ONLY per-line view: the admin Invoices page lists invoice totals and student names, never line items, so an admin invoice detail would be a new feature. When a package runs out
   mid-month the remaining lessons bill **ad hoc at the class's own effective-dated
   rate**, on the same invoice — nobody is blocked at poolside and nothing is lost. A
   family with no package takes exactly the pre-package path.
