@@ -302,7 +302,7 @@ with zero DB footprint. Seed only if the route approach cannot reach the banner,
 invoice `status='paid'` in the own tenant, so no outstanding-invoice flow (reminders, balances) sees them.
 **Mutations:** `paynow.ts:20` → `/^\d{7,8}$/` · `useTenantBilling.ts:87` → `Math.min(31`.
 
-### ☐ U7 — `verify-class-admin` (~2 h)
+### ☑ U7 — `verify-class-admin` (~2 h) — DONE 2026-09-26, 18 checks
 **Covers:** **End** an ongoing shadow (`useClassDrawer.ts:90-107` → `end_class_shadow`), the rate-less-coach
 warning (`classRows.ts:96-103`), the failed-shadow-load branch (`page.route` the `class_shadow_coaches` GET → 500).
 **Fixture:** an ongoing `class_shadow_coaches` row (`effective_from` ≥ 7 days in the past) + shadow rate; a second

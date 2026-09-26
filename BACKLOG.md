@@ -1558,7 +1558,8 @@ asserts the page renders). A driver makes each guarantee repeatable so the next 
 a driver. Write-off needs a fixture with a `parent_tenant_balances.debit_balance > 0` row (none seeded today);
 CSV export can't be asserted headlessly past the download, so assert the cap-banner path instead.
 
-### A `verify-class-admin` driver for the uncovered shadow-coach actions — **S** `[from the classes refactor 2026-09-17]`
+### ~~A `verify-class-admin` driver for the uncovered shadow-coach actions~~ — **S** — **DONE 2026-09-26** `[from the classes refactor 2026-09-17]`
+_Shipped as `verify-class-admin.mjs` (18 checks, own tenant, 2 mutation proofs; the failed load is a `page.route`d 500 on the drawer's GET — no table rename, no RLS denial) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U7._
 The classes refactor (§8.108) has a strong net — `class-deactivation`, `class-edit`, `class-terms`,
 `class-students`, `cancel-lesson`, `locations`, plus `coach-roster` (shadow **ASSIGN**) and `attendance-guard`
 (extra lesson) — but **three shadow-coach actions in the roster drawer have no driver**: **End** an ongoing
