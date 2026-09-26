@@ -283,7 +283,7 @@ held search, Show superseded (table in the research, `packages/…`).
 **Mutations:** `dao/packages.repo.ts:142` → `.in("status",["pending"])` (Cancel of active silently no-ops) ·
 `useSale.ts:54` → `status:"pending"`.
 
-### ☐ U6 — `verify-invoice-admin` (~2.5 h)
+### ☑ U6 — `verify-invoice-admin` (~2.5 h) — DONE 2026-09-26, 31 checks
 **Covers:** PayNow UEN/mobile save + the 8-digit advisory (`invoices/domain/paynow.ts:14-24`), run-day save + 1–28
 clamp (`useTenantBilling.ts:85-95`), the CSV export cap banner (`useInvoiceList.ts:123-134`), pending-debit
 **Write off** (prompt, blank-reason refusal, RPC).

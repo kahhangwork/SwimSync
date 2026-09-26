@@ -1543,7 +1543,8 @@ them into a driver + `fixtures-packages-admin.sql`. The fixture needs a supersed
 Show-superseded toggle (the current `fixtures-packages.sql` seeds none). Companion to the L-A driver-gap
 note (`verify-packages` §7.238 family).
 
-### A `verify-invoice-admin` driver for the uncovered Invoices settings actions — **S** `[from the invoices refactor 2026-09-16]`
+### ~~A `verify-invoice-admin` driver for the uncovered Invoices settings actions~~ — **S** — **DONE 2026-09-26** `[from the invoices refactor 2026-09-16]`
+_Shipped as `verify-invoice-admin.mjs` (31 checks, own tenant, 2 mutation proofs; the CSV cap is reached by `page.route` repeating the real rows to 1000 — no seeded rows) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U6._
 The invoices refactor (§8.106) has a strong net — `verify-invoice-controls` (picker/toggle/platform refusal),
 `orphan-report`, `trial-onboarding`, `unmarked-lessons`, `payment-collection` — but **four admin actions on the
 page have no dedicated driver**: PayNow UEN/mobile save + its advisory, run-day save, the CSV-export cap banner,
