@@ -1671,7 +1671,8 @@ equivalent path IS covered, by `verify-tenant-provisioning`, which is why that o
 this and asserts it worked. Do NOT model it on `verify-smoke-app`'s `/reset-password`: that is the **Expo app's**
 screen, built from `${EXPO}`, a different page entirely. The three cleanup/settle traps are §7.251.
 
-### A driver for the coach roster's Remove — **S** `[from the coach roster refactor 2026-09-21]`
+### ~~A driver for the coach roster's Remove~~ — **S** — **DONE 2026-09-26** `[from the coach roster refactor 2026-09-21]`
+_Shipped as `verify-coach-remove-student.mjs` (20 checks, own tenant + plain coach, 2 mutation proofs; the hand-check script it promoted is deleted) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U3._
 The coach's **Remove** on `(coach)/classes/[id]/roster` — `confirmAction` → `close_student_enrolment` → toast →
 reload — is pressed by **no** driver; `verify-student-identity` only reads the button's label. Nor does any
 driver press the level curriculum's **Hide** (`verify-level-skills` only expands it). Both were hand-checked at

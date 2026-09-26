@@ -1278,9 +1278,8 @@ the guest-only zero-enrolment class (20260810), and the mid-month joiner's denom
 only end-to-end check of the Mark target), `student-identity` (ages, the two-Ethan-Tans birthday, the Remove
 label), `levels`, `level-skills` (expands the curriculum), `attendance-guard`, `makeups`, `trial-visibility`,
 `smoke-app`; `schedule-week` lands on it by URL only. **Not** `verify-class-students` (admin-only) nor
-`verify-coach-roster` (it opens `/attendance`). **No driver presses Remove or the curriculum's Hide** — both are
-hand-checked by **`docs/refactor/coach-roster-handchecks.mjs`** + `.sql` (12 checks, DB-verified); read §7.252
-before reusing it.
+`verify-coach-roster` (it opens `/attendance`). **Remove and the curriculum's Hide are pressed by
+`verify-coach-remove-student`** (2026-09-26), which promoted and replaced the roster refactor's hand-check script.
 
 **The coach attendance (marking) screen joined the app fence 2026-09-22 (§8.115)** — `SCOPE_DIRS` +
 `features/mark-attendance`, ledgers pinned at 20 sites / 14 imports, both empty at Stage 6. Characterisation
@@ -1353,6 +1352,7 @@ and carries its mutation proofs in its header:
 |---|---|---|---|
 | `verify-grading-admin` | `fixtures-grading-admin` (its OWN tenant, `c3000000-`) | 27 | Trials Convert's two-press guard (0 enrolments after press 1) + Cancel; the multi-class make-up's home-class select → `home_class_id` on the booking, Change, Cancel; grading-scale add / rename / remove + the held-grade refusal; skill Move down / Remove; level Edit; Assessment Move up offered WITHOUT a reload after re-painting (6abe8c2) and pressed; a grade from the Students drawer's modal |
 | `verify-lesson-detail-guests` | `fixtures-lesson-detail-guests` (its OWN tenant, `b3000000-`) | 29 | The lesson page's unpressed actions: book a TRIAL + Cancel booking on the guest row; a make-up for a child with two same-category homes (the "which class" select, its client refusal with 0 rows written, and `home_class_id` = the chosen class); the Book modal's `full-notice`; invalid-date / unknown-class states; Keep the lesson (no session row written); the assign-substitute ERROR branch (`page.route` POST, hit once); Set all + the Rain/Coach and Paid/Free sub-toggles, saved and read back. Weekday-independent: every class runs on today's weekday |
+| `verify-coach-remove-student` | `fixtures-coach-remove-student` (its OWN tenant + a PLAIN coach, `b4000000-`) | 20 | The coach roster's Remove on a child in TWO classes: Cancel (the `window.confirm` text asserted, DB unchanged) and OK (toast; THIS enrolment closed, the other class's still open, the child still active + `assigned`, the classmate untouched, the audit row names THIS class; the list re-reads to 1); the level curriculum's expand (note, skills in `sort_order`) and Hide. Reached by Classes-tab taps; promotes the deleted `docs/refactor/coach-roster-handchecks` |
 
 **`verify-cancel-lesson.mjs` step 5b (2026-09-24)** — the admin's UI cancel is AGED two weeks back as postgres
 (`cancel_lesson` refuses today and earlier), the coach taps it from Schedule's DONE list, and the driver asserts

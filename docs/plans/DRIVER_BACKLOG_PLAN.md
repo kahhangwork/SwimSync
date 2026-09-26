@@ -240,7 +240,7 @@ delete `setCoachMsg(...)`.
 guard at `:71` still fires first when no home is picked). Check the booking row's `home_class_id` equals the
 chosen class, not just the toast.
 
-### ☐ U3 — `verify-coach-remove-student` (~1.5 h): promotes `coach-roster-handchecks`
+### ☑ U3 — `verify-coach-remove-student` (~1.5 h): promotes `coach-roster-handchecks` — DONE 2026-09-26, 20 checks
 **Covers:** coach roster **Remove** cancel path (dialog "… will be removed from THIS class", count unchanged) and
 accept path (toast "… removed from this class.", count −1); level curriculum expand + **Hide**.
 **Fixture:** rewrite `coach-roster-handchecks.sql` (bare `DO`, no ids, no teardown) as an idempotent `b4` fixture:
