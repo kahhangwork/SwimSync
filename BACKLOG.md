@@ -1,13 +1,13 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-26 — **NativeWind's colour-scheme throw is FIXED** (`darkMode: "class"`; both driver allowlists emptied): that item removed. Same day — **Two driver items §8.120 claimed removed were still here** (*harden `appLoginDies`* — shipped `f38db4f`; *`verify-admin-calendar` Today race* — shipped `cdf942d`): both removed now. Same day — **`isPublicPage` matches on a segment boundary** (`e55038a`): that item removed. Same day — **The deployed `public-package` CORS is CHECKED**: prod answers `Allow-Headers: content-type` whatever is requested, so the code comment and §7.264 are both right; nothing to correct, that item removed. Same day — **The step-4 item is FIXED** (a same-route replace re-mounted `/reset-password`; §7.274): that item removed. Same day — **The package page's own *I've paid* is driven** (`verify-app-money` C2): that item removed. Earlier, 2026-09-25 — **No driver hardcodes a port** (all eight — the item said three — read `ADMIN`/`EXPO` from `lib.mjs`; CI guard `check-driver-ports.sh`): that item removed. Earlier same day — **The dead `app_settings.auto_invoice_enabled` row is dropped** (`20260925000200`): that item removed. Earlier same day — **The dead `app_settings.invoice_run_day` row is dropped** (`20260925000100`): that item removed; filed **drop the dead `app_settings.auto_invoice_enabled` row**. Earlier same day — **`/register` and `/forgot-password` deep links now open signed-out** (`lib/publicRoutes.ts`): that item removed. Earlier same day — **The running-low fields now save on leaving the field** (blur/Enter, saves queued per field): that item removed. Earlier same day — **Step-4 item: first evidence recorded** (nightly `36071084202` logged the re-mount). Earlier same day — **Ten branches shipped** (§8.120): removed *the coach landing bounce*, *harden `appLoginDies`*, *`verify-admin-calendar` Today race*, *the lesson page swallows six read errors*, *Assessment grid promote/stale grade*, *package settings on Students* (Wave D) and *pgTAP #21 midnight*; filed *running-low fields save per keystroke* and *what clears `app-auth` step 4's fields*. Earlier, 2026-09-24 — **The hand-check scripts are four nightly drivers** (`3ff558a`): that item removed; filed a driver for the **package page's *I've paid*** and a **deployed `public-package` CORS check**. Earlier same day — **The cancelled-lesson spinner FIXED** (a coach tapping an admin-cancelled lesson now sees the notice): that item removed. Earlier same day — **The engine now reads the BUSINESS's run day** (`ENGINE_TENANT_RUN_DAY_PLAN.md`): that item removed; filed **drop the dead `app_settings.invoice_run_day` row**. Earlier same day — **App L-F/G/H + the app fence SHIPPED** (§8.118): the feature-tier programme is DONE in both apps, so its item is removed, with the stale struck *Smoke drivers* entry and the *four local driver reds* item (all four GREEN in the 2026-09-24 full local sweep). Filed: **promote the hand-check scripts to drivers**, **harden `appLoginDies`** (§7.262), the **admin-calendar 400 ms race**. Earlier, 2026-09-23 — **Billing months card SHIPPED** (§8.117): the "cannot see WHY a month is open" item removed; filed the **engine run-day source** (before cron) and the **midnight pgTAP flake** (§7.260). Earlier, 2026-09-22 — **Coach Schedule (the LAST full-track giant) SHIPPED** (§8.116); a **Schedule driver** item filed (role badges, location chips + clamp, DONE tap), and the local-reds item updated (`smoke-app` / `trial-onboarding` GREEN locally). Earlier same day — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-26 — **Drift sweep**: ten stale lines corrected (two shipped items still unstruck — the trial-onboarding teardown and *HANDOVER §3 graduating*; both partial-payment migrations marked undeployed though on prod; the location entity and swim-skill grading still listed as pending; the ledger over-cap count 30 → 33; the component-test rationale; the grading-admin driver's stale reload note). Same day — **NativeWind's colour-scheme throw is FIXED** (`darkMode: "class"`; both driver allowlists emptied): that item removed. Same day — **Two driver items §8.120 claimed removed were still here** (*harden `appLoginDies`* — shipped `f38db4f`; *`verify-admin-calendar` Today race* — shipped `cdf942d`): both removed now. Same day — **`isPublicPage` matches on a segment boundary** (`e55038a`): that item removed. Same day — **The deployed `public-package` CORS is CHECKED**: prod answers `Allow-Headers: content-type` whatever is requested, so the code comment and §7.264 are both right; nothing to correct, that item removed. Same day — **The step-4 item is FIXED** (a same-route replace re-mounted `/reset-password`; §7.274): that item removed. Same day — **The package page's own *I've paid* is driven** (`verify-app-money` C2): that item removed. Earlier, 2026-09-25 — **No driver hardcodes a port** (all eight — the item said three — read `ADMIN`/`EXPO` from `lib.mjs`; CI guard `check-driver-ports.sh`): that item removed. Earlier same day — **The dead `app_settings.auto_invoice_enabled` row is dropped** (`20260925000200`): that item removed. Earlier same day — **The dead `app_settings.invoice_run_day` row is dropped** (`20260925000100`): that item removed; filed **drop the dead `app_settings.auto_invoice_enabled` row**. Earlier same day — **`/register` and `/forgot-password` deep links now open signed-out** (`lib/publicRoutes.ts`): that item removed. Earlier same day — **The running-low fields now save on leaving the field** (blur/Enter, saves queued per field): that item removed. Earlier same day — **Step-4 item: first evidence recorded** (nightly `36071084202` logged the re-mount). Earlier same day — **Ten branches shipped** (§8.120): removed *the coach landing bounce*, *harden `appLoginDies`*, *`verify-admin-calendar` Today race*, *the lesson page swallows six read errors*, *Assessment grid promote/stale grade*, *package settings on Students* (Wave D) and *pgTAP #21 midnight*; filed *running-low fields save per keystroke* and *what clears `app-auth` step 4's fields*. Earlier, 2026-09-24 — **The hand-check scripts are four nightly drivers** (`3ff558a`): that item removed; filed a driver for the **package page's *I've paid*** and a **deployed `public-package` CORS check**. Earlier same day — **The cancelled-lesson spinner FIXED** (a coach tapping an admin-cancelled lesson now sees the notice): that item removed. Earlier same day — **The engine now reads the BUSINESS's run day** (`ENGINE_TENANT_RUN_DAY_PLAN.md`): that item removed; filed **drop the dead `app_settings.invoice_run_day` row**. Earlier same day — **App L-F/G/H + the app fence SHIPPED** (§8.118): the feature-tier programme is DONE in both apps, so its item is removed, with the stale struck *Smoke drivers* entry and the *four local driver reds* item (all four GREEN in the 2026-09-24 full local sweep). Filed: **promote the hand-check scripts to drivers**, **harden `appLoginDies`** (§7.262), the **admin-calendar 400 ms race**. Earlier, 2026-09-23 — **Billing months card SHIPPED** (§8.117): the "cannot see WHY a month is open" item removed; filed the **engine run-day source** (before cron) and the **midnight pgTAP flake** (§7.260). Earlier, 2026-09-22 — **Coach Schedule (the LAST full-track giant) SHIPPED** (§8.116); a **Schedule driver** item filed (role badges, location chips + clamp, DONE tap), and the local-reds item updated (`smoke-app` / `trial-onboarding` GREEN locally). Earlier same day — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
 on three tracks** (full / lite / fence — playbook §7), 17 units, smoke driver first; the *Foundations* item
 rewritten and a **Smoke drivers** item added. On 2026-09-12: the Students decomposition shipped (§8.100), the driver-port
 fix filed, and the package-settings move marked ripe. Earlier: **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
-suites green, **not yet deployed** (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD
+suites green, **not yet deployed** *(it went to prod 2026-08-29)* (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD
 §7.15). Struck from the pick-now list. **One new item added, found by its driver:** the admin sidebar
 has no breakpoint, so every admin page is unusable on a phone (§7.222) — which now matters, because
 Assessment is the first admin surface meant for poolside use. **Piece 5 (email-confirmation copy)
@@ -406,7 +406,7 @@ grant dump clean, RISK 12 checks 0/0. DORMANT (no business has enabled it).
 **SHIPPED LIVE 2026-08-21 — Capacity hard limit + holiday retirement boundary + Lessons badge** (§8.73,
 `docs/plans/CAPACITY_HOLIDAY_BADGE_PLAN.md`, DEPLOYMENT §11.31): three migrations, holiday → capacity →
 badge, no engine change, grant dump clean. Its one calendar-wave follow-up, *A location entity*, was
-**demoted to Later 2026-08-22** (production is one location) — see the *Later* section below.
+**demoted to Later 2026-08-22** (production is one location), then **SHIPPED 2026-08-24** anyway (§8.88/§8.89).
 
 **Build order re-ranked 2026-08-16 after referrals shipped.** No rework-critical sequence remains —
 the queue is now a decision-gated tail plus a flat value pool. Three decisions settled (table above):
@@ -436,7 +436,8 @@ edge. The pass produced three durable findings, recorded so they are not re-deri
 - **Two retrofit-tax deferrals are CHOICES, not free — surfaced so they don't drift silently.**
   *Split co-admin permissions* (every ungated admin surface built meanwhile is one to retrofit — user's
   call is "yes eventually, not now") and *A location entity* (cheap now at 2 consumers, dearer per
-  venue-aware screen). Neither is due today; both accrue cost while parked.
+  venue-aware screen). Neither is due today; both accrue cost while parked. *(2026-09-26: the location
+  entity SHIPPED 2026-08-24 — only co-admin permissions still accrues.)*
 
 #### Current pick-now order (set 2026-08-27 with the user)
 
@@ -499,8 +500,8 @@ click-through queue stops scaling.
 5. ~~Export to CSV~~ — DONE 2026-08-17.
 
 **Wave C is exhausted bar the lower-value S pool.** **Pieces 1–3 of the S-pool SHIPPED 2026-08-28**
-(Better filtering/search, family-status scan, Moving-a-student loose ends). What remains: **Tick off
-swimming skills** (Piece 4, M) and ~~**Email-confirmation copy**~~ (Piece 5, S, shipped 2026-08-30) — see *Current pick-now order*.
+(Better filtering/search, family-status scan, Moving-a-student loose ends). What remains: ~~**Tick off
+swimming skills**~~ (Piece 4, M, shipped 2026-08-28) and ~~**Email-confirmation copy**~~ (Piece 5, S, shipped 2026-08-30) — see *Current pick-now order*.
 *(Maps deep link → **Later**, deferred 2026-08-27 — production is one location.)*
 
 ### Wave D — latent traps: cheap now, silently worse later
@@ -531,7 +532,8 @@ swimming skills** (Piece 4, M) and ~~**Email-confirmation copy**~~ (Piece 5, S, 
   mirror of `credit_balance`) instead of reopening it; the engine folds that debit onto the next invoice,
   drawing credit against the debit-inclusive base so credit and debit net. Reviewed by `/plan-review`
   (fable) — the single-signed-column idea was replaced with the separate `debit_balance` for ledger
-  safety. Two follow-ups filed below. Dormant (0 credit notes on prod). **Deploy via `/deploy` when ready.**
+  safety. Two follow-ups filed below. Dormant (0 credit notes on prod). **Deployed** — `20260822000100` is on prod
+  (`supabase migration list --linked`, checked 2026-09-26).
 - ~~**Partial-payment: seamless re-correction of a debited note — the FOLDED case only**~~ (M) — **WON'T
   DO, decided 2026-08-23 with the user.** The PENDING case shipped (auto-unwind, §8.84); the FOLDED case —
   re-correcting a note whose debit has already landed on a later invoice (or been written off) — will keep
@@ -546,15 +548,16 @@ swimming skills** (Piece 4, M) and ~~**Email-confirmation copy**~~ (Piece 5, S, 
   trigger refuses set-inactive while `debit_balance > 0` (**debit only** — credit is preserved across
   offboard); the write-off is its exit ramp. A standalone "collect now" charge was designed then
   **REJECTED** (it forced a `kind` discriminator + an engine change and still only produced a chaseable
-  invoice). Dormant (0 credit notes on prod). Deploy via `/deploy`.
+  invoice). Dormant (0 credit notes on prod). **Deployed** — `20260822000200` is on prod (checked 2026-09-26).
 - ~~**`HANDOVER.md` §3 needs graduating**~~ — **DONE 2026-08-22.** DORMANT trimmed to one line per
   area; the *Production reality* deploy/rollback narrative dropped for a pointer to `docs/DEPLOYMENT.md`
   §11, which already held it (restated in §3 it was a fourth copy that drifts). Prohibitions + the
   verified-vs-specified table kept intact, as the item specified. HANDOVER back under the 45 KB budget.
 
-- **30 ledger rows in `docs/SESSIONS.md` are still over the 200-char cap** — **M**. Three were
-  compressed on 2026-08-30 (§8.36/§8.37/§8.38: 1432/1344/1368 → 197/181/199); the rest are all
-  August, largest **1204** (§8.34). **Why:** a ledger row is a *pointer*, and an oversized one is a
+- **33 ledger rows in `docs/SESSIONS.md` are still over the 200-char cap** (re-measured 2026-09-26;
+  it read 30) — **M**. Three were compressed on 2026-08-30 (§8.36/§8.37/§8.38: 1432/1344/1368 →
+  197/181/199); the rest are mostly August, largest **1204** (§8.34), plus §8.103–§8.105 from
+  September. **Why:** a ledger row is a *pointer*, and an oversized one is a
   narrative that duplicates the graduated copy, then goes stale and competes with it — the exact
   failure that took §8 to 49% of a 3,972-line file. The rows were written when reasoning was not
   being graduated, so their length is the symptom, not the disease.
@@ -576,9 +579,7 @@ swimming skills** (Piece 4, M) and ~~**Email-confirmation copy**~~ (Piece 5, S, 
 ~~**An owner-only accounting page (M — *absorbs Revenue reporting*)**~~ — **SHIPPED 2026-08-23**
 (PRD §7.23, `20260823000100`). Accrual as chosen; owner-gated; no capability model, as predicted.
 **Split co-admin permissions (M)** — *yes eventually*; the accounting page did not wait
-on it (and shipping it added no gated surface — it is owner-gated, not co-admin-scoped). **A location entity / venue (M — *demoted here 2026-08-22*)** — production is one
-location, so promoting `classes.location_name` to a `locations` table only pays off for a
-multi-venue business; full item under *Admin and operations*. **Maps integration (S — *deferred here
+on it (and shipping it added no gated surface — it is owner-gated, not co-admin-scoped). ~~**A location entity / venue (M)**~~ — **SHIPPED 2026-08-24** (PRD §7.24); struck under *Admin and operations*. **Maps integration (S — *deferred here
 2026-08-27*)** — tap a class location to open the platform maps app; builds directly on `locations.address`,
 no new data, no rework, but parked because production is one location (full item below). Household split billing (M — *needs a credit-splitting
 rule*), Auto PayNow detection (L — *the CSV-import M is the 10% worth doing first*),
@@ -592,8 +593,9 @@ Deliberately not doing 2026-08-16.)*
 
 - **Generate real Supabase `Database` types** (M) — a schema snapshot. Waves 2 and 3 are
   both migrations; every one landed first invalidates it.
-- **Deeper component-render tests** (M) — they pin screens the planned redesign will
-  rewrite.
+- **Deeper component-render tests** (M) — they pinned screens the feature-tier refactor was about
+  to rewrite. *(That refactor finished 2026-09-24 in both apps, so this reason no longer holds — it
+  now waits on value, not on a redesign.)*
 
 **Shared `lessonDates.ts` package (M)** stays not-recommended and unranked — free only if
 workspaces arrive for another reason.
@@ -1122,7 +1124,8 @@ That is precisely the mistake PRD §4.4 records about the platform pages, which 
 several businesses' figures added together and labelled as one; the fix there was to show
 nothing rather than something wrong.
 
-### `HANDOVER.md` §3 needs graduating — **S** `[docs]`
+### ~~`HANDOVER.md` §3 needs graduating~~ — **S** `[docs]` — **DONE 2026-08-22**
+_Graduated as the Notes below direct (Wave D). This heading was left unstruck until 2026-09-26._
 `HANDOVER.md` is **~1000 lines against its own ~700 target**, and §3 ("what works") is about
 40% of it. The file has carried a note flagging this since 2026-07-26.
 
@@ -1627,8 +1630,9 @@ either is silent until an invoice run. Same shape as `verify-money-admin` / `ver
 
 **Notes:** the seeds are `fixtures-assessment.sql` + `fixtures-makeups.sql` plus ONE extra enrolment (Makeupvis Kid
 → Saturday Beginners) to make a multi-class child. Convert needs a past trial AND a future one for the same child —
-book both through the form (new child, then "a child already in SwimSync"). **Promote only appears after a
-reload** when the painted grade equals the held one (see the grid item below) — reload before looking for it.
+book both through the form (new child, then "a child already in SwimSync"). **Promote no longer needs a
+reload** when the painted grade equals the held one — `6abe8c2` (§8.120) made a re-confirmed grade read fresh, so
+assert Move up appears WITHOUT a reload; that is now part of what this driver pins.
 Unit coverage already exists for the grid's writes (`components/AssessmentGrid.test.tsx`).
 
 ### A `verify-lesson-detail-guests` driver for the lesson page's uncovered actions — **S** `[from the lesson-detail refactor 2026-09-18]`
@@ -1760,7 +1764,9 @@ not a silent one.
   to outlive the person. Settle that with the user first; every option above is cheap once
   it is answered.
 
-### `fixtures-trial-onboarding-teardown.sql` deletes invoices it does not own — **S**
+### ~~`fixtures-trial-onboarding-teardown.sql` deletes invoices it does not own~~ — **S** — **DONE 2026-08-18** (`e401ed7`)
+_The invoice delete is now scoped to the fixture's own class and ordered before the session delete (Wave D).
+This heading was left unstruck until 2026-09-26._
 Its cleanup is `DELETE FROM invoice_items … WHERE i.tenant_id = v_tenant AND
 i.billing_month = <its month>` — every invoice in the tenant for that month, not just the
 ones it created. Same for the `invoices` and `billing_periods` deletes beneath it.
@@ -1849,9 +1855,10 @@ frozen and we want compiler-enforced safety before a big build."
 ### Deeper component-render tests — **M** `[handover]`
 RN screens with a mocked Supabase; admin table components.
 
-**Why:** frontend tests currently cover `lib/**` pure functions only. The billing *maths*
-is well covered (34 pgTAP + 8 Deno), but the screens where a coach actually loses money
-by abandoning a task are covered only by hand-run Playwright drivers.
+**Why:** frontend unit tests are still mostly `lib/**` pure functions — though the feature-tier
+refactor added hook and component tests (`components/AssessmentGrid.test.tsx` and ~80 other non-`lib`
+test files across both apps, counted 2026-09-26). Screens are otherwise covered by the Playwright drivers,
+which run nightly in CI (`ui-drivers.yml`), not by hand. Counts drift — the test runner is the fact.
 
 **Notes:** named in `docs/TESTING.md` §5 as "the natural next additions." The
 `run-ui-playwright` drivers show what's worth pinning.
