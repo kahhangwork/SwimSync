@@ -3,8 +3,8 @@
 // app/(coach)/classes/[id]/roster.tsx. `showToast` is read from the store HERE,
 // never on the route: the store is a domain/ import only (fence check 4).
 //
-// ⚠ NO DRIVER PRESSES REMOVE. It was hand-checked against the database at
-// Stage 4 (plan §11a); BACKLOG carries the missing verify-coach-remove-student.
+// Driven by verify-coach-remove-student (a nightly driver, added 2026-09-26): Cancel
+// changes nothing, Remove closes THIS class's enrolment only, one audit row.
 import { useState } from "react";
 import { confirmAction } from "@/lib/confirm";
 import { useAppStore } from "@/store/useAppStore";

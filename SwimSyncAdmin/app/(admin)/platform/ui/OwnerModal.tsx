@@ -1,7 +1,7 @@
 // The Change-owner modal. Stage 7 of docs/refactor/PLATFORM_REFACTOR_PLAN.md,
 // markup verbatim from page.tsx lines 464-531.
 //
-// ⚠ NO DRIVER OPENS THIS. See domain/useOwnerTransfer.ts for why, and for the
+// Driven by verify-platform-controls. See domain/useOwnerTransfer.ts for the
 // stale-response guard that decides WHICH business's admins this list belongs to.
 //
 // ⚠ `disabled={a.is_owner || a.is_disabled}` on the <option> is not decoration:

@@ -11,8 +11,7 @@
 // the two cards would silently point that driver at family status, where its
 // subsequent assertions about a child would fail for the wrong reason.
 //
-// ⚠ NO DRIVER OPENS THIS SECTION (the plan credited verify-platform-admin in
-// error; it only mentions family status in a comment). The mapping's net is
+// Driven by verify-platform-controls (the search); the mapping's net is
 // domain/familyRows.test.ts.
 
 import {

@@ -47,9 +47,11 @@ SELECT p.id, 'da100000-0000-0000-0000-000000000001'
   FROM parents p WHERE p.profile_id = 'da100000-0000-0000-0000-0000000000b1'
 ON CONFLICT DO NOTHING;
 
--- The admin can only read a parent's profile (name, PHONE — what the
--- WhatsApp button dials) through tenant_serves_parent(), which requires a
--- CHILD in the tenant — parent_tenants membership alone is not enough.
+-- A child in the tenant. Before 20260926000100 it was the admin's ONLY read
+-- path to the parent's profile (name, PHONE — what the WhatsApp button
+-- dials). Membership now opens the profile row to an admin too, but a screen
+-- that reaches the parent through parent_students still needs the child — and
+-- a billed family has one anyway. Keep it.
 INSERT INTO students (id, full_name, assignment_status, tenant_id)
 VALUES ('da100000-0000-0000-0000-0000000000d1','Pay Driver Kid','assigned',
         'da100000-0000-0000-0000-000000000001')

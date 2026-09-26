@@ -5,9 +5,7 @@
 // They belong to no business, so no tenant admin can see them and nothing else
 // surfaces them — and they are exactly who the student-move tool exists for.
 //
-// ⚠ NO DRIVER OPENS THIS PANEL (grepped 2026-09-18: no verify-*.mjs contains
-// "not in any business"). It is hand-checked at Stage 5 and a verify-platform-
-// controls driver is filed in BACKLOG.md. Treat a change here as unnetted.
+// Driven by verify-platform-controls (a nightly driver, added 2026-09-26).
 //
 // The caller renders this only when `stranded.length > 0`, exactly as the page
 // did — an empty panel is not the same as no panel.

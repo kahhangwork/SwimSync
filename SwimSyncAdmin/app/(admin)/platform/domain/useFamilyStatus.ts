@@ -8,11 +8,9 @@
 // in is the business's operational concern, and putting it here would invite the
 // platform admin to reason about it.
 //
-// ⚠ NO DRIVER OPENS THIS SECTION. verify-platform-admin mentions "Family status"
-// only in a COMMENT explaining why its Search click needs .first() — it never
-// asserts on the section. (The plan credited it in error; corrected at
-// plan-review.) domain/familyRows.test.ts is the whole net for the mapping, and
-// the rest is hand-checked at Stage 10.
+// Driven by verify-platform-controls (a nightly driver, added 2026-09-26) — not by
+// verify-platform-admin, which mentions "Family status" only in a comment.
+// domain/familyRows.test.ts is the net for the mapping.
 //
 // ⚠ The query's shape lives in dao/platform.repo.ts and is load-bearing there
 // (both embeds !inner, the orIlike sanitisation, the .in() sentinel). Read that

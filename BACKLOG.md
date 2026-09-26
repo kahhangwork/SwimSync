@@ -1537,17 +1537,6 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### Seven app comments still say "no driver" covers what now has one — **S** `[from the driver backlog 2026-09-26]`
-`SwimSyncApp/features/roster/domain/useRemoveStudent.ts:7`, and in `SwimSyncAdmin/app/(admin)/platform/`:
-`ui/StrandedPanel.tsx`, `ui/OwnerModal.tsx`, `domain/useOwnerTransfer.ts`, `ui/CreditWarningModal.tsx`,
-`ui/FamilyStatusSection.tsx`, `domain/useFamilyStatus.ts` — each says "NO DRIVER OPENS/PRESSES THIS".
-
-**Why:** a comment that says nothing guards the code invites the next reader to add a redundant test or, worse,
-to trust a hand-check that no longer exists. `verify-coach-remove-student` and `verify-platform-controls` now cover them.
-
-**Notes:** comment-only, but it is an APP edit — every push to `main` rebuilds both prod apps (§7.276). Fold it into
-the next real change to either app rather than shipping a deploy for comments.
-
 ### `tenant_isolation.test.sql` #18 counts every invoice in the database — **S** `[from the driver backlog 2026-09-26]`
 "platform admin sees both tenants' invoices" expects a global count of 2, so ANY driver fixture that seeds an
 invoice, left loaded, turns `supabase test db` red (§7.272's second shape).

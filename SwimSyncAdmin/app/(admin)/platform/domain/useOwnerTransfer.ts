@@ -1,10 +1,8 @@
 // Changing a business's owner. Stage 7 of docs/refactor/PLATFORM_REFACTOR_PLAN.md.
 //
-// ⚠ NO DRIVER OPENS THIS MODAL (grepped 2026-09-18: no verify-*.mjs contains
-// "Change owner" or "Set owner"). It is also DORMANT on production — owner
-// transfer has no target while every admin is their own owner (HANDOVER §3,
-// Wave 5). So the only net here is the hand-check recorded in the Stage 7 commit
-// plus these prohibitions. Treat any change as unnetted.
+// Driven by verify-platform-controls (a nightly driver, added 2026-09-26), including the
+// stale-response guard below. It is DORMANT on production — owner transfer has
+// no target while every admin is their own owner (HANDOVER §3, Wave 5).
 //
 // ⚠ ownerModalTenantRef IS A CORRECTNESS GUARD, NOT A STYLE CHOICE. openOwnerModal
 // awaits the admin list, then re-reads the ref before writing state: close A,

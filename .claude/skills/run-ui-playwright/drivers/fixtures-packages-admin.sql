@@ -26,6 +26,8 @@
 --                         the pending row is Declined; the offer is what
 --                         "Show superseded" reveals.
 --   PkgAdm Parent Cedar   holds nothing — the Record-a-sale target.
+--   Only Alder has a child: Birch and Cedar are the joined-but-childless
+--   families whose names the admin must still read (20260926000100).
 --
 -- IDEMPOTENT AND RESETTING: re-loading deletes every package in the business
 -- and re-inserts the three above (a cancelled package cannot be un-cancelled —
@@ -126,21 +128,24 @@ BEGIN
   VALUES (v_a, t), (v_b, t), (v_c, t)
   ON CONFLICT (parent_id, tenant_id) DO UPDATE SET is_active = TRUE;
 
-  -- One child each. NOT decoration: the admin can read a parent's name only
-  -- through a child at the business (tenant_serves_parent), so a childless
-  -- family reads "Unknown" on the Awaiting panel and has no name in the sale's
-  -- Parent select.
+  -- ONLY ALDER HAS A CHILD, deliberately. Birch (on the Awaiting panel) and
+  -- Cedar (the Record-a-sale target) have none: an admin must read a parent's
+  -- name from the membership alone (20260926000100). Until then this fixture
+  -- gave every family a child to hide the gap. Alder's child is what the
+  -- Who-holds-one row names. The DELETE makes a re-load over the older
+  -- fixture (which gave Birch and Cedar a child) childless again.
+  DELETE FROM parent_students WHERE student_id IN
+    ('c8000000-0000-0000-0000-0000000000d2','c8000000-0000-0000-0000-0000000000d3');
+  DELETE FROM students WHERE id IN
+    ('c8000000-0000-0000-0000-0000000000d2','c8000000-0000-0000-0000-0000000000d3');
   INSERT INTO students (id, full_name, tenant_id, assignment_status, is_active)
-  VALUES ('c8000000-0000-0000-0000-0000000000d1','PkgAdm Kid Alder', t, 'assigned', TRUE),
-         ('c8000000-0000-0000-0000-0000000000d2','PkgAdm Kid Birch', t, 'assigned', TRUE),
-         ('c8000000-0000-0000-0000-0000000000d3','PkgAdm Kid Cedar', t, 'assigned', TRUE)
+  VALUES ('c8000000-0000-0000-0000-0000000000d1','PkgAdm Kid Alder', t, 'assigned', TRUE)
   ON CONFLICT (id) DO NOTHING;
   INSERT INTO parent_students (parent_id, student_id)
-  SELECT v.p, v.s FROM (VALUES (v_a, 'c8000000-0000-0000-0000-0000000000d1'::uuid),
-                               (v_b, 'c8000000-0000-0000-0000-0000000000d2'::uuid),
-                               (v_c, 'c8000000-0000-0000-0000-0000000000d3'::uuid)) AS v(p, s)
+  SELECT v_a, 'c8000000-0000-0000-0000-0000000000d1'
    WHERE NOT EXISTS (SELECT 1 FROM parent_students ps
-                      WHERE ps.parent_id = v.p AND ps.student_id = v.s);
+                      WHERE ps.parent_id = v_a
+                        AND ps.student_id = 'c8000000-0000-0000-0000-0000000000d1');
 
   -- 1. Alder's ACTIVE package, started 14 days ago (SGT). The lifecycle
   --    trigger snapshots the terms and dates expires_on = start + 84.
@@ -167,7 +172,7 @@ END $$;
 
 -- ── Postconditions — fail at load time, not twenty checks later ────────────
 DO $$
-DECLARE v_pk text; v_prod text; v_cat text; v_pt int;
+DECLARE v_pk text; v_prod text; v_cat text; v_pt int; v_kids text;
 BEGIN
   SELECT string_agg(right(id::text, 3) || ':' || status || ':' ||
                     coalesce(right(superseded_by::text, 3), '-'), ',' ORDER BY id) INTO v_pk
@@ -179,12 +184,17 @@ BEGIN
     FROM class_categories WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001';
   SELECT count(*) INTO v_pt FROM parent_tenants
    WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001' AND is_active;
+  SELECT string_agg(pr.full_name, ',' ORDER BY pr.full_name) INTO v_kids
+    FROM parent_students ps JOIN parents p ON p.id = ps.parent_id
+    JOIN profiles pr ON pr.id = p.profile_id
+   WHERE pr.id::text LIKE 'c8000000-%';
   IF v_pk IS DISTINCT FROM '3a1:active:-,3a2:cancelled:3a3,3a3:pending:-'
      OR v_prod IS DISTINCT FROM 'PkgAdm 10 Group:true,PkgAdm 5 Any:true,PkgAdm Retiree:true'
      OR v_cat IS DISTINCT FROM 'PkgAdm Group:-:-,PkgAdm Private:-:-'
-     OR v_pt <> 3 THEN
-    RAISE EXCEPTION 'fixture: packages % / products % / categories % / members %',
-      v_pk, v_prod, v_cat, v_pt;
+     OR v_pt <> 3
+     OR v_kids IS DISTINCT FROM 'PkgAdm Parent Alder' THEN
+    RAISE EXCEPTION 'fixture: packages % / products % / categories % / members % / with a child %',
+      v_pk, v_prod, v_cat, v_pt, v_kids;
   END IF;
 END $$;
 

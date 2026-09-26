@@ -40,8 +40,10 @@
 //   |---|-----------------------------------------------------------------------|--------|------------|
 //   | 1 | packages/dao/packages.repo.ts:142 → `.in("status", ["pending"])` (Cancel of an ACTIVE package matches 0 rows, no error) | 44/47 | "⚠ Cancel package moves the ACTIVE package to cancelled" (DB still active — the modal closed as if it worked), "the row now reads Cancelled…", "every package's status is where the driver put it…" |
 //   | 2 | packages/domain/useSale.ts:54 → `status: "pending"` (a recorded sale is saved as a request) | 40/47 | "⚠ Record sale writes ONE ACTIVE package…" (pending, confirmed_by NULL), "the sale lands in Who-holds-one as Active…" (it sat in Awaiting), the held-search pair, "…Cedar's sale is untouched", "every package's status…", "Awaiting now reads (0)…" |
+//   | 3 | DATABASE, not app code: supabase/rollback/20260926000100_admin_sees_member_parent_DOWN.sql (the admin reads a parent's name only through a child again) | 5/49 (ran 9) | "⚠ Awaiting names Birch — a family with no child…" (row read "Unknown"), "Show superseded reveals the offer…" ("UnknownSuperseded"), "⚠ Record a sale's Parent select lists Cedar…" (only Alder offered), then selectOption timed out |
 //
-// (2026-09-26, both reverted; `git diff --exit-code -- SwimSyncAdmin SwimSyncApp` clean, and the served
+// (Proof 3: 2026-09-26, the UP re-applied after and 49/49 twice via --only.)
+// (Proofs 1-2: 2026-09-26, both reverted; `git diff --exit-code -- SwimSyncAdmin SwimSyncApp` clean, and the served
 // chunk re-grepped for the reverted code. SWC strips a `// MUTATION-PROOF` comment inside an object
 // literal, so proof 2's arrival was grepped as `status: "pending"` in the served chunk instead.)
 
@@ -57,7 +59,7 @@ for (const u of [ADMIN, EXPO]) {
   }
 }
 
-const EXPECTED_CHECKS = 47;
+const EXPECTED_CHECKS = 49;
 
 const DB = execFileSync("docker", ["ps", "--format", "{{.Names}}"], { encoding: "utf8" })
   .split("\n").find((n) => n.startsWith("supabase_db_"));
@@ -152,6 +154,11 @@ try {
   const awaitingStart = await refsUntil(awaiting(), REF_REQUEST);
   check("Awaiting shows the pending request only; the superseded offer is hidden by default",
     awaitingStart === REF_REQUEST && /Awaiting confirmation \(1\)/.test(await awaiting().innerText()), awaitingStart);
+  // Birch has NO child at the business: her name is readable only through the
+  // membership (20260926000100). Before it, this row read "Unknown".
+  const requestText = flat(await awaiting().locator("tr", { hasText: REF_REQUEST }).innerText().catch(() => ""));
+  check("⚠ Awaiting names Birch — a family with no child — not \"Unknown\"",
+    /PkgAdm Parent Birch/.test(requestText) && !/Unknown/.test(await awaiting().innerText()), requestText.slice(0, 160));
   await page.getByRole("button", { name: "Show superseded (1)" }).click();
   const shown = await refsUntil(awaiting(), sorted(REF_REQUEST, REF_OFFER));
   const offerRow = awaiting().locator("tr", { hasText: REF_OFFER });
@@ -172,6 +179,10 @@ try {
   await held().getByRole("button", { name: "Record a sale" }).click();
   const saleModal = modal(page);
   await saleModal.getByRole("heading", { name: "Record a sale" }).waitFor();
+  // Cedar has no child either: without the membership arm she is not an option at all.
+  const parentOptions = flat(await saleModal.locator("select").nth(0).innerText().catch(() => ""));
+  check("⚠ Record a sale's Parent select lists Cedar — a family with no child — by name",
+    /PkgAdm Parent Cedar/.test(parentOptions) && !/Unknown/.test(parentOptions), parentOptions.slice(0, 160));
   await saleModal.locator("select").nth(0).selectOption({ label: "PkgAdm Parent Cedar" });
   await saleModal.locator("select").nth(1).selectOption({ label: "PkgAdm 10 Group — S$300.00" });
   const preview = await saleModal.getByText("Pays S$300.00").waitFor({ timeout: 8000 })

@@ -1,10 +1,9 @@
 // "Credit stays with the old business" — the advisory before a cross-business
 // move. Stage 9 of docs/refactor/PLATFORM_REFACTOR_PLAN.md, markup verbatim.
 //
-// ⚠ NO DRIVER OPENS THIS MODAL (grepped 2026-09-18: no verify-*.mjs contains
-// "Credit stays" or "Move anyway"), and it is DORMANT on production — no
-// cross-business move has happened since the RPC shipped (HANDOVER §3, §8.91).
-// Hand-checked at Stage 9; a verify-platform-controls driver is owed.
+// Driven by verify-platform-controls (a nightly driver, added 2026-09-26): both exits and
+// both checkFailed sites. DORMANT on production — no cross-business move has
+// happened since the RPC shipped (HANDOVER §3, §8.91).
 //
 // ⚠ BOTH EXITS CALL THE SAME onCancel. The dialog's onClose (backdrop/escape)
 // and the Cancel button are two separate paths, and each must reset the
