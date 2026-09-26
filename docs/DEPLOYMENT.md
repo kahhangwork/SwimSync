@@ -1000,3 +1000,7 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     §7.274) rebased onto it, both drivers re-run on the merged tree (27/27, 29/29) → `main`. Vercel app+admin
     `success` on `56fbf81`, CI green; live `swimsync.sg` entry bundle contains `.replace("/(auth)","")`, absent
     from `8f34881`'s source (§7.271).
+54. **Deploy record (2026-09-26): two app fixes and a docs push.** 0 migrations, 0 functions; the §7.1 gate was
+    CLEARED by the green nightly `36200015882` on `64f838e`. `e55038a` (`isPublicPage` segment boundary), `a5585cc`
+    (BACKLOG), `7f969cb` (NativeWind `darkMode: "class"`, §7.275) → `main`, CI green on all three. Live
+    `swimsync.sg` CSS holds `--css-interop-darkMode:class dark` (§7.271: checked on the last commit).

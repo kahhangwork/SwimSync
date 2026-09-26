@@ -448,7 +448,7 @@ proven by mutation;
 route in each app once — 32 admin routes as tenant admin / platform admin / logged out; every app
 screen as coach / parent / logged out (Register and Forgot password by deep link since 2026-09-25) — and assert the page's own `<h1>` (admin, exact) or a
 screen-unique literal (app), plus no `pageerror` and no `console.error` while it loaded (failed
-request URLs attached). The app twin reaches nested-stack screens by PRESSING from the landing tab,
+request URLs attached; `IGNORED_ERRORS` is EMPTY since 2026-09-26, §7.275 — keep it so). The app twin reaches nested-stack screens by PRESSING from the landing tab,
 not by deep link: the root layout's session restore replaces a deep link with the landing tab, so the
 target is mounted-but-hidden (lib.mjs, `includeHidden`) and its buttons are unpressable — a one-read
 render assertion on such a screen was green, then red, with no change. No content assertions: they are the net for the pages **no other driver

@@ -158,7 +158,9 @@ next person re-deriving it. Link related items by name.
 
 **Remove it from the backlog entirely** and make sure `PRD.md` now describes it
 (Step 2). Do **not** leave it in place marked "done" — a backlog of completed items is
-how it stops being a queue. The record of what shipped lives in git history, the PRD,
+how it stops being a queue. **Then grep the heading to confirm it is gone** — §8.120's dateline
+said two driver items were "removed" while both stayed listed, and a later session planned to
+build them (2026-09-26). The record of what shipped lives in git history, the PRD,
 and the `HANDOVER.md` session log.
 
 ### (c) An idea was raised and rejected

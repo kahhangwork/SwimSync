@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-26 — **The deployed `public-package` CORS is checked (§8.126):** prod allows only `content-type`,
-so the code comment and §7.264 were right; a docs-only session, no code merged. **Tonight's nightly still covers
-§8.123–§8.125.**_
+_Last updated: 2026-09-26 — **Three small units shipped behind a GREEN nightly (§8.127):** `isPublicPage` matches on a
+segment boundary, NativeWind's per-load throw fixed (`darkMode: "class"`, §7.275), and two already-shipped driver items
+cleared from BACKLOG. **Tonight's nightly is the first on `e55038a`/`7f969cb`.**_
 
-_Previously (§8.125, 2026-09-26) — a recovery / invite link no longer wipes the typed form; `app-money` C2 driven._
+_Previously (§8.126, 2026-09-26) — the deployed `public-package` CORS checked; §7.264 holds._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +347,17 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.127 (2026-09-26) — Segment-bounded public pages; NativeWind's throw fixed; stale BACKLOG cleared
+
+**Three units, each its own branch → `main`, after the nightly `36200015882` on `64f838e` went GREEN (§7.1 gate cleared).**
+Deploy record: DEPLOYMENT §11 #54.
+
+- **`isPublicPage`** (`e55038a`): `p` or `p + "/"`, so a future `/invoices` is gated. ARCHITECTURE §10.
+- **NativeWind** (`7f969cb`): `darkMode: "class"`; both driver allowlists emptied; smoke red 45/71 without it. §7.275.
+- **BACKLOG drift** (`a5585cc`): *harden `appLoginDies`* and the *calendar Today race* shipped 2026-09-25 but were still
+  listed; `/update-docs` Step 3(b) now says to grep the heading after deleting.
+- **Not done:** the NativeWind fix was not run on a native build (reasoned safe: no `dark:` class exists, pinned).
+
 ## 8.126 (2026-09-26) — The deployed CORS probe: §7.264 holds
 
 **The §9 CORS item, read-only, docs-only** (`eb95259`). Prod `public-package` and `public-invoice` answer
@@ -355,17 +366,7 @@ BACKLOG item removed.
 
 - **Not done:** no code merged — the §7.1 gate still waits on tonight's nightly.
 
-## 8.125 (2026-09-26) — A late session restore wiped the reset form; the package page's *I've paid* is driven
-
-**Both §9 S-items, each on its own branch, merged drivers-first then the app fix, on the user's override of the §7.1
-gate.** Deploy record: DEPLOYMENT §11 #53.
-
-- **The step-4 mystery was a real bug** (`56fbf81`): a same-route `router.replace` after the `profiles` read re-mounted
-  `/reset-password` — and `/accept-invite` — clearing the typing on any slow load. §7.274 · TESTING §5.
-- **`verify-app-money` C2** (`954e82f`): the logged-out claim POST. TESTING §5.
-- **Not done:** one harmless pre-form mount remains unexplained (§7.274). No driver ran beyond these two.
-
-_(§8.124 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.125 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -408,12 +409,9 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-26: last nightly `36071084202` RED 55/56 (`app-auth` check 1) — cleared by a local 25/25 the user accepted
-(§8.122).** Tonight's scheduled nightly is the next real signal, and the FIRST on §8.123's three units, §8.124's two and
-§8.125's two: **a second check-1 red is a real verdict, not a flake** (§7.263); a red in `smoke-app`, `verify-packages`
-or `app-auth` points at §8.123 first; a red in one of the eight port-fixed drivers points at `c81b32f` first; a red on
-`app-auth`'s *typed form survives* (step 4/5) or `app-money` C2 points at §8.125 (§7.274). The step-4 refill log line
-is GONE — its cause is fixed.
+**State on 2026-09-26: last nightly `36200015882` GREEN on `64f838e`** — it cleared §8.123–§8.125 (§7.1 gate). Tonight's
+is the first on §8.127's two app commits: a new `pageerror` in `smoke-app` or `cancel-lesson` points at `7f969cb` first
+(their `IGNORED_ERRORS` are now EMPTY, §7.275); a login/redirect red on a public page points at `e55038a`.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -423,15 +421,16 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-- **Give `isPublicPage`'s prefix match a segment boundary** (BACKLOG, S) — the next Foundations item; app code, so it
-  waits for the gate below.
-- Any other uncovered-actions driver item, or `BACKLOG.md` Build order.
+- **The uncovered-actions driver items** (BACKLOG → *Foundations*, all S, drivers only — no deploy, no gate): the first
+  is `verify-packages-admin` (ten Packages actions). Or the `BACKLOG.md` Build order.
+- **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`) — two were
+  still listed a day after shipping (§8.127).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before
   `supabase test db` (§7.272).
 
-**GATE (§7.1): read tonight's nightly before the next unit merges** — seven units (§8.123–§8.125) went in, the last four
-on the user's override of this gate, so tonight's run is their shared driver-level check.
+**GATE (§7.1): read tonight's nightly before the next APP unit merges** — it is the first driver-level run on
+`e55038a` and `7f969cb`. Driver-only units need no gate.
 
 **No migration is HELD or in flight.** Latest applied is `20260925000200` (drop the dead `auto_invoice_enabled` row,
 §8.124), on prod, 0 pending (160/160 on 2026-09-25), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list

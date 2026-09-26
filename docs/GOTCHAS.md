@@ -40,7 +40,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272 |
-| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274 |
+| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269 |
 | Source-scanning guards | 230, 231, 233, 241, 247, 248 |
@@ -2249,3 +2249,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     invite form's name + password too. Fix: `showAuthScreen()` (`app/_layout.tsx`) skips a replace to the current
     path; one mount ~30 ms in (before `PASSWORD_RECOVERY`, before the form renders) remains and is harmless. Locally the read wins the race, so a driver must HOLD it: `holdProfilesRead()` (`verify-app-auth.mjs`,
     GETs only). A refill loop in a driver HIDES this — assert the typed value survived. (2026-09-26.)
+
+275. **NativeWind's `darkMode` must be `"class"` — under the default `"media"` the web runtime throws on EVERY page
+    load.** `global.css` sets the darkMode flag after `react-native-css-interop`'s `color-scheme.js` has loaded; the
+    MutationObserver that notices it calls `colorScheme.set()`, which refuses under `"media"` ("Cannot manually set
+    color scheme…"). Drivers allowlisted it from 2026-09-13. Fixed `7f969cb`; `lib/darkMode.drift.test.ts` pins it.
+    ⚠ Under `"class"` a `dark:` variant applies only with `<html class="dark">` — i.e. never. Adding dark mode means
+    toggling that class, not just writing `dark:` classes. Prod proof: served CSS holds `--css-interop-darkMode:class dark`. (2026-09-26.)
