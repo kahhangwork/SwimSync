@@ -373,7 +373,7 @@ before and after the fixture loads.
 seed coach, and that would delete every other driver's audit rows.
 **Mutations:** `useSaveAttendance.ts:235` → `if (true || …)` · `lib/coachRoster.ts:172` → let `"shadow"` mark.
 
-### ☐ U11 — `verify-coach-schedule-roles` (~2.5 h): promotes `coach-schedule-handchecks`
+### ☑ U11 — `verify-coach-schedule-roles` (~2.5 h): promotes `coach-schedule-handchecks` — DONE 2026-09-26, 28 checks
 **Covers:** Covering + Mark Attendance (substitute), Shadowing + View lesson (shadow), Covered + View lesson (owner);
 location chips render + filter; the clamp back to *All locations*; a DONE row tap →
 `…/attendance?date=…&from=schedule`.

@@ -1707,7 +1707,8 @@ creating exactly one session row), proven able to fail. It deep-links, so every 
 hidden screen (§7.254) — fine for DB assertions; for the title, one `check()` inside `verify-coach-roster`'s
 shadow leg is cheaper than a new driver.
 
-### A driver for the coach Schedule's role badges, location chips and DONE tap — **S** `[from the coach schedule refactor 2026-09-22]`
+### ~~A driver for the coach Schedule's role badges, location chips and DONE tap~~ — **S** — **DONE 2026-09-26** `[from the coach schedule refactor 2026-09-22]`
+_Shipped as `verify-coach-schedule-roles.mjs` (28 checks, own tenant + owner / substitute / shadow coaches, 2 mutation proofs; the hand-check script it promoted is deleted) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U11._
 Three things on `(coach)/schedule/index` no driver asserts: **the role UI** — `Covering` / `Shadowing` / `Covered`
 badges and the `View lesson` vs `Mark Attendance` button on TODAY's cards (`verify-coach-roster`'s `Covering` is the
 ADMIN lesson page); **the location chips** — render, filter, and the clamp back to *All locations*; and **a tap on a
@@ -1717,7 +1718,7 @@ DONE row** landing on `…/attendance?date=…&from=schedule` (`verify-schedule-
 wrong button either nags a coach the DB will refuse, or hides the Mark button from the coach who owes the marks
 (§8i). The chips are the only control that can empty the week, and nothing proves they cannot strand it.
 
-**Notes:** `docs/refactor/coach-schedule-handchecks.mjs` + `.sql` (on top of `fixtures-coach-roster.sql`) is the
+**Notes:** the (now deleted) coach-schedule hand-check script (on top of `fixtures-coach-roster.sql`) was the
 skeleton — 9 checks, 9/9 before and after the refactor. **The clamp is reachable only when a location's classes
 vanish between loads** (weekly recurrence means week navigation never empties a location); the skeleton
 deactivates them (`is_active=false` needs `deactivated_at`, a CHECK) and refocuses. Target a DONE card by
