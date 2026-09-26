@@ -2256,3 +2256,33 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     color scheme…"). Drivers allowlisted it from 2026-09-13. Fixed `7f969cb`; `lib/darkMode.drift.test.ts` pins it.
     ⚠ Under `"class"` a `dark:` variant applies only with `<html class="dark">` — i.e. never. Adding dark mode means
     toggling that class, not just writing `dark:` classes. Prod proof: served CSS holds `--css-interop-darkMode:class dark`. (2026-09-26.)
+
+276. **A driver-only push to `main` still rebuilds BOTH prod apps — so a mutation proof left in app code ships.**
+    Neither Vercel project has an ignore step (`SwimSyncApp/vercel.json` has no `ignoreCommand`; the admin has no
+    `vercel.json`). "Driver-only, no deploy" is true only if the commit holds no app code. Before merging a test
+    branch: `git diff --name-only main...HEAD` must list only `drivers/`, `docs/`, `BACKLOG.md`; after every
+    mutation revert, `git diff --exit-code -- SwimSyncAdmin SwimSyncApp` must exit 0. Run the proofs BEFORE the
+    final green runs, never after. (`docs/plans/DRIVER_BACKLOG_PLAN.md` ship steps 3, 6; 2026-09-26.)
+
+277. **Pinning `session_window_start()` to a FUTURE month simulates nothing past next month's 1st.** Callers go
+    through `markable_floor(tenant) = LEAST(session_window_start(), <month after last seal, else created_at>)`, and
+    after `db reset` the seed tenant's `created_at` IS today with no `billing_periods` — so any floor later than
+    today clamps to today. Only D = the 1st of NEXT month moves the effective floor. Assert
+    `markable_floor(<tenant>)` equals the pinned floor, or refuse. Relative-date fixtures redden by construction
+    under a pin (§7.226) — that is not a finding. (2026-09-26.)
+
+278. **Anything that `CREATE OR REPLACE`s a function in the SHARED DB must restore it in an EXIT trap.** "The next
+    `db reset` wipes it" fails after the LAST run, on Ctrl-C, and on a crash — every later driver, `supabase test
+    db` and manual check then runs against the sabotaged body. Capture `pg_get_functiondef()` first,
+    `trap restore EXIT INT TERM`, and assert the live value after. (§7.55; 2026-09-26.)
+
+279. **`launch()` (`drivers/lib.mjs`) AUTO-ACCEPTS every dialog — a "Cancel" check is vacuous unless it also
+    asserts the DB row is unchanged.** RN-web `confirmAction` is `window.confirm`; under the auto-accept a driver
+    that "presses Cancel" actually confirms, and a UI-only assertion can still pass. `page.removeAllListeners(
+    "dialog")` before answering, and pair every Cancel/refusal check with a scoped DB-unchanged assert. (2026-09-26.)
+
+280. **A new fixture's UUID prefix must be checked against `supabase/tests/`, not only `drivers/`.** On 2026-09-26
+    nine "free" prefixes (`b2`, `b5`–`bc`) turned out to be used by pgTAP files — a fixture left loaded with a
+    same-table id breaks `supabase test db` (§7.272). Check with
+    `git grep -nE '<pp>[0-9a-f]{6}-0000' -- '*.sql' '*.mjs' '*.ts'` → 0 hits. And a teardown matches the FULL
+    `'<pp>000000-%'` block, never `'<pp>%'`: random seed ids share any 2 hex chars 1 time in 256. (2026-09-26.)
