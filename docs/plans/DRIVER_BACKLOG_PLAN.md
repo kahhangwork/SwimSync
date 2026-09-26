@@ -315,7 +315,7 @@ profile id.
 the same URL, and a lingering route turns the End check into an error-branch check.
 **Mutations:** `classRows.ts:100` → `return null` · `useClassDrawer.ts:51` → delete `setShadowError(...)`.
 
-### ☐ U8 — `verify-platform-controls` (~3.5 h, the heaviest fixture)
+### ☑ U8 — `verify-platform-controls` (~3.5 h, the heaviest fixture) — DONE 2026-09-26, 37 checks
 **Covers:** stranded-parents panel; `N unpaid` chip; Change/Set owner modal **and its stale-response guard**
 (`useOwnerTransfer.ts:45,53,68`); "Credit stays with the old business" advisory, both exits + `checkFailed`
 (`page.route` the parent-links read → 500); Family status search (scope to the section: two "Search" buttons).

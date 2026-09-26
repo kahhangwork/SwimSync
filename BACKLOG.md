@@ -1596,7 +1596,8 @@ insert). Call `page.removeAllListeners("dialog")` before answering the referrals
 its own handler), and select the payout toggle by name — `button[aria-expanded]` hits the sidebar first. **Do not
 press Resend** unless the driver stubs the email function.
 
-### A `verify-platform-controls` driver for the five uncovered Platform surfaces — **S** `[from the platform refactor 2026-09-18]`
+### ~~A `verify-platform-controls` driver for the five uncovered Platform surfaces~~ — **S** — **DONE 2026-09-26** `[from the platform refactor 2026-09-18]`
+_Shipped as `verify-platform-controls.mjs` (37 checks, two own tenants, 3 mutation proofs; the stale-response guard is held by a promise gate, not a delay; `checkFailed` is a `page.route`d 500 on the parent-link read AND the balance read — no dao rename) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U8._
 The platform full-track refactor (§8.110) decomposed `platform/page.tsx`. Its driver net — `platform-admin`,
 `platform-admin-scope`, `tenant-provisioning`, `tenant-suspension`, `smoke-admin` (129/129) — **opens none of
 these five**: the **stranded-parents panel** ("Signed up but not in any business"), the **`N unpaid`**
