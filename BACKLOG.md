@@ -1423,8 +1423,10 @@ Packages *Awaiting* panel, and has no name in *Record a sale*'s Parent select.
 **Why:** the admin is asked to confirm a payment from someone they cannot identify — the one moment the name
 matters most. Production is one tenant with every family already holding a child, so it has not bitten yet.
 
-**Notes:** decide first whether a `parent_tenants` membership alone should grant name visibility (the parent chose
-to join this business, so a relationship exists) — that is an RLS change on `profiles`/`parents`, needs a policy +
+**Decided 2026-09-26 (user): YES** — a `parent_tenants` membership alone grants the admin name visibility (the
+parent chose to join this business, so a relationship exists); nothing blocks the build.
+
+**Notes:** building it is an RLS change on `profiles`/`parents`, needs a policy +
 GRANT migration (§7.87) and a pgTAP case. `verify-packages-admin`'s fixture gives every parent a child to work
 around it; drop that workaround when this ships and let the driver assert the name.
 

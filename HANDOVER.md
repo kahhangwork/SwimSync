@@ -428,9 +428,16 @@ which mutate shared seed state — are in the same section.
 ### THE NEXT BUILD — pick from BACKLOG
 
 - **Read tonight's nightly first** (never dispatch it). Then the two product gaps §8.128's drivers found (BACKLOG →
-  *Admin and operations*, both S, both APP changes so both behind the §7.1 gate): *a family with no child reads as
-  "Unknown"* (needs an RLS decision first) and *a refused run-day save is silent*. Fold the *stale "no driver"
-  comments* item into whichever app change goes first.
+  *Admin and operations*, both S, both APP changes so both behind the §7.1 gate):
+  - *A family with no child reads as "Unknown"* — **DECIDED 2026-09-26 (user): YES, a parent who joined the business
+    is visible to its admin by name before adding a child.** Buildable now: an RLS change (policy + GRANT, §7.87) +
+    pgTAP; then drop `verify-packages-admin`'s every-parent-has-a-child workaround and assert the name.
+  - *A refused run-day save is silent* — **queued in BACKLOG (user, 2026-09-26)**; not scheduled.
+- **Seven stale "no driver" app comments ride along with the FIRST app change** (comment-only; a push to `main`
+  redeploys both apps, §7.276, so never a deploy of their own): `SwimSyncApp/features/roster/domain/useRemoveStudent.ts:7`,
+  and under `SwimSyncAdmin/app/(admin)/platform/` — `ui/StrandedPanel.tsx`, `ui/OwnerModal.tsx`,
+  `domain/useOwnerTransfer.ts`, `ui/CreditWarningModal.tsx`, `ui/FamilyStatusSection.tsx`, `domain/useFamilyStatus.ts`.
+  Each says no driver covers it; `verify-coach-remove-student` / `verify-platform-controls` now do.
 - **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`) — two were
   still listed a day after shipping (§8.127).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
