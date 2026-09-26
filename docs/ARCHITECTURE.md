@@ -380,8 +380,8 @@ the shape of the system changes:_
   `tenant_admin` *and* a `coaches` row. This is why coach type is not an authorization
   concept anywhere, why wages needed no private-vs-school check, and why the app must
   route on **which extension rows exist**, not on the role enum (undoing that is what
-  locked the real coach out — §7.19). `tenants.kind` exists for copy and future pricing
-  and **must never appear in an RLS policy**. Full reasoning: `TENANCY_DESIGN.md` §1.
+  locked the real coach out — §7.19). `tenants.kind` was dropped on 2026-08-04 (§8.28 —
+  nothing read it); a coach-type column must never return as an **RLS** input. Full reasoning: `TENANCY_DESIGN.md` §1.
 - **The tenant boundary: parents GLOBAL, students TENANTED.** A parent may deal with
   several businesses (the common case, per the user), so `parents` has no `tenant_id`;
   a tenant reaches a parent through their children's enrolments (`tenant_serves_parent()`).
@@ -540,8 +540,9 @@ the shape of the system changes:_
     checks `postgres`, not the caller (§7.38) — and they exist because `profiles_update`
     lets any tenant admin update any tenant profile, which with two admins is an
     escalation path.
-  - **There is no owner-transfer path** — refused at the trigger. Adding one is a
-    `BACKLOG.md` item, not a quick UPDATE.
+  - **No SELF-SERVICE owner transfer** — a tenant admin's UPDATE of `owner_profile_id` is
+    refused at the trigger. The one path is the platform admin's audited
+    `platform_reassign_owner()` (`20260813000100`, Platform → Change / Set owner).
 
 - **The mark renders two different ways on purpose, and is absent from the invoice email
   on purpose.** `SwimSyncAdmin/components/Logo.tsx` inlines the SVG paths (recolourable via
