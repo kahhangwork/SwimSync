@@ -253,7 +253,7 @@ label (`CoachRm …`). No seed-row UPDATE.
 **Mutations:** ✎ CORRECTED `features/roster/domain/useRemoveStudent.ts:32` (the `removeStudentFromClass(student.id,
 id)` call; not `:~34`) → wrong class id · delete `loadData()` at `:39`.
 
-### ☐ U4 — `verify-money-admin` (~3 h)
+### ☑ U4 — `verify-money-admin` (~3 h) — DONE 2026-09-26, 44 checks
 **Covers:** credit-notes **Void** (confirm / blank-reason "A reason is required." / Cancel), scoped **search** +
 status filter, **Export CSV** (assert the download event only); referrals **Save**, **Disable/Enable**, **Grant**,
 **Void** (`window.prompt`, rule 8); wages **rain toggle**, **pay-day clamp**, **Shadow rate re-prefill**

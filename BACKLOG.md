@@ -1573,7 +1573,8 @@ prod (0 `class_shadow_coaches`).
 **no** shadow rate; the failed-load needs the read to error (rename the table in a throwaway, or an RLS denial).
 Assert the DB row COUNT is unchanged across an End (only `effective_to` is set) — a DELETE would claw back paid wages.
 
-### A `verify-money-admin` driver for the uncovered Credit Notes / Referrals / Wages actions — **S** `[from the Admin L-C refactor 2026-09-17]`
+### ~~A `verify-money-admin` driver for the uncovered Credit Notes / Referrals / Wages actions~~ — **S** — **DONE 2026-09-26** `[from the Admin L-C refactor 2026-09-17]`
+_Shipped as `verify-money-admin.mjs` (44 checks, own tenant, 2 mutation proofs; Resend is never pressed — the run fails on any `credit-note-emails` call) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U4._
 The L-C lite batch (§8.109) decomposed `wages`, `credit-notes`, `referrals`, `accounting`. Its driver net —
 `coach-wages` (rate · Calculate · Mark paid), `referrals` (page render + minted code), `platform-admin-scope`,
 `smoke-admin` — **presses none of these**: credit-notes **Void** (confirm / empty-reason refusal / cancel), scoped
