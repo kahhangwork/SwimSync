@@ -651,6 +651,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `verify-payment-collection.mjs`).
     - When an admin page shows "—" for a parent who exists, check the CHILD link before suspecting the fetch.
     (2026-08-02.)
+    - **PARTLY SUPERSEDED 2026-09-26 (`20260926000100`):** an ADMIN now also reads a member's `parents` +
+      `profiles` rows through the membership alone (`tenant_admin_has_member()`). Still true: a COACH needs the
+      child, and `parent_students` is NOT widened — a screen that reaches the parent THROUGH the child link
+      (e.g. the parent-contact modal) still shows nothing for a childless member.
 
 78. **A FUNCTION CALLED ONLY BY A `SECURITY DEFINER` TRIGGER SHOULD BE REVOKED FROM
     *EVERYONE* — INCLUDING `service_role` — AND THE TRIGGER FUNCTION ITSELF MUST STAY
