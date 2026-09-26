@@ -66,13 +66,9 @@ const PARENT = "pay-driver-parent@swimsync.test";
 
 // Errors this driver IGNORES, each with the reason. Keep this list short and
 // every entry exact — an allowlist is where a real crash goes to hide.
-const IGNORED_ERRORS = [
-  // NativeWind 4 throws this on every web load (its own dark-mode probe; the
-  // app never sets a colour scheme). Chronic, harmless to the render, and NOT
-  // ours to fix here — filed in BACKLOG. Exact message, so a different throw
-  // from the same library still fails.
-  "Cannot manually set color scheme, as dark mode is type 'media'",
-];
+// Empty since 2026-09-26: its one entry, NativeWind's "Cannot manually set color
+// scheme" throw, was fixed at the source (tailwind.config.js darkMode "class").
+const IGNORED_ERRORS = [];
 
 const DOW = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 function nextDateFor(dayOfWeek) {

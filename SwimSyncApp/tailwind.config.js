@@ -9,6 +9,10 @@ module.exports = {
     "./features/**/*.{js,jsx,ts,tsx}",
   ],
   presets: [require("nativewind/preset")],
+  // "class", not the default "media": under "media" NativeWind's web runtime
+  // throws on every page load. Inert while the app is light-only — pinned by
+  // lib/darkMode.drift.test.ts.
+  darkMode: "class",
   theme: {
     extend: {
       colors: {

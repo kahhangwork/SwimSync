@@ -40,10 +40,9 @@ const check = (l, p, d = "") => {
 const sql = (q) =>
   execSync(`docker exec -i supabase_db_SwimSync psql -U postgres -d postgres -Atc "${q.replace(/"/g, '\\"')}"`, { encoding: "utf8" }).trim();
 
-// Errors ignored, each with its reason — the same exact entry as
-// verify-smoke-app.mjs. NativeWind 4 throws it on every web load (its own
-// dark-mode probe); matched as a substring, as there — a different throw still fails.
-const IGNORED_ERRORS = ["Cannot manually set color scheme, as dark mode is type 'media'"];
+// Errors ignored, each with its reason — kept in step with verify-smoke-app.mjs.
+// Empty since 2026-09-26: NativeWind's colour-scheme throw is fixed at the source.
+const IGNORED_ERRORS = [];
 
 // Press a visible leaf matching `pattern` that comes AFTER the Schedule's
 // "DONE" heading in document order. Returns how many matched there; presses
