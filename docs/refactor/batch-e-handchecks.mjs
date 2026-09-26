@@ -1,4 +1,5 @@
-// Admin L-E hand-checks — the seven surfaces no driver presses
+// Admin L-E hand-checks — the surfaces no driver presses (check 7, reset-password,
+// is now the verify-admin-reset-password driver)
 // (docs/refactor/BATCH_E_PLAN.md §3). Each one is proved by a DB read, not by
 // the page agreeing with itself.
 //
@@ -352,63 +353,10 @@ check(
 
 await page.screenshot({ path: `${OUT}/le-handcheck-history.png`, fullPage: true });
 
-// ── 7: reset-password — the valid path NO driver covers (RISK 3) ────────────
-const RECOVERY_EMAIL = "coach@swimsync.test";
-const NEW_PASSWORD = "handcheck-le-2026";
-const { data: link, error: linkErr } = await db.auth.admin.generateLink({
-  type: "recovery",
-  email: RECOVERY_EMAIL,
-});
-if (linkErr) {
-  check("7. reset-password valid path", false, `generateLink failed: ${linkErr.message}`);
-} else {
-  const url = new URL(link.properties.action_link);
-  // Point the verify link at the LOCAL admin, mirroring what the email does.
-  url.searchParams.set("redirect_to", `${ADMIN}/reset-password`);
-  const ctx = await browser.newContext();
-  const rp = await ctx.newPage();
-  await rp.goto(url.toString());
-  await rp.waitForTimeout(3500);
-  const rpBody = await rp.innerText("body");
-  const validBranch =
-    rpBody.includes("Set New Password") && !/expired|invalid/i.test(rpBody);
-  check("7a. the recovery link renders the VALID branch", validBranch, rpBody.slice(0, 120));
-
-  if (validBranch) {
-    const pw = rp.locator('input[type="password"]');
-    await pw.nth(0).fill(NEW_PASSWORD);
-    await pw.nth(1).fill(NEW_PASSWORD);
-    await rp.getByRole("button", { name: /Update Password|Set Password|Save/i }).click();
-    await rp.waitForTimeout(2500);
-    await rp.screenshot({ path: `${OUT}/le-handcheck-reset-password.png`, fullPage: true });
-
-    // The proof: the NEW password actually signs in.
-    const probe = createClient(API_URL, serviceKey(), {
-      auth: { persistSession: false },
-    });
-    const { data: signIn, error: signInErr } =
-      await probe.auth.signInWithPassword({
-        email: RECOVERY_EMAIL,
-        password: NEW_PASSWORD,
-      });
-    check(
-      "7b. the NEW password signs in",
-      !signInErr && !!signIn?.session,
-      signInErr?.message ?? "session granted"
-    );
-
-    // Put the seed password back — every other driver logs in with it.
-    const { data: users } = await db.auth.admin.listUsers();
-    const u = users.users.find((x) => x.email === RECOVERY_EMAIL);
-    await db.auth.admin.updateUserById(u.id, { password: "password123" });
-    const { error: backErr } = await probe.auth.signInWithPassword({
-      email: RECOVERY_EMAIL,
-      password: "password123",
-    });
-    check("7c. seed password restored for the other drivers", !backErr, backErr?.message ?? "ok");
-  }
-  await ctx.close();
-}
+// ── 7: reset-password — PROMOTED to the nightly driver
+// .claude/skills/run-ui-playwright/drivers/verify-admin-reset-password.mjs
+// (docs/plans/DRIVER_BACKLOG_PLAN.md U9) and deleted here: it reset the SEED
+// admin's password, and its "new password signs in" passed vacuously on a re-run.
 
 await browser.close();
 

@@ -336,7 +336,7 @@ a `release()` the driver calls only after B's admin list has rendered (wait on a
 for A's `requestfinished` and re-assert. There is no timing window for the nightly runner to lose.
 **Mutations:** `useStudentMove.ts:115` → `credit > 0` only · ✎ CORRECTED `TenantsTable.tsx:175` (not `:176`) → `> 1`.
 
-### ☐ U9 — `verify-admin-reset-password` (~1.5 h): promotes `batch-e-handchecks.mjs` check 7
+### ☑ U9 — `verify-admin-reset-password` (~1.5 h): promotes `batch-e-handchecks.mjs` check 7 — DONE 2026-09-26, 18 checks
 **Covers:** valid recovery link → "Set New Password" → mismatch / <8-char refusals → Update → sign in with the new
 password succeeds; an `#error=` link → "Link expired".
 **Fixture:** its **own** admin user (`d6`), so no seed password is touched and nothing needs restoring (the

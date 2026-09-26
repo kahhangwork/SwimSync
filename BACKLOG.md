@@ -1660,7 +1660,8 @@ any of them is silent until an invoice run.
 Rose (an enrolment-less child reads "(0)" in the picker). To make assign FAIL, pick a shape the RPC refuses (a
 cancelled lesson, or a coach the class rate already pays via SQL) — the picker hides the latter on purpose.
 
-### A driver for the `reset-password` recovery path — **S** `[from the Admin L-E fence commit 2026-09-21]`
+### ~~A driver for the `reset-password` recovery path~~ — **S** — **DONE 2026-09-26** `[from the Admin L-E fence commit 2026-09-21]`
+_Shipped as `verify-admin-reset-password.mjs` (18 checks, own tenant + admin, per-run password asserted refused first, 2 mutation proofs; `batch-e-handchecks.mjs` check 7 deleted, checks 1–6 kept) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U9._
 `/reset-password` (admin) is opened by **one** driver, `verify-smoke-admin`, and only on its INVALID branch:
 logged out, no token, "checking…" → "invalid" after 3s. The whole valid path — a real recovery link parsed from
 the URL hash, `onAuthStateChange` settling the session, setting a password, and signing in with it — is exercised
