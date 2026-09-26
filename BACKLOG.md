@@ -1415,21 +1415,6 @@ table (the additive path the shipped design deliberately left open —
 `docs/ARCHITECTURE.md` §6). Don't add enum roles for this (same reasoning as the owner
 column: permanent, string-audited everywhere, can't express one-owner-per-tenant).
 
-### A family with no child at the business reads as "Unknown" to the admin — **S** `[from verify-packages-admin 2026-09-26]`
-The admin can read a parent's name only through a child they have at the business (`tenant_serves_parent`). A
-family that joined (join code) and requested a package before any child was added shows as **"Unknown"** on the
-Packages *Awaiting* panel, and has no name in *Record a sale*'s Parent select.
-
-**Why:** the admin is asked to confirm a payment from someone they cannot identify — the one moment the name
-matters most. Production is one tenant with every family already holding a child, so it has not bitten yet.
-
-**Decided 2026-09-26 (user): YES** — a `parent_tenants` membership alone grants the admin name visibility (the
-parent chose to join this business, so a relationship exists); nothing blocks the build.
-
-**Notes:** building it is an RLS change on `profiles`/`parents`, needs a policy +
-GRANT migration (§7.87) and a pgTAP case. `verify-packages-admin`'s fixture gives every parent a child to work
-around it; drop that workaround when this ships and let the driver assert the name.
-
 ### A refused run-day save is silent on the Invoices page — **S** `[from verify-invoice-admin 2026-09-26]`
 `handleSaveRunDay` (`invoices/domain/useTenantBilling.ts`) ignores the update's error, so a save the database
 refuses leaves the input showing the rejected value while the DB keeps the old one.

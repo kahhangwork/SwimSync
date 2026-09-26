@@ -478,6 +478,10 @@ but has not yet signed in.
   signed-out visitor — it is the link a coach sends a new family (it used to land on Sign In). A
   signed-in user opening it is sent to their home, as `/login` does. `/forgot-password` behaves the same.
 - Parent account may exist before any child is created
+- *(implemented 2026-09-26)* **The business's admin sees a parent's name from the moment they join** —
+  before any child is added. A family that joined by code and requested a package first used to show as
+  *Unknown* on Packages → Awaiting and was missing from *Record a sale*. Admins only: the coach still sees a
+  family through its children, and the admin sees none of the family's links to children at other businesses.
 - A newly registered parent may create one or more child/student profiles
 - **Student profile includes:** child name, age/date of birth, gender, optional notes. *(implemented: parents do **not** set a swimming ability/level. Levels are **coach-defined per business** and set by the business's admin — see §7.15; the parent sees their child's level read-only.)*
 - A child remains unassigned until the business's admin assigns that child to a coach/class
