@@ -133,6 +133,7 @@ export default function InvoicesPage() {
         runDay={tenant.runDay}
         setRunDay={tenant.setRunDay}
         savingRunDay={tenant.savingRunDay}
+        runDayMessage={tenant.runDayMessage}
         onSaveRunDay={tenant.handleSaveRunDay}
         paynowUen={tenant.paynowUen}
         setPaynowUen={tenant.setPaynowUen}

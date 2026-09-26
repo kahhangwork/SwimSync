@@ -1,6 +1,6 @@
 // verify-invoice-admin.mjs — the four Invoices-page actions no other driver
 // presses: the PayNow UEN / mobile save (on blur) and its 8-digit advisory,
-// the run-day save and its 1–28 clamp, the CSV export (a real download, then
+// the run-day save, its 1–28 clamp and a REFUSED save, the CSV export (a real download, then
 // the cap banner at 1000 rows), and a pending debit's Write off (Cancel, the
 // blank-reason refusal, then a real reason through write_off_parent_balance).
 //
@@ -42,8 +42,10 @@
 //   |---|------------------------------------------------------------|--------|------------|
 //   | 1 | invoices/domain/paynow.ts:20 → `/^\d{7,8}$/` (a 7-digit mobile passes) | 30/31 | "⚠ …but warns it isn't 8 digits, so no QR can be built" (read "PayNow details saved.") |
 //   | 2 | invoices/domain/useTenantBilling.ts:87 → `Math.min(31, …)` | 30/31 | "⚠ run day 31 is clamped to 28 and saved" (DB still 7, input 31 — the column's CHECK 1..28 refused the write and the page said nothing) |
+//   | 3 | invoices/domain/useTenantBilling.ts handleSaveRunDay → the pre-fix body (`if (!error) setRunDay(clamped)`, no re-read, no message) | 31/33 | "⚠ a save the DB refuses with an error says so…" (msg "", input 20, DB 15), "⚠ a save that returns no error but changed nothing…" (msg "", input 21, DB 15) |
 //
-// (2026-09-26, both reverted; `git diff --exit-code -- SwimSyncAdmin SwimSyncApp` clean. Each mutation's
+// (Proof 3: 2026-09-27, reverted from a copy; served chunk grepped for the mutation both ways; 33/33 after.)
+// (Proofs 1-2: 2026-09-26, both reverted; `git diff --exit-code -- SwimSyncAdmin SwimSyncApp` clean. Each mutation's
 // arrival was grepped in the served chunk `/_next/static/chunks/app/(admin)/invoices/page.js` as the
 // changed CODE (`d{7,8}`, `Math.min(31, Math.max`), and its absence re-grepped after the revert.)
 
@@ -60,7 +62,7 @@ for (const u of [ADMIN, EXPO]) {
   }
 }
 
-const EXPECTED_CHECKS = 31;
+const EXPECTED_CHECKS = 33;
 
 const DB = execFileSync("docker", ["ps", "--format", "{{.Names}}"], { encoding: "utf8" })
   .split("\n").find((n) => n.startsWith("supabase_db_"));
@@ -222,6 +224,52 @@ try {
     .waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
   check("run day 15 saves, and the schedule line says so", day15 === "∅/91234567/15" && runsFrom,
     `DB ${day15} · line ${runsFrom}`);
+
+  // A save the database REFUSES (rule 9: page.route the PATCH — the 1–28 clamp
+  // means no real input can reach the CHECK). Two shapes: an error response,
+  // and a 204 that changed nothing (what an RLS-filtered update looks like).
+  // Either way the input must fall back to the STORED 15 and say so.
+  const runDayMsg = page.locator("#run-day-message");
+  const isTenantPatch = (url) => {
+    const u = new URL(url);
+    return u.origin === API && u.pathname === "/rest/v1/tenants";
+  };
+  let patches = 0;
+  const refuse = (shape) => async (route) => {
+    if (route.request().method() !== "PATCH") return route.fallback();
+    patches++;
+    return shape === "error"
+      ? route.fulfill({ status: 400, contentType: "application/json",
+          json: { code: "23514", message: "forced refusal", details: null, hint: null } })
+      : route.fulfill({ status: 204, body: "" });
+  };
+  // Polls for the EXPECTED line: the previous refusal's message is still on
+  // screen until the next save clears it, so "first visible text" would race.
+  async function refusedSave(shape, typed, want) {
+    const handler = refuse(shape);
+    await page.route(isTenantPatch, handler);
+    await runDay.fill(typed);
+    await runDay.blur();
+    const end = Date.now() + 8000;
+    let msg = "";
+    while (Date.now() < end) {
+      msg = await runDayMsg.innerText({ timeout: 250 }).catch(() => "");
+      if (want.test(flat(msg))) break;
+      await page.waitForTimeout(200);
+    }
+    await page.unroute(isTenantPatch, handler);
+    return { msg: flat(msg), input: await runDay.inputValue(), db: sql(settingsQ) };
+  }
+  const refusedErr = await refusedSave("error", "20", /^Error: /);
+  check("⚠ a save the DB refuses with an error says so, and the input shows the stored 15, not 20",
+    /^Error: forced refusal$/.test(refusedErr.msg) && refusedErr.input === "15" &&
+      refusedErr.db === "∅/91234567/15" && patches === 1,
+    `msg "${refusedErr.msg}" · input ${refusedErr.input} · DB ${refusedErr.db} · patches ${patches}`);
+  const refusedSilent = await refusedSave("silent", "21", /^Not saved/);
+  check("⚠ a save that returns no error but changed nothing (RLS-shaped) says Not saved, and shows 15",
+    refusedSilent.msg === "Not saved — the run day is still 15." && refusedSilent.input === "15" &&
+      refusedSilent.db === "∅/91234567/15" && patches === 2,
+    `msg "${refusedSilent.msg}" · input ${refusedSilent.input} · DB ${refusedSilent.db} · patches ${patches}`);
 
   // ══ 3. CSV export — a real download, then the cap ══════════════════════════
   const invCountQ = `SELECT count(*) FROM invoices WHERE tenant_id='${TENANT}'`;

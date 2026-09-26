@@ -1415,17 +1415,6 @@ table (the additive path the shipped design deliberately left open —
 `docs/ARCHITECTURE.md` §6). Don't add enum roles for this (same reasoning as the owner
 column: permanent, string-audited everywhere, can't express one-owner-per-tenant).
 
-### A refused run-day save is silent on the Invoices page — **S** `[from verify-invoice-admin 2026-09-26]`
-`handleSaveRunDay` (`invoices/domain/useTenantBilling.ts`) ignores the update's error, so a save the database
-refuses leaves the input showing the rejected value while the DB keeps the old one.
-
-**Why:** the admin believes the run day changed, and billing then runs on a different day than the screen says.
-Masked today only by the client's 1–28 clamp; any future DB-side refusal (a CHECK, RLS, a suspended tenant)
-would surface as this silent mismatch.
-
-**Notes:** show the error and re-read the stored value, like the PayNow save beside it does. `verify-invoice-admin`
-can then add a forced-refusal check (`page.route` the PATCH, rule 9 of `docs/plans/DRIVER_BACKLOG_PLAN.md`).
-
 ### ~~The family-status search scans every membership client-side~~ — **S** — **DONE 2026-08-28**
 `handleFamilySearch` now pushes the term into the query — a sanitised `.or()` matching name OR email over
 `!inner` embeds — so it reaches every membership in the DB instead of the silently-capped first 1000

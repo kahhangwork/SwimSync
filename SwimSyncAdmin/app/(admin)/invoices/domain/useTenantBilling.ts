@@ -2,6 +2,7 @@ import { useState } from "react";
 import { blankToNull, normalizeSgPhone } from "@/lib/sgPhone";
 import * as repo from "../dao/invoices.repo";
 import { payNowProxyWarning } from "./paynow";
+import { runDaySaveOutcome } from "./runDay";
 
 /** The tenant this admin bills for and its billing schedule (auto on/off, run
  *  day, PayNow proxy, business name). `tenantId` is the shared spine — orphans,
@@ -15,6 +16,7 @@ export function useTenantBilling() {
   const [togglingAuto, setTogglingAuto] = useState(false);
   const [runDay, setRunDay] = useState<number | null>(null);
   const [savingRunDay, setSavingRunDay] = useState(false);
+  const [runDayMessage, setRunDayMessage] = useState<string | null>(null);
   // PayNow proxy — where invoice QRs point the money. null = not loaded yet
   // (platform admin has no tenant); "" = loaded and unset.
   const [paynowUen, setPaynowUen] = useState<string | null>(null);
@@ -86,11 +88,22 @@ export function useTenantBilling() {
     if (!tenantId) return;
     const clamped = Math.min(28, Math.max(1, Math.trunc(next)));
     setSavingRunDay(true);
+    setRunDayMessage(null);
     const { error } = await repo.updateTenant(tenantId, {
       invoice_run_day: clamped,
       updated_at: new Date().toISOString(),
     });
-    if (!error) setRunDay(clamped);
+    // Re-read, whatever the update said: an RLS-filtered update returns no
+    // error and changes nothing (runDaySaveOutcome). The input must show the
+    // day billing will actually run on.
+    const { data: stored, error: readError } = await repo.fetchTenant(tenantId);
+    const outcome = runDaySaveOutcome(
+      clamped,
+      error?.message ?? null,
+      readError || !stored ? undefined : stored.invoice_run_day
+    );
+    if (outcome.day !== null) setRunDay(outcome.day);
+    setRunDayMessage(outcome.message);
     setSavingRunDay(false);
   }
 
@@ -114,6 +127,7 @@ export function useTenantBilling() {
     runDay,
     setRunDay,
     savingRunDay,
+    runDayMessage,
     paynowUen,
     setPaynowUen,
     paynowMobile,

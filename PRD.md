@@ -1476,6 +1476,10 @@ tenant at a time: it bills, gates, blocks and seals each independently. One scho
 forgotten lesson cannot hold up an unrelated coach's invoices, and one business
 finishing a month cannot close it for anyone else. The automatic switch and the run day
 are per-business settings too.
+*(implemented 2026-09-26)* **The run day on the Invoices page always shows the day billing will
+use.** It saves on leaving the field (clamped 1–28), then re-reads what the database kept: a save the
+database refuses — with an error, or silently, as a suspended business's would be — puts the stored
+day back in the field with a red line saying it was not saved.
 
 > The billing engine runs with a service key and therefore **bypasses row-level
 > security entirely**, so this isolation is enforced in engine code rather than by

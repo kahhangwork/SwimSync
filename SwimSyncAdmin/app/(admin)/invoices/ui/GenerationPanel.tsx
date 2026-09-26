@@ -20,6 +20,7 @@ export function GenerationPanel({
   runDay,
   setRunDay,
   savingRunDay,
+  runDayMessage,
   onSaveRunDay,
   paynowUen,
   setPaynowUen,
@@ -40,6 +41,7 @@ export function GenerationPanel({
   runDay: number | null;
   setRunDay: (n: number) => void;
   savingRunDay: boolean;
+  runDayMessage: string | null;
   onSaveRunDay: (n: number) => void;
   paynowUen: string | null;
   setPaynowUen: (s: string) => void;
@@ -147,6 +149,13 @@ export function GenerationPanel({
           {!autoEnabled && " — no effect while automatic generation is off"}
         </span>
       </div>
+      {/* A refused save is said out loud; the input already shows the STORED
+          day (useTenantBilling re-reads it), not the rejected one. */}
+      {runDayMessage && (
+        <p id="run-day-message" className="mt-1 text-xs font-medium text-red-600">
+          {runDayMessage}
+        </p>
+      )}
 
       {/* PayNow proxy. The invoice QR is computed from these — no QR image
           is uploaded anywhere. UEN wins when both are set (a corporate
