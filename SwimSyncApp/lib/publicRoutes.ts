@@ -11,7 +11,7 @@
 // 128-bit token in the URL is the whole access control:
 //   • /invoice — the public invoice page (a month's bill).
 //   • /package — the public package-OFFER page (a renewal to pre-pay).
-// The AUTHED equivalents live under /billing/…, which startsWith does not match.
+// The AUTHED equivalents live under /billing/…, which isPublicPage does not match.
 // /welcome is the parent-facing onboarding page.
 const PUBLIC_PAGES = ["/welcome", "/invoice", "/package"];
 
@@ -25,9 +25,13 @@ const SIGNED_OUT_SCREENS = ["/register", "/forgot-password"];
 
 const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
 
-/** A page that renders with or without a session, and keeps a signed-in user. */
+/**
+ * A page that renders with or without a session, and keeps a signed-in user.
+ * Matched on a SEGMENT boundary — the page itself or anything under it — so a
+ * future /invoices or /packages does not silently become public.
+ */
 export function isPublicPage(pathname: string): boolean {
-  return PUBLIC_PAGES.some((p) => pathname.startsWith(p));
+  return PUBLIC_PAGES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
 /** Whether a session-less load of `pathname` may stay where it is. */

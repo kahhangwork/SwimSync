@@ -1523,14 +1523,6 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### Give `isPublicPage`'s prefix match a segment boundary — **S** `[from §8.123, 2026-09-25]`
-`lib/publicRoutes.ts` matches `PUBLIC_PAGES` with a bare `startsWith`, so `/invoiceX` or `/packages` would also
-be let through the auth gate session-less, and a signed-in user on them would not be redirected.
-
-**Why:** every page it admits TODAY is token-gated, so nothing leaks now — but a future route whose name starts
-with `/welcome`, `/invoice` or `/package` would silently become public. **Notes:** match `p` or `p + "/"`, and pin
-both cases in `publicRoutes.test.ts`. The authed `/billing/…` pages are unaffected (they don't share a prefix).
-
 ### Harden `appLoginDies` in verify-tenant-suspension / verify-coach-disable — **S** `[from App L-F/G/H 2026-09-23]`
 Replace the fixed 7 s hydrate wait with a wait for the login form (as `loginExpo` does), and report a form that
 never appeared as its own "cannot say" failure, not as `parentDied !== false`.

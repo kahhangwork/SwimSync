@@ -38,6 +38,23 @@ describe("isPublicPage — what a signed-in user stays on", () => {
     expect(isPublicPage("/invoice/abc123")).toBe(true);
   });
 
+  it.each(["/welcome", "/welcome/", "/invoice", "/invoice/abc123", "/package", "/package/abc123"])(
+    "matches %s on a segment boundary",
+    (p) => {
+      expect(isPublicPage(p)).toBe(true);
+    }
+  );
+
+  // A future route whose NAME merely starts with a public one must not become
+  // public by accident (BACKLOG, from §8.123).
+  it.each(["/welcomed", "/invoices", "/invoiceX/abc", "/packages", "/package-admin"])(
+    "does not match %s by prefix",
+    (p) => {
+      expect(isPublicPage(p)).toBe(false);
+      expect(allowsNoSession(p)).toBe(false);
+    }
+  );
+
   // Like /login: a signed-in user opening Register is sent to their landing,
   // not shown a sign-up form.
   it.each(["/register", "/forgot-password", "/login"])("does not keep a signed-in user on %s", (p) => {
