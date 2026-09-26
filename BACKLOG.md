@@ -1526,25 +1526,6 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### `tenant_isolation.test.sql` #18 counts every invoice in the database — **S** `[from the driver backlog 2026-09-26]`
-"platform admin sees both tenants' invoices" expects a global count of 2, so ANY driver fixture that seeds an
-invoice, left loaded, turns `supabase test db` red (§7.272's second shape).
-
-**Why:** `supabase test db` is the gate every migration and every fixture is proven against; a red that means
-"a fixture is loaded" teaches people to ignore it. Four new fixtures (money, invoice, marking, geometry) trip it.
-
-**Notes:** scope the count to the test's own two tenant ids. Do not "fix" it by forbidding invoices in fixtures.
-
-### `run-all-drivers.sh --help` fails when called by a relative path from outside its directory — **S**
-It `cd`s into the drivers directory, then runs `awk "$0"` on a now-wrong relative path. Pre-existing; found by
-U12 while diffing `--help` output.
-
-**Why:** small, but `--help` is the documented way to learn the runner, and it fails silently for the common
-invocation from the repo root with a relative path.
-
-**Notes:** resolve `$0` to an absolute path before the `cd`. The nightly is unaffected (it calls the script by path
-without `--help`); prove it with a `--only` run after the change.
-
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the
 single deliberate exclusion in `profile_reference_columns()`; every other FK pointing at

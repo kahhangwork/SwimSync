@@ -52,14 +52,17 @@
 # rot issue.
 
 set -uo pipefail # not -e: one failing driver must not stop the sweep
-cd "$(dirname "$0")"
+# Absolute path to this script, resolved BEFORE the cd: `--help` awks "$SELF",
+# and a relative $0 is wrong once we have moved into the drivers directory.
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+cd "$(dirname "$SELF")"
 ROOT="$(git rev-parse --show-toplevel)"
 
 ONLY=""
 while (($#)); do
   case "$1" in
     --only) ONLY="${2:-}"; shift 2 ;;
-    -h|--help) awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
+    -h|--help) awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$SELF"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
