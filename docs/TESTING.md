@@ -331,9 +331,22 @@ not a lesson taught). Historically **14 files, 188 tests**, scoped to
 `authErrors`, `claimCandidates`, `invoiceFunding` (which invoice lines a package funded —
 a **reversed** draw is not funding, and garbage input yields no tags, never a crash),
 `landing`, `lessonDates`, `packageCoverage` (the
-mapper's fail-safe and `describeCoverage`'s exact Balances-line copy), `timeOfDay`. Deeper
-component-render tests (RN screens with mocked Supabase, admin tables) are the natural next
-additions.
+mapper's fail-safe and `describeCoverage`'s exact Balances-line copy), `timeOfDay`.
+
+**Component-render tests — first pass 2026-09-27, billing-critical surfaces.** The app uses
+`@testing-library/react-native` ^13.3.3, with `react-test-renderer` pinned to **exactly 18.3.1** (unpinned,
+npm picks 19.x and fails ERESOLVE against react 18.3.1). App: `features/mark-attendance/ui/*.test.tsx` —
+`BlockedLesson` (says why, offers only leaving, no status control), `StudentMarkList` (each press reports the
+right child and status/sub-type; the current mark shows; a make-up guest is never offered Trial; a holiday void
+and a read-only view cannot be marked), `SetAllMenu` (applies exactly the option pressed; the backdrop applies
+nothing), `AttendanceHeader` (no Set all when read-only), `CoachesPresent` (a tick flips only that shadow).
+Admin (vitest + RTL): `invoices/ui/GenerationPanel` (month capped at the last completed month; no double
+Generate; unknown settings shown unknown and locked; run day saved on blur; each PayNow field under its own
+column; the phone check advises, never blocks), `packages/ui/PendingPanel` + `HeldTable` (reference and
+`amount_payable` per row; oldest request first; row actions act on THAT row and only on active packages; busy
+locks; live balance; three distinct empty states; the capped notice). All props-only — no Supabase mock. Each
+file records its mutation proofs in its header (§7.25). Traps: §7.285, §7.286. **Still to do:** whole screens
+and pages with mocked dao modules (the invoice table, the attendance save flow, parent balances).
 
 Four of the app's suites exist because of bugs that reached production on 2026-07-26, and
 what each one *pins* is the point:

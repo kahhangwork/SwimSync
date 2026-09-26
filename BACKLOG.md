@@ -1627,16 +1627,19 @@ start this while migrations are still landing (NRIC and coach-defined levels are
 schema-touching backlog items ahead of it). The natural trigger is "the schema is
 frozen and we want compiler-enforced safety before a big build."
 
-### Deeper component-render tests — **M** `[handover]`
-RN screens with a mocked Supabase; admin table components.
+### Deeper component-render tests — **M** `[handover]` — _first pass DONE 2026-09-27_
+RN screens with a mocked Supabase; admin table components. **First pass shipped:** the coach mark-attendance
+UI (5 components) and the admin Invoices GenerationPanel + Packages Awaiting/Who-holds-one, props-only, each
+mutation-proven (`docs/TESTING.md` §5). **What remains:** whole screens/pages with mocked dao modules — the
+invoice table, the attendance save flow, parent balances.
 
 **Why:** frontend unit tests are still mostly `lib/**` pure functions — though the feature-tier
 refactor added hook and component tests (`components/AssessmentGrid.test.tsx` and ~80 other non-`lib`
 test files across both apps, counted 2026-09-26). Screens are otherwise covered by the Playwright drivers,
 which run nightly in CI (`ui-drivers.yml`), not by hand. Counts drift — the test runner is the fact.
 
-**Notes:** named in `docs/TESTING.md` §5 as "the natural next additions." The
-`run-ui-playwright` drivers show what's worth pinning.
+**Notes:** `docs/TESTING.md` §5 lists what the first pass pins. The `run-ui-playwright` drivers show
+what's worth pinning next.
 
 ### Shared `lessonDates.ts` package — **M**
 The file is duplicated **byte-identical** in both apps.

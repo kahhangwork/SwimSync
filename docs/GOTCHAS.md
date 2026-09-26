@@ -2328,3 +2328,15 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     in ~13 months. Pad with `LPAD(v::TEXT, GREATEST(4, length(v::TEXT)), '0')` — all three live counters
     (`next_invoice_ref`, `next_credit_note_ref`, `next_package_ref`) do, checked from `pg_get_functiondef`
     2026-09-27. Found 2026-08-02 (`20260802000800_reference_overflow.sql`, §8.26); promoted from a ledger row.
+
+285. **Under jest-expo, NativeWind `className` is NOT converted to styles** — the class string reaches the element
+    as a raw `className` prop and `style` is empty. In a component test assert on `props.className`
+    (`/\btext-white\b/`), never on `StyleSheet.flatten(style)`, which is always empty and passes a "not red" check
+    vacuously. Recorded in `SwimSyncApp/jest.config.js` too. (2026-09-27, first component-render pass.)
+    - A blur-save test on a CONTROLLED input with static props snaps back to the prop after `fireEvent.change`;
+      pass the value in the blur itself: `fireEvent.blur(el, { target: { value } })`.
+
+286. **A component test that presses nested text proves nothing about the Playwright drivers.** RNTL's
+    `fireEvent.press` on a `Text` inside a `TouchableOpacity` bubbles to the handler; on RN-web a real click on the
+    Text child does not always reach the Pressable (§7.10, §7.58 — why drivers use `pressByText`). Green here and
+    red in a driver is the platform, not a contradiction. (2026-09-27.)
