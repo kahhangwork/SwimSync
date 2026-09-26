@@ -39,7 +39,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266 |
 | A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269 |
@@ -2137,6 +2137,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     current:** `curl` `/node_modules/expo-router/entry.bundle?platform=web&dev=true&…` and grep for a string only
     the new code has (§7.31). (Coach attendance, 2026-09-22.)
     A throwaway edit that appears and disappears within seconds proves the watcher.
+    - **Refined 2026-09-26 (driver backlog, U5/U11):** grep for the CHANGED CODE, never a `// MUTATION-PROOF`
+      marker — SWC/Babel strip comments (inside an object literal too), so the marker reads absent when the edit
+      HAS arrived. And the default lazy web bundle does not contain the coach screens: fetch it with `lazy=false`.
 
 254. **A coach's full-page load of ANY coach URL ends on Schedule, with the requested screen mounted HIDDEN
     beneath it — the root of §7.252.** `routeForSession` (`app/_layout.tsx`) replaced to `landingFor(…)`:
@@ -2237,6 +2240,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 272. **A driver fixture left loaded breaks `supabase test db`.** `fixtures-packages.sql` and `makeup_bookings.test.sql`
     share student `c5000000-…01` → §7.116, on a file never touched. Tear down every fixture you loaded (its
     `-teardown.sql`) before `supabase test db`. (2026-09-25.)
+    - **A second shape (2026-09-26):** not an id collision but a GLOBAL count — `tenant_isolation.test.sql` #18
+      counts every invoice and expects 2, so ANY invoice-bearing fixture left loaded reds it (`admin-table-geometry`
+      did before this was noticed). Filed in BACKLOG to scope the count. Also note `run-all-drivers.sh --only X`
+      leaves X's fixture AND its writes loaded — the next full `check-fixture-roundtrip.sh` then reports X as a
+      leftover ("loaded but changed no rows"); run X's teardown and re-run.
 
 273. **To simulate a slow cold hydrate in a driver, never rewrite the Expo bundle, and don't delay it with
     `page.route` alone.** `domcontentloaded` absorbs it, so the helper never sees it; `setTimeout`-wrapping
@@ -2286,3 +2294,16 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     same-table id breaks `supabase test db` (§7.272). Check with
     `git grep -nE '<pp>[0-9a-f]{6}-0000' -- '*.sql' '*.mjs' '*.ts'` → 0 hits. And a teardown matches the FULL
     `'<pp>000000-%'` block, never `'<pp>%'`: random seed ids share any 2 hex chars 1 time in 256. (2026-09-26.)
+    **Join codes and slugs too** — `SWIM-PKGA` was already `lesson_packages.test.sql`'s (U5). `git grep` them.
+
+281. **A fixture must RESET every row its driver's "after" check counts — `audit_log` included — or a re-run's
+    check passes on the PREVIOUS run's row.** `verify-coach-remove-student`'s "one audit row" stayed green under a
+    mutation that wrote none, because run 1's row was still there; only the mutation proof exposed it. Loading the
+    fixture is the reset: delete the driver's own writes (by entity id, never a seed `actor_id`), and assert a
+    PRECONDITION count before every write. (Driver backlog U3, 2026-09-26.)
+
+282. **Local GoTrue allows 30 sign-ins per 5 minutes per IP (`config.toml [auth.rate_limit] sign_in_sign_ups`),
+    and the nightly's drivers share that budget.** A driver that proves "password unchanged" by signing in again
+    after every refusal walks toward a 429 that reads as a product failure. Prove it from the `auth.users`
+    `encrypted_password` hash instead, and keep sign-ins to the ones the check is about. (U9, 2026-09-26.)
+

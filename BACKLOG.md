@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-26 — **Drift sweep**: ten stale lines corrected (two shipped items still unstruck — the trial-onboarding teardown and *HANDOVER §3 graduating*; both partial-payment migrations marked undeployed though on prod; the location entity and swim-skill grading still listed as pending; the ledger over-cap count 30 → 33; the component-test rationale; the grading-admin driver's stale reload note). Same day — **NativeWind's colour-scheme throw is FIXED** (`darkMode: "class"`; both driver allowlists emptied): that item removed. Same day — **Two driver items §8.120 claimed removed were still here** (*harden `appLoginDies`* — shipped `f38db4f`; *`verify-admin-calendar` Today race* — shipped `cdf942d`): both removed now. Same day — **`isPublicPage` matches on a segment boundary** (`e55038a`): that item removed. Same day — **The deployed `public-package` CORS is CHECKED**: prod answers `Allow-Headers: content-type` whatever is requested, so the code comment and §7.264 are both right; nothing to correct, that item removed. Same day — **The step-4 item is FIXED** (a same-route replace re-mounted `/reset-password`; §7.274): that item removed. Same day — **The package page's own *I've paid* is driven** (`verify-app-money` C2): that item removed. Earlier, 2026-09-25 — **No driver hardcodes a port** (all eight — the item said three — read `ADMIN`/`EXPO` from `lib.mjs`; CI guard `check-driver-ports.sh`): that item removed. Earlier same day — **The dead `app_settings.auto_invoice_enabled` row is dropped** (`20260925000200`): that item removed. Earlier same day — **The dead `app_settings.invoice_run_day` row is dropped** (`20260925000100`): that item removed; filed **drop the dead `app_settings.auto_invoice_enabled` row**. Earlier same day — **`/register` and `/forgot-password` deep links now open signed-out** (`lib/publicRoutes.ts`): that item removed. Earlier same day — **The running-low fields now save on leaving the field** (blur/Enter, saves queued per field): that item removed. Earlier same day — **Step-4 item: first evidence recorded** (nightly `36071084202` logged the re-mount). Earlier same day — **Ten branches shipped** (§8.120): removed *the coach landing bounce*, *harden `appLoginDies`*, *`verify-admin-calendar` Today race*, *the lesson page swallows six read errors*, *Assessment grid promote/stale grade*, *package settings on Students* (Wave D) and *pgTAP #21 midnight*; filed *running-low fields save per keystroke* and *what clears `app-auth` step 4's fields*. Earlier, 2026-09-24 — **The hand-check scripts are four nightly drivers** (`3ff558a`): that item removed; filed a driver for the **package page's *I've paid*** and a **deployed `public-package` CORS check**. Earlier same day — **The cancelled-lesson spinner FIXED** (a coach tapping an admin-cancelled lesson now sees the notice): that item removed. Earlier same day — **The engine now reads the BUSINESS's run day** (`ENGINE_TENANT_RUN_DAY_PLAN.md`): that item removed; filed **drop the dead `app_settings.invoice_run_day` row**. Earlier same day — **App L-F/G/H + the app fence SHIPPED** (§8.118): the feature-tier programme is DONE in both apps, so its item is removed, with the stale struck *Smoke drivers* entry and the *four local driver reds* item (all four GREEN in the 2026-09-24 full local sweep). Filed: **promote the hand-check scripts to drivers**, **harden `appLoginDies`** (§7.262), the **admin-calendar 400 ms race**. Earlier, 2026-09-23 — **Billing months card SHIPPED** (§8.117): the "cannot see WHY a month is open" item removed; filed the **engine run-day source** (before cron) and the **midnight pgTAP flake** (§7.260). Earlier, 2026-09-22 — **Coach Schedule (the LAST full-track giant) SHIPPED** (§8.116); a **Schedule driver** item filed (role badges, location chips + clamp, DONE tap), and the local-reds item updated (`smoke-app` / `trial-onboarding` GREEN locally). Earlier same day — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
+_Last updated: 2026-09-26 (evening) — **The Foundations driver backlog SHIPPED** (11 drivers + `simulate-date.sh`, `docs/plans/DRIVER_BACKLOG_PLAN.md`): all twelve items removed; filed two product gaps the drivers found (*a family with no child reads as "Unknown"*, *a refused run-day save is silent*) and three small Foundations items. Same day — **Drift sweep**: ten stale lines corrected (two shipped items still unstruck — the trial-onboarding teardown and *HANDOVER §3 graduating*; both partial-payment migrations marked undeployed though on prod; the location entity and swim-skill grading still listed as pending; the ledger over-cap count 30 → 33; the component-test rationale; the grading-admin driver's stale reload note). Same day — **NativeWind's colour-scheme throw is FIXED** (`darkMode: "class"`; both driver allowlists emptied): that item removed. Same day — **Two driver items §8.120 claimed removed were still here** (*harden `appLoginDies`* — shipped `f38db4f`; *`verify-admin-calendar` Today race* — shipped `cdf942d`): both removed now. Same day — **`isPublicPage` matches on a segment boundary** (`e55038a`): that item removed. Same day — **The deployed `public-package` CORS is CHECKED**: prod answers `Allow-Headers: content-type` whatever is requested, so the code comment and §7.264 are both right; nothing to correct, that item removed. Same day — **The step-4 item is FIXED** (a same-route replace re-mounted `/reset-password`; §7.274): that item removed. Same day — **The package page's own *I've paid* is driven** (`verify-app-money` C2): that item removed. Earlier, 2026-09-25 — **No driver hardcodes a port** (all eight — the item said three — read `ADMIN`/`EXPO` from `lib.mjs`; CI guard `check-driver-ports.sh`): that item removed. Earlier same day — **The dead `app_settings.auto_invoice_enabled` row is dropped** (`20260925000200`): that item removed. Earlier same day — **The dead `app_settings.invoice_run_day` row is dropped** (`20260925000100`): that item removed; filed **drop the dead `app_settings.auto_invoice_enabled` row**. Earlier same day — **`/register` and `/forgot-password` deep links now open signed-out** (`lib/publicRoutes.ts`): that item removed. Earlier same day — **The running-low fields now save on leaving the field** (blur/Enter, saves queued per field): that item removed. Earlier same day — **Step-4 item: first evidence recorded** (nightly `36071084202` logged the re-mount). Earlier same day — **Ten branches shipped** (§8.120): removed *the coach landing bounce*, *harden `appLoginDies`*, *`verify-admin-calendar` Today race*, *the lesson page swallows six read errors*, *Assessment grid promote/stale grade*, *package settings on Students* (Wave D) and *pgTAP #21 midnight*; filed *running-low fields save per keystroke* and *what clears `app-auth` step 4's fields*. Earlier, 2026-09-24 — **The hand-check scripts are four nightly drivers** (`3ff558a`): that item removed; filed a driver for the **package page's *I've paid*** and a **deployed `public-package` CORS check**. Earlier same day — **The cancelled-lesson spinner FIXED** (a coach tapping an admin-cancelled lesson now sees the notice): that item removed. Earlier same day — **The engine now reads the BUSINESS's run day** (`ENGINE_TENANT_RUN_DAY_PLAN.md`): that item removed; filed **drop the dead `app_settings.invoice_run_day` row**. Earlier same day — **App L-F/G/H + the app fence SHIPPED** (§8.118): the feature-tier programme is DONE in both apps, so its item is removed, with the stale struck *Smoke drivers* entry and the *four local driver reds* item (all four GREEN in the 2026-09-24 full local sweep). Filed: **promote the hand-check scripts to drivers**, **harden `appLoginDies`** (§7.262), the **admin-calendar 400 ms race**. Earlier, 2026-09-23 — **Billing months card SHIPPED** (§8.117): the "cannot see WHY a month is open" item removed; filed the **engine run-day source** (before cron) and the **midnight pgTAP flake** (§7.260). Earlier, 2026-09-22 — **Coach Schedule (the LAST full-track giant) SHIPPED** (§8.116); a **Schedule driver** item filed (role badges, location chips + clamp, DONE tap), and the local-reds item updated (`smoke-app` / `trial-onboarding` GREEN locally). Earlier same day — **Coach attendance (the second APP full-track unit) SHIPPED** (§8.115); three items filed: the **cancelled-lesson spinner** (a live bug), the **coach landing bounce**, and a **coach marking-screen driver**. Earlier, 2026-09-21 — **Coach roster (the first APP full-track unit) SHIPPED** (§8.114), a `verify-coach-remove-student` driver filed. Earlier same day — **Admin L-E + the admin FENCE commit SHIPPED** (§8.113), a `reset-password` recovery driver and the four local-only driver reds filed. Earlier, 2026-09-18 — **Lesson detail (full track) SHIPPED** (§8.112 — the last admin giant), a `verify-lesson-detail-guests` driver and a swallowed-load-errors item filed. Earlier same day — **Admin L-D grading batch SHIPPED** (§8.111; the dao-split → ARCHITECTURE §6 graduation DONE), a `verify-grading-admin` driver and an Assessment-grid feedback item filed. Earlier same day — **`platform` (full track) SHIPPED** (4th full-track giant, §8.110; 4 giants remain), a `verify-platform-controls` driver filed. Earlier, 2026-09-17 — **Admin L-C money batch SHIPPED** (§8.109), a `verify-money-admin` driver filed. Earlier, 2026-09-16 — **`invoices` (full track) SHIPPED** (3rd full-track giant, §8.106; 5 giants remain:
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -1415,6 +1415,30 @@ table (the additive path the shipped design deliberately left open —
 `docs/ARCHITECTURE.md` §6). Don't add enum roles for this (same reasoning as the owner
 column: permanent, string-audited everywhere, can't express one-owner-per-tenant).
 
+### A family with no child at the business reads as "Unknown" to the admin — **S** `[from verify-packages-admin 2026-09-26]`
+The admin can read a parent's name only through a child they have at the business (`tenant_serves_parent`). A
+family that joined (join code) and requested a package before any child was added shows as **"Unknown"** on the
+Packages *Awaiting* panel, and has no name in *Record a sale*'s Parent select.
+
+**Why:** the admin is asked to confirm a payment from someone they cannot identify — the one moment the name
+matters most. Production is one tenant with every family already holding a child, so it has not bitten yet.
+
+**Notes:** decide first whether a `parent_tenants` membership alone should grant name visibility (the parent chose
+to join this business, so a relationship exists) — that is an RLS change on `profiles`/`parents`, needs a policy +
+GRANT migration (§7.87) and a pgTAP case. `verify-packages-admin`'s fixture gives every parent a child to work
+around it; drop that workaround when this ships and let the driver assert the name.
+
+### A refused run-day save is silent on the Invoices page — **S** `[from verify-invoice-admin 2026-09-26]`
+`handleSaveRunDay` (`invoices/domain/useTenantBilling.ts`) ignores the update's error, so a save the database
+refuses leaves the input showing the rejected value while the DB keeps the old one.
+
+**Why:** the admin believes the run day changed, and billing then runs on a different day than the screen says.
+Masked today only by the client's 1–28 clamp; any future DB-side refusal (a CHECK, RLS, a suspended tenant)
+would surface as this silent mismatch.
+
+**Notes:** show the error and re-read the stored value, like the PayNow save beside it does. `verify-invoice-admin`
+can then add a forced-refusal check (`page.route` the PATCH, rule 9 of `docs/plans/DRIVER_BACKLOG_PLAN.md`).
+
 ### ~~The family-status search scans every membership client-side~~ — **S** — **DONE 2026-08-28**
 `handleFamilySearch` now pushes the term into the query — a sanitised `.or()` matching name OR email over
 `!inner` embeds — so it reaches every membership in the DB instead of the silently-capped first 1000
@@ -1526,204 +1550,35 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### ~~A `verify-packages-admin` driver for the ten uncovered Packages actions~~ — **S** — **DONE 2026-09-26** `[from the packages refactor 2026-09-16]`
-_Shipped as `verify-packages-admin.mjs` (47 checks, own tenant, 2 mutation proofs; the fixture carries a real superseded offer) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U5._
-`verify-packages` + `verify-package-renewal` + `verify-referrals` exercise render, the live-balance cell,
-Payment received, offer generation and the referrer reward — but **ten admin actions have no driver**:
-Record a sale, Decline, Cancel, Extend, Retire/Reoffer, Add package, Add category, category Default/Max,
-held search, Show superseded.
+### Seven app comments still say "no driver" covers what now has one — **S** `[from the driver backlog 2026-09-26]`
+`SwimSyncApp/features/roster/domain/useRemoveStudent.ts:7`, and in `SwimSyncAdmin/app/(admin)/platform/`:
+`ui/StrandedPanel.tsx`, `ui/OwnerModal.tsx`, `domain/useOwnerTransfer.ts`, `ui/CreditWarningModal.tsx`,
+`ui/FamilyStatusSection.tsx`, `domain/useFamilyStatus.ts` — each says "NO DRIVER OPENS/PRESSES THIS".
 
-**Why:** the packages page was just decomposed with zero behaviour change, and those ten actions were the
-only ones riding on hand checks (screenshots, Stages 4–11 of `PACKAGES_REFACTOR_PLAN.md`). A driver makes
-the guarantee repeatable so the next change to a slice hook is caught by CI, not by remembering to click.
+**Why:** a comment that says nothing guards the code invites the next reader to add a redundant test or, worse,
+to trust a hand-check that no longer exists. `verify-coach-remove-student` and `verify-platform-controls` now cover them.
 
-**Notes:** the hand-checks are already written as one-off Playwright scripts against `coach@swimsync.test`
-(the seed tenant admin — NOT the default `superadmin`, who has no tenant and sees "administers none"); lift
-them into a driver + `fixtures-packages-admin.sql`. The fixture needs a superseded offer to cover the
-Show-superseded toggle (the current `fixtures-packages.sql` seeds none). Companion to the L-A driver-gap
-note (`verify-packages` §7.238 family).
+**Notes:** comment-only, but it is an APP edit — every push to `main` rebuilds both prod apps (§7.276). Fold it into
+the next real change to either app rather than shipping a deploy for comments.
 
-### ~~A `verify-invoice-admin` driver for the uncovered Invoices settings actions~~ — **S** — **DONE 2026-09-26** `[from the invoices refactor 2026-09-16]`
-_Shipped as `verify-invoice-admin.mjs` (31 checks, own tenant, 2 mutation proofs; the CSV cap is reached by `page.route` repeating the real rows to 1000 — no seeded rows) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U6._
-The invoices refactor (§8.106) has a strong net — `verify-invoice-controls` (picker/toggle/platform refusal),
-`orphan-report`, `trial-onboarding`, `unmarked-lessons`, `payment-collection` — but **four admin actions on the
-page have no dedicated driver**: PayNow UEN/mobile save + its advisory, run-day save, the CSV-export cap banner,
-and the pending-debits **Write off** (the last is dormant on prod — 0 credit notes).
+### `tenant_isolation.test.sql` #18 counts every invoice in the database — **S** `[from the driver backlog 2026-09-26]`
+"platform admin sees both tenants' invoices" expects a global count of 2, so ANY driver fixture that seeds an
+invoice, left loaded, turns `supabase test db` red (§7.272's second shape).
 
-**Why:** those four were the only actions on the decomposed page riding on unit tests + `smoke-admin` (which only
-asserts the page renders). A driver makes each guarantee repeatable so the next change to `useTenantBilling` /
-`useInvoiceList` / `usePendingDebits` is caught by CI, not by remembering to click.
+**Why:** `supabase test db` is the gate every migration and every fixture is proven against; a red that means
+"a fixture is loaded" teaches people to ignore it. Four new fixtures (money, invoice, marking, geometry) trip it.
 
-**Notes:** same shape as `verify-packages-admin` above — lift one-off scripts against `coach@swimsync.test` into
-a driver. Write-off needs a fixture with a `parent_tenant_balances.debit_balance > 0` row (none seeded today);
-CSV export can't be asserted headlessly past the download, so assert the cap-banner path instead.
+**Notes:** scope the count to the test's own two tenant ids. Do not "fix" it by forbidding invoices in fixtures.
 
-### ~~A `verify-class-admin` driver for the uncovered shadow-coach actions~~ — **S** — **DONE 2026-09-26** `[from the classes refactor 2026-09-17]`
-_Shipped as `verify-class-admin.mjs` (18 checks, own tenant, 2 mutation proofs; the failed load is a `page.route`d 500 on the drawer's GET — no table rename, no RLS denial) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U7._
-The classes refactor (§8.108) has a strong net — `class-deactivation`, `class-edit`, `class-terms`,
-`class-students`, `cancel-lesson`, `locations`, plus `coach-roster` (shadow **ASSIGN**) and `attendance-guard`
-(extra lesson) — but **three shadow-coach actions in the roster drawer have no driver**: **End** an ongoing
-shadow (the money-critical half — END-never-DELETE), the **rate-less-coach warning** (the `coach-roster` fixture
-gives the shadow a rate, so the branch never fires), and the **failed-shadow-load** error branch. All dormant on
-prod (0 `class_shadow_coaches`).
+### `run-all-drivers.sh --help` fails when called by a relative path from outside its directory — **S**
+It `cd`s into the drivers directory, then runs `awk "$0"` on a now-wrong relative path. Pre-existing; found by
+U12 while diffing `--help` output.
 
-**Why:** those three ride on unit tests (`shadowRateWarning`'s 4 cases) + the source grep gate (one `.from`, zero
-`.delete`/`.update` on `class_shadow_coaches`). A driver makes each repeatable so the next change to
-`useClassDrawer` is caught by CI, not by remembering to click. Same shape as `verify-invoice-admin` /
-`verify-packages-admin`.
+**Why:** small, but `--help` is the documented way to learn the runner, and it fails silently for the common
+invocation from the repo root with a relative path.
 
-**Notes:** End needs a fixture with an ongoing `class_shadow_coaches` row + a rate; the warning needs a coach with
-**no** shadow rate; the failed-load needs the read to error (rename the table in a throwaway, or an RLS denial).
-Assert the DB row COUNT is unchanged across an End (only `effective_to` is set) — a DELETE would claw back paid wages.
-
-### ~~A `verify-money-admin` driver for the uncovered Credit Notes / Referrals / Wages actions~~ — **S** — **DONE 2026-09-26** `[from the Admin L-C refactor 2026-09-17]`
-_Shipped as `verify-money-admin.mjs` (44 checks, own tenant, 2 mutation proofs; Resend is never pressed — the run fails on any `credit-note-emails` call) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U4._
-The L-C lite batch (§8.109) decomposed `wages`, `credit-notes`, `referrals`, `accounting`. Its driver net —
-`coach-wages` (rate · Calculate · Mark paid), `referrals` (page render + minted code), `platform-admin-scope`,
-`smoke-admin` — **presses none of these**: credit-notes **Void** (confirm / empty-reason refusal / cancel), scoped
-**search** + status filter, **Export CSV**; referrals **Save settings**, **Disable/Enable** a code, **Grant**, **Void**
-(a `window.prompt`); wages **rain toggle**, **pay-day clamp**, the **Shadow-role re-prefill**, and the payout
-**breakdown** expand. All passed a one-off hand-check (26/26, `docs/refactor/BATCH_C_PLAN.md` L4).
-
-**Why:** those actions ride on characterisation tests + a one-time script. Void on a credit note reopens a drawn
-invoice server-side and the wages re-prefill is what stops a trainee being saved at a teaching rate — the next change
-to `useVoidNote` / `useRateEditor` should be caught by CI, not by remembering to click. Same shape as
-`verify-invoice-admin` / `verify-class-admin`.
-
-**Notes:** run as `coach@swimsync.test`. `fixtures-admin-table-geometry.sql` already seeds a not-emailed credit note
-(`CN-YYYY-9801`) and a parent membership; wages needs one attended lesson in a past month (copy `coach-wages`'
-insert). Call `page.removeAllListeners("dialog")` before answering the referrals Void prompt (`launch()` registers
-its own handler), and select the payout toggle by name — `button[aria-expanded]` hits the sidebar first. **Do not
-press Resend** unless the driver stubs the email function.
-
-### ~~A `verify-platform-controls` driver for the five uncovered Platform surfaces~~ — **S** — **DONE 2026-09-26** `[from the platform refactor 2026-09-18]`
-_Shipped as `verify-platform-controls.mjs` (37 checks, two own tenants, 3 mutation proofs; the stale-response guard is held by a promise gate, not a delay; `checkFailed` is a `page.route`d 500 on the parent-link read AND the balance read — no dao rename) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U8._
-The platform full-track refactor (§8.110) decomposed `platform/page.tsx`. Its driver net — `platform-admin`,
-`platform-admin-scope`, `tenant-provisioning`, `tenant-suspension`, `smoke-admin` (129/129) — **opens none of
-these five**: the **stranded-parents panel** ("Signed up but not in any business"), the **`N unpaid`**
-`staff_without_rate` chip, the **Change owner / Set owner** modal *and its stale-response guard*, the **"Credit
-stays with the old business"** advisory (both exits **and** the `checkFailed` branch), and the whole **Family
-status** search. All were hand-checked during the refactor — 23 assertions with screenshots, stage by stage.
-
-**Why:** each is dormant on production for a DATA reason, not a bug (§3), so its first real firing is still ahead
-of us and there is nothing between a regression and that firing. Two carry real consequences: the owner-transfer
-ref guard is what stops business A's admin list landing in business B's modal, and the credit advisory is the only
-warning before credit is stranded unspendable at the old business (PRD §5.6). Same shape as `verify-money-admin`
-and `verify-class-admin`.
-
-**Notes:** the seeds are the hard part and they are all in the stage commits' hand-check scripts (`406bb3f`,
-`4607bc4`, `4135d91`). Shapes needed: a parent with **zero** `parent_tenants` rows; a rate-less **staff** coach
-(not the owner — the owner is excluded in SQL by design, §7.131); **two** businesses with **distinct** co-admins
-(the guard is unobservable if they share one); a family holding `credit_balance > 0` at the child's current
-business; and a parent at **two** businesses with one child at each (the only shape that exposes the
-tenant-narrowing). `tenants` needs a `slug` — the insert fails without it. To exercise `checkFailed`, rename
-`parent_tenant_balances` in `dao/platform.repo.ts` for one local run. **Beware §7.244/§7.246**: keep exactly one
-`<select>` on the page, use `.first()`/`.last()` for the two "Search" buttons, and scope row locators by a second
-`hasText` — tenant names appear in two tables.
-
-### ~~A `verify-grading-admin` driver for the uncovered Levels / Trials / Make-ups / Assessment actions~~ — **S** — **DONE 2026-09-26** `[from the Admin L-D refactor 2026-09-18]`
-_Shipped as `verify-grading-admin.mjs` (27 checks, own tenant, 2 mutation proofs) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U1._
-The Admin L-D batch (§8.111) decomposed the four grading pages and injected the `AssessmentGrid`'s writes. Its
-nine-driver net (210/210) **presses none of these**: trial **Convert** (the §7.180 two-press guard) and **Cancel**;
-a make-up for a **multi-class** child (the "Which class is this making up?" select that sets `p_home_class_id`),
-**Change**, and **Cancel**; the **grade-scale editor** (add / rename / remove, and the refusal on a held grade);
-skill **Move down** and **remove**; level **Edit**; **promote** ("Move up" is only asserted to *appear*); and any
-grade **write from the Students grading modal**. All were hand-checked once — 35/35, DB-verified (plan L4).
-
-**Why:** Convert and the multi-class make-up are billing-adjacent — the first can stack a permanent enrolment on a
-live unmarked trial and stall a billing month; the second's home class prices the invoice line. A regression in
-either is silent until an invoice run. Same shape as `verify-money-admin` / `verify-platform-controls`.
-
-**Notes:** the seeds are `fixtures-assessment.sql` + `fixtures-makeups.sql` plus ONE extra enrolment (Makeupvis Kid
-→ Saturday Beginners) to make a multi-class child. Convert needs a past trial AND a future one for the same child —
-book both through the form (new child, then "a child already in SwimSync"). **Promote no longer needs a
-reload** when the painted grade equals the held one — `6abe8c2` (§8.120) made a re-confirmed grade read fresh, so
-assert Move up appears WITHOUT a reload; that is now part of what this driver pins.
-Unit coverage already exists for the grid's writes (`components/AssessmentGrid.test.tsx`).
-
-### ~~A `verify-lesson-detail-guests` driver for the lesson page's uncovered actions~~ — **S** — **DONE 2026-09-26** `[from the lesson-detail refactor 2026-09-18]`
-_Shipped as `verify-lesson-detail-guests.mjs` (29 checks, own tenant, 2 mutation proofs; the assign error is forced with `page.route`, not a refusable shape) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U2._
-The four-driver net for `/lessons/[classId]/[date]` (129/129, §8.112) presses none of these: **book a TRIAL** into a
-lesson and **Cancel booking** on a guest row; **Set all**; the **Rain/Coach** and **Paid/Free** sub-toggles; a
-make-up for a child with **two same-category homes** (the "Which class does this make-up replace?" select and its
-refusal); the **`full-notice`** inside the Book modal (the driver's FULL check reads the RPC's refusal via
-`bookError`, not the notice); the invalid-date / unknown-class states; **Keep the lesson**; and the
-**assign-substitute ERROR** branch — which has no render proof anywhere, by driver or by hand. All but the last were
-hand-checked once, 20/20, DB-verified (`docs/refactor/LESSON_DETAIL_REFACTOR_PLAN.md` §11a).
-
-**Why:** the lesson page is the admin's only attendance-writing surface. Cancel booking and the multi-home make-up are
-billing-adjacent (a guest's home class prices the line); Set all writes every editable row at once. A regression in
-any of them is silent until an invoice run.
-
-**Notes:** seeds = `fixtures-admin-calendar.sql` plus ONE trial-eligible child and ONE extra home for Calkid Delta
-(Saturday Beginners). The trial child must be **visible to the admin under RLS** — give it an INACTIVE enrolment in
-Rose (an enrolment-less child reads "(0)" in the picker). To make assign FAIL, pick a shape the RPC refuses (a
-cancelled lesson, or a coach the class rate already pays via SQL) — the picker hides the latter on purpose.
-
-### ~~A driver for the `reset-password` recovery path~~ — **S** — **DONE 2026-09-26** `[from the Admin L-E fence commit 2026-09-21]`
-_Shipped as `verify-admin-reset-password.mjs` (18 checks, own tenant + admin, per-run password asserted refused first, 2 mutation proofs; `batch-e-handchecks.mjs` check 7 deleted, checks 1–6 kept) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U9._
-`/reset-password` (admin) is opened by **one** driver, `verify-smoke-admin`, and only on its INVALID branch:
-logged out, no token, "checking…" → "invalid" after 3s. The whole valid path — a real recovery link parsed from
-the URL hash, `onAuthStateChange` settling the session, setting a password, and signing in with it — is exercised
-by nothing. It was hand-checked at Admin L-E's L4 (`docs/refactor/batch-e-handchecks.mjs` check 7, 3/3) and that
-script is the driver's skeleton: `auth.admin.generateLink({ type: "recovery" })`, open it, set the password, then
-prove `signInWithPassword` succeeds and restore the seed password.
-
-**Why:** it is the only way a locked-out admin gets back in, and it is a one-shot token flow — the failure is
-silent ("this link has expired" on a good link), and the admin cannot retry their way out of it. `accept-invite`'s
-equivalent path IS covered, by `verify-tenant-provisioning`, which is why that one needs no item.
-
-**Notes:** restore `password123` afterwards or every other driver's `loginAdmin` fails — the hand-check script does
-this and asserts it worked. Do NOT model it on `verify-smoke-app`'s `/reset-password`: that is the **Expo app's**
-screen, built from `${EXPO}`, a different page entirely. The three cleanup/settle traps are §7.251.
-
-### ~~A driver for the coach roster's Remove~~ — **S** — **DONE 2026-09-26** `[from the coach roster refactor 2026-09-21]`
-_Shipped as `verify-coach-remove-student.mjs` (20 checks, own tenant + plain coach, 2 mutation proofs; the hand-check script it promoted is deleted) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U3._
-The coach's **Remove** on `(coach)/classes/[id]/roster` — `confirmAction` → `close_student_enrolment` → toast →
-reload — is pressed by **no** driver; `verify-student-identity` only reads the button's label. Nor does any
-driver press the level curriculum's **Hide** (`verify-level-skills` only expands it). Both were hand-checked at
-the roster refactor (`docs/refactor/coach-roster-handchecks.mjs` + `.sql`, 12/12, DB-verified).
-
-**Why:** Remove closes a real enrolment, and it is the coach's only way to stop a child who has left from
-blocking the month's invoicing. A regression would either fail silently (the confirm on RN-web is
-`window.confirm`, easy to break) or close the wrong class — a child in two classes must lose only THIS one.
-
-**Notes:** the hand-check script is the driver's skeleton, including the cancel path (dismiss → nothing
-changes) and the DB read (this class closed, the other class untouched, `students.is_active` still true).
-Reach the roster by TAB taps, or click by DOM, and `waitFor` the 3000 ms toast — §7.252 is both traps.
-
-### ~~A driver for the coach marking screen's credit-note email and read-only title~~ — **S** — **DONE 2026-09-26** `[from the coach attendance refactor 2026-09-22]`
-_Shipped as `verify-coach-marking.mjs` (31 checks, own tenant + plain coach + own shadow coach, 2 mutation proofs; the hand-check script it promoted is deleted) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U10._
-Two things on `(coach)/classes/[id]/attendance` no driver asserts: **the credit-note email path** — flipping an
-INVOICED lesson Present → Absent must issue one credit note and exactly ONE `credit-note-emails` request, and a
-no-change re-save must issue none (the `mayHaveIssuedCreditNote` guard) — and **the read-only title** *Lesson
-Attendance* a class shadow sees (`verify-coach-roster` checks the notice and `· shadowing`, not the title).
-
-**Why:** the email is how a parent learns they were credited; the guard is what keeps every normal save off an
-edge-function cold start. A regression in either is invisible — the save still says "Attendance saved."
-
-**Notes:** the (now deleted) coach-attendance hand-check script was the skeleton (11 checks incl. a first save
-creating exactly one session row), proven able to fail. It deep-links, so every press is a DOM click on the
-hidden screen (§7.254) — fine for DB assertions; for the title, one `check()` inside `verify-coach-roster`'s
-shadow leg is cheaper than a new driver.
-
-### ~~A driver for the coach Schedule's role badges, location chips and DONE tap~~ — **S** — **DONE 2026-09-26** `[from the coach schedule refactor 2026-09-22]`
-_Shipped as `verify-coach-schedule-roles.mjs` (28 checks, own tenant + owner / substitute / shadow coaches, 2 mutation proofs; the hand-check script it promoted is deleted) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U11._
-Three things on `(coach)/schedule/index` no driver asserts: **the role UI** — `Covering` / `Shadowing` / `Covered`
-badges and the `View lesson` vs `Mark Attendance` button on TODAY's cards (`verify-coach-roster`'s `Covering` is the
-ADMIN lesson page); **the location chips** — render, filter, and the clamp back to *All locations*; and **a tap on a
-DONE row** landing on `…/attendance?date=…&from=schedule` (`verify-schedule-week` pins only COMING UP → roster).
-
-**Why:** the badges and button are how a substitute, a shadow and an owner tell whose lesson it is to mark — a
-wrong button either nags a coach the DB will refuse, or hides the Mark button from the coach who owes the marks
-(§8i). The chips are the only control that can empty the week, and nothing proves they cannot strand it.
-
-**Notes:** the (now deleted) coach-schedule hand-check script (on top of `fixtures-coach-roster.sql`) was the
-skeleton — 9 checks, 9/9 before and after the refactor. **The clamp is reachable only when a location's classes
-vanish between loads** (weekly recurrence means week navigation never empties a location); the skeleton
-deactivates them (`is_active=false` needs `deactivated_at`, a CHECK) and refocuses. Target a DONE card by
-`div.text-sm.font-bold` and a day by its EXACT label — a day-shaped regex hits NEEDS MARKING rows, and
-`getByText(title).last()` hit a TODAY title on a screen mounted underneath (§7.254).
+**Notes:** resolve `$0` to an absolute path before the `cd`. The nightly is unaffected (it calls the script by path
+without `--help`); prove it with a `--only` run after the change.
 
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the
@@ -1814,31 +1669,6 @@ nothing else will notice it.
 alignment and text assertion still passes, so width is a human-judgement signal, not a
 pass/fail one. Do not "fix" this by adding a width assertion to the driver; fix the two
 pages' column classes. The threshold in the driver is 80px and is arbitrary.
-
-### ~~Simulate a FUTURE date against the driver suite~~ — **S** — **DONE 2026-09-26** `[from the 2026-08-30 sweep]`
-_Shipped as `drivers/simulate-date.sh <YYYY-MM-DD> --only a,b` (per driver: `AFTER_RESET_SQL=<pin> run-all-drivers.sh --only`, so `fixture_for()` is reused; refuses a clamped floor (§7.277), restores the function in an EXIT trap (§7.278); both limits below still hold) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U12._
-A committed script that pins `session_window_start()` to a chosen month's floor, runs the
-drivers against it, and reports which reddened — so a window-fragile fixture is found before
-the 1st, not after.
-
-**Why:** two drivers were two days from breaking and nothing would have told us. A fixture
-pinned to dates that fall out of the marking window fails **silently** — an empty
-needs-marking backlog is a valid screen, not an error — so the suite goes red on a date
-nobody changed anything on, and the triage starts by looking for a code change that does not
-exist. The throwaway version found and proved both breaks in about fifteen minutes (§7.226).
-
-**Notes:** the mechanism is four lines — `CREATE OR REPLACE FUNCTION session_window_start()
-RETURNS date … SELECT DATE '<floor>'`, applied AFTER `supabase db reset` (which wipes it, so
-it is self-cleaning). Take a **calendar date** and derive the floor from it, not a floor;
-reuse `run-all-drivers.sh`'s `fixture_for()` rather than passing fixtures by hand — doing that
-from memory is what produced a false failure during the original run. **Two real limits, and
-they are why this was deferred rather than built.** (1) It only moves the SERVER floor, not
-`now()` and not the browser clock, so it is blind to the other date-rot shape — it would NOT
-have caught §7.225's hardcoded month. (2) It cannot validate a fixture whose dates are
-*correctly* derived: overriding the floor without moving `now()` makes fixture and floor
-disagree by construction, which is exactly what happened once `fixtures-unmarked-lessons.sql`
-was fixed. A true time machine needs `libfaketime` on the Postgres container plus the
-Playwright clock moved together — much bigger, and not obviously worth it.
 
 ### Generate real Supabase `Database` types — **M** — _low priority, do last_
 Give the supabase-js client a generated `Database` type (`supabase gen types typescript`

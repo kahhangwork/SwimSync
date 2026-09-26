@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-26 — **Three small units shipped behind a GREEN nightly (§8.127):** `isPublicPage` matches on a
-segment boundary, NativeWind's per-load throw fixed (`darkMode: "class"`, §7.275), and two already-shipped driver items
-cleared from BACKLOG. **Tonight's nightly is the first on `e55038a`/`7f969cb`.**_
+_Last updated: 2026-09-26 (evening) — **The whole Foundations driver backlog SHIPPED (§8.128):** 11 new nightly drivers
+(330 checks, each mutation-proven) + `simulate-date.sh`, driver-only, no app code. **Tonight's nightly is the first to
+carry them (~+25–30 min)** — and still the first on §8.127's two app commits. Plan: `docs/plans/DRIVER_BACKLOG_PLAN.md`._
 
-_Previously (§8.126, 2026-09-26) — the deployed `public-package` CORS checked; §7.264 holds._
+_Previously (§8.127, 2026-09-26) — segment-bounded public pages; NativeWind's per-load throw fixed (§7.275)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.280** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.282** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -347,6 +347,19 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.128 (2026-09-26) — The Foundations driver backlog: 11 drivers + `simulate-date.sh`
+
+**Twelve units, one branch each → `main`, all driver-only** (no app code; R1 gate `git diff --name-only` per unit).
+Planned by `/plan-with-confidence`, hardened by `/plan-review`: `docs/plans/DRIVER_BACKLOG_PLAN.md` (all ☑).
+Drivers + checks: TESTING §5 "Foundations driver backlog" table. U1 by hand; U2–U12 by sequential subagents, each
+reviewed and shipped from root. Same session: a BACKLOG drift sweep (`3c0b39c`), gotchas §7.276–§7.282.
+
+- **Proof bar:** every driver red under 1–3 app mutations (recorded in its header), then 2× green via `--only`; full
+  roundtrip + pgTAP each time. Push CI green through `7f007a0`.
+- **Found, not fixed (→ BACKLOG):** childless family reads "Unknown"; refused run-day save is silent; pgTAP #18
+  global invoice count; 7 stale "no driver" app comments; `--help` path bug.
+- **Not done:** the new drivers have never run in the CI nightly; `simulate-date.sh` found no literal-date fixture at risk.
+
 ## 8.127 (2026-09-26) — Segment-bounded public pages; NativeWind's throw fixed; stale BACKLOG cleared
 
 **Three units, each its own branch → `main`, after the nightly `36200015882` on `64f838e` went GREEN (§7.1 gate cleared).**
@@ -358,15 +371,7 @@ Deploy record: DEPLOYMENT §11 #54.
   listed; `/update-docs` Step 3(b) now says to grep the heading after deleting.
 - **Not done:** the NativeWind fix was not run on a native build (reasoned safe: no `dark:` class exists, pinned).
 
-## 8.126 (2026-09-26) — The deployed CORS probe: §7.264 holds
-
-**The §9 CORS item, read-only, docs-only** (`eb95259`). Prod `public-package` and `public-invoice` answer
-`Allow-Headers: content-type` whatever is requested; the local gateway echoes every header. Recorded on §7.264; the
-BACKLOG item removed.
-
-- **Not done:** no code merged — the §7.1 gate still waits on tonight's nightly.
-
-_(§8.125 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.126 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -410,7 +415,8 @@ for one marked inactive.
 > full day after the sweep had gone red beneath it.
 
 **State on 2026-09-26: last nightly `36200015882` GREEN on `64f838e`** — it cleared §8.123–§8.125 (§7.1 gate). Tonight's
-is the first on §8.127's two app commits: a new `pageerror` in `smoke-app` or `cancel-lesson` points at `7f969cb` first
+is the first to carry §8.128's **11 new drivers** (a red on one of them is most likely the driver: triage it per TESTING §5
+before blaming the product) and the first on §8.127's two app commits: a new `pageerror` in `smoke-app` or `cancel-lesson` points at `7f969cb` first
 (their `IGNORED_ERRORS` are now EMPTY, §7.275); a login/redirect red on a public page points at `e55038a`.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
@@ -421,8 +427,10 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-- **The uncovered-actions driver items** (BACKLOG → *Foundations*, all S, drivers only — no deploy, no gate): the first
-  is `verify-packages-admin` (ten Packages actions). Or the `BACKLOG.md` Build order.
+- **Read tonight's nightly first** (never dispatch it). Then the two product gaps §8.128's drivers found (BACKLOG →
+  *Admin and operations*, both S, both APP changes so both behind the §7.1 gate): *a family with no child reads as
+  "Unknown"* (needs an RLS decision first) and *a refused run-day save is silent*. Fold the *stale "no driver"
+  comments* item into whichever app change goes first.
 - **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`) — two were
   still listed a day after shipping (§8.127).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
@@ -430,7 +438,7 @@ which mutate shared seed state — are in the same section.
   `supabase test db` (§7.272).
 
 **GATE (§7.1): read tonight's nightly before the next APP unit merges** — it is the first driver-level run on
-`e55038a` and `7f969cb`. Driver-only units need no gate.
+`e55038a` and `7f969cb`, and on the 11 new drivers. Driver-only units need no gate.
 
 **No migration is HELD or in flight.** Latest applied is `20260925000200` (drop the dead `auto_invoice_enabled` row,
 §8.124), on prod, 0 pending (160/160 on 2026-09-25), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list
