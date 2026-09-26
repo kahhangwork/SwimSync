@@ -178,7 +178,12 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"20000000-0000-0000-0000-0000000000f1"
 SELECT is((SELECT COUNT(*) FROM tenants WHERE id IN
             ('11111111-0000-0000-0000-000000000001','11111111-0000-0000-0000-000000000002'))::int,
           2, 'platform admin sees both tenants');
-SELECT is((SELECT COUNT(*) FROM invoices)::int, 2, 'platform admin sees both tenants'' invoices');
+-- Scoped to this file's two tenants: the platform admin sees EVERY invoice in
+-- the database, so a global count went red whenever a driver fixture with
+-- invoices was left loaded (§7.272) — a red that meant nothing about RLS.
+SELECT is((SELECT COUNT(*) FROM invoices WHERE tenant_id IN
+            ('11111111-0000-0000-0000-000000000001','11111111-0000-0000-0000-000000000002'))::int,
+          2, 'platform admin sees both tenants'' invoices');
 
 -- ============================================================
 -- JOIN CODES (phase 3). A parent joins a business they cannot see, and the

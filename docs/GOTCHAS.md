@@ -2242,7 +2242,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `-teardown.sql`) before `supabase test db`. (2026-09-25.)
     - **A second shape (2026-09-26):** not an id collision but a GLOBAL count — `tenant_isolation.test.sql` #18
       counts every invoice and expects 2, so ANY invoice-bearing fixture left loaded reds it (`admin-table-geometry`
-      did before this was noticed). Filed in BACKLOG to scope the count. Also note `run-all-drivers.sh --only X`
+      did before this was noticed). **Fixed 2026-09-27:** #18 now counts only its own two tenants. Also note `run-all-drivers.sh --only X`
       leaves X's fixture AND its writes loaded — the next full `check-fixture-roundtrip.sh` then reports X as a
       leftover ("loaded but changed no rows"); run X's teardown and re-run.
 
