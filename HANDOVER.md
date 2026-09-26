@@ -480,7 +480,7 @@ leave the file smaller. Three commands, ten seconds:
 ```bash
 wc -c HANDOVER.md                                              # budget 45000
 grep -c '^_Previously,' HANDOVER.md                            # must be ≤ 1
-awk '/^\| \*\*8/ && length($0)>200 {print length($0)}' HANDOVER.md   # must print NOTHING
+perl -CSD -nle 'print length if /^\| \*\*8/ && length>200' HANDOVER.md   # must print NOTHING
 ```
 
 **Nothing in CI checks these** — the byte-ratchet was built, proven to fail correctly, and

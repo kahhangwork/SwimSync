@@ -572,7 +572,7 @@ swimming skills**~~ (Piece 4, M, shipped 2026-08-28) and ~~**Email-confirmation 
   it shrinks. **Verify every pointer resolves before writing it**: §8.38 cited §7.108 for a
   `SECURITY DEFINER` lesson §7.108 does not contain, and carried its full narrative *because* the
   delegation it claimed was never checked. Measure with
-  `awk '/^\| \*\*8/ && length($0)>200' docs/SESSIONS.md | wc -l`.
+  `perl -CSD -nle 'print if /^\| \*\*8/ && length>200' docs/SESSIONS.md | wc -l` (§7.283 — not `awk`).
 
 ### Later — big features carrying their own dependencies
 
@@ -585,7 +585,7 @@ no new data, no rework, but parked because production is one location (full item
 rule*), Auto PayNow detection (L — *the CSV-import M is the 10% worth doing first*),
 In-app payment gateway (L), Native store builds (M — *deferred; not spending the $99 yet*)
 → Push notifications (M — *blocked by it*), Check the logo for brand collisions (S —
-*before native builds, whenever those happen*), Bulk WhatsApp Cloud API (M — *only on a
+*deferred to the user's brand refactor, 2026-09-27; still before native builds*), Bulk WhatsApp Cloud API (M — *only on a
 real tenant's request*). *(Multi-language and More polished dashboards moved to
 Deliberately not doing 2026-08-16.)*
 
@@ -1485,7 +1485,10 @@ between "a link the coach sends parents" and "an app."
 whole stack is $0 today. **Blocks push notifications.** Decision point is willingness to
 spend, not engineering.
 
-### Check the logo for brand collisions — **S**
+### Check the logo for brand collisions — **S** — _deferred 2026-09-27 to the user's brand refactor_
+**Deferred (user, 2026-09-27):** a brand refactor is coming; run this check as part of it, against the NEW mark,
+not the current pace clock — checking a mark about to be replaced is wasted work. Not before the user starts it.
+
 Search existing swim-school, swim-club and fitness marks for anything close to the pace
 clock, before it is on a storefront.
 

@@ -1139,7 +1139,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     - Rules like "a ledger **line**", "a **one-line** summary", "prefer **deleting a stale
       line**" bound nothing: rows grew to **1,446 characters**. "Delete what's stale" is an
       unbounded judgement call; §3's in-file note was read past (410 → 469 lines).
-    - **Fix: a size, countable in one command.** Ledger row ≤200 chars (`awk 'length($0)>200'`),
+    - **Fix: a size, countable in one command.** Ledger row ≤200 chars (`perl -CSD -nle 'print if length>200'` — *not* `awk`, which counts bytes, §7.283),
       ≤1 `_Previously,_` (`grep -c`), file ≤45,000 bytes (`wc -c`). **Measure at the START of
       the write, not the end.**
     - **Graduating a fact means MOVING it, not copying it.**
@@ -2311,3 +2311,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     after every refusal walks toward a 429 that reads as a product failure. Prove it from the `auth.users`
     `encrypted_password` hash instead, and keep sign-ins to the ones the check is about. (U9, 2026-09-26.)
 
+283. **macOS `awk` counts BYTES, not characters — `length($0)` over-reports any line with `·`, `§` or `—`.**
+    The ledger cap is 200 *characters*, but the documented measure was `awk 'length($0)>200'`: BSD awk
+    (20200816) ignores the UTF-8 locale, so `§` and `·` count 2 and `—` counts 3. On 2026-09-27 it reported
+    **33** over-cap `docs/SESSIONS.md` rows where **30** were, and read the three rows compressed on 2026-08-30
+    (197/181/199 chars) as 204. **Measure characters with `perl -CSD -nle 'print length if …'`** (present on macOS
+    and the Linux CI images alike). Every copy of the command — HANDOVER §9, `/update-docs`, BACKLOG, §7.119 —
+    was switched the same day. (2026-09-27.)

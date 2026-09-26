@@ -269,7 +269,7 @@ Run these three. They take ten seconds together and they are the whole of the di
 ```bash
 wc -c HANDOVER.md                                              # budget 45000
 grep -c '^_Previously,' HANDOVER.md                            # must be ≤ 1
-awk '/^\| \*\*8/ && length($0)>200 {print length($0), $0}' HANDOVER.md | sort -rn | head
+perl -CSD -nle 'print length, " ", $_ if /^\| \*\*8/ && length>200' HANDOVER.md | sort -rn | head   # §7.283: never awk
                                                                # must print NOTHING
 ```
 
