@@ -1616,7 +1616,8 @@ tenant-narrowing). `tenants` needs a `slug` — the insert fails without it. To 
 `<select>` on the page, use `.first()`/`.last()` for the two "Search" buttons, and scope row locators by a second
 `hasText` — tenant names appear in two tables.
 
-### A `verify-grading-admin` driver for the uncovered Levels / Trials / Make-ups / Assessment actions — **S** `[from the Admin L-D refactor 2026-09-18]`
+### ~~A `verify-grading-admin` driver for the uncovered Levels / Trials / Make-ups / Assessment actions~~ — **S** — **DONE 2026-09-26** `[from the Admin L-D refactor 2026-09-18]`
+_Shipped as `verify-grading-admin.mjs` (27 checks, own tenant, 2 mutation proofs) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U1._
 The Admin L-D batch (§8.111) decomposed the four grading pages and injected the `AssessmentGrid`'s writes. Its
 nine-driver net (210/210) **presses none of these**: trial **Convert** (the §7.180 two-press guard) and **Cancel**;
 a make-up for a **multi-class** child (the "Which class is this making up?" select that sets `p_home_class_id`),

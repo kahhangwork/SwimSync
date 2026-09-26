@@ -204,7 +204,7 @@ DB (§7.55), so no sibling may be running.
 
 Order = billing-adjacent risk first (September is billed in early October), then the rest by value.
 
-### ☐ U1 — `verify-grading-admin` (~3 h)
+### ☑ U1 — `verify-grading-admin` (~3 h) — DONE 2026-09-26, 27 checks
 **Covers:** trial **Convert** two-press guard (`trials/domain/trialConvert.ts:21-26`, "Convert anyway") + trial
 **Cancel**; multi-class make-up select "Which class is this making up?" (`makeups/ui/BookMakeupModal.tsx:95-115`,
 `p_home_class_id` at `useMakeups.ts:153`), **Change**, **Cancel**; grade-scale add / rename / remove + the held-grade

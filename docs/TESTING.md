@@ -1344,6 +1344,15 @@ Mutation-proven (§7.25) except auth's "old password no longer works" (needs a G
 provenance (`app-fgh-handchecks-{F,G,H,fence}.mjs`), like every sibling refactor's; `app-fgh-idle.mjs` still
 counts each screen's requests (load / idle).
 
+**The Foundations driver backlog is being built as nightly drivers** (`docs/plans/DRIVER_BACKLOG_PLAN.md`, from
+2026-09-26). Each has its own fixture + teardown under its own UUID prefix (checked against `supabase/tests/` too,
+§7.280), declares `EXPECTED_CHECKS` (a skipped check fails the run), asserts every write in the DB before AND after,
+and carries its mutation proofs in its header:
+
+| driver | fixture | checks | covers |
+|---|---|---|---|
+| `verify-grading-admin` | `fixtures-grading-admin` (its OWN tenant, `c3000000-`) | 27 | Trials Convert's two-press guard (0 enrolments after press 1) + Cancel; the multi-class make-up's home-class select → `home_class_id` on the booking, Change, Cancel; grading-scale add / rename / remove + the held-grade refusal; skill Move down / Remove; level Edit; Assessment Move up offered WITHOUT a reload after re-painting (6abe8c2) and pressed; a grade from the Students drawer's modal |
+
 **`verify-cancel-lesson.mjs` step 5b (2026-09-24)** — the admin's UI cancel is AGED two weeks back as postgres
 (`cancel_lesson` refuses today and earlier), the coach taps it from Schedule's DONE list, and the driver asserts
 *This lesson was cancelled*, the class name + reason, and *Back to class*. 29 checks; on the pre-fix hook the four
