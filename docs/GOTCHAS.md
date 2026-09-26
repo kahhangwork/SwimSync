@@ -2318,3 +2318,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     (197/181/199 chars) as 204. **Measure characters with `perl -CSD -nle 'print length if …'`** (present on macOS
     and the Linux CI images alike). Every copy of the command — HANDOVER §9, `/update-docs`, BACKLOG, §7.119 —
     was switched the same day. (2026-09-27.)
+
+284. **Postgres `LPAD` TRUNCATES input longer than the target width — `lpad('10000', 4, '0')` is `'1000'`.** A
+    reference counter padded with a fixed width silently reuses an old number past 9,999 (wrong on a bank
+    statement, then a `UNIQUE` violation = a failed billing run). A tenant billing ~800 families a month reaches it
+    in ~13 months. Pad with `LPAD(v::TEXT, GREATEST(4, length(v::TEXT)), '0')` — all three live counters
+    (`next_invoice_ref`, `next_credit_note_ref`, `next_package_ref`) do, checked from `pg_get_functiondef`
+    2026-09-27. Found 2026-08-02 (`20260802000800_reference_overflow.sql`, §8.26); promoted from a ledger row.
