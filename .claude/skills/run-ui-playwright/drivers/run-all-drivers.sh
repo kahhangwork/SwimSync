@@ -231,6 +231,20 @@ for name in "${DRIVERS[@]}"; do
   docker restart "$KONG_CONTAINER" > /dev/null
   wait_for_auth || { FAILED+=("$name (auth 502 after reset)"); echo "| $name | ABORT (auth) | — | $((SECONDS - started)) |" >> "$SUMMARY"; break; }
 
+  # Opt-in hook for simulate-date.sh (§7.277): SQL applied to the fresh DB after
+  # the reset and BEFORE the fixture — e.g. a pinned session_window_start().
+  # Unset (the nightly, every normal run) this block does nothing. A failure
+  # skips the driver loudly: a half-applied pin reads as a product regression.
+  if [[ -n "${AFTER_RESET_SQL:-}" ]]; then
+    if ! psql_file "$AFTER_RESET_SQL" > "$RUN_DIR/$name.after-reset.log" 2>&1; then
+      echo "  ✗ AFTER_RESET_SQL ($AFTER_RESET_SQL) did not apply — driver skipped"
+      tail -15 "$RUN_DIR/$name.after-reset.log" | sed 's/^/      /'
+      echo "| $name | AFTER_RESET_SQL FAILED | — | $((SECONDS - started)) |" >> "$SUMMARY"
+      FAILED+=("$name (AFTER_RESET_SQL)")
+      continue
+    fi
+  fi
+
   if [[ -n "$fixture" ]]; then
     if ! psql_file "$fixture" > "$RUN_DIR/$name.fixture.log" 2>&1; then
       echo "  ✗ $fixture did not load (§7.62) — driver skipped, this is a FIXTURE failure"
