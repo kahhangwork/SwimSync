@@ -355,7 +355,7 @@ the `:74` mutation this unit relies on.
 "Shape". Delete **check 7 only** (lines ~355–409), so no one can re-run the seed-password mutation.
 **Mutations:** `app/reset-password/domain/useResetPassword.ts:74` → skip `updatePassword` · `:35` regex → `/never=/`.
 
-### ☐ U10 — `verify-coach-marking` (~2.5 h): promotes `coach-attendance-handchecks`
+### ☑ U10 — `verify-coach-marking` (~2.5 h): promotes `coach-attendance-handchecks` — DONE 2026-09-26, 31 checks
 **Covers:** Present→Absent on an INVOICED lesson → +1 credit note and **exactly one** `credit-note-emails` request;
 a no-change re-save → +0 notes, **zero** requests (`useSaveAttendance.ts:235` guard); first save with no session →
 exactly one `lesson_sessions` row + one `attendance_saved` audit row; **the read-only title "Lesson Attendance"** for

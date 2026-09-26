@@ -1692,7 +1692,8 @@ blocking the month's invoicing. A regression would either fail silently (the con
 changes) and the DB read (this class closed, the other class untouched, `students.is_active` still true).
 Reach the roster by TAB taps, or click by DOM, and `waitFor` the 3000 ms toast — §7.252 is both traps.
 
-### A driver for the coach marking screen's credit-note email and read-only title — **S** `[from the coach attendance refactor 2026-09-22]`
+### ~~A driver for the coach marking screen's credit-note email and read-only title~~ — **S** — **DONE 2026-09-26** `[from the coach attendance refactor 2026-09-22]`
+_Shipped as `verify-coach-marking.mjs` (31 checks, own tenant + plain coach + own shadow coach, 2 mutation proofs; the hand-check script it promoted is deleted) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U10._
 Two things on `(coach)/classes/[id]/attendance` no driver asserts: **the credit-note email path** — flipping an
 INVOICED lesson Present → Absent must issue one credit note and exactly ONE `credit-note-emails` request, and a
 no-change re-save must issue none (the `mayHaveIssuedCreditNote` guard) — and **the read-only title** *Lesson
@@ -1701,7 +1702,7 @@ Attendance* a class shadow sees (`verify-coach-roster` checks the notice and `·
 **Why:** the email is how a parent learns they were credited; the guard is what keeps every normal save off an
 edge-function cold start. A regression in either is invisible — the save still says "Attendance saved."
 
-**Notes:** `docs/refactor/coach-attendance-handchecks.mjs` + `.sql` is the skeleton (11 checks incl. a first save
+**Notes:** the (now deleted) coach-attendance hand-check script was the skeleton (11 checks incl. a first save
 creating exactly one session row), proven able to fail. It deep-links, so every press is a DOM click on the
 hidden screen (§7.254) — fine for DB assertions; for the title, one `check()` inside `verify-coach-roster`'s
 shadow leg is cheaper than a new driver.
