@@ -391,7 +391,7 @@ it must still `throw` on a non-zero exit (§7.251). The restore sits in `finally
 (`is_active = true` for both ids).
 **Mutations:** `lib/coachRoster.ts:180` → `"Shadowing"` → `null` · `useScheduleSections.ts:97` → drop `&from=schedule`.
 
-### ☐ U12 — `simulate-date.sh` (~3 h)
+### ☑ U12 — `simulate-date.sh` (~3 h) — DONE 2026-09-26, a tool (no checks; 4 proofs in its header)
 **What:** `drivers/simulate-date.sh <YYYY-MM-DD> [--only a,b]`, for each driver: `db reset` → pin
 `session_window_start()` to the given date's floor (`date_trunc('month', D) - 1 month`, same expression as
 `20260727000100_attendance_window_guard.sql:57-65`) → load fixture → run → table of which reddened.

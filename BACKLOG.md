@@ -1815,7 +1815,8 @@ alignment and text assertion still passes, so width is a human-judgement signal,
 pass/fail one. Do not "fix" this by adding a width assertion to the driver; fix the two
 pages' column classes. The threshold in the driver is 80px and is arbitrary.
 
-### Simulate a FUTURE date against the driver suite — **S** `[from the 2026-08-30 sweep]`
+### ~~Simulate a FUTURE date against the driver suite~~ — **S** — **DONE 2026-09-26** `[from the 2026-08-30 sweep]`
+_Shipped as `drivers/simulate-date.sh <YYYY-MM-DD> --only a,b` (per driver: `AFTER_RESET_SQL=<pin> run-all-drivers.sh --only`, so `fixture_for()` is reused; refuses a clamped floor (§7.277), restores the function in an EXIT trap (§7.278); both limits below still hold) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U12._
 A committed script that pins `session_window_start()` to a chosen month's floor, runs the
 drivers against it, and reports which reddened — so a window-fragile fixture is found before
 the 1st, not after.
