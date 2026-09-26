@@ -1526,7 +1526,8 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
-### A `verify-packages-admin` driver for the ten uncovered Packages actions — **S** `[from the packages refactor 2026-09-16]`
+### ~~A `verify-packages-admin` driver for the ten uncovered Packages actions~~ — **S** — **DONE 2026-09-26** `[from the packages refactor 2026-09-16]`
+_Shipped as `verify-packages-admin.mjs` (47 checks, own tenant, 2 mutation proofs; the fixture carries a real superseded offer) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U5._
 `verify-packages` + `verify-package-renewal` + `verify-referrals` exercise render, the live-balance cell,
 Payment received, offer generation and the referrer reward — but **ten admin actions have no driver**:
 Record a sale, Decline, Cancel, Extend, Retire/Reoffer, Add package, Add category, category Default/Max,

@@ -272,7 +272,7 @@ amount. That is the only path on which the `:87` mutation changes what is saved.
 **Mutations:** delete `RatesCard.tsx:87` `setRateAmount(...)` (shadow saves teaching rate) ·
 `useCreditNoteList.ts:93` → `label !== statusFilter` (✎ CORRECTED: the line has two `===`; name which one).
 
-### ☐ U5 — `verify-packages-admin` (~2.5 h)
+### ☑ U5 — `verify-packages-admin` (~2.5 h) — DONE 2026-09-26, 47 checks
 **Covers:** Record a sale, Decline, Cancel, Extend, Retire/Reoffer, Add package, Add category, category Default/Max,
 held search, Show superseded (table in the research, `packages/…`).
 **Fixture:** copy `fixtures-packages.sql` shapes + **a superseded offer** (none seeded today) + one pending request
