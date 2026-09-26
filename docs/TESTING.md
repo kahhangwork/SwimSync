@@ -1352,6 +1352,7 @@ and carries its mutation proofs in its header:
 | driver | fixture | checks | covers |
 |---|---|---|---|
 | `verify-grading-admin` | `fixtures-grading-admin` (its OWN tenant, `c3000000-`) | 27 | Trials Convert's two-press guard (0 enrolments after press 1) + Cancel; the multi-class make-up's home-class select → `home_class_id` on the booking, Change, Cancel; grading-scale add / rename / remove + the held-grade refusal; skill Move down / Remove; level Edit; Assessment Move up offered WITHOUT a reload after re-painting (6abe8c2) and pressed; a grade from the Students drawer's modal |
+| `verify-lesson-detail-guests` | `fixtures-lesson-detail-guests` (its OWN tenant, `b3000000-`) | 29 | The lesson page's unpressed actions: book a TRIAL + Cancel booking on the guest row; a make-up for a child with two same-category homes (the "which class" select, its client refusal with 0 rows written, and `home_class_id` = the chosen class); the Book modal's `full-notice`; invalid-date / unknown-class states; Keep the lesson (no session row written); the assign-substitute ERROR branch (`page.route` POST, hit once); Set all + the Rain/Coach and Paid/Free sub-toggles, saved and read back. Weekday-independent: every class runs on today's weekday |
 
 **`verify-cancel-lesson.mjs` step 5b (2026-09-24)** — the admin's UI cancel is AGED two weeks back as postgres
 (`cancel_lesson` refuses today and earlier), the coach taps it from Schedule's DONE list, and the driver asserts

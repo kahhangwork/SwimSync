@@ -223,7 +223,7 @@ labels. Every copied label gets its own stem (e.g. `GradAdm %`), or the assessme
 in a stacked roundtrip.
 **Mutations:** `trialConvert.ts:25` → `return false` (single press enrols) · `useMakeups.ts:153` → `p_home_class_id: null`.
 
-### ☐ U2 — `verify-lesson-detail-guests` (~3 h)
+### ☑ U2 — `verify-lesson-detail-guests` (~3 h) — DONE 2026-09-26, 29 checks
 **Covers:** book a TRIAL (`BookGuestModal.tsx:71` trial-child select; submit is testid `book-guest` at `:92`) +
 **Cancel booking** on the guest row (`AttendancePanel.tsx:95-97`); **Set all** ("Set all to"); Rain/Coach and
 Paid/Free sub-toggles (`aria-pressed`); two-same-category-homes make-up select + client refusal "Choose which class

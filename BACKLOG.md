@@ -1636,7 +1636,8 @@ reload** when the painted grade equals the held one — `6abe8c2` (§8.120) made
 assert Move up appears WITHOUT a reload; that is now part of what this driver pins.
 Unit coverage already exists for the grid's writes (`components/AssessmentGrid.test.tsx`).
 
-### A `verify-lesson-detail-guests` driver for the lesson page's uncovered actions — **S** `[from the lesson-detail refactor 2026-09-18]`
+### ~~A `verify-lesson-detail-guests` driver for the lesson page's uncovered actions~~ — **S** — **DONE 2026-09-26** `[from the lesson-detail refactor 2026-09-18]`
+_Shipped as `verify-lesson-detail-guests.mjs` (29 checks, own tenant, 2 mutation proofs; the assign error is forced with `page.route`, not a refusable shape) — TESTING §5; `docs/plans/DRIVER_BACKLOG_PLAN.md` U2._
 The four-driver net for `/lessons/[classId]/[date]` (129/129, §8.112) presses none of these: **book a TRIAL** into a
 lesson and **Cancel booking** on a guest row; **Set all**; the **Rain/Coach** and **Paid/Free** sub-toggles; a
 make-up for a child with **two same-category homes** (the "Which class does this make-up replace?" select and its
