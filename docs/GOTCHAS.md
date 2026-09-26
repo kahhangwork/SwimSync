@@ -966,6 +966,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     - **Related:** the class ROSTER gates "Mark Attendance" on `activeStudentIds.length > 0`
       (**enrolments only**), so a guest-only lesson shows no button there; the Schedule tab uses
       `expectedStudentsOn()` (counts bookings). Test guest-only lessons via Schedule. (2026-08-09.)
+    - **A `/g` RegExp reused across elements carries `lastIndex` between `.test()` calls**, so the second
+      element can fail to match text the first one matched. Caught in review of this fix; build the RegExp
+      per call, or drop `g` for a boolean test. (Promoted from the §8.35 ledger row, 2026-09-27.)
 
 101. **ON A SHARED DATABASE, `nth(n)` IS A DATA-CORRUPTION BUG, NOT A BRITTLE-SELECTOR
     NIT — IT WRITES TO A ROW YOU DO NOT OWN, AND THE TEARDOWN THEN DESTROYS THAT ROW'S

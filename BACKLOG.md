@@ -554,25 +554,9 @@ swimming skills**~~ (Piece 4, M, shipped 2026-08-28) and ~~**Email-confirmation 
   §11, which already held it (restated in §3 it was a fourth copy that drifts). Prohibitions + the
   verified-vs-specified table kept intact, as the item specified. HANDOVER back under the 45 KB budget.
 
-- **33 ledger rows in `docs/SESSIONS.md` are still over the 200-char cap** (re-measured 2026-09-26;
-  it read 30) — **M**. Three were compressed on 2026-08-30 (§8.36/§8.37/§8.38: 1432/1344/1368 →
-  197/181/199); the rest are mostly August, largest **1204** (§8.34), plus §8.103–§8.105 from
-  September. **Why:** a ledger row is a *pointer*, and an oversized one is a
-  narrative that duplicates the graduated copy, then goes stale and competes with it — the exact
-  failure that took §8 to 49% of a 3,972-line file. The rows were written when reasoning was not
-  being graduated, so their length is the symptom, not the disease.
-  **Notes — this is NOT a text-trimming job, and doing it as one loses facts.** The rule is
-  trace-before-cutting: an oversized row is a row whose reasoning never got a home, so each fact
-  must be found in `docs/` *before* its sentence is deleted. All three rows done on 2026-08-30
-  turned up facts with **no pointer anywhere** — the widened engine scan (already §7.109, never
-  cited), Postgres firing same-timing triggers in alphabetical name order, and "ask the code for a
-  call-site list, never inherit one" (both `docs/plans/WAVE_1_PLAN.md`). Expect ~10–15 min per row,
-  more where a fact needs a new §7 written. **Never delete a row** — they are cited by number from
-  applied migrations and `core.ts`, so a missing row is a dangling reference; only the prose inside
-  it shrinks. **Verify every pointer resolves before writing it**: §8.38 cited §7.108 for a
-  `SECURITY DEFINER` lesson §7.108 does not contain, and carried its full narrative *because* the
-  delegation it claimed was never checked. Measure with
-  `perl -CSD -nle 'print if /^\| \*\*8/ && length>200' docs/SESSIONS.md | wc -l` (§7.283 — not `awk`).
+- ~~**33 ledger rows in `docs/SESSIONS.md` are still over the 200-char cap**~~ — **DONE 2026-09-27.** The real
+  count was 30 (the `awk` measure counted bytes, §7.283); all 30 now ≤200 characters, every fact traced first.
+  Homes written on the way: §7.283, §7.284, a §7.100 bullet, a PRD §7.16 sentence, two stale ARCHITECTURE lines.
 
 ### Later — big features carrying their own dependencies
 
