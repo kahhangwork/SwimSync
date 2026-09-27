@@ -98,6 +98,9 @@ touching an unfamiliar subsystem.
   makes the second run short-circuit — passing once proves nothing. (§7.15)
 
 **Database**
+- **Never take a role from sign-up metadata.** A public `signUp()` sets `raw_user_meta_data`; trusting it made
+  anyone a platform admin until 2026-09-27. Staff accounts exist only via a server-minted `staff_invitations` row
+  (`lib/staffInvitation.ts`); every staff-creating route mints one. (§7.289, ARCHITECTURE §6aa.)
 - Expand/contract, **one schema change in flight at a time**. Write migrations on a short
   `db/…` branch, apply, `supabase test db`, merge before anything depends on them.
 - **A new function or table is callable by NOBODY until its own migration grants it**, and
