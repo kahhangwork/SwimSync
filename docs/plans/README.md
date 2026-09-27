@@ -20,7 +20,8 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `DONE` · `DONE (partly superseded)`
 | ROLES_PERMISSIONS_PLAN.md | DONE (§8.131, deploy #58; P5 half — see BACKLOG) | Wave 1 lane 1 — owner-defined roles × 8 areas × None/View/Edit |
 | ROLES_ENFORCEMENT_MAP.md | CURRENT | Step 0 of the roles plan — every admin-gated policy/function/route → area + level |
 | CRASH_SAFE_EMAIL_CLAIM_PLAN.md | DONE (§8.131, deploy #57) | Wave 1 lane 2 — claim lease + Resend idempotency key; no auto-retry after 24 h |
-| WAVE_2_PACKAGES_BRIEF.md | NEXT (brief) | Wave 2 — package revenue + refunds; Roles has shipped, so plan it next |
+| PACKAGE_REVENUE_REFUNDS_PLAN.md | DONE (§8.132, deploy #59) | Wave 2 — package revenue on Accounting (cash basis) + in-app refunds |
+| WAVE_2_PACKAGES_BRIEF.md | SUPERSEDED by PACKAGE_REVENUE_REFUNDS_PLAN.md | Wave 2's decisions W1–W6 (still the source for those) |
 
 ## Done
 

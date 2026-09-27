@@ -913,6 +913,19 @@ holds operations ≥ view. **Standing prohibitions:** no column-level grant or v
 (§7.292); nobody but the owner acts on the owner (§7.288/§7.293); a co-admin gives only a role within their own.
 Plan + enforcement map: `docs/plans/ROLES_PERMISSIONS_PLAN.md`, `ROLES_ENFORCEMENT_MAP.md`.
 
+### 6ac. Package money on Accounting is CASH-basis; refunds are written only by RPC (2026-09-27)
+
+`accounting_summary` counts a package once, in the SGT month of `confirmed_at`, at `amount_payable` — a deliberate
+exception to the invoices' accrual basis (the user's decision; **do not "fix" it to per-lesson recognition**).
+Package-funded invoice lines stay subtracted (`revenue_package_applied`), so nothing counts twice. Because
+`confirmed_at` now decides a month, the lifecycle trigger pins it to `now()` for `authenticated`. Refunds
+(`package_refunds`) are the mirror: they come off Revenue in the month of `refunded_on`, and `authenticated` holds
+SELECT only — `record_package_refund` / `reverse_package_refund` hold every rule (cap = what was paid, SGT dates, no
+closed month, one live refund). **Standing prohibitions:** no override for a closed month or a back-dated refund,
+and no revenue arithmetic outside the single `v_revenue` assignment (§7.298). A test purchase that was confirmed by
+mistake is corrected by clearing `confirmed_at` with an audit row (DEPLOYMENT #59), not by a fake refund.
+Plan: `docs/plans/PACKAGE_REVENUE_REFUNDS_PLAN.md`.
+
 ### 12a. `Alert.alert` is a no-op on the web build (known pattern)
 
 `Alert.alert` has **no `react-native-web` implementation** — on the deployed web app

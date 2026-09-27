@@ -1035,3 +1035,13 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     greps: `blockedNoticeRecipients`, `has_admin_area`, `packagesAdmin`; verify_jwt unchanged). Then `b487524` →
     `main`; Vercel both `success`, CI green; live admin chunks hold the Roles page and "Your role doesn't"; the live
     app entry bundle calls `has_admin_area`. Not verified by a real co-admin login on prod.
+59. **Deploy record (2026-09-27): package revenue + in-app refunds (Wave 2).** 2 migrations, 0 functions. `db push`
+    `20260928000100` then `…0200`, each landed on `main` first; 169/169, 0 pending; remote ACLs: `accounting_summary`,
+    `record_package_refund`, `reverse_package_refund` EXECUTE to `authenticated` only (one of each);
+    `package_refunds` RLS on, SELECT-only to `authenticated`, full to `service_role`. Rollbacks rehearsed (U2's
+    refuses while refunds exist). Apps `96fa216` → `main` after nightly `36313394669` read GREEN (68/68); live admin
+    chunks hold "Record refund", the new Cancel copy, "Packages sold (paid this month)", "Package refunds (paid out
+    this month)". **Prod data correction, same day:** Little Orcas's PKG-2026-0001 was an owner's TEST (confirmed
+    and cancelled 16 Sep, no money) — its `confirmed_at`/`confirmed_by` cleared by the user in the SQL Editor, with
+    an `audit_log` row `package_marked_unpaid` (actor Site Admin) holding the old values and the reason; it now
+    counts in no month. PKG-2026-0002 (S$700) is a real sale and untouched.

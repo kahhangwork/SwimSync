@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-27 (night) — **Wave 1 SHIPPED (§8.131): Roles & permissions and the crash-safe email claim
-are live, and a critical sign-up escalation (anyone could become a platform admin) was found and closed.** Six
-migrations, three deploys (#56–#58), two sessions in parallel. Tonight's nightly is the first over all of it._
+_Last updated: 2026-09-27 (late night) — **Wave 2 SHIPPED (§8.132): package revenue counts on Accounting (cash basis)
+and refunds are recorded in-app.** Two migrations + apps (deploy #59) after nightly `36313394669` read GREEN 68/68.
+One prod data fix: Little Orcas's test package PKG-2026-0001 no longer counts._
 
-_Previously (§8.130, 2026-09-27) — the backlog re-ranked with the user; Wave 1 planned and reviewed._
+_Previously (§8.131, 2026-09-27) — Wave 1 (roles, crash-safe email claim) shipped; the sign-up escalation closed._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -122,7 +122,7 @@ behaviour is deployed to production; the rest is verified on the local stack onl
 | Coach wages — effective-dated rates, the pay-decision surface | UI + backend, LIVE | PRD §7.13 · §8.3 |
 | Active/inactive families and children, per business | UI + backend, LIVE | PRD §7.14 · §8.4 |
 | Effective-dated class terms — a lesson is priced by its OWN date | UI + backend, LIVE | PRD §7.3 · §8.3 |
-| Prepaid packages — weeks/start-date/holiday-extension, renewal OFFERS (tokenised `/package` pay page + WhatsApp queue + default packages + Students columns/drawer), purchases numbered + QR-payable (`PKG-YYYY-NNNN`, §8.37) | pgTAP + Deno + vitest + jest + driver, LIVE 2026-08-15 | PRD §7.16 · §8.59, §8.60 |
+| Prepaid packages (+ in-app refunds and cash-basis revenue on Accounting, §8.132) — weeks/start-date/holiday-extension, renewal OFFERS (tokenised `/package` pay page + WhatsApp queue + default packages + Students columns/drawer), purchases numbered + QR-payable (`PKG-YYYY-NNNN`, §8.37) | pgTAP + Deno + vitest + jest + driver, LIVE 2026-08-15 | PRD §7.16 · §8.59, §8.60 |
 | **Parent referral codes — double-sided package discount** (`REF-` join code, friend's-first + referrer's-later reward, FIFO, tenant %/$ + per-product override, same-household guard, admin Referrals page) — moves `amount_payable`, never `total_value` | pgTAP 57 + Deno + vitest + jest + `verify-referrals` 13, **LIVE 2026-08-15** | PRD §7.16 · §8.61 |
 | **Advance-cancel a lesson — admin cancels a FUTURE lesson with a reason; the SESSION carries it; parent struck, coach nothing to mark (DB trigger), engine neither blocks nor bills; a live guest on the date still BLOCKS** | pgTAP 37 + Deno + vitest + jest + 17-check driver, LIVE 2026-08-21 **DORMANT** | PRD §7.6 · §7.203, §7.204 · §8.81 |
 | Every child's name carries their payment method (per-child, category-aware) | pgTAP + vitest, LIVE | PRD §7.16 · §8.23 |
@@ -348,6 +348,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.132 (2026-09-27) — Wave 2 planned, reviewed and shipped: package revenue + in-app refunds
+
+**One session: `/plan-with-confidence` (7 questions to the user) → `/plan-review` (11 risks, all inlined) → U1 then
+U2, each migration → prod before its app; apps pushed after the nightly read green.** Commits `8f039b7` … `96fa216`.
+
+- **Shipped:** package revenue on Accounting, cash basis (PRD §7.23, ARCHITECTURE §6ac); in-app refunds — admin types
+  any amount up to what was paid, no closed month, one live refund, reverse to correct (PRD §7.16). Deploy #59.
+- **Review caught before code:** refunds would all have failed on `audit_log_tenant_of` (§7.297); net repeated the
+  revenue sum (§7.298). Five gotchas filed, §7.297–§7.301.
+- **Prod census was not 0|0:** Little Orcas held 2 paid packages (open month, so no closed figure moved). The owner
+  confirmed PKG-2026-0001 was a test → the user cleared its confirmation in the SQL Editor (my write was blocked by
+  the permission classifier); verified read-only: Sept package revenue S$700. Record: DEPLOYMENT #59.
+- **Not done:** parent visibility of refunds (BACKLOG *Show package refunds to the parent*); Wave 2 lane 2
+  (attendance component tests) untouched.
+
 ## 8.131 (2026-09-27) — Wave 1 shipped in two lanes; a public sign-up could make itself platform admin
 
 **Two Claude sessions in parallel — root (roles, lane 1) and worktree `email-claim` (lane 2) — coordinated over
@@ -367,22 +382,7 @@ the user.** Commits `ee688d9` … `b487524`.
 - **Not done:** P5's per-control hiding (BACKLOG); the stale "new key" function COMMENTs (BACKLOG); DB-backed
   lane-2 Deno tests not mutation-proven (TESTING §5); no real co-admin login on prod.
 
-## 8.130 (2026-09-27) — Build order re-ranked with the user; Wave 1 planned and reviewed; plans indexed
-
-**A planning session: no code, no migration, no deploy.** `/backlog-prioritisation`, then a decision Q&A with the user,
-then `/plan-with-confidence` for Wave 1 and a brief for Wave 2. Commits `9f0cad4`, `1582b8f`, `186b551`, `0d4b90b`.
-
-- **Order + decisions:** BACKLOG → *Current build order* (decisions table, three waves, two lanes). Roles first (co-admin
-  hire ~3 months out); four items → *Deliberately not doing*; new item *Package revenue on the accounting page*.
-- **Plans:** `ROLES_PERMISSIONS_PLAN.md` (11 areas, money XOR ops; P1–P12 planner defaults for the user to veto),
-  `CRASH_SAFE_EMAIL_CLAIM_PLAN.md` (no auto-retry after 24 h — user's call), `WAVE_2_PACKAGES_BRIEF.md` (5 open questions).
-- **Reviewed by an Opus agent before commit:** 2 critical + 6 high found in the drafts and folded in; two live gaps
-  graduated as §7.287 (coach arm can write invoices) and §7.288 (owner protection is implicit).
-- **`docs/plans/README.md`:** all 41 older plans audited DONE/superseded; 9 stale headers corrected; plans never move.
-- **Tooling:** `plan-reviewer` agent; `/plan-with-confidence` now always ends in `/plan-review` (AVAIL_SKILLS).
-- **Not done:** nothing built. The next nightly (first on `d8e1c05`) has not run yet — read it before any APP unit.
-
-_(§8.129 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.130 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -425,11 +425,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-27 (night): last nightly `36276724651` GREEN, 67/67, on `9732951`.** **The next one is the first
-over §8.131 — everything shipped today went out with the gate OVERRIDDEN, so read it before anything else.** Where
-a red points first: `verify-roles` / `verify-admins` / `verify-platform-admin-scope` → roles (26 pages, the co-admin
-refusal); `platform-controls` → its fixture's role change; any login / invite red → `staff_invitations` (§7.289);
-a credit-note or invoice-email red → the email claim. 68 drivers now (`verify-roles` is new).
+**State on 2026-09-27 (late night): last nightly `36313394669` GREEN, 68/68, on `58a564f`** (Wave 1 — dispatched on
+the user's word). **The next one is the first over Wave 2** (`96fa216`, 69 drivers — `verify-accounting-packages` is
+new, `verify-packages-admin` is 56 checks). Where a red points first: those two → refunds / package revenue
+(`package_refunds`, `accounting_summary`); `verify-packages` / `verify-package-renewal` → the `confirmed_at` pin (§7.300).
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -439,12 +438,12 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read tonight's nightly** (never dispatch it). If it is red, fix that first — today's three deploys skipped the gate.
-2. **Wave 2 — packages** (`BACKLOG.md` → *Current build order*): turn `docs/plans/WAVE_2_PACKAGES_BRIEF.md` into a
-   full plan with `/plan-with-confidence` — *Package revenue on the accounting page*, then *In-app package refunds*.
-   New money surfaces take their role area from birth (`packages` / `billing` / `accounting`, ARCHITECTURE §6ab).
-3. **Before the co-admin hire** (~3 months): if the owner builds a role with an area at View, do *Hide edit controls
-   page by page for a view-only role* (BACKLOG). Ride *Correct the "new key" COMMENTs* on the next migration.
+1. **Read the next nightly** (never dispatch it unasked) — the first over Wave 2. Red → fix that first.
+2. **Before Little Orcas bills September:** its Accounting will show *Packages sold S$700* (PKG-2026-0002, a real
+   sale). PKG-2026-0001 was a test and now counts nowhere (DEPLOYMENT #59) — nothing to do unless a figure disagrees.
+3. **Next build** (`BACKLOG.md` → *Current build order*): Wave 2 lane 2 (attendance-save component tests), then Wave
+   3; before the co-admin hire (~3 months), *Hide edit controls page by page for a view-only role*. New in the queue:
+   *Show package refunds to the parent*.
 
 - **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
@@ -454,8 +453,8 @@ which mutate shared seed state — are in the same section.
 
 **GATE (§7.1): read the next nightly before the next APP unit merges.** Driver-only units need no gate.
 
-**No migration is HELD or in flight.** Latest applied is `20260927000600` (roles D — admin management), on prod,
-0 pending (167/167 on 2026-09-27); rollbacks for all six of today's migrations rehearsed byte-identical.
+**No migration is HELD or in flight.** Latest applied is `20260928000200` (package refunds), on prod, 0 pending
+(169/169 on 2026-09-27); both Wave 2 rollbacks rehearsed (U2's refuses while refunds exist).
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
@@ -503,7 +502,8 @@ stays off. This is a "not yet", not a refusal — it parks the three scheduled-r
 it on later: a blocked month becomes a *silent stall* rather than a button that refuses, and the
 block-notification email **has still never fired in production**.
 
-**Dormant but live, so don't rediscover them as bugs:** prepaid packages (Admin → Packages),
+**Dormant but live, so don't rediscover them as bugs:** prepaid packages (Admin → Packages — first real sale:
+Little Orcas, PKG-2026-0002),
 business provisioning (Platform → New business — creating one is immediate and its join code
 works straight away, and there is deliberately no delete button), trial bookings, and parent
 claiming. Each does nothing until first used.

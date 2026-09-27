@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-27 (night) — **Wave 1 SHIPPED** (§8.131): removed *Split co-admin permissions* and *Crash-safe email claim* (both live); filed *Hide edit controls page by page for a view-only role* (roles P5's unbuilt half) and *Correct the "new key" COMMENTs on the email claim functions*. Wave 2 (packages) is next. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-09-27 (late night) — **Wave 2 SHIPPED** (§8.132): removed *Package revenue on the accounting page* and *In-app package refunds* (both live); filed *Show package refunds to the parent*. Wave 2's lane 2 (attendance component tests) and Wave 3 remain. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -281,10 +281,7 @@ _Supersedes every older ranking below, which is kept as history. Forced by: the 
    page by page for a view-only role*.
 2. ~~Crash-safe email claim~~ — live (PRD §7.7/§7.8, deploy #57).
 
-#### Wave 2 — packages (after Wave 1, so each new admin surface is born with its grid area)
-
-**Brief: `docs/plans/WAVE_2_PACKAGES_BRIEF.md`** — Roles has shipped, so this is next: turn the brief into a full
-plan (`/plan-with-confidence`). New money surfaces take the `packages` / `billing` / `accounting` areas.
+#### Wave 2 — packages — **lane 1 SHIPPED 2026-09-27** (§8.132, `docs/plans/PACKAGE_REVENUE_REFUNDS_PLAN.md`)
 
 
 3. ~~**Package revenue on the accounting page** (S)~~ — **shipped 2026-09-27** (PRD §7.23).
