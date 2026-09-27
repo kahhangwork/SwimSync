@@ -212,6 +212,8 @@ in the coach app uses the admin arm (research §6) — verify with the enforceme
   (admin OR main coach) → `attendance:edit` OR main coach.
 - `package-emails` offered / referral reward (`can_admin_tenant`) → `packages:edit`.
 - `generate-invoices` trusts the Next.js route (CRON_SECRET) — the route gets `billing:edit` (P9).
+- The **invoice email resend** path added by the crash-safe email claim (lane 2, `CRASH_SAFE_EMAIL_CLAIM_PLAN.md` §3.2)
+  is born on `is_tenant_admin`; re-point it to `billing:edit`. Whichever lane lands second does it — check at step 0.
 - `generate-invoices/email.ts` `notifyGenerationBlocked` (~`:641-674`) emails **every profile of the tenant** with role
   coach / tenant_admin, plus the platform admin, that billing is blocked. Decide during step 0 whether co-admins
   without `billing:view` drop off (coaches stay — they are the ones who must mark). A recipient filter, not a

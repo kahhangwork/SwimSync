@@ -18,7 +18,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `DONE` · `DONE (partly superseded)`
 | Plan | Status | What it is |
 |---|---|---|
 | ROLES_PERMISSIONS_PLAN.md | NOT STARTED | Wave 1 lane 1 — owner-defined roles × 11 areas × None/View/Edit |
-| CRASH_SAFE_EMAIL_CLAIM_PLAN.md | NOT STARTED | Wave 1 lane 2 — claim lease + Resend idempotency key |
+| CRASH_SAFE_EMAIL_CLAIM_PLAN.md | NOT STARTED | Wave 1 lane 2 — claim lease + Resend idempotency key; no auto-retry after 24 h |
 | WAVE_2_PACKAGES_BRIEF.md | NOT STARTED (brief) | Wave 2 — package revenue + refunds; becomes a full plan after Roles ships |
 
 ## Done

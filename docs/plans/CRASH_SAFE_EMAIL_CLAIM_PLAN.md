@@ -21,25 +21,20 @@ Package, referral and invite emails keep no sent state, so they have no window (
 
 ## 2. Decisions (settled with the user, 2026-09-27)
 
-- **An email whose outcome is unknown is retried automatically after 15 minutes**, safely: every send carries a Resend
-  **`Idempotency-Key`**, so Resend delivers at most one email per key within 24 h
-  ([Resend docs](https://resend.com/docs/dashboard/emails/idempotency-keys)). The parent gets exactly one email.
-- Credit notes keep their **manual** Resend (no automatic credit-note retry pass — unchanged decision); a stuck claim
-  simply becomes Resend-able again after 15 minutes.
-- **No new invoice UI** — *unless* §2b's option (a) is chosen, which adds one count + Resend on the Billing months card.
-
-## 2b. OPEN QUESTION for the user — the 24-hour limit (found by review, 2026-09-27)
-
-The "retry safely" decision assumed a stuck email is retried within minutes. **Billing runs are manual** (cron off),
-so a stuck invoice email is normally retried at the **next** run — days later, after Resend's 24-hour idempotency
-window has lapsed. At that point a retry *can* send a duplicate. Options:
-
-- **(a) Recommended — never auto-retry an unknown-outcome claim older than 24 h.** Credit notes show **"May have been
-  sent — Resend anyway?"** (admin decides). Invoices: the Billing months card shows a count, *"1 invoice email may not
-  have arrived"*, with a per-invoice Resend. Small new UI; no duplicates without a human choosing one.
-- **(b)** Retry anyway after 24 h — a rare duplicate is preferred over a missing email.
-
-Build waits on this answer.
+- **An email whose outcome is unknown is retried automatically after 15 minutes — but only within 24 hours of the
+  claim.** Every send carries a Resend **`Idempotency-Key`**, so Resend delivers at most one email per key within
+  24 h ([Resend docs](https://resend.com/docs/dashboard/emails/idempotency-keys)); inside that window a retry cannot
+  duplicate.
+- **After 24 hours an unknown-outcome email is never retried automatically** (user, 2026-09-27 — option (a) of the
+  review's 24-hour question). Billing runs are manual, so the next run is usually days later, when the key has lapsed
+  and a retry *could* duplicate. Instead the email is shown as **"May have been sent"** and a human decides:
+  - **Credit notes:** the row reads *"May have been sent — Resend anyway?"* with the Resend button.
+  - **Invoices:** the Billing months card shows a count — *"1 invoice email may not have arrived"* — opening a list
+    with a per-invoice **Resend**. This is the only new invoice UI.
+  - A human resend of a **MAY_HAVE_SENT** email uses a **new** key (`…/manual/<timestamp>`), because choosing to
+    resend is choosing to risk one duplicate. A human resend of an UNSENT or RETRYABLE email uses the **normal** key —
+    still inside the window, still safe.
+- Credit notes keep their **manual** Resend (no automatic credit-note retry pass — unchanged decision).
 
 ## 3. Design
 
@@ -63,8 +58,9 @@ Build waits on this answer.
 - The **15-minute lease is computed in SQL only.** supabase-js filters cannot express `now() - interval`, so claim and
   discovery go through two small `SECURITY DEFINER` RPCs (`claim_invoice_email`, `claim_credit_note_email`, returning
   the claimed row or nothing) with `GRANT EXECUTE … TO service_role` in the same migration (§7.87 — callable by nobody
-  until granted). The admin read gets a computed `claim_fresh BOOLEAN` (a view or RPC), so the browser never compares
-  its own clock to the lease.
+  until granted). The admin read gets the computed **four-value state** (UNSENT / SENDING / RETRYABLE / MAY_HAVE_SENT,
+  §3.2) from a view or RPC for both credit notes and invoices — with the matching `GRANT` for `authenticated` on
+  whichever object it is — so the browser never compares its own clock to the lease.
 
 ### 3.2 Claim, send, settle (both functions)
 
@@ -85,22 +81,39 @@ settle:  every settle UPDATE is conditional:  … WHERE id = $1 AND claimed_at =
                                              different payload — e.g. a renamed child, RISK 7)
          409 concurrent_idempotent_requests,
            5xx, throw, crash               → leave claimed_at                (lease expires in 15 min)
+
+state of an unsent row (computed in SQL, never in the browser):
+         claimed_at NULL                        → UNSENT         (retryable now)
+         claimed 0–15 min ago                   → SENDING        (skip)
+         claimed 15 min – 24 h ago              → RETRYABLE      (auto-retry, same key — safe)
+         claimed > 24 h ago                     → MAY_HAVE_SENT  (NO auto-retry; human Resend only, new key)
 ```
 
 - **Invoice first send** also claims first (same UPDATE) and uses the same key, closing the concurrent-run duplicate.
-- Discovery queries (`retryUnsentInvoiceEmails` candidates; `findUnsentBySession`, `findUnsentById`) select
-  `sent_at IS NULL AND (claimed_at IS NULL OR expired)`.
+- Discovery queries (`retryUnsentInvoiceEmails` candidates; `findUnsentBySession`) select only UNSENT and RETRYABLE
+  rows. `findUnsentById` (the admin Resend path) also accepts MAY_HAVE_SENT, because a human asked.
+- **The manual resend claims first, like every send** — the same conditional UPDATE, widened to accept MAY_HAVE_SENT —
+  so a double-clicked Resend (or two admins) sends once, and the row shows SENDING meanwhile.
+- **Invoice resend endpoint (new):** a per-invoice resend needs a caller-authorised path. Add an admin route →
+  `generate-invoices` (or a small `invoice-email` function) taking `invoice_id`, gated today by `is_tenant_admin` of
+  the invoice's tenant. **Roles coordination:** this is one more call site for the Roles enforcement map
+  (`billing:edit`) — whichever lane lands second re-points it.
 - `shouldResetClaim` (credit notes) is retired in favour of the settle table above — its RISK 7 caution is now carried
   by the idempotency key instead of by holding the claim forever.
 - Keep the per-row try/catch and "one failure never blocks the rest" behaviour (existing tests pin it).
 - `notifyGenerationBlocked` (~`email.ts:641`) is not a claimed send — out of scope.
 
-### 3.3 Admin UI (credit notes only)
+### 3.3 Admin UI
 
-`creditNoteEmailState.ts`: a fresh claim (`claimed_at` < 15 min, `sent_at` NULL) renders **"Sending…"** with no
-button; an expired claim renders **"Not emailed"** + Resend. The repo select (`creditNotes.repo.ts:41`) adds
-`email_claimed_at` — which needs a column `GRANT SELECT` to `authenticated` for the admin read, **not** UPDATE.
-`useResend`'s optimistic update sets the claimed state, not the sent state.
+**Credit notes** — `creditNoteEmailState.ts` maps the SQL state: SENDING → **"Sending…"**, no button; UNSENT /
+RETRYABLE → **"Not emailed"** + Resend; MAY_HAVE_SENT → **"May have been sent — Resend anyway?"** + Resend.
+
+**Invoices** — the Billing months card (`invoices/` feature) shows *"N invoice emails may not have arrived"* when any
+invoice of that month is MAY_HAVE_SENT; it opens a short list (parent, reference, claimed at) with a Resend per row.
+Hidden when N = 0.
+
+Both read the **state from SQL** (§3.1), never `claimed_at` compared to the browser clock. `useResend`'s optimistic
+update sets SENDING, not sent.
 
 ## 4. Sequence
 
@@ -121,7 +134,10 @@ button; an expired claim renders **"Not emailed"** + Resend. The repo select (`c
   existing tests updated where they pinned "5xx keeps the claim forever".
 - **pgTAP:** new columns carry no `authenticated` write privilege; the re-issue trigger clears `email_claimed_at`;
   `table_grants.test.sql` green.
-- **vitest:** `creditNoteEmailState` — fresh claim → Sending…, expired → Resend.
+- **vitest:** `creditNoteEmailState` — each of the four SQL states renders its label/button; the Billing months
+  card shows the may-not-have-arrived count only when N > 0.
+- **Deno / pgTAP:** a claim older than 24 h is **never** picked by the automatic retry pass, but is accepted by the
+  manual resend path with a new key; the state function's four boundaries (0, 15 min, 24 h) are pinned.
 - Each new test proven RED without its fix (§7.25). A literal kill-between-claim-and-send stays untestable; the lease
   expiry is what the tests exercise (by writing an old `claimed_at`).
 
@@ -129,12 +145,13 @@ button; an expired claim renders **"Not emailed"** + Resend. The repo select (`c
 
 1. **Clock/lease maths in two languages** — do the expiry comparison **in SQL** (`now()`), never in Deno.
 2. **Idempotency key reuse after 24 h** — with manual billing runs this is the NORMAL case for a stuck invoice email,
-   not a theoretical one. Resolved by §2b.
+   not a theoretical one. Resolved by §2: no automatic retry after 24 h; a human resend uses a new key knowingly.
 3. **Edge-function deploy is separate from git** (CLAUDE.md) — confirm with `supabase functions list`.
 
 ## 7. Out of scope
 
-Automatic credit-note retry pass; invoice email status UI; claim state for package / invite emails.
+Automatic credit-note retry pass; a general invoice email status column (only the may-not-have-arrived count is
+built); claim state for package / invite emails.
 
 ## 8. Graduate at `/update-docs`
 
