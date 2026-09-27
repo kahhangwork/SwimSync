@@ -33,6 +33,11 @@ UPDATE profiles SET role = 'tenant_admin', tenant_id = 'a0d17000-0000-0000-0000-
  WHERE id = 'a0d17000-0000-0000-0000-0000000000a1';
 UPDATE profiles SET role = 'coach', tenant_id = 'a0d17000-0000-0000-0000-000000000001'
  WHERE id = 'a0d17000-0000-0000-0000-0000000000c1';
+-- The business's admin is its OWNER. Since 20260927000300 a non-owner admin
+-- must hold a role (checked at commit — never reached in a rolled-back test),
+-- and since 20260927000400 the operations RPCs ask that role.
+UPDATE tenants SET owner_profile_id = 'a0d17000-0000-0000-0000-0000000000a1'
+ WHERE id = 'a0d17000-0000-0000-0000-000000000001';
 
 INSERT INTO coaches (id, tenant_id, profile_id)
 VALUES ('a0d17000-0000-0000-0000-0000000000f1','a0d17000-0000-0000-0000-000000000001',
