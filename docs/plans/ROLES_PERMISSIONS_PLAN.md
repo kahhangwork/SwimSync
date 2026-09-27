@@ -1,6 +1,12 @@
 # Roles & permissions — owner-defined roles for co-admins — plan
 
-> **Status: IN PROGRESS — step 0 (enforcement map: `ROLES_ENFORCEMENT_MAP.md`)** (written 2026-09-27 via `/plan-with-confidence`). Wave 1, lane 1 of `BACKLOG.md` →
+> **Status: IN PROGRESS — steps 0–1 done** (map: `ROLES_ENFORCEMENT_MAP.md`; migration A: `20260927000300_admin_roles.sql`,
+> pgTAP `roles_permissions.test.sql`). **Built differently from §5.1, on purpose:** roles are seeded by an AFTER INSERT
+> trigger on `tenants` (not inside `provision_tenant`); the seeded roles carry a `standard_key` so renaming one never
+> breaks a lookup; "every co-admin holds a role" is a commit-time (deferred) check because `handle_new_user` decides
+> ownership after inserting the profile; no `created_by` column (§7.90 — audit_log has it); **P6 moved from step 4 into
+> A** because the new check would otherwise refuse an owner transfer; `assign_admin_role` with the full escalation guard
+> is already in A (dormant — nobody holds `admins:edit` until the owner assigns *Full admin*). (written 2026-09-27 via `/plan-with-confidence`). Wave 1, lane 1 of `BACKLOG.md` →
 > *Current build order*. Backlog item: *Split co-admin permissions*. Index: `docs/plans/README.md`.
 
 ## 1. The problem
@@ -54,7 +60,7 @@ otherwise have to be retrofitted.
   these three so money writes need `billing:edit`. *(A column grant is NOT an option: `table_grants.test.sql` assertion 6
   forbids any column-level grant to `authenticated` — found building lane 2's migration, 2026-09-27.)*
 - **P12** `profiles_update` is tenant-wide: an Operations-edit role must **not** edit staff profiles. The admin arm of
-  `profiles_update` is restricted to parent profiles under `students`; staff profiles go under `admins`.
+  `profiles_update` is restricted to parent profiles under `operations`; staff profiles go under `admins`.
 
 ## 3. The 8 areas
 

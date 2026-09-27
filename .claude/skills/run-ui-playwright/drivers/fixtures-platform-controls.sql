@@ -82,6 +82,14 @@ ON CONFLICT (id) DO NOTHING;
 UPDATE tenants SET owner_profile_id = 'd5000000-0000-0000-0000-0000000000a1'
  WHERE id = 'd5000000-0000-0000-0000-000000000001'
    AND owner_profile_id IS DISTINCT FROM 'd5000000-0000-0000-0000-0000000000a1';
+-- Every non-owner co-admin must hold a role at commit (20260927000300), so
+-- Bravo's first admin gets one BEFORE losing ownership — the same role the
+-- migration gave every existing co-admin.
+UPDATE profiles p SET admin_role_id = r.id
+  FROM tenant_roles r
+ WHERE p.tenant_id = 'd5000000-0000-0000-0000-000000000002'
+   AND p.role = 'tenant_admin' AND p.admin_role_id IS NULL
+   AND r.tenant_id = p.tenant_id AND r.standard_key = 'co_admin_as_before';
 UPDATE tenants SET owner_profile_id = NULL
  WHERE id = 'd5000000-0000-0000-0000-000000000002' AND owner_profile_id IS NOT NULL;
 
