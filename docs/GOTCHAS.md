@@ -2420,3 +2420,28 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     Tell the 409s apart by the body's `name`. **Unverified:** whether a 4xx-refused request uses up its key for
     24 h (harmless here — the claim keeps releasing). One key per email, reused by a human resend too
     (`CRASH_SAFE_EMAIL_CLAIM_PLAN.md` §2). (§8.131, `docs/handoff` email-claim.)
+
+297. **`audit_log_tenant_of()` RAISES for any `entity_type` it has no arm for — including from a `SECURITY DEFINER`
+    RPC.** A new audited entity type needs its arm in the SAME migration, plus a pgTAP asserting the audit row's
+    `tenant_id`. Never dodge the raise by auditing under `'Tenant'` or passing a tenant — both lose the link to the
+    entity. Definer-side sibling of §7.192. (`PACKAGE_REVENUE_REFUNDS_PLAN.md`, §8.132.)
+
+298. **`accounting_summary` used to repeat its revenue expression inside `RETURN QUERY`'s `net` CASE** — a new
+    revenue component added to one copy only gives a silently wrong Net. Every component now flows through ONE
+    `v_revenue` assignment. And assert `net` only on a wages-FINAL month: on `run_payouts` it is NULL, so a net
+    check there passes on anything. (§8.132.)
+
+299. **A red-first proof "against the old function" is vacuous when the test reads a column the old function
+    lacks** — it errors on the missing column, not on the rule. Prove red by mutating the NEW body, one guard at a
+    time, and record each mutation in the test header (§7.25 family). (§8.132.)
+
+300. **`enforce_parent_package_lifecycle` resets `discount_amount` / `amount_payable` (and more) on EVERY insert,
+    for every role, superuser included.** A fixture that needs a discounted or otherwise non-default package must
+    superuser-`UPDATE` it after the insert, and assert that precondition before the assertion it enables — or the
+    "payable, not total" check is vacuous. Since §8.132 `confirmed_at` is also pinned to `now()` for
+    `authenticated`; write a fixture's past `confirmed_at` as superuser. (§8.132.)
+
+301. **A driver cannot see current-month money on Accounting — the current month is never sealed.** An Accounting
+    driver needs its OWN tenant with a superuser-written past month and a `billing_periods` row for that tenant
+    only. Never seal the seed tenant: `markable_floor` follows `billing_periods`, and other drivers break.
+    (`verify-accounting-packages.mjs`, §8.132.)

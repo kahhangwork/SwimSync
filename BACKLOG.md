@@ -1091,6 +1091,15 @@ credit notes. On the accounting page a refund **subtracts from the month it is p
 on the accounting page* (counted when paid). Build straight after that item, same lane. Refund-amount rule not yet
 chosen (the 2026-07-20 convention above is the default candidate).
 
+### Show package refunds to the parent — **S** — _filed 2026-09-27_
+Show a recorded package refund on the parent's Billing card (*"Refunded S$X on <date>"*), and email them when one is
+recorded.
+
+**Why:** *In-app package refunds* (`docs/plans/PACKAGE_REVENUE_REFUNDS_PLAN.md`) records refunds admin-side only — the
+user chose "nothing in-app for now" (2026-09-27); the family hears about it from the business directly. **Notes:** the
+email goes through `package-emails`; if it sends per refund, inherit the crash-safe claim pattern (Wave 1 lane 2)
+rather than staying stateless. Needs a parent-scoped SELECT on `package_refunds` (today it is admin-only).
+
 ### Package revenue on the accounting page — **S** — _Wave 2, filed 2026-09-27_
 Count package purchases in the owner's P&L, in the month the package is **paid**.
 
