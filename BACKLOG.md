@@ -267,7 +267,7 @@ _Supersedes every older ranking below, which is kept as history. Forced by: the 
 | Decision | Answer | Consequence for the order |
 |---|---|---|
 | Co-admin permissions — now or later? | **NOW** — a co-admin will be hired within ~3 months | *Split co-admin permissions* goes to the head of the queue, alone, before any new admin surface (every surface built first would be retrofitted) |
-| Permission shape | **Owner-defined ROLES**, each a grid of **11 areas × None / View / Edit** (refined in planning: every area is money OR operations, never both — `docs/plans/ROLES_PERMISSIONS_PLAN.md` §3); a few **starter presets** the owner can copy and edit; **all areas at once**, not phased | Server-side enforcement per area (RLS/RPC), not UI hiding. Size **L** (~1–2 weeks) |
+| Permission shape | **Owner-defined ROLES**, each a grid of **8 areas × None / View / Edit** (11 in planning; the four ops areas merged into one `operations` area in step 0, 2026-09-27, because they read each other's data. Refined in planning: every area is money OR operations, never both — `docs/plans/ROLES_PERMISSIONS_PLAN.md` §3); a few **starter presets** the owner can copy and edit; **all areas at once**, not phased | Server-side enforcement per area (RLS/RPC), not UI hiding. Size **L** (~1–2 weeks) |
 | Can admin/role management be granted? | **Yes, grantable** | Escalation guard is mandatory: a delegate can grant only capabilities they hold themselves, and can never modify or remove the owner |
 | Package revenue on the accounting page | **Counted when the package is PAID** (cash, in the month paid) | New item *Package revenue on the accounting page*. A deliberate exception to 2026-08-16's accrual basis — recorded so it is not "fixed" back |
 | Refunds | ~~Owner-only~~ **grantable via `packages:edit`** (refined in planning — the user made every area grantable; the standard roles give it to Full admin only); package-only (monthly invoices already correct via credit notes); a refund **subtracts from the month it is paid out** (mirrors the line above) | *In-app package refunds* ships right after package revenue, same lane (shared surface: the accounting page) |
@@ -1444,7 +1444,7 @@ final and overstate Net.
 ### Split co-admin permissions — **L** (was M) — **Wave 1, decided 2026-09-27**
 
 **Decided with the user 2026-09-27:** build NOW (a co-admin hire is ~3 months out). Owner-defined **roles**, each a
-grid of **11 areas** — six operations, five money, never mixed (full list and mapping: `docs/plans/ROLES_PERMISSIONS_PLAN.md` §3) × **None / View / Edit**; a few **starter presets** the
+grid of **8 areas** — three operations, five money, never mixed (was 11; the four ops areas merged 2026-09-27) (full list and mapping: `docs/plans/ROLES_PERMISSIONS_PLAN.md` §3) × **None / View / Edit**; a few **starter presets** the
 owner can copy and edit; **all areas in one build**. **Admin/role management is grantable**, with a mandatory
 escalation guard: a delegate may grant only what they hold, and never touches the owner. The owner always holds
 everything. Enforcement is server-side per area — hiding a page is not a boundary (the accounting page's own rule).

@@ -1,6 +1,6 @@
 # Roles & permissions — owner-defined roles for co-admins — plan
 
-> **Status: NOT STARTED** (written 2026-09-27 via `/plan-with-confidence`). Wave 1, lane 1 of `BACKLOG.md` →
+> **Status: IN PROGRESS — step 0 (enforcement map: `ROLES_ENFORCEMENT_MAP.md`)** (written 2026-09-27 via `/plan-with-confidence`). Wave 1, lane 1 of `BACKLOG.md` →
 > *Current build order*. Backlog item: *Split co-admin permissions*. Index: `docs/plans/README.md`.
 
 ## 1. The problem
@@ -15,17 +15,17 @@ otherwise have to be retrofitted.
 | # | Decision |
 |---|---|
 | D1 | **The owner sees and edits everything, always.** No role applies to the owner. |
-| D2 | **Owner-defined roles.** A role is a named grid of **11 areas × None / View / Edit**. Each co-admin holds exactly one role. |
-| D3 | **Every area is either money or operations, never both** (the user's governing rule). The 11 areas are in §3. |
+| D2 | **Owner-defined roles.** A role is a named grid of **8 areas × None / View / Edit** *(was 11 — the four ops areas merged into one, user 2026-09-27, §3)*. Each co-admin holds exactly one role. |
+| D3 | **Every area is either money or operations, never both** (the user's governing rule). The 8 areas are in §3. |
 | D4 | **Everything is grantable**, Accounting and refunds included. The owner decides; the product does not restrict them. |
 | D5 | **Three standard roles** seeded for every business: *Full admin*, *Operations assistant*, *Front desk* (§4) — plus a transitional *Co-admin (as before)* holding today's co-admins (P1). The owner may edit or delete them. They encode the norm: helpers do operations, money stays with the owner. |
 | D6 | **"None" = page hidden + admin-only data refused by the server.** Reference data every staff member can already read (class list, levels, locations, coach names — the `current_tenant_id()` read policies) stays readable. The coach app keeps working. |
 | D7 | **Small money details on operations pages stay visible** (a child's payment method, package lessons left, a family's balance). Only whole money pages and money actions are gated. |
 | D8 | **Operations actions that move money by rule are allowed** to an operations role: an attendance correction in a billed month still auto-issues its credit note; an advance-cancel still extends a package. The money follows the recorded fact, and is audited. |
 | D9 | **Admin management is grantable** (area *Admins & roles*). A co-admin with *Admins & roles: Edit* may invite, deactivate, reactivate and change the role of **any co-admin**, but **never the owner**. They may **assign** only roles that are **no stronger than their own** (escalation guard, §5.4), and they **cannot create or edit roles** — only the owner can. |
-| D10 | **Scope: all 11 areas in one build** (not phased by area). Rollout is still staged by migration (§6), and is behaviour-preserving until the owner moves a co-admin off *Co-admin (as before)*. |
+| D10 | **Scope: all 8 areas in one build** (not phased by area). Rollout is still staged by migration (§6), and is behaviour-preserving until the owner moves a co-admin off *Co-admin (as before)*. |
 
-### Defaults chosen by the planner (veto any before building)
+### Defaults chosen by the planner — **all accepted by the user, 2026-09-27**
 
 - **P1** Existing co-admins are placed on a fourth standard role, **"Co-admin (as before)"** = every area Edit **except
   Accounting and Admins & roles = None** — exactly today's authority (PRD §4.3). *Full admin* would have been a silent
@@ -51,27 +51,37 @@ otherwise have to be retrofitted.
   (`pin_invoice_public_fields`) covers `reference_number`/`public_token`, so `net_amount`/`status` are writable.
   `confirm_invoice_paid` and `payment_records_insert` also admit the coach arm. The coach app shows **no** invoices
   (PRD §7.9), so the arm serves nothing. Step 0 confirms no caller uses it; migration C removes the coach arm from
-  these three (or narrows `invoices` UPDATE to a column grant) so money writes need `billing:edit`.
-- **P12** `profiles_update` is tenant-wide: a Students-edit role must **not** edit staff profiles. The admin arm of
+  these three so money writes need `billing:edit`. *(A column grant is NOT an option: `table_grants.test.sql` assertion 6
+  forbids any column-level grant to `authenticated` — found building lane 2's migration, 2026-09-27.)*
+- **P12** `profiles_update` is tenant-wide: an Operations-edit role must **not** edit staff profiles. The admin arm of
   `profiles_update` is restricted to parent profiles under `students`; staff profiles go under `admins`.
 
-## 3. The 11 areas
+## 3. The 8 areas
+
+> **Merged 2026-09-27 (user, during step 0).** The draft had four ops areas — Attendance & lessons, Students &
+> families, Classes & setup, Coaches & cover. Step 0 found they all READ each other's tables (the roster needs student
+> names, Students needs classes, Attendance needs cover), so a role with one and not another shows half-empty pages.
+> The user's call: a combination that cannot work must not be settable, so the four are **one area, `operations`**.
+> The rows below keep the four old headings for the page/table inventory; they are one grid row and one enum value.
+>
+> **Grid invariant that follows:** money pages also show child and class names, so **a role with any area above None
+> must have `operations` ≥ View**. The Roles editor enforces it and `update_role_permissions` refuses the violation.
 
 | # | Area (`admin_area` enum value) | Kind | Pages | Tables / RPCs it gates (headline) |
 |---|---|---|---|---|
-| 1 | `attendance` — Attendance & lessons | ops | Attendance Log, Lessons, Calendar, Make-ups, Trials, Holidays, Change History | `tenant_public_holidays`, `attendance`, `lesson_sessions`, `session_coach_absences`, `audit_log` read, `makeup_bookings`, `trial_bookings` writes; `cancel_lesson`, `restore_lesson`, `schedule_extra_lesson`, `mark_day_holiday`, `unmark_day_holiday`, `book_makeup`, `book_trial`, `cancel_*_booking`, `unbilled_sealed_lessons` (view) |
-| 2 | `students` — Students & families | ops | Students, Parents, Unassigned, Parent Requests, Assessment | `students`, `student_class_enrolments`, `student_claims`, `student_skill_progress`, `skill_grade_levels`, `profiles` update; `add_unclaimed_student`, `*_student_claim`, `link_invited_parent`, `merge_students`, `rename_student`, `find_roster_duplicates`, `set_students_active`, `set_parent_tenant_active`, `close_student_enrolment`, `tenant_admin_has_member` |
-| 3 | `classes` — Classes & setup | ops | Classes (schedule, not price), Levels, Locations | `classes` (a price on INSERT needs `pricing:edit` too — see §5.3), `class_categories`, `locations`, `tenant_levels`, `tenant_level_skills`; `deactivate_class`, `reactivate_class` |
-| 4 | `coaches` — Coaches & cover | ops | Coaches, Substitutes | `coaches` update, `session_coaches`, `class_shadow_coaches`; `assign_session_coach`, `set_session_main_coach`, `assign_class_shadow`, `end_class_shadow`, `disable_coach`, `reactivate_coach`; route `create-coach` |
-| 5 | `profile` — Business profile | ops | Dashboard tenant card | `tenants` name / logo / join code columns; `regenerate_join_code` |
-| 6 | `admins` — Admins & roles | ops | Admins, Roles | co-admin RPCs + API routes (§5.4) |
-| 7 | `pricing` — Pricing | money | price fields on the class form, trial prices | `class_rates`, `class_rate_overrides`, `trial_rates`; `set_class_terms` (the price half — see §5.3) |
-| 8 | `billing` — Billing & payments | money | Invoices, Credit Notes, billing months, WhatsApp queue | `invoices`, `invoice_items`, `credit_notes`, `credit_applications`, `billing_periods`, `billing_runs`, `payment_records`, `student_settlements`; `confirm_invoice_paid`, `void_credit_note`, `write_off_parent_balance`; `tenants` PayNow + run-day columns; storage bucket `paynow-qr`; route `generate-invoices`; edge `credit-note-emails` note path |
-| 9 | `packages` — Packages & referrals | money | Packages, Referrals (+ refunds, Wave 2) | `package_products`, `parent_packages`, `package_*` read tables, `referrals`, `referral_rewards`; `create_package_offer`, `extend_package`, `preview_package_price`, `grant_referral_reward`, `void_referral_reward`, `set_referral_code_disabled`; edge `package-emails` offered/reward |
-| 10 | `wages` — Wages | money | Wages | `coach_rates`, `coach_payouts`, `coach_payout_items`, `session_pay_overrides`; `generate_coach_payouts`, `mark_payout_paid` |
-| 11 | `accounting` — Accounting | money | Accounting | `accounting_summary`, `accounting_months` (today owner-gated) |
+| 1a | `operations` — *Attendance & lessons* | ops | Attendance Log, Lessons, Calendar, Make-ups, Trials, Holidays, Change History | `tenant_public_holidays`, `attendance`, `lesson_sessions`, `session_coach_absences`, `audit_log` read, `makeup_bookings`, `trial_bookings` writes; `cancel_lesson`, `restore_lesson`, `schedule_extra_lesson`, `mark_day_holiday`, `unmark_day_holiday`, `book_makeup`, `book_trial`, `cancel_*_booking`, `unbilled_sealed_lessons` (view) |
+| 1b | `operations` — *Students & families* | ops | Students, Parents, Unassigned, Parent Requests, Assessment | `students`, `student_class_enrolments`, `student_claims`, `student_skill_progress`, `skill_grade_levels`, `profiles` update; `add_unclaimed_student`, `*_student_claim`, `link_invited_parent`, `merge_students`, `rename_student`, `find_roster_duplicates`, `set_students_active`, `set_parent_tenant_active`, `close_student_enrolment`, `tenant_admin_has_member` |
+| 1c | `operations` — *Classes & setup* | ops | Classes (schedule, not price), Levels, Locations | `classes` (a price on INSERT needs `pricing:edit` too — see §5.3), `class_categories`, `locations`, `tenant_levels`, `tenant_level_skills`; `deactivate_class`, `reactivate_class` |
+| 1d | `operations` — *Coaches & cover* | ops | Coaches, Substitutes | `coaches` update, `session_coaches`, `class_shadow_coaches`; `assign_session_coach`, `set_session_main_coach`, `assign_class_shadow`, `end_class_shadow`, `disable_coach`, `reactivate_coach`; route `create-coach` |
+| 2 | `profile` — Business profile | ops | Dashboard tenant card | `tenants` name / logo / join code columns; `regenerate_join_code` |
+| 3 | `admins` — Admins & roles | ops | Admins, Roles | co-admin RPCs + API routes (§5.4) |
+| 4 | `pricing` — Pricing | money | price fields on the class form, trial prices | `class_rates`, `class_rate_overrides`, `trial_rates`; `set_class_terms` (the price half — see §5.3) |
+| 5 | `billing` — Billing & payments | money | Invoices, Credit Notes, billing months, WhatsApp queue | `invoices`, `invoice_items`, `credit_notes`, `credit_applications`, `billing_periods`, `billing_runs`, `payment_records`, `student_settlements`; `confirm_invoice_paid`, `void_credit_note`, `write_off_parent_balance`; `tenants` PayNow + run-day columns; storage bucket `paynow-qr`; route `generate-invoices`; edge `credit-note-emails` note path |
+| 6 | `packages` — Packages & referrals | money | Packages, Referrals (+ refunds, Wave 2) | `package_products`, `parent_packages`, `package_*` read tables, `referrals`, `referral_rewards`; `create_package_offer`, `extend_package`, `preview_package_price`, `grant_referral_reward`, `void_referral_reward`, `set_referral_code_disabled`; edge `package-emails` offered/reward |
+| 7 | `wages` — Wages | money | Wages | `coach_rates`, `coach_payouts`, `coach_payout_items`, `session_pay_overrides`; `generate_coach_payouts`, `mark_payout_paid` |
+| 8 | `accounting` — Accounting | money | Accounting | `accounting_summary`, `accounting_months` (today owner-gated) |
 
-`tenant_public_holidays` is written by the Holidays page → area 1. The enforcement map (§6, step 1) is the
+`tenant_public_holidays` is written by the Holidays page → `operations`. The enforcement map (§6, step 1) is the
 authority for every table and function; this table is the headline.
 
 **Dashboard** is always visible; each tile renders only if its area is at least View.
@@ -80,10 +90,7 @@ authority for every table and function; this table is the headline.
 
 | Area | Full admin | Operations assistant | Front desk |
 |---|---|---|---|
-| Attendance & lessons | Edit | Edit | Edit |
-| Students & families | Edit | Edit | Edit |
-| Classes & setup | Edit | Edit | View |
-| Coaches & cover | Edit | Edit | View |
+| Operations | Edit | Edit | Edit |
 | Business profile | Edit | Edit | None |
 | Admins & roles | Edit | None | None |
 | Pricing · Billing · Packages · Wages · Accounting | Edit | **None** | **None** |
@@ -91,15 +98,18 @@ authority for every table and function; this table is the headline.
 A fourth, **"Co-admin (as before)"**, exists only to hold today's co-admins without changing their authority (P1):
 every area Edit except **Accounting = None** and **Admins & roles = None**. The owner may delete it once empty.
 
+*Front desk* lost its draft distinction (Classes/Coaches view-only) in the merge; it now differs from *Operations
+assistant* only by Business profile. Kept as a starting point the owner can edit.
+
 ## 5. Design
 
 ### 5.1 Data (migration A — expand, dormant)
 
-- `CREATE TYPE admin_area AS ENUM (…11…)`, `CREATE TYPE admin_level AS ENUM ('none','view','edit')` (ordered, so
+- `CREATE TYPE admin_area AS ENUM ('operations','profile','admins','pricing','billing','packages','wages','accounting')`, `CREATE TYPE admin_level AS ENUM ('none','view','edit')` (ordered, so
   `>=` compares levels).
 - `tenant_roles (id, tenant_id, name, is_standard BOOLEAN, created_at, created_by, UNIQUE(tenant_id, name))`.
 - `tenant_role_permissions (role_id → tenant_roles ON DELETE CASCADE, area admin_area, level admin_level,
-  PRIMARY KEY(role_id, area))` — **all 11 rows always present** (a CHECK-by-trigger or a seed function guarantees it);
+  PRIMARY KEY(role_id, area))` — **all 8 rows always present** (a CHECK-by-trigger or a seed function guarantees it);
   a missing row is a bug, never an implicit None.
 - `profiles.admin_role_id UUID REFERENCES tenant_roles` — **required for every non-owner `tenant_admin`** (a trigger
   enforces it, and that the role belongs to the profile's tenant); NULL for the owner and everyone else. A NULL on a
@@ -154,12 +164,12 @@ Three places need more than a swap:
    (Pattern: `guard_tenants_owner`. Detect the UPDATE-from-upsert case, §7.57.)
 2. **`set_class_terms`** writes price *and* coach (`p_coach_id` sets both `classes.coach_id` and `paid_coach_id`).
    Checks are **additive, one per group that actually changes**, compared against `class_rate_on(v_from)` and the
-   current row: rate changed → `pricing:edit`; coach changed → `coaches:edit`; schedule/title changed →
-   `classes:edit`. A call changing price and title needs both. The class form hides price fields without
+   current row: rate changed → `pricing:edit`; coach, schedule or title changed → `operations:edit`. A call changing price
+   and title needs both. The class form hides price fields without
    `pricing:view` and makes them read-only without `pricing:edit`.
 2b. **Creating a class seeds its billing rate**: trigger `classes_seed_rate` → `seed_class_rate()` (SECURITY DEFINER)
    inserts a `class_rates` row from `NEW.price_per_lesson`. A class INSERT with a price therefore needs
-   `pricing:edit` as well as `classes:edit` — enforced in that trigger (or a `create_class` RPC), not in the form.
+   `pricing:edit` as well as `operations:edit` — enforced in that trigger (or a `create_class` RPC), not in the form.
 3. **Owner-only RPCs** (`accounting_*`, admin management) move from `is_tenant_owner` to `has_admin_area(…,'accounting'|'admins',…)`
    — owner still passes via D1.
 
@@ -194,7 +204,7 @@ means the newest body lives in any later migration.
 - `lib/adminNav.ts`: each `NavItem` gains `area`; `navFor` filters on `can(area,'view')`. `RequiresTenant` refuses a
   direct URL to a page the role can't view, with a plain *"Your role doesn't include this page"* state.
 - Per page: edit controls hidden without Edit (P5). Money pages are simply absent for an ops role.
-- **New Roles page** (`/roles`, area `admins`): list roles + holder counts; owner edits the 11×3 grid; co-admins with
+- **New Roles page** (`/roles`, area `admins`): list roles + holder counts; owner edits the 8×3 grid; co-admins with
   `admins:view|edit` see it read-only.
 - **Admins page:** a Role column; role picker on invite and per row (options filtered by the assignment rule —
   display only; the RPC is the boundary). Owner-only UI checks are replaced by `can('admins','edit')`.
@@ -209,7 +219,7 @@ in the coach app uses the admin arm (research §6) — verify with the enforceme
 ### 5.7 Edge functions
 
 - `credit-note-emails` note path (`is_tenant_admin`) → `has_admin_area(t,'billing','edit')`. The session path
-  (admin OR main coach) → `attendance:edit` OR main coach.
+  (admin OR main coach) → `operations:edit` OR main coach.
 - `package-emails` offered / referral reward (`can_admin_tenant`) → `packages:edit`.
 - `generate-invoices` trusts the Next.js route (CRON_SECRET) — the route gets `billing:edit` (P9).
 - The **invoice email resend** path added by the crash-safe email claim (lane 2, `CRASH_SAFE_EMAIL_CLAIM_PLAN.md` §3.2)
@@ -229,8 +239,8 @@ all co-admins are on *Co-admin (as before)* (today's authority exactly) and the 
 |---|---|---|
 | 0 | **Enforcement map.** Generate from the live local DB: every policy (`pg_policies`) and function (`pg_proc.prosrc`) referencing the three helpers, each assigned an area + level. Commit as `docs/plans/ROLES_ENFORCEMENT_MAP.md`. Review with the user if any row is ambiguous. | Every one of the 68 policies + ~55 functions has a row |
 | 1 | Migration A: types, tables, `has_admin_area`, `my_admin_permissions`, seed, `profiles.admin_role_id` + guard, role RPCs, `provision_tenant` seeding | pgTAP: new `roles_permissions.test.sql` (§7) |
-| 2 | Migration B: re-point **operations** areas 1–5 (policies + RPCs) | pgTAP matrix for areas 1–5 |
-| 3 | Migration C: re-point **money** areas 7–11 incl. the `tenants` trigger and `set_class_terms` split | pgTAP matrix for 7–11 |
+| 2 | Migration B: re-point `operations` + `profile` (policies + RPCs) | pgTAP matrix for both |
+| 3 | Migration C: re-point **money** areas 4–8 (`pricing`…`accounting`) incl. the `tenants` trigger and `set_class_terms` split | pgTAP matrix for 4–8 |
 | 4 | Migration D: admin management → `admins` area + escalation guard | pgTAP escalation tests |
 | 5 | Edge functions (`credit-note-emails`, `package-emails`) — deploy one at a time, `supabase functions list` | Deno tests |
 | 6 | Admin app + coach app (context, nav, pages, Roles page, Admins page, API routes incl. P9) | vitest + jest + typecheck |
@@ -241,7 +251,7 @@ Steps 1–4 can each deploy to prod as they land (dormant). Step 6 is the first 
 
 ## 7. Tests
 
-- **pgTAP `roles_permissions.test.sql`:** seed creates 4 roles × 11 rows per tenant; existing co-admins on *Co-admin (as before)* and still refused Accounting and admin management (`accounting_summary.test.sql`'s co-admin refusal stays green);
+- **pgTAP `roles_permissions.test.sql`:** seed creates 4 roles × 8 rows per tenant; the operations-≥-View invariant is refused; existing co-admins on *Co-admin (as before)* and still refused Accounting and admin management (`accounting_summary.test.sql`'s co-admin refusal stays green);
   `has_admin_area` truth table (owner, platform admin, deactivated admin, suspended tenant, each level); a user cannot
   write `admin_role_id`; role CRUD owner-only; `delete_role` refuses while held; cross-tenant role assignment refused.
 - **pgTAP permission matrix:** for each area, a co-admin on a role with that area at None / View / Edit — SELECT
@@ -258,7 +268,7 @@ Steps 1–4 can each deploy to prod as they land (dormant). Step 6 is the first 
 - **Deno:** the two edge-function gates.
 - **vitest:** `navFor` filtering by area; `usePermissions`; Admins role picker filtering; Roles grid editor.
 - **Driver `verify-roles.mjs`:** owner creates a role; invites a co-admin on *Front desk*; the co-admin sees only ops
-  pages, gets the refusal state on `/invoices` by URL, sees Classes read-only; owner upgrades them and the page appears.
+  pages, gets the refusal state on `/invoices` by URL, cannot edit the business profile; owner upgrades them and the page appears.
   Prove red by reverting one policy re-point.
 - **Every new test proven RED without its fix** (§7.25).
 
