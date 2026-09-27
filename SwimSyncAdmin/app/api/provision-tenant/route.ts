@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@supabase/supabase-js";
 import { sendInviteEmail } from "@/lib/inviteEmail";
+import { mintStaffInvitation } from "@/lib/staffInvitation";
 
 /**
  * Provision a new business and invite its first admin. Platform admin only.
@@ -121,6 +122,17 @@ export async function POST(req: NextRequest) {
 
   // ── 2. Invite the admin; compensate on ANY failure ────────────────────────
   try {
+    // The auth trigger grants tenant_admin ONLY against this row, not from
+    // the metadata below (20260927000200 — a public signUp sets metadata too).
+    const invitation = await mintStaffInvitation(adminClient, {
+      email,
+      role: "tenant_admin",
+      tenantId,
+      isCoach: Boolean(isCoach),
+      createdBy: userData.user.id,
+    });
+    if (!invitation.ok) throw new Error(invitation.error);
+
     const { data: link, error: linkErr } =
       await adminClient.auth.admin.generateLink({
         type: "invite",
@@ -131,6 +143,7 @@ export async function POST(req: NextRequest) {
           // they administer the business AND teach in it. It is deliberately
           // independent of `kind` — a school's owner may well teach.
           data: {
+            invitation_nonce: invitation.nonce,
             role: "tenant_admin",
             full_name: adminName.trim(),
             tenant_id: tenantId,

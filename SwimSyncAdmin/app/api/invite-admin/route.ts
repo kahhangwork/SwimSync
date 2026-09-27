@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireOwner } from "@/lib/adminManagementGate";
 import { sendCoAdminInviteEmail } from "@/lib/coAdminInviteEmail";
+import { mintStaffInvitation } from "@/lib/staffInvitation";
 
 /**
  * The OWNER invites a co-admin into their own business. Owner only — a
@@ -17,7 +18,7 @@ import { sendCoAdminInviteEmail } from "@/lib/coAdminInviteEmail";
 export async function POST(req: NextRequest) {
   const gate = await requireOwner(req);
   if (!gate.ok) return gate.response;
-  const { tenantId, adminClient } = gate;
+  const { tenantId, adminClient, callerId } = gate;
 
   const { name, email: rawEmail, phone, isCoach } = await req.json();
   if (!name?.trim() || !rawEmail?.trim()) {
@@ -54,15 +55,29 @@ export async function POST(req: NextRequest) {
     .eq("id", tenantId)
     .single();
 
+  // The auth trigger grants tenant_admin ONLY against this row, not from
+  // the metadata below (20260927000200 — a public signUp sets metadata too).
+  const invitation = await mintStaffInvitation(adminClient, {
+    email,
+    role: "tenant_admin",
+    tenantId,
+    isCoach: Boolean(isCoach),
+    createdBy: callerId,
+  });
+  if (!invitation.ok) {
+    return NextResponse.json({ error: invitation.error }, { status: 500 });
+  }
+
   const { data: link, error: linkErr } =
     await adminClient.auth.admin.generateLink({
       type: "invite",
       email,
       options: {
         // The auth trigger builds profiles (+ coaches when is_coach) from
-        // this. is_coach here is "this co-admin also teaches" — same shape as
-        // the private-coach owner.
+        // the invitation row; role / tenant_id / is_coach here are kept for
+        // display and for the trusted direct-SQL path only.
         data: {
+          invitation_nonce: invitation.nonce,
           role: "tenant_admin",
           full_name: name.trim(),
           tenant_id: tenantId,

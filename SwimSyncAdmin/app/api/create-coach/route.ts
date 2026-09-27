@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient } from "@supabase/supabase-js";
+import { mintStaffInvitation } from "@/lib/staffInvitation";
 
 export async function POST(req: NextRequest) {
   // Verify caller is an authenticated superadmin
@@ -51,6 +52,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // The auth trigger grants coach ONLY against this row, not from the
+  // metadata below (20260927000200 — a public signUp sets metadata too).
+  const invitation = await mintStaffInvitation(adminClient, {
+    email,
+    role: "coach",
+    tenantId: profile!.tenant_id,
+    createdBy: userData.user.id,
+  });
+  if (!invitation.ok) {
+    return NextResponse.json({ error: invitation.error }, { status: 500 });
+  }
+
   // Create Supabase auth user
   const { data: newUser, error: createError } =
     await adminClient.auth.admin.createUser({
@@ -60,7 +73,12 @@ export async function POST(req: NextRequest) {
       // The auth trigger REFUSES to create a coach without a tenant rather than
       // guessing — with one business on the platform a wrong guess would look
       // like it worked. A tenant admin's coaches join their own business.
-      user_metadata: { role: "coach", full_name: name, tenant_id: profile!.tenant_id },
+      user_metadata: {
+        invitation_nonce: invitation.nonce,
+        role: "coach",
+        full_name: name,
+        tenant_id: profile!.tenant_id,
+      },
     });
 
   if (createError || !newUser.user) {
