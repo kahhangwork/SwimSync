@@ -12,6 +12,7 @@ export function toSummary(row: any): Summary | null {
         revenue: num(row.revenue),
         revenue_invoiced: num(row.revenue_invoiced),
         revenue_settlements: num(row.revenue_settlements),
+        revenue_packages: num(row.revenue_packages),
         revenue_gross: num(row.revenue_gross),
         revenue_package_applied: num(row.revenue_package_applied),
         revenue_credit_applied: num(row.revenue_credit_applied),

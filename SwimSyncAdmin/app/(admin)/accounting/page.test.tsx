@@ -50,6 +50,7 @@ const FINAL = {
   revenue_gross: "180.00", revenue_package_applied: "10.00",
   revenue_credit_applied: "20.00", revenue_balance_adjustment: "15.00",
   outstanding: "100.00", wages: "180.00", net: "10.00", wages_state: "final",
+  revenue_packages: "0.00",
 };
 
 const RUN_PAYOUTS = {
@@ -118,5 +119,24 @@ describe("AccountingPage wages withholding", () => {
     const net = await screen.findByTestId("tile-net");
     expect(wages.textContent).toContain("S$180.00");
     expect(net.textContent).toContain("S$10.00");
+  });
+});
+
+describe("AccountingPage package revenue (Wave 2 U1)", () => {
+  it("shows packages sold as its own line, apart from packages applied, with the basis note", async () => {
+    state.summary = { ...FINAL, revenue: "460.00", revenue_packages: "270.00", net: "280.00" };
+    render(<AccountingPage />);
+    const revenue = await screen.findByTestId("tile-revenue");
+    expect(revenue.textContent).toContain("S$460.00");
+    expect(revenue.textContent).toContain("packages S$270.00");
+    const sold = screen.getByText("+ Packages sold (paid this month)");
+    expect(sold.nextElementSibling?.textContent).toBe("S$270.00");
+    // W2: the invoice deduction keeps its own label, explained, never merged.
+    const applied = screen.getByText("− Packages applied");
+    expect(applied.getAttribute("title")).toMatch(/counted when sold/);
+    expect(applied.nextElementSibling?.textContent).toBe("S$10.00");
+    expect(screen.getByTestId("revenue-basis-note").textContent).toContain(
+      "packages count the month they were paid",
+    );
   });
 });

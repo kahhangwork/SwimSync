@@ -2874,8 +2874,16 @@ received. Four figures per month:
 
 - **Revenue** = each invoice's `net_amount` **minus** its `balance_adjustment` (a prior
   month's debit folded onto this month's invoice is not this month's earning), **plus** live
-  `paid_outside` settlements covering the month. A **breakdown** (gross − packages − credit −
-  prior-month debit = invoiced; + settlements = revenue) makes any figure auditable.
+  `paid_outside` settlements covering the month, **plus package purchases paid that month**. A
+  **breakdown** (gross − packages applied − credit − prior-month debit = invoiced; + settlements
+  + packages sold = revenue) makes any figure auditable.
+- **Package revenue is cash-basis** *(implemented 2026-09-27)* — a deliberate exception to the
+  accrual basis: a package counts **once**, in the Singapore month it was **paid** (confirmed),
+  at what the family actually paid (`amount_payable`, after any referral discount). A package
+  paid then cancelled still counts in its paid month. Lessons later drawn from it stay out of
+  invoiced revenue (*− Packages applied*), so nothing counts twice. The page says so under the
+  breakdown. A confirmation date cannot be back-dated by the app — it is always the moment of
+  confirming — so package revenue never lands in a closed month.
 - **Outstanding** = the month's still-unpaid invoices (raw `net_amount`, the same definition
   the Invoices page uses); it legitimately changes over time as invoices get paid.
 - **Wages** = accrued cost of lessons **taught** that month (a period's own payout items plus

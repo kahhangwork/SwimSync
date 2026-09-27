@@ -16,6 +16,11 @@ describe("toSummary", () => {
     expect(s.wages_state).toBe("final");
   });
 
+  it("maps revenue_packages (Wave 2 U1 — without it the line silently shows —)", () => {
+    const s = toSummary({ revenue_packages: "270.00", wages_state: "final" })!;
+    expect(s.revenue_packages).toBe(270);
+  });
+
   it("a withheld figure (null / missing) stays null, never 0", () => {
     const s = toSummary({ wages: null, wages_state: "run_payouts" })!;
     expect(s.wages).toBeNull();

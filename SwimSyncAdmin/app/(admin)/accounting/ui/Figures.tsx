@@ -13,7 +13,7 @@ export function Figures({ summary }: { summary: Summary }) {
         <Tile
           label="Revenue"
           value={moneyOrDash(summary.revenue)}
-          sub={`Invoices ${moneyOrDash(summary.revenue_invoiced)} + settlements ${moneyOrDash(summary.revenue_settlements)}`}
+          sub={`Invoices ${moneyOrDash(summary.revenue_invoiced)} + settlements ${moneyOrDash(summary.revenue_settlements)} + packages ${moneyOrDash(summary.revenue_packages)}`}
           testid="tile-revenue"
         />
         <Tile
@@ -53,22 +53,33 @@ export function Figures({ summary }: { summary: Summary }) {
         </p>
         <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm sm:max-w-md">
           <Line label="Gross billed" v={moneyOrDash(summary.revenue_gross)} />
-          <Line label="− Packages applied" v={moneyOrDash(summary.revenue_package_applied)} />
+          <Line
+            label="− Packages applied"
+            title="Lessons paid from a package — the package itself is counted when sold."
+            v={moneyOrDash(summary.revenue_package_applied)}
+          />
           <Line label="− Credit applied" v={moneyOrDash(summary.revenue_credit_applied)} />
           <Line label="− Prior-month debit" v={moneyOrDash(summary.revenue_balance_adjustment)} />
           <Line label="= Invoiced revenue" v={moneyOrDash(summary.revenue_invoiced)} strong />
           <Line label="+ Outside settlements" v={moneyOrDash(summary.revenue_settlements)} />
+          <Line label="+ Packages sold (paid this month)" v={moneyOrDash(summary.revenue_packages)} />
           <Line label="= Revenue" v={moneyOrDash(summary.revenue)} strong />
         </dl>
+        {/* Two bases on one page (PACKAGE_REVENUE_REFUNDS_PLAN.md U1) — say so,
+            or a surprising Revenue is unexplainable. */}
+        <p className="mt-3 text-xs text-gray-500" data-testid="revenue-basis-note">
+          Invoices count the month they bill; packages count the month they were paid.
+          A package paid this month appears once the month closes.
+        </p>
       </div>
     </>
   );
 }
 
-function Line({ label, v, strong }: { label: string; v: string; strong?: boolean }) {
+function Line({ label, v, strong, title }: { label: string; v: string; strong?: boolean; title?: string }) {
   return (
     <>
-      <dt className={`text-gray-500 ${strong ? "font-semibold text-gray-700" : ""}`}>
+      <dt title={title} className={`text-gray-500 ${strong ? "font-semibold text-gray-700" : ""}`}>
         {label}
       </dt>
       <dd className={`text-right tabular-nums ${strong ? "font-semibold text-gray-900" : "text-gray-700"}`}>

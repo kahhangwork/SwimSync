@@ -287,7 +287,7 @@ _Supersedes every older ranking below, which is kept as history. Forced by: the 
 plan (`/plan-with-confidence`). New money surfaces take the `packages` / `billing` / `accounting` areas.
 
 
-3. **Package revenue on the accounting page** (S).
+3. ~~**Package revenue on the accounting page** (S)~~ — **shipped 2026-09-27** (PRD §7.23).
 4. **In-app package refunds** (S) — same lane as 3, straight after (shared surface).
    - **Lane 2:** *Deeper component-render tests* — **only** the attendance save flow, which Wave 2 does not touch.
 
@@ -1099,20 +1099,6 @@ recorded.
 user chose "nothing in-app for now" (2026-09-27); the family hears about it from the business directly. **Notes:** the
 email goes through `package-emails`; if it sends per refund, inherit the crash-safe claim pattern (Wave 1 lane 2)
 rather than staying stateless. Needs a parent-scoped SELECT on `package_refunds` (today it is admin-only).
-
-### Package revenue on the accounting page — **S** — _Wave 2, filed 2026-09-27_
-Count package purchases in the owner's P&L, in the month the package is **paid**.
-
-**Why:** today a family on a package contributes **S$0** to Revenue, ever. `accounting_summary`
-(`20260823000100`) subtracts `package_applied` from each invoice line and counts the package purchase nowhere
-("off-invoice cash … belongs to no month here"). Harmless today only because packages are dormant on prod (HANDOVER §3; check
-`SELECT count(*) FROM parent_packages` before trusting that); the user plans to sell them soon, and the first sale would make the P&L under-report.
-
-**Notes:** decided with the user 2026-09-27 — **cash, in the month paid**, a deliberate exception to the accrual
-basis of 2026-08-16; don't "fix" it back to recognising revenue per lesson used. No double count: package-funded
-lines stay subtracted from invoice revenue, the purchase is added once. Add it as its own breakdown line so Revenue
-stays auditable. Refunds subtract in the month paid out (*In-app package refunds*). Gated by the *Accounting* area under
-Roles (owner always; grantable).
 
 ### Household-level split billing — **M** `[MVP-excluded]`
 Let two parents (e.g. separated households) each receive a share of the invoice.
