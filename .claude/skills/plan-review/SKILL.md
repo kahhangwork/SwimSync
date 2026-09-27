@@ -1,6 +1,6 @@
 ---
 name: plan-review
-description: Manually-invoked only. Review the CURRENT plan for product risk — list the riskiest areas most-to-least risky, then add risk-reduction steps to the plan for each. Trigger ONLY when the user explicitly types "/plan-review" — never auto-load this for ordinary planning or plan-mode requests.
+description: Manually-invoked only. Review the CURRENT plan for product risk — list the riskiest areas most-to-least risky, then add risk-reduction steps to the plan for each. Runs in the plan-reviewer agent (Opus 5.5, high effort). Trigger ONLY when the user explicitly types "/plan-review", or as the mandatory final step of /plan-with-confidence — never auto-load this for ordinary planning or plan-mode requests.
 ---
 
 # plan-review
@@ -11,6 +11,27 @@ against risk. Do this verbatim to intent:
 > Review your plan and identify the areas that introduce the most amount of
 > product risk. List them from **most to least risky**. Then add to your plan
 > steps to reduce the implementation risk for each item.
+
+## Who runs it — the `plan-reviewer` agent
+
+The review itself is done by the **`plan-reviewer` agent**
+(`.claude/agents/plan-reviewer.md`, Opus 5.5 at high effort), not in the main
+thread. The main thread's job:
+
+1. **Locate the plan** (step 1 below). No plan → say so and stop.
+2. **Spawn `plan-reviewer`** with the Agent tool (`subagent_type:
+   "plan-reviewer"`). Pass the plan file path if there is one; otherwise paste
+   the full plan text. Add any context from the conversation the agent can't
+   see (user constraints, decisions already made).
+3. **Write its "Revised plan" into the plan file**, replacing the old plan.
+   If there is no plan file, present the revised plan as the plan.
+4. **Show the user its "Ranked risks"** list in your response.
+5. **Offer, don't auto-apply,** any "Graduate to GOTCHAS §7" items.
+
+Do NOT do the review yourself in the main thread, even if it looks quick. If
+the agent can't be spawned, say so and stop.
+
+The sections below are the agent's method.
 
 ## How to run it
 
@@ -85,7 +106,8 @@ already hit*), not only in a plan file that is discarded when the work lands.
 ## Rules
 
 - **Explicit invocation only.** Run this workflow only when the user typed
-  `/plan-review`. Do not apply it to other requests.
+  `/plan-review`, or when `/plan-with-confidence` hands off to it. Do not
+  apply it to other requests.
 - **Product risk, not code style.** The lens is impact on users and the
   product, not tidiness. Rank by blast radius.
 - **Mutate the plan.** The deliverable is an updated plan with mitigations

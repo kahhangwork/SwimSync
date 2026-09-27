@@ -1,6 +1,6 @@
 ---
 name: plan-with-confidence
-description: Manually-invoked only. Do NOT plan until you have >96% confidence you understand what to plan for; ask follow-up questions until you reach that confidence, THEN plan. Trigger ONLY when the user explicitly types "/plan-with-confidence" — never auto-load this for ordinary planning, "make a plan", or plan-mode requests.
+description: Manually-invoked only. Do NOT plan until you have >96% confidence you understand what to plan for; ask follow-up questions until you reach that confidence, THEN plan, THEN run /plan-review on it. Trigger ONLY when the user explicitly types "/plan-with-confidence" — never auto-load this for ordinary planning, "make a plan", or plan-mode requests.
 ---
 
 # plan-with-confidence
@@ -22,7 +22,15 @@ When invoked, follow this rule before producing **any** plan:
 3. **Loop.** After each answer, re-assess. Keep asking until you cross the 96%
    bar. Do not draft, outline, or hint at a plan while below it.
 4. **Only then, plan.** Once over 96% confident, briefly state that you've
-   reached confidence, then produce the plan.
+   reached confidence, then produce the plan (write it to the plan file if
+   in plan mode).
+5. **Always review it with `/plan-review`.** Immediately after drafting, invoke
+   the `plan-review` skill (Skill tool) on the plan you just wrote. It spawns
+   the `plan-reviewer` agent and rewrites the plan with mitigations inlined.
+   The plan is NOT finished — and must NOT be presented for approval
+   (ExitPlanMode) or implemented — until the review has run and its revised
+   plan is in the plan file. Do not ask the user whether to review; it is
+   mandatory.
 
 ## Rules
 
@@ -30,6 +38,8 @@ When invoked, follow this rule before producing **any** plan:
   `/plan-with-confidence`. Do not apply it to other planning requests.
 - **No premature plans.** Below the confidence bar, the correct output is
   *questions*, not a partial plan.
+- **No unreviewed plans.** A plan from this skill that skipped `/plan-review`
+  is incomplete. If the review can't run, say so instead of presenting the plan.
 - **Be honest about confidence.** If you're at 70%, say 70% and name the gaps —
   don't inflate it to skip the questions.
 - Project-scoped (SwimSync). To use it in every repo, move this directory to
