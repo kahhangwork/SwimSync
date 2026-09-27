@@ -71,7 +71,8 @@ slash command); the rest also respond to plain requests.
 #### `plan-with-confidence` — don't plan until you're sure
 
 Holds off on any plan until confidence is **>96%**, asking batched follow-up
-questions until it clears that bar — then plans.
+questions until it clears that bar — then plans, **then always runs `/plan-review`** on the result (mandatory
+since 2026-09-27; a plan that skipped it is incomplete).
 
 - **Invoke:** `/plan-with-confidence` (only fires when typed explicitly).
 - **Details:** [.claude/skills/plan-with-confidence/SKILL.md](.claude/skills/plan-with-confidence/SKILL.md)
@@ -86,7 +87,10 @@ prefers a *structural* mitigation (make the failure impossible) over a *vigilanc
 one (ask someone to remember). That preference is why review findings were being
 read at planning time and forgotten at implementation time.
 
-- **Invoke:** `/plan-review` (only fires when typed explicitly).
+The review itself runs in the **`plan-reviewer` agent** (`.claude/agents/plan-reviewer.md`, Opus 5.5, read-only);
+the main thread writes its revised plan back into the plan file.
+
+- **Invoke:** `/plan-review` (typed explicitly, or automatically at the end of `/plan-with-confidence`).
 - **Details:** [.claude/skills/plan-review/SKILL.md](.claude/skills/plan-review/SKILL.md)
 
 #### `commit-review` — Senior-Engineer review, then commit **and ship**

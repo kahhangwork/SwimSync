@@ -1,18 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-27 (evening) — **Build order RE-RANKED with the user** (new top section *Current build order*): Roles & permissions promoted to Wave 1; new item *Package revenue on the accounting page*; four items moved to *Deliberately not doing* (per-child make-up, different-coach private make-up, NRIC last 4, shared `lessonDates.ts`). Earlier the same day: shipped and removed *a family with no child reads "Unknown"*, *a refused run-day save is silent*, and four tooling items. Earlier datelines: `git log -p -- BACKLOG.md`._
-classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
-filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
-dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
-on three tracks** (full / lite / fence — playbook §7), 17 units, smoke driver first; the *Foundations* item
-rewritten and a **Smoke drivers** item added. On 2026-09-12: the Students decomposition shipped (§8.100), the driver-port
-fix filed, and the package-settings move marked ripe. Earlier: **Grading is ADMIN-ONLY, and there is an Assessment tab** — built, all
-suites green, **not yet deployed** *(it went to prod 2026-08-29)* (`20260829000100`, `docs/plans/GRADING_ADMIN_ONLY_PLAN.md`, PRD
-§7.15). Struck from the pick-now list. **One new item added, found by its driver:** the admin sidebar
-has no breakpoint, so every admin page is unusable on a phone (§7.222) — which now matters, because
-Assessment is the first admin surface meant for poolside use. **Piece 5 (email-confirmation copy)
-SHIPPED 2026-08-30 — the S-pool is now EXHAUSTED.** It is dormant by design: the template is written
-and wired, confirmation stays OFF, and a CI guard now holds that toggle down._
+_Last updated: 2026-09-27 (evening) — **Build order RE-RANKED with the user** (new top section *Current build order*): Roles & permissions promoted to Wave 1; new item *Package revenue on the accounting page*; Wave 1 plans + Wave 2 brief written (`docs/plans/README.md`); four items moved to *Deliberately not doing* (per-child make-up, different-coach private make-up, NRIC last 4, shared `lessonDates.ts`). Earlier the same day: shipped and removed *a family with no child reads "Unknown"*, *a refused run-day save is silent*, and four tooling items. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -1715,7 +1703,8 @@ frozen and we want compiler-enforced safety before a big build."
 RN screens with a mocked Supabase; admin table components. **First pass shipped:** the coach mark-attendance
 UI (5 components) and the admin Invoices GenerationPanel + Packages Awaiting/Who-holds-one, props-only, each
 mutation-proven (`docs/TESTING.md` §5). **What remains:** whole screens/pages with mocked dao modules — the
-invoice table, the attendance save flow, parent balances.
+invoice table, the attendance save flow, parent balances — **plus** the *Pending charges* panel's two-tenant test,
+`PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md` RISK 6, deferred for want of a harness that now exists (plan audit, 2026-09-27).
 
 **Why:** frontend unit tests are still mostly `lib/**` pure functions — though the feature-tier
 refactor added hook and component tests (`components/AssessmentGrid.test.tsx` and ~80 other non-`lib`

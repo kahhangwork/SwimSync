@@ -33,8 +33,8 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Area | Items |
 |---|---|
 | SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260 |
-| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255 |
-| `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167 |
+| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287 |
+| `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266 |
@@ -2340,3 +2340,21 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `fireEvent.press` on a `Text` inside a `TouchableOpacity` bubbles to the handler; on RN-web a real click on the
     Text child does not always reach the Pressable (§7.10, §7.58 — why drivers use `pressByText`). Green here and
     red in a driver is the platform, not a contradiction. (2026-09-27.)
+
+287. **A table's admin arm is not its only money arm — `invoices` is writable by any coach who serves the family.**
+    `invoices_update` is `can_admin_tenant(tenant_id) OR coach_serves_parent(parent_id)`, `authenticated` holds
+    **table-level UPDATE** on `invoices`, and the only column pin (`pin_invoice_public_fields`) covers
+    `reference_number`/`public_token` — so a coach can rewrite `net_amount`/`status` directly. `confirm_invoice_paid`
+    and `payment_records_insert` also admit the coach arm. The coach app shows no invoices (PRD §7.9), so the arm
+    serves nothing. Dormant on prod (the only coach is the owner). **When auditing "who can move money", read every
+    arm of every policy and the table's GRANTs, not just the admin helper.** Closed by Roles P11
+    (`docs/plans/ROLES_PERMISSIONS_PLAN.md`). Same review: `app/api/create-coach` and `app/api/generate-invoices`
+    check `role` only, so a **deactivated** admin passes (Roles P9). (Found by plan review, 2026-09-27.)
+
+288. **An owner-only RPC protects the owner only BECAUSE the caller is the owner.** The admin-management RPCs
+    (`deactivate_admin`, `prepare_admin_delete`, `remove_admin_role`) refuse `p_profile_id = auth.uid()` and nothing
+    else; `reactivate_admin` has no target check at all. That is safe only while `is_tenant_owner()` gates them —
+    **widening who may call a function widens who it can target.** Before relaxing any caller gate, add the target
+    rule explicitly (`p_profile_id <> tenants.owner_profile_id`) and pin it per RPC. Roles §5.4 does this.
+    (Found by plan review, 2026-09-27.)
+

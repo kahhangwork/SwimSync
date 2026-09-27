@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-27 — **Shipped (§8.129): an admin sees a joined family's name before any child; a refused
-run-day save is said out loud (`20260926000100` on prod, `d8e1c05` live, deploy #55).** Plus the first component-render
-tests, every ledger row ≤200 chars, pgTAP #18 scoped, `--help` fixed. Nightly `36276724651` green, 67/67._
+_Last updated: 2026-09-27 (later) — **Planned, not built (§8.130): the backlog re-ranked with the user — Roles &
+permissions first — and both Wave 1 plans written and reviewed** (`ROLES_PERMISSIONS_PLAN.md`,
+`CRASH_SAFE_EMAIL_CLAIM_PLAN.md`), a Wave 2 brief, and a `docs/plans/` index. No code, no migration, no deploy._
 
-_Previously (§8.128, 2026-09-26) — the Foundations driver backlog: 11 nightly drivers + `simulate-date.sh`._
+_Previously (§8.129, 2026-09-27) — admin sees a childless family's name; a refused run-day save is loud (deploy #55)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,13 +27,14 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.282** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.288** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
 | What is live in the cloud, and its config traps | `docs/DEPLOYMENT.md` | §11 |
 | **Running two sessions at once without clashing** | **`docs/WORKTREES.md`** | — |
 | How to bill a month | `INVOICE_RUNBOOK.md` | — |
+| **Plans — which are open, which are done** | **`docs/plans/README.md`** (index; plans never move) | — |
 | The design/plan behind a shipped feature | `docs/design/`, `docs/plans/` | — |
 | **How to decompose an oversized page or screen** | **`docs/refactor/FEATURE_TIER_REFACTOR_PLAYBOOK.md`** | worked example: `docs/refactor/STUDENTS_PAGE_REFACTOR_PLAN.md` |
 
@@ -347,6 +348,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.130 (2026-09-27) — Build order re-ranked with the user; Wave 1 planned and reviewed; plans indexed
+
+**A planning session: no code, no migration, no deploy.** `/backlog-prioritisation`, then a decision Q&A with the user,
+then `/plan-with-confidence` for Wave 1 and a brief for Wave 2. Commits `9f0cad4`, `1582b8f`, `186b551`, `0d4b90b`.
+
+- **Order + decisions:** BACKLOG → *Current build order* (decisions table, three waves, two lanes). Roles first (co-admin
+  hire ~3 months out); four items → *Deliberately not doing*; new item *Package revenue on the accounting page*.
+- **Plans:** `ROLES_PERMISSIONS_PLAN.md` (11 areas, money XOR ops; P1–P12 planner defaults for the user to veto),
+  `CRASH_SAFE_EMAIL_CLAIM_PLAN.md` (no auto-retry after 24 h — user's call), `WAVE_2_PACKAGES_BRIEF.md` (5 open questions).
+- **Reviewed by an Opus agent before commit:** 2 critical + 6 high found in the drafts and folded in; two live gaps
+  graduated as §7.287 (coach arm can write invoices) and §7.288 (owner protection is implicit).
+- **`docs/plans/README.md`:** all 41 older plans audited DONE/superseded; 9 stale headers corrected; plans never move.
+- **Tooling:** `plan-reviewer` agent; `/plan-with-confidence` now always ends in `/plan-review` (AVAIL_SKILLS).
+- **Not done:** nothing built. The next nightly (first on `d8e1c05`) has not run yet — read it before any APP unit.
+
 ## 8.129 (2026-09-27) — Childless member names, a loud run-day refusal, component tests, the ledger compressed
 
 **Five branches built while the nightly gate was closed, then shipped in order after nightly `36276724651` went green
@@ -363,20 +379,7 @@ inside a file read at the start of every session.
 - **Caught before shipping:** rerunning on the COMBINED tree found a typecheck break the separate branches hid (#55).
 - **Not done:** no native build; prod has no childless member yet, so the name change is invisible there today.
 
-## 8.128 (2026-09-26) — The Foundations driver backlog: 11 drivers + `simulate-date.sh`
-
-**Twelve units, one branch each → `main`, all driver-only** (no app code; R1 gate `git diff --name-only` per unit).
-Planned by `/plan-with-confidence`, hardened by `/plan-review`: `docs/plans/DRIVER_BACKLOG_PLAN.md` (all ☑).
-Drivers + checks: TESTING §5 "Foundations driver backlog" table. U1 by hand; U2–U12 by sequential subagents, each
-reviewed and shipped from root. Same session: a BACKLOG drift sweep (`3c0b39c`), gotchas §7.276–§7.282.
-
-- **Proof bar:** every driver red under 1–3 app mutations (recorded in its header), then 2× green via `--only`; full
-  roundtrip + pgTAP each time. Push CI green through `7f007a0`.
-- **Found, not fixed (→ BACKLOG):** childless family reads "Unknown"; refused run-day save is silent; pgTAP #18
-  global invoice count; 7 stale "no driver" app comments; `--help` path bug.
-- **Not done:** the new drivers have never run in the CI nightly; `simulate-date.sh` found no literal-date fixture at risk.
-
-_(§8.127 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.128 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 

@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.128** | 2026-09-26 | Foundations driver backlog: 11 nightly drivers + `simulate-date.sh`, all driver-only | `docs/plans/DRIVER_BACKLOG_PLAN.md` · TESTING §5 · §7.276–§7.282 |
 | **8.127** | 2026-09-26 | Segment-bounded `isPublicPage`; NativeWind `darkMode: "class"` stops a per-load throw | ARCHITECTURE §10 · §7.275 · DEPLOYMENT §11 #54 |
 | **8.126** | 2026-09-26 | Deployed `public-package` CORS probed read-only: `Allow-Headers: content-type`; §7.264 holds | §7.264 |
 | **8.125** | 2026-09-26 | A late session restore no longer wipes the reset/invite form; `app-money` C2 driven | §7.274 · TESTING §5 · DEPLOYMENT §11 #53 |
