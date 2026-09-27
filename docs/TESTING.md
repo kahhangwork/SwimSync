@@ -1470,3 +1470,34 @@ reports failures that are just the driver's own UI writes — reset before belie
   behind 20 closed), the D6 run-day flip, RISK 6/7/8, the fail-safe raw status. 8 deliberate mutations, each caught.
 - **No driver covers the Dashboard alert or "Show all"** — hand-checked (tenant admin sees the alert, platform
   admin does not; 4 → 7 → 4 rows). Plan: `docs/plans/BILLING_MONTHS_PLAN.md` §11.
+
+### Staff invitations, crash-safe email claim, roles & permissions (2026-09-27, §8.131)
+
+- **HTTP `supabase/tests/http/signup_trust.sh`** (7, CI step "Sign-up trust (HTTP)") — a public `signUp` with a
+  `platform_admin` / `tenant_admin` / forged-nonce payload creates nothing privileged; a parent still signs up; a
+  real invitation yields the ROW's role (metadata ignored), is consumed, and cannot be reused. Drives real GoTrue
+  because pgTAP cannot act as its DB role (§7.295). Red on the pre-`20260927000200` trigger (3 fail).
+- **pgTAP `email_claim.test.sql`** (26) — the five delivery states + boundaries, both claim RPCs (SENDING refuses,
+  MAY_HAVE_SENT only when manual), re-issue clears the claim, the invoice email-column pin, grants. Red without the
+  pin / re-issue trigger (5 fail).
+- **Deno `emailClaim.test.ts`** (lane 2, in `test.sh`; Deno 251 → 278) — lease, keys, token-conditional settle,
+  concurrency, the MAY_HAVE_SENT resend reusing the one key. **Known gap (§7.25):** its DB-backed cases were not
+  mutation-proven red (each proof needs a shared-DB run); the pure ones were. vitest `undeliveredEmails.test.ts` +
+  `BillingMonthsCard.test.tsx` cover the "may not have arrived" list.
+- **pgTAP roles** — `roles_permissions` (54: seeding, the gate's truth table, grid validation, owner-only CRUD,
+  escalation, P6, the commit-time check via `SET CONSTRAINTS … IMMEDIATE`), `roles_operations` (24),
+  `roles_money` (34 — incl. the coach money arm gone, the tenants column map, the price/schedule split),
+  `roles_admins` (26 — delegation, owner protection, P12). Each proven red against its migration's DOWN (or, for
+  D, against the old RPC bodies alone: 10 fail). `payment_collection` #20–22 now pin the coach's REFUSAL (P11);
+  `admin_management` #7 pins the outcome, not the guard's exception (§7.294's neighbour: RLS now hides the row).
+- **Deno** `email.test.ts` + `blockedNoticeRecipients` (X4) — Deno 279.
+- **vitest** `lib/permissions.test.ts`, `admins/domain/adminRoles.test.ts`, `roles/domain/rolesRows.test.ts`,
+  `adminNav.test.ts` (role filtering, `areaForPath` fails closed, 26 pages), accounting page (role grants access;
+  nothing fires while the role loads). Admin vitest 956.
+- **Driver `verify-roles.mjs`** (8, fixture `fixtures-roles.sql`) — the owner creates a role through the grid,
+  moves a co-admin onto it; their sidebar hides Invoices/Admins, a typed `/invoices` refuses in words, `/classes`
+  shows "View only"; after an upgrade the page renders. Red with `RequiresTenant` question 4 disabled (7/8). It
+  found §7.291. `verify-admins` (24) now expects the role refusal for a co-admin without Admins & roles;
+  `verify-platform-admin-scope` pins 26 pages.
+- **Flake to watch:** one unnamed admin vitest failure in 5 full runs on `d98cc46` + lane 2 (929 tests), not
+  reproduced in 4 reruns (lane 2). If it recurs, capture the name before rerunning.

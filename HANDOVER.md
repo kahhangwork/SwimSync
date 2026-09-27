@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-27 (later) — **Planned, not built (§8.130): the backlog re-ranked with the user — Roles &
-permissions first — and both Wave 1 plans written and reviewed** (`ROLES_PERMISSIONS_PLAN.md`,
-`CRASH_SAFE_EMAIL_CLAIM_PLAN.md`), a Wave 2 brief, and a `docs/plans/` index. No code, no migration, no deploy._
+_Last updated: 2026-09-27 (night) — **Wave 1 SHIPPED (§8.131): Roles & permissions and the crash-safe email claim
+are live, and a critical sign-up escalation (anyone could become a platform admin) was found and closed.** Six
+migrations, three deploys (#56–#58), two sessions in parallel. Tonight's nightly is the first over all of it._
 
-_Previously (§8.129, 2026-09-27) — admin sees a childless family's name; a refused run-day save is loud (deploy #55)._
+_Previously (§8.130, 2026-09-27) — the backlog re-ranked with the user; Wave 1 planned and reviewed._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.288** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.296** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -348,6 +348,25 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.131 (2026-09-27) — Wave 1 shipped in two lanes; a public sign-up could make itself platform admin
+
+**Two Claude sessions in parallel — root (roles, lane 1) and worktree `email-claim` (lane 2) — coordinated over
+cross-session messages, shared DB handed back and forth; three prod deploys, all with the §7.1 gate overridden by
+the user.** Commits `ee688d9` … `b487524`.
+
+- **SECURITY, found while designing roles:** `handle_new_user` trusted `role`/`tenant_id` from sign-up metadata —
+  one anonymous `signUp` became a platform admin. Fixed by server-minted `staff_invitations` (§7.289, ARCHITECTURE
+  §6aa, deploy #56). Prod was NOT audited for prior use (user declined) and not probed.
+- **Crash-safe email claim** (lane 2): claim lease + one Resend key per email; >24 h → "May have been sent" (PRD
+  §7.7/§7.8, #57). The user reversed plan §2's "new key" in review.
+- **Roles & permissions**, all 8 steps: 8 areas (four ops areas merged at step 0), migrations A–D, edge gates, both
+  apps, Roles page, `verify-roles` (PRD §4.3, ARCHITECTURE §6ab, map + plan in `docs/plans/`, #58). Coaches lost all
+  money access (P11/X3).
+- **Caught by tests before shipping:** §7.290 (a trigger `CASE` broke every sign-up), §7.291 (page-wide radio
+  groups), §7.293 (delete-admin banned before its RPC), §7.294 (a test built an invalid shape).
+- **Not done:** P5's per-control hiding (BACKLOG); the stale "new key" function COMMENTs (BACKLOG); DB-backed
+  lane-2 Deno tests not mutation-proven (TESTING §5); no real co-admin login on prod.
+
 ## 8.130 (2026-09-27) — Build order re-ranked with the user; Wave 1 planned and reviewed; plans indexed
 
 **A planning session: no code, no migration, no deploy.** `/backlog-prioritisation`, then a decision Q&A with the user,
@@ -363,23 +382,7 @@ then `/plan-with-confidence` for Wave 1 and a brief for Wave 2. Commits `9f0cad4
 - **Tooling:** `plan-reviewer` agent; `/plan-with-confidence` now always ends in `/plan-review` (AVAIL_SKILLS).
 - **Not done:** nothing built. The next nightly (first on `d8e1c05`) has not run yet — read it before any APP unit.
 
-## 8.129 (2026-09-27) — Childless member names, a loud run-day refusal, component tests, the ledger compressed
-
-**Five branches built while the nightly gate was closed, then shipped in order after nightly `36276724651` went green
-(67/67 on `9732951`):** migration first, then one fast-forward push of 17 commits. Deploy record: DEPLOYMENT §11 #55.
-
-- **Admin sees a joined family's name before any child** (`20260926000100`, `tenant_admin_has_member()`): admins only;
-  `parent_students` deliberately NOT widened. PRD §5.1; pgTAP `admin_sees_member_parent`; §7.77 marked partly superseded.
-- **A refused run-day save is loud** (`runDaySaveOutcome` re-reads the stored day; an RLS-filtered update returns no
-  error). PRD §7.7; `verify-invoice-admin` +2 via `page.route`.
-- **Tests/tooling:** first component-render pass (TESTING §5, §7.285–§7.286, by a subagent, re-verified); pgTAP #18
-  scoped; `run-all-drivers.sh --help`; `verify-packages-admin` asserts childless names.
-- **Docs:** all 30 oversized ledger rows ≤200 chars (the old `awk` counted bytes — §7.283); §7.284 (`LPAD`); two stale
-  ARCHITECTURE lines fixed. Logo check deferred to the user's brand refactor (BACKLOG).
-- **Caught before shipping:** rerunning on the COMBINED tree found a typecheck break the separate branches hid (#55).
-- **Not done:** no native build; prod has no childless member yet, so the name change is invisible there today.
-
-_(§8.128 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.129 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -422,10 +425,11 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-27: last nightly `36276724651` GREEN, 67/67, on `9732951`** — the first to carry §8.128's 11
-drivers, and it cleared §8.127's app commits. **The next one is the first on `d8e1c05`** (§8.129): a red in
-`verify-packages-admin` / `verify-invoice-admin` points at §8.129's new checks first; a login/visibility red on an admin
-page reading parents points at `20260926000100`.
+**State on 2026-09-27 (night): last nightly `36276724651` GREEN, 67/67, on `9732951`.** **The next one is the first
+over §8.131 — everything shipped today went out with the gate OVERRIDDEN, so read it before anything else.** Where
+a red points first: `verify-roles` / `verify-admins` / `verify-platform-admin-scope` → roles (26 pages, the co-admin
+refusal); `platform-controls` → its fixture's role change; any login / invite red → `staff_invitations` (§7.289);
+a credit-note or invoice-email red → the email claim. 68 drivers now (`verify-roles` is new).
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -435,28 +439,27 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-- **Read the next nightly first** (never dispatch it) — it is the first on §8.129's push.
-- Then **`BACKLOG.md` → *Current build order* (re-ranked with the user 2026-09-27)** — decided, two lanes:
-  - **Wave 1:** *Split co-admin permissions* — roles × 11 areas × None/View/Edit (L, root checkout,
-    `docs/plans/ROLES_PERMISSIONS_PLAN.md`) ‖ *Crash-safe email claim* (S, lane 2, migration lands first,
-    `docs/plans/CRASH_SAFE_EMAIL_CLAIM_PLAN.md`).
-  - **Wave 2:** *Package revenue* → *In-app package refunds* — brief only, `docs/plans/WAVE_2_PACKAGES_BRIEF.md`.
+1. **Read tonight's nightly** (never dispatch it). If it is red, fix that first — today's three deploys skipped the gate.
+2. **Wave 2 — packages** (`BACKLOG.md` → *Current build order*): turn `docs/plans/WAVE_2_PACKAGES_BRIEF.md` into a
+   full plan with `/plan-with-confidence` — *Package revenue on the accounting page*, then *In-app package refunds*.
+   New money surfaces take their role area from birth (`packages` / `billing` / `accounting`, ARCHITECTURE §6ab).
+3. **Before the co-admin hire** (~3 months): if the owner builds a role with an area at View, do *Hide edit controls
+   page by page for a view-only role* (BACKLOG). Ride *Correct the "new key" COMMENTs* on the next migration.
+
 - **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
-  current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before
-  `supabase test db` (§7.272 — #18 no longer trips on invoices, other shapes still can); a `--only` run RESETS the DB,
-  so a migration applied only locally is gone after it.
-- **Stacked branches: rerun the suites on the COMBINED tree before pushing** (#55).
+  current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); a `--only` run RESETS the DB.
+- **A new staff-creating route must mint a `staff_invitations` row** (§7.289); **a new admin surface must name its
+  area** in `lib/adminNav.ts` and gate its RPCs with `has_admin_area` (§6ab).
 
 **GATE (§7.1): read the next nightly before the next APP unit merges.** Driver-only units need no gate.
 
-**No migration is HELD or in flight.** Latest applied is `20260926000100` (admin reads a member parent's name), on
-prod, 0 pending (161/161 on 2026-09-27), rollback rehearsed byte-identical. **`supabase migration list --linked` is the
-fact; a prose status is a hint.**
+**No migration is HELD or in flight.** Latest applied is `20260927000600` (roles D — admin management), on prod,
+0 pending (167/167 on 2026-09-27); rollbacks for all six of today's migrations rehearsed byte-identical.
+**`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
-> low-balance email, automated reminders. *(The **crash-safe email claim** was listed here but was never
-> cron-gated — it is Wave 1 lane 2 as of 2026-09-27.)*
+> low-balance email, automated reminders.
 
 ### When the sweep reddens, and when you deploy — both graduated
 

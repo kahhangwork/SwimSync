@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-27 (evening) — **Build order RE-RANKED with the user** (new top section *Current build order*): Roles & permissions promoted to Wave 1; new item *Package revenue on the accounting page*; Wave 1 plans + Wave 2 brief written (`docs/plans/README.md`); four items moved to *Deliberately not doing* (per-child make-up, different-coach private make-up, NRIC last 4, shared `lessonDates.ts`). Earlier the same day: shipped and removed *a family with no child reads "Unknown"*, *a refused run-day save is silent*, and four tooling items. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-09-27 (night) — **Wave 1 SHIPPED** (§8.131): removed *Split co-admin permissions* and *Crash-safe email claim* (both live); filed *Hide edit controls page by page for a view-only role* (roles P5's unbuilt half) and *Correct the "new key" COMMENTs on the email claim functions*. Wave 2 (packages) is next. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -275,18 +275,16 @@ _Supersedes every older ranking below, which is kept as history. Forced by: the 
 | PayNow statement import | **Not yet** — ~9 invoices/month is fine by hand | Stays parked under *Automatic PayNow payment detection* |
 | Parallel sessions | **2 lanes** | Waves below are written as two lanes |
 
-#### Wave 1 — foundations (build first)
+#### Wave 1 — foundations — **SHIPPED 2026-09-27** (§8.131)
 
-1. **Split co-admin permissions — roles + grid** (L). Migration-heavy, so built from the **root checkout** on `db/…`
-   branches (a worktree never authors a migration). **Plan: `docs/plans/ROLES_PERMISSIONS_PLAN.md`.**
-2. **Crash-safe email claim** (S) — **lane 2**. Its small migration lands on `main` FIRST, then the edge-function
-   work (`generate-invoices`, `credit-note-emails`) runs in a worktree beside lane 1. Goes before any new email path
-   (a refund email, the nudges) so none of them inherits the one-row window. **Plan: `docs/plans/CRASH_SAFE_EMAIL_CLAIM_PLAN.md`.** **Not cron-gated** — HANDOVER §9 used to
-   list it with the parked cron tail; its own item never depended on cron.
+1. ~~Split co-admin permissions~~ — roles + grid, live (PRD §4.3, deploy #58). Follow-up filed: *Hide edit controls
+   page by page for a view-only role*.
+2. ~~Crash-safe email claim~~ — live (PRD §7.7/§7.8, deploy #57).
 
 #### Wave 2 — packages (after Wave 1, so each new admin surface is born with its grid area)
 
-**Brief: `docs/plans/WAVE_2_PACKAGES_BRIEF.md`** — becomes a full plan once Roles ships.
+**Brief: `docs/plans/WAVE_2_PACKAGES_BRIEF.md`** — Roles has shipped, so this is next: turn the brief into a full
+plan (`/plan-with-confidence`). New money surfaces take the `packages` / `billing` / `accounting` areas.
 
 
 3. **Package revenue on the accounting page** (S).
@@ -597,7 +595,7 @@ swimming skills**~~ (Piece 4, M, shipped 2026-08-28) and ~~**Email-confirmation 
 
 ~~**An owner-only accounting page (M — *absorbs Revenue reporting*)**~~ — **SHIPPED 2026-08-23**
 (PRD §7.23, `20260823000100`). Accrual as chosen; owner-gated; no capability model, as predicted.
-**Split co-admin permissions (L, was M)** — ~~*yes eventually*~~ **promoted to Wave 1 of *Current build order* 2026-09-27**; the accounting page did not wait
+~~**Split co-admin permissions (L, was M)**~~ — **SHIPPED 2026-09-27** (§8.131, PRD §4.3) after promotion to Wave 1; the accounting page did not wait
 on it (and shipping it added no gated surface — it is owner-gated, not co-admin-scoped). ~~**A location entity / venue (M)**~~ — **SHIPPED 2026-08-24** (PRD §7.24); struck under *Admin and operations*. **Maps integration (S — *deferred here
 2026-08-27*)** — tap a class location to open the platform maps app; builds directly on `locations.address`,
 no new data, no rework, but parked because production is one location (full item below). Household split billing (M — *needs a credit-splitting
@@ -1325,30 +1323,6 @@ untestable. The coach app calls a `verify_jwt`-ON function instead, re-checking 
 against `attendance_write`'s own expression — the `package-emails` pattern that already
 existed here and that this item never considered.
 
-### Crash-safe email claim (eliminate the one-row claim window) — **S**
-The shipped invoice retry (SHIPPED LIVE 2026-08-16 — PRD §7.7) uses the boolean
-`invoice_email_sent_at` as BOTH the claim and the sent-marker: it claims one invoice, sends it,
-resets on failure. A crash/timeout in the ~one-row window between claim and send silently drops
-that single invoice's email.
-
-**Credit notes now share the exposure** (`credit_notes.email_sent_at`, 2026-08-17) and it is
-*sharper* there: the invoice path has an automatic retry pass on every generate-invoices run,
-whereas the credit-note path has **only the admin Resend button** by decision — and a claimed
-row renders as *emailed*, so Resend cannot reach it. A `try/finally` covers a thrown send; a
-process kill does not. Fix both columns together; the design is one column, not two.
-
-**Why:** email is best-effort, but a silent drop still means a parent never hears about a bill
-or an adjustment. Today bounded to one in-flight row and low-volume, so low-priority.
-
-**Notes:** eliminating the residual window needs a separate `claimed_at` column (or a per-scope
-advisory lock) so a crash-safe send-then-stamp ordering is safe under concurrency — a boolean
-column cannot be both claim and sent-marker. Design + why the per-invoice claim was chosen:
-`docs/plans/INVOICE_EMAIL_RETRY_PLAN.md` (⚠ RISK 1).
-
-**2026-09-27: Wave 1, lane 2.** Not cron-gated (HANDOVER §9 had grouped it with the parked cron tail). Build it
-before any new email path so none inherits the window. *(Planning refined "one column, not two" above: the plan adds a
-`claimed_at` column beside each `sent_at` — `docs/plans/CRASH_SAFE_EMAIL_CLAIM_PLAN.md`.)*
-
 ### One-click bulk WhatsApp sends (Cloud API) — **M** `[Phase 3]`
 Send the payment reminder to every unpaid parent with ONE click, server-side, instead
 of one Send per chat via the wa.me click-through queue.
@@ -1441,36 +1415,6 @@ folded onto this month's invoice), and `wages_state` is a **per-rated-coach cove
 check, not "any payout row exists" — a coach rated after the run would otherwise read as
 final and overstate Net.
 
-### ~~Split co-admin permissions~~ — **L** — **BUILT 2026-09-27** (migrations A–D on `main`; apps + edge on `feat/roles-app`, shipped with its deploy) — PRD §4.3. Follow-up: *Hide edit controls page by page for a view-only role*.
-
-**Decided with the user 2026-09-27:** build NOW (a co-admin hire is ~3 months out). Owner-defined **roles**, each a
-grid of **8 areas** — three operations, five money, never mixed (was 11; the four ops areas merged 2026-09-27) (full list and mapping: `docs/plans/ROLES_PERMISSIONS_PLAN.md` §3) × **None / View / Edit**; a few **starter presets** the
-owner can copy and edit; **all areas in one build**. **Admin/role management is grantable**, with a mandatory
-escalation guard: a delegate may grant only what they hold, and never touches the owner. The owner always holds
-everything. Enforcement is server-side per area — hiding a page is not a boundary (the accounting page's own rule).
-Resized **M → L**: 26 admin pages, and `is_tenant_admin`/`can_admin_tenant` appear ~300 times across 80 migrations
-(a raw grep — it counts comments and superseded `CREATE OR REPLACE` bodies, so the LIVE policy/RPC count is lower;
-the plan must take it from `pg_policies` / `pg_get_functiondef`, §7.40). "Roles" here means **rows in a tenant-scoped
-table** — the capability-table path the note below recommends — **not** a Postgres enum, which that note rules out.
-Settled in planning: *Accounting* and *refunds* are **grantable** like every area; the standard roles keep all money
-areas None except on *Full admin*.
-
-Restrict what individual co-admins can do — e.g. an assistant who can mark attendance and
-chase payments but cannot change class pricing or issue credit notes.
-
-**Why:** the user has said feature-splitting is coming ("I will only be splitting features
-in the future"). Today every co-admin has the owner's full authority except admin
-management, which is the right first cut but means an assistant hired to chase invoices
-can also reprice every class.
-
-**Notes:** parent/coach/admin are ONE database role, so grants can't do this — only RLS
-resolution or per-capability checks can (§8.29's structural finding). The seam is
-`is_tenant_admin()`/`is_tenant_owner()` in `20260806000100`: a permissions model slots in
-as either more owner-style columns (cheap, coarse) or a `tenant_members`-style capability
-table (the additive path the shipped design deliberately left open —
-`docs/ARCHITECTURE.md` §6). Don't add enum roles for this (same reasoning as the owner
-column: permanent, string-audited everywhere, can't express one-owner-per-tenant).
-
 ### ~~The family-status search scans every membership client-side~~ — **S** — **DONE 2026-08-28**
 `handleFamilySearch` now pushes the term into the query — a sanitised `.or()` matching name OR email over
 `!inner` embeds — so it reaches every membership in the DB instead of the silently-capped first 1000
@@ -1527,6 +1471,16 @@ Richer metrics on the admin dashboard. **Retired with the user 2026-08-16** — 
 standing instruction was "delete if a real question ever replaces it", and none has. No
 specific pain behind it. Moved to *Deliberately not doing*; the concrete money question
 ("how much am I owed / did I earn?") is served by *An owner-only accounting page* instead.
+
+### Correct the "new key" COMMENTs on the email claim functions — **S** — _filed 2026-09-27 (lane 2 handoff)_
+The applied migration `20260927000100` documents `claim_invoice_email` / `claim_credit_note_email` with "a
+MAY_HAVE_SENT resend uses a NEW Idempotency-Key". The user decided the opposite during lane 2's review (one key per
+email, reused — `CRASH_SAFE_EMAIL_CLAIM_PLAN.md` §2), and the code follows the decision.
+
+**Why:** a `COMMENT ON FUNCTION` is what `\df+` and a future session reading the catalogue see; a wrong one invites
+"fixing" the code back to per-resend keys, which reopens a duplicate-send path. **Notes:** applied migrations are
+immutable — a new root migration re-issues the two `COMMENT ON FUNCTION` lines only (no behaviour). Ride it on
+the next migration rather than deploying it alone.
 
 ### Hide edit controls page by page for a view-only role — **M** — _filed 2026-09-27 (roles step 6)_
 Roles' P5 said a View-only area shows its pages with the edit controls **hidden**, not disabled. What shipped is the

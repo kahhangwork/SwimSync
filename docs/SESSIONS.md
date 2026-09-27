@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.129** | 2026-09-27 | Admin sees a childless family's name; a refused run-day save is loud; component tests | PRD §5.1, §7.7 · TESTING §5 · §7.283–§7.286 · DEPLOYMENT #55 |
 | **8.128** | 2026-09-26 | Foundations driver backlog: 11 nightly drivers + `simulate-date.sh`, all driver-only | `docs/plans/DRIVER_BACKLOG_PLAN.md` · TESTING §5 · §7.276–§7.282 |
 | **8.127** | 2026-09-26 | Segment-bounded `isPublicPage`; NativeWind `darkMode: "class"` stops a per-load throw | ARCHITECTURE §10 · §7.275 · DEPLOYMENT §11 #54 |
 | **8.126** | 2026-09-26 | Deployed `public-package` CORS probed read-only: `Allow-Headers: content-type`; §7.264 holds | §7.264 |

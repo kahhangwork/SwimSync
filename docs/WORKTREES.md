@@ -218,6 +218,15 @@ afterwards.
 > If a sibling IS live, the alternative is a scoped teardown of your own fixture by prefix.
 > A reset is never the cheapest way to clean up — see Phase 6.
 
+**The DB owner's "go" is not the USER's approval — and a Claude session will not treat it as one.**
+*(Observed 2026-09-27, §8.131: two Claude sessions coordinating over cross-session messages.)* The worktree
+session's permission check refused `test.sh` and `supabase test db` against the shared database ("modify shared
+resources") even after the root session — the DB owner — said go; the user had to approve (or run the suites with
+`!`) in the worktree's own terminal, and the root session correctly would not run them on its behalf (that would
+launder the refusal). **Plan for it:** when a worktree will need DB-backed runs, tell the user up front that each
+one needs their click in that terminal. The DB-ownership handshake still matters — it decides *when*; the user
+decides *whether*.
+
 **Prefix every fixture row**, and have a teardown that deletes by that prefix. Without a
 prefix, two worktrees seeding "Test Parent" produce a passing test that should have failed.
 

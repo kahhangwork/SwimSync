@@ -1,9 +1,7 @@
 # Roles & permissions — owner-defined roles for co-admins — plan
 
-> **Status: BUILT — steps 0–7 done, step 8 (deploy) waiting on the user.** Map: `ROLES_ENFORCEMENT_MAP.md`.
-> Migrations A–D (`20260927000300`–`000600`) on `main`, not on prod. Edge functions (step 5) and the apps (step 6–7) on
-> branch `feat/roles-app` (on top of `feat/roles-edge`), NOT on `main` — pushing it is the app deploy, and the edge
-> code calls `has_admin_area`, so both wait for the migrations to reach prod first.
+> **Status: DONE — live 2026-09-27** (§8.131, DEPLOYMENT §11 #58: migrations `20260927000300`–`000600`, three
+> functions, app `b487524`). Map: `ROLES_ENFORCEMENT_MAP.md`.
 >
 > **Built differently from the plan, on purpose:** roles are seeded by an AFTER INSERT trigger on `tenants`; seeded
 > roles carry a `standard_key`; "every co-admin holds a role" is a commit-time (deferred) check; no `created_by`

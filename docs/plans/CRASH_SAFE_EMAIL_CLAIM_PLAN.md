@@ -1,6 +1,8 @@
 # Crash-safe email claim — plan
 
-> **Status: NOT STARTED** (written 2026-09-27 via `/plan-with-confidence`). Wave 1, lane 2 of `BACKLOG.md` →
+> **Status: DONE** — live 2026-09-27 (§8.131; migration `20260927000100`, `generate-invoices` v30 → v31,
+> `credit-note-emails` v3 → v4, app `7d6c979`). Built in worktree `email-claim`; §2's "new key" was reversed during
+> review (one key per email). Written 2026-09-27 via `/plan-with-confidence`. Wave 1, lane 2 of `BACKLOG.md` →
 > *Current build order*. Backlog item: *Crash-safe email claim*. Residual of `INVOICE_EMAIL_RETRY_PLAN.md` ⚠ RISK 1.
 > Index: `docs/plans/README.md`.
 

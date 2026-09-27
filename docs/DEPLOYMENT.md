@@ -1014,3 +1014,24 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     admin Invoices chunk holds `id:"run-day-message"` + "Not saved — the run day is still".
     - **Rerunning the suites on the COMBINED tree caught a typecheck break** the separate branches hid: a test
       written against `main` lacked a prop another branch made required. §7.1's "the merged tree is not your tree".
+
+56. **Deploy record (2026-09-27): SECURITY — staff accounts by invitation only (+ the dormant email-claim schema).**
+    2 migrations, 0 functions; the §7.1 gate OVERRIDDEN by the user for a live privilege escalation (§7.289).
+    `db push` applied `20260927000100` (email claim, dormant) + `20260927000200` (staff_invitations,
+    handle_new_user); `migration list --linked` 0 pending (163/163). Remote grant dump: `staff_invitations` granted
+    to `service_role` only, no `anon` on any new function; the fixed body is live. Then `18816d2` (the three
+    staff-creating routes mint invitations) → `main`; Vercel both `success`; CI green incl. the new HTTP step.
+    NOT probed on prod (a sign-up would create a real account); no audit of prior escalation (user declined).
+57. **Deploy record (2026-09-27): crash-safe email claim (lane 2, worktree `email-claim`).** 0 migrations (landed in
+    #56), 2 functions deployed FROM THE WORKTREE (root still held old code): `generate-invoices` v30
+    (`--workdir .claude/worktrees/email-claim --project-ref …`, `--no-verify-jwt` kept), `credit-note-emails` v3
+    (verify_jwt kept true); downloaded bundles hold `claim_invoice_email` / `claim_credit_note_email`. Then `7d6c979`
+    → `main`; Vercel `success`; live credit-notes chunk holds "May have been sent". Gate overridden by the user.
+58. **Deploy record (2026-09-27): Roles & permissions (A–D + edge + apps).** 4 migrations, 3 functions; gate
+    overridden by the user. `db push` `20260927000300`–`000600`; 167/167, 0 pending; remote grant dump: no `anon`
+    on any new object, internal helpers (`role_is_within`, `set_role_grid`, `seed_standard_roles`) granted to no
+    client role, `tenant_roles` / `tenant_role_permissions` SELECT-only to `authenticated` + `service_role`.
+    Functions from `feat/roles-app`: `generate-invoices` v31, `credit-note-emails` v4, `package-emails` v4 (bundle
+    greps: `blockedNoticeRecipients`, `has_admin_area`, `packagesAdmin`; verify_jwt unchanged). Then `b487524` →
+    `main`; Vercel both `success`, CI green; live admin chunks hold the Roles page and "Your role doesn't"; the live
+    app entry bundle calls `has_admin_area`. Not verified by a real co-admin login on prod.

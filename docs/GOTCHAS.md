@@ -33,13 +33,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Area | Items |
 |---|---|
 | SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260 |
-| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287 |
-| `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288 |
+| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292 |
+| `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269 |
@@ -2350,6 +2350,9 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     arm of every policy and the table's GRANTs, not just the admin helper.** Closed by Roles P11
     (`docs/plans/ROLES_PERMISSIONS_PLAN.md`). Same review: `app/api/create-coach` and `app/api/generate-invoices`
     check `role` only, so a **deactivated** admin passes (Roles P9). (Found by plan review, 2026-09-27.)
+    - **Closed 2026-09-27 (§8.131):** migration C (`20260927000500`) removed `coach_serves_parent` from every money
+      policy and `confirm_invoice_paid`; the two routes now ask `has_admin_area` (P9). A column grant was NOT the fix
+      — §7.292.
 
 288. **An owner-only RPC protects the owner only BECAUSE the caller is the owner.** The admin-management RPCs
     (`deactivate_admin`, `prepare_admin_delete`, `remove_admin_role`) refuse `p_profile_id = auth.uid()` and nothing
@@ -2357,4 +2360,63 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     **widening who may call a function widens who it can target.** Before relaxing any caller gate, add the target
     rule explicitly (`p_profile_id <> tenants.owner_profile_id`) and pin it per RPC. Roles §5.4 does this.
     (Found by plan review, 2026-09-27.)
+    - **Closed 2026-09-27 (§8.131):** migration D added the owner-target refusal to all four RPCs
+      (`roles_admins.test.sql`). The ROUTES needed it too — §7.293.
 
+289. **`handle_new_user` must NEVER take a privileged role from `raw_user_meta_data` — a public `signUp()` sets it.**
+    Until `20260927000200` it read `role` / `tenant_id` from user metadata, and public sign-up is open (parents
+    register), so `signUp({…, options:{data:{role:'platform_admin'}}})` produced a PLATFORM ADMIN and
+    `{role:'tenant_admin', tenant_id}` an active co-admin of any business — confirmed on the local stack, live on prod
+    until that migration. `generateLink({type:'invite'})` cannot set `app_metadata`, so trust comes from a
+    server-minted row instead: `staff_invitations` (service_role only), keyed by a random nonce the route passes in
+    metadata; a GoTrue insert is a PARENT unless it presents a valid unconsumed nonce for the same email, and
+    `platform_admin` is never granted that way. Direct SQL (`session_user` postgres / supabase_admin — seed, tests,
+    fixtures) stays trusted, fail-closed for everything else. **Any new staff-creating route mints an invitation**
+    (`SwimSyncAdmin/lib/staffInvitation.ts`). Pinned by `supabase/tests/http/signup_trust.sh` in CI — HTTP, because
+    of §7.295. Sibling of §7.86's "signup is open" RLS lesson. (§8.131.)
+
+290. **PL/pgSQL resolves EVERY record field in an expression, so one trigger function shared by two tables cannot
+    read `OLD.<col_of_table_B>` inside a `CASE` — even in the arm that is never taken.**
+    `check_admin_role_present()` (on `profiles` AND `tenants`) did
+    `CASE WHEN TG_TABLE_NAME = 'tenants' THEN OLD.owner_profile_id ELSE NEW.id END`; on `profiles` it raised
+    `record "old" has no field "owner_profile_id"` — on EVERY profile insert, i.e. every sign-up. Use separate
+    `IF` branches (a statement is planned only when reached). Caught before commit by `signup_trust.sh`'s parent
+    check. Related runtime-binding trap: §7.211. (§8.131.)
+
+291. **HTML radio groups are PAGE-wide by `name` — two grids on one page with the same names are ONE group.** The
+    Roles page rendered every role's read-only grid and the editor with `name="area-<area>"`, so checking a radio
+    in the editor unchecked the displayed grids (and a driver's `getByLabel` hit five matches). Give each grid
+    instance its own prefix (`useId()` in `roles/ui/RoleGrid.tsx`). Caught by `verify-roles.mjs`. (§8.131.)
+
+292. **`authenticated` may hold NO column-level grant and `public` may hold NO view — `table_grants.test.sql`
+    assertion 6.** So "narrow `invoices` UPDATE to a column list" and "expose state through a view" are both
+    refused by the suite, even though each is the textbook fix. Instead: pin columns against `authenticated` in a
+    BEFORE UPDATE trigger (`pin_invoice_public_fields` now also pins the invoice email columns), close a whole arm
+    in the policy (P11), and expose derived state as a PostgREST COMPUTED COLUMN — a function taking the row
+    type, `select=*,credit_note_email_state` — whose read gate is the table's RLS. (§8.131, `20260927000100`.)
+
+293. **A route that performs an auth side effect BEFORE the RPC that gates it can harm a target the RPC would
+    refuse.** `delete-admin` bans the account, THEN calls `prepare_admin_delete`; once a co-admin could call it
+    (roles), a co-admin targeting a pure-admin OWNER would ban the owner before the RPC refused. Every
+    management route now calls `refuseOwnerTarget()` (`lib/adminManagementGate.ts`) before any ban / delete /
+    invite link. The database stays the authority; the route only must not act first. Sibling of §7.288. (§8.131.)
+
+294. **A commit-time (DEFERRED) constraint never fires in a rolled-back pgTAP test — so a test can build a shape
+    production would refuse, and pass.** `trg_profiles_admin_role_present` requires every non-owner tenant_admin
+    to hold a role AT COMMIT; `audit_log_tenant.test.sql` flipped a parent to `tenant_admin` of an ownerless
+    business with no role, and nothing complained until migration B asked that (impossible) role. When a test
+    constructs staff by direct UPDATE, make it the owner or give it a role; to TEST a deferred check, use
+    `SET CONSTRAINTS <name> IMMEDIATE` (`roles_permissions.test.sql`). (§8.131.)
+
+295. **pgTAP cannot act as GoTrue's database role — `SET SESSION AUTHORIZATION supabase_auth_admin` is refused to
+    `postgres` (not a superuser locally).** Anything that branches on `session_user` (the §7.289 trust test) can
+    only be exercised on its GoTrue side over HTTP: `supabase/tests/http/signup_trust.sh` drives `/auth/v1/signup`
+    and `/auth/v1/admin/generate_link` against the running stack and cleans up after itself. (§8.131.)
+
+296. **Resend `Idempotency-Key` semantics (confirmed from Resend's docs 2026-09-27, lane 2):** ≤256 chars, 24 h
+    retention; same key + same payload replays the original response without re-sending; 409
+    `invalid_idempotent_request` = key used with a DIFFERENT payload (the email WAS sent — settle as sent);
+    409 `concurrent_idempotent_requests` = same key in flight (keep the claim); 400 `invalid_idempotency_key`.
+    Tell the 409s apart by the body's `name`. **Unverified:** whether a 4xx-refused request uses up its key for
+    24 h (harmless here — the claim keeps releasing). One key per email, reused by a human resend too
+    (`CRASH_SAFE_EMAIL_CLAIM_PLAN.md` §2). (§8.131, `docs/handoff` email-claim.)

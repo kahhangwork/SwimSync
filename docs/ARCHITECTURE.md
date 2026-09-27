@@ -802,7 +802,12 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `SwimSyncAdmin/lib/adminNav.ts` (+ test) | **Which pages** an admin sees, keyed on `tenant_id` (§7.19). Panel **entry** is a separate, role-based question since co-admins — the two-question split is §7.91 and the file's own header. Sidebar, the layout gate and the post-login landing all derive from it, so they cannot disagree. Unknown routes fail closed |
 | `SwimSyncAdmin/components/RequiresTenant.tsx` | The audience gate, applied once in the `(admin)` layout: role gate (coach/parent → "use the SwimSync app", **only on a resolved profile** — §7.91), suspension screen for deactivated admins, then tenant-vs-platform scope. **Early-returns** so a refused page's children never mount — an overlay would leave the queries running (§7.10) |
 | `SwimSyncAdmin/app/(admin)/admins/page.tsx` + `app/api/{invite,resend-admin-invite,deactivate,reactivate,delete,list}-admin*` | Co-admin management (§8.31): roster visible to every admin, levers owner-only. Routes call the RPCs **as the caller** (service-role would blow past `is_tenant_owner()`); delete order is ban → RPC → deleteUser |
-| `SwimSyncAdmin/lib/adminManagementGate.ts` | The shared route gate (caller's tenant from their OWN profile, owner check against `tenants.owner_profile_id`) — five routes, one boundary |
+| `SwimSyncAdmin/lib/adminManagementGate.ts` | The shared route gate (caller's tenant from their OWN profile, owner check against `tenants.owner_profile_id`) — five routes, one boundary | **Since roles:** `requireArea(req, area, level)` (asks `has_admin_area` as the caller) and `refuseOwnerTarget()` before any auth side effect (§7.293).
+| `SwimSyncAdmin/lib/permissions.ts` (+ test) · `components/PermissionsProvider.tsx` | The role model the panel reads: 8 areas, `can()`, `gridProblem()` (mirrors `set_role_grid`), `isWithin()`; the provider loads `my_admin_permissions` once (§6ab) |
+| `SwimSyncAdmin/app/(admin)/roles/` | The Roles page — roles, holders, the 8×3 grid; owner-only writes (D9) |
+| `SwimSyncAdmin/lib/staffInvitation.ts` | `mintStaffInvitation()` — every staff-creating route calls it before `generateLink`/`createUser` (§6aa) |
+| `SwimSyncAdmin/app/api/resend-invoice-email/route.ts` | Per-invoice email resend (lane 2): `billing:edit` as the caller, then a CRON_SECRET proxy to `generate-invoices`' `{resend_invoice_email}` branch |
+| `supabase/tests/http/signup_trust.sh` | The GoTrue-path sign-up trust test, in CI (§7.295) |
 | `SwimSyncAdmin/lib/coAdminInviteEmail.ts` (+ test) | Co-admin invite copy: "help manage", **no join-code custody paragraph** — that language belongs to the owner invite (`inviteEmail.ts`) |
 | `supabase/migrations/2026071900{2300,2400}` | `platform_tenant_overview()` + `platform_stranded_parents()`, then the derived-shape correction. SECURITY DEFINER, gated internally, REVOKEd from PUBLIC (§7.35) |
 | `.claude/skills/run-ui-playwright/drivers/verify-platform-admin-scope.mjs` | 32 checks: every refusal asserts the **absence of rows**, the tenant-admin half asserts each listed page renders its **content** — "no refusal" would also pass on a blank page — and the sidebar count is pinned (16 since Admins, 2026-08-06) |
@@ -885,6 +890,28 @@ of the rule. That is §7.129's shape inside §7.129's own function; it cost a re
 payment. **Substitute beats shadow**, and the client mirrors the same order.
 
 ---
+
+### 6aa. Staff accounts exist only by server-minted INVITATION — metadata is never the trust (2026-09-27)
+
+`handle_new_user` grants `coach` / `tenant_admin` to an auth-API user ONLY against an unconsumed, unexpired
+`staff_invitations` row for the same email whose random nonce the user's metadata presents; role, business,
+is_coach and admin role come from the ROW. `platform_admin` is never granted through the auth API. Direct SQL
+sessions (`postgres`/`supabase_admin`) stay trusted — fail-closed for anything else. **Do not "simplify" this back
+to reading `role` from `raw_user_meta_data`**: a public `signUp()` sets that field (§7.289). Every staff-creating
+route calls `lib/staffInvitation.ts` first. Migration `20260927000200`.
+
+### 6ab. Co-admin authority is ONE gate — `has_admin_area(tenant, area, level)` — over 8 areas (2026-09-27)
+
+Every admin arm of every policy and RPC asks `has_admin_area()` (migrations `20260927000300`–`000600`): false unless
+`is_tenant_admin` (so suspension and deactivation stay one choke point, and a platform admin never passes it);
+true for the owner (D1); else the co-admin's role grid. **The area is visible at the call site** — no per-area
+helper functions. Non-admin arms (coach, parent, `current_tenant_id()` reference reads) are untouched. The UI reads
+`my_admin_permissions()` once (`components/PermissionsProvider.tsx`) and never re-derives the rule; routes ask
+`has_admin_area` / `can_assign_role` / `can_restore_admin` with the caller's JWT. Areas are money XOR operations
+(the four ops areas merged into `operations` because they read each other's tables); a role with any access
+holds operations ≥ view. **Standing prohibitions:** no column-level grant or view to work around a policy
+(§7.292); nobody but the owner acts on the owner (§7.288/§7.293); a co-admin gives only a role within their own.
+Plan + enforcement map: `docs/plans/ROLES_PERMISSIONS_PLAN.md`, `ROLES_ENFORCEMENT_MAP.md`.
 
 ### 12a. `Alert.alert` is a no-op on the web build (known pattern)
 
