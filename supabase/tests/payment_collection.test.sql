@@ -284,21 +284,28 @@ SELECT throws_ok(
 
 RESET ROLE;
 
--- The SERVING coach (their class, this parent's child) may confirm — the
--- same reach invoices_update gives them today.
+-- The SERVING coach may NOT confirm (P11, 20260927000500). Until then
+-- confirm_invoice_paid and invoices_update admitted coach_serves_parent; the
+-- coach app shows no invoices (PRD §7.9), so the arm served nobody and was a
+-- money write open to every coach of the family. Money now needs billing:edit.
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"fd000000-0000-0000-0000-000000000004","role":"authenticated"}';
 
-SELECT lives_ok(
+SELECT throws_ok(
   $$ SELECT confirm_invoice_paid('f5000000-0000-0000-0000-0000000000a2') $$,
-  'the serving coach confirms');
+  'P0001', 'not allowed to confirm this invoice',
+  'the serving coach can no longer confirm an invoice paid (P11)');
 
 SELECT is(
-  (SELECT count(*)::int FROM payment_records
-    WHERE invoice_id='f5000000-0000-0000-0000-0000000000a2'
-      AND marked_by='fd000000-0000-0000-0000-000000000004'),
-  1, 'the coach''s confirmation carries the same audit row');
+  (SELECT count(*)::int FROM invoices WHERE id = 'f5000000-0000-0000-0000-0000000000a2'),
+  0, 'the serving coach no longer reads the family''s invoices (X3)');
 
+RESET ROLE;
+
+-- The admin confirms instead, so a2 is paid for the claim check below.
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claims" TO '{"sub":"fd000000-0000-0000-0000-000000000001","role":"authenticated"}';
+SELECT confirm_invoice_paid('f5000000-0000-0000-0000-0000000000a2');
 RESET ROLE;
 
 -- A paid invoice with NO prior claim can no longer be claimed. (a1 would be
