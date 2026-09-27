@@ -29,6 +29,7 @@ import { useExtend } from "./domain/useExtend";
 import { useSale } from "./domain/useSale";
 import { useGenerateOffers } from "./domain/useGenerateOffers";
 import { useLowSettings } from "./domain/useLowSettings";
+import { useRefund } from "./domain/useRefund";
 import { ListNotices } from "./ui/ListNotices";
 import { ProductModal } from "./ui/ProductModal";
 import { ExtendModal } from "./ui/ExtendModal";
@@ -41,6 +42,7 @@ import { PendingPanel } from "./ui/PendingPanel";
 import { ProductsTable } from "./ui/ProductsTable";
 import { HeldTable } from "./ui/HeldTable";
 import { LowSettingsCard } from "./ui/LowSettingsCard";
+import { RefundModal, ReverseRefundModal } from "./ui/RefundModal";
 
 export default function PackagesPage() {
   // Slice 1 (list-core): all loaded data, held-search, the WhatsApp queue, and
@@ -51,6 +53,7 @@ export default function PackagesPage() {
     categories,
     products,
     purchases,
+    refunds,
     parents,
     businessName,
     tenantDefaultProduct,
@@ -120,6 +123,9 @@ export default function PackagesPage() {
     reload: load,
   });
   const { openGenerateAll, genBusy } = gen;
+  // Refunds (Wave 2 U2) — record/reverse, and whether this admin may (canEdit).
+  const refund = useRefund({ setBusy, reload: load });
+
   // The "running low" thresholds — Generate renewal offers reads them.
   const low = useLowSettings();
 
@@ -188,6 +194,10 @@ export default function PackagesPage() {
         openExtend={openExtend}
         setCancelling={setCancelling}
         setSaleModal={setSaleModal}
+        refunds={refunds}
+        canEdit={refund.canEdit}
+        openRefund={refund.openRefund}
+        openReverse={refund.openReverse}
       />
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}
@@ -220,6 +230,9 @@ export default function PackagesPage() {
         setCancelling={setCancelling}
         cancelPurchase={cancelPurchase}
       />
+
+      <RefundModal form={refund} busy={busy} />
+      <ReverseRefundModal form={refund} busy={busy} />
 
       {/* Manual extension */}
       <ExtendModal form={extend} busy={busy} />

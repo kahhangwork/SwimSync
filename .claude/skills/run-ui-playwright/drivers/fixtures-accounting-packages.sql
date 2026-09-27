@@ -8,7 +8,8 @@
 -- Last month (SGT), AcctPkg Swim:
 --   one package, total 300 DISCOUNTED to payable 270, confirmed on the 10th     → Packages sold S$270.00
 --   one invoice, gross 200, package_applied 60, net 140, paid                   → invoiced S$140.00
---   no rated coaches → wages final 0                                             → Revenue = Net = S$410.00
+--   one refund of S$50 paid out on the 20th (written directly, U2)              → Package refunds S$50.00
+--   no rated coaches → wages final 0                                             → Revenue = Net = S$360.00
 --
 -- Persona (password123): acctpkg-owner@swimsync.test — owner of AcctPkg Swim.
 -- Ids: the full 'ac700000-' block (§7.280). Idempotent; teardown: fixtures-accounting-packages-teardown.sql.
@@ -69,6 +70,15 @@ SELECT 'ac700000-0000-0000-0000-00000000f001', p.id,
        200.00, 60.00, 0, 0, 140.00, 'paid', 'ac700000-0000-0000-0000-000000000001',
        'INV-2026-9701', 'acctpkg-tok-0001'
   FROM parents p WHERE p.profile_id = 'ac700000-0000-0000-0000-00000000b001'
+ON CONFLICT (id) DO NOTHING;
+
+-- A refund paid out in the SAME closed month (written as superuser — the RPC refuses a closed month, which is
+-- the point: this is the shape the month had when it closed).
+INSERT INTO package_refunds (id, tenant_id, parent_package_id, amount, refunded_on, recorded_by)
+VALUES ('ac700000-0000-0000-0000-00000000f101','ac700000-0000-0000-0000-000000000001',
+        'ac700000-0000-0000-0000-00000000e001', 50.00,
+        date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month')::date + 19,
+        'ac700000-0000-0000-0000-00000000a001')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO billing_periods (billing_month, tenant_id, invoices_issued)

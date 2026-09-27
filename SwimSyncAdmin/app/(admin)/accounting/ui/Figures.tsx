@@ -13,7 +13,7 @@ export function Figures({ summary }: { summary: Summary }) {
         <Tile
           label="Revenue"
           value={moneyOrDash(summary.revenue)}
-          sub={`Invoices ${moneyOrDash(summary.revenue_invoiced)} + settlements ${moneyOrDash(summary.revenue_settlements)} + packages ${moneyOrDash(summary.revenue_packages)}`}
+          sub={`Invoices ${moneyOrDash(summary.revenue_invoiced)} + settlements ${moneyOrDash(summary.revenue_settlements)} + packages ${moneyOrDash(summary.revenue_packages)} − refunds ${moneyOrDash(summary.revenue_package_refunds)}`}
           testid="tile-revenue"
         />
         <Tile
@@ -63,6 +63,7 @@ export function Figures({ summary }: { summary: Summary }) {
           <Line label="= Invoiced revenue" v={moneyOrDash(summary.revenue_invoiced)} strong />
           <Line label="+ Outside settlements" v={moneyOrDash(summary.revenue_settlements)} />
           <Line label="+ Packages sold (paid this month)" v={moneyOrDash(summary.revenue_packages)} />
+          <Line label="− Package refunds (paid out this month)" v={moneyOrDash(summary.revenue_package_refunds)} />
           <Line label="= Revenue" v={moneyOrDash(summary.revenue)} strong />
         </dl>
         {/* Two bases on one page (PACKAGE_REVENUE_REFUNDS_PLAN.md U1) — say so,

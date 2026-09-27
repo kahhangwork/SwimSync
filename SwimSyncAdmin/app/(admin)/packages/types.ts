@@ -40,6 +40,9 @@ export type Purchase = {
   live_value_remaining: number | null;
   live_lessons_remaining: number | null;
   status: string;
+  /** When the business confirmed payment (NULL = never paid — a request, or a
+   *  declined one). Only a cancelled package WITH this can be refunded. */
+  confirmed_at: string | null;
   product_id: string;
   requested_at: string;
   start_date: string | null;
@@ -88,4 +91,14 @@ export type CandidateRow = {
   previewTotal: number | null;
   previewDiscount: number | null;
   previewPayable: number | null;
+};
+
+/** A LIVE (non-reversed) package refund (20260928000200). One per package at
+ *  most; a correction is a reversal + a new row. */
+export type LiveRefund = {
+  id: string;
+  parent_package_id: string;
+  amount: number;
+  refunded_on: string;
+  note: string | null;
 };

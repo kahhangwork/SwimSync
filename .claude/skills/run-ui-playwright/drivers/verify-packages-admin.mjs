@@ -1,7 +1,8 @@
-// verify-packages-admin.mjs — the ten Packages admin actions no other driver
+// verify-packages-admin.mjs — the eleven Packages admin actions no other driver
 // presses: Show superseded (and Hide), Record a sale, the held search, Extend
 // (with its refusal), Cancel of an ACTIVE package (Keep it, then Cancel
-// package), Decline of a PENDING request (Keep it, then Decline), Retire /
+// package), Decline of a PENDING request (Keep it, then Decline), Record refund
+// on the cancelled package (with the closed-month refusal) and Reverse, Retire /
 // Reoffer, Add package (with its refusal), Add category (with the duplicate
 // refusal), and a category's Default and Max (with the Max refusal).
 //
@@ -41,7 +42,9 @@
 //   | 1 | packages/dao/packages.repo.ts:142 → `.in("status", ["pending"])` (Cancel of an ACTIVE package matches 0 rows, no error) | 44/47 | "⚠ Cancel package moves the ACTIVE package to cancelled" (DB still active — the modal closed as if it worked), "the row now reads Cancelled…", "every package's status is where the driver put it…" |
 //   | 2 | packages/domain/useSale.ts:54 → `status: "pending"` (a recorded sale is saved as a request) | 40/47 | "⚠ Record sale writes ONE ACTIVE package…" (pending, confirmed_by NULL), "the sale lands in Who-holds-one as Active…" (it sat in Awaiting), the held-search pair, "…Cedar's sale is untouched", "every package's status…", "Awaiting now reads (0)…" |
 //   | 3 | DATABASE, not app code: supabase/rollback/20260926000100_admin_sees_member_parent_DOWN.sql (the admin reads a parent's name only through a child again) | 5/49 (ran 9) | "⚠ Awaiting names Birch — a family with no child…" (row read "Unknown"), "Show superseded reveals the offer…" ("UnknownSuperseded"), "⚠ Record a sale's Parent select lists Cedar…" (only Alder offered), then selectOption timed out |
+//   | 4 | packages/dao/packages.rpc.ts recordPackageRefund → `Promise.resolve({ error: null })` (Record refund silently writes nothing) | 34/56 (ran 36) | "⚠ a refund dated in a CLOSED month is refused in words…" (no message — the no-op "succeeded" and closed the dialog), then the next Record refund click timed out |
 //
+// (Proof 4: 2026-09-27, reverted; the four package drivers green after.)
 // (Proof 3: 2026-09-26, the UP re-applied after and 49/49 twice via --only.)
 // (Proofs 1-2: 2026-09-26, both reverted; `git diff --exit-code -- SwimSyncAdmin SwimSyncApp` clean, and the served
 // chunk re-grepped for the reverted code. SWC strips a `// MUTATION-PROOF` comment inside an object
@@ -59,7 +62,7 @@ for (const u of [ADMIN, EXPO]) {
   }
 }
 
-const EXPECTED_CHECKS = 49;
+const EXPECTED_CHECKS = 56;
 
 const DB = execFileSync("docker", ["ps", "--format", "{{.Names}}"], { encoding: "utf8" })
   .split("\n").find((n) => n.startsWith("supabase_db_"));
@@ -309,6 +312,66 @@ try {
     /Awaiting confirmation \(0\)/.test(awaitingAfter) &&
       /Cancelled/.test(await held().locator("tr", { hasText: REF_REQUEST }).innerText().catch(() => "")),
     flat(awaitingAfter).slice(0, 120));
+
+  // ══ 6b. Refund the cancelled package (Alder) — Wave 2 U2 ═══════════════════
+  // PACKAGE_REVENUE_REFUNDS_PLAN.md U2.3. Alder was PAID (confirmed 14 days ago)
+  // and is now cancelled → Record refund; Birch's declined request was never
+  // paid → nothing. Every step is asserted on package_refunds, not the modal.
+  // The closed-month refusal seals THIS month for the fixture's OWN business
+  // only (never the seed tenant, §7.301), then unseals it.
+  const liveRefQ = `SELECT count(*) FROM package_refunds WHERE tenant_id='${TENANT}' AND reversed_at IS NULL`;
+  const allRefQ = `SELECT count(*) FROM package_refunds WHERE tenant_id='${TENANT}'`;
+  check("PRECONDITION: the business has no refunds", sql(allRefQ) === "0", sql(allRefQ));
+  const alderHeld = held().locator("tr", { hasText: REF_ALDER });
+  const reqHeld = held().locator("tr", { hasText: REF_REQUEST });
+  check("the paid, cancelled package offers Record refund; the declined (never paid) request does not",
+    (await alderHeld.getByRole("button", { name: "Record refund" }).count()) === 1 &&
+      (await reqHeld.getByRole("button", { name: "Record refund" }).count()) === 0,
+    flat(await alderHeld.innerText().catch(() => "")).slice(0, 160));
+
+  const month = sql(`SELECT to_char(now() AT TIME ZONE 'Asia/Singapore','YYYY-MM')`);
+  sql(`INSERT INTO billing_periods (billing_month, tenant_id, invoices_issued) VALUES ('${month}','${TENANT}',1)`);
+  await alderHeld.getByRole("button", { name: "Record refund" }).click();
+  await modal(page).getByLabel("Amount refunded (S$)").fill("120");
+  await modal(page).getByRole("button", { name: "Record refund" }).click();
+  const closedMsg = await modal(page).getByTestId("refund-error").innerText({ timeout: 8000 }).catch(() => "(no message)");
+  check("⚠ a refund dated in a CLOSED month is refused in words, the dialog stays open, nothing is written",
+    closedMsg === "That month is closed — refunds can only be dated in an open month." && sql(allRefQ) === "0",
+    `${closedMsg} · rows ${sql(allRefQ)}`);
+  await modal(page).getByRole("button", { name: "Cancel", exact: true }).click();
+  sql(`DELETE FROM billing_periods WHERE tenant_id='${TENANT}' AND billing_month='${month}'`);
+
+  await alderHeld.getByRole("button", { name: "Record refund" }).click();
+  await modal(page).getByLabel("Amount refunded (S$)").fill("120");
+  await modal(page).getByLabel(/Note/).fill("Driver refund");
+  await modal(page).getByRole("button", { name: "Record refund" }).click();
+  const refRow = await dbUntil(
+    `SELECT amount||'|'||(refunded_on = (now() AT TIME ZONE 'Asia/Singapore')::date)::text||'|'||coalesce(note,'-')||'|'||recorded_by
+       FROM package_refunds WHERE tenant_id='${TENANT}' AND reversed_at IS NULL`,
+    (v) => v !== "");
+  check("⚠ Record refund writes ONE live refund — S$120.00, dated today (SGT), with the note, by this admin",
+    refRow === `120.00|true|Driver refund|${OWNER}`, refRow);
+  const recorded = alderHeld.getByTestId("refund-recorded");
+  const recText = await recorded.innerText({ timeout: 8000 }).catch(() => "");
+  check("the row now reads \"Refunded S$120.00 on …\" with Reverse, and no Record refund",
+    /Refunded S\$120\.00 on /.test(recText) &&
+      (await alderHeld.getByRole("button", { name: "Reverse" }).count()) === 1 &&
+      (await alderHeld.getByRole("button", { name: "Record refund" }).count()) === 0,
+    flat(recText));
+
+  await alderHeld.getByRole("button", { name: "Reverse" }).click();
+  await modal(page).getByRole("button", { name: "Keep it" }).click();
+  await page.waitForTimeout(800);
+  check("Reverse → Keep it reverses nothing (still one live refund)", sql(liveRefQ) === "1", sql(liveRefQ));
+  await alderHeld.getByRole("button", { name: "Reverse" }).click();
+  await modal(page).getByRole("button", { name: "Reverse refund" }).click();
+  const liveAfter = await dbUntil(liveRefQ, (v) => v === "0");
+  await alderHeld.getByRole("button", { name: "Record refund" }).waitFor({ timeout: 8000 }).catch(() => {});
+  check("⚠ Reverse refund keeps the row as reversed (by this admin), and Record refund is offered again",
+    liveAfter === "0" && sql(allRefQ) === "1" &&
+      sql(`SELECT reversed_by FROM package_refunds WHERE tenant_id='${TENANT}'`) === OWNER &&
+      (await alderHeld.getByRole("button", { name: "Record refund" }).count()) === 1,
+    `live ${liveAfter} · all ${sql(allRefQ)}`);
 
   // ══ 7. Retire / Reoffer ════════════════════════════════════════════════════
   const retQ = `SELECT is_active::text FROM package_products WHERE id='${PROD_RETIREE}'`;

@@ -33,9 +33,9 @@ export function CancelModal({
         ) : (
           <>
             <strong>{money(cancelling?.value_remaining ?? 0)}</strong>{" "}
-            remains on this package. Cancelling freezes it at that amount —
-            settle any refund with the family directly; SwimSync keeps the
-            record but does not move the money.
+            remains on this package. Cancelling freezes it at that amount. If
+            you refund the family, record it on the cancelled package
+            afterwards.
           </>
         )}
       </p>

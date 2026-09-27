@@ -42,6 +42,7 @@ function purchase(over: Partial<Purchase>): Purchase {
     live_value_remaining: null,
     live_lessons_remaining: null,
     status: "pending",
+    confirmed_at: null,
     product_id: "prod1",
     requested_at: "2026-09-10T02:00:00Z",
     start_date: null,

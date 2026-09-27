@@ -16,8 +16,10 @@ import {
   heldPurchases,
   heldMatching,
   activeProducts,
+  refundsByPackage,
+  refundState,
 } from "./packageRows";
-import type { Purchase } from "../types";
+import type { LiveRefund, Purchase } from "../types";
 
 describe("mapCategories", () => {
   it("counts classes from the embedded array and defaults nulls", () => {
@@ -182,5 +184,43 @@ describe("activeProducts", () => {
       { id: "b", is_active: false } as any,
     ]);
     expect(out.map((p) => p.id)).toEqual(["a"]);
+  });
+});
+
+// Refunds (PACKAGE_REVENUE_REFUNDS_PLAN.md U2) — NEW behaviour, so §7.25 applies:
+// proven red by dropping the `!p.confirmed_at` condition (a declined request
+// then offers Record refund) and by `refunds === null` → `false` (a failed read
+// then offers it too).
+describe("refundState", () => {
+  const base = {
+    id: "k1",
+    status: "cancelled",
+    confirmed_at: "2026-09-16T05:46:00Z",
+    amount_payable: 350,
+  } as Purchase;
+  const none = new Map<string, LiveRefund>();
+  const withRefund = new Map<string, LiveRefund>([
+    ["k1", { id: "r1", parent_package_id: "k1", amount: 100, refunded_on: "2026-09-20", note: null }],
+  ]);
+
+  it("a cancelled, paid package with no refund can be refunded — only with packages:edit", () => {
+    expect(refundState(base, none, true)).toBe("can_record");
+    expect(refundState(base, none, false)).toBe("none");
+  });
+  it("a recorded refund shows, reversible only with packages:edit", () => {
+    expect(refundState(base, withRefund, true)).toBe("recorded");
+    expect(refundState(base, withRefund, false)).toBe("recorded_readonly");
+  });
+  it("an active package, a declined request (never paid) and a S$0 package offer nothing", () => {
+    expect(refundState({ ...base, status: "active" }, none, true)).toBe("none");
+    expect(refundState({ ...base, confirmed_at: null }, none, true)).toBe("none");
+    expect(refundState({ ...base, amount_payable: 0 }, none, true)).toBe("none");
+  });
+  it("fails CLOSED when refunds could not be loaded — never a Record button", () => {
+    expect(refundState(base, null, true)).toBe("none");
+  });
+  it("refundsByPackage keys live refunds by package, numbers as numbers", () => {
+    const m = refundsByPackage([{ id: "r1", parent_package_id: "k1", amount: "100.00", refunded_on: "2026-09-20", note: null }]);
+    expect(m.get("k1")).toEqual({ id: "r1", parent_package_id: "k1", amount: 100, refunded_on: "2026-09-20", note: null });
   });
 });

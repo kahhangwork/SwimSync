@@ -6,6 +6,8 @@ export type Summary = {
   revenue_settlements: number | null;
   /** Package purchases PAID this month (cash basis, amount after any discount). */
   revenue_packages: number | null;
+  /** Package refunds PAID OUT this month — positive; subtracted from revenue. */
+  revenue_package_refunds: number | null;
   revenue_gross: number | null;
   revenue_package_applied: number | null;
   revenue_credit_applied: number | null;

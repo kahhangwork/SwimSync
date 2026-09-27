@@ -14,6 +14,8 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
+DELETE FROM package_refunds        WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001';
+DELETE FROM billing_periods        WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001';
 DELETE FROM parent_packages        WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001';
 UPDATE tenants SET default_package_product_id = NULL, owner_profile_id = NULL
  WHERE id = 'c8000000-0000-0000-0000-000000000001';

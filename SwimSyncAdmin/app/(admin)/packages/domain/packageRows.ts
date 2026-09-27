@@ -4,7 +4,7 @@
 // (characterisation tests: they pin the behaviour the page already had).
 
 import { matchesAnyField } from "@/lib/tableSearch";
-import type { Category, Product, Purchase, ParentOption } from "../types";
+import type { Category, Product, Purchase, ParentOption, LiveRefund } from "../types";
 
 export function mapCategories(rows: any[] | null): Category[] {
   return (rows ?? []).map((c: any) => ({
@@ -79,6 +79,7 @@ export function mapPurchases(
       ? Number(liveById.get(p.id).live_lessons_remaining)
       : null,
     status: p.status,
+    confirmed_at: p.confirmed_at ?? null,
     product_id: p.product_id,
     requested_at: p.requested_at,
     start_date: p.start_date,
@@ -136,3 +137,36 @@ export const heldMatching = (held: Purchase[], search: string): Purchase[] =>
 
 export const activeProducts = (products: Product[]): Product[] =>
   products.filter((p) => p.is_active);
+
+// ── Refunds (PACKAGE_REVENUE_REFUNDS_PLAN.md U2) ─────────────────────────────
+
+export function refundsByPackage(rows: any[] | null): Map<string, LiveRefund> {
+  const m = new Map<string, LiveRefund>();
+  for (const r of rows ?? []) {
+    m.set(r.parent_package_id, {
+      id: r.id,
+      parent_package_id: r.parent_package_id,
+      amount: Number(r.amount),
+      refunded_on: r.refunded_on,
+      note: r.note ?? null,
+    });
+  }
+  return m;
+}
+
+export type RefundState = "none" | "can_record" | "recorded" | "recorded_readonly";
+
+/** What the refund cell of a held row shows. Fails CLOSED: refunds that could
+ *  not be loaded (refunds === null) show nothing, never a Record button that
+ *  might double-refund. Only a CANCELLED package that was PAID (confirmed_at)
+ *  and cost something can be refunded — the RPC refuses the rest anyway. */
+export function refundState(
+  p: Purchase,
+  refunds: Map<string, LiveRefund> | null,
+  canEdit: boolean
+): RefundState {
+  if (refunds === null) return "none";
+  if (p.status !== "cancelled" || !p.confirmed_at || !(p.amount_payable > 0)) return "none";
+  if (refunds.has(p.id)) return canEdit ? "recorded" : "recorded_readonly";
+  return canEdit ? "can_record" : "none";
+}

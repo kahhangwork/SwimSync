@@ -76,6 +76,8 @@ ON CONFLICT (id) DO NOTHING;
 
 -- ── Reset the driver's side effects FIRST ───────────────────────────────────
 -- Every package (fixture + a recorded sale); extension events cascade.
+DELETE FROM package_refunds  WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001';
+DELETE FROM billing_periods  WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001';
 DELETE FROM parent_packages  WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001';
 DELETE FROM audit_log        WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001';
 
@@ -188,6 +190,10 @@ BEGIN
     FROM parent_students ps JOIN parents p ON p.id = ps.parent_id
     JOIN profiles pr ON pr.id = p.profile_id
    WHERE pr.id::text LIKE 'c8000000-%';
+  IF EXISTS (SELECT 1 FROM package_refunds WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001')
+     OR EXISTS (SELECT 1 FROM billing_periods WHERE tenant_id = 'c8000000-0000-0000-0000-000000000001') THEN
+    RAISE EXCEPTION 'fixture: a refund or a sealed month survived the reset (verify-packages-admin 6b writes both)';
+  END IF;
   IF v_pk IS DISTINCT FROM '3a1:active:-,3a2:cancelled:3a3,3a3:pending:-'
      OR v_prod IS DISTINCT FROM 'PkgAdm 10 Group:true,PkgAdm 5 Any:true,PkgAdm Retiree:true'
      OR v_cat IS DISTINCT FROM 'PkgAdm Group:-:-,PkgAdm Private:-:-'

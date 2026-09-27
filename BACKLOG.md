@@ -288,7 +288,7 @@ plan (`/plan-with-confidence`). New money surfaces take the `packages` / `billin
 
 
 3. ~~**Package revenue on the accounting page** (S)~~ — **shipped 2026-09-27** (PRD §7.23).
-4. **In-app package refunds** (S) — same lane as 3, straight after (shared surface).
+4. ~~**In-app package refunds** (S)~~ — **shipped 2026-09-27** (PRD §7.16, §7.23).
    - **Lane 2:** *Deeper component-render tests* — **only** the attendance save flow, which Wave 2 does not touch.
 
 #### Wave 3 — cheaper by waiting
@@ -1075,21 +1075,6 @@ page load. Status never flips at expiry, so the set grew unboundedly over years.
 if a late-added holiday inside an old nominal window can still resurrect an expired package —
 which is exactly why the event-driven replacement is correct: extension now happens at the
 holiday mark, not on a scan that would have to be un-bounded to catch it. (Fable review #9.)
-
-### In-app package refunds — **S**
-Record a refund against a cancelled package instead of settling fully offline.
-
-**Why:** cancellation freezes the remaining value and shows it, but the money movement
-lives outside SwimSync — fine at one tenant, unauditable at ten. **Notes:** the
-commercial convention discussed 2026-07-20: refund = paid − (lessons taken × walk-in
-rate), i.e. claw back the volume discount on lessons actually used; don't apportion
-"bonus vs cash".
-
-**Decided 2026-09-27:** ~~owner-only~~ **grantable via `packages:edit`** (planning refinement; Full admin only by default — `docs/plans/WAVE_2_PACKAGES_BRIEF.md` W5). Refunds are **package-only** — the one case is a package CANCELLED with value
-left (family moves, injury, child quits, class closed with no alternative); monthly invoices already correct through
-credit notes. On the accounting page a refund **subtracts from the month it is paid out**, mirroring *Package revenue
-on the accounting page* (counted when paid). Build straight after that item, same lane. Refund-amount rule not yet
-chosen (the 2026-07-20 convention above is the default candidate).
 
 ### Show package refunds to the parent — **S** — _filed 2026-09-27_
 Show a recorded package refund on the parent's Billing card (*"Refunded S$X on <date>"*), and email them when one is

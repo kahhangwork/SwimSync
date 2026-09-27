@@ -49,6 +49,7 @@ function purchase(over: Partial<Purchase>): Purchase {
     live_value_remaining: 180,
     live_lessons_remaining: 6,
     status: "active",
+    confirmed_at: null,
     product_id: "prod1",
     requested_at: "2026-08-01T02:00:00Z",
     start_date: "2026-08-02",
@@ -106,6 +107,10 @@ function setup(over: Partial<Props> = {}) {
     openExtend: vi.fn(),
     setCancelling: vi.fn(),
     setSaleModal: vi.fn(),
+    refunds: new Map(),
+    canEdit: true,
+    openRefund: vi.fn(),
+    openReverse: vi.fn(),
     ...over,
   };
   const utils = render(<HeldTable {...props} />);
@@ -208,5 +213,52 @@ describe("HeldTable", () => {
     capped.unmount();
     setup({ capped: false });
     expect(screen.queryByText(/Showing the first/)).toBeNull();
+  });
+});
+
+// Refund cell (PACKAGE_REVENUE_REFUNDS_PLAN.md U2). Proven red by rendering
+// <RefundCell> with canEdit hard-wired true (the view-only test fails) and by
+// wiring Record refund to a no-op (the acts-on-that-row test fails).
+describe("HeldTable refunds", () => {
+  const CANCELLED = purchase({
+    id: "p9",
+    parent_name: "Dan Koh",
+    reference_number: "PKG-2026-0009",
+    status: "cancelled",
+    confirmed_at: "2026-09-16T05:46:00Z",
+    amount_payable: 350,
+    live_value_remaining: null,
+    live_lessons_remaining: null,
+  });
+  const REFUND = { id: "r1", parent_package_id: "p9", amount: 120, refunded_on: "2026-09-20", note: "moved" };
+
+  it("a cancelled, paid package offers Record refund, acting on that row; active rows do not", () => {
+    const { props } = setup({ held: [ALICE, CANCELLED] });
+    expect(row("Alice Tan").queryByText("Record refund")).toBeNull();
+    fireEvent.click(row("Dan Koh").getByText("Record refund"));
+    expect(props.openRefund).toHaveBeenCalledWith(CANCELLED);
+  });
+
+  it("a recorded refund shows its amount and SGT date, with Reverse", () => {
+    const { props } = setup({ held: [CANCELLED], refunds: new Map([["p9", REFUND]]) });
+    const dan = row("Dan Koh");
+    expect(dan.getByTestId("refund-recorded").textContent).toContain("Refunded S$120.00 on 20 Sept 2026");
+    expect(dan.queryByText("Record refund")).toBeNull();
+    fireEvent.click(dan.getByText("Reverse"));
+    expect(props.openReverse).toHaveBeenCalledWith(CANCELLED, REFUND);
+  });
+
+  it("a view-only admin sees the refund but no Record or Reverse", () => {
+    setup({ held: [CANCELLED], canEdit: false, refunds: new Map([["p9", REFUND]]) });
+    expect(row("Dan Koh").getByTestId("refund-recorded")).toBeTruthy();
+    expect(screen.queryByText("Reverse")).toBeNull();
+    setup({ held: [purchase({ ...CANCELLED, id: "p10", parent_name: "Eve Ong" })], canEdit: false });
+    expect(row("Eve Ong").queryByText("Record refund")).toBeNull();
+  });
+
+  it("a failed refunds read hides every refund control and says so", () => {
+    setup({ held: [CANCELLED], refunds: null });
+    expect(screen.queryByText("Record refund")).toBeNull();
+    expect(screen.getByTestId("refunds-unavailable")).toBeTruthy();
   });
 });

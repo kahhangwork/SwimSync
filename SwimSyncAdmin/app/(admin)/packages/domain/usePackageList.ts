@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import type { WaQueueRow } from "@/components/WhatsAppQueue";
 import { ROW_LIMIT } from "../constants";
-import type { Category, Product, Purchase, ParentOption } from "../types";
+import type { Category, Product, Purchase, ParentOption, LiveRefund } from "../types";
 import * as repo from "../dao/packages.repo";
 import * as rpc from "../dao/packages.rpc";
 import {
@@ -17,6 +17,7 @@ import {
   mapProducts,
   childrenByParent,
   liveBalancesById,
+  refundsByPackage,
   mapPurchases,
   mapParents,
   pendingPurchases,
@@ -36,6 +37,8 @@ export function usePackageList() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  // null = the refunds read FAILED — every refund control hides (fail closed).
+  const [refunds, setRefunds] = useState<Map<string, LiveRefund> | null>(new Map());
   const [parents, setParents] = useState<ParentOption[]>([]);
   const [businessName, setBusinessName] = useState("your swim school");
   const [tenantDefaultProduct, setTenantDefaultProduct] = useState<string | null>(null);
@@ -81,13 +84,14 @@ export function usePackageList() {
     }
 
     // RLS scopes every query here to the caller's own business.
-    const [catRes, prodRes, purRes, liveRes, ptRes, childRes] = await Promise.all([
+    const [catRes, prodRes, purRes, liveRes, ptRes, childRes, refRes] = await Promise.all([
       repo.loadCategories(),
       repo.loadProducts(),
       repo.loadPurchases(),
       rpc.liveBalances(),
       repo.loadParentOptions(),
       repo.loadChildren(),
+      repo.loadRefunds(),
     ]);
 
     // A failed catalogue fetch and "this business sells nothing" render
@@ -106,6 +110,8 @@ export function usePackageList() {
     const liveById = liveBalancesById(liveRes.data as any[]);
     setPurchases(mapPurchases(purRes.data as any[], liveById, childMap));
     setParents(mapParents(ptRes.data as any[]));
+    if (refRes.error) console.error("package_refunds fetch failed", refRes.error);
+    setRefunds(refRes.error ? null : refundsByPackage(refRes.data as any[]));
 
     setLoading(false);
   }
@@ -129,6 +135,7 @@ export function usePackageList() {
     categories,
     products,
     purchases,
+    refunds,
     parents,
     businessName,
     tenantDefaultProduct,

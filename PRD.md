@@ -2270,8 +2270,21 @@ cash paid always equals value granted — nothing to reconcile.
 - Precedence when both exist: the package covers its own in-scope lines; credit notes
   then reduce the remaining cash amount.
 
-*(Deliberately not built: in-app refunds — cancelling freezes the remaining value and
-the money settles offline, see `BACKLOG.md`; arbitrary-amount top-ups — buying another
+- **Refunds are recorded in-app** *(implemented 2026-09-27)*. Cancelling still freezes the
+  remaining value; the money is still sent outside SwimSync (PayNow, bank). Once it has been
+  sent, a cancelled package that was **paid** shows **Record refund** on its row (Admin →
+  Packages → *Who holds one*): the admin types the amount (**nothing is suggested**), the date
+  it was paid out and an optional note. The database refuses a refund **above what the family
+  paid**, dated **in the future**, **before the package was paid**, or in a **closed** billing
+  month — so a closed month's Accounting figures never change. **One live refund per
+  package**; a mistake is **reversed** (kept on record, only while its month is open) and the
+  right one recorded. Declined requests (never paid) and active packages cannot be refunded.
+  Recording and reversing need the *Packages & referrals* area at **edit** (Full admin by
+  default); a view-only role sees the refund but no buttons. A refund comes **off Revenue in
+  the month it was paid out** (§7.23). The family is not notified in-app — see `BACKLOG.md`
+  *Show package refunds to the parent*.
+
+*(Deliberately not built: arbitrary-amount top-ups — buying another
 package is the top-up; and the UNPROMPTED parent low-balance nudge — the admin now sends a
 renewal offer with its own email (above), but an automatic parent-side reminder stays
 backlogged behind cron.)*
@@ -2884,6 +2897,10 @@ received. Four figures per month:
   invoiced revenue (*− Packages applied*), so nothing counts twice. The page says so under the
   breakdown. A confirmation date cannot be back-dated by the app — it is always the moment of
   confirming — so package revenue never lands in a closed month.
+- **Package refunds** *(implemented 2026-09-27)* are the mirror: a recorded refund (§7.16)
+  comes **off** Revenue in the month it was **paid out** (its own *− Package refunds* line),
+  and a reversed one never counts. A month with little else can therefore show a negative
+  Revenue — that is the real figure, not an error.
 - **Outstanding** = the month's still-unpaid invoices (raw `net_amount`, the same definition
   the Invoices page uses); it legitimately changes over time as invoices get paid.
 - **Wages** = accrued cost of lessons **taught** that month (a period's own payout items plus

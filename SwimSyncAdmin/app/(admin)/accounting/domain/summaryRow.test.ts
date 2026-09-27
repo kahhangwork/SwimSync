@@ -21,6 +21,11 @@ describe("toSummary", () => {
     expect(s.revenue_packages).toBe(270);
   });
 
+  it("maps revenue_package_refunds (Wave 2 U2)", () => {
+    const s = toSummary({ revenue_package_refunds: "150.00", wages_state: "final" })!;
+    expect(s.revenue_package_refunds).toBe(150);
+  });
+
   it("a withheld figure (null / missing) stays null, never 0", () => {
     const s = toSummary({ wages: null, wages_state: "run_payouts" })!;
     expect(s.wages).toBeNull();

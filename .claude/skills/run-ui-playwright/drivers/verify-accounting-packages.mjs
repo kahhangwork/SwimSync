@@ -9,13 +9,15 @@
 //   supabase start; admin panel on :3000 (or ADMIN_URL)
 //   fixture: fixtures-accounting-packages.sql — AcctPkg Swim, last month SEALED
 //   for that business only (§7.301), a package total 300 / payable 270, an
-//   invoice net 140. Read-only driver: re-runnable without a teardown.
+//   invoice net 140, a S$50 refund paid out that month (U2). Read-only driver:
+//   re-runnable without a teardown.
 //
 // Persona (password123):
 //   acctpkg-owner@swimsync.test   owner of AcctPkg Swim
 //
 // PROVEN RED (2026-09-27): with accounting_summary summing pp.total_value, check 2
-// fails (S$300.00) and so does check 3 (S$440.00).
+// fails (S$300.00) and so does check 3 (then S$440.00). With refunds not
+// subtracted from v_revenue, check 3 fails (S$410.00) (U2).
 
 import os from "node:os";
 import { launch, loginAdmin, ADMIN } from "./lib.mjs";
@@ -56,10 +58,12 @@ const sold = await lineValue(page, "+ Packages sold (paid this month)");
 check("'+ Packages sold (paid this month)' shows S$270.00 — what was paid, not the S$300 face value",
   sold === "S$270.00", `got ${sold}`);
 
-// ── 3. Revenue adds it once: invoiced 140 + packages 270 ─────────────────────
+// ── 3. Revenue adds it once and takes the refund off: 140 + 270 − 50 ─────────
 const revenue = await lineValue(page, "= Revenue");
-check("= Revenue is S$410.00 (invoiced S$140.00 + packages S$270.00)",
-  revenue === "S$410.00", `got ${revenue}`);
+check("= Revenue is S$360.00 (invoiced S$140.00 + packages S$270.00 − refunds S$50.00)",
+  revenue === "S$360.00", `got ${revenue}`);
+const refunds = await lineValue(page, "− Package refunds (paid out this month)");
+check("'− Package refunds (paid out this month)' shows S$50.00", refunds === "S$50.00", `got ${refunds}`);
 const applied = await lineValue(page, "− Packages applied");
 check("'− Packages applied' is still its own line (S$60.00), not merged with the sale",
   applied === "S$60.00", `got ${applied}`);

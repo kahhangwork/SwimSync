@@ -8,6 +8,7 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
+DELETE FROM package_refunds        WHERE tenant_id = 'ac700000-0000-0000-0000-000000000001';
 DELETE FROM invoices               WHERE tenant_id = 'ac700000-0000-0000-0000-000000000001';
 DELETE FROM billing_periods        WHERE tenant_id = 'ac700000-0000-0000-0000-000000000001';
 DELETE FROM parent_packages        WHERE tenant_id = 'ac700000-0000-0000-0000-000000000001';

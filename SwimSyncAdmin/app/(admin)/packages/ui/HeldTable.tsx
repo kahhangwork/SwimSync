@@ -9,9 +9,12 @@
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { todayInSg } from "@/lib/lessonDates";
+import { formatSgStamp, todayInSg } from "@/lib/lessonDates";
 import { ROW_LIMIT, money } from "../constants";
-import type { Purchase } from "../types";
+import { refundState } from "../domain/packageRows";
+import type { LiveRefund, Purchase } from "../types";
+
+const DMY: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
 
 export function HeldTable({
   held,
@@ -24,6 +27,10 @@ export function HeldTable({
   openExtend,
   setCancelling,
   setSaleModal,
+  refunds,
+  canEdit,
+  openRefund,
+  openReverse,
 }: {
   held: Purchase[];
   heldMatches: Purchase[];
@@ -35,6 +42,12 @@ export function HeldTable({
   openExtend: (p: Purchase) => void;
   setCancelling: (p: Purchase | null) => void;
   setSaleModal: (open: boolean) => void;
+  /** Live refunds by package id; null = they could not be loaded (controls hide). */
+  refunds: Map<string, LiveRefund> | null;
+  /** packages:edit, known (false while permissions load — fail closed). */
+  canEdit: boolean;
+  openRefund: (p: Purchase) => void;
+  openReverse: (p: Purchase, r: LiveRefund) => void;
 }) {
   const heldSort = useTableSort<Purchase>({
     key: "parent_name",
@@ -182,6 +195,14 @@ export function HeldTable({
                     />
                   </Td>
                   <Td>
+                    <RefundCell
+                      p={p}
+                      refunds={refunds}
+                      canEdit={canEdit}
+                      busy={busy}
+                      openRefund={openRefund}
+                      openReverse={openReverse}
+                    />
                     {p.status === "active" && (
                       <div className="flex items-center gap-1">
                         <Button
@@ -213,6 +234,52 @@ export function HeldTable({
         are already subtracted. The money itself moves when the month is
         billed.
       </p>
+      {refunds === null && (
+        <p className="mt-1 text-xs text-amber-700" data-testid="refunds-unavailable">
+          Refund details couldn&rsquo;t load — reload the page before recording a refund.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// The refund slot of a cancelled row (PACKAGE_REVENUE_REFUNDS_PLAN.md U2). What
+// it shows is decided by refundState() alone, so the rules live in one tested place.
+function RefundCell({
+  p,
+  refunds,
+  canEdit,
+  busy,
+  openRefund,
+  openReverse,
+}: {
+  p: Purchase;
+  refunds: Map<string, LiveRefund> | null;
+  canEdit: boolean;
+  busy: boolean;
+  openRefund: (p: Purchase) => void;
+  openReverse: (p: Purchase, r: LiveRefund) => void;
+}) {
+  const state = refundState(p, refunds, canEdit);
+  if (state === "none") return null;
+  if (state === "can_record") {
+    return (
+      <Button variant="outline" size="sm" onClick={() => openRefund(p)} disabled={busy}>
+        Record refund
+      </Button>
+    );
+  }
+  const r = refunds!.get(p.id)!;
+  return (
+    <div className="flex items-center gap-1" data-testid="refund-recorded">
+      <span className="text-xs text-gray-600" title={r.note ?? undefined}>
+        Refunded {money(r.amount)} on {formatSgStamp(r.refunded_on, DMY)}
+      </span>
+      {state === "recorded" && (
+        <Button variant="ghost" size="sm" onClick={() => openReverse(p, r)} disabled={busy}>
+          Reverse
+        </Button>
+      )}
     </div>
   );
 }

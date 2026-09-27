@@ -54,11 +54,21 @@ export const loadPurchases = () =>
   supabase
     .from("parent_packages")
     .select(
-      "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, requested_at, start_date, expires_on, holiday_extension_days, cancel_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
+      "id, parent_id, product_id, name, lesson_count, rate_per_lesson, total_value, amount_payable, discount_amount, value_remaining, status, confirmed_at, requested_at, start_date, expires_on, holiday_extension_days, cancel_extension_days, manual_extension_days, reference_number, offered_by, paid_claimed_at, superseded_by, public_token, class_categories(name), parents(profiles(full_name, email))"
     )
     .order("status")
     .order("requested_at", { ascending: false })
     .limit(ROW_LIMIT);
+
+// Live refunds — a SEPARATE query, never an embed on loadPurchases: if this read
+// fails (a grant drift, §7.39) the purchases list must still load, and the page
+// hides every refund control rather than offer one that might double-refund
+// (PACKAGE_REVENUE_REFUNDS_PLAN.md ⚠ RISK 6).
+export const loadRefunds = () =>
+  supabase
+    .from("package_refunds")
+    .select("id, parent_package_id, amount, refunded_on, note")
+    .is("reversed_at", null);
 
 export const loadParentOptions = () =>
   supabase

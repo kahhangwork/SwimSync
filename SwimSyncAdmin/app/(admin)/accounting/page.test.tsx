@@ -50,7 +50,7 @@ const FINAL = {
   revenue_gross: "180.00", revenue_package_applied: "10.00",
   revenue_credit_applied: "20.00", revenue_balance_adjustment: "15.00",
   outstanding: "100.00", wages: "180.00", net: "10.00", wages_state: "final",
-  revenue_packages: "0.00",
+  revenue_packages: "0.00", revenue_package_refunds: "0.00",
 };
 
 const RUN_PAYOUTS = {
@@ -138,5 +138,21 @@ describe("AccountingPage package revenue (Wave 2 U1)", () => {
     expect(screen.getByTestId("revenue-basis-note").textContent).toContain(
       "packages count the month they were paid",
     );
+  });
+});
+
+describe("AccountingPage package refunds (Wave 2 U2)", () => {
+  it("shows refunds as their own line, and a negative revenue as -S$", async () => {
+    state.summary = {
+      ...FINAL, revenue: "-50.00", revenue_invoiced: "0.00", revenue_settlements: "0.00",
+      revenue_packages: "100.00", revenue_package_refunds: "150.00", wages: "0.00", net: "-50.00",
+    };
+    render(<AccountingPage />);
+    const revenue = await screen.findByTestId("tile-revenue");
+    expect(revenue.textContent).toContain("-S$50.00");
+    expect(revenue.textContent).toContain("refunds S$150.00");
+    const refunds = screen.getByText("− Package refunds (paid out this month)");
+    expect(refunds.nextElementSibling?.textContent).toBe("S$150.00");
+    expect(screen.getByText("= Revenue").nextElementSibling?.textContent).toBe("-S$50.00");
   });
 });

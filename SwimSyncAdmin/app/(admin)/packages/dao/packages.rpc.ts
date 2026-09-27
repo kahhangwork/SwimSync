@@ -94,3 +94,22 @@ export const renewalCandidates = () => supabase.rpc("package_renewal_candidates"
  *  best-effort and must never block or fail the action that triggered them. */
 export const invokePackageEmail = (body: Record<string, unknown>) =>
   supabase.functions.invoke("package-emails", { body });
+
+// Refunds (20260928000200). The RPCs are the guard — amount cap, dates, closed
+// months, one live refund — and their refusals are sentences meant for the
+// admin; the modal shows error.message verbatim.
+export const recordPackageRefund = (
+  packageId: string,
+  amount: number,
+  refundedOn: string,
+  note: string
+) =>
+  supabase.rpc("record_package_refund", {
+    p_package: packageId,
+    p_amount: amount,
+    p_refunded_on: refundedOn,
+    p_note: note || null,
+  });
+
+export const reversePackageRefund = (refundId: string) =>
+  supabase.rpc("reverse_package_refund", { p_refund: refundId });
