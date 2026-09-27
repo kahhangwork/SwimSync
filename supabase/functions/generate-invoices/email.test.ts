@@ -14,6 +14,10 @@ import {
   buildBlockedEmailHtml,
   notifyGenerationBlocked,
   shouldRetryTenantEmails,
+  settleActionFor,
+  outcomeForStatus,
+  invoiceIdempotencyKey,
+  type SendOutcome,
 } from "./email.ts";
 
 const sample: InvoiceEmailData = {
@@ -179,9 +183,86 @@ Deno.test("sendInvoiceEmail: fetch throws → caught, not sent", async () => {
   try {
     const r = await sendInvoiceEmail({ ...sample, apiKey: "re_x", to: "a@b.com" });
     assertEquals(r.sent, false);
+    assertEquals(r.outcome, "threw");
     assertStringIncludes(r.reason ?? "", "fetch_error");
   } finally {
     globalThis.fetch = orig;
+  }
+});
+
+// ── Crash-safe claim: the settle table (CRASH_SAFE_EMAIL_CLAIM_PLAN.md §3.2) ──
+
+Deno.test("settleActionFor: the settle table, every outcome decided", () => {
+  // Confirmed sent — stamp sent_at.
+  assertEquals(settleActionFor("ok"), "sent");
+  assertEquals(settleActionFor("key_reused"), "sent"); // 409: the key was already accepted
+  // Provably nothing left our side — release, retry any time.
+  assertEquals(settleActionFor("no_api_key"), "release");
+  assertEquals(settleActionFor("no_recipient"), "release");
+  assertEquals(settleActionFor("rejected"), "release");
+  // Unknown — keep the claim; the lease expires and the SAME key dedups.
+  assertEquals(settleActionFor("server_error"), "keep");
+  assertEquals(settleActionFor("threw"), "keep");
+  assertEquals(settleActionFor("key_in_flight"), "keep");
+});
+
+Deno.test("outcomeForStatus: the two idempotency 409s are told apart by name", () => {
+  const body = (name: string) => JSON.stringify({ statusCode: 409, name, message: "m" });
+  assertEquals(outcomeForStatus(409, body("invalid_idempotent_request")), "key_reused");
+  assertEquals(outcomeForStatus(409, body("concurrent_idempotent_requests")), "key_in_flight");
+  // Any other 409, or a body that is not JSON, is an ordinary refusal.
+  assertEquals(outcomeForStatus(409, body("something_else")), "rejected");
+  assertEquals(outcomeForStatus(409, "not json"), "rejected");
+  assertEquals(outcomeForStatus(422, body("validation_error")), "rejected");
+  assertEquals(outcomeForStatus(400, body("invalid_idempotency_key")), "rejected");
+  assertEquals(outcomeForStatus(500, ""), "server_error");
+  assertEquals(outcomeForStatus(503, "x"), "server_error");
+});
+
+Deno.test("sendInvoiceEmail: a 409 invalid_idempotent_request reports SENT", async () => {
+  const orig = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response(
+      JSON.stringify({ statusCode: 409, name: "invalid_idempotent_request", message: "m" }),
+      { status: 409 },
+    ))) as typeof fetch;
+  try {
+    const r = await sendInvoiceEmail({ ...sample, apiKey: "re_x", to: "a@b.com", idempotencyKey: "invoice/x" });
+    assertEquals(r.outcome, "key_reused");
+    assertEquals(r.sent, true, "the key was already accepted — the email went out");
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+Deno.test("sendInvoiceEmail: sends the Idempotency-Key header when given one", async () => {
+  const orig = globalThis.fetch;
+  let headers: Record<string, string> = {};
+  globalThis.fetch = ((_u: string | URL | Request, init?: RequestInit) => {
+    headers = (init?.headers ?? {}) as Record<string, string>;
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  }) as typeof fetch;
+  try {
+    await sendInvoiceEmail({ ...sample, apiKey: "re_x", to: "a@b.com", idempotencyKey: "invoice/abc" });
+    assertEquals(headers["Idempotency-Key"], "invoice/abc");
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
+
+Deno.test("invoiceIdempotencyKey: one key per invoice, for every attempt", () => {
+  // No claim-dependent variant: a MAY_HAVE_SENT resend reuses the (lapsed) key,
+  // so any later retry dedups against it (decided 2026-09-27, see email.ts).
+  assertEquals(invoiceIdempotencyKey("i1"), "invoice/i1");
+  assertEquals(invoiceIdempotencyKey("i2"), "invoice/i2");
+});
+
+Deno.test("SendOutcome: every outcome has a settle action", () => {
+  const all: SendOutcome[] = [
+    "ok", "no_api_key", "no_recipient", "rejected", "key_reused", "key_in_flight", "server_error", "threw",
+  ];
+  for (const o of all) {
+    assert(["sent", "release", "keep"].includes(settleActionFor(o)), `outcome ${o} undecided`);
   }
 });
 

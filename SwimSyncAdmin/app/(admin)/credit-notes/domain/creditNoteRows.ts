@@ -39,6 +39,9 @@ export function toCreditNoteRow(cn: any): CreditNoteRow {
     created_at: cn.issued_at?.split("T")[0] ?? "—",
     status: cn.status,
     email_sent_at: cn.email_sent_at ?? null,
+    // The computed column is always selected; the fallback only guards a row
+    // shaped by hand (tests, or a select that forgot it).
+    email_state: cn.credit_note_email_state ?? (cn.email_sent_at ? "SENT" : "UNSENT"),
     tenant_id: cn.tenant_id,
     applied_to_invoice_id: cn.applied_to_invoice_id ?? null,
     has_applications: (cn.credit_applications ?? []).some(

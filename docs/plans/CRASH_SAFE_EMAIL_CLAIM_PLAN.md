@@ -31,9 +31,14 @@ Package, referral and invite emails keep no sent state, so they have no window (
   - **Credit notes:** the row reads *"May have been sent — Resend anyway?"* with the Resend button.
   - **Invoices:** the Billing months card shows a count — *"1 invoice email may not have arrived"* — opening a list
     with a per-invoice **Resend**. This is the only new invoice UI.
-  - A human resend of a **MAY_HAVE_SENT** email uses a **new** key (`…/manual/<timestamp>`), because choosing to
-    resend is choosing to risk one duplicate. A human resend of an UNSENT or RETRYABLE email uses the **normal** key —
-    still inside the window, still safe.
+  - **Every attempt at one email uses the same key** — `invoice/<id>`, `credit-note/<id>/<issued_at epoch>` —
+    including a human resend of a **MAY_HAVE_SENT** email. *(implemented — changed with the user 2026-09-27 during
+    lane 2's /commit-review; this bullet originally said MAY_HAVE_SENT got a **new** `…/manual/<timestamp>` key.)*
+    MAY_HAVE_SENT means the claim is > 24 h old, so the key has already lapsed and Resend sends fresh: the human
+    still gets a real resend, still knowingly risking one duplicate. A per-resend key opened a **second** duplicate
+    path: resend → unknown outcome (5xx / timeout, claim kept) → RETRYABLE 15 min later → the automatic retry (or a
+    coach re-save) sends under the lapsed normal key. With one key, that retry is de-duplicated against the human's
+    send. Pinned by `emailClaim.test.ts` "reuses the SAME key".
 - Credit notes keep their **manual** Resend (no automatic credit-note retry pass — unchanged decision).
 
 ## 3. Design
@@ -86,7 +91,7 @@ state of an unsent row (computed in SQL, never in the browser):
          claimed_at NULL                        → UNSENT         (retryable now)
          claimed 0–15 min ago                   → SENDING        (skip)
          claimed 15 min – 24 h ago              → RETRYABLE      (auto-retry, same key — safe)
-         claimed > 24 h ago                     → MAY_HAVE_SENT  (NO auto-retry; human Resend only, new key)
+         claimed > 24 h ago                     → MAY_HAVE_SENT  (NO auto-retry; human Resend only, same key — §2)
 ```
 
 - **Invoice first send** also claims first (same UPDATE) and uses the same key, closing the concurrent-run duplicate.
@@ -137,7 +142,7 @@ update sets SENDING, not sent.
 - **vitest:** `creditNoteEmailState` — each of the four SQL states renders its label/button; the Billing months
   card shows the may-not-have-arrived count only when N > 0.
 - **Deno / pgTAP:** a claim older than 24 h is **never** picked by the automatic retry pass, but is accepted by the
-  manual resend path with a new key; the state function's four boundaries (0, 15 min, 24 h) are pinned.
+  manual resend path (same key — §2); the state function's four boundaries (0, 15 min, 24 h) are pinned.
 - Each new test proven RED without its fix (§7.25). A literal kill-between-claim-and-send stays untestable; the lease
   expiry is what the tests exercise (by writing an old `claimed_at`).
 
@@ -145,7 +150,7 @@ update sets SENDING, not sent.
 
 1. **Clock/lease maths in two languages** — do the expiry comparison **in SQL** (`now()`), never in Deno.
 2. **Idempotency key reuse after 24 h** — with manual billing runs this is the NORMAL case for a stuck invoice email,
-   not a theoretical one. Resolved by §2: no automatic retry after 24 h; a human resend uses a new key knowingly.
+   not a theoretical one. Resolved by §2: no automatic retry after 24 h; a human resend (same, lapsed key — §2) knowingly risks one duplicate.
 3. **Edge-function deploy is separate from git** (CLAUDE.md) — confirm with `supabase functions list`.
 
 ## 7. Out of scope

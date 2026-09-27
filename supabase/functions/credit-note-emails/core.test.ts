@@ -16,6 +16,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
   claimNote,
+  creditNoteIdempotencyKey,
   fetchBalances,
   fetchTenantSuspended,
   findEmailedInvoiceItemIds,
@@ -25,8 +26,8 @@ import {
   NOTE_SELECT,
   type NoteRow,
   one,
-  releaseNote,
   sendNotes,
+  settleNote,
   skipReasonFor,
 } from "./core.ts";
 import type { SendResult } from "./email.ts";
@@ -166,24 +167,48 @@ Deno.test("the claim is atomic: of two racing claims exactly ONE wins", async ()
       claimNote(s.db, note.id),
     ]);
     assert(a.ok && b.ok);
-    const wins = [a, b].filter((r) => r.ok && r.claimed).length;
+    const wins = [a, b].filter((r) => r.ok && r.claim !== null).length;
     assertEquals(wins, 1, "exactly one caller may claim a note");
   } finally {
     await s.teardown();
   }
 });
 
+/** The note's two email columns and its SQL-computed state. */
+async function emailCols(s: Scenario, noteId: string) {
+  const { data } = await s.db
+    .from("credit_notes")
+    .select("email_sent_at, email_claimed_at, credit_note_email_state")
+    .eq("id", noteId)
+    .single();
+  return data as {
+    email_sent_at: string | null;
+    email_claimed_at: string | null;
+    credit_note_email_state: string;
+  };
+}
+
+/** Age the claim as if its sender died `minutes` ago (service_role is not pinned). */
+async function ageClaim(s: Scenario, noteId: string, minutes: number) {
+  const { error } = await s.db
+    .from("credit_notes")
+    .update({ email_claimed_at: new Date(Date.now() - minutes * 60_000).toISOString() })
+    .eq("id", noteId);
+  if (error) throw new Error(`fixture: could not age the claim — ${error.message}`);
+}
+
 Deno.test("a claimed note is no longer discoverable; releasing restores it", async () => {
   const { s, sessionId, note } = await scenarioWithCreditNote();
   try {
-    const claim = await claimNote(s.db, note.id);
-    assert(claim.ok && claim.claimed);
+    const claimed = await claimNote(s.db, note.id);
+    assert(claimed.ok && claimed.claim);
 
     const afterClaim = await findUnsentBySession(s.db, sessionId, s.tenantId);
     assert(afterClaim.ok);
-    assertEquals(afterClaim.notes.length, 0, "a claimed note is stamped, so unsent-only misses it");
+    assertEquals(afterClaim.notes.length, 0, "a note mid-send (SENDING) is not a candidate");
+    assertEquals((await emailCols(s, note.id)).email_sent_at, null, "a claim is NOT a sent stamp");
 
-    await releaseNote(s.db, note.id);
+    await settleNote(s.db, note.id, claimed.claim.claimedAt, "release");
     const afterRelease = await findUnsentBySession(s.db, sessionId, s.tenantId);
     assert(afterRelease.ok);
     assertEquals(afterRelease.notes.length, 1, "release makes it resendable");
@@ -192,7 +217,7 @@ Deno.test("a claimed note is no longer discoverable; releasing restores it", asy
   }
 });
 
-Deno.test("findUnsentById returns nothing for an already-claimed note", async () => {
+Deno.test("findUnsentById hides a FRESH claim (sending) and returns an EXPIRED one", async () => {
   const { s, note } = await scenarioWithCreditNote();
   try {
     const before = await findUnsentById(s.db, note.id);
@@ -201,10 +226,18 @@ Deno.test("findUnsentById returns nothing for an already-claimed note", async ()
 
     await claimNote(s.db, note.id);
 
-    // This is what stops a second press of Resend re-sending.
-    const after = await findUnsentById(s.db, note.id);
-    assert(after.ok);
-    assertEquals(after.notes.length, 0);
+    // This is what stops a second press of Resend re-sending while one is in flight.
+    const fresh = await findUnsentById(s.db, note.id);
+    assert(fresh.ok);
+    assertEquals(fresh.notes.length, 0);
+    assert(fresh.sending, "reported as sending, not as already emailed");
+
+    // The sender died: 20 minutes on, the lease has expired and a human can resend.
+    await ageClaim(s, note.id, 20);
+    const expired = await findUnsentById(s.db, note.id);
+    assert(expired.ok);
+    assertEquals(expired.notes.length, 1, "an expired claim is resendable — it no longer strands");
+    assertEquals(expired.notes[0].credit_note_email_state, "RETRYABLE");
   } finally {
     await s.teardown();
   }
@@ -220,7 +253,13 @@ Deno.test("⚠ RISK 5: an emailed invoice line is reported, so a sibling note is
     assert(before.ok);
     assertEquals(before.items.size, 0);
 
-    await claimNote(s.db, note.id); // stamping is what "emailed" means
+    // A CONFIRMED send is what "emailed" means — a claim alone is not.
+    const claimed = await claimNote(s.db, note.id);
+    assert(claimed.ok && claimed.claim);
+    const mid = await findEmailedInvoiceItemIds(s.db, [note.invoice_item_id]);
+    assert(mid.ok);
+    assertEquals(mid.items.size, 0, "a claim in flight has not emailed the line");
+    await settleNote(s.db, note.id, claimed.claim.claimedAt, "sent");
 
     const after = await findEmailedInvoiceItemIds(s.db, [note.invoice_item_id]);
     assert(after.ok);
@@ -263,7 +302,7 @@ Deno.test("⚠ RISK 5: a re-toggled correction reuses ONE note on the line; one 
     for (const n of found.notes) {
       if (skipReasonFor(n, { spent, emailedItems })) continue;
       const claim = await claimNote(s.db, n.id);
-      if (!(claim.ok && claim.claimed)) continue;
+      if (!(claim.ok && claim.claim)) continue;
       emailedItems.add(n.invoice_item_id);
       would++;
     }
@@ -439,7 +478,7 @@ function stubSender(answer: (n: number) => SendResult | Promise<never>) {
   };
 }
 
-Deno.test("⚠ RISK 8: a THROWING send leaves email_sent_at NULL, not stamped", async () => {
+Deno.test("⚠ RISK 8: a THROWING send is never stamped sent, and heals when its lease expires", async () => {
   const { s, note } = await scenarioWithCreditNote();
   try {
     const stub = {
@@ -453,15 +492,18 @@ Deno.test("⚠ RISK 8: a THROWING send leaves email_sent_at NULL, not stamped", 
     );
     assertEquals(res.sent, 0);
 
-    // The whole point: the row must be resendable, not silently stamped-as-emailed.
-    const { data } = await s.db
-      .from("credit_notes").select("email_sent_at").eq("id", note.id).maybeSingle();
-    assertEquals(
-      (data as { email_sent_at: string | null }).email_sent_at,
-      null,
-      "a throw after a successful claim MUST release it — otherwise the note renders " +
-        "'Emailed', Resend cannot reach it, and there is no automatic retry pass",
-    );
+    // A throw may have been delivered (a timeout after Resend accepted), so the
+    // claim is KEPT — but email_sent_at is not stamped, so nothing renders "Emailed".
+    const cols = await emailCols(s, note.id);
+    assertEquals(cols.email_sent_at, null, "a throw must never stamp the note as emailed");
+    assertEquals(cols.credit_note_email_state, "SENDING");
+
+    // Before 20260927000100 this was the stuck state: kept claim == sent marker,
+    // no Resend button, no retry pass. Now the lease expires and it is resendable.
+    await ageClaim(s, note.id, 20);
+    const found = await findUnsentById(s.db, note.id);
+    assert(found.ok);
+    assertEquals(found.notes.length, 1, "15 minutes on, the admin's Resend can reach it");
   } finally {
     await s.teardown();
   }
@@ -477,26 +519,114 @@ Deno.test("⚠ RISK 7: a 5xx KEEPS the claim; a 4xx releases it", async () => {
       send: () => Promise.resolve({ sent: false, outcome: "server_error", reason: "503" }),
       balances,
     });
-    const { data: afterFive } = await s.db
-      .from("credit_notes").select("email_sent_at").eq("id", note.id).maybeSingle();
+    const afterFive = await emailCols(s, note.id);
     assert(
-      (afterFive as { email_sent_at: string | null }).email_sent_at !== null,
+      afterFive.email_claimed_at !== null,
       "a 5xx must KEEP the claim — releasing it is how a parent gets a duplicate",
     );
+    assertEquals(afterFive.email_sent_at, null, "…but it is not a confirmed send");
 
-    await releaseNote(s.db, note.id); // reset for the second half
+    // Reset for the second half.
+    await s.db.from("credit_notes").update({ email_claimed_at: null }).eq("id", note.id);
 
     // 4xx — Resend refused, nothing sent, so it must become resendable.
     await sendNotes(s.db, [note], { spent: new Set(), emailedItems: new Set() }, {
       send: () => Promise.resolve({ sent: false, outcome: "rejected", reason: "422" }),
       balances,
     });
-    const { data: afterFour } = await s.db
-      .from("credit_notes").select("email_sent_at").eq("id", note.id).maybeSingle();
-    assertEquals(
-      (afterFour as { email_sent_at: string | null }).email_sent_at,
-      null,
-      "a 4xx released the claim",
+    const afterFour = await emailCols(s, note.id);
+    assertEquals(afterFour.email_claimed_at, null, "a 4xx released the claim");
+    assertEquals(afterFour.credit_note_email_state, "UNSENT");
+  } finally {
+    await s.teardown();
+  }
+});
+
+// ── The crash-safe claim (CRASH_SAFE_EMAIL_CLAIM_PLAN.md §3.2) ───────────────
+
+Deno.test("claim: every send carries the key credit-note/<id>/<issued_at epoch>", async () => {
+  const { s, note } = await scenarioWithCreditNote();
+  try {
+    const keys: string[] = [];
+    await sendNotes(s.db, [note], { spent: new Set(), emailedItems: new Set() }, {
+      send: (_d, _to, key) => {
+        keys.push(key);
+        return Promise.resolve({ sent: true, outcome: "ok" } as SendResult);
+      },
+      balances: new Map(),
+    });
+    const { data } = await s.db.from("credit_notes").select("issued_at").eq("id", note.id).single();
+    const issuedAt = (data as { issued_at: string }).issued_at;
+    assertEquals(keys, [`credit-note/${note.id}/${Date.parse(issuedAt)}`]);
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("claim: a note claimed > 24 h ago is never auto-sent; a human Resend reuses its key", async () => {
+  const { s, sessionId, note } = await scenarioWithCreditNote();
+  try {
+    await claimNote(s.db, note.id);
+    await ageClaim(s, note.id, 25 * 60);
+    assertEquals((await emailCols(s, note.id)).credit_note_email_state, "MAY_HAVE_SENT");
+
+    // The coach's re-save path does not even see it…
+    const bySession = await findUnsentBySession(s.db, sessionId, s.tenantId);
+    assert(bySession.ok);
+    assertEquals(bySession.notes.length, 0, "an unknown outcome past 24 h is a human decision");
+
+    // …and an automatic (non-manual) send cannot claim it either.
+    const byId = await findUnsentById(s.db, note.id);
+    assert(byId.ok && byId.notes.length === 1, "the admin's lookup DOES find it");
+    const keys: string[] = [];
+    const send = (_d: unknown, _to: unknown, key: string) => {
+      keys.push(key);
+      return Promise.resolve({ sent: true, outcome: "ok" } as SendResult);
+    };
+    const auto = await sendNotes(s.db, byId.notes, { spent: new Set(), emailedItems: new Set() }, {
+      send: send as never, balances: new Map(),
+    });
+    assertEquals(auto.sent, 0);
+    assertEquals(keys.length, 0);
+
+    // The admin presses "Resend anyway": manual, under the note's ONE key — lapsed
+    // by now, so Resend sends fresh, and a later coach re-save would dedup on it.
+    const manual = await sendNotes(s.db, byId.notes, { spent: new Set(), emailedItems: new Set() }, {
+      send: send as never, balances: new Map(), manual: true,
+    });
+    assertEquals(manual.sent, 1);
+    assertEquals(keys.length, 1);
+    const { data: issued } = await s.db.from("credit_notes").select("issued_at").eq("id", note.id).single();
+    assertEquals(keys[0], `credit-note/${note.id}/${Date.parse((issued as { issued_at: string }).issued_at)}`);
+    assertEquals((await emailCols(s, note.id)).credit_note_email_state, "SENT");
+  } finally {
+    await s.teardown();
+  }
+});
+
+Deno.test("claim: a note RE-ISSUED mid-send is not stamped by the stale sender", async () => {
+  // The re-issue reuses the same row with a new issued_at; its trigger clears
+  // the claim. The in-flight sender's settle is conditional on its token, so it
+  // matches nothing — and the re-issued credit is announced afresh, under a new key.
+  const { s, sessionId, note } = await scenarioWithCreditNote();
+  try {
+    const claimed = await claimNote(s.db, note.id);
+    assert(claimed.ok && claimed.claim);
+    const firstKey = creditNoteIdempotencyKey(note.id, claimed.claim);
+
+    await s.mark(sessionId, "present"); // voids
+    await s.mark(sessionId, "absent");  // re-issues the SAME row, new issued_at
+
+    await settleNote(s.db, note.id, claimed.claim.claimedAt, "sent");
+    const cols = await emailCols(s, note.id);
+    assertEquals(cols.email_sent_at, null, "the stale sender must not mark the re-issue emailed");
+    assertEquals(cols.credit_note_email_state, "UNSENT");
+
+    const again = await claimNote(s.db, note.id);
+    assert(again.ok && again.claim);
+    assert(
+      creditNoteIdempotencyKey(note.id, again.claim) !== firstKey,
+      "a re-issued note is a NEW email — the key is versioned by issued_at",
     );
   } finally {
     await s.teardown();
@@ -563,9 +693,9 @@ Deno.test("a successful send STAMPS the note and reports it", async () => {
     assertEquals(stub.calls[0].reference, note.reference_number);
     assert(stub.calls[0].to, "the parent's email was resolved from the snapshot join");
 
-    const { data } = await s.db
-      .from("credit_notes").select("email_sent_at").eq("id", note.id).maybeSingle();
-    assert((data as { email_sent_at: string | null }).email_sent_at !== null);
+    const cols = await emailCols(s, note.id);
+    assert(cols.email_sent_at !== null, "a confirmed send stamps email_sent_at");
+    assertEquals(cols.email_claimed_at, null, "and clears the claim");
   } finally {
     await s.teardown();
   }

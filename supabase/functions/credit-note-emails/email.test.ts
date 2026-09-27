@@ -15,7 +15,8 @@ import {
   formatDate,
   isSendableNote,
   sendCreditNoteEmail,
-  shouldResetClaim,
+  outcomeForStatus,
+  settleActionFor,
   type SendOutcome,
 } from "./email.ts";
 
@@ -198,29 +199,80 @@ Deno.test("⚠ RISK 10: a suspended business never emails; a live one does", () 
   assert(canEmailForTenant({ suspended: false }));
 });
 
-// ── ⚠ RISK 7 — release the claim only when nothing left our side ────────────
+// ── ⚠ RISK 7 — the settle table (CRASH_SAFE_EMAIL_CLAIM_PLAN.md §3.2) ─────────
 
 Deno.test("⚠ RISK 7: release the claim only on provably pre-send outcomes", () => {
   // Pre-send: nothing reached the parent, so the note must become resendable.
-  assert(shouldResetClaim("no_api_key"));
-  assert(shouldResetClaim("no_recipient"));
-  assert(shouldResetClaim("rejected")); // Resend answered 4xx = refused
+  assertEquals(settleActionFor("no_api_key"), "release");
+  assertEquals(settleActionFor("no_recipient"), "release");
+  assertEquals(settleActionFor("rejected"), "release"); // Resend answered 4xx = refused
 
-  // May ALREADY be in the parent's inbox. Releasing here is what produces a
-  // duplicate email when the admin then presses Resend.
-  assertFalse(shouldResetClaim("threw"));
-  assertFalse(shouldResetClaim("server_error"));
+  // May ALREADY be in the parent's inbox. KEEP the claim: releasing it is what
+  // produced a duplicate when the admin then pressed Resend. The claim is now a
+  // 15-minute lease, so keeping it no longer strands the note.
+  assertEquals(settleActionFor("threw"), "keep");
+  assertEquals(settleActionFor("server_error"), "keep");
+  assertEquals(settleActionFor("key_in_flight"), "keep");
 
-  // Sent: the claim is the sent-marker.
-  assertFalse(shouldResetClaim("ok"));
+  // Sent — including a 409 saying this key was already accepted.
+  assertEquals(settleActionFor("ok"), "sent");
+  assertEquals(settleActionFor("key_reused"), "sent");
 });
 
 Deno.test("⚠ RISK 7: every outcome is decided explicitly — no default branch", () => {
   const all: SendOutcome[] = [
-    "no_api_key", "no_recipient", "rejected", "server_error", "threw", "ok",
+    "no_api_key", "no_recipient", "rejected", "key_reused", "key_in_flight",
+    "server_error", "threw", "ok",
   ];
   for (const o of all) {
-    assertEquals(typeof shouldResetClaim(o), "boolean", `outcome ${o} undecided`);
+    assert(["sent", "release", "keep"].includes(settleActionFor(o)), `outcome ${o} undecided`);
+  }
+});
+
+Deno.test("outcomeForStatus: the two idempotency 409s are told apart by name", () => {
+  const body = (name: string) => JSON.stringify({ statusCode: 409, name, message: "m" });
+  assertEquals(outcomeForStatus(409, body("invalid_idempotent_request")), "key_reused");
+  assertEquals(outcomeForStatus(409, body("concurrent_idempotent_requests")), "key_in_flight");
+  assertEquals(outcomeForStatus(409, "not json"), "rejected");
+  assertEquals(outcomeForStatus(422, body("validation_error")), "rejected");
+  assertEquals(outcomeForStatus(502, ""), "server_error");
+});
+
+Deno.test("sends the Idempotency-Key header when given one", async () => {
+  const original = globalThis.fetch;
+  let key: string | undefined;
+  globalThis.fetch = (_url: string | URL | Request, init?: RequestInit) => {
+    key = (init?.headers as Record<string, string>)["Idempotency-Key"];
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  };
+  try {
+    await sendCreditNoteEmail({
+      apiKey: "re_test", to: "p@example.com", subject: "s", html: "h",
+      fromName: "Coastal Swim School", idempotencyKey: "credit-note/n1/1700000000000",
+    });
+    assertEquals(key, "credit-note/n1/1700000000000");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+Deno.test("a 409 invalid_idempotent_request reports sent (settles SENT)", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = () =>
+    Promise.resolve(new Response(
+      JSON.stringify({ statusCode: 409, name: "invalid_idempotent_request", message: "m" }),
+      { status: 409 },
+    ));
+  try {
+    const r = await sendCreditNoteEmail({
+      apiKey: "re_test", to: "p@example.com", subject: "s", html: "h",
+      fromName: "Coastal Swim School", idempotencyKey: "k",
+    });
+    assertEquals(r.outcome, "key_reused");
+    assert(r.sent);
+    assertEquals(settleActionFor(r.outcome), "sent");
+  } finally {
+    globalThis.fetch = original;
   }
 });
 
@@ -236,7 +288,7 @@ Deno.test("no API key: a logged no-op, typed pre-send so the claim releases", as
   });
   assertFalse(r.sent);
   assertEquals(r.outcome, "no_api_key");
-  assert(shouldResetClaim(r.outcome));
+  assertEquals(settleActionFor(r.outcome), "release");
 });
 
 Deno.test("no recipient: refused before any network call, claim releases", async () => {
@@ -249,7 +301,7 @@ Deno.test("no recipient: refused before any network call, claim releases", async
   });
   assertFalse(r.sent);
   assertEquals(r.outcome, "no_recipient");
-  assert(shouldResetClaim(r.outcome));
+  assertEquals(settleActionFor(r.outcome), "release");
 });
 
 // The two that decide whether a real parent gets a duplicate. Stubbing fetch is
@@ -267,7 +319,7 @@ Deno.test("⚠ RISK 7: a THROWN fetch reports sent-unknown and KEEPS the claim",
     });
     assertFalse(r.sent);
     assertEquals(r.outcome, "threw");
-    assertFalse(shouldResetClaim(r.outcome)); // ← the duplicate-email guard
+    assertEquals(settleActionFor(r.outcome), "keep"); // ← the duplicate-email guard
   } finally {
     globalThis.fetch = original;
   }
@@ -283,7 +335,7 @@ Deno.test("⚠ RISK 7: a 5xx keeps the claim, a 4xx releases it", async () => {
       fromName: "Coastal Swim School",
     });
     assertEquals(five.outcome, "server_error");
-    assertFalse(shouldResetClaim(five.outcome));
+    assertEquals(settleActionFor(five.outcome), "keep");
 
     globalThis.fetch = () =>
       Promise.resolve(new Response("bad address", { status: 422 }));
@@ -292,13 +344,13 @@ Deno.test("⚠ RISK 7: a 5xx keeps the claim, a 4xx releases it", async () => {
       fromName: "Coastal Swim School",
     });
     assertEquals(four.outcome, "rejected");
-    assert(shouldResetClaim(four.outcome));
+    assertEquals(settleActionFor(four.outcome), "release");
   } finally {
     globalThis.fetch = original;
   }
 });
 
-Deno.test("a 2xx is sent, and the claim stands as the sent-marker", async () => {
+Deno.test("a 2xx is sent, and settles SENT", async () => {
   const original = globalThis.fetch;
   globalThis.fetch = () =>
     Promise.resolve(new Response(JSON.stringify({ id: "re_1" }), { status: 200 }));
@@ -309,7 +361,7 @@ Deno.test("a 2xx is sent, and the claim stands as the sent-marker", async () => 
     });
     assert(r.sent);
     assertEquals(r.outcome, "ok");
-    assertFalse(shouldResetClaim(r.outcome));
+    assertEquals(settleActionFor(r.outcome), "sent");
   } finally {
     globalThis.fetch = original;
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   creditNoteEmailView,
+  emailPillLabel,
   resendBlockedLabel,
 } from "./creditNoteEmailState";
 
@@ -13,7 +14,7 @@ const TENANT_A = "99999999-0000-0000-0000-00000000000a";
 const TENANT_B = "99999999-0000-0000-0000-00000000000b";
 
 const virgin = {
-  emailSentAt: null,
+  emailState: "UNSENT" as const,
   status: "available",
   appliedToInvoiceId: null,
   hasApplications: false,
@@ -25,7 +26,7 @@ const adminOfA = { role: "tenant_admin", tenantId: TENANT_A, adminDisabled: fals
 describe("creditNoteEmailView", () => {
   it("a virgin unsent note owned by the viewer's business is resendable", () => {
     expect(creditNoteEmailView(virgin, adminOfA)).toEqual({
-      showNotEmailed: true,
+      pill: "not-emailed",
       canResend: true,
       blockedReason: null,
     });
@@ -33,9 +34,9 @@ describe("creditNoteEmailView", () => {
 
   it("an already-emailed note shows no pill and no button", () => {
     expect(
-      creditNoteEmailView({ ...virgin, emailSentAt: "2026-08-17T02:00:00Z" }, adminOfA),
+      creditNoteEmailView({ ...virgin, emailState: "SENT" as const }, adminOfA),
     ).toEqual({
-      showNotEmailed: false,
+      pill: null,
       canResend: false,
       blockedReason: "already-emailed",
     });
@@ -49,7 +50,7 @@ describe("creditNoteEmailView", () => {
     expect(view.canResend).toBe(false);
     expect(view.blockedReason).toBe("not-your-business");
     // They still see that it was never emailed — visibility is not the problem.
-    expect(view.showNotEmailed).toBe(true);
+    expect(view.pill).toBe("not-emailed");
   });
 
   it("⚠ RISK 4: a platform admin who also carries a tenant_id is still refused", () => {
@@ -141,13 +142,13 @@ describe("creditNoteEmailView", () => {
   it("a reversed (voided) note reports 'reversed', never the 'already used' copy", () => {
     const view = creditNoteEmailView({ ...virgin, status: "reversed" }, adminOfA);
     expect(view.canResend).toBe(false);
-    expect(view.showNotEmailed).toBe(false);
+    expect(view.pill).toBe(null);
     expect(view.blockedReason).toBe("reversed");
   });
 
   it("a reversed note reads as voided even if it was emailed before the void", () => {
     const view = creditNoteEmailView(
-      { ...virgin, status: "reversed", emailSentAt: "2026-08-18T00:00:00Z" },
+      { ...virgin, status: "reversed", emailState: "SENT" as const },
       adminOfA,
     );
     expect(view.blockedReason).toBe("reversed");
@@ -163,10 +164,52 @@ describe("creditNoteEmailView", () => {
     expect(view.blockedReason).toBe("not-your-business");
   });
 
+  // ── The four SQL states (CRASH_SAFE_EMAIL_CLAIM_PLAN.md §3.3) ───────────────
+
+  it("SENDING: 'Sending…' pill and NO button — for the note's own admin too", () => {
+    const view = creditNoteEmailView({ ...virgin, emailState: "SENDING" }, adminOfA);
+    expect(view).toEqual({ pill: "sending", canResend: false, blockedReason: "sending" });
+    expect(emailPillLabel("sending")).toBe("Sending…");
+  });
+
+  it("UNSENT and RETRYABLE: 'Not emailed' + Resend", () => {
+    for (const emailState of ["UNSENT", "RETRYABLE"] as const) {
+      expect(creditNoteEmailView({ ...virgin, emailState }, adminOfA)).toEqual({
+        pill: "not-emailed",
+        canResend: true,
+        blockedReason: null,
+      });
+    }
+    expect(emailPillLabel("not-emailed")).toBe("Not emailed");
+  });
+
+  it("MAY_HAVE_SENT: 'May have been sent — Resend anyway?' + Resend", () => {
+    const view = creditNoteEmailView({ ...virgin, emailState: "MAY_HAVE_SENT" }, adminOfA);
+    expect(view).toEqual({ pill: "may-have-sent", canResend: true, blockedReason: null });
+    expect(emailPillLabel("may-have-sent")).toBe("May have been sent — Resend anyway?");
+  });
+
+  it("MAY_HAVE_SENT keeps its pill but no button for another business", () => {
+    const view = creditNoteEmailView(
+      { ...virgin, emailState: "MAY_HAVE_SENT" },
+      { role: "platform_admin", tenantId: null, adminDisabled: false },
+    );
+    expect(view.pill).toBe("may-have-sent");
+    expect(view.canResend).toBe(false);
+    expect(view.blockedReason).toBe("not-your-business");
+  });
+
+  it("SENT reads 'Emailed'; a voided note reads 'Credit voided', not 'Emailed'", () => {
+    const sent = creditNoteEmailView({ ...virgin, emailState: "SENT" }, adminOfA);
+    expect(resendBlockedLabel(sent.blockedReason!)).toBe("Emailed");
+    const voided = creditNoteEmailView({ ...virgin, status: "reversed" }, adminOfA);
+    expect(resendBlockedLabel(voided.blockedReason!)).toBe("Credit voided");
+  });
+
   it("blockedReason is null exactly when canResend is true", () => {
     const cases = [
       creditNoteEmailView(virgin, adminOfA),
-      creditNoteEmailView({ ...virgin, emailSentAt: "x" }, adminOfA),
+      creditNoteEmailView({ ...virgin, emailState: "SENT" as const }, adminOfA),
       creditNoteEmailView(virgin, { role: "platform_admin", tenantId: null, adminDisabled: false }),
       creditNoteEmailView({ ...virgin, hasApplications: true }, adminOfA),
     ];
@@ -179,6 +222,7 @@ describe("creditNoteEmailView", () => {
 describe("resendBlockedLabel", () => {
   it("gives copy for every reason", () => {
     expect(resendBlockedLabel("already-emailed")).toBe("Emailed");
+    expect(resendBlockedLabel("sending")).toBe("Sending…");
     expect(resendBlockedLabel("not-your-business")).toBe("Another business");
     expect(resendBlockedLabel("already-applied")).toBe("Credit already used");
     expect(resendBlockedLabel("reversed")).toBe("Credit voided");

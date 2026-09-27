@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/Button";
 import { formatSgStamp } from "@/lib/lessonDates";
@@ -10,6 +11,20 @@ import {
   type BillingMonthRow,
   type BillingRun,
 } from "@/lib/billingMonths";
+import {
+  groupByMonth,
+  mayNotHaveArrivedLabel,
+  type UndeliveredEmail,
+} from "../domain/undeliveredEmails";
+
+/** The "may not have arrived" list's wiring (CRASH_SAFE_EMAIL_CLAIM_PLAN.md §3.3). */
+type UndeliveredProps = {
+  undelivered: UndeliveredEmail[];
+  undeliveredError: string | null;
+  resendingInvoice: Set<string>;
+  resendInvoiceError: Record<string, string>;
+  onResendInvoice: (invoiceId: string) => void;
+};
 
 /** ── Billing months ──────────────────────────────────────────────────
  *  Which months are closed, which are still open and WHY, as of the last run
@@ -29,6 +44,7 @@ export function BillingMonthsCard({
   onSelectMonth,
   onOpenUnclaimed,
   onOpenBlocked,
+  ...undeliveredProps
 }: {
   rows: BillingMonthRow[];
   loaded: boolean;
@@ -41,9 +57,14 @@ export function BillingMonthsCard({
   onSelectMonth: (month: string) => void;
   onOpenUnclaimed: (row: BillingMonthRow) => void;
   onOpenBlocked: (row: BillingMonthRow) => void;
-}) {
+} & UndeliveredProps) {
   if (!loaded) return null;
   const { visible, hiddenCount } = visibleMonths(rows, showAll);
+  const byMonth = groupByMonth(undeliveredProps.undelivered);
+  // A closed month beyond the newest three is hidden (D2), and so would be its
+  // count — which is exactly the kind of quiet failure this list exists to end.
+  const shown = new Set(visible.map((r) => r.month));
+  const offscreen = undeliveredProps.undelivered.filter((u) => !shown.has(u.billingMonth)).length;
 
   return (
     <div
@@ -68,9 +89,37 @@ export function BillingMonthsCard({
               onSelectMonth={onSelectMonth}
               onOpenUnclaimed={onOpenUnclaimed}
               onOpenBlocked={onOpenBlocked}
+              undelivered={byMonth.get(row.month) ?? []}
+              resendingInvoice={undeliveredProps.resendingInvoice}
+              resendInvoiceError={undeliveredProps.resendInvoiceError}
+              onResendInvoice={undeliveredProps.onResendInvoice}
             />
           ))}
         </ul>
+      )}
+
+      {!loadError && offscreen > 0 && (
+        <p className="mt-2 text-xs text-amber-700">
+          {mayNotHaveArrivedLabel(offscreen)} in months not shown
+          {!showAll && (
+            <>
+              {" — "}
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="font-medium text-sky-600 hover:underline"
+              >
+                show all months
+              </button>
+            </>
+          )}
+        </p>
+      )}
+      {undeliveredProps.undeliveredError && (
+        <p className="mt-2 text-xs text-amber-700">
+          Could not check for invoice emails that may not have arrived:{" "}
+          {undeliveredProps.undeliveredError}
+        </p>
       )}
 
       {!loadError && (hiddenCount > 0 || showAll) && (
@@ -101,6 +150,10 @@ function MonthRow({
   onSelectMonth,
   onOpenUnclaimed,
   onOpenBlocked,
+  undelivered,
+  resendingInvoice,
+  resendInvoiceError,
+  onResendInvoice,
 }: {
   row: BillingMonthRow;
   isExpanded: boolean;
@@ -110,7 +163,13 @@ function MonthRow({
   onSelectMonth: (month: string) => void;
   onOpenUnclaimed: (row: BillingMonthRow) => void;
   onOpenBlocked: (row: BillingMonthRow) => void;
+  /** This month's MAY_HAVE_SENT invoice emails. */
+  undelivered: UndeliveredEmail[];
+  resendingInvoice: Set<string>;
+  resendInvoiceError: Record<string, string>;
+  onResendInvoice: (invoiceId: string) => void;
 }) {
+  const [showUndelivered, setShowUndelivered] = useState(false);
   const style = STATE_STYLE[row.state];
   const latest = row.recentRuns[0] ?? null;
   const unclaimedCount = latest?.unclaimed_students?.length ?? 0;
@@ -151,6 +210,18 @@ function MonthRow({
         )}
 
         <span className="ml-auto flex items-center gap-2">
+          {/* Any state, closed months included: a sealed month can still hold
+              an email whose delivery is unknown. Hidden when there are none. */}
+          {undelivered.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowUndelivered(!showUndelivered)}
+              aria-expanded={showUndelivered}
+            >
+              {mayNotHaveArrivedLabel(undelivered.length)}
+            </Button>
+          )}
           {row.state === "open" && blockedCount > 0 && (
             <Button size="sm" variant="outline" onClick={() => onOpenBlocked(row)}>
               Unmarked ({blockedCount})
@@ -181,6 +252,46 @@ function MonthRow({
 
       {/* RISK 6: the stored list is stale, or could not be checked. */}
       {note && <p className="mt-1 text-xs text-amber-700">{note}</p>}
+
+      {showUndelivered && undelivered.length > 0 && (
+        <div
+          data-testid={`undelivered-${row.month}`}
+          className="mt-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2"
+        >
+          <p className="mb-1.5 text-[11px] text-amber-900">
+            These emails were being sent more than a day ago and never confirmed.
+            They may have arrived. Resend only if the parent says they did not get it.
+          </p>
+          <ul className="space-y-1.5">
+            {undelivered.map((u) => (
+              <li key={u.invoiceId} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className="font-medium text-gray-800">{u.parentName}</span>
+                <span className="font-mono text-gray-500">{u.reference ?? "—"}</span>
+                <span className="text-gray-500">
+                  sending since{" "}
+                  {formatSgStamp(u.claimedAt, {
+                    day: "numeric",
+                    month: "short",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onResendInvoice(u.invoiceId)}
+                  disabled={resendingInvoice.has(u.invoiceId)}
+                >
+                  {resendingInvoice.has(u.invoiceId) ? "Sending…" : "Resend"}
+                </Button>
+                {resendInvoiceError[u.invoiceId] && (
+                  <span className="basis-full text-red-600">{resendInvoiceError[u.invoiceId]}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {isExpanded && (
         <ul className="mt-2 space-y-1 rounded-lg bg-gray-50 px-3 py-2">

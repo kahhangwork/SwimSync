@@ -12,6 +12,12 @@ import {
   type RunUnclaimedStudent,
 } from "@/lib/billingMonths";
 import * as repo from "../dao/invoices.repo";
+import * as api from "../dao/invoices.api";
+import {
+  resendInvoiceReasonLabel,
+  toUndeliveredEmail,
+  type UndeliveredEmail,
+} from "./undeliveredEmails";
 
 /** The Billing months card: which months are closed, which are open and why
  *  (docs/plans/BILLING_MONTHS_PLAN.md). The page reloads it after a generate —
@@ -27,12 +33,75 @@ export function useBillingMonths() {
   // offered: fully stale (everyone claimed or settled since the run), or the
   // check itself failed. Cleared on every load — a new run is a new list.
   const [staleNote, setStaleNote] = useState<{ month: string; text: string } | null>(null);
+  // Invoice emails whose outcome is unknown after 24 h (CRASH_SAFE_EMAIL_CLAIM_PLAN.md
+  // §3.3). Loaded beside the months but failing on its own: a failed read here
+  // must not blank the card, so it carries its own error.
+  const [undelivered, setUndelivered] = useState<UndeliveredEmail[]>([]);
+  const [undeliveredError, setUndeliveredError] = useState<string | null>(null);
+  const [resendingInvoice, setResendingInvoice] = useState<Set<string>>(new Set());
+  const [resendInvoiceError, setResendInvoiceError] = useState<Record<string, string>>({});
+
+  async function loadUndelivered(tenantId: string) {
+    const { data, error } = await repo.fetchMayNotHaveArrived(tenantId);
+    if (error) {
+      setUndeliveredError(error.message);
+      return;
+    }
+    setUndeliveredError(null);
+    setUndelivered((data ?? []).map(toUndeliveredEmail));
+  }
+
+  /** The human Resend for one MAY_HAVE_SENT invoice email. The engine claims
+   *  it first, so a double press (or two admins) still sends once. */
+  async function resendInvoice(invoiceId: string) {
+    setResendingInvoice((prev) => new Set(prev).add(invoiceId));
+    setResendInvoiceError((prev) => {
+      const { [invoiceId]: _drop, ...rest } = prev;
+      return rest;
+    });
+    const done = () =>
+      setResendingInvoice((prev) => {
+        const next = new Set(prev);
+        next.delete(invoiceId);
+        return next;
+      });
+    const fail = (text: string) => {
+      done();
+      setResendInvoiceError((prev) => ({ ...prev, [invoiceId]: text }));
+    };
+
+    const {
+      data: { session },
+    } = await repo.getSession();
+    if (!session) return fail("Your session has expired. Sign in again.");
+
+    let json: { sent?: boolean; reason?: string; error?: string } = {};
+    try {
+      const res = await api.resendInvoiceEmail(session.access_token, invoiceId);
+      json = await res.json().catch(() => ({}));
+      if (!res.ok) return fail(json.error ?? `Not sent (HTTP ${res.status}).`);
+    } catch (e) {
+      return fail(`Could not reach the server: ${(e as Error).message}`);
+    }
+    done();
+
+    // Sent now, or already sent by someone else: either way it has left this list.
+    if (json.sent || json.reason === "nothing to send") {
+      setUndelivered((prev) => prev.filter((u) => u.invoiceId !== invoiceId));
+      return;
+    }
+    setResendInvoiceError((prev) => ({
+      ...prev,
+      [invoiceId]: resendInvoiceReasonLabel(json.reason ?? "unknown"),
+    }));
+  }
 
   /** Reads its own run day rather than taking it from useTenantBilling: the
    *  page calls this before that hook's state has settled (loadTenant returns
    *  only the id), and a stale default would flip D6's amber on the wrong day. */
   async function load(tenantId: string) {
     setStaleNote(null);
+    void loadUndelivered(tenantId);
     const latestBillableMonth = previousBillingMonth();
     const [tenant, periods, runs, invoices] = await Promise.all([
       repo.fetchTenant(tenantId),
@@ -134,5 +203,10 @@ export function useBillingMonths() {
     staleNote,
     load,
     openUnclaimed,
+    undelivered,
+    undeliveredError,
+    resendingInvoice,
+    resendInvoiceError,
+    resendInvoice,
   };
 }

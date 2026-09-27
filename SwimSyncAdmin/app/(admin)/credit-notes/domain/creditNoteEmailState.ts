@@ -7,10 +7,21 @@
 // exists to stop the admin pressing a button that cannot work, not to enforce
 // anything. A UI-only check would be a hole; a server-only check would be a button
 // that fails for reasons the admin cannot see.
+//
+// The delivery state comes FROM SQL (credit_note_email_state, CRASH_SAFE_EMAIL_CLAIM_PLAN.md
+// §3.3) — never email_claimed_at compared to this browser's clock:
+//   SENT                → "Emailed"
+//   SENDING             → "Sending…", no button (someone's send is in flight)
+//   UNSENT / RETRYABLE  → "Not emailed" + Resend
+//   MAY_HAVE_SENT       → "May have been sent — Resend anyway?" + Resend
+
+import type { EmailDeliveryState } from "../types";
 
 export type ResendBlockedReason =
   /** Already emailed. Nothing to do — and pressing again must never re-send. */
   | "already-emailed"
+  /** A send is in flight under a claim younger than 15 minutes. */
+  | "sending"
   /**
    * ⚠ RISK 4 — the viewer is not a TENANT admin of this note's business.
    * The page's select is UNFILTERED and leans on RLS, which hands a platform admin
@@ -34,9 +45,12 @@ export type ResendBlockedReason =
    *  mislead on a money page. Never sendable. */
   | "reversed";
 
+/** The pill beside a note that is not (known to be) emailed. null = no pill. */
+export type EmailPill = "not-emailed" | "sending" | "may-have-sent";
+
 export type CreditNoteEmailView = {
-  /** Show a "Not emailed" pill? False once it has been sent. */
-  showNotEmailed: boolean;
+  /** Which pill to show; null once emailed (or voided). */
+  pill: EmailPill | null;
   /** Render the Resend button? */
   canResend: boolean;
   /** Why not. null exactly when canResend is true. */
@@ -45,7 +59,8 @@ export type CreditNoteEmailView = {
 
 export function creditNoteEmailView(
   note: {
-    emailSentAt: string | null;
+    /** credit_note_email_state, from SQL. */
+    emailState: EmailDeliveryState;
     status: string;
     appliedToInvoiceId: string | null;
     /** True if ANY credit_applications row exists for this note. */
@@ -64,12 +79,20 @@ export function creditNoteEmailView(
   // A voided note is not live credit — decide this before anything else so the
   // hint reads "Credit voided", never "already used" or a stale "Not emailed".
   if (note.status === "reversed") {
-    return { showNotEmailed: false, canResend: false, blockedReason: "reversed" };
+    return { pill: null, canResend: false, blockedReason: "reversed" };
   }
 
-  if (note.emailSentAt !== null) {
-    return { showNotEmailed: false, canResend: false, blockedReason: "already-emailed" };
+  if (note.emailState === "SENT") {
+    return { pill: null, canResend: false, blockedReason: "already-emailed" };
   }
+
+  // In flight for everyone, whoever is looking: no button, so a second press can
+  // never race the first. It becomes RETRYABLE by itself when the lease expires.
+  if (note.emailState === "SENDING") {
+    return { pill: "sending", canResend: false, blockedReason: "sending" };
+  }
+
+  const pill: EmailPill = note.emailState === "MAY_HAVE_SENT" ? "may-have-sent" : "not-emailed";
 
   // Order matters: authority is decided before state. A platform admin must not
   // learn "this one is resendable" about a business they do not administer, and the
@@ -94,14 +117,26 @@ export function creditNoteEmailView(
     viewer.tenantId !== null &&
     viewer.tenantId === note.tenantId;
   if (!isTenantAdminOfNote) {
-    return { showNotEmailed: true, canResend: false, blockedReason: "not-your-business" };
+    return { pill, canResend: false, blockedReason: "not-your-business" };
   }
 
   if (note.appliedToInvoiceId !== null || note.status !== "available" || note.hasApplications) {
-    return { showNotEmailed: true, canResend: false, blockedReason: "already-applied" };
+    return { pill, canResend: false, blockedReason: "already-applied" };
   }
 
-  return { showNotEmailed: true, canResend: true, blockedReason: null };
+  return { pill, canResend: true, blockedReason: null };
+}
+
+/** Copy for the pill. */
+export function emailPillLabel(pill: EmailPill): string {
+  switch (pill) {
+    case "not-emailed":
+      return "Not emailed";
+    case "sending":
+      return "Sending…";
+    case "may-have-sent":
+      return "May have been sent — Resend anyway?";
+  }
 }
 
 /** Copy for the inline hint beside a blocked note. */
@@ -109,6 +144,8 @@ export function resendBlockedLabel(reason: ResendBlockedReason): string {
   switch (reason) {
     case "already-emailed":
       return "Emailed";
+    case "sending":
+      return "Sending…";
     case "not-your-business":
       return "Another business";
     case "already-applied":

@@ -4,9 +4,13 @@ import { Table, Thead, Th, Tbody, Tr, Td, type TableSort } from "@/components/Ta
 import { PackageChip } from "@/components/PackageChip";
 import type { StudentCoverage } from "@/lib/packageCoverage";
 import { creditNoteStatusLabel } from "../domain/creditNoteRows";
-import { creditNoteEmailView, resendBlockedLabel } from "../domain/creditNoteEmailState";
+import {
+  creditNoteEmailView,
+  emailPillLabel,
+  resendBlockedLabel,
+} from "../domain/creditNoteEmailState";
 import { creditNoteVoidView, voidConfirmMessage } from "../domain/creditNoteVoidState";
-import type { CreditNoteRow, Viewer } from "../types";
+import type { CreditNoteRow, EmailDeliveryState, Viewer } from "../types";
 
 export function CreditNotesTable({
   sort,
@@ -39,7 +43,7 @@ export function CreditNotesTable({
   onVoid: (cn: CreditNoteRow) => void;
   resending: Set<string>;
   resendError: Record<string, string>;
-  onResend: (id: string) => void;
+  onResend: (id: string, prior: EmailDeliveryState) => void;
 }) {
   return (
     <Table>
@@ -124,7 +128,7 @@ export function CreditNotesTable({
                 {(() => {
                   const view = creditNoteEmailView(
                     {
-                      emailSentAt: cn.email_sent_at,
+                      emailState: cn.email_state,
                       status: cn.status,
                       appliedToInvoiceId: cn.applied_to_invoice_id,
                       hasApplications: cn.has_applications,
@@ -132,17 +136,27 @@ export function CreditNotesTable({
                     },
                     viewer
                   );
-                  if (!view.showNotEmailed) {
-                    return <span className="text-xs text-gray-400">Emailed</span>;
+                  if (!view.pill) {
+                    return (
+                      <span className="text-xs text-gray-400">
+                        {resendBlockedLabel(view.blockedReason!)}
+                      </span>
+                    );
                   }
                   return (
                     <div className="flex flex-col gap-1">
-                      <span className="inline-flex w-fit items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                        Not emailed
+                      <span
+                        className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          view.pill === "sending"
+                            ? "bg-sky-50 text-sky-700"
+                            : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {emailPillLabel(view.pill)}
                       </span>
-                      {view.canResend ? (
+                      {view.pill === "sending" ? null : view.canResend ? (
                         <button
-                          onClick={() => onResend(cn.id)}
+                          onClick={() => onResend(cn.id, cn.email_state)}
                           disabled={resending.has(cn.id)}
                           className="w-fit rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                         >

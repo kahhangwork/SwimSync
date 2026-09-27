@@ -13,3 +13,15 @@ export const generateInvoices = (accessToken: string, billingMonth: string) =>
     },
     body: JSON.stringify({ billing_month: billingMonth }),
   });
+
+/** POST a single invoice email resend. The route checks the caller administers
+ *  the invoice's business, then asks the engine to claim + send + settle it. */
+export const resendInvoiceEmail = (accessToken: string, invoiceId: string) =>
+  fetch("/api/resend-invoice-email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ invoice_id: invoiceId }),
+  });

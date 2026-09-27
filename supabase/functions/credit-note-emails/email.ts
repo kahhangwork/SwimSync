@@ -53,8 +53,14 @@ export type SendOutcome =
   | "no_api_key"
   /** No recipient address. Pre-send: nothing left our side. */
   | "no_recipient"
-  /** Resend answered 4xx — it rejected the request. Pre-send in effect. */
+  /** Resend answered a 4xx other than the two idempotency 409s — it refused. */
   | "rejected"
+  /** 409 invalid_idempotent_request: this key was ALREADY accepted with a
+   *  different payload. The email went out. */
+  | "key_reused"
+  /** 409 concurrent_idempotent_requests: another request with this key is in
+   *  flight right now. Outcome unknown. */
+  | "key_in_flight"
   /** Resend answered 5xx. May or may not have been accepted. */
   | "server_error"
   /** fetch threw (timeout, DNS, socket). May ALREADY have been delivered. */
@@ -164,33 +170,63 @@ export function canEmailForTenant(t: { suspended: boolean }): boolean {
   return !t.suspended;
 }
 
+/** What to do with a claim once its send has an outcome. */
+export type SettleAction =
+  /** Stamp email_sent_at and clear the claim. */
+  | "sent"
+  /** Clear the claim — provably nothing was delivered; resendable at once. */
+  | "release"
+  /** Leave the claim. Outcome unknown: the lease expires in 15 minutes. */
+  | "keep";
+
 /**
- * ⚠ RISK 7 — reset the claim ONLY on outcomes that provably never left our side.
+ * ⚠ RISK 7 — the settle table (CRASH_SAFE_EMAIL_CLAIM_PLAN.md §3.2). Replaces
+ * shouldResetClaim, which held the claim FOREVER on an unknown outcome.
  *
- * The claim (`email_sent_at = now()`) is released on failure so the note can be
- * resent. But `fetch` throwing does NOT mean Resend refused: a timeout can arrive
- * after Resend accepted AND delivered. Releasing the claim then makes the pill
- * reappear, the admin presses Resend, and a real parent gets the same email twice.
- * The atomic claim stops CONCURRENT duplicates; it does nothing about this one.
- *
- * So a thrown fetch and a 5xx are treated as SENT-UNKNOWN — claim stays stamped,
- * failure logged. Only the three provably-pre-send outcomes release it.
+ * `fetch` throwing does NOT mean Resend refused: a timeout can arrive after Resend
+ * accepted AND delivered. So a thrown fetch, a 5xx and a concurrent-key 409 are
+ * SENT-UNKNOWN and KEEP the claim. What changed (20260927000100) is that the claim
+ * is now email_claimed_at, a 15-minute LEASE, not email_sent_at: an unknown
+ * outcome reads "Sending…" for 15 minutes, then "Not emailed" + Resend (a resend
+ * inside 24 h reuses the SAME Idempotency-Key, so Resend dedups it), then after
+ * 24 h "May have been sent — Resend anyway?". The RISK 7 caution is carried by the
+ * idempotency key now, instead of by stranding the note as "Emailed".
  *
  * The decision is made over a typed outcome, never by parsing an error string —
  * the precedent's sendPackageEmail returns `reason: e.message`, and a substring
  * test against that is exactly the fragile thing this avoids.
  */
-export function shouldResetClaim(outcome: SendOutcome): boolean {
+export function settleActionFor(outcome: SendOutcome): SettleAction {
   switch (outcome) {
+    case "ok":
+    case "key_reused":
+      return "sent";
     case "no_api_key":
     case "no_recipient":
     case "rejected":
-      return true;
+      return "release";
+    case "key_in_flight":
     case "server_error":
     case "threw":
-    case "ok":
-      return false;
+      return "keep";
   }
+}
+
+/** A non-2xx Resend answer → typed outcome. The two 409s are told apart by
+ *  the error `name` in the body (resend.com/docs/dashboard/emails/idempotency-keys). */
+export function outcomeForStatus(status: number, body: string): SendOutcome {
+  if (status >= 500) return "server_error";
+  if (status === 409) {
+    let name: unknown = null;
+    try {
+      name = (JSON.parse(body) as { name?: unknown })?.name;
+    } catch {
+      // not JSON — an ordinary refusal
+    }
+    if (name === "invalid_idempotent_request") return "key_reused";
+    if (name === "concurrent_idempotent_requests") return "key_in_flight";
+  }
+  return "rejected";
 }
 
 // ── Formatting ──────────────────────────────────────────────────────────────
@@ -334,7 +370,7 @@ export function buildCreditNoteHtml(d: CreditNoteEmailData): string {
 /**
  * Send via the Resend HTTP API. Logged no-op without a key.
  *
- * Returns a TYPED outcome so shouldResetClaim (⚠ RISK 7) can distinguish
+ * Returns a TYPED outcome so settleActionFor (⚠ RISK 7) can distinguish
  * "never left our side" from "may already be in the parent's inbox" without
  * parsing an error message.
  */
@@ -344,6 +380,8 @@ export async function sendCreditNoteEmail(opts: {
   subject: string;
   html: string;
   fromName: string;
+  /** Resend Idempotency-Key — core.ts creditNoteIdempotencyKey. */
+  idempotencyKey?: string;
 }): Promise<SendResult> {
   if (!opts.apiKey) {
     return { sent: false, outcome: "no_api_key", reason: "RESEND_API_KEY not set" };
@@ -358,6 +396,7 @@ export async function sendCreditNoteEmail(opts: {
       headers: {
         Authorization: `Bearer ${opts.apiKey}`,
         "Content-Type": "application/json",
+        ...(opts.idempotencyKey ? { "Idempotency-Key": opts.idempotencyKey } : {}),
       },
       body: JSON.stringify({
         from: `${opts.fromName} <noreply@swimsync.sg>`,
@@ -369,10 +408,13 @@ export async function sendCreditNoteEmail(opts: {
     if (!res.ok) {
       // 4xx = Resend refused, nothing sent, safe to release the claim.
       // 5xx = unknown; it may have been accepted. Keep the claim (⚠ RISK 7).
+      // 409s are the idempotency answers — outcomeForStatus tells them apart.
+      const body = await res.text().catch(() => "");
+      const outcome = outcomeForStatus(res.status, body);
       return {
-        sent: false,
-        outcome: res.status >= 500 ? "server_error" : "rejected",
-        reason: `resend ${res.status}: ${await res.text()}`,
+        sent: outcome === "key_reused",
+        outcome,
+        reason: `resend ${res.status}: ${body}`,
       };
     }
     return { sent: true, outcome: "ok" };

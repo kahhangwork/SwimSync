@@ -1917,10 +1917,13 @@ Deno.test("fixture guard: a scenario that expects NO lessons is refused at const
 // (tenant, month) re-sends ONLY the misses, even on a sealed month, with no
 // duplicate to parents who already got theirs.
 //
-// NOTE ON ⚠ RISK 4 (stamp failure must not drop the batch): stamping now happens
-// in a SEPARATE loop AFTER all sends complete (email.ts), so a stamp error
-// cannot affect any send by construction — the sends are already done. It is
-// therefore covered structurally, not by a fault-injection test.
+// NOTE ON ⚠ RISK 4 (stamp failure must not drop the batch): each invoice's
+// claim → send → settle runs inside its own try/catch, and settleInvoiceEmail
+// never throws (email.ts), so a settle error cannot affect any other invoice.
+// Covered structurally, not by a fault-injection test.
+//
+// The crash-safe claim (claimed_at lease, Idempotency-Key, MAY_HAVE_SENT) has
+// its own file: emailClaim.test.ts.
 
 // Intercept ONLY the Resend HTTP call; delegate Supabase traffic to real fetch.
 // `statusFor` picks the HTTP status per call; `calls` records the sent bodies.
@@ -1986,7 +1989,8 @@ Deno.test("invoice email retry: a dropped send self-heals on a SEALED-month re-r
     });
     const inv = await getInvoice(s.db, s.parentId, "2026-06");
 
-    // First send fails → attempted once, left UNSENT (NULL).
+    // First send fails with a 5xx → attempted once, NOT stamped sent. The claim
+    // is KEPT (a 5xx may have been delivered), so the row reads SENDING.
     await emailCreatedInvoices(s.db, res.created ?? [], { apiKey: "re_test" });
     assertEquals(calls.length, 1);
     assertEquals(await sentAtFor(s.db, inv!.id), null);
@@ -1996,6 +2000,11 @@ Deno.test("invoice email retry: a dropped send self-heals on a SEALED-month re-r
       tenant_id: s.tenantId, billing_month: "2026-06", now: s.now,
     });
     assertEquals(res2.status, "already_complete");
+
+    // The 15-minute lease runs out (written, not waited for) → RETRYABLE.
+    await s.db.from("invoices")
+      .update({ invoice_email_claimed_at: new Date(Date.now() - 20 * 60_000).toISOString() })
+      .eq("id", inv!.id);
 
     // Resend recovers; the retry pass heals the miss (sealed month notwithstanding).
     status = 200; calls.length = 0;
@@ -2012,11 +2021,13 @@ Deno.test("invoice email retry: a dropped send self-heals on a SEALED-month re-r
   } finally { globalThis.fetch = orig; await s.teardown(); }
 });
 
-Deno.test("invoice email retry: a claim whose send fails RESETS to NULL (stays retryable)", async () => {
+Deno.test("invoice email retry: a claim whose send is REFUSED (4xx) is released (stays retryable)", async () => {
   const s = await newScenario({ price: 30, billing: monthEnded("2026-07") });
   const orig = globalThis.fetch;
   const calls: Record<string, string>[] = [];
-  let status = 500;
+  // A 4xx means Resend refused — provably nothing sent — so the claim is
+  // released. (A 5xx KEEPS the claim instead: emailClaim.test.ts.)
+  let status = 422;
   globalThis.fetch = resendStub(() => status, calls);
   try {
     const a = await s.addSession("2026-07-04"); await s.mark(a, "present");
@@ -2027,7 +2038,7 @@ Deno.test("invoice email retry: a claim whose send fails RESETS to NULL (stays r
     const inv = await getInvoice(s.db, s.parentId, "2026-07");
     assertEquals(await sentAtFor(s.db, inv!.id), null);
 
-    // Retry, but Resend rejects: claim stamps then must reset back to NULL.
+    // Retry, but Resend refuses: the claim is released, sent_at stays NULL.
     const r = await retryUnsentInvoiceEmails(s.db, s.tenantId, "2026-07", { apiKey: "re_test" });
     assertEquals(r.emailsRetried, 0);
     assertEquals(calls.length, 1);

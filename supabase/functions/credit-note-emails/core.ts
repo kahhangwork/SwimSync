@@ -18,7 +18,8 @@ import {
   type CreditNoteEmailData,
   isSendableNote,
   type SendResult,
-  shouldResetClaim,
+  type SettleAction,
+  settleActionFor,
 } from "./email.ts";
 
 // ⚠ RISK 6 — snapshot fields ONLY. credit_notes.student_name is the note's own
@@ -32,7 +33,10 @@ export const NOTE_SELECT =
   "tenant_id, parent_id, invoice_item_id, lesson_session_id, student_name, " +
   "invoice_items(class_title, session_date), " +
   "parents(profiles(full_name, email)), " +
-  "tenants(display_name, logo_url)";
+  "tenants(display_name, logo_url), " +
+  // PostgREST computed column (20260927000100): the email state, computed in SQL
+  // so no lease maths happens in Deno.
+  "credit_note_email_state";
 
 export type NoteRow = {
   id: string;
@@ -49,6 +53,8 @@ export type NoteRow = {
   invoice_items: unknown;
   parents: unknown;
   tenants: unknown;
+  /** SENT / UNSENT / SENDING / RETRYABLE / MAY_HAVE_SENT (email_delivery_state). */
+  credit_note_email_state: string;
 };
 
 /** PostgREST returns an embedded row as an object or a 1-element array. */
@@ -57,7 +63,9 @@ export function one<T>(v: unknown): T | undefined {
 }
 
 export type Candidates =
-  | { ok: true; notes: NoteRow[] }
+  /** `sending` (findUnsentById only): the note exists and is mid-send under
+   *  someone else's fresh claim — not "nothing to send", which means emailed. */
+  | { ok: true; notes: NoteRow[]; sending?: boolean }
   | { ok: false; reason: string };
 
 /**
@@ -69,6 +77,10 @@ export type Candidates =
  * the only thing preventing it — service_role bypasses RLS." And credit_notes.tenant_id
  * is derived from invoices.tenant_id with a fallback to students.tenant_id, so it CAN
  * diverge from session_tenant().
+ *
+ * Only UNSENT and RETRYABLE notes: a coach's re-save must neither race an
+ * in-flight send (SENDING) nor resend one whose outcome is unknown after 24 h
+ * (MAY_HAVE_SENT — the Idempotency-Key has lapsed; that is a human decision).
  */
 export async function findUnsentBySession(
   svc: SupabaseClient,
@@ -80,12 +92,16 @@ export async function findUnsentBySession(
     .select(NOTE_SELECT)
     .eq("lesson_session_id", lessonSessionId)
     .eq("tenant_id", tenantId) // ⚠ RISK 3
-    .is("email_sent_at", null);
+    .in("credit_note_email_state", ["UNSENT", "RETRYABLE"]);
   if (error) return { ok: false, reason: `discovery failed: ${error.message}` };
   return { ok: true, notes: (data ?? []) as unknown as NoteRow[] };
 }
 
-/** One unsent note by id, for the admin Resend path. */
+/**
+ * One unsent note by id, for the admin Resend path. Accepts UNSENT, RETRYABLE
+ * and MAY_HAVE_SENT — a human asked. A note mid-send under a fresh claim comes
+ * back as `sending`, with no notes.
+ */
 export async function findUnsentById(
   svc: SupabaseClient,
   creditNoteId: string,
@@ -99,7 +115,10 @@ export async function findUnsentById(
   if (error) return { ok: false, reason: `lookup failed: ${error.message}` };
   // No row means "no such note" OR "already emailed". Both are nothing-to-do, and
   // the second is what stops a double press re-sending.
-  return { ok: true, notes: data ? [data as unknown as NoteRow] : [] };
+  if (!data) return { ok: true, notes: [] };
+  const note = data as unknown as NoteRow;
+  if (note.credit_note_email_state === "SENDING") return { ok: true, notes: [], sending: true };
+  return { ok: true, notes: [note] };
 }
 
 /**
@@ -223,39 +242,85 @@ export async function fetchBalances(
   return out;
 }
 
+/** A won claim. `claimedAt` is the SETTLE TOKEN; `issuedAt` versions the key. */
+export type NoteClaim = { claimedAt: string; priorState: string; issuedAt: string };
+
 /**
- * Atomically claim ONE note for sending. Returns true only for the caller that won.
+ * Atomically claim ONE note for sending (CRASH_SAFE_EMAIL_CLAIM_PLAN.md §3.2).
+ * `claim` is null unless this caller won.
  *
- * The conditional UPDATE is the whole concurrency story: a second caller racing for
- * the same row (a coach saving twice, or an admin pressing Resend while the coach's
- * save is in flight) matches zero rows and gets false back.
+ * claim_credit_note_email row-locks, computes the state in SQL, and claims only
+ * UNSENT or RETRYABLE — or MAY_HAVE_SENT when `manual` (the admin's Resend). A
+ * second caller racing for the same row (a coach saving twice, or an admin
+ * pressing Resend while the coach's save is in flight) waits on the lock, then
+ * sees SENDING and gets no row. The claim is email_claimed_at, a 15-minute lease:
+ * email_sent_at is stamped only after a confirmed send (settleNote).
  */
 export async function claimNote(
   svc: SupabaseClient,
   noteId: string,
-): Promise<{ ok: true; claimed: boolean } | { ok: false; reason: string }> {
-  const { data, error } = await svc
-    .from("credit_notes")
-    // toISOString() writes a timestamptz — it does NOT derive a calendar date, so
-    // this is not the §7.7 / ⚠ RISK 13 bug. Same as the invoice precedent's claimedAt.
-    .update({ email_sent_at: new Date().toISOString() })
-    .eq("id", noteId)
-    .is("email_sent_at", null)
-    .select("id");
+  manual = false,
+): Promise<{ ok: true; claim: NoteClaim | null } | { ok: false; reason: string }> {
+  const { data, error } = await svc.rpc("claim_credit_note_email", {
+    p_credit_note_id: noteId,
+    p_manual: manual,
+  });
   if (error) return { ok: false, reason: `claim failed: ${error.message}` };
-  return { ok: true, claimed: Boolean(data && data.length) };
+  const row = (data as { claimed_at: string; prior_state: string; issued_at: string }[] | null)?.[0];
+  return {
+    ok: true,
+    claim: row ? { claimedAt: row.claimed_at, priorState: row.prior_state, issuedAt: row.issued_at } : null,
+  };
 }
 
-/** Release a claim so the note can be resent. */
-export async function releaseNote(
+/**
+ * Settle a claim. CONDITIONAL on the token (`… AND email_claimed_at = <claimedAt>`):
+ * a note re-issued meanwhile (its trigger clears the claim) or re-claimed after the
+ * lease expired is no longer ours, and is left alone. Never throws.
+ */
+export async function settleNote(
   svc: SupabaseClient,
   noteId: string,
+  claimedAt: string,
+  action: SettleAction,
 ): Promise<void> {
-  const { error } = await svc
-    .from("credit_notes")
-    .update({ email_sent_at: null })
-    .eq("id", noteId);
-  if (error) console.log(`credit-note email reset failed (${noteId}): ${error.message}`);
+  if (action === "keep") return;
+  const patch = action === "sent"
+    // toISOString() writes a timestamptz — it does NOT derive a calendar date, so
+    // this is not the §7.7 / ⚠ RISK 13 bug.
+    ? { email_sent_at: new Date().toISOString(), email_claimed_at: null }
+    : { email_claimed_at: null };
+  try {
+    const { error } = await svc
+      .from("credit_notes")
+      .update(patch)
+      .eq("id", noteId)
+      .eq("email_claimed_at", claimedAt);
+    if (error) console.log(`credit-note email settle (${action}) failed (${noteId}): ${error.message}`);
+  } catch (e) {
+    console.log(`credit-note email settle (${action}) threw (${noteId}): ${(e as Error).message}`);
+  }
+}
+
+/**
+ * The Resend Idempotency-Key for one credit-note email. Versioned by issued_at:
+ * a re-issued note (same row, new issued_at) is a NEW email, and reusing the first
+ * issue's key would have Resend replay that send, or answer 409.
+ *
+ * Within one issue it is ONE key for every attempt — including a human resend of a
+ * MAY_HAVE_SENT note (decided with the user 2026-09-27, superseding plan §2's "new
+ * key"). MAY_HAVE_SENT means the claim is > 24 h old, so the key has lapsed and
+ * Resend sends fresh; a new key would let a coach re-save 15 minutes after an
+ * unknown-outcome resend send a second copy under the lapsed original key.
+ *
+ * The epoch is taken from the timestamptz only to be a stable version number — no
+ * calendar date is derived, so this is not the ⚠ RISK 13 pattern.
+ */
+export function creditNoteIdempotencyKey(noteId: string, claim: NoteClaim): string {
+  // An unparseable timestamp falls back to the raw string — still a distinct
+  // version per issue, where NaN would collide across every re-issue.
+  const epoch = Date.parse(claim.issuedAt);
+  return `credit-note/${noteId}/${Number.isNaN(epoch) ? claim.issuedAt : epoch}`;
 }
 
 export type SkipReason = "already-applied" | "invoice-line-already-emailed" | "no-snapshot";
@@ -323,7 +388,7 @@ export function buildEmailData(
 }
 
 /**
- * Claim → send → release, once per note.
+ * Claim → send → settle, once per note.
  *
  * EXTRACTED FROM THE Deno.serve CLOSURE ON PURPOSE. A handler closure cannot be
  * reached by a test, and that is not academic: the RISK 10 suspension gate shipped
@@ -342,17 +407,20 @@ export async function sendNotes(
     send: (
       data: CreditNoteEmailData,
       to: string | undefined,
+      idempotencyKey: string,
     ) => Promise<SendResult>;
     balances: Map<string, number>;
+    /** The admin's Resend: may claim a MAY_HAVE_SENT note. */
+    manual?: boolean;
   },
 ): Promise<{ sent: number; firstSkip: SkipReason | null }> {
   let sent = 0;
   let firstSkip: SkipReason | null = null;
 
   for (const note of notes) {
-    // ⚠ RISK 12 — ONE try/catch PER NOTE, INSIDE the loop. The claim is a raw
-    // UPDATE and can throw (transient DB error, or a missing column if this is ever
-    // deployed ahead of its migration). With only an outer try, the first throw
+    // ⚠ RISK 12 — ONE try/catch PER NOTE, INSIDE the loop. The claim and the
+    // settle are database calls and can throw (transient DB error, or a missing
+    // function if this is ever deployed ahead of its migration). With only an outer try, the first throw
     // silently drops every remaining parent in a rained-off class — verbatim
     // INVOICE_EMAIL_RETRY_PLAN.md RISK 4.
     try {
@@ -365,77 +433,43 @@ export async function sendNotes(
 
       const { data, to } = buildEmailData(note, deps.balances);
 
-      const claim = await claimNote(svc, note.id);
-      if (!claim.ok) {
-        // The UPDATE may have COMMITTED with only its response lost, which would
-        // leave the row stamped-but-unsent: rendered "Emailed", filtered out of
-        // findUnsentById, unreachable by Resend. releaseNote is unconditional, so
-        // it is safe when the claim never landed.
-        console.log(`credit-note email ${claim.reason} (${note.id}) — releasing in case it committed`);
-        await releaseNote(svc, note.id);
+      const claimed = await claimNote(svc, note.id, deps.manual ?? false);
+      if (!claimed.ok) {
+        // If the claim COMMITTED with only its response lost, the note reads
+        // "Sending…" for 15 minutes and then becomes resendable — the lease heals
+        // it. (Before 20260927000100 this stranded it as "Emailed" forever.)
+        console.log(`credit-note email ${claimed.reason} (${note.id})`);
         continue;
       }
-      if (!claim.claimed) continue; // a concurrent call won the race
+      const claim = claimed.claim;
+      if (!claim) continue; // a concurrent call holds it, or it is not claimable
 
-      // ⚠ RISK 5 — bar this invoice line for the rest of THIS run. The DB query
-      // only knows about notes emailed on an EARLIER run; two unsent notes on one
-      // line (what a re-toggled correction produces) would otherwise both pass.
-      // Recorded on the CLAIM, not on a successful send, so a released claim still
-      // does not let a sibling note email the same line.
+      // ⚠ RISK 5 — bar this invoice line for the rest of THIS run. Recorded on the
+      // CLAIM, not on a successful send, so a released claim still does not let a
+      // sibling note email the same line. Cross-run, UNIQUE(invoice_item_id)
+      // (credit_notes_invoice_item_id_key, 20260818000100) makes a second note on
+      // one line impossible, so the old post-claim sibling re-read is gone: with
+      // one row per line, the row lock inside the claim RPC IS the line lock.
       ctx.emailedItems.add(note.invoice_item_id);
 
-      // ⚠ RISK 5, CONCURRENCY — the guarantee is "one email per line per run", plus
-      // this best-effort cross-run check. It is NOT "ever", and the plan used to
-      // over-claim that.
-      //
-      // The hole: two notes N1/N2 on one invoice_item_id, a coach save and an admin
-      // Resend firing together. Both read emailedItems as empty, then claim
-      // DIFFERENT ROWS — so both claims succeed and two emails go out for one $30
-      // lesson, both quoting the doubled balance. A condition evaluated before the
-      // claim is not a claim.
-      //
-      // Re-reading AFTER our own claim narrows it to the interval between the two
-      // claims: whichever ran second now sees the other's stamp and backs out. It
-      // cannot close it completely — that needs a partial unique index on
-      // credit_notes(invoice_item_id) WHERE email_sent_at IS NOT NULL, filed with
-      // the duplicate-note item in BACKLOG.md.
-      const sibling = await findEmailedInvoiceItemIds(svc, [note.invoice_item_id]);
-      if (sibling.ok) {
-        const { data: mine } = await svc
-          .from("credit_notes")
-          .select("id")
-          .eq("invoice_item_id", note.invoice_item_id)
-          .not("email_sent_at", "is", null);
-        const stamped = (mine ?? []) as { id: string }[];
-        if (stamped.length > 1) {
-          // Someone else stamped this line too. Back out rather than double-send.
-          console.log(
-            `credit-note email backing out (${note.id}): another note on invoice line ` +
-              `${note.invoice_item_id} was claimed concurrently`,
-          );
-          await releaseNote(svc, note.id);
-          continue;
-        }
-      }
-
-      // ⚠ RISK 8 — try/finally so a THROW cannot leave a stamped-but-unsent row.
-      let release = true;
+      // ⚠ RISK 7 / RISK 8 — settle from the typed outcome (settleActionFor). A
+      // THROW is an unknown outcome like a 5xx: the claim is KEPT, and its lease
+      // expires in 15 minutes — so the note is never stranded "Emailed" (sent_at
+      // was never stamped), and a resend inside 24 h reuses the same key.
+      let result: SendResult;
       try {
-        const result = await deps.send(data, to);
-        if (result.sent) {
-          sent++;
-          release = false;
-        } else {
-          // ⚠ RISK 7 — release ONLY on outcomes that provably never left our side.
-          // A thrown fetch or a 5xx may already have been DELIVERED.
-          release = shouldResetClaim(result.outcome);
-          console.log(
-            `credit-note email not sent (${note.id}): ${result.outcome} — ${result.reason}` +
-              (release ? "" : " [claim kept: may have been delivered]"),
-          );
-        }
-      } finally {
-        if (release) await releaseNote(svc, note.id);
+        result = await deps.send(data, to, creditNoteIdempotencyKey(note.id, claim));
+      } catch (e) {
+        result = { sent: false, outcome: "threw", reason: (e as Error).message };
+      }
+      const action = settleActionFor(result.outcome);
+      await settleNote(svc, note.id, claim.claimedAt, action);
+      if (action === "sent") {
+        sent++;
+      } else {
+        console.log(
+          `credit-note email not sent (${note.id}): ${result.outcome} — ${result.reason} [claim ${action}]`,
+        );
       }
     } catch (e) {
       console.log(`credit-note email threw (${note.id}): ${(e as Error).message}`);
@@ -450,6 +484,7 @@ export function resendSender(apiKey: string | undefined) {
   return async (
     data: CreditNoteEmailData,
     to: string | undefined,
+    idempotencyKey: string,
   ): Promise<SendResult> => {
     const { sendCreditNoteEmail } = await import("./email.ts");
     return await sendCreditNoteEmail({
@@ -458,6 +493,7 @@ export function resendSender(apiKey: string | undefined) {
       subject: buildCreditNoteSubject(data),
       html: buildCreditNoteHtml(data),
       fromName: data.businessName,
+      idempotencyKey,
     });
   };
 }

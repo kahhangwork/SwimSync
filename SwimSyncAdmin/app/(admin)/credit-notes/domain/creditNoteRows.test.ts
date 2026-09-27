@@ -23,7 +23,7 @@ describe("toCreditNoteRow", () => {
   const base = {
     id: "cn1", reference_number: "CN-1", amount: "12.50", reason: "absent",
     status: "available", applied_to_invoice_id: null, issued_at: "2026-09-01T03:00:00+00:00",
-    student_name: null, email_sent_at: null, tenant_id: "t1",
+    student_name: null, email_sent_at: null, credit_note_email_state: "RETRYABLE", tenant_id: "t1",
     credit_applications: [], students: { id: "s1", full_name: "Kid" },
     parents: { profiles: { full_name: "Mum" } },
   };
@@ -32,9 +32,15 @@ describe("toCreditNoteRow", () => {
     expect(toCreditNoteRow(base)).toEqual({
       id: "cn1", reference_number: "CN-1", student_id: "s1", student_name: "Kid",
       parent_name: "Mum", amount: 12.5, reason: "absent", linked_invoice_id: null,
-      created_at: "2026-09-01", status: "available", email_sent_at: null, tenant_id: "t1",
-      applied_to_invoice_id: null, has_applications: false,
+      created_at: "2026-09-01", status: "available", email_sent_at: null, email_state: "RETRYABLE",
+      tenant_id: "t1", applied_to_invoice_id: null, has_applications: false,
     });
+  });
+
+  it("the email state is the SQL computed column, not derived from the timestamps", () => {
+    // email_sent_at null would fall back to UNSENT — the SQL answer must win.
+    expect(toCreditNoteRow(base).email_state).toBe("RETRYABLE");
+    expect(toCreditNoteRow({ ...base, credit_note_email_state: undefined }).email_state).toBe("UNSENT");
   });
 
   it("the snapshot student_name wins over the embed; missing embeds read —", () => {

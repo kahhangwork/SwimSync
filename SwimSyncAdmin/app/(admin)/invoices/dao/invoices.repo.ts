@@ -176,6 +176,20 @@ export const fetchBillingRuns = (tenantId: string) =>
 // shows up through this. ⚠ RISK 10: PostgREST caps a read at 1,000 rows, so the
 // read is bounded to recent months and ordered newest-first; an older month is
 // either sealed or visible through a run row.
+// Invoice emails whose outcome is unknown after 24 h — the Billing months card's
+// "may not have arrived" list (CRASH_SAFE_EMAIL_CLAIM_PLAN.md §3.3). Filtered on
+// the invoice_email_state COMPUTED COLUMN, so the lease maths stays in SQL and
+// the browser's clock is never compared to invoice_email_claimed_at.
+export const fetchMayNotHaveArrived = (tenantId: string) =>
+  supabase
+    .from("invoices")
+    .select(
+      "id, billing_month, reference_number, invoice_email_claimed_at, parents(profiles(full_name))"
+    )
+    .eq("tenant_id", tenantId)
+    .eq("invoice_email_state", "MAY_HAVE_SENT")
+    .order("invoice_email_claimed_at", { ascending: true });
+
 export const fetchInvoiceMonths = (tenantId: string, fromMonth: string) =>
   supabase
     .from("invoices")

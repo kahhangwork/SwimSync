@@ -115,6 +115,9 @@ Deno.serve(async (req) => {
         console.log(`credit-note email ${found.reason}`);
         return respond({ sent: 0, reason: "lookup failed" });
       }
+      // Mid-send under someone else's fresh claim (the coach's save, or a first
+      // press still in flight). Not "nothing to send" — that means emailed.
+      if (found.sending) return respond({ sent: 0, reason: "sending" });
       // Already emailed, or no such note. Both are nothing-to-do — and the first is
       // what stops a second press of Resend re-sending.
       if (!found.notes.length) return respond({ sent: 0, reason: "nothing to send" });
@@ -186,11 +189,18 @@ Deno.serve(async (req) => {
       [...new Set(notes.map((n) => n.parent_id))],
     );
 
+    // The admin's Resend (note mode) is a human decision, so it may claim a
+    // MAY_HAVE_SENT note (CRASH_SAFE_EMAIL_CLAIM_PLAN.md §2) — under the note's
+    // one key, lapsed by then (creditNoteIdempotencyKey). The coach path never does.
     const { sent, firstSkip } = await sendNotes(
       svc,
       notes,
       { spent: spentRes.spent, emailedItems: itemsRes.items },
-      { send: resendSender(Deno.env.get("RESEND_API_KEY")), balances },
+      {
+        send: resendSender(Deno.env.get("RESEND_API_KEY")),
+        balances,
+        manual: mode === "note",
+      },
     );
 
     // Report WHY nothing went out, so the admin's inline error is actionable rather

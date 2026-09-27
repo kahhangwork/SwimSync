@@ -38,7 +38,7 @@ export function loadNotes(term: string, searchField: SearchField) {
     // row (a db-max-rows truncation), silently disarming the part-spent guard.
     // As an embed it is scoped to the notes loaded and shares this error path.
     .select(
-      `id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, email_sent_at, tenant_id, credit_applications(credit_note_id, reversed_at), students(id, full_name), ${parentEmbed}`
+      `id, reference_number, amount, reason, status, applied_to_invoice_id, issued_at, student_name, email_sent_at, credit_note_email_state, tenant_id, credit_applications(credit_note_id, reversed_at), students(id, full_name), ${parentEmbed}`
     )
     .order("issued_at", { ascending: false })
     .limit(ROW_LIMIT);

@@ -6,6 +6,11 @@
 //
 //   • AUTO  (cron)   — POST {} (or {"mode":"auto"}). Runs daily via pg_cron.
 //   • MANUAL (admin) — POST {"mode":"manual","force":true,"billing_month":"YYYY-MM"}.
+//   • RESEND (admin) — POST {"resend_invoice_email":"<invoice uuid>"}. Re-sends ONE
+//     invoice email and bills nothing. The admin route
+//     (SwimSyncAdmin/app/api/resend-invoice-email) has already checked the caller
+//     administers the invoice's business — CRON_SECRET only proves it came from
+//     that route (CRASH_SAFE_EMAIL_CLAIM_PLAN.md §3.2).
 //
 // Request body (all optional):
 //   mode          "auto" | "manual"   (default "auto")
@@ -19,6 +24,7 @@ import { recordRuns, toErrorRows, toRunRows } from "./runLog.ts";
 import {
   emailCreatedInvoices,
   notifyGenerationBlocked,
+  resendInvoiceEmail,
   retryUnsentInvoiceEmails,
   shouldRetryTenantEmails,
 } from "./email.ts";
@@ -49,6 +55,21 @@ Deno.serve(async (req: Request) => {
     opts = await req.json();
   } catch {
     // empty body → defaults (auto mode, previous month)
+  }
+
+  // ── Resend one invoice email — no generation, no run-log row ──────────────
+  const resendId = (opts as { resend_invoice_email?: unknown }).resend_invoice_email;
+  if (resendId !== undefined) {
+    if (typeof resendId !== "string" || !/^[0-9a-f-]{36}$/i.test(resendId)) {
+      return json({ sent: false, reason: "bad request" }, 400);
+    }
+    // Never throws; a failed send is a 200 with a reason, like the other paths.
+    return json(
+      await resendInvoiceEmail(supabase, resendId, {
+        apiKey: Deno.env.get("RESEND_API_KEY"),
+        appUrl: Deno.env.get("APP_URL"),
+      })
+    );
   }
 
   let blockedAlerts = 0;

@@ -118,6 +118,11 @@ export default function InvoicesPage() {
           generate.setGenMonth(row.month);
           generate.setBlockedLessons(row.recentRuns[0]?.blocking ?? []);
         }}
+        undelivered={months.undelivered}
+        undeliveredError={months.undeliveredError}
+        resendingInvoice={months.resendingInvoice}
+        resendInvoiceError={months.resendInvoiceError}
+        onResendInvoice={months.resendInvoice}
       />
 
       <GenerationPanel
