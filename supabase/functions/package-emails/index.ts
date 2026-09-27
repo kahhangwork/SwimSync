@@ -35,6 +35,20 @@ import {
   type PackageEmailData,
 } from "./email.ts";
 
+// Roles (20260927000500): offering a package or granting a referral reward is
+// a packages:edit act. The platform admin keeps the arm can_admin_tenant gave
+// it (P7). Asked AS THE CALLER, via their own JWT.
+async function packagesAdmin(
+  anon: { rpc: (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown }> },
+  tenantId: string,
+): Promise<boolean> {
+  const [{ data: isPlatform }, { data: hasArea }] = await Promise.all([
+    anon.rpc("is_platform_admin"),
+    anon.rpc("has_admin_area", { p_tenant: tenantId, p_area: "packages", p_level: "edit" }),
+  ]);
+  return isPlatform === true || hasArea === true;
+}
+
 const APP_URL = Deno.env.get("APP_URL") ?? "https://swimsync.sg";
 
 Deno.serve(async (req) => {
@@ -90,9 +104,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!reward) return respond({ sent: false, reason: "not found" }, 404);
 
-      const { data: isAdmin } = await anon.rpc("can_admin_tenant", {
-        p_tenant_id: reward.tenant_id,
-      });
+      const isAdmin = await packagesAdmin(anon, reward.tenant_id as string);
       if (
         !authorizePackageEmail(
           "referral_reward",
@@ -154,9 +166,7 @@ Deno.serve(async (req) => {
     let isAdminOfTenant = false;
     let profileTenantId: string | null = null;
     if (type === "offered") {
-      const { data: isAdmin } = await anon.rpc("can_admin_tenant", {
-        p_tenant_id: pkg.tenant_id,
-      });
+      const isAdmin = await packagesAdmin(anon, pkg.tenant_id as string);
       isAdminOfTenant = isAdmin === true;
     } else if (type === "confirmed") {
       const { data: callerProfile } = await svc

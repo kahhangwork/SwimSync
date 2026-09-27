@@ -834,6 +834,35 @@ export function buildBlockedEmailHtml(
   </div></body></html>`;
 }
 
+export type BlockedNoticeCandidate = {
+  id: string;
+  email: string | null;
+  role: string;
+  tenant_id: string | null;
+  admin_role_id: string | null;
+};
+
+/**
+ * Who hears that billing is blocked (X4, decided with the user 2026-09-27):
+ * coaches (they must mark), the platform admin (the fallback), the business
+ * OWNER, and co-admins whose role holds operations:edit — the people who can
+ * fix the marking. A co-admin who can do neither drops off. Pure: the caller
+ * fetches owners and the operations:edit role ids.
+ */
+export function blockedNoticeRecipients(
+  candidates: BlockedNoticeCandidate[],
+  ownerIds: Set<string>,
+  opsEditRoleIds: Set<string>,
+): BlockedNoticeCandidate[] {
+  return candidates.filter((c) => {
+    if (!c.email) return false;
+    if (c.role === "coach" || c.role === "platform_admin") return true;
+    if (c.role !== "tenant_admin") return false;
+    return ownerIds.has(c.id) ||
+      (c.admin_role_id !== null && opsEditRoleIds.has(c.admin_role_id));
+  });
+}
+
 /**
  * Email a TENANT's coaches and admin that their generation is blocked, at most
  * once per distinct set of blocking lessons per month. Never throws; a failure
@@ -872,12 +901,25 @@ export async function notifyGenerationBlocked(
     const seenKey = opts.tenantId ? `${opts.tenantId}:${billingMonth}` : billingMonth;
     if (seen[seenKey] === fingerprint) return { notified: 0 };
 
-    // This tenant's coaches and admin, plus the platform admin (who has no
-    // tenant and is the fallback when something is stuck).
-    let q = supabase.from("profiles").select("email, role, tenant_id");
-    const { data: recipients } = opts.tenantId
+    // This tenant's coaches and the admins who can fix the marking, plus the
+    // platform admin (who has no tenant and is the fallback when something is
+    // stuck). Which admins: blockedNoticeRecipients (X4, roles 2026-09-27).
+    const q = supabase.from("profiles").select("id, email, role, tenant_id, admin_role_id");
+    const { data: candidates } = opts.tenantId
       ? await q.or(`tenant_id.eq.${opts.tenantId},role.eq.platform_admin`)
       : await q.in("role", ["coach", "tenant_admin", "platform_admin"]);
+    let ownersQ = supabase.from("tenants").select("owner_profile_id");
+    if (opts.tenantId) ownersQ = ownersQ.eq("id", opts.tenantId);
+    const [{ data: owners }, { data: opsEditRoles }] = await Promise.all([
+      ownersQ,
+      supabase.from("tenant_role_permissions").select("role_id")
+        .eq("area", "operations").eq("level", "edit"),
+    ]);
+    const recipients = blockedNoticeRecipients(
+      (candidates ?? []) as BlockedNoticeCandidate[],
+      new Set((owners ?? []).map((t) => t.owner_profile_id as string).filter(Boolean)),
+      new Set((opsEditRoles ?? []).map((r) => r.role_id as string)),
+    );
 
     const html = buildBlockedEmailHtml(billingMonth, blocking);
     const subject = `Action needed: ${formatBillingMonth(
@@ -885,8 +927,7 @@ export async function notifyGenerationBlocked(
     )} invoices are blocked by unmarked attendance`;
 
     let notified = 0;
-    for (const r of recipients ?? []) {
-      if (!r.email) continue;
+    for (const r of recipients) {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {

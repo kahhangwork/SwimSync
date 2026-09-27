@@ -13,6 +13,7 @@ import {
   type InvoiceEmailData,
   buildBlockedEmailHtml,
   notifyGenerationBlocked,
+  blockedNoticeRecipients,
   shouldRetryTenantEmails,
   settleActionFor,
   outcomeForStatus,
@@ -378,4 +379,23 @@ Deno.test("shouldRetryTenantEmails: normal statuses always retry", () => {
     assertEquals(shouldRetryTenantEmails(st, false), true);
     assertEquals(shouldRetryTenantEmails(st, true), true);
   }
+});
+
+Deno.test("blockedNoticeRecipients: coaches, platform, owner and operations:edit admins only (X4)", () => {
+  const c = (id: string, role: string, admin_role_id: string | null = null, email: string | null = `${id}@x.test`) =>
+    ({ id, email, role, tenant_id: "t1", admin_role_id });
+  const got = blockedNoticeRecipients(
+    [
+      c("coach", "coach"),
+      c("platform", "platform_admin"),
+      c("owner", "tenant_admin"),
+      c("ops", "tenant_admin", "role-ops-edit"),
+      c("money", "tenant_admin", "role-billing-only"),
+      c("parent", "parent"),
+      c("nomail", "coach", null, null),
+    ],
+    new Set(["owner"]),
+    new Set(["role-ops-edit"]),
+  ).map((r) => r.id);
+  assertEquals(got, ["coach", "platform", "owner", "ops"]);
 });

@@ -91,13 +91,16 @@ Deno.serve(async (req) => {
       tenantId = sessionTenant;
 
       // Verbatim the live attendance_write policy, so this grants no authority the
-      // edit itself did not have. can_admin_tenant is CORRECT here (and only here):
-      // the policy uses it, and this path sends only for a session the caller could
-      // have marked.
-      const [{ data: isMain }, { data: isAdmin }] = await Promise.all([
+      // edit itself did not have: main coach, OR the platform admin, OR an admin
+      // whose role holds operations:edit (20260927000400 re-pointed the policy
+      // from can_admin_tenant; this path sends only for a session the caller
+      // could have marked).
+      const [{ data: isMain }, { data: isPlatform }, { data: hasOps }] = await Promise.all([
         anon.rpc("coach_is_main_on_session", { p_session_id: lesson_session_id }),
-        anon.rpc("can_admin_tenant", { p_tenant_id: tenantId }),
+        anon.rpc("is_platform_admin"),
+        anon.rpc("has_admin_area", { p_tenant: tenantId, p_area: "operations", p_level: "edit" }),
       ]);
+      const isAdmin = isPlatform === true || hasOps === true;
       if (
         !authorizeCreditNoteEmail("session", {
           isMainOnSession: isMain === true,
@@ -130,8 +133,13 @@ Deno.serve(async (req) => {
       // mail `From: <another business>` to that business's parents.
       // PROHIBITION: do not widen this to make a platform admin's 403 go away. That
       // 403 is the feature.
-      const { data: isTenantAdmin } = await anon.rpc("is_tenant_admin", {
-        p_tenant_id: tenantId,
+      // Roles (20260927000600 era): the admin must hold billing:edit — sending a
+      // credit note is a billing act. has_admin_area is false for a platform
+      // admin exactly as is_tenant_admin was, so RISK 4 above still holds.
+      const { data: isTenantAdmin } = await anon.rpc("has_admin_area", {
+        p_tenant: tenantId,
+        p_area: "billing",
+        p_level: "edit",
       });
       if (
         !authorizeCreditNoteEmail("note", {
