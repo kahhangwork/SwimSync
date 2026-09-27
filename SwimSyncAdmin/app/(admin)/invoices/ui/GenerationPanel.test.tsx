@@ -35,6 +35,8 @@ import { GenerationPanel } from "./GenerationPanel";
 //      → RED: "an Error result reads red, a success reads green"
 //   7. toggle `aria-pressed={!!autoEnabled}` → `aria-pressed={true}`
 //      → RED: "the auto toggle reflects the setting and calls the handler"
+//   8. `{runDayMessage && (` → `{false && (` (a refused run-day save is silent again)
+//      → RED: "a refused run-day save is said out loud, in red, and nothing when saved"
 
 type Props = ComponentProps<typeof GenerationPanel>;
 
@@ -52,6 +54,7 @@ function setup(over: Partial<Props> = {}) {
     runDay: 5,
     setRunDay: vi.fn(),
     savingRunDay: false,
+    runDayMessage: null,
     onSaveRunDay: vi.fn(),
     paynowUen: "",
     setPaynowUen: vi.fn(),
@@ -183,5 +186,13 @@ describe("GenerationPanel — PayNow", () => {
     expect(screen.getByText("Error: not allowed").className).toMatch(/text-red-600/);
     rerender(<GenerationPanel {...props} paynowSaved="Saved" />);
     expect(screen.getByText("Saved").className).toMatch(/text-green-600/);
+  });
+
+  it("a refused run-day save is said out loud, in red, and nothing when saved", () => {
+    const { rerender, props } = setup({ runDayMessage: "Not saved — the run day is still 7." });
+    const line = screen.getByText("Not saved — the run day is still 7.");
+    expect(line.className).toMatch(/text-red-600/);
+    rerender(<GenerationPanel {...props} runDayMessage={null} />);
+    expect(screen.queryByText(/Not saved|^Error:/)).toBeNull();
   });
 });
