@@ -1,5 +1,7 @@
 # Plan — weeks-based packages, per-purchase start/end dates, public-holiday auto-extension, manual extension
 
+> **Status (audited 2026-09-27): DONE — shipped and on prod.** Any status line below is the one written at the time and is stale; `docs/plans/README.md` is the index.
+
 _Status: BUILT on the local stack, 2026-08-15 — all four phases (migrations
 `20260814000400`–`20260815000300`), engine re-anchor, both apps, and tests. Verified:
 pgTAP 1001 (only the pre-existing `coach_disable` date-flake red, which fails on clean

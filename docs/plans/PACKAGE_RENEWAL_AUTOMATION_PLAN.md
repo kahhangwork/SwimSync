@@ -1,5 +1,7 @@
 # Plan — package renewal automation ("generate package invoices"), Packages page reorder, Students page package columns + actions drawer
 
+> **Status (audited 2026-09-27): DONE — shipped and on prod.** Any status line below is the one written at the time and is stale; `docs/plans/README.md` is the index.
+
 _Status: PLANNED, not built. Settled with the user via `/plan-with-confidence` on 2026-08-15
 (three rounds of questions; every decision below was answered explicitly, none is inferred).
 **Risk-reviewed via `/plan-review` on 2026-08-15 by an independent reviewer agent** that

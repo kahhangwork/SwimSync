@@ -1,5 +1,7 @@
 # Partial-payment follow-ups (a) + (b) — PLAN
 
+> **Status (audited 2026-09-27): DONE — shipped and on prod.** Any status line below is the one written at the time and is stale; `docs/plans/README.md` is the index.
+
 _Drafted 2026-08-22. Follows §8.83 (partial-payment via `debit_balance`, shipped + deployed). Both items
 DORMANT on prod (0 credit notes), so this is correctness + tests ahead of first use, not a live-bug fix.
 Decisions locked with the user 2026-08-22. Hardened by two `/plan-review` (fable) passes — findings inlined

@@ -1,5 +1,7 @@
 # Tenant Provisioning — Build Plan
 
+> **Status (audited 2026-09-27): DONE — shipped and on prod.** Any status line below is the one written at the time and is stale; `docs/plans/README.md` is the index.
+
 _Written 2026-07-21. Platform-admin-only provisioning of a new business + its first
 admin account._
 

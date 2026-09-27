@@ -434,9 +434,10 @@ which mutate shared seed state — are in the same section.
 
 - **Read the next nightly first** (never dispatch it) — it is the first on §8.129's push.
 - Then **`BACKLOG.md` → *Current build order* (re-ranked with the user 2026-09-27)** — decided, two lanes:
-  - **Wave 1:** *Split co-admin permissions* — owner-defined roles × ~8 areas × None/View/Edit (L, root checkout,
-    plan it first) ‖ *Crash-safe email claim* (S, lane 2, migration lands first).
-  - **Wave 2:** *Package revenue on the accounting page* → *In-app package refunds* (owner-only).
+  - **Wave 1:** *Split co-admin permissions* — roles × 11 areas × None/View/Edit (L, root checkout,
+    `docs/plans/ROLES_PERMISSIONS_PLAN.md`) ‖ *Crash-safe email claim* (S, lane 2, migration lands first,
+    `docs/plans/CRASH_SAFE_EMAIL_CLAIM_PLAN.md`).
+  - **Wave 2:** *Package revenue* → *In-app package refunds* — brief only, `docs/plans/WAVE_2_PACKAGES_BRIEF.md`.
 - **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before

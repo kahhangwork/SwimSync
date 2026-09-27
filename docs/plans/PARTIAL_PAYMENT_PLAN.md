@@ -1,5 +1,7 @@
 # Partial-payment via an account balance — PLAN
 
+> **Status (audited 2026-09-27): DONE — shipped and on prod.** Any status line below is the one written at the time and is stale; `docs/plans/README.md` is the index.
+
 _Drafted 2026-08-22. Revised after `/plan-review` (fable) — separate `debit_balance` column, not a signed
 `credit_balance`. **BUILT and verified locally 2026-08-22** (migration `20260822000100`, engine v?, apps):
 pgTAP 1340 (`partial_payment.test.sql` 17 + `void_credit_note.test.sql` updated), Deno 234 ×2, email +2,

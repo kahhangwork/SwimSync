@@ -1,5 +1,7 @@
 # Location Entity — Implementation Plan
 
+> **Status (audited 2026-09-27): DONE — shipped and on prod.** Any status line below is the one written at the time and is stale; `docs/plans/README.md` is the index.
+
 _Status: BUILT 2026-08-24 on branch `db/location-entity` (not committed yet). Phases 0–5 DONE
 + all suites green locally: pgTAP **1445**, admin vitest **539**, app jest **404**, Deno **236 ×2**
 (expand AND contract schemas), both typechecks clean, UI driver `verify-locations` **6/6** against

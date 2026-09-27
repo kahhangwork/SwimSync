@@ -1,5 +1,7 @@
 # Wave D plan — credit-note batch + 3 non-schema items
 
+> **Status (audited 2026-09-27): DONE — shipped and on prod.** Any status line below is the one written at the time and is stale; `docs/plans/README.md` is the index.
+
 _Drafted 2026-08-17. Scope chosen with the user: the credit-note double-credit migration
 batch PLUS the non-schema Wave D items (PayNow save validation, the 79px date column,
 HANDOVER §3 graduation). `/plan-review` run 2026-08-17 (Fable agent, all risks verified in

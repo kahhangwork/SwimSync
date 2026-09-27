@@ -1,5 +1,7 @@
 # Plan — warn on a possible duplicate at the admin's Add-student step
 
+> **Status (audited 2026-09-27): DONE — shipped and on prod.** Any status line below is the one written at the time and is stale; `docs/plans/README.md` is the index.
+
 _Status: proposed (2026-08-14). Settled with the user through `/plan-with-confidence`,
 hardened through `/plan-review` (product-risk mitigations inlined below, marked
 `⚠ RISK n`)._

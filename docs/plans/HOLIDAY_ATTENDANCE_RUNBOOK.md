@@ -1,5 +1,7 @@
 # Holiday attendance — deploy runbook
 
+> **Status (audited 2026-09-27): REFERENCE (historical) — executed in §8.70.** Any status line below is the one written at the time and is stale; `docs/plans/README.md` is the index.
+
 Event-driven public-holiday package extension. Replaces the calendar-scan
 `recompute_package_extensions`. **Dormant on prod** (0 packages, 0 holidays), so
 there is no backfill — but the ORDER is load-bearing: dropping the retired weeks

@@ -279,10 +279,10 @@ _Supersedes every older ranking below, which is kept as history. Forced by: the 
 | Decision | Answer | Consequence for the order |
 |---|---|---|
 | Co-admin permissions — now or later? | **NOW** — a co-admin will be hired within ~3 months | *Split co-admin permissions* goes to the head of the queue, alone, before any new admin surface (every surface built first would be retrofitted) |
-| Permission shape | **Owner-defined ROLES**, each a grid of **~8 grouped areas × None / View / Edit**; a few **starter presets** the owner can copy and edit; **all areas at once**, not phased | Server-side enforcement per area (RLS/RPC), not UI hiding. Size **L** (~1–2 weeks) |
+| Permission shape | **Owner-defined ROLES**, each a grid of **11 areas × None / View / Edit** (refined in planning: every area is money OR operations, never both — `docs/plans/ROLES_PERMISSIONS_PLAN.md` §3); a few **starter presets** the owner can copy and edit; **all areas at once**, not phased | Server-side enforcement per area (RLS/RPC), not UI hiding. Size **L** (~1–2 weeks) |
 | Can admin/role management be granted? | **Yes, grantable** | Escalation guard is mandatory: a delegate can grant only capabilities they hold themselves, and can never modify or remove the owner |
 | Package revenue on the accounting page | **Counted when the package is PAID** (cash, in the month paid) | New item *Package revenue on the accounting page*. A deliberate exception to 2026-08-16's accrual basis — recorded so it is not "fixed" back |
-| Refunds | **Owner-only**; package-only (monthly invoices already correct via credit notes); a refund **subtracts from the month it is paid out** (mirrors the line above) | *In-app package refunds* ships right after package revenue, same lane (shared surface: the accounting page) |
+| Refunds | ~~Owner-only~~ **grantable via `packages:edit`** (refined in planning — the user made every area grantable; the standard roles give it to Full admin only); package-only (monthly invoices already correct via credit notes); a refund **subtracts from the month it is paid out** (mirrors the line above) | *In-app package refunds* ships right after package revenue, same lane (shared surface: the accounting page) |
 | Per-child make-up | **Not needed** — no child is enrolled in every group class of their kind | → *Deliberately not doing* |
 | PayNow statement import | **Not yet** — ~9 invoices/month is fine by hand | Stays parked under *Automatic PayNow payment detection* |
 | Parallel sessions | **2 lanes** | Waves below are written as two lanes |
@@ -290,13 +290,16 @@ _Supersedes every older ranking below, which is kept as history. Forced by: the 
 #### Wave 1 — foundations (build first)
 
 1. **Split co-admin permissions — roles + grid** (L). Migration-heavy, so built from the **root checkout** on `db/…`
-   branches (a worktree never authors a migration). Plan it first (`/plan-with-confidence`).
+   branches (a worktree never authors a migration). **Plan: `docs/plans/ROLES_PERMISSIONS_PLAN.md`.**
 2. **Crash-safe email claim** (S) — **lane 2**. Its small migration lands on `main` FIRST, then the edge-function
    work (`generate-invoices`, `credit-note-emails`) runs in a worktree beside lane 1. Goes before any new email path
-   (a refund email, the nudges) so none of them inherits the one-row window. **Not cron-gated** — HANDOVER §9 used to
+   (a refund email, the nudges) so none of them inherits the one-row window. **Plan: `docs/plans/CRASH_SAFE_EMAIL_CLAIM_PLAN.md`.** **Not cron-gated** — HANDOVER §9 used to
    list it with the parked cron tail; its own item never depended on cron.
 
 #### Wave 2 — packages (after Wave 1, so each new admin surface is born with its grid area)
+
+**Brief: `docs/plans/WAVE_2_PACKAGES_BRIEF.md`** — becomes a full plan once Roles ships.
+
 
 3. **Package revenue on the accounting page** (S).
 4. **In-app package refunds** (S) — same lane as 3, straight after (shared surface).
@@ -1096,7 +1099,7 @@ commercial convention discussed 2026-07-20: refund = paid − (lessons taken × 
 rate), i.e. claw back the volume discount on lessons actually used; don't apportion
 "bonus vs cash".
 
-**Decided 2026-09-27:** **owner-only**. Refunds are **package-only** — the one case is a package CANCELLED with value
+**Decided 2026-09-27:** ~~owner-only~~ **grantable via `packages:edit`** (planning refinement; Full admin only by default — `docs/plans/WAVE_2_PACKAGES_BRIEF.md` W5). Refunds are **package-only** — the one case is a package CANCELLED with value
 left (family moves, injury, child quits, class closed with no alternative); monthly invoices already correct through
 credit notes. On the accounting page a refund **subtracts from the month it is paid out**, mirroring *Package revenue
 on the accounting page* (counted when paid). Build straight after that item, same lane. Refund-amount rule not yet
@@ -1113,7 +1116,8 @@ Count package purchases in the owner's P&L, in the month the package is **paid**
 **Notes:** decided with the user 2026-09-27 — **cash, in the month paid**, a deliberate exception to the accrual
 basis of 2026-08-16; don't "fix" it back to recognising revenue per lesson used. No double count: package-funded
 lines stay subtracted from invoice revenue, the purchase is added once. Add it as its own breakdown line so Revenue
-stays auditable. Refunds subtract in the month paid out (*In-app package refunds*). Owner-gated like the rest of the page.
+stays auditable. Refunds subtract in the month paid out (*In-app package refunds*). Gated by the *Accounting* area under
+Roles (owner always; grantable).
 
 ### Household-level split billing — **M** `[MVP-excluded]`
 Let two parents (e.g. separated households) each receive a share of the invoice.
@@ -1354,7 +1358,8 @@ column cannot be both claim and sent-marker. Design + why the per-invoice claim 
 `docs/plans/INVOICE_EMAIL_RETRY_PLAN.md` (⚠ RISK 1).
 
 **2026-09-27: Wave 1, lane 2.** Not cron-gated (HANDOVER §9 had grouped it with the parked cron tail). Build it
-before any new email path so none inherits the window.
+before any new email path so none inherits the window. *(Planning refined "one column, not two" above: the plan adds a
+`claimed_at` column beside each `sent_at` — `docs/plans/CRASH_SAFE_EMAIL_CLAIM_PLAN.md`.)*
 
 ### One-click bulk WhatsApp sends (Cloud API) — **M** `[Phase 3]`
 Send the payment reminder to every unpaid parent with ONE click, server-side, instead
@@ -1451,8 +1456,7 @@ final and overstate Net.
 ### Split co-admin permissions — **L** (was M) — **Wave 1, decided 2026-09-27**
 
 **Decided with the user 2026-09-27:** build NOW (a co-admin hire is ~3 months out). Owner-defined **roles**, each a
-grid of **~8 grouped areas** (e.g. Attendance · Students & families · Classes & pricing · Billing & invoices ·
-Packages & refunds · Coaches & wages · Settings · Accounting) × **None / View / Edit**; a few **starter presets** the
+grid of **11 areas** — six operations, five money, never mixed (full list and mapping: `docs/plans/ROLES_PERMISSIONS_PLAN.md` §3) × **None / View / Edit**; a few **starter presets** the
 owner can copy and edit; **all areas in one build**. **Admin/role management is grantable**, with a mandatory
 escalation guard: a delegate may grant only what they hold, and never touches the owner. The owner always holds
 everything. Enforcement is server-side per area — hiding a page is not a boundary (the accounting page's own rule).
@@ -1460,8 +1464,8 @@ Resized **M → L**: 26 admin pages, and `is_tenant_admin`/`can_admin_tenant` ap
 (a raw grep — it counts comments and superseded `CREATE OR REPLACE` bodies, so the LIVE policy/RPC count is lower;
 the plan must take it from `pg_policies` / `pg_get_functiondef`, §7.40). "Roles" here means **rows in a tenant-scoped
 table** — the capability-table path the note below recommends — **not** a Postgres enum, which that note rules out.
-Open for the plan: whether *Accounting* (owner-only by PRD §7.23) and *refunds* (owner-only, decided the same day)
-become grantable areas or stay hard owner-only.
+Settled in planning: *Accounting* and *refunds* are **grantable** like every area; the standard roles keep all money
+areas None except on *Full admin*.
 
 Restrict what individual co-admins can do — e.g. an assistant who can mark attendance and
 chase payments but cannot change class pricing or issue credit notes.
