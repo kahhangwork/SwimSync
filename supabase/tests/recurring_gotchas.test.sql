@@ -45,6 +45,7 @@ INSERT INTO _known_pairs VALUES
   ('credit_notes|invoices'),
   ('makeup_bookings|profiles'),
   ('package_products|tenants'),
+  ('package_refunds|profiles'),
   ('parent_packages|profiles'),
   ('parent_packages|referral_rewards'),
   ('parents|referrals'),
