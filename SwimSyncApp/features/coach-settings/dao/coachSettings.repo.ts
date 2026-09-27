@@ -28,6 +28,12 @@ export const fetchProfileRole = (session: Session) =>
     .eq("id", session.id)
     .maybeSingle();
 
+// Roles (20260927000500): the PayNow QR is Billing: Edit. Asked of the database
+// as this user — false for a coach, a deactivated admin, a suspended business,
+// and a co-admin whose role lacks billing.
+export const fetchCanEditBilling = (tenantId: string) =>
+  supabase.rpc("has_admin_area", { p_tenant: tenantId, p_area: "billing", p_level: "edit" });
+
 export const updateTenantQrUrl = (tenantId: string, publicUrl: string) =>
   supabase
     .from("tenants")

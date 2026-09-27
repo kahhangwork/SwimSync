@@ -9,10 +9,11 @@ import { InviteAdminModal } from "./ui/InviteAdminModal";
 import { DeleteAdminModal } from "./ui/DeleteAdminModal";
 
 /**
- * Who administers this business, and — for the OWNER only — the levers:
- * invite, resend, deactivate/reactivate, delete. Visible to every admin
- * (seeing who runs the business is not a privilege); every button is
- * owner-gated server-side, so hiding them here is honesty, not the boundary.
+ * Who administers this business, their ROLE, and — for an admin whose role
+ * holds Admins & roles: Edit (always the owner) — the levers: invite, change
+ * role, resend, deactivate/reactivate, delete. Every button is gated
+ * server-side (has_admin_area + the owner-target and escalation rules,
+ * 20260927000600), so hiding them here is honesty, not the boundary.
  *
  * Deleting is deliberately two different things (20260806000100):
  *   - an admin who is ALSO a coach loses only the admin role (demotion via
@@ -29,7 +30,7 @@ export default function AdminsPage() {
       <PageHeader
         title="Admins"
         subtitle={`${p.admins.length} admin ${p.admins.length === 1 ? "account" : "accounts"}`}
-        action={p.isOwner ? <InviteAdminButton onOpen={p.openInvite} /> : undefined}
+        action={p.canManage && p.assignable.length > 0 ? <InviteAdminButton onOpen={p.openInvite} /> : undefined}
       />
 
       {p.pageError && (
@@ -48,7 +49,10 @@ export default function AdminsPage() {
       <AdminsTable
         admins={p.admins}
         loading={p.loading}
-        isOwner={p.isOwner}
+        isOwner={p.canManage}
+        roles={p.roles}
+        assignable={p.assignable}
+        changeRole={p.changeRole}
         busyRow={p.busyRow}
         rowAction={p.rowAction}
         openDelete={p.openDelete}
@@ -65,6 +69,9 @@ export default function AdminsPage() {
         setPhone={p.setPhone}
         isCoachInvite={p.isCoachInvite}
         setIsCoachInvite={p.setIsCoachInvite}
+        assignable={p.assignable}
+        roleId={p.inviteRoleId}
+        setRoleId={p.setInviteRoleId}
         inviting={p.inviting}
         inviteError={p.inviteError}
         handleInvite={p.handleInvite}

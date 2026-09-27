@@ -19,6 +19,7 @@ import {
   fetchCoach,
   fetchTenantPaynow,
   fetchProfileRole,
+  fetchCanEditBilling,
   updateTenantQrUrl,
 } from "../dao/coachSettings.repo";
 import { readImageBytes, uploadQrImage, qrPublicUrl } from "../dao/coachSettings.storage";
@@ -37,6 +38,10 @@ export function useCoachSettings() {
   // which a private coach is, for their own tenant of one. A school coach sees
   // the QR but cannot change it.
   const [tenantId, setTenantId] = useState<string | null>(null);
+  // Two different questions since roles (ROLES_PERMISSIONS_PLAN.md §5.6):
+  // may this person open the admin panel at all (any tenant_admin — the
+  // panel's own door, §7.91), and may they change the PayNow QR (Billing: Edit).
+  const [isAdmin, setIsAdmin] = useState(false);
   const [canEditQr, setCanEditQr] = useState(false);
   // Since 2026-08-02 the PRIMARY way a parent pays is a computed dynamic QR
   // built from the business's PayNow ID (uen/mobile), set on the admin panel.
@@ -60,16 +65,18 @@ export function useCoachSettings() {
     setCoachId(data.id);
     setTenantId(data.tenant_id);
 
-    const [{ data: tenant }, { data: profile }] = await Promise.all([
+    const [{ data: tenant }, { data: profile }, { data: mayBill }] = await Promise.all([
       fetchTenantPaynow(data.tenant_id),
       fetchProfileRole(session),
+      fetchCanEditBilling(data.tenant_id),
     ]);
 
     setPaynowUrl(tenant?.paynow_qr_url ?? null);
     setHasPaynowId(
       Boolean(tenant?.paynow_uen?.trim() || tenant?.paynow_mobile?.trim())
     );
-    setCanEditQr(profile?.role === "tenant_admin");
+    setIsAdmin(profile?.role === "tenant_admin");
+    setCanEditQr(mayBill === true);
   }, [session]);
 
   function openAdminPanel() {
@@ -166,6 +173,7 @@ export function useCoachSettings() {
     paynowUrl,
     uploading,
     canEditQr,
+    isAdmin,
     hasPaynowId,
     showQrUpload,
     setShowQrUpload,

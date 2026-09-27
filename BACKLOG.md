@@ -1441,7 +1441,7 @@ folded onto this month's invoice), and `wages_state` is a **per-rated-coach cove
 check, not "any payout row exists" — a coach rated after the run would otherwise read as
 final and overstate Net.
 
-### Split co-admin permissions — **L** (was M) — **Wave 1, decided 2026-09-27**
+### ~~Split co-admin permissions~~ — **L** — **BUILT 2026-09-27** (migrations A–D on `main`; apps + edge on `feat/roles-app`, shipped with its deploy) — PRD §4.3. Follow-up: *Hide edit controls page by page for a view-only role*.
 
 **Decided with the user 2026-09-27:** build NOW (a co-admin hire is ~3 months out). Owner-defined **roles**, each a
 grid of **8 areas** — three operations, five money, never mixed (was 11; the four ops areas merged 2026-09-27) (full list and mapping: `docs/plans/ROLES_PERMISSIONS_PLAN.md` §3) × **None / View / Edit**; a few **starter presets** the
@@ -1527,6 +1527,17 @@ Richer metrics on the admin dashboard. **Retired with the user 2026-08-16** — 
 standing instruction was "delete if a real question ever replaces it", and none has. No
 specific pain behind it. Moved to *Deliberately not doing*; the concrete money question
 ("how much am I owed / did I earn?") is served by *An owner-only accounting page* instead.
+
+### Hide edit controls page by page for a view-only role — **M** — _filed 2026-09-27 (roles step 6)_
+Roles' P5 said a View-only area shows its pages with the edit controls **hidden**, not disabled. What shipped is the
+page-level half: `RequiresTenant` renders a one-line *"View only — your role can't change this."* notice above the
+page. The buttons themselves still render; pressing one gets the server's refusal (RLS / `has_admin_area`), shown as
+the page's normal error. Safe, but noisy.
+
+**Why:** every edit control on ~20 operations and money pages would need a `can(perms, area, 'edit')` guard — the
+hook exists (`usePermissions()` + `lib/permissions.ts`), the per-page pass does not. **Notes:** only bites a CUSTOM
+role with an area at View; every standard role is Edit or None on each area except Operations for money-only
+roles. Do it before the co-admin hire if the owner builds such a role.
 
 ## Platform and reach
 

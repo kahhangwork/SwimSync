@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePermissions } from "@/components/PermissionsProvider";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, ChevronDown } from "lucide-react";
@@ -198,10 +199,13 @@ export function Sidebar() {
     "/unassigned": unassignedStudents,
   };
 
+  // The role decides which links show (an affordance — pages and the server
+  // refuse on their own). Nothing renders until the role is known.
+  const { status: permsStatus, perms } = usePermissions();
   const grouped =
-    tenantId === undefined
+    tenantId === undefined || permsStatus === "loading"
       ? { topLevel: [] as NavItem[], groups: [] as ReturnType<typeof groupedNavFor>["groups"] }
-      : groupedNavFor(tenantId);
+      : groupedNavFor(tenantId, perms);
 
   function isActive(href: string): boolean {
     return pathname === href || pathname.startsWith(href + "/");

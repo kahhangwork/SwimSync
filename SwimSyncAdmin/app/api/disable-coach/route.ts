@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveAdmin, BAN_FOREVER } from "@/lib/adminManagementGate";
+import { requireArea, BAN_FOREVER } from "@/lib/adminManagementGate";
 
 /**
  * Disable a coach: the RPC cuts their coach authority (RLS-level, instant —
@@ -21,7 +21,7 @@ import { requireActiveAdmin, BAN_FOREVER } from "@/lib/adminManagementGate";
  * gate would evaluate against a superuser and always pass (§7.8).
  */
 export async function POST(req: NextRequest) {
-  const gate = await requireActiveAdmin(req);
+  const gate = await requireArea(req, "operations", "edit");
   if (!gate.ok) return gate.response;
   const { adminClient, callerClient } = gate;
 

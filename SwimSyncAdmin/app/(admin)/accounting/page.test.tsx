@@ -21,6 +21,17 @@ const { state, rpcMock } = vi.hoisted(() => {
   return { state, rpcMock };
 });
 
+// The signed-in admin's role (components/PermissionsProvider). Default: no
+// accounting — so a non-owner is refused unless a test grants it.
+const permState = vi.hoisted(() => ({
+  status: "ready" as "ready" | "loading",
+  tenantId: "t1",
+  isOwner: false,
+  perms: { levels: { operations: "edit", profile: "none", admins: "none", pricing: "none",
+    billing: "none", packages: "none", wages: "none", accounting: "none" } as Record<string, string> },
+}));
+vi.mock("@/components/PermissionsProvider", () => ({ usePermissions: () => permState }));
+
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: { getUser: async () => ({ data: { user: { id: state.myId } } }) },
@@ -51,6 +62,8 @@ beforeEach(() => {
   state.ownerId = "me";
   state.months = ["2026-07"];
   state.summary = FINAL;
+  permState.status = "ready";
+  permState.perms.levels.accounting = "none";
 });
 
 describe("AccountingPage owner gate", () => {
@@ -62,6 +75,22 @@ describe("AccountingPage owner gate", () => {
     expect(screen.queryByTestId("tile-revenue")).toBeNull();
     // ...and the page never even asked the server for them (⚠ RISK 6).
     await waitFor(() => expect(rpcMock).not.toHaveBeenCalled());
+  });
+
+  it("shows figures to a co-admin whose ROLE includes Accounting", async () => {
+    state.ownerId = "someone-else";
+    permState.perms.levels.accounting = "view";
+    render(<AccountingPage />);
+    const revenue = await screen.findByTestId("tile-revenue");
+    expect(revenue.textContent).toContain("S$190.00");
+  });
+
+  it("fires nothing and refuses nothing while the role is still loading", async () => {
+    state.ownerId = "someone-else";
+    permState.status = "loading";
+    render(<AccountingPage />);
+    await waitFor(() => expect(rpcMock).not.toHaveBeenCalled());
+    expect(screen.queryByTestId("owner-only-notice")).toBeNull();
   });
 
   it("shows figures to the owner", async () => {

@@ -1,3 +1,4 @@
+import { permissionsFromRows } from "./permissions";
 import { describe, it, expect } from "vitest";
 import {
   NAV,
@@ -9,6 +10,7 @@ import {
   groupIdForPath,
   NAV_GROUPS,
   TOP_LEVEL_HREFS,
+  areaForPath,
 } from "./adminNav";
 
 // The seeded production shape: the real coach holds tenant_admin AND a coaches
@@ -31,6 +33,18 @@ describe("hasTenant", () => {
   });
 });
 
+describe("areaForPath", () => {
+  it("maps a page and its detail routes to the page's area", () => {
+    expect(areaForPath("/invoices")).toBe("billing");
+    expect(areaForPath("/invoices/abc")).toBe("billing");
+    expect(areaForPath("/roles")).toBe("admins");
+  });
+  it("needs no area for the dashboard", () => expect(areaForPath("/dashboard")).toBeNull());
+  it("fails CLOSED onto an area for an unknown path", () => {
+    expect(areaForPath("/something-new")).toBe("operations");
+  });
+});
+
 describe("navFor", () => {
   it("gives a business admin the seventeen business pages and NOT Platform", () => {
     const hrefs = navFor(A_TENANT).map((n) => n.href);
@@ -49,7 +63,10 @@ describe("navFor", () => {
     // — must not see it, exactly like every other row here. It also has a
     // dynamic child route (/assessment/[classId]) which inherits the scope by
     // scopeForPath()'s prefix rule; that is asserted below.
-    expect(hrefs).toHaveLength(25);
+    // + Roles (2026-09-27, ROLES_PERMISSIONS_PLAN.md — a tenant page in the
+    //   admins area, beside /admins).
+    expect(hrefs).toHaveLength(26);
+    expect(hrefs).toContain("/roles");
     expect(hrefs).toContain("/assessment");
     expect(hrefs).toContain("/accounting");
     expect(hrefs).toContain("/locations");
@@ -64,6 +81,30 @@ describe("navFor", () => {
     expect(hrefs).toContain("/admins");
     expect(hrefs).toContain("/substitutes");
     expect(hrefs).not.toContain("/platform");
+  });
+
+  it("filters by the admin's ROLE when given one — view is enough, none hides", () => {
+    const front = permissionsFromRows([{ area: "operations", level: "edit" }]);
+    const hrefs = navFor(A_TENANT, front).map((n) => n.href);
+    expect(hrefs).toContain("/dashboard"); // area null — every admin
+    expect(hrefs).toContain("/lessons");
+    expect(hrefs).not.toContain("/invoices");
+    expect(hrefs).not.toContain("/admins");
+    expect(hrefs).not.toContain("/roles");
+    expect(hrefs).not.toContain("/accounting");
+    const billingView = permissionsFromRows([
+      { area: "operations", level: "view" },
+      { area: "billing", level: "view" },
+    ]);
+    expect(navFor(A_TENANT, billingView).map((n) => n.href)).toContain("/invoices");
+  });
+
+  it("the owner's grid (all edit) shows every business page", () => {
+    const all = permissionsFromRows(
+      ["operations", "profile", "admins", "pricing", "billing", "packages", "wages", "accounting"]
+        .map((area) => ({ area, level: "edit" }))
+    );
+    expect(navFor(A_TENANT, all)).toHaveLength(26);
   });
 
   it("gives a platform admin ONLY Platform", () => {

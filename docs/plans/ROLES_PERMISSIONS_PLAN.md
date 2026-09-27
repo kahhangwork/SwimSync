@@ -1,13 +1,20 @@
 # Roles & permissions — owner-defined roles for co-admins — plan
 
-> **Status: IN PROGRESS — steps 0–1 done** (map: `ROLES_ENFORCEMENT_MAP.md`; migration A: `20260927000300_admin_roles.sql`,
-> pgTAP `roles_permissions.test.sql`). **Built differently from §5.1, on purpose:** roles are seeded by an AFTER INSERT
-> trigger on `tenants` (not inside `provision_tenant`); the seeded roles carry a `standard_key` so renaming one never
-> breaks a lookup; "every co-admin holds a role" is a commit-time (deferred) check because `handle_new_user` decides
-> ownership after inserting the profile; no `created_by` column (§7.90 — audit_log has it); **P6 moved from step 4 into
-> A** because the new check would otherwise refuse an owner transfer; `assign_admin_role` with the full escalation guard
-> is already in A (dormant — nobody holds `admins:edit` until the owner assigns *Full admin*). (written 2026-09-27 via `/plan-with-confidence`). Wave 1, lane 1 of `BACKLOG.md` →
-> *Current build order*. Backlog item: *Split co-admin permissions*. Index: `docs/plans/README.md`.
+> **Status: BUILT — steps 0–7 done, step 8 (deploy) waiting on the user.** Map: `ROLES_ENFORCEMENT_MAP.md`.
+> Migrations A–D (`20260927000300`–`000600`) on `main`, not on prod. Edge functions (step 5) and the apps (step 6–7) on
+> branch `feat/roles-app` (on top of `feat/roles-edge`), NOT on `main` — pushing it is the app deploy, and the edge
+> code calls `has_admin_area`, so both wait for the migrations to reach prod first.
+>
+> **Built differently from the plan, on purpose:** roles are seeded by an AFTER INSERT trigger on `tenants`; seeded
+> roles carry a `standard_key`; "every co-admin holds a role" is a commit-time (deferred) check; no `created_by`
+> (§7.90); P6 moved into A; `assign_admin_role` with the escalation guard is in A; the four ops areas merged into
+> `operations` (8 areas); a column grant was replaced by nothing (table_grants assertion 6 — P11 removes the coach arm
+> instead); X3 extended to invoice_items / credit_notes / credit_applications; the route checks are
+> `can_assign_role` / `can_restore_admin` RPCs; `delete-admin` et al. refuse an owner target BEFORE banning.
+>
+> **P5 is only half built:** a view-only area renders under the one-line "View only — your role can't change this."
+> notice, but edit controls are NOT yet hidden page by page — a view-only co-admin still sees the buttons and gets the
+> server's refusal when pressing one. Hiding them is per-page work across ~20 pages; filed in BACKLOG.
 
 ## 1. The problem
 

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { usePermissions } from "@/components/PermissionsProvider";
+import { can } from "@/lib/permissions";
 import { toSummary } from "./summaryRow";
 import * as repo from "../dao/accounting.repo";
 import * as rpc from "../dao/accounting.rpc";
@@ -11,7 +13,15 @@ import type { Summary } from "../types";
  */
 export function useAccounting() {
   // null = not yet known. Figures and RPCs wait for a resolved TRUE (⚠ RISK 6).
-  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+  const [ownerKnown, setIsOwner] = useState<boolean | null>(null);
+  // Roles (20260927000500): the owner OR a role holding Accounting: View may
+  // read. Still tri-state — null until BOTH ownership and the role are known,
+  // so nothing fires and no notice shows on "not yet known" (⚠ RISK 6).
+  const { status: permsStatus, perms } = usePermissions();
+  const isOwner: boolean | null =
+    ownerKnown === true ? true
+    : ownerKnown === null || permsStatus === "loading" ? null
+    : can(perms, "accounting", "view");
   const [tenantId, setTenantId] = useState<string | null>(null);
 
   const [months, setMonths] = useState<string[]>([]);

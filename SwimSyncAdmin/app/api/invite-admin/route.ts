@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOwner } from "@/lib/adminManagementGate";
+import { requireArea } from "@/lib/adminManagementGate";
 import { sendCoAdminInviteEmail } from "@/lib/coAdminInviteEmail";
 import { mintStaffInvitation } from "@/lib/staffInvitation";
 
 /**
- * The OWNER invites a co-admin into their own business. Owner only — a
- * co-admin holding this power could invite allies and outvote the owner's
- * lockout protections.
+ * An admin with Admins & roles: Edit invites a co-admin into their own
+ * business, on a ROLE (P4). Owner-only until 2026-09-27; since roles, a
+ * co-admin may invite too, but only onto a role no stronger than their own
+ * (can_assign_role) — so inviting allies cannot out-rank the inviter, and the
+ * owner is never reachable (owner-target rule, 20260927000600).
  *
  * Mechanically this is provision-tenant's step 2 without the tenant creation:
  * generateLink({type:'invite'}) with the role metadata the auth trigger reads
@@ -16,11 +18,11 @@ import { mintStaffInvitation } from "@/lib/staffInvitation";
  * handle_new_user's ownership claim is guarded on owner_profile_id IS NULL.
  */
 export async function POST(req: NextRequest) {
-  const gate = await requireOwner(req);
+  const gate = await requireArea(req, "admins", "edit");
   if (!gate.ok) return gate.response;
-  const { tenantId, adminClient, callerId } = gate;
+  const { tenantId, adminClient, callerId, callerClient } = gate;
 
-  const { name, email: rawEmail, phone, isCoach } = await req.json();
+  const { name, email: rawEmail, phone, isCoach, roleId } = await req.json();
   if (!name?.trim() || !rawEmail?.trim()) {
     return NextResponse.json(
       { error: "name and email are required" },
@@ -28,6 +30,20 @@ export async function POST(req: NextRequest) {
     );
   }
   const email = String(rawEmail).trim().toLowerCase();
+
+  // P4: every invite names a role, and the caller must be allowed to give it —
+  // the owner any role, a co-admin with admins:edit only one no stronger than
+  // their own. Asked of the database as the caller (can_assign_role).
+  if (!roleId) {
+    return NextResponse.json({ error: "Choose a role for the new admin." }, { status: 400 });
+  }
+  const { data: mayAssign } = await callerClient.rpc("can_assign_role", { p_role_id: roleId });
+  if (mayAssign !== true) {
+    return NextResponse.json(
+      { error: "You can only give a role that is no stronger than your own." },
+      { status: 403 }
+    );
+  }
 
   // "The invite didn't arrive, try again" must route to Resend, not mint a
   // second account (provision-tenant's rule).
@@ -63,6 +79,7 @@ export async function POST(req: NextRequest) {
     tenantId,
     isCoach: Boolean(isCoach),
     createdBy: callerId,
+    adminRoleId: roleId,
   });
   if (!invitation.ok) {
     return NextResponse.json({ error: invitation.error }, { status: 500 });

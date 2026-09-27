@@ -3,13 +3,18 @@
 import { ShieldCheck } from "lucide-react";
 import { Table, Thead, Th, Tbody, Tr, Td, useTableSort } from "@/components/Table";
 import { Button } from "@/components/Button";
-import type { AdminRow } from "../types";
+import type { AdminRow, RoleOption } from "../types";
 import { STATUS_PILL } from "../constants";
 
 type Props = {
   admins: AdminRow[];
   loading: boolean;
+  /** Admins & roles: Edit — shows the levers. The server decides each one. */
   isOwner: boolean;
+  roles: RoleOption[];
+  /** The roles this admin may give (display only — the RPC is the boundary). */
+  assignable: RoleOption[];
+  changeRole: (row: AdminRow, roleId: string) => void;
   busyRow: string | null;
   rowAction: (row: AdminRow, path: string) => void;
   openDelete: (row: AdminRow) => void;
@@ -31,20 +36,21 @@ export function AdminsTable(p: Props) {
         <Th sort={sort} sortKey="fullName">Name</Th>
         <Th sort={sort} sortKey="email">Email</Th>
         <Th sort={sort} sortKey="phone">Phone</Th>
-        <Th sort={sort} sortKey="roles">Roles</Th>
+        <Th sort={sort} sortKey="roles">Type</Th>
+        <Th>Role</Th>
         <Th sort={sort} sortKey="status">Status</Th>
         <Th>Actions</Th>
       </Thead>
       <Tbody>
         {p.loading ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={6}>
+            <Td className="text-center text-gray-400 py-8" colSpan={7}>
               Loading…
             </Td>
           </Tr>
         ) : visible.length === 0 ? (
           <Tr>
-            <Td className="text-center text-gray-400 py-8" colSpan={6}>
+            <Td className="text-center text-gray-400 py-8" colSpan={7}>
               No admin accounts.
             </Td>
           </Tr>
@@ -65,6 +71,31 @@ export function AdminsTable(p: Props) {
               <Td className="text-gray-500">{admin.phone ?? "—"}</Td>
               <Td className="text-gray-500 text-xs">
                 {admin.isCoach ? "Admin + Coach" : "Admin"}
+              </Td>
+              <Td className="text-xs">
+                {admin.isOwner ? (
+                  <span className="text-gray-500">Everything (owner)</span>
+                ) : p.isOwner && p.assignable.length > 0 ? (
+                  <select
+                    aria-label={`Role for ${admin.fullName || admin.email}`}
+                    className="rounded-lg border border-gray-200 px-2 py-1 text-xs"
+                    value={admin.roleId ?? ""}
+                    disabled={p.busyRow === admin.id}
+                    onChange={(e) => p.changeRole(admin, e.target.value)}
+                  >
+                    {/* The current role stays listed even if it is stronger
+                        than the viewer's — they may move someone DOWN (D9). */}
+                    {p.roles
+                      .filter((r) => r.id === admin.roleId || p.assignable.some((a) => a.id === r.id))
+                      .map((r) => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                  </select>
+                ) : (
+                  <span className="text-gray-500">
+                    {p.roles.find((r) => r.id === admin.roleId)?.name ?? "—"}
+                  </span>
+                )}
               </Td>
               <Td>
                 {admin.isOwner ? (

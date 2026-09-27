@@ -134,6 +134,9 @@ try {
   // said 25 and was green in CI the whole time this driver was stale. A vitest
   // pin passing is therefore NOT evidence that this one is current — when you add
   // a sidebar page, grep for BOTH. (§8.95.)
+  // 25 → 26 (2026-09-27) for Roles (ROLES_PERMISSIONS_PLAN.md) — both pins
+  // moved in the same change: adminNav.test.ts and this one. The owner sees
+  // every page; a co-admin's sidebar is filtered by role (verify-roles).
   await page.evaluate(() => {
     document
       .querySelectorAll('aside button[data-testid^="navgroup-"]')
@@ -147,7 +150,7 @@ try {
       a.getAttribute("href")
     )
   );
-  check("sidebar shows the 25 business pages", tenantLinks.length === 25,
+  check("sidebar shows the 26 business pages", tenantLinks.length === 26,
     `${tenantLinks.length}: ${JSON.stringify(tenantLinks)}`);
   check("sidebar does NOT show Platform", !tenantLinks.includes("/platform"));
 

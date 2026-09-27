@@ -3,9 +3,15 @@ import { MetricCard } from "@/components/MetricCard";
 import { inactiveNote } from "@/lib/studentCounts";
 import type { Metrics } from "../types";
 
-type Props = { metrics: Metrics | null; loading: boolean };
+type Props = {
+  metrics: Metrics | null;
+  loading: boolean;
+  /** Billing: View (roles). Without it the two money tiles are absent, not
+   *  zero — RLS would return no rows and "0 outstanding" would be a lie. */
+  showBilling?: boolean;
+};
 
-export function MetricGrid({ metrics, loading }: Props) {
+export function MetricGrid({ metrics, loading, showBilling = true }: Props) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
       <MetricCard
@@ -25,6 +31,7 @@ export function MetricGrid({ metrics, loading }: Props) {
         color="yellow"
         subtitle="Awaiting class assignment"
       />
+      {showBilling && (<>
       <MetricCard
         title="Outstanding Invoices"
         value={loading ? "—" : metrics?.outstandingInvoices ?? 0}
@@ -39,6 +46,7 @@ export function MetricGrid({ metrics, loading }: Props) {
         color="purple"
         subtitle="Total issued"
       />
+      </>)}
       <MetricCard
         title="Active Coaches"
         value={loading ? "—" : metrics?.totalCoaches ?? 0}

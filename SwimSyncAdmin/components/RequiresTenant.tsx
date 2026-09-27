@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { hasTenant, scopeForPath } from "@/lib/adminNav";
+import { areaForPath, hasTenant, scopeForPath } from "@/lib/adminNav";
+import { can, AREA_LABELS } from "@/lib/permissions";
+import { usePermissions } from "@/components/PermissionsProvider";
 import { PageHeader } from "@/components/PageHeader";
 
 /**
@@ -42,6 +44,12 @@ import { PageHeader } from "@/components/PageHeader";
  * the children: painting real rows for a beat before replacing them is a leak
  * with a short duration, not an absence of one.
  *
+ * 4. DOES THIS ADMIN'S ROLE INCLUDE THIS PAGE? — each page belongs to an area
+ *    (lib/adminNav.ts NAV); a role without VIEW on it gets "Your role doesn't
+ *    include this page", unmounted like the other refusals. With VIEW but not
+ *    EDIT the page renders under a one-line "View only" notice (P5).
+ *    ROLES_PERMISSIONS_PLAN.md §5.5.
+ *
  * Hiding sidebar links is the affordance; RLS is the boundary; this is the
  * honest explanation in between. A hidden link is still a URL.
  */
@@ -77,7 +85,8 @@ export function RequiresTenant({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const resolved = profile !== undefined;
+  const { status: permsStatus, perms } = usePermissions();
+  const resolved = profile !== undefined && permsStatus === "ready";
   const tenantId = profile?.tenant_id ?? null;
 
   // Question 1: refuse ONLY an affirmatively non-admin role. A missing
@@ -97,6 +106,13 @@ export function RequiresTenant({ children }: { children: React.ReactNode }) {
   const needsTenant = scopeForPath(pathname) === "tenant";
   const refused =
     resolved && !wrongApp && !suspended && needsTenant && !hasTenant(tenantId);
+
+  // Question 4: the role's area for this page.
+  const area = needsTenant ? areaForPath(pathname) : null;
+  const roleRefused =
+    resolved && !wrongApp && !suspended && !refused && area !== null && !can(perms, area, "view");
+  const viewOnly =
+    resolved && !roleRefused && area !== null && !can(perms, area, "edit");
 
   // /dashboard is the one route worth redirecting rather than refusing: nobody
   // chooses to visit it, it is where a bookmark or an old link lands, and a
@@ -168,6 +184,37 @@ export function RequiresTenant({ children }: { children: React.ReactNode }) {
           </p>
         </div>
       </div>
+    );
+  }
+
+  if (roleRefused && area) {
+    return (
+      <div>
+        <PageHeader title="Not in your role" />
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
+          <p className="mb-2 font-semibold text-gray-900">
+            Your role doesn&apos;t include this page.
+          </p>
+          <p>
+            It belongs to {AREA_LABELS[area]}. If you need it, ask the business
+            owner to change your role.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (viewOnly) {
+    return (
+      <>
+        <div
+          role="status"
+          className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800"
+        >
+          View only — your role can&apos;t change this.
+        </div>
+        {children}
+      </>
     );
   }
 

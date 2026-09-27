@@ -10,6 +10,9 @@ type Props = {
   handleSaveName: () => void;
   regenerating: boolean;
   handleRegenerate: () => void;
+  /** Business profile: Edit (roles). Without it the card is read-only — the
+   *  tenants column guard and regenerate_join_code refuse server-side anyway. */
+  canEdit?: boolean;
 };
 
 /* The join code is how families reach this business. There is no public
@@ -26,6 +29,7 @@ export function TenantCard({
   handleSaveName,
   regenerating,
   handleRegenerate,
+  canEdit = true,
 }: Props) {
   return (
     <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4">
@@ -59,6 +63,7 @@ export function TenantCard({
                 <span className="text-sm font-semibold text-sky-900">
                   {tenant.display_name}
                 </span>
+                {canEdit && (
                 <button
                   onClick={() => {
                     setNameDraft(tenant.display_name);
@@ -68,6 +73,7 @@ export function TenantCard({
                 >
                   Rename
                 </button>
+                )}
               </>
             )}
           </div>
@@ -82,6 +88,7 @@ export function TenantCard({
             classes.
           </p>
         </div>
+        {canEdit && (
         <button
           onClick={handleRegenerate}
           disabled={regenerating}
@@ -89,6 +96,7 @@ export function TenantCard({
         >
           {regenerating ? "Generating…" : "Generate a new code"}
         </button>
+        )}
       </div>
       <p className="mt-3 text-xs text-sky-700">
         Generating a new code does not remove families who have already

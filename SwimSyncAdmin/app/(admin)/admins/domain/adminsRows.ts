@@ -16,6 +16,7 @@ export function toAdminRows(
     isCoach: coachIds.has(p.id),
     // Deactivation is client-readable; invited-vs-active is not (yet null).
     status: p.admin_disabled_at ? ("deactivated" as const) : null,
+    roleId: p.admin_role_id ?? null,
   }));
 }
 

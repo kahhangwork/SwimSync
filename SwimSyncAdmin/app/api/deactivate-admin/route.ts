@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOwner, isPureAdmin, BAN_FOREVER } from "@/lib/adminManagementGate";
+import { requireArea, refuseOwnerTarget, isPureAdmin, BAN_FOREVER } from "@/lib/adminManagementGate";
 
 /**
  * Deactivate a co-admin: the RPC suspends their admin authority (RLS-level,
@@ -18,7 +18,7 @@ import { requireOwner, isPureAdmin, BAN_FOREVER } from "@/lib/adminManagementGat
  * gate would evaluate against a superuser and always pass.
  */
 export async function POST(req: NextRequest) {
-  const gate = await requireOwner(req);
+  const gate = await requireArea(req, "admins", "edit");
   if (!gate.ok) return gate.response;
   const { adminClient, callerClient } = gate;
 
@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
   if (!profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
   }
+  const ownerRefusal = refuseOwnerTarget(gate, profileId);
+  if (ownerRefusal) return ownerRefusal;
 
   const { error: rpcErr } = await callerClient.rpc("deactivate_admin", {
     p_profile_id: profileId,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveAdmin } from "@/lib/adminManagementGate";
+import { requireArea } from "@/lib/adminManagementGate";
 
 /**
  * Reactivate a disabled coach: clear the disable (idempotent RPC, as the
@@ -10,7 +10,7 @@ import { requireActiveAdmin } from "@/lib/adminManagementGate";
  * again.
  */
 export async function POST(req: NextRequest) {
-  const gate = await requireActiveAdmin(req);
+  const gate = await requireArea(req, "operations", "edit");
   if (!gate.ok) return gate.response;
   const { adminClient, callerClient } = gate;
 

@@ -253,15 +253,54 @@ the capability is unchanged, only its blast radius is.
 A business can have **more than one admin**. Its first admin — the person the platform
 admin invited at provisioning — is the **owner** (recorded on the business itself, not as
 a separate role), and the hierarchy is: platform admin → **owner** → co-admins →
-coaches/parents. From the **Admins** page (visible to every admin of the business, beside
-Coaches) the owner invites co-admins by email — optionally *also a coach*, the same
-question provisioning asks — resends un-actioned invites, deactivates/reactivates, and
-deletes.
+coaches/parents. From the **Admins** page the owner invites co-admins by email —
+optionally *also a coach*, the same question provisioning asks — **on a role**, and
+resends un-actioned invites, deactivates/reactivates, and deletes.
 
-**A co-admin can do everything the owner can, except manage admin accounts.** That single
-exception is deliberate and load-bearing: a co-admin who could deactivate or delete
-admins could lock the owner out of their own business. The owner can never be deactivated
-or deleted, by anyone.
+*(implemented 2026-09-27 — replaces "a co-admin can do everything the owner can, except
+manage admin accounts")* **Every co-admin holds a ROLE**, which decides what they can see
+and change. A role is a named grid of **8 areas × None / View / Edit**:
+
+| Area | Covers |
+|---|---|
+| Operations | students, families, classes, lessons, attendance, coaches & cover, trials, make-ups, holidays, levels, locations, change history |
+| Business profile | name, logo, join code |
+| Admins & roles | inviting, deactivating and re-roling co-admins |
+| Pricing | class prices, trial prices |
+| Billing & payments | invoices, credit notes, payments, PayNow |
+| Packages & referrals | packages, package settings, referrals |
+| Wages | coach rates and payouts |
+| Accounting | the monthly figures |
+
+Every area is either operations or money, never both. **None** hides the page and the
+server refuses its data; **View** shows it read-only (under a *"View only — your role can't
+change this"* notice); **Edit** allows changes. Reference data every staff member needs —
+class list, levels, locations, coach names — stays readable to all. Because every page shows
+student and class names, **a role with any access must hold Operations at least View**.
+
+**The owner holds no role and can always do everything.** Every business starts with four
+roles the owner may edit or delete: **Full admin** (everything), **Operations assistant**
+(operations + business profile, no money), **Front desk** (operations only), and
+**Co-admin (as before)** — every area except Accounting and Admins & roles, which is where
+every co-admin who existed before roles was placed, so nothing changed for them until the
+owner moves them. Only the **owner** creates, edits, renames or deletes roles, on the
+**Roles** page; a role somebody holds cannot be deleted. Inviting a co-admin requires
+choosing a role (Front desk is preselected).
+
+**Admin management is itself an area**, so the owner can delegate it — with two rules the
+database enforces: **nobody but the owner can act on the owner** (deactivate, delete,
+demote, re-role), and a co-admin may only **give a role no stronger than their own**,
+including when reactivating someone or resending their invite. A co-admin with Admins &
+roles may still deactivate a stronger co-admin (taking access away is always allowed).
+Every role change is recorded in the change history. When the platform admin transfers
+ownership, the outgoing owner becomes a co-admin on Full admin.
+
+**Coaches no longer see any money** *(2026-09-27)*: the coach app never showed invoices, and
+the database access that let any coach of a family read — or mark paid — its invoices has
+been removed. Marking an invoice paid needs Billing: Edit. A coach's own authority —
+marking their classes — is untouched by roles.
+
+The owner can never be deactivated or deleted, by anyone.
 
 **Deactivation and deletion touch only the admin role.** An admin who is also a coach
 keeps coaching when deactivated (their classes, attendance and coach app are untouched;
@@ -2808,12 +2847,11 @@ SwimSync tracked money **in** (invoices) and money **out** (coach wages, §7.13)
 summed either into "what did the business make this month?". The Accounting page
 (Admin → Billing → **Accounting**) is that single answer, for **one closed month at a time**.
 
-**Owner-only.** The figures are visible to the business **owner**, not to co-admins — it is
-the first concrete thing a co-admin should not see. The gate is `is_tenant_owner()`; no
-capability model. The nav link shows for every admin (like Admins), but the page shows a
-co-admin an *Owner only* notice, and the two RPCs (`accounting_months`,
-`accounting_summary`) **refuse a non-owner server-side** — the page's hiding is honesty, the
-server is the boundary.
+**The Accounting area.** *(implemented 2026-09-27 — was owner-only)* The figures are visible
+to the owner and to any co-admin whose role includes **Accounting** (none of the four
+starting roles except Full admin does). The two RPCs (`accounting_months`,
+`accounting_summary`) **refuse everyone else server-side** — the page's hiding is honesty,
+the server is the boundary.
 
 **Accrual basis** (decided 2026-08-16): revenue is what was *issued for* the month, not cash
 received. Four figures per month:

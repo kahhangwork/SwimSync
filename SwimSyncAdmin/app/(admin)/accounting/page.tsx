@@ -66,9 +66,9 @@ export default function AccountingPage() {
           className="rounded-2xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600"
           data-testid="owner-only-notice"
         >
-          <strong className="text-gray-800">Owner only.</strong> The accounting
-          figures — revenue, wages and net — are visible to the business owner,
-          not to co-admins.
+          <strong className="text-gray-800">Not in your role.</strong> The
+          accounting figures — revenue, wages and net — are visible to the
+          business owner and to roles that include Accounting.
         </div>
       </div>
     );

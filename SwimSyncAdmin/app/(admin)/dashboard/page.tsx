@@ -9,11 +9,13 @@ import { MetricGrid } from "./ui/MetricGrid";
 import { OutstandingMini } from "./ui/OutstandingMini";
 import { TenantCard } from "./ui/TenantCard";
 import { UnassignedMini } from "./ui/UnassignedMini";
+import { useDashboardAccess } from "./domain/useDashboardAccess";
 
 export default function DashboardPage() {
   const { metrics, unassigned, covMap, invoices, loading } = useDashboard();
   const card = useTenantCard();
   const billing = useBillingAlert();
+  const { showBilling, canEditProfile } = useDashboardAccess();
 
   return (
     <div>
@@ -39,10 +41,11 @@ export default function DashboardPage() {
           handleSaveName={card.handleSaveName}
           regenerating={card.regenerating}
           handleRegenerate={card.handleRegenerate}
+          canEdit={canEditProfile}
         />
       )}
 
-      <MetricGrid metrics={metrics} loading={loading} />
+      <MetricGrid metrics={metrics} loading={loading} showBilling={showBilling} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <UnassignedMini
@@ -50,7 +53,7 @@ export default function DashboardPage() {
           covMap={covMap}
           loading={loading}
         />
-        <OutstandingMini invoices={invoices} loading={loading} />
+        {showBilling && <OutstandingMini invoices={invoices} loading={loading} />}
       </div>
     </div>
   );

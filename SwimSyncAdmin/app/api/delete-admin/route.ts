@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOwner, isPureAdmin, BAN_FOREVER } from "@/lib/adminManagementGate";
+import { requireArea, refuseOwnerTarget, isPureAdmin, BAN_FOREVER } from "@/lib/adminManagementGate";
 
 /**
  * Hard-delete a PURE co-admin (an admin-who-coaches is demoted via the
@@ -19,7 +19,7 @@ import { requireOwner, isPureAdmin, BAN_FOREVER } from "@/lib/adminManagementGat
  * purge and succeeds as a no-op-shaped pass through its checks.
  */
 export async function POST(req: NextRequest) {
-  const gate = await requireOwner(req);
+  const gate = await requireArea(req, "admins", "edit");
   if (!gate.ok) return gate.response;
   const { adminClient, callerClient } = gate;
 
@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
   if (!profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
   }
+  const ownerRefusal = refuseOwnerTarget(gate, profileId);
+  if (ownerRefusal) return ownerRefusal;
 
   // The RPC re-checks this, but banning a coach-admin even transiently would
   // cut their coach app access — refuse the wrong kind before touching auth.

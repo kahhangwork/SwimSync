@@ -5,11 +5,22 @@ import type { AdminRow } from "../types";
 import * as repo from "../dao/admins.repo";
 import { removeAdminRole } from "../dao/admins.rpc";
 import { authedFetch, listAdmins } from "../dao/admins.api";
+import { usePermissions } from "@/components/PermissionsProvider";
+import { can } from "@/lib/permissions";
+import { assignableRoles, defaultInviteRoleId, toRoleOptions } from "./adminRoles";
+import type { RoleOption } from "../types";
 import { mergeStatuses, toAdminRows } from "./adminsRows";
 
 export function useAdmins() {
   const [admins, setAdmins] = useState<AdminRow[]>([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [inviteRoleId, setInviteRoleId] = useState<string | null>(null);
+  // Roles (§5.5): the levers show for Admins & roles: Edit, not only the owner.
+  // The server decides each action — this is honesty, not the boundary.
+  const { perms, isOwner: iAmOwner } = usePermissions();
+  const canManage = can(perms, "admins", "edit");
+  const assignable = assignableRoles(roles, iAmOwner, perms.levels);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
 
@@ -42,12 +53,15 @@ export function useAdmins() {
     const { data: auth } = await repo.getUser();
     const myId = auth.user?.id;
 
-    const [{ data: profiles }, { data: tenants }, { data: coachRows }] =
+    const [{ data: profiles }, { data: tenants }, { data: coachRows }, { data: roleRows }, { data: permRows }] =
       await Promise.all([
         repo.loadProfiles(),
         repo.loadTenants(),
         repo.loadCoaches(),
+        repo.loadRoles(),
+        repo.loadRolePermissions(),
       ]);
+    setRoles(toRoleOptions(roleRows ?? [], permRows ?? []));
 
     const ownerId = (tenants ?? [])[0]?.owner_profile_id ?? null;
     const coachIds = new Set((coachRows ?? []).map((c) => c.profile_id));
@@ -78,6 +92,7 @@ export function useAdmins() {
       email,
       phone,
       isCoach: isCoachInvite,
+      roleId: inviteRoleId ?? defaultInviteRoleId(assignable),
     });
     setInviting(false);
     if (!ok) {
@@ -91,6 +106,18 @@ export function useAdmins() {
     setIsCoachInvite(false);
     if (!json.emailSent && json.inviteLink) {
       setInviteLinkWarning(json.inviteLink);
+    }
+    loadAdmins();
+  }
+
+  async function changeRole(row: AdminRow, roleId: string) {
+    setBusyRow(row.id);
+    setPageError(null);
+    const { error } = await repo.assignRole(row.id, roleId);
+    setBusyRow(null);
+    if (error) {
+      setPageError(error.message);
+      return;
     }
     loadAdmins();
   }
@@ -153,6 +180,12 @@ export function useAdmins() {
   }
 
   return {
+    roles,
+    assignable,
+    canManage,
+    inviteRoleId: inviteRoleId ?? defaultInviteRoleId(assignable),
+    setInviteRoleId,
+    changeRole,
     admins,
     isOwner,
     loading,

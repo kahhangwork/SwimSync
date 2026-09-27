@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOwner } from "@/lib/adminManagementGate";
+import { requireArea, refuseOwnerTarget } from "@/lib/adminManagementGate";
 import { sendCoAdminInviteEmail } from "@/lib/coAdminInviteEmail";
 
 /**
@@ -9,13 +9,28 @@ import { sendCoAdminInviteEmail } from "@/lib/coAdminInviteEmail";
  * wearing onboarding clothes.
  */
 export async function POST(req: NextRequest) {
-  const gate = await requireOwner(req);
+  const gate = await requireArea(req, "admins", "edit");
   if (!gate.ok) return gate.response;
-  const { tenantId, adminClient } = gate;
+  const { tenantId, adminClient, callerClient } = gate;
 
   const { profileId } = await req.json();
   if (!profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
+  }
+  const ownerRefusal = refuseOwnerTarget(gate, profileId);
+  if (ownerRefusal) return ownerRefusal;
+
+  // A resend restores the invitee's role, so it runs the escalation guard: a
+  // non-owner may only resend for a role no stronger than their own. Asked of
+  // the database as the caller (can_restore_admin, 20260927000600).
+  const { data: mayRestore } = await callerClient.rpc("can_restore_admin", {
+    p_profile_id: profileId,
+  });
+  if (mayRestore !== true) {
+    return NextResponse.json(
+      { error: "You can only resend an invite for a role no stronger than your own." },
+      { status: 403 }
+    );
   }
 
   const { data: target } = await adminClient

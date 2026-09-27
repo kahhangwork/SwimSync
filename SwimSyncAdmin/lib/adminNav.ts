@@ -22,6 +22,7 @@
 // The mobile app's twin of this idea is SwimSyncApp/lib/landing.ts.
 
 import type { LucideIcon } from "lucide-react";
+import { can, type AdminArea, type Permissions } from "@/lib/permissions";
 import {
   LayoutDashboard,
   UserX,
@@ -49,6 +50,7 @@ import {
   Calculator,
   MapPin,
   ClipboardCheck,
+  KeyRound,
 } from "lucide-react";
 
 /** A page's audience. `tenant` = shows ONE business. `platform` = cross-tenant. */
@@ -59,41 +61,45 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   scope: NavScope;
+  /** The role area a co-admin needs at least VIEW on (ROLES_PERMISSIONS_PLAN.md
+   *  §5.5). null = every admin (Dashboard — its tiles gate themselves) or not a
+   *  tenant page at all (Platform). */
+  area: AdminArea | null;
 };
 
 // Explicitly typed. Previously `platformOnly?: true` was inferred from the last
 // element alone, so a typo on any other entry was silent — the flag simply did
 // not exist on the type and nothing complained.
 export const NAV: readonly NavItem[] = [
-  { href: "/dashboard",    label: "Dashboard",            icon: LayoutDashboard, scope: "tenant"   },
-  { href: "/unassigned",   label: "Unassigned",           icon: UserX,           scope: "tenant"   },
-  { href: "/classes",      label: "Classes",              icon: Layers,          scope: "tenant"   },
-  { href: "/students",     label: "Students",             icon: Users,           scope: "tenant"   },
-  { href: "/claims",       label: "Parent Requests",      icon: UserCheck,       scope: "tenant"   },
-  { href: "/assessment",   label: "Assessment",           icon: ClipboardCheck,  scope: "tenant"   },
-  { href: "/levels",       label: "Levels",               icon: Waves,           scope: "tenant"   },
-  { href: "/locations",    label: "Locations",            icon: MapPin,          scope: "tenant"   },
-  { href: "/parents",      label: "Parents",              icon: UsersRound,      scope: "tenant"   },
-  { href: "/attendance",   label: "Attendance Log",       icon: CalendarCheck,   scope: "tenant"   },
-  { href: "/calendar",     label: "Calendar",             icon: CalendarDays,    scope: "tenant"   },
-  { href: "/lessons",      label: "Lessons",              icon: ListChecks,      scope: "tenant"   },
-  { href: "/substitutes",  label: "Substitutes",          icon: ArrowLeftRight,  scope: "tenant"   },
-  { href: "/trials",       label: "Trials",               icon: Sparkles,        scope: "tenant"   },
-  { href: "/makeups",      label: "Make-ups",             icon: RefreshCcw,      scope: "tenant"   },
-  { href: "/invoices",     label: "Invoices",             icon: Receipt,         scope: "tenant"   },
-  { href: "/packages",     label: "Packages",             icon: Package,         scope: "tenant"   },
-  { href: "/referrals",    label: "Referrals",            icon: Gift,            scope: "tenant"   },
-  { href: "/holidays",     label: "Holidays",             icon: CalendarX,       scope: "tenant"   },
-  { href: "/credit-notes", label: "Credit Notes",         icon: FileText,        scope: "tenant"   },
-  { href: "/coaches",      label: "Coaches",              icon: UserCog,         scope: "tenant"   },
-  { href: "/admins",       label: "Admins",               icon: ShieldCheck,     scope: "tenant"   },
-  { href: "/wages",        label: "Wages",                icon: Wallet,          scope: "tenant"   },
-  // Owner-only, but listed as a plain tenant page — the /admins precedent: the
-  // link shows for every admin and the PAGE owner-gates (hiding is not the
-  // boundary; the RPCs refuse a non-owner). No `owner` nav scope by design.
-  { href: "/accounting",   label: "Accounting",           icon: Calculator,      scope: "tenant"   },
-  { href: "/history",      label: "Change History",       icon: History,         scope: "tenant"   },
-  { href: "/platform",     label: "Platform",             icon: Globe,           scope: "platform" },
+  { href: "/dashboard",    label: "Dashboard",            icon: LayoutDashboard, scope: "tenant", area: null },
+  { href: "/unassigned",   label: "Unassigned",           icon: UserX,           scope: "tenant", area: "operations" },
+  { href: "/classes",      label: "Classes",              icon: Layers,          scope: "tenant", area: "operations" },
+  { href: "/students",     label: "Students",             icon: Users,           scope: "tenant", area: "operations" },
+  { href: "/claims",       label: "Parent Requests",      icon: UserCheck,       scope: "tenant", area: "operations" },
+  { href: "/assessment",   label: "Assessment",           icon: ClipboardCheck,  scope: "tenant", area: "operations" },
+  { href: "/levels",       label: "Levels",               icon: Waves,           scope: "tenant", area: "operations" },
+  { href: "/locations",    label: "Locations",            icon: MapPin,          scope: "tenant", area: "operations" },
+  { href: "/parents",      label: "Parents",              icon: UsersRound,      scope: "tenant", area: "operations" },
+  { href: "/attendance",   label: "Attendance Log",       icon: CalendarCheck,   scope: "tenant", area: "operations" },
+  { href: "/calendar",     label: "Calendar",             icon: CalendarDays,    scope: "tenant", area: "operations" },
+  { href: "/lessons",      label: "Lessons",              icon: ListChecks,      scope: "tenant", area: "operations" },
+  { href: "/substitutes",  label: "Substitutes",          icon: ArrowLeftRight,  scope: "tenant", area: "operations" },
+  { href: "/trials",       label: "Trials",               icon: Sparkles,        scope: "tenant", area: "operations" },
+  { href: "/makeups",      label: "Make-ups",             icon: RefreshCcw,      scope: "tenant", area: "operations" },
+  { href: "/invoices",     label: "Invoices",             icon: Receipt,         scope: "tenant", area: "billing" },
+  { href: "/packages",     label: "Packages",             icon: Package,         scope: "tenant", area: "packages" },
+  { href: "/referrals",    label: "Referrals",            icon: Gift,            scope: "tenant", area: "packages" },
+  { href: "/holidays",     label: "Holidays",             icon: CalendarX,       scope: "tenant", area: "operations" },
+  { href: "/credit-notes", label: "Credit Notes",         icon: FileText,        scope: "tenant", area: "billing" },
+  { href: "/coaches",      label: "Coaches",              icon: UserCog,         scope: "tenant", area: "operations" },
+  { href: "/admins",       label: "Admins",               icon: ShieldCheck,     scope: "tenant", area: "admins" },
+  { href: "/roles",        label: "Roles",                icon: KeyRound,        scope: "tenant", area: "admins" },
+  { href: "/wages",        label: "Wages",                icon: Wallet,          scope: "tenant", area: "wages" },
+  // Gated by the accounting area (owner-only before roles). The owner passes
+  // every area; the page and the RPCs refuse a role without it.
+  { href: "/accounting",   label: "Accounting",           icon: Calculator,      scope: "tenant", area: "accounting" },
+  { href: "/history",      label: "Change History",       icon: History,         scope: "tenant", area: "operations" },
+  { href: "/platform",     label: "Platform",             icon: Globe,           scope: "platform", area: null },
 ];
 
 /** Does this account administer a business? */
@@ -111,9 +117,26 @@ export function hasTenant(tenantId: string | null | undefined): boolean {
  * Hiding is an AFFORDANCE, not a boundary: the pages refuse in their own right
  * (see components/RequiresTenant.tsx), because a hidden link is still a URL.
  */
-export function navFor(tenantId: string | null | undefined): NavItem[] {
+export function navFor(
+  tenantId: string | null | undefined,
+  perms?: Permissions
+): NavItem[] {
   const scope: NavScope = hasTenant(tenantId) ? "tenant" : "platform";
-  return NAV.filter((n) => n.scope === scope);
+  return NAV.filter(
+    (n) => n.scope === scope && (!perms || n.area === null || can(perms, n.area, "view"))
+  );
+}
+
+/**
+ * The role area a URL belongs to (same prefix rule as scopeForPath), or null
+ * for a page every admin may open. An UNKNOWN path returns "operations" — fail
+ * closed onto an area, never onto "no area needed".
+ */
+export function areaForPath(pathname: string): AdminArea | null {
+  const match = NAV.find(
+    (n) => pathname === n.href || pathname.startsWith(n.href + "/")
+  );
+  return match ? match.area : "operations";
 }
 
 /**
@@ -189,7 +212,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   // history. Marking moved front-and-centre to /lessons on 2026-08-19; the log
   // is what you consult, not where you work.
   { id: "log",        label: "Log",        hrefs: ["/attendance", "/history"] },
-  { id: "settings",   label: "Settings",   hrefs: ["/levels", "/locations", "/coaches", "/admins"] },
+  { id: "settings",   label: "Settings",   hrefs: ["/levels", "/locations", "/coaches", "/admins", "/roles"] },
 ];
 
 export type GroupedNav = {
@@ -205,8 +228,11 @@ export type GroupedNav = {
  * Platform link — follows, ungrouped. Empty groups are dropped, so a platform
  * admin renders no headers.
  */
-export function groupedNavFor(tenantId: string | null | undefined): GroupedNav {
-  const items = navFor(tenantId);
+export function groupedNavFor(
+  tenantId: string | null | undefined,
+  perms?: Permissions
+): GroupedNav {
+  const items = navFor(tenantId, perms);
   const byHref = new Map(items.map((n) => [n.href, n]));
   const claimed = new Set<string>();
 

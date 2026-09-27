@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireActiveAdmin } from "@/lib/adminManagementGate";
+import { requireArea } from "@/lib/adminManagementGate";
 
 /**
  * The Admins page's data: every tenant_admin of the caller's business, with
@@ -12,7 +12,7 @@ import { requireActiveAdmin } from "@/lib/adminManagementGate";
  * not a privilege. Mutating anything is (see the owner-gated routes).
  */
 export async function GET(req: NextRequest) {
-  const gate = await requireActiveAdmin(req);
+  const gate = await requireArea(req, "admins", "view");
   if (!gate.ok) return gate.response;
   const { tenantId, ownerProfileId, isOwner, adminClient } = gate;
 

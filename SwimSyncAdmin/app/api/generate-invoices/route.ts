@@ -41,6 +41,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // P9 (roles, 2026-09-27): a tenant admin also needs Billing: Edit — asked of
+  // the database as the caller. This closes the gap where the role check alone
+  // admitted a DEACTIVATED admin: has_admin_area() is false for one.
+  if (isTenantAdmin) {
+    const asCaller = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    );
+    const { data: mayBill } = await asCaller.rpc("has_admin_area", {
+      p_tenant: profile!.tenant_id,
+      p_area: "billing",
+      p_level: "edit",
+    });
+    if (mayBill !== true) {
+      return NextResponse.json({ error: "Your role doesn't include billing." }, { status: 403 });
+    }
+  }
+
   // ── Parse + validate billing month ────────────────────────────────────────
   const body = await req.json();
   const billing_month = body?.billing_month;

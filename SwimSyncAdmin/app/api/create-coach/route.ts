@@ -43,6 +43,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // P9 (roles, 2026-09-27): adding a coach is an Operations: Edit act, asked of
+  // the database as the caller. Also closes the gap where the role check alone
+  // admitted a DEACTIVATED admin: has_admin_area() is false for one.
+  const asCaller = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+  const { data: mayAddCoach } = await asCaller.rpc("has_admin_area", {
+    p_tenant: profile!.tenant_id,
+    p_area: "operations",
+    p_level: "edit",
+  });
+  if (mayAddCoach !== true) {
+    return NextResponse.json({ error: "Your role doesn't include adding coaches." }, { status: 403 });
+  }
+
   // Parse body
   const { name, email, phone, password } = await req.json();
   if (!name || !email || !password) {

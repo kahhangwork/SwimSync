@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOwner, isPureAdmin } from "@/lib/adminManagementGate";
+import { requireArea, refuseOwnerTarget, isPureAdmin } from "@/lib/adminManagementGate";
 
 /**
  * Reactivate a deactivated co-admin: clear the suspension (idempotent RPC, as
@@ -9,7 +9,7 @@ import { requireOwner, isPureAdmin } from "@/lib/adminManagementGate";
  * again.
  */
 export async function POST(req: NextRequest) {
-  const gate = await requireOwner(req);
+  const gate = await requireArea(req, "admins", "edit");
   if (!gate.ok) return gate.response;
   const { adminClient, callerClient } = gate;
 
@@ -17,6 +17,8 @@ export async function POST(req: NextRequest) {
   if (!profileId) {
     return NextResponse.json({ error: "profileId is required" }, { status: 400 });
   }
+  const ownerRefusal = refuseOwnerTarget(gate, profileId);
+  if (ownerRefusal) return ownerRefusal;
 
   const { error: rpcErr } = await callerClient.rpc("reactivate_admin", {
     p_profile_id: profileId,

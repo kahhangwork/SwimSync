@@ -10,18 +10,17 @@ import type { useCoachSettings } from "../domain/useCoachSettings";
 
 type Settings = ReturnType<typeof useCoachSettings>;
 
-export function AdminPanelCard(p: Pick<Settings, "canEditQr" | "openAdminPanel">) {
-  const { canEditQr, openAdminPanel } = p;
+export function AdminPanelCard(p: Pick<Settings, "isAdmin" | "openAdminPanel">) {
+  const { isAdmin, openAdminPanel } = p;
   return (
     <>
-      {/* The admin panel. Gated on the SAME predicate that decides whether
-          this coach may edit the QR (profile.role === 'tenant_admin'), which
-          is also what the panel's own door checks (§7.91) — so a plain coach
+      {/* The admin panel. Gated on profile.role === 'tenant_admin', which is
+          what the panel's own door checks (§7.91) — so a plain coach
           must not see this at all. Absence is the point: a disabled-looking
           link still tells them the panel exists. Do NOT loosen the panel's
           entry gate if this is ever reported as "broken"; that gate is
           deliberate. */}
-      {canEditQr && (
+      {isAdmin && (
         <Card className="mb-4">
           <MenuItem
             icon="desktop-outline"

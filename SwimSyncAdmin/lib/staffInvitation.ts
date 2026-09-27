@@ -24,6 +24,9 @@ export async function mintStaffInvitation(
     tenantId: string;
     isCoach?: boolean;
     createdBy?: string | null;
+    /** A co-admin's role (20260927000300). The trigger gives the new
+     *  tenant_admin this role; omitted = "Co-admin (as before)". */
+    adminRoleId?: string | null;
   },
 ): Promise<{ ok: true; nonce: string } | { ok: false; error: string }> {
   const nonce = randomBytes(32).toString("hex");
@@ -34,6 +37,7 @@ export async function mintStaffInvitation(
     tenant_id: invite.tenantId,
     is_coach: Boolean(invite.isCoach),
     created_by: invite.createdBy ?? null,
+    admin_role_id: invite.adminRoleId ?? null,
   });
   if (error) return { ok: false, error: `Could not create the invitation: ${error.message}` };
   return { ok: true, nonce };

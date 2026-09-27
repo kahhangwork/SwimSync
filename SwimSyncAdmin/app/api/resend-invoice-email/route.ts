@@ -10,13 +10,12 @@ import { createClient } from "@supabase/supabase-js";
 // the caller and then invokes it server-side, never exposing the secret. The
 // function bills nothing on this path; it claims, sends and settles one email.
 //
-// AUTHORITY: is_tenant_admin(<the invoice's tenant>), evaluated AS THE CALLER
-// (their JWT) — under the service role it would run against a superuser and
-// always pass (§7.8). is_tenant_admin, NOT can_admin_tenant: a platform admin
-// must not send mail in a business's name (the credit-note Resend's ⚠ RISK 4).
-// It is also false for a suspended business and a disabled admin.
-// ROLES: when Roles & permissions lands, this re-points to `billing:edit` —
-// whichever lane lands second does it.
+// AUTHORITY: has_admin_area(<the invoice's tenant>, 'billing', 'edit'),
+// evaluated AS THE CALLER (their JWT) — under the service role it would run
+// against a superuser and always pass (§7.8). Like is_tenant_admin before it
+// (re-pointed by Roles, the lane that landed second), it is false for a
+// platform admin — who must not send mail in a business's name (the
+// credit-note Resend's ⚠ RISK 4) — a suspended business and a disabled admin.
 //
 // A human resend of an email whose outcome is unknown after 24 h
 // (MAY_HAVE_SENT) is a choice to risk one duplicate. It goes out under the
@@ -55,8 +54,12 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
   );
-  const { data: isTenantAdmin } = await callerClient.rpc("is_tenant_admin", {
-    p_tenant_id: invoice.tenant_id,
+  // Roles (20260927000500): Billing: Edit, not merely "an admin". Like
+  // is_tenant_admin before it, has_admin_area is false for a platform admin.
+  const { data: isTenantAdmin } = await callerClient.rpc("has_admin_area", {
+    p_tenant: invoice.tenant_id,
+    p_area: "billing",
+    p_level: "edit",
   });
   if (isTenantAdmin !== true) {
     return NextResponse.json(

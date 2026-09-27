@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { AdminArea } from "@/lib/permissions";
 
 /**
  * The shared gate for the admin-management routes (invite / resend /
@@ -120,6 +121,57 @@ export async function requireOwner(req: NextRequest): Promise<GateResult> {
 }
 
 /** ~100 years. Supabase has no permanent ban flag; this is the idiom. */
+/**
+ * An ACTIVE admin whose role holds `level` on `area` (ROLES_PERMISSIONS_PLAN.md
+ * §5.4). Asked of the database as the CALLER — has_admin_area() via their own
+ * JWT — so the route never re-implements the rule in TypeScript. The owner
+ * passes every area there (D1); a platform admin never reaches this (gate()
+ * refuses an account with no business first).
+ */
+export async function requireArea(
+  req: NextRequest,
+  area: AdminArea,
+  level: "view" | "edit"
+): Promise<GateResult> {
+  const result = await gate(req);
+  if (!result.ok) return result;
+  const { data: allowed } = await result.callerClient.rpc("has_admin_area", {
+    p_tenant: result.tenantId,
+    p_area: area,
+    p_level: level,
+  });
+  if (allowed !== true) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Your role doesn't include this." },
+        { status: 403 }
+      ),
+    };
+  }
+  return result;
+}
+
+/**
+ * Refuse a request that targets the business OWNER, before any auth side
+ * effect (ban, delete, invite link). The database refuses it too — every
+ * management RPC carries the owner-target rule since 20260927000600 — but
+ * delete-admin BANS before its RPC, so without this a co-admin could briefly
+ * lock the owner out. Returns a response to send, or null to proceed.
+ */
+export function refuseOwnerTarget(
+  gate: Extract<GateResult, { ok: true }>,
+  profileId: string
+): NextResponse | null {
+  if (profileId === gate.ownerProfileId && profileId !== gate.callerId) {
+    return NextResponse.json(
+      { error: "The business owner cannot be changed by another admin." },
+      { status: 403 }
+    );
+  }
+  return null;
+}
+
 export const BAN_FOREVER = "876000h";
 
 /** Is this profile a PURE admin (no coaches row)? Pure admins are the only

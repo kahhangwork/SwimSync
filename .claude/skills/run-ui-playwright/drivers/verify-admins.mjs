@@ -115,11 +115,15 @@ check("reactivated admin is no longer marked deactivated",
 check("…and can log in again (the unban half)",
   await loginSticks("adminpure@swimsync.test"));
 
-// ── 6. The co-admin's view: same page, no levers ────────────────────────────
+// ── 6. The co-admin's view: no Admins & roles area, so no page ──────────────
+// Since roles (20260927000600 + the admin app): the Admins page belongs to the
+// Admins & roles area. A co-admin on "Co-admin (as before)" holds none of it,
+// so the page refuses in words — and certainly offers no levers.
 await page.goto(`${ADMIN}/admins`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1500);
 body = await page.evaluate(() => document.body.innerText);
-check("a co-admin sees the roster", body.includes("coach@swimsync.test"));
+check("a co-admin without Admins & roles is told the page is not in their role",
+  body.includes("Your role doesn"), body.slice(0, 300));
 check("a co-admin gets NO management buttons",
   !body.includes("Invite admin") && !body.includes("Deactivate"));
 await page.screenshot({ path: shot("04-coadmin-view.png"), fullPage: true });
