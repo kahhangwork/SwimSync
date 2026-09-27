@@ -433,10 +433,10 @@ which mutate shared seed state — are in the same section.
 ### THE NEXT BUILD — pick from BACKLOG
 
 - **Read the next nightly first** (never dispatch it) — it is the first on §8.129's push.
-- Then, all BACKLOG, none decided yet — ask the user:
-  - *In-app package refunds* (S) — needs a schema change; nothing is in flight now, so it is unblocked.
-  - *Deeper component-render tests*, second pass (M) — whole screens with mocked dao modules (item says which).
-  - Per-child make-up / different-coach private make-up — each needs a design decision first.
+- Then **`BACKLOG.md` → *Current build order* (re-ranked with the user 2026-09-27)** — decided, two lanes:
+  - **Wave 1:** *Split co-admin permissions* — owner-defined roles × ~8 areas × None/View/Edit (L, root checkout,
+    plan it first) ‖ *Crash-safe email claim* (S, lane 2, migration lands first).
+  - **Wave 2:** *Package revenue on the accounting page* → *In-app package refunds* (owner-only).
 - **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before
@@ -451,8 +451,8 @@ prod, 0 pending (161/161 on 2026-09-27), rollback rehearsed byte-identical. **`s
 fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
-> low-balance email, automated reminders, and the **crash-safe email claim** (covers
-> `credit_notes.email_sent_at` too).
+> low-balance email, automated reminders. *(The **crash-safe email claim** was listed here but was never
+> cron-gated — it is Wave 1 lane 2 as of 2026-09-27.)*
 
 ### When the sweep reddens, and when you deploy — both graduated
 

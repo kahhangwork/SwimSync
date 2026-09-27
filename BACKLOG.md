@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-27 — shipped and removed: *a family with no child reads "Unknown"*, *a refused run-day save is silent*, *seven stale "no driver" comments*, *pgTAP #18*, *`--help` path*, *33 oversized ledger rows*; *Deeper component-render tests* first pass done; logo check deferred to the brand refactor. Earlier datelines are in git history (`git log -p -- BACKLOG.md`) — this line had grown to 5.5 KB of changelog._
+_Last updated: 2026-09-27 (evening) — **Build order RE-RANKED with the user** (new top section *Current build order*): Roles & permissions promoted to Wave 1; new item *Package revenue on the accounting page*; four items moved to *Deliberately not doing* (per-child make-up, different-coach private make-up, NRIC last 4, shared `lessonDates.ts`). Earlier the same day: shipped and removed *a family with no child reads "Unknown"*, *a refused run-day save is silent*, and four tooling items. Earlier datelines: `git log -p -- BACKLOG.md`._
 classes, platform, lessons/[classId]/[date], coach schedule/attendance/roster), a `verify-invoice-admin` driver
 filed. Earlier same day — **`packages` (full track) SHIPPED**, a `verify-packages-admin` driver filed, and the
 dao-split → ARCHITECTURE §6 graduation flagged as now-triggered. Earlier, 2026-09-13 — **The feature-tier rollout is now EVERY page in both apps,
@@ -268,6 +268,50 @@ theme.
 > it). The item bodies were correct every time; these lists were not, and a list is what
 > someone picking work actually reads. **When you strike an item through, grep this
 > document for its name before you close the file.**
+
+### Current build order — re-ranked 2026-09-27 with the user
+
+_Supersedes every older ranking below, which is kept as history. Forced by: the Foundations driver backlog and
+§8.129 emptied the previous pick-now list, and the user settled the decisions below in one Q&A session._
+
+#### Decisions settled 2026-09-27
+
+| Decision | Answer | Consequence for the order |
+|---|---|---|
+| Co-admin permissions — now or later? | **NOW** — a co-admin will be hired within ~3 months | *Split co-admin permissions* goes to the head of the queue, alone, before any new admin surface (every surface built first would be retrofitted) |
+| Permission shape | **Owner-defined ROLES**, each a grid of **~8 grouped areas × None / View / Edit**; a few **starter presets** the owner can copy and edit; **all areas at once**, not phased | Server-side enforcement per area (RLS/RPC), not UI hiding. Size **L** (~1–2 weeks) |
+| Can admin/role management be granted? | **Yes, grantable** | Escalation guard is mandatory: a delegate can grant only capabilities they hold themselves, and can never modify or remove the owner |
+| Package revenue on the accounting page | **Counted when the package is PAID** (cash, in the month paid) | New item *Package revenue on the accounting page*. A deliberate exception to 2026-08-16's accrual basis — recorded so it is not "fixed" back |
+| Refunds | **Owner-only**; package-only (monthly invoices already correct via credit notes); a refund **subtracts from the month it is paid out** (mirrors the line above) | *In-app package refunds* ships right after package revenue, same lane (shared surface: the accounting page) |
+| Per-child make-up | **Not needed** — no child is enrolled in every group class of their kind | → *Deliberately not doing* |
+| PayNow statement import | **Not yet** — ~9 invoices/month is fine by hand | Stays parked under *Automatic PayNow payment detection* |
+| Parallel sessions | **2 lanes** | Waves below are written as two lanes |
+
+#### Wave 1 — foundations (build first)
+
+1. **Split co-admin permissions — roles + grid** (L). Migration-heavy, so built from the **root checkout** on `db/…`
+   branches (a worktree never authors a migration). Plan it first (`/plan-with-confidence`).
+2. **Crash-safe email claim** (S) — **lane 2**. Its small migration lands on `main` FIRST, then the edge-function
+   work (`generate-invoices`, `credit-note-emails`) runs in a worktree beside lane 1. Goes before any new email path
+   (a refund email, the nudges) so none of them inherits the one-row window. **Not cron-gated** — HANDOVER §9 used to
+   list it with the parked cron tail; its own item never depended on cron.
+
+#### Wave 2 — packages (after Wave 1, so each new admin surface is born with its grid area)
+
+3. **Package revenue on the accounting page** (S).
+4. **In-app package refunds** (S) — same lane as 3, straight after (shared surface).
+   - **Lane 2:** *Deeper component-render tests* — **only** the attendance save flow, which Wave 2 does not touch.
+
+#### Wave 3 — cheaper by waiting
+
+5. *Deeper component-render tests* — the rest (invoice table, parent balances), after refunds reshapes them.
+6. *Generate real Supabase `Database` types* — always last (a schema snapshot).
+
+**Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
+(low-balance nudge, automated reminders), Native builds → Push → Logo check, Bulk WhatsApp, In-app payment gateway.
+
+**Moved to *Deliberately not doing* 2026-09-27:** per-child make-up, different-coach private make-up, NRIC last 4,
+shared `lessonDates.ts`.
 
 ### The near-term plan — build roughly in this order
 
@@ -562,7 +606,7 @@ swimming skills**~~ (Piece 4, M, shipped 2026-08-28) and ~~**Email-confirmation 
 
 ~~**An owner-only accounting page (M — *absorbs Revenue reporting*)**~~ — **SHIPPED 2026-08-23**
 (PRD §7.23, `20260823000100`). Accrual as chosen; owner-gated; no capability model, as predicted.
-**Split co-admin permissions (M)** — *yes eventually*; the accounting page did not wait
+**Split co-admin permissions (L, was M)** — ~~*yes eventually*~~ **promoted to Wave 1 of *Current build order* 2026-09-27**; the accounting page did not wait
 on it (and shipping it added no gated surface — it is owner-gated, not co-admin-scoped). ~~**A location entity / venue (M)**~~ — **SHIPPED 2026-08-24** (PRD §7.24); struck under *Admin and operations*. **Maps integration (S — *deferred here
 2026-08-27*)** — tap a class location to open the platform maps app; builds directly on `locations.address`,
 no new data, no rework, but parked because production is one location (full item below). Household split billing (M — *needs a credit-splitting
@@ -581,8 +625,8 @@ Deliberately not doing 2026-08-16.)*
   to rewrite. *(That refactor finished 2026-09-24 in both apps, so this reason no longer holds — it
   now waits on value, not on a redesign.)*
 
-**Shared `lessonDates.ts` package (M)** stays not-recommended and unranked — free only if
-workspaces arrive for another reason.
+~~**Shared `lessonDates.ts` package (M)**~~ — moved to *Deliberately not doing* 2026-09-27 (revisit if workspaces
+arrive for another reason).
 
 ---
 
@@ -597,7 +641,7 @@ because a missed lesson never billed in the first place. Three follow-ups filed 
 *Book a make-up from the Attendance page*, *A different-coach PRIVATE make-up*, and the
 `book_trial` date-floor asymmetry.
 
-### A child in EVERY class of their kind has no per-child make-up — **S/M** `[Wave 2 fallout]`
+### ~~A child in EVERY class of their kind has no per-child make-up~~ — **S/M** — **NOT DOING 2026-09-27** → *Deliberately not doing*
 When a child is enrolled in every class of their category, there is nowhere to guest them
 into, so a missed lesson has no per-child remedy at all.
 
@@ -627,7 +671,7 @@ button shows only on the child's OWN enrolled class — a guest row carries the 
 an enrolment, and would be refused. PRD §7.20 describes it. (Off-schedule extra dates are not
 offered here — the Make-ups page remains the full-featured home.)
 
-### A different-coach PRIVATE make-up — **M**
+### ~~A different-coach PRIVATE make-up~~ — **M** — **NOT DOING 2026-09-27** → *Deliberately not doing*
 A private-category make-up today is an **Extra lesson of the child's own class** — same
 coach by construction. A school whose private coach is away wants the make-up taught by a
 *different* coach, which means a temporary one-off class (its own coach, rate, wage row,
@@ -1052,6 +1096,25 @@ commercial convention discussed 2026-07-20: refund = paid − (lessons taken × 
 rate), i.e. claw back the volume discount on lessons actually used; don't apportion
 "bonus vs cash".
 
+**Decided 2026-09-27:** **owner-only**. Refunds are **package-only** — the one case is a package CANCELLED with value
+left (family moves, injury, child quits, class closed with no alternative); monthly invoices already correct through
+credit notes. On the accounting page a refund **subtracts from the month it is paid out**, mirroring *Package revenue
+on the accounting page* (counted when paid). Build straight after that item, same lane. Refund-amount rule not yet
+chosen (the 2026-07-20 convention above is the default candidate).
+
+### Package revenue on the accounting page — **S** — _Wave 2, filed 2026-09-27_
+Count package purchases in the owner's P&L, in the month the package is **paid**.
+
+**Why:** today a family on a package contributes **S$0** to Revenue, ever. `accounting_summary`
+(`20260823000100`) subtracts `package_applied` from each invoice line and counts the package purchase nowhere
+("off-invoice cash … belongs to no month here"). Harmless today only because packages are dormant on prod (HANDOVER §3; check
+`SELECT count(*) FROM parent_packages` before trusting that); the user plans to sell them soon, and the first sale would make the P&L under-report.
+
+**Notes:** decided with the user 2026-09-27 — **cash, in the month paid**, a deliberate exception to the accrual
+basis of 2026-08-16; don't "fix" it back to recognising revenue per lesson used. No double count: package-funded
+lines stay subtracted from invoice revenue, the purchase is added once. Add it as its own breakdown line so Revenue
+stays auditable. Refunds subtract in the month paid out (*In-app package refunds*). Owner-gated like the rest of the page.
+
 ### Household-level split billing — **M** `[MVP-excluded]`
 Let two parents (e.g. separated households) each receive a share of the invoice.
 
@@ -1223,7 +1286,7 @@ coach confirms it against their bank. The driver asserts that explicitly.
   later in DOM order (§7.10). It now targets the longer string, which only the detail
   screen can contain. Keep the two labels distinct.
 
-### Child identification: NRIC last 4 — **S** — _considered and declined 2026-07-19_
+### ~~Child identification: NRIC last 4~~ — **S** — _declined 2026-07-19; moved to *Deliberately not doing* 2026-09-27_
 Capture the last 4 characters of a child's NRIC as part of their identity.
 
 **Status:** the problem this existed to solve — a coach with two students called "Ethan
@@ -1289,6 +1352,9 @@ or an adjustment. Today bounded to one in-flight row and low-volume, so low-prio
 advisory lock) so a crash-safe send-then-stamp ordering is safe under concurrency — a boolean
 column cannot be both claim and sent-marker. Design + why the per-invoice claim was chosen:
 `docs/plans/INVOICE_EMAIL_RETRY_PLAN.md` (⚠ RISK 1).
+
+**2026-09-27: Wave 1, lane 2.** Not cron-gated (HANDOVER §9 had grouped it with the parked cron tail). Build it
+before any new email path so none inherits the window.
 
 ### One-click bulk WhatsApp sends (Cloud API) — **M** `[Phase 3]`
 Send the payment reminder to every unpaid parent with ONE click, server-side, instead
@@ -1382,7 +1448,21 @@ folded onto this month's invoice), and `wages_state` is a **per-rated-coach cove
 check, not "any payout row exists" — a coach rated after the run would otherwise read as
 final and overstate Net.
 
-### Split co-admin permissions — **M**
+### Split co-admin permissions — **L** (was M) — **Wave 1, decided 2026-09-27**
+
+**Decided with the user 2026-09-27:** build NOW (a co-admin hire is ~3 months out). Owner-defined **roles**, each a
+grid of **~8 grouped areas** (e.g. Attendance · Students & families · Classes & pricing · Billing & invoices ·
+Packages & refunds · Coaches & wages · Settings · Accounting) × **None / View / Edit**; a few **starter presets** the
+owner can copy and edit; **all areas in one build**. **Admin/role management is grantable**, with a mandatory
+escalation guard: a delegate may grant only what they hold, and never touches the owner. The owner always holds
+everything. Enforcement is server-side per area — hiding a page is not a boundary (the accounting page's own rule).
+Resized **M → L**: 26 admin pages, and `is_tenant_admin`/`can_admin_tenant` appear ~300 times across 80 migrations
+(a raw grep — it counts comments and superseded `CREATE OR REPLACE` bodies, so the LIVE policy/RPC count is lower;
+the plan must take it from `pg_policies` / `pg_get_functiondef`, §7.40). "Roles" here means **rows in a tenant-scoped
+table** — the capability-table path the note below recommends — **not** a Postgres enum, which that note rules out.
+Open for the plan: whether *Accounting* (owner-only by PRD §7.23) and *refunds* (owner-only, decided the same day)
+become grantable areas or stay hard owner-only.
+
 Restrict what individual co-admins can do — e.g. an assistant who can mark attendance and
 chase payments but cannot change class pricing or issue credit notes.
 
@@ -1623,8 +1703,8 @@ supabase-js still infers to-one embeds as arrays without `!inner`/`!hint` annota
 a few casts remain. This **supersedes and absorbs** the `any`-cast fix already applied in
 `(parent)/home/child/[id].tsx` (shipped 2026-07-16, HANDOVER §8d) — that cast was the
 pragmatic `S`-sized fix to clear the baseline now; this is the thorough version for later. Do **not**
-start this while migrations are still landing (NRIC and coach-defined levels are still
-schema-touching backlog items ahead of it). The natural trigger is "the schema is
+start this while migrations are still landing (as of 2026-09-27: roles & permissions, the email claim column,
+package revenue and refunds are the schema-touching items ahead of it). The natural trigger is "the schema is
 frozen and we want compiler-enforced safety before a big build."
 
 ### Deeper component-render tests — **M** `[handover]` — _first pass DONE 2026-09-27_
@@ -1641,7 +1721,7 @@ which run nightly in CI (`ui-drivers.yml`), not by hand. Counts drift — the te
 **Notes:** `docs/TESTING.md` §5 lists what the first pass pins. The `run-ui-playwright` drivers show
 what's worth pinning next.
 
-### Shared `lessonDates.ts` package — **M**
+### ~~Shared `lessonDates.ts` package~~ — **M** — **NOT DOING 2026-09-27** → *Deliberately not doing*
 The file is duplicated **byte-identical** in both apps.
 
 **Why:** filed for visibility, **not recommended**. `docs/ARCHITECTURE.md` §6 makes the case
@@ -1717,6 +1797,10 @@ Kept so the reasoning doesn't get re-litigated.
 
 | Idea | Why not |
 |---|---|
+| **A per-child make-up for a child in every class of their kind** | Refused 2026-09-27 with the user: no child is enrolled in every group class of their kind, so the gap (nowhere to guest them, `book_makeup()` rightly refusing the own-class silent void) never arises. Workarounds stand: mark the miss non-billable, or a whole-class extra lesson. **Never "fix" it by relaxing the own-class refusal** (pinned by `multi_class.test.sql`). **Revisit if** a child really is enrolled in every class of a kind; the design sketch is in the struck item. |
+| **A different-coach private make-up** | Refused 2026-09-27 with the user: no requester. A private make-up stays an extra lesson of the child's own class (same coach). **Revisit if** a private coach's cover is actually requested; the struck item names the two shapes (a one-off class, or a per-lesson coach override). |
+| **Child identification by NRIC last 4** | Declined 2026-07-19 and formally moved here 2026-09-27. Name + date of birth solved the duplicate-name problem with no new personal data; partial NRIC is still PDPC-regulated personal data and would sit on every coach's roster. **Revisit only if** two children share a name *and* a birthday at one business. |
+| **A shared `lessonDates.ts` package** (or splitting the apps into separate repos with a shared-code repo/API) | Refused 2026-09-27 with the user. The file is duplicated byte-identical in both apps (only the twin-file header differs); sharing it needs workspaces + Metro `watchFolders` + `transpilePackages` across two projects with different React majors, bundlers and test runners — days of work to save a `diff`. Splitting into repos was raised the same day and also refused: the apps already share one API (Supabase — schema, RLS, RPCs, one migrations folder), features cut across all three layers, and a published shared package or an API for pure date maths is worse than two copies. **Revisit if** npm workspaces arrive for another reason — then this comes free. Until then: **edit both.** |
 | **A `data-tenant-id` attribute on the platform table row** | Refused 2026-08-30 while fixing `verify-tenant-provisioning` (§7.228). Its dead fallback read this attribute to mint a fresh invite link over `/api/resend-invite`; the obvious repair is to add the attribute. **Don't** — it is product markup existing solely for a test, to restore a path that only matters when `RESEND_API_KEY` is set, which neither CI nor a local stack does. A named precondition plus a loud skip notice buys the same safety for no product surface. |
 | **A mobile breakpoint for the admin sidebar** | Raised and **REFUSED the same day, 2026-08-29, with the user.** `components/Sidebar.tsx` is a hard `w-64` at every width (plus the layout's `p-8`), so at 390px portrait any admin page gets ~70px of content — found by `verify-assessment.mjs`, which runs at a phone viewport deliberately (§7.222). The refusal is a **product boundary, not a cost judgement**: *"the admin page will most likely only be used landscape and on a tablet. I don't intend on making the admin webapp a mobile app, only the coach app might become a mobile app."* So the admin panel is a desktop/tablet surface by intent, and portrait-phone width is not a case it needs to serve. **This settles the worry that motivated it** — the Assessment tab (PRD §7.15) was thought to need phone width because grading left the coach app; it does not, because assessment is done on a tablet. **Revisit only if** the admin panel itself is ever targeted at phones — not merely if another admin page feels cramped. **Do not "fix" this page-by-page:** a per-page workaround would spread the problem across the panel while leaving the sidebar as it is. |
 | **Multi-language support** | Refused 2026-08-16 with the user: low value for the customer base being sought, English-only is enough, and it was accruing retrofit tax while sitting unranked. English-only was already an explicit MVP call (§8.1) and is a reasonable long-term answer for Singapore. **Revisit only if** a real tenant asks for Mandarin (grandparents doing pickup is the one honest trigger) — a "not yet", not a "never". |
