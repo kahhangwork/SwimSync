@@ -230,11 +230,31 @@ async function createRoleUser(
   fullName: string,
   extra?: Record<string, unknown>
 ): Promise<string> {
+  // A staff account through the auth API needs a server-minted invitation
+  // (20260927000200): the trigger no longer trusts a role in user metadata,
+  // which a public signUp can set too. Same call the admin routes make.
+  let invitationNonce: string | undefined;
+  if (role === "coach") {
+    invitationNonce = crypto.randomUUID().replaceAll("-", "") +
+      crypto.randomUUID().replaceAll("-", "");
+    const { error: invErr } = await db.from("staff_invitations").insert({
+      nonce: invitationNonce,
+      email,
+      role,
+      tenant_id: extra?.tenant_id,
+    });
+    if (invErr) throw new Error(`staff invitation failed: ${invErr.message}`);
+  }
   const { data, error } = await db.auth.admin.createUser({
     email,
     password: "password123",
     email_confirm: true,
-    user_metadata: { full_name: fullName, role, ...(extra ?? {}) },
+    user_metadata: {
+      full_name: fullName,
+      role,
+      ...(extra ?? {}),
+      ...(invitationNonce ? { invitation_nonce: invitationNonce } : {}),
+    },
   });
   if (error || !data.user) {
     throw new Error(`createUser(${role}) failed: ${error?.message}`);

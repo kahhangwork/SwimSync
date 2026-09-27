@@ -138,7 +138,14 @@ BEGIN
               AND cl.relname NOT LIKE '\_\_%'
             ORDER BY cl.relname
   LOOP
-    EXECUTE format('SELECT count(*) FROM public.%I', r.relname) INTO c;
+    -- A table the role holds no SELECT on at all (staff_invitations,
+    -- 20260927000200 — service_role only) is the strongest isolation there
+    -- is: it counts as zero rows seen, rather than aborting the sweep.
+    IF has_table_privilege(format('public.%I', r.relname), 'SELECT') THEN
+      EXECUTE format('SELECT count(*) FROM public.%I', r.relname) INTO c;
+    ELSE
+      c := 0;
+    END IF;
     tbl := r.relname; n := c; RETURN NEXT;
   END LOOP;
 END $fn$;

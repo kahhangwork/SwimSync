@@ -65,6 +65,12 @@ jobs:
       - name: DB tests (pgTAP)
         run: supabase test db
 
+      # A public sign-up can never create staff or a platform admin
+      # (20260927000200). HTTP, not pgTAP: the hole was GoTrue's /signup, and
+      # pgTAP cannot act as the auth server's database role.
+      - name: Sign-up trust (HTTP)
+        run: supabase/tests/http/signup_trust.sh
+
       # Deno: generate-invoices billing math + credit ledger. test.sh pulls
       # SERVICE_ROLE_KEY / API_URL from `supabase status`.
       - name: Engine tests (Deno)
