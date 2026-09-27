@@ -142,11 +142,16 @@ SELECT throws_ok(
   'a co-admin cannot change any profile''s role (their own included)');
 
 -- 7. Nor can they suspend a peer directly, bypassing the owner-only RPC.
-SELECT throws_ok(
-  $$ UPDATE profiles SET admin_disabled_at = now()
-      WHERE id = 'ca000000-0000-0000-0000-0000000000a3' $$,
-  'P0001', NULL,
-  'admin_disabled_at is not client-writable');
+-- Since 20260927000600 (P12) a co-admin without admins:edit cannot reach a
+-- peer's profile row at all, so the write matches nothing rather than
+-- tripping guard_profiles_privileges. The outcome is what is pinned: the
+-- peer is still active. (The guard itself is pinned by roles_permissions.)
+UPDATE profiles SET admin_disabled_at = now()
+ WHERE id = 'ca000000-0000-0000-0000-0000000000a3';
+SELECT is(
+  (SELECT count(*)::int FROM profiles
+    WHERE id = 'ca000000-0000-0000-0000-0000000000a3' AND admin_disabled_at IS NOT NULL),
+  0, 'admin_disabled_at is not client-writable');
 
 -- 8. Nor take ownership of the business.
 SELECT throws_ok(
