@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.127** | 2026-09-26 | Segment-bounded `isPublicPage`; NativeWind `darkMode: "class"` stops a per-load throw | ARCHITECTURE §10 · §7.275 · DEPLOYMENT §11 #54 |
 | **8.126** | 2026-09-26 | Deployed `public-package` CORS probed read-only: `Allow-Headers: content-type`; §7.264 holds | §7.264 |
 | **8.125** | 2026-09-26 | A late session restore no longer wipes the reset/invite form; `app-money` C2 driven | §7.274 · TESTING §5 · DEPLOYMENT §11 #53 |
 | **8.124** | 2026-09-25 | Dead `auto_invoice_enabled` row dropped; no driver hardcodes an app port | §7.93 · TESTING §5 · DEPLOYMENT §11 #52 |

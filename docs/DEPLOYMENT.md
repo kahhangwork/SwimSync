@@ -1004,3 +1004,13 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     CLEARED by the green nightly `36200015882` on `64f838e`. `e55038a` (`isPublicPage` segment boundary), `a5585cc`
     (BACKLOG), `7f969cb` (NativeWind `darkMode: "class"`, §7.275) → `main`, CI green on all three. Live
     `swimsync.sg` CSS holds `--css-interop-darkMode:class dark` (§7.271: checked on the last commit).
+
+55. **Deploy record (2026-09-27): one EXPAND migration, then 17 commits of app/tests/docs.** 1 migration, 0 functions;
+    the §7.1 gate CLEARED by nightly `36276724651` (67/67) on `9732951`. `53b584f` (`20260926000100`, admin reads a
+    member parent's name) → `main`, then `db push`; `migration list --linked` 0 pending (161/161); remote grant dump:
+    `tenant_admin_has_member` REVOKEd from PUBLIC, granted to `authenticated` + `service_role` only, no `anon`; both
+    prod policies carry the arm. Rollback rehearsed first (DOWN → policies byte-identical → UP). Then `d8e1c05` →
+    `main` (run-day refusal fix, driver/pgTAP/tooling, component tests, ledger docs); CI green on both pushes. Live
+    admin Invoices chunk holds `id:"run-day-message"` + "Not saved — the run day is still".
+    - **Rerunning the suites on the COMBINED tree caught a typecheck break** the separate branches hid: a test
+      written against `main` lacked a prop another branch made required. §7.1's "the merged tree is not your tree".

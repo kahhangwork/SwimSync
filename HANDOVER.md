@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-26 (evening) — **The whole Foundations driver backlog SHIPPED (§8.128):** 11 new nightly drivers
-(330 checks, each mutation-proven) + `simulate-date.sh`, driver-only, no app code. **Tonight's nightly is the first to
-carry them (~+25–30 min)** — and still the first on §8.127's two app commits. Plan: `docs/plans/DRIVER_BACKLOG_PLAN.md`._
+_Last updated: 2026-09-27 — **Shipped (§8.129): an admin sees a joined family's name before any child; a refused
+run-day save is said out loud (`20260926000100` on prod, `d8e1c05` live, deploy #55).** Plus the first component-render
+tests, every ledger row ≤200 chars, pgTAP #18 scoped, `--help` fixed. Nightly `36276724651` green, 67/67._
 
-_Previously (§8.127, 2026-09-26) — segment-bounded public pages; NativeWind's per-load throw fixed (§7.275)._
+_Previously (§8.128, 2026-09-26) — the Foundations driver backlog: 11 nightly drivers + `simulate-date.sh`._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -347,6 +347,22 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.129 (2026-09-27) — Childless member names, a loud run-day refusal, component tests, the ledger compressed
+
+**Five branches built while the nightly gate was closed, then shipped in order after nightly `36276724651` went green
+(67/67 on `9732951`):** migration first, then one fast-forward push of 17 commits. Deploy record: DEPLOYMENT §11 #55.
+
+- **Admin sees a joined family's name before any child** (`20260926000100`, `tenant_admin_has_member()`): admins only;
+  `parent_students` deliberately NOT widened. PRD §5.1; pgTAP `admin_sees_member_parent`; §7.77 marked partly superseded.
+- **A refused run-day save is loud** (`runDaySaveOutcome` re-reads the stored day; an RLS-filtered update returns no
+  error). PRD §7.7; `verify-invoice-admin` +2 via `page.route`.
+- **Tests/tooling:** first component-render pass (TESTING §5, §7.285–§7.286, by a subagent, re-verified); pgTAP #18
+  scoped; `run-all-drivers.sh --help`; `verify-packages-admin` asserts childless names.
+- **Docs:** all 30 oversized ledger rows ≤200 chars (the old `awk` counted bytes — §7.283); §7.284 (`LPAD`); two stale
+  ARCHITECTURE lines fixed. Logo check deferred to the user's brand refactor (BACKLOG).
+- **Caught before shipping:** rerunning on the COMBINED tree found a typecheck break the separate branches hid (#55).
+- **Not done:** no native build; prod has no childless member yet, so the name change is invisible there today.
+
 ## 8.128 (2026-09-26) — The Foundations driver backlog: 11 drivers + `simulate-date.sh`
 
 **Twelve units, one branch each → `main`, all driver-only** (no app code; R1 gate `git diff --name-only` per unit).
@@ -360,18 +376,7 @@ reviewed and shipped from root. Same session: a BACKLOG drift sweep (`3c0b39c`),
   global invoice count; 7 stale "no driver" app comments; `--help` path bug.
 - **Not done:** the new drivers have never run in the CI nightly; `simulate-date.sh` found no literal-date fixture at risk.
 
-## 8.127 (2026-09-26) — Segment-bounded public pages; NativeWind's throw fixed; stale BACKLOG cleared
-
-**Three units, each its own branch → `main`, after the nightly `36200015882` on `64f838e` went GREEN (§7.1 gate cleared).**
-Deploy record: DEPLOYMENT §11 #54.
-
-- **`isPublicPage`** (`e55038a`): `p` or `p + "/"`, so a future `/invoices` is gated. ARCHITECTURE §10.
-- **NativeWind** (`7f969cb`): `darkMode: "class"`; both driver allowlists emptied; smoke red 45/71 without it. §7.275.
-- **BACKLOG drift** (`a5585cc`): *harden `appLoginDies`* and the *calendar Today race* shipped 2026-09-25 but were still
-  listed; `/update-docs` Step 3(b) now says to grep the heading after deleting.
-- **Not done:** the NativeWind fix was not run on a native build (reasoned safe: no `dark:` class exists, pinned).
-
-_(§8.126 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.127 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -414,10 +419,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-26: last nightly `36200015882` GREEN on `64f838e`** — it cleared §8.123–§8.125 (§7.1 gate). Tonight's
-is the first to carry §8.128's **11 new drivers** (a red on one of them is most likely the driver: triage it per TESTING §5
-before blaming the product) and the first on §8.127's two app commits: a new `pageerror` in `smoke-app` or `cancel-lesson` points at `7f969cb` first
-(their `IGNORED_ERRORS` are now EMPTY, §7.275); a login/redirect red on a public page points at `e55038a`.
+**State on 2026-09-27: last nightly `36276724651` GREEN, 67/67, on `9732951`** — the first to carry §8.128's 11
+drivers, and it cleared §8.127's app commits. **The next one is the first on `d8e1c05`** (§8.129): a red in
+`verify-packages-admin` / `verify-invoice-admin` points at §8.129's new checks first; a login/visibility red on an admin
+page reading parents points at `20260926000100`.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -427,30 +432,23 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-- **Read tonight's nightly first** (never dispatch it). Then the two product gaps §8.128's drivers found (BACKLOG →
-  *Admin and operations*, both S, both APP changes so both behind the §7.1 gate):
-  - *A family with no child reads as "Unknown"* — **DECIDED 2026-09-26 (user): YES, a parent who joined the business
-    is visible to its admin by name before adding a child.** Buildable now: an RLS change (policy + GRANT, §7.87) +
-    pgTAP; then drop `verify-packages-admin`'s every-parent-has-a-child workaround and assert the name.
-  - *A refused run-day save is silent* — **queued in BACKLOG (user, 2026-09-26)**; not scheduled.
-- **Seven stale "no driver" app comments ride along with the FIRST app change** (comment-only; a push to `main`
-  redeploys both apps, §7.276, so never a deploy of their own): `SwimSyncApp/features/roster/domain/useRemoveStudent.ts:7`,
-  and under `SwimSyncAdmin/app/(admin)/platform/` — `ui/StrandedPanel.tsx`, `ui/OwnerModal.tsx`,
-  `domain/useOwnerTransfer.ts`, `ui/CreditWarningModal.tsx`, `ui/FamilyStatusSection.tsx`, `domain/useFamilyStatus.ts`.
-  Each says no driver covers it; `verify-coach-remove-student` / `verify-platform-controls` now do.
-- **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`) — two were
-  still listed a day after shipping (§8.127).
+- **Read the next nightly first** (never dispatch it) — it is the first on §8.129's push.
+- Then, all BACKLOG, none decided yet — ask the user:
+  - *In-app package refunds* (S) — needs a schema change; nothing is in flight now, so it is unblocked.
+  - *Deeper component-render tests*, second pass (M) — whole screens with mocked dao modules (item says which).
+  - Per-child make-up / different-coach private make-up — each needs a design decision first.
+- **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); tear fixtures down before
-  `supabase test db` (§7.272).
+  `supabase test db` (§7.272 — #18 no longer trips on invoices, other shapes still can); a `--only` run RESETS the DB,
+  so a migration applied only locally is gone after it.
+- **Stacked branches: rerun the suites on the COMBINED tree before pushing** (#55).
 
-**GATE (§7.1): read tonight's nightly before the next APP unit merges** — it is the first driver-level run on
-`e55038a` and `7f969cb`, and on the 11 new drivers. Driver-only units need no gate.
+**GATE (§7.1): read the next nightly before the next APP unit merges.** Driver-only units need no gate.
 
-**No migration is HELD or in flight.** Latest applied is `20260925000200` (drop the dead `auto_invoice_enabled` row,
-§8.124), on prod, 0 pending (160/160 on 2026-09-25), rehearsed DOWN in `supabase/rollback/`. **`supabase migration list
---linked` is the fact; a prose status is a hint.** §8.124 authored `20260925000200`, §8.123 `20260925000100`. Prod
-`app_settings` now holds one row, `invoice_block_notified`.
+**No migration is HELD or in flight.** Latest applied is `20260926000100` (admin reads a member parent's name), on
+prod, 0 pending (161/161 on 2026-09-27), rollback rehearsed byte-identical. **`supabase migration list --linked` is the
+fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted
 > low-balance email, automated reminders, and the **crash-safe email claim** (covers
