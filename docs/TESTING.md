@@ -391,6 +391,18 @@ still be a CI fail because the Next/Expo type stubs it leans on are git-ignored.
 > which read `ADMIN_URL` / `EXPO_URL`, so a worktree on its own ports drives its OWN build. The backlog
 > item counted three offenders; the grep found eight.
 >
+> **No driver builds a date label outside `lib.mjs`** (2026-10-01). `drivers/check-driver-dates.sh` (CI,
+> `repo-invariants`) refuses `to_char(…'Mon|Dy|Day…')` and any `toLocale*String` / `Intl.DateTimeFormat` call outside
+> `lib.mjs` — labels come from `sgLabel()` / `sgMonthLabel()`, the apps' own en-SG formatter ("Sept", not "Sep").
+> A non-label line opts out with `// date-label-ok: <why>` (§7.302).
+>
+> **No pgTAP test or fixture holds an expiring literal date** (2026-10-01). `scripts/check-test-dates.sh` (CI,
+> `repo-invariants`) fails on a quoted `'YYYY-MM-DD'` / `'YYYY-MM'` at or after the marking floor (1st of last month,
+> SGT) unless that line ends `-- date-literal-ok: <the gate that makes it safe>`. Derive instead where you can (the
+> `td` table in `trial_onboarding.test.sql`). It prints `scanned P pgTAP + F fixture files, L literals, E exemptions`
+> and exits 2 if it scanned too little. Local proofs only: `CHECK_TEST_DATES_FLOOR=YYYY-MM-DD` or file arguments
+> (refused under `CI`). An annotation needs a static clock audit, not a pin run (§7.305, §7.308).
+>
 > **Every fixture is now LOADED by CI too** (2026-08-01), by
 > `drivers/check-fixture-roundtrip.sh` — a step in `backend-tests`, which already boots a
 > Supabase stack. It runs **two passes**:

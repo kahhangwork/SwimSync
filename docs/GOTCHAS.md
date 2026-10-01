@@ -2291,6 +2291,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `db reset` wipes it" fails after the LAST run, on Ctrl-C, and on a crash — every later driver, `supabase test
     db` and manual check then runs against the sabotaged body. Capture `pg_get_functiondef()` first,
     `trap restore EXIT INT TERM`, and assert the live value after. (§7.55; 2026-09-26.)
+    **For a single pgTAP file, pin inside its own transaction instead → §7.307.**
 
 279. **`launch()` (`drivers/lib.mjs`) AUTO-ACCEPTS every dialog — a "Cancel" check is vacuous unless it also
     asserts the DB row is unchanged.** RN-web `confirmAction` is `window.confirm`; under the auto-accept a driver
@@ -2471,6 +2472,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `session_window_start()` to a FUTURE month cannot validate a file whose lessons must also be in the past** —
     `now()` does not move, so the dates land in the future and fail by construction (the `simulate-date.sh` caveat,
     §7.226). A pinned PAST floor is a fair check. (2026-10-01.)
+    **Now enforced in CI → §7.305** (`scripts/check-test-dates.sh`).
 
 304. **Two fixtures that each derive "a Saturday" for the SAME seed class will land on the same one, some days of
     every month.** `fixtures-packages.sql` used "most recent Saturday − 7"; `fixtures-unmarked-lessons.sql` owns L (last
@@ -2482,3 +2484,41 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     proven over every day of 2026–27 by a one-off SQL sweep. **When a fixture writes into the SEED class, enumerate
     the other fixtures that do (`grep -l "Saturday Beginners" fixtures-*.sql`) and check every day of the year, not
     today.** (2026-10-01.)
+
+305. **A literal test date the floor has not passed now fails CI — `scripts/check-test-dates.sh`.** Scans pgTAP +
+    UI fixtures for quoted `'YYYY-MM-DD'` / `'YYYY-MM'` at or after the floor (1st of last month, SGT); each must be
+    DERIVED from `session_window_start()` (the `td` pattern, `trial_onboarding.test.sql`) or carry
+    `-- date-literal-ok: <the gate that makes it safe>` on its own line. Below the floor is ignored (it would already
+    be red if guarded); the floor only rises, so the check never reddens on its own. ⚠ **It models ONE clock.** An
+    annotation is a claim that nothing on the path decides on ANY clock — prove it by reading every trigger and
+    function from `pg_get_functiondef` (§7.40) and classifying each `now()`/`today_sg()` read as stamp or decision
+    (§7.308), not by a pin experiment alone. 2026-10-01 triage: 47 lines in `coach_wages`, `package_weeks_start_date`,
+    `partial_payment_followups`, all unguarded (superuser/service_role writes past role-gated guards; payroll reads
+    no clock). The real fix is BACKLOG *Inject the database clock*. (2026-10-01.)
+
+306. **Bash arithmetic on a zero-padded month is OCTAL — `$((09 - 1))` errors.** A date script works ten months of the
+    year and dies in August and September (`08`, `09` are invalid octal). Always `$((10#$m))`. A date guard should
+    self-test its own month arithmetic on every run (Jan → Dec of the year before, Aug, Sep) —
+    `scripts/check-test-dates.sh`'s `floor_of()` does. (2026-10-01.)
+
+307. **To pin `session_window_start()` for one pgTAP file, pin it INSIDE that file's transaction.** Copy the file,
+    insert the `CREATE OR REPLACE` right after its `BEGIN;`, run the copy; the file's own `ROLLBACK;` restores the
+    body and no sibling session ever sees the pin. Strictly safer than §7.278's EXIT-trap restore, which still leaves
+    a window where the shared DB is sabotaged. Assert the file starts `BEGIN;` / ends `ROLLBACK;`, and compare
+    `md5(pg_get_functiondef(...))` before and after. (2026-10-01.)
+
+308. **"Unguarded" cannot be proven by experiment while `now()` cannot move.** Pinning `session_window_start()`
+    moves the floor only; `today_sg()` / `now()` horizons ("has not happened yet", future-booking checks, a display
+    sync's `effective_from <= today_sg()`) stay on the real clock, so a green pinned run proves nothing about them.
+    The verdict is a static audit: every function and trigger on the path, read from the database, each clock read
+    classified stamp (written to `*_at`) or decision (compared) — and whether a role gate skips it for the role the
+    test uses. Pinning only confirms. (2026-10-01.)
+
+309. **A static CI guard must print and floor-check its own scan count.** A wrong path, an unmatched glob or an
+    awk/regex difference on the CI runner (mawk ≠ BSD awk) makes a scan match nothing — and "found nothing" is the
+    green path, so it looks enforced forever. Print `scanned P files, L items` and exit 2 below a sane minimum.
+    A guard that cannot fail is not one — §7.302's "a recurring trap is a missing guard", one level up. (2026-10-01.)
+
+310. **`TZ=Asia/Singapore date` silently means UTC when zoneinfo is missing** (bare containers: `ubuntu:24.04` has no
+    tzdata). No error, just a date up to 8 hours — and on the 1st, a month — wrong. Any shell code computing an SGT date
+    must assert `TZ=Asia/Singapore date +%z` = `+0800` and refuse otherwise. The fourth axis of §7.7. (2026-10-01.)

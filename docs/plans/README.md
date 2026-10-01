@@ -21,7 +21,7 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `DONE` · `DONE (partly superseded)`
 | ROLES_ENFORCEMENT_MAP.md | CURRENT | Step 0 of the roles plan — every admin-gated policy/function/route → area + level |
 | CRASH_SAFE_EMAIL_CLAIM_PLAN.md | DONE (§8.131, deploy #57) | Wave 1 lane 2 — claim lease + Resend idempotency key; no auto-retry after 24 h |
 | PACKAGE_REVENUE_REFUNDS_PLAN.md | DONE (§8.132, deploy #59) | Wave 2 — package revenue on Accounting (cash basis) + in-app refunds |
-| TEST_DATE_EXPIRY_ALARM_PLAN.md | NOT STARTED | CI alarm for literal test dates the marking floor will pass (§7.303); injected clock → BACKLOG |
+| TEST_DATE_EXPIRY_ALARM_PLAN.md | DONE (2026-10-01; clock → BACKLOG) | CI alarm for literal test dates the marking floor will pass (§7.303); injected clock → BACKLOG |
 | WAVE_2_PACKAGES_BRIEF.md | SUPERSEDED by PACKAGE_REVENUE_REFUNDS_PLAN.md | Wave 2's decisions W1–W6 (still the source for those) |
 
 ## Done
