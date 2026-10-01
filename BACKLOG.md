@@ -1527,6 +1527,60 @@ real tenant asks — that is the one honest reason, and nobody has.
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
 
+### Inject the database clock — **L** — _filed 2026-10-01_
+**Make every date-sensitive test choose its own "today", so no test can ever expire.** Today the database has no
+single clock: 51 public functions read `now()` / `CURRENT_DATE` directly (57 counting `today_sg()`,
+`session_window_start()`, `markable_floor()`), so a test cannot say "pretend it is 1 November".
+
+**Why — what 2026-10-01 proved.** `main` CI went red that morning with no code change (§7.302–§7.304). A test has
+**two clocks**: its own dates, and the database's "today" (which sets the marking floor = 1st of LAST month, SGT).
+- **Hardcoded dates froze one clock and left the other running** — the gap grew until the floor passed `'2026-08-08'`
+  and the guard (correctly) refused it. Three pgTAP files, 14 assertions (§7.303).
+- **Derived dates move both clocks together** — the fix shipped that day (`78589c7`, a `td` temp table built from
+  `session_window_start()`). It works, but every test is still only exercised on whatever day CI happens to run.
+- **An injected clock freezes both** — a test replays the same day forever, and can deliberately target edge days:
+  the 1st of a month, a leap day, the days before the month's first Saturday. That last window is exactly where
+  §7.304's fixture collision hid — real-clock CI only hit it on some days (247 of 730 in 2026–27).
+
+**Shape.**
+1. One SQL function, e.g. `app_today()` → the SGT date. Product functions call it instead of `now()` /
+   `CURRENT_DATE` / `today_sg()` **for date decisions**. Timestamps (`created_at`, `confirmed_at`, `paid_at`) stay
+   real — only "what day is it" moves.
+2. Tests pin it: `SET LOCAL app.today = '2026-09-15'` at the top of the file's transaction.
+3. **Prod safety is the crux.** The override must be honoured only where a database-level flag allows it (local / CI),
+   never on prod — a client-movable clock would let someone mark a closed month or dodge the completed-month guard.
+   PostgREST writes `request.*` settings from headers/JWT, so the setting must live outside that namespace. **Prove it
+   cannot be set from a client** (a pgTAP probe as `authenticated` and `anon`) rather than assume it. Own security review.
+4. **A guard so the clock cannot leak back:** CI refuses a new raw `now()` / `CURRENT_DATE` used for a date decision
+   in a migration (the `check-driver-dates.sh` / `check-test-dates.sh` pattern).
+
+**Precedent already in the repo — copy its reasoning:** the Deno billing-engine tests already inject the clock.
+`BillingScenario` in `supabase/functions/generate-invoices/test-helpers.ts` pairs every billing month with its own
+`now`, which is why those tests use far-future 2029 months and never rot.
+
+**How to sequence it.** Expand/contract, one function family per migration (CLAUDE.md: one schema change in flight).
+Recount the surface first — the count above is a hint (query: `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON
+n.oid=p.pronamespace WHERE n.nspname='public' AND prosrc ~* 'now\(\)|current_date'`). Not every read is a decision —
+classify stamp vs decision per function (read bodies with `pg_get_functiondef`, §7.40). **Billing guards last**, Deno
+suite run twice (§7.15). Then convert pgTAP files to `SET LOCAL app.today`, starting with the ones carrying
+`-- date-literal-ok:` markers (47 lines on 2026-10-01 — each records why it is safe today) and the three files with a
+`td` table. **Not mid-billing** — it touches the guards the monthly run depends on; pick a quiet stretch.
+
+**Rejected alternative — a "time machine"** (libfaketime in CI's Postgres, run the suite as if it were the 1st of next
+month). Considered 2026-10-01 and dropped: unproven against the Supabase-CLI-owned container (needs a spike);
+fragile across CLI/image upgrades (must self-check that `now()` is really faked or it passes vacuously); Postgres
+multi-process quirks; it only DETECTS a month early rather than prevents; needs several simulated dates per run to
+catch §7.304-shaped bugs; ~1–2 days. Already deferred once (`docs/plans/DRIVER_BACKLOG_PLAN.md` §6). The injected
+clock makes it unnecessary. **Also do not pin `session_window_start()` to a FUTURE month as a stand-in** — `now()`
+does not move, so any test whose lessons must be in the past reddens by construction (§7.303, §7.226, §7.277).
+
+**What guards meanwhile** (built 2026-10-01): `scripts/check-test-dates.sh` — fails CI on a literal date/month in
+pgTAP or a UI fixture that the floor has not passed, unless the line says `-- date-literal-ok: <why>` (§7.305; it
+models only the floor, not `today_sg()` horizons); `check-driver-dates.sh` (driver labels, §7.302);
+`check-fixture-roundtrip.sh`'s co-load pass (§7.304). Plan: `docs/plans/TEST_DATE_EXPIRY_ALARM_PLAN.md`.
+
+**Size:** L (~1–2 weeks). Product change across the billing guards; migrations + prod deploys.
+
 ### ~~Deleting an admin destroys the audit history~~ — **SHIPPED 2026-08-13** (`20260813000400`)
 **Resolved by REFUSING the delete, not by a tombstone table.** `audit_log.actor_id` was the
 single deliberate exclusion in `profile_reference_columns()`; every other FK pointing at
