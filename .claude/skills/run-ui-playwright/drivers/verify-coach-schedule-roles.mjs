@@ -55,7 +55,7 @@
 // edit and not after each revert, where `return "Shadowing"` / `…&from=schedule` were back.)
 
 import { execFileSync } from "node:child_process";
-import { launch, loginExpo, pressByText, visibleText, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginExpo, pressByText, visibleText, sgLabel, ADMIN, EXPO } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API_URL = "http://127.0.0.1:54321";
@@ -105,9 +105,8 @@ const todaySg = sql(`SELECT today_sg()`);
 const doneDate = sql(`SELECT session_date FROM lesson_sessions WHERE id = '${DONE_SESSION}'`);
 // The day heading, built with the APP's formatter family (§7.121: never
 // to_char for a label — ICU says "Sept"): scheduleFormat.ts dayHeading →
-// formatSgDate → toLocaleDateString("en-SG", …, timeZone "UTC").
-const doneHeading = new Date(`${doneDate}T00:00:00Z`)
-  .toLocaleDateString("en-SG", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+// formatSgDate — which lib.mjs's sgLabel mirrors.
+const doneHeading = sgLabel(doneDate);
 
 // ── Scoped queries ──────────────────────────────────────────────────────────
 const activeQ = `SELECT string_agg(title || ':' || is_active || ':' || (deactivated_at IS NULL), ',' ORDER BY title)
@@ -196,7 +195,7 @@ try {
     a0 === ACTIVE_BOTH && s0 === STATE0, `${a0} | ${s0}`);
   check("PRECONDITION: both classes run on today's weekday, the DONE lesson is 7 days ago",
     sql(`SELECT count(*) FROM classes WHERE tenant_id = '${TENANT}'
-          AND day_of_week = lower(trim(to_char(today_sg(), 'FMDay')))::day_of_week`) === "2"
+          AND day_of_week = lower(trim(to_char(today_sg(), 'FMDay')))::day_of_week`) === "2" // date-label-ok: enum, not a label
       && sql(`SELECT (today_sg() - 7)::text`) === doneDate,
     `today=${todaySg} done=${doneDate} heading="${doneHeading}"`);
 

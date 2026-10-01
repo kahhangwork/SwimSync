@@ -92,7 +92,7 @@
 
 import { execSync } from "node:child_process";
 import {
-  launch, loginAdmin, loginExpo, pressByText, gotoAuthed, ADMIN, EXPO, visibleText,
+  launch, loginAdmin, loginExpo, pressByText, gotoAuthed, sgLabel, ADMIN, EXPO, visibleText,
 } from "./lib.mjs";
 
 const CLASS_A = "c7000000-0000-0000-0000-00000000000a";
@@ -140,9 +140,8 @@ const MONTH = PATTERN_DATE.slice(0, 7);
 // (en-SG, weekday short / day numeric / month short). Derived from the same
 // date, so a formatting change breaks it loudly rather than silently matching
 // nothing (§7.101: a check that matches zero times passes while testing nothing).
-const LESSON_LABEL = sql(
-  `SELECT to_char(DATE '${PATTERN_DATE}', 'Dy, FMDD Mon')`
-);
+// Labelled by lib.mjs, never to_char 'Mon' — "Sep" vs the app's "Sept" (§7.302).
+const LESSON_LABEL = sgLabel(PATTERN_DATE);
 
 (async () => {
   // ── The fixture is real. Runs first and hard-exits: every assertion below
@@ -372,10 +371,10 @@ const LESSON_LABEL = sql(
   );
 
   // ── 8. The off-pattern lesson the fixture inserted directly ─────────────
-  const EXTRA_LABEL = sql(
-    `SELECT to_char(ls.session_date, 'Dy, FMDD Mon') FROM lesson_sessions ls
+  const EXTRA_LABEL = sgLabel(sql(
+    `SELECT ls.session_date::text FROM lesson_sessions ls
       WHERE ls.id = 'c7000000-0000-0000-0000-0000000000d1'`
-  );
+  ));
   check(
     "8 — a lesson off the class's weekly pattern is badged Extra",
     atext.includes(EXTRA_LABEL) &&

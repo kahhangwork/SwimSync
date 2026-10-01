@@ -40,6 +40,11 @@ jobs:
       - name: No UI driver hardcodes a port
         run: .claude/skills/run-ui-playwright/drivers/check-driver-ports.sh
 
+      # A date label built in SQL or Node's en-US says "Sep"; the apps say "Sept".
+      # Agrees 11 months a year, then reddens. Written down 3 times, hit 4 (§7.302).
+      - name: No UI driver builds a date label outside lib.mjs
+        run: .claude/skills/run-ui-playwright/drivers/check-driver-dates.sh
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:

@@ -31,7 +31,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, tap, dumpText, EXPO } from "./lib.mjs";
+import { launch, loginExpo, tap, dumpText, sgLabel, EXPO } from "./lib.mjs";
 
 const sql = (q) =>
   execSync(
@@ -42,14 +42,15 @@ const sql = (q) =>
   ).trim();
 
 // The one row the fixture wrote is the single source of truth for the scenario.
-const [markedIso, missingIso, missingLabel] = sql(`
+// Dates from the DB, labels from lib.mjs — never to_char 'Mon' (§7.302).
+const [markedIso, missingIso] = sql(`
   SELECT to_char(ls.session_date,'YYYY-MM-DD')
       || '|' || to_char(ls.session_date + 7,'YYYY-MM-DD')
-      || '|' || to_char(ls.session_date + 7,'FMDD Mon')
     FROM lesson_sessions ls
     JOIN classes c ON c.id = ls.class_id
    WHERE c.title = 'Saturday Beginners'
    ORDER BY ls.session_date DESC LIMIT 1`).split("|");
+const missingLabel = sgLabel(missingIso, { day: "numeric", month: "short" });
 
 // The Wednesday after the missing Saturday.
 const TODAY_SGT = new Date(`${missingIso}T04:00:00Z`);

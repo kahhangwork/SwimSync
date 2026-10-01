@@ -72,7 +72,7 @@ const IGNORED_ERRORS = [];
 
 const DOW = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 function nextDateFor(dayOfWeek) {
-  const sg = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Singapore" }));
+  const sg = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Singapore" })); // date-label-ok: SGT clock → ISO
   const want = DOW.indexOf(dayOfWeek);
   const ahead = (want - sg.getDay() + 7) % 7 || 7;
   sg.setDate(sg.getDate() + ahead);

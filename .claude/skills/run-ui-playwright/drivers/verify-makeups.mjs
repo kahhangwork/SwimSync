@@ -22,7 +22,7 @@
 // SwimSyncAdmin npm run dev; SwimSyncApp expo web.
 import os from "node:os";
 import path from "node:path";
-import { launch, loginAdmin, loginExpo, gotoAuthed, tap, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, gotoAuthed, tap, sgLabel, ADMIN, EXPO } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -43,10 +43,7 @@ const HOME_TITLE = "Makeup Home Sunday";
 // run, whatever the weekday.
 const sgNow = new Date(Date.now() + 8 * 3600 * 1000); // SGT = UTC+8, no DST
 const BOOK_ISO = sgNow.toISOString().slice(0, 10);
-const BOOK_LABEL = new Date(`${BOOK_ISO}T12:00:00+08:00`)
-  .toLocaleDateString("en-SG", {
-    weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Singapore",
-  });
+const BOOK_LABEL = sgLabel(BOOK_ISO);
 
 const { browser, page } = await launch();
 

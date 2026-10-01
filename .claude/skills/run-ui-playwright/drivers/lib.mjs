@@ -8,6 +8,20 @@ import { chromium } from "playwright-core";
 export const ADMIN = process.env.ADMIN_URL ?? "http://localhost:3000";
 export const EXPO = process.env.EXPO_URL ?? "http://localhost:8081";
 
+// ⚠ EVERY DATE LABEL A DRIVER COMPARES AGAINST THE SCREEN IS BUILT HERE — and
+// check-driver-dates.sh fails CI if one is built anywhere else. Postgres
+// `to_char(d,'Mon')` and Node's en-US both say "Sep"; the apps render en-SG,
+// whose CLDR month for September is "Sept". They agree eleven months a year, so
+// every copy of the wrong formatter passed review and went red the first time
+// its date reached September — four times (§7.121, §7.215, §7.225, §7.302).
+// This is the app's own call (formatSgDate in both apps' lib/lessonDates.ts):
+// parse a "YYYY-MM-DD" as UTC, render en-SG in UTC, so the label is that date.
+/** "Sat, 18 Jul" by default — formatSgDate's default options. */
+export const sgLabel = (iso, opts = { weekday: "short", day: "numeric", month: "short" }) =>
+  new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-SG", { ...opts, timeZone: "UTC" });
+/** "Sept 2026" for a billing month "2026-09" — the admin's formatBillingMonth. */
+export const sgMonthLabel = (ym) => sgLabel(`${ym.slice(0, 7)}-01`, { month: "short", year: "numeric" });
+
 /** Launch Chrome. mobile=true gives a phone viewport for the Expo app. */
 export async function launch({ mobile = false, headless = true } = {}) {
   const browser = await chromium.launch({ channel: "chrome", headless });

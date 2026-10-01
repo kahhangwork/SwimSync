@@ -77,7 +77,7 @@ try {
   // Billing month: default and cap. Invoices cover a COMPLETE month, so the
   // latest billable month is always the one before today in SGT.
   const sgToday = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Asia/Singapore" })
+    new Date().toLocaleString("en-US", { timeZone: "Asia/Singapore" }) // date-label-ok: SGT clock, never compared as text
   );
   const expected = `${sgToday.getFullYear()}-${String(sgToday.getMonth()).padStart(2, "0")}`;
   const expectedMonth =

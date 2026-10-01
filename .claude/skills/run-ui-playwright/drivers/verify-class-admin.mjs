@@ -49,7 +49,7 @@
 // `setShadowError(error.message)`), and the original re-grepped after the revert.)
 
 import { execFileSync } from "node:child_process";
-import { launch, loginAdmin, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, sgLabel, ADMIN, EXPO } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API = "http://127.0.0.1:54321";
@@ -94,8 +94,7 @@ const LATE_FROM = sql(`SELECT r.effective_from FROM coach_rates r JOIN coaches c
 const ONGOING_FROM = sql(`SELECT effective_from FROM class_shadow_coaches WHERE id='${ONGOING}'`);
 const [HIST_FROM, HIST_TO] = sql(`SELECT effective_from||'|'||effective_to FROM class_shadow_coaches WHERE id='${HISTORY}'`).split("|");
 // The drawer's display format (lib/lessonDates.formatSgDate's default), applied to DB dates.
-const fmt = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-SG",
-  { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+const fmt = (d) => sgLabel(d);
 
 const results = [];
 const check = (name, pass, detail = "") => {

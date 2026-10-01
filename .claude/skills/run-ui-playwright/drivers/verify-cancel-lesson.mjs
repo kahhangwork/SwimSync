@@ -28,7 +28,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, visibleText, pressByText, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, gotoAuthed, tap, dumpText, visibleText, pressByText, sgLabel, ADMIN, EXPO } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -161,9 +161,10 @@ try {
   // own day BY NAME (§7.101 — never `.last()` over a bare day-header regex),
   // and assert it matched before pressing (a `tap()` on an empty locator
   // throws and would silently shrink this driver's denominator, §7.100).
-  const sgOpts = (o) => new Date(`${nextWeek}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Singapore", ...o });
+  const sgOpts = (o) => sgLabel(nextWeek, o); // the app's own formatter (lib.mjs, §7.302)
   // The coach app renders month labels from the BROWSER's CLDR data, which for
-  // September is "Sept" (4 letters); Node's en-US short month here is "Sep" (3).
+  // September is "Sept" (4 letters); Node's en-US short month here WAS "Sep" (3) —
+  // now built by lib.mjs's sgLabel, the app's own call (§7.302).
   // An anchored `Sep$` silently stopped matching, so headerCount fell to 0, the
   // expand was skipped and the card never entered the DOM — two checks red for
   // the price of one string. This drove the driver red 2026-08-24..27, the first
@@ -218,7 +219,7 @@ try {
     await spin.waitForTimeout(2500);
 
     // Same day-header matching as step 5, and for the same reasons (§7.101, §7.122).
-    const sg2 = (o) => new Date(`${twoWeeksAgo}T12:00:00+08:00`).toLocaleDateString("en-US", { timeZone: "Asia/Singapore", ...o });
+    const sg2 = (o) => sgLabel(twoWeeksAgo, o);
     const doneHeader = new RegExp(`^${sg2({ weekday: "short" })}\\w*,? ${sg2({ day: "numeric" })} ${sg2({ month: "short" })}\\w*$`);
     // ⚠ SCOPED TO DONE. NEEDS MARKING sits ABOVE it and its cards carry the same
     // "Thu, 10 Sept" subtitle (and a "Cal Rose Full" title — today's lesson, on a

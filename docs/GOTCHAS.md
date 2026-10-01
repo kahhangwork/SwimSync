@@ -1173,6 +1173,7 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       app's call — `new Date(iso+"T00:00:00Z").toLocaleDateString("en-SG", {...,
       timeZone:"UTC"})`, mirroring `SwimSyncApp/lib/lessonDates.ts` (Node/Chrome agree on all 12
       months) — or better, match an ISO `testID`, `value` or URL. §7.100's "never rendered labels" in a new place.
+    **Enforced in CI since 2026-10-01 → §7.302** (`lib.mjs` `sgLabel`, `check-driver-dates.sh`).
 
 122. **A NIGHTLY CI RUN IS LABELLED IN UTC AND EXECUTES IN SGT, SO THE WEEKDAY IT ACTUALLY
     SAW IS THE DAY AFTER ITS NAME.** `ui-drivers.yml` `0 20 * * *` = **04:00 SGT next day**
@@ -2445,3 +2446,15 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     driver needs its OWN tenant with a superuser-written past month and a `billing_periods` row for that tenant
     only. Never seal the seed tenant: `markable_floor` follows `billing_periods`, and other drivers break.
     (`verify-accounting-packages.mjs`, §8.132.)
+
+302. **The `Sep`/`Sept` trap came back a FOURTH time — so it is now a CI guard, not a gotcha.** Nightly
+    `36791874903` (2026-10-01, the first run whose "last month" was September) went red on `invoice-admin` and
+    `orphan-report`: both built `'Mon YYYY'` in SQL ("Sep 2026") against the admin's en-SG "Sept 2026" — a
+    whole-token compare, so no `Sep ⊂ Sept` luck to hide behind. An audit found five more drivers passing only by
+    that substring luck, and four carrying private copies of the right formatter. Three written warnings (§7.121,
+    §7.215, §7.225) had not stopped any of them. **Every driver date label now comes from `lib.mjs`'s `sgLabel()` /
+    `sgMonthLabel()`, and `check-driver-dates.sh` (CI) refuses `to_char(…'Mon|Dy|Day…')` and any
+    `toLocale*String` / `Intl.DateTimeFormat` call outside `lib.mjs`** (en-CA ISO excepted; a non-label line opts out
+    with a trailing `// date-label-ok: <why>`). Proven: red on `main`'s drivers (21 lines), red with the old
+    `orphan-report` line restored, green fixed. **The lesson beyond dates: a trap that recurs after being written
+    down is a missing guard** — `check-driver-ports.sh` is the same move. (2026-10-01.)

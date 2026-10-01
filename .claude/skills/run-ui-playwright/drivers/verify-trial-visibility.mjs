@@ -25,7 +25,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, loginExpo, tap, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, loginExpo, tap, sgLabel, ADMIN } from "./lib.mjs";
 
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
@@ -65,12 +65,15 @@ check(
 // fact being tested; "whatever month the fixture landed in" was. So ASK THE
 // DATABASE what it inserted rather than restating its date maths here: two
 // copies of the same calculation is the thing that drifts (§7.225).
-// The \w* is §8.90's ICU trap — 'Sep' and 'Sept' must both pass.
-const [trialDay, trialMon] = sql(`
-  SELECT to_char(session_date,'FMDD') || '|' || to_char(session_date,'Mon')
+// The DATE comes from the DB, the LABEL from lib.mjs (§7.302); the \w* stays as
+// belt-and-braces for §8.90's ICU trap.
+const trialDayIso = sql(`
+  SELECT session_date::text
     FROM trial_bookings
    WHERE student_id = '7d099999-0000-0000-0000-000000000001'
-   ORDER BY session_date DESC LIMIT 1`).split("|");
+   ORDER BY session_date DESC LIMIT 1`);
+const trialDay = sgLabel(trialDayIso, { day: "numeric" });
+const trialMon = sgLabel(trialDayIso, { month: "short" });
 
 check(
   "...and WHEN, with the class named",
@@ -112,11 +115,13 @@ check(
 // is the only non-drifting form (§7.225); the frozen "Aug" passed only because an
 // unrelated August session date still showed in the roster list — a green for the
 // wrong reason, which would have masked the guest's date vanishing entirely.
-const [guestDay, guestMon] = sql(`
-  SELECT to_char(session_date,'FMDD') || '|' || to_char(session_date,'Mon')
+const guestDayIso = sql(`
+  SELECT session_date::text
     FROM trial_bookings
    WHERE student_id = '7d099999-0000-0000-0000-000000000002'
-   ORDER BY session_date DESC LIMIT 1`).split("|");
+   ORDER BY session_date DESC LIMIT 1`);
+const guestDay = sgLabel(guestDayIso, { day: "numeric" });
+const guestMon = sgLabel(guestDayIso, { month: "short" });
 check(
   "...naming the guest and the date",
   /Trialvis Guest/i.test(text) &&

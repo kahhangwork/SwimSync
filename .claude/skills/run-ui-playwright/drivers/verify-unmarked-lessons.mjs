@@ -33,7 +33,7 @@
 import os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
-import { launch, loginExpo, loginAdmin, tap, dumpText, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginExpo, loginAdmin, tap, dumpText, sgLabel, ADMIN, EXPO } from "./lib.mjs";
 
 const sql = (q) =>
   execSync(
@@ -44,17 +44,22 @@ const sql = (q) =>
   ).trim();
 
 // Every label this driver asserts on, derived from the one row the fixture wrote.
-// 'Dy, FMDD Mon' matches how the app renders a dated backlog row ("Sat, 4 Jul").
-const [missingIso, MISSING, MARKED_ROW, NEXT_1, NEXT_2] = sql(`
-  SELECT to_char(ls.session_date + 7,'YYYY-MM-DD')
-      || '|' || to_char(ls.session_date + 7,'FMDD Mon')
-      || '|' || to_char(ls.session_date,    'Dy, FMDD Mon')
-      || '|' || to_char(ls.session_date + 14,'FMDD Mon')
-      || '|' || to_char(ls.session_date + 21,'FMDD Mon')
+// Dates from the DB, labels from lib.mjs ("Sat, 4 Jul" is the app's dated backlog
+// row) — never to_char 'Mon', which says "Sep" against the app's "Sept" (§7.302).
+const [markedIso, missingIso, next1Iso, next2Iso] = sql(`
+  SELECT to_char(ls.session_date,     'YYYY-MM-DD')
+      || '|' || to_char(ls.session_date + 7, 'YYYY-MM-DD')
+      || '|' || to_char(ls.session_date + 14,'YYYY-MM-DD')
+      || '|' || to_char(ls.session_date + 21,'YYYY-MM-DD')
     FROM lesson_sessions ls
     JOIN classes c ON c.id = ls.class_id
    WHERE c.title = 'Saturday Beginners'
    ORDER BY ls.session_date DESC LIMIT 1`).split("|");
+const DAY_MON = { day: "numeric", month: "short" };
+const MISSING = sgLabel(missingIso, DAY_MON);
+const MARKED_ROW = sgLabel(markedIso);
+const NEXT_1 = sgLabel(next1Iso, DAY_MON);
+const NEXT_2 = sgLabel(next2Iso, DAY_MON);
 
 // The Wednesday after the missing Saturday, so NEXT_1/NEXT_2 stay in the future.
 const TODAY_SGT = new Date(`${missingIso}T04:00:00Z`);

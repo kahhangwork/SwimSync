@@ -19,7 +19,7 @@
 //   13    the badge is gone after navigation
 
 import { execSync } from "node:child_process";
-import { launch, loginAdmin, ADMIN } from "./lib.mjs";
+import { launch, loginAdmin, sgMonthLabel, ADMIN } from "./lib.mjs";
 
 const TENANT = "ab000000-0000-0000-0000-000000000001";
 const KID_TWO = "OrphanRpt Two Lessons";
@@ -137,9 +137,11 @@ function sqlAs(uid, q) {
         text.includes("1 billable lesson"),
       ""
     );
-    // The month label — "Jul 2026" style, derived the same way the page does.
-    const monthLabel = sql(
-      `SELECT to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month', 'Mon YYYY')`
+    // The month label — "Sept 2026" style. The MONTH comes from the DB (last
+    // month in SGT, the fixture's sealed month); the LABEL from lib.mjs, never
+    // to_char — 'Mon' said "Sep" against the page's "Sept" (§7.302).
+    const monthLabel = sgMonthLabel(
+      sql(`SELECT to_char((now() AT TIME ZONE 'Asia/Singapore') - INTERVAL '1 month', 'YYYY-MM')`)
     );
     check(
       `lines name the sealed month (${monthLabel})`,

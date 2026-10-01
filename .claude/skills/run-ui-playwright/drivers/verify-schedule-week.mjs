@@ -53,7 +53,7 @@
 // looks correct for eleven twelfths of the year and then matches NOTHING —
 // which under `exact: true` is a THROWN driver, not a failed check. Measured
 // 2026-08-10: PG `Mon, 7 Sep` vs Chrome `Mon, 7 Sept` for 2026-09-07. Labels
-// are built by `sgLabel()` below, in the same formatter family as the screen.
+// are built by lib.mjs's `sgLabel()`, in the same formatter family as the screen.
 // This is §7.100's "compare ISO values, never rendered labels" in miniature.
 //
 // SABOTAGE SIGNATURE, measured 2026-08-10 on a Monday. Restore the old
@@ -66,7 +66,7 @@
 // If sabotage still passes, the reveal guard has gone vacuous — fix that first.
 
 import { execSync } from "node:child_process";
-import { launch, loginExpo, visibleText, tap } from "./lib.mjs";
+import { launch, loginExpo, visibleText, tap, sgLabel } from "./lib.mjs";
 
 const results = [];
 const check = (label, pass, detail = "") => {
@@ -80,15 +80,6 @@ function sql(q) {
     { encoding: "utf8" }
   ).trim();
 }
-
-/**
- * "Sat, 1 Aug" — byte-for-byte what `formatSgDate` puts on the screen.
- * Deliberately the SAME call the app makes (`SwimSyncApp/lib/lessonDates.ts`):
- * parse as UTC, render `en-SG`. Building this in SQL instead is the `Sept` trap
- * in the header comment.
- */
-const sgLabel = (iso, opts = { weekday: "short", day: "numeric", month: "short" }) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-SG", { ...opts, timeZone: "UTC" });
 
 const TODAY = sql("SELECT (now() AT TIME ZONE 'Asia/Singapore')::date");
 const D_PREV = sql(`SELECT '${TODAY}'::date - 7`);

@@ -51,7 +51,7 @@
 
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { launch, loginAdmin, ADMIN, EXPO } from "./lib.mjs";
+import { launch, loginAdmin, sgMonthLabel, ADMIN, EXPO } from "./lib.mjs";
 
 // ── Refuse anything but the local stack (plan rule 14) ──────────────────────
 const API = "http://127.0.0.1:54321";
@@ -87,9 +87,10 @@ const APPLICATION = "d3000000-0000-0000-0000-0000000002b1";
 const LEAVER = sql(`SELECT id FROM parents WHERE profile_id='d3000000-0000-0000-0000-0000000000f1'`);
 if (!LEAVER) throw new Error("fixture not loaded — load fixtures-invoice-admin.sql first");
 const REFS = "INV-IA-0001,INV-IA-0002,INV-IA-0003";
-// The three rows as the table renders them (months from the DB, §7.225).
-const MONTHS = sql(`SELECT string_agg(to_char(to_date(billing_month,'YYYY-MM'),'Mon YYYY'), ',' ORDER BY reference_number)
-                      FROM invoices WHERE tenant_id='d3000000-0000-0000-0000-000000000001'`).split(",");
+// The three rows as the table renders them: months FROM the DB (§7.225), LABELLED
+// by lib.mjs — a to_char 'Mon' here said "Sep" against the page's "Sept" (§7.302).
+const MONTHS = sql(`SELECT string_agg(billing_month, ',' ORDER BY reference_number)
+                      FROM invoices WHERE tenant_id='d3000000-0000-0000-0000-000000000001'`).split(",").map(sgMonthLabel);
 const ROWS = [`InvAdm Leaver|${MONTHS[0]}|Paid`, `InvAdm Leaver|${MONTHS[1]}|Paid`,
               `InvAdm Stayer|${MONTHS[2]}|Outstanding`].sort().join(",");
 
