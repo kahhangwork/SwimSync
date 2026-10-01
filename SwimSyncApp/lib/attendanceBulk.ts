@@ -19,22 +19,27 @@ export const SET_ALL_OPTIONS: BulkOption[] = [
   { label: "Cancelled — Coach", top: "cancelled", sub: "coach", dot: "bg-orange-500" },
 ];
 
+export type BulkState = { top: BulkTop; sub: "rain" | "coach" | null };
+
 /**
- * Build a NEW attendance map with every student set to next.top/next.sub. Each student's
- * Statuses only. There is no attendance-row id to carry: the save matches an
- * existing row on (lesson_session_id, student_id), and sending the primary key
- * is what broke partially-marked lessons (§7.67).
+ * Build a NEW attendance map: every id in `studentIds` set to next.top/next.sub, and
+ * EVERY OTHER entry of `current` carried over untouched. A set entry is a status
+ * only — there is no attendance-row id to carry: the save matches an existing row on
+ * (lesson_session_id, student_id), and sending the primary key is what broke
+ * partially-marked lessons (§7.67). (The save payload is built from statuses in
+ * lib/attendancePayload.ts, so a carried-over entry cannot put an id back in it.)
+ *
+ * ⚠ The carry-over is load-bearing. The caller leaves a public-holiday void out of
+ * `studentIds` (a coach may not re-mark it); until 2026-10-02 this returned only the
+ * listed ids, so that row was DELETED from the map and Save refused the lesson.
  * Does not mutate the input.
  */
-export function applyBulkStatus(
+export function applyBulkStatus<T>(
   studentIds: string[],
-  current: Record<string, unknown>,
-  next: { top: BulkTop; sub: "rain" | "coach" | null }
-): Record<string, { top: BulkTop; sub: "rain" | "coach" | null }> {
-  const result: Record<
-    string,
-    { top: BulkTop; sub: "rain" | "coach" | null }
-  > = {};
+  current: Record<string, T>,
+  next: BulkState
+): Record<string, T | BulkState> {
+  const result: Record<string, T | BulkState> = { ...current };
   for (const id of studentIds) {
     result[id] = {
       top: next.top,

@@ -1341,8 +1341,11 @@ session id — the row may not exist yet). There the admin:
 The most common whole-class case — a lesson rained off, or everyone present — is a one-tap
 **"Set all ▾"** menu in the Mark Attendance header. It sets every enrolled student to a
 single status at once (Present, Absent, Cancelled — Rain, or Cancelled — Coach), which the
-coach then adjusts individually. It **overwrites** all students; if any student is already
-marked it asks for confirmation first, so a stray tap can't wipe individual edits. **Trial
+coach then adjusts individually. It **overwrites** all students — **except a public-holiday
+void, which it leaves exactly as it is** (admin-owned and read-only to a coach; fixed
+2026-10-02, when Set all had been deleting it and Save then refused the lesson); if any
+student is already marked it asks for confirmation first, so a stray tap can't wipe
+individual edits. **Trial
 is deliberately not offered in bulk** — a whole class of trials doesn't happen, and its
 Paid/Free split needs a per-student choice. This is a client-side shortcut layered over the
 existing per-student marking and the single upsert-all save (§7.6 above); it changes no

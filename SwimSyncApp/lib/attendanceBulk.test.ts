@@ -2,7 +2,7 @@ import { applyBulkStatus, SET_ALL_OPTIONS } from "./attendanceBulk";
 
 describe("applyBulkStatus", () => {
   it("sets every student id to the chosen top/sub", () => {
-    const result = applyBulkStatus(["a", "b", "c"], {}, { top: "cancelled", sub: "rain" });
+    const result = applyBulkStatus(["a", "b", "c"], {} as Record<string, never>, { top: "cancelled", sub: "rain" });
     expect(Object.keys(result).sort()).toEqual(["a", "b", "c"]);
     for (const id of ["a", "b", "c"]) {
       expect(result[id].top).toBe("cancelled");
@@ -33,6 +33,23 @@ describe("applyBulkStatus", () => {
     const snapshot = JSON.stringify(current);
     applyBulkStatus(["a"], current, { top: "cancelled", sub: "coach" });
     expect(JSON.stringify(current)).toBe(snapshot);
+  });
+
+  // A student NOT in the id list keeps their entry, untouched. useMarking leaves a
+  // public-holiday void out of the list (a coach may not re-mark it, §7.67) — and
+  // until 2026-10-02 this returned ONLY the listed ids, so the holiday row was
+  // DELETED from the map: the screen showed it "Not yet marked" and Save refused
+  // the whole lesson until it was reopened.
+  it("keeps every student it was not asked to set, exactly as they were", () => {
+    const current = {
+      a: { top: "unmarked", sub: null },
+      h: { top: "holiday", sub: null },
+    };
+    const result = applyBulkStatus(["a"], current, { top: "present", sub: null });
+    expect(result).toEqual({
+      a: { top: "present", sub: null },
+      h: { top: "holiday", sub: null },
+    });
   });
 
   it("returns an empty map when there are no students", () => {
