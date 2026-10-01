@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-09-27 (late night) — **Wave 2 SHIPPED (§8.132): package revenue counts on Accounting (cash basis)
-and refunds are recorded in-app.** Two migrations + apps (deploy #59) after nightly `36313394669` read GREEN 68/68.
-One prod data fix: Little Orcas's test package PKG-2026-0001 no longer counts._
+_Last updated: 2026-10-01 — **§8.133: 1 October turned CI red with no code change; four date bugs fixed, two CI
+date guards added.** Driver labels "Sep"≠"Sept", expired pgTAP literals, a fixture Saturday collision; new
+`check-driver-dates.sh` + `scripts/check-test-dates.sh`. Tests/CI/docs only — no deploy. Injected clock → BACKLOG._
 
-_Previously (§8.131, 2026-09-27) — Wave 1 (roles, crash-safe email claim) shipped; the sign-up escalation closed._
+_Previously (§8.132, 2026-09-27) — Wave 2 shipped: package revenue on Accounting, in-app refunds (deploy #59)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.296** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.310** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -348,6 +348,22 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.133 (2026-10-01) — the calendar turned CI red: four date bugs, two guards, the real fix filed
+
+**No code changed between green and red: the first run of October met four latent date assumptions. Each fixed,
+proven red→green, and the two that recurred are now CI guards rather than prose.** Commits `d419151` … `23cb423`.
+
+- **Drivers** `invoice-admin`/`orphan-report` built "Sep" in SQL vs the app's en-SG "Sept"; 5 more passed by
+  substring luck. All 11 now use `lib.mjs` `sgLabel()` + CI guard (§7.302).
+- **pgTAP** `trial_onboarding`/`session_coach_roster`/`class_shadow_coaches` wrote August literals the floor passed
+  → derived from `session_window_start()` (§7.303). Hidden behind it: a fixture Saturday collision (§7.304).
+- **Expiry alarm** `scripts/check-test-dates.sh` (§7.305, plan DONE): 47 future literals audited, all unguarded,
+  annotated. Gotchas §7.306–§7.310 from its review.
+- **Decided with the user:** the real fix is an injected DB clock → BACKLOG *Inject the database clock* (L, unranked);
+  the libfaketime "time machine" rejected (reasons there). pgTAP is kept — it guards RLS, grants, billing.
+- **Not done:** Wave 2 lane 2 (attendance-save tests) — `/plan-with-confidence` started, one answer recorded (both
+  layers: hook + 2–3 screen tests), three questions open; no plan file.
+
 ## 8.132 (2026-09-27) — Wave 2 planned, reviewed and shipped: package revenue + in-app refunds
 
 **One session: `/plan-with-confidence` (7 questions to the user) → `/plan-review` (11 risks, all inlined) → U1 then
@@ -363,26 +379,7 @@ U2, each migration → prod before its app; apps pushed after the nightly read g
 - **Not done:** parent visibility of refunds (BACKLOG *Show package refunds to the parent*); Wave 2 lane 2
   (attendance component tests) untouched.
 
-## 8.131 (2026-09-27) — Wave 1 shipped in two lanes; a public sign-up could make itself platform admin
-
-**Two Claude sessions in parallel — root (roles, lane 1) and worktree `email-claim` (lane 2) — coordinated over
-cross-session messages, shared DB handed back and forth; three prod deploys, all with the §7.1 gate overridden by
-the user.** Commits `ee688d9` … `b487524`.
-
-- **SECURITY, found while designing roles:** `handle_new_user` trusted `role`/`tenant_id` from sign-up metadata —
-  one anonymous `signUp` became a platform admin. Fixed by server-minted `staff_invitations` (§7.289, ARCHITECTURE
-  §6aa, deploy #56). Prod was NOT audited for prior use (user declined) and not probed.
-- **Crash-safe email claim** (lane 2): claim lease + one Resend key per email; >24 h → "May have been sent" (PRD
-  §7.7/§7.8, #57). The user reversed plan §2's "new key" in review.
-- **Roles & permissions**, all 8 steps: 8 areas (four ops areas merged at step 0), migrations A–D, edge gates, both
-  apps, Roles page, `verify-roles` (PRD §4.3, ARCHITECTURE §6ab, map + plan in `docs/plans/`, #58). Coaches lost all
-  money access (P11/X3).
-- **Caught by tests before shipping:** §7.290 (a trigger `CASE` broke every sign-up), §7.291 (page-wide radio
-  groups), §7.293 (delete-admin banned before its RPC), §7.294 (a test built an invalid shape).
-- **Not done:** P5's per-control hiding (BACKLOG); the stale "new key" function COMMENTs (BACKLOG); DB-backed
-  lane-2 Deno tests not mutation-proven (TESTING §5); no real co-admin login on prod.
-
-_(§8.130 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.131 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -425,10 +422,12 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-09-27 (late night): last nightly `36313394669` GREEN, 68/68, on `58a564f`** (Wave 1 — dispatched on
-the user's word). **The next one is the first over Wave 2** (`96fa216`, 69 drivers — `verify-accounting-packages` is
-new, `verify-packages-admin` is 56 checks). Where a red points first: those two → refunds / package revenue
-(`package_refunds`, `accounting_summary`); `verify-packages` / `verify-package-renewal` → the `confirmed_at` pin (§7.300).
+**State on 2026-10-01: last nightly `36791874903` RED 67/69, on `6502d95`** — `invoice-admin` + `orphan-report`, a
+driver "Sep"≠"Sept" bug, fixed in `d419151` (§7.302; both green locally). The run dispatched 2026-09-27
+(`36321271139`, first over Wave 2) and the two scheduled after it were GREEN, so Wave 2 is cleared. **The next one is
+the first over §8.133** (`23cb423`: 11 drivers moved onto `lib.mjs` `sgLabel()`, `fixtures-packages` date rule) and
+CI's first real check of "Sept" on its Node. A red on a label → `sgLabel()` vs the screen; on `verify-packages` /
+`verify-unmarked-lessons` → §7.304's date rule.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -438,14 +437,16 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read the next nightly** (never dispatch it unasked) — the first over Wave 2. Red → fix that first.
-2. **Before Little Orcas bills September:** its Accounting will show *Packages sold S$700* (PKG-2026-0002, a real
-   sale). PKG-2026-0001 was a test and now counts nowhere (DEPLOYMENT #59) — nothing to do unless a figure disagrees.
-3. **Next build** (`BACKLOG.md` → *Current build order*): Wave 2 lane 2 (attendance-save component tests), then Wave
-   3; before the co-admin hire (~3 months), *Hide edit controls page by page for a view-only role*. New in the queue:
-   *Show package refunds to the parent*.
+1. **Read the next nightly** (never dispatch it unasked) — the first over §8.133's driver changes. Red → fix first.
+2. **Bill September now (early October):** Little Orcas's Accounting should show *Packages sold S$700*
+   (PKG-2026-0002); PKG-2026-0001 was a test and counts nowhere (DEPLOYMENT #59). `INVOICE_RUNBOOK.md`.
+3. **Next build** (`BACKLOG.md` → *Current build order*): Wave 2 lane 2 (attendance-save tests) — resume
+   `/plan-with-confidence`: decided "both layers" (hook tests via `renderHook` + 2–3 whole-screen tests); still open:
+   which save behaviours to pin, Pending charges' two-tenant test in or out, port `useAttendanceLoad.test.ts` or not.
+   Then Wave 3. **Unranked, new:** *Inject the database clock* (L) — rank it with the user; not mid-billing.
 
 - **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127).
+- **A new test/fixture date:** derive it from `session_window_start()` or CI refuses it (§7.305).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
   current change has (§7.253); **`verify-app-auth` needs :8081** (§7.268); a `--only` run RESETS the DB.
 - **A new staff-creating route must mint a `staff_invitations` row** (§7.289); **a new admin surface must name its

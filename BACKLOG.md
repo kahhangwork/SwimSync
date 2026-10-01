@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-09-27 (late night) — **Wave 2 SHIPPED** (§8.132): removed *Package revenue on the accounting page* and *In-app package refunds* (both live); filed *Show package refunds to the parent*. Wave 2's lane 2 (attendance component tests) and Wave 3 remain. Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-01 — filed *Inject the database clock* (L, Foundations; unranked — rank with the user) after 1 October turned CI red through four latent date bugs (§8.133). Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
