@@ -11,6 +11,19 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT plan(41);
 
+CREATE TEMP TABLE td AS
+WITH w AS (SELECT session_window_start() AS w, (session_window_start() - INTERVAL '1 month')::date AS wj),
+     d AS (SELECT w + ((6 - EXTRACT(DOW FROM w)::int + 7) % 7)   AS x,   -- first Saturday ≥ floor
+                  wj + ((6 - EXTRACT(DOW FROM wj)::int + 7) % 7) AS j    -- first Saturday a month earlier
+             FROM w)
+SELECT x, j, x + 4 AS wed,                                       -- a Wednesday: not a class day
+       to_char(j, 'YYYY-MM') AS j_ym,
+       to_char(x, 'YYYY-MM') AS x_ym,
+       to_char(x + INTERVAL '1 month',  'YYYY-MM') AS p1_ym,
+       to_char(x + INTERVAL '2 months', 'YYYY-MM') AS p2_ym
+  FROM d;
+GRANT SELECT ON td TO authenticated;
+
 -- ── fixture ────────────────────────────────────────────────────────────────
 INSERT INTO tenants (id, slug, display_name, join_code, rain_pays_coach)
 VALUES ('99999999-0000-0000-0000-000000000001','roster','Roster Swim','SWIM-ROST', FALSE);
@@ -31,9 +44,17 @@ SELECT t.id, 'Default Group' FROM tenants t
                     WHERE c.tenant_id = t.id AND lower(trim(c.name)) = 'default group');
 
 -- A 60-minute Saturday class owned by Coach A. Two Saturdays are used:
--- 2026-08-08 (the cover, in the past so attendance is markable) and
--- 2026-07-04 (the settled-month correction). Both MUST be Saturdays or
+-- td.x (the cover, in the past so attendance is markable) and td.j (the
+-- settled-month correction, a month earlier). Both MUST be Saturdays or
 -- guard_session_date refuses the insert.
+--
+-- ⚠ DERIVED FROM THE FLOOR, NEVER LITERAL (§7.303). These were 2026-08-08 and
+-- 2026-07-04, and on 2026-10-01 the marking floor (the 1st of LAST month) passed
+-- 08-08: the substitute's attendance write was refused and both payroll checks
+-- read 0. td.x is the first Saturday on or after session_window_start() — the
+-- function the guard itself reads — and every payroll period is derived from it
+-- in the same shape as before (j's month, x's month, then the two after). Readable
+-- by `authenticated` because the probes run as that role.
 -- classes.location_id is NOT NULL since the location contract migration
 -- (20260824000200). Give every tenant one location to hang classes off,
 -- tenant-agnostic and idempotent (mirrors the Default Group category block).
@@ -92,29 +113,29 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"71000000-0000-0000-0000-000000000001"
 -- lesson_sessions rows are created LAZILY at first attendance save, so a
 -- FUTURE lesson has no id to assign against. The assignment resolves-or-creates.
 SELECT lives_ok(
-  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-08',
+  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001',(SELECT x FROM td),
        (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003')) $$,
   'assigning a cover CREATES the lesson_sessions row the roster needs');
 
 SELECT is(
   (SELECT count(*)::INT FROM lesson_sessions
-    WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08'),
+    WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date=(SELECT x FROM td)),
   1, 'exactly one lesson_sessions row exists after the first assignment');
 
 SELECT lives_ok(
-  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-08',
+  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001',(SELECT x FROM td),
        (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003')) $$,
   'assigning the same cover twice does not raise');
 
 SELECT is(
   (SELECT count(*)::INT FROM lesson_sessions
-    WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08'),
+    WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date=(SELECT x FROM td)),
   1, 'resolve-or-create is IDEMPOTENT — still one session row, not two');
 
 SELECT is(
   (SELECT count(*)::INT FROM session_coaches sc
      JOIN lesson_sessions ls ON ls.id=sc.lesson_session_id
-    WHERE ls.session_date='2026-08-08'),
+    WHERE ls.session_date=(SELECT x FROM td)),
   1, 'and exactly one SUBSTITUTE row, enforced by one_substitute_per_session');
 
 -- session_coaches is the SUBSTITUTE table now, so the index is a plain UNIQUE
@@ -123,7 +144,7 @@ SELECT is(
 -- reference, which is the reason the RPC exists at all.
 SELECT lives_ok(
   $$ SELECT set_session_main_coach(
-       (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08'),
+       (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date=(SELECT x FROM td)),
        (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000004')) $$,
   'changing who the main coach is does not raise 23505');
 
@@ -131,15 +152,15 @@ SELECT is(
   (SELECT p.full_name FROM session_coaches sc
      JOIN coaches c ON c.id=sc.coach_id JOIN profiles p ON p.id=c.profile_id
      JOIN lesson_sessions ls ON ls.id=sc.lesson_session_id
-    WHERE ls.session_date='2026-08-08'),
+    WHERE ls.session_date=(SELECT x FROM td)),
   'Coach T', 'the swap actually replaced the main rather than keeping the old one');
 
 -- Put B back as the substitute, and assign T as a shadow of the WHOLE CLASS —
 -- the shape the rest of the file uses. Dated from January so it covers both the
--- August lesson and July's settled one; it is assigned BEFORE any payout is
+-- cover lesson (td.x) and the settled one (td.j); it is assigned BEFORE any payout is
 -- marked paid, because assign_class_shadow() is sealed against that (§2.1).
 SELECT set_session_main_coach(
-  (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08'),
+  (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date=(SELECT x FROM td)),
   (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003'));
 SELECT assign_class_shadow('67000000-0000-0000-0000-000000000001',
   (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000004'), '2026-01-01');
@@ -147,7 +168,7 @@ SELECT assign_class_shadow('67000000-0000-0000-0000-000000000001',
 -- A roster row against a fabricated date is a lesson that will be marked, paid
 -- and BILLED on a day the class never met.
 SELECT throws_ok(
-  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-12',
+  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001',(SELECT wed FROM td),
        (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003')) $$,
   NULL, NULL,
   'a date the class does not run on is REFUSED, not silently created');
@@ -163,7 +184,7 @@ SELECT isnt((SELECT id FROM _foreign), NULL,
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"71000000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT throws_ok(
-  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-08',
+  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001',(SELECT x FROM td),
        (SELECT id FROM _foreign)) $$,
   NULL, NULL,
   'a coach of ANOTHER business cannot be rostered onto this lesson');
@@ -173,7 +194,7 @@ SELECT throws_ok(
 -- confusing state a private coach hit assigning themselves. Refused at the DB, not
 -- just the UI. Coach A is the paid coach here (seed_class_rate). (20260821000100)
 SELECT throws_ok(
-  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001','2026-08-08',
+  $$ SELECT assign_session_coach('67000000-0000-0000-0000-000000000001',(SELECT x FROM td),
        (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000002')) $$,
   NULL, NULL,
   'the class''s own paid coach is REFUSED as a substitute — a cover names a different coach');
@@ -186,11 +207,11 @@ SELECT throws_ok(
 -- billing month that will not close, with no override and nothing on screen).
 RESET ROLE;
 INSERT INTO trial_bookings (student_id, class_id, session_date, tenant_id, category_id, booked_by)
-SELECT '56000000-0000-0000-0000-000000000002','67000000-0000-0000-0000-000000000001','2026-08-08',
+SELECT '56000000-0000-0000-0000-000000000002','67000000-0000-0000-0000-000000000001',(SELECT x FROM td),
        '99999999-0000-0000-0000-000000000001', cl.category_id, '71000000-0000-0000-0000-000000000001'
   FROM classes cl WHERE cl.id='67000000-0000-0000-0000-000000000001';
 INSERT INTO makeup_bookings (student_id, class_id, session_date, tenant_id, category_id, home_class_id, booked_by)
-SELECT '56000000-0000-0000-0000-000000000003','67000000-0000-0000-0000-000000000001','2026-08-08',
+SELECT '56000000-0000-0000-0000-000000000003','67000000-0000-0000-0000-000000000001',(SELECT x FROM td),
        '99999999-0000-0000-0000-000000000001', cl.category_id, '67000000-0000-0000-0000-000000000001',
        '71000000-0000-0000-0000-000000000001'
   FROM classes cl WHERE cl.id='67000000-0000-0000-0000-000000000001';
@@ -201,7 +222,7 @@ SET LOCAL "request.jwt.claims" TO '{"sub":"71000000-0000-0000-0000-000000000003"
 SELECT is((SELECT count(*)::INT FROM classes WHERE id='67000000-0000-0000-0000-000000000001'),
   1, 'RISK 1 — the substitute can read the CLASS row (no class row, no week card at all)');
 
-SELECT is((SELECT count(*)::INT FROM lesson_sessions WHERE session_date='2026-08-08'),
+SELECT is((SELECT count(*)::INT FROM lesson_sessions WHERE session_date=(SELECT x FROM td)),
   1, 'the substitute can read the covered SESSION');
 
 SELECT is((SELECT count(*)::INT FROM student_class_enrolments WHERE class_id='67000000-0000-0000-0000-000000000001'),
@@ -224,7 +245,7 @@ SELECT lives_ok(
   $$ INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
      SELECT ls.id,'56000000-0000-0000-0000-000000000001','present','71000000-0000-0000-0000-000000000003'
        FROM lesson_sessions ls
-      WHERE ls.class_id='67000000-0000-0000-0000-000000000001' AND ls.session_date='2026-08-08' $$,
+      WHERE ls.class_id='67000000-0000-0000-0000-000000000001' AND ls.session_date=(SELECT x FROM td) $$,
   'the substitute can WRITE attendance on the lesson they are covering');
 
 
@@ -248,18 +269,18 @@ SELECT throws_ok(
 -- ═══ 4. THE TRAINEE READS, AND DOES NOT MARK ══════════════════════════════
 SET LOCAL "request.jwt.claims" TO '{"sub":"71000000-0000-0000-0000-000000000004","role":"authenticated"}';
 
-SELECT is((SELECT count(*)::INT FROM lesson_sessions WHERE session_date='2026-08-08'),
+SELECT is((SELECT count(*)::INT FROM lesson_sessions WHERE session_date=(SELECT x FROM td)),
   1, 'a shadow coach can READ the lesson they are shadowing');
 
 SELECT ok(NOT coach_is_main_on_session(
-    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08')),
+    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date=(SELECT x FROM td))),
   'a shadow is not the main coach');
 
 SELECT throws_ok(
   $$ INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
      SELECT ls.id,'56000000-0000-0000-0000-000000000002','present','71000000-0000-0000-0000-000000000004'
        FROM lesson_sessions ls
-      WHERE ls.class_id='67000000-0000-0000-0000-000000000001' AND ls.session_date='2026-08-08' $$,
+      WHERE ls.class_id='67000000-0000-0000-0000-000000000001' AND ls.session_date=(SELECT x FROM td) $$,
   NULL, NULL,
   'a shadow canNOT write attendance — the main coach stays unambiguous for marking');
 
@@ -268,14 +289,14 @@ SELECT throws_ok(
 SET LOCAL "request.jwt.claims" TO '{"sub":"71000000-0000-0000-0000-000000000002","role":"authenticated"}';
 
 SELECT ok(NOT coach_is_main_on_session(
-    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08')),
+    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date=(SELECT x FROM td))),
   'the class''s own coach is not main on a lesson someone else covered');
 
 SELECT throws_ok(
   $$ INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
      SELECT ls.id,'56000000-0000-0000-0000-000000000003','present','71000000-0000-0000-0000-000000000002'
        FROM lesson_sessions ls
-      WHERE ls.class_id='67000000-0000-0000-0000-000000000001' AND ls.session_date='2026-08-08' $$,
+      WHERE ls.class_id='67000000-0000-0000-0000-000000000001' AND ls.session_date=(SELECT x FROM td) $$,
   NULL, NULL,
   'THE NARROWING — and so canNOT write attendance on it either');
 
@@ -293,22 +314,22 @@ SELECT cmp_ok((SELECT count(*)::INT FROM lesson_sessions), '>', 0,
 RESET ROLE;
 
 SELECT is((SELECT amount FROM session_pay_amount(
-    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08'),
+    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date=(SELECT x FROM td)),
     (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000002'))),
   NULL, 'the REPLACED coach is owed nothing for a lesson they did not teach');
 
 SELECT is((SELECT amount FROM session_pay_amount(
-    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08'),
+    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date=(SELECT x FROM td)),
     (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003'))),
   50.00::NUMERIC, 'RISK 2 — the substitute is paid THEIR OWN rate (50), not the class''s terms (30)');
 
 SELECT is((SELECT amount FROM session_pay_amount(
-    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08'),
+    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date=(SELECT x FROM td)),
     (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000004'))),
   10.00::NUMERIC, 'RISK 2 — the shadow is paid their own rate (10); three different answers prove the coach argument is read');
 
 SELECT is((SELECT amount FROM session_pay_amount(
-    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date='2026-08-08'))),
+    (SELECT id FROM lesson_sessions WHERE class_id='67000000-0000-0000-0000-000000000001' AND session_date=(SELECT x FROM td)))),
   50.00::NUMERIC, '§7.123 — the one-argument form still exists and delegates to the roster main');
 
 -- The absence rule: an untouched lesson of Coach A''s other class still pays A.
@@ -316,7 +337,7 @@ SELECT is((SELECT amount FROM session_pay_amount(
 -- session ("not a lesson that happened"), so an unmarked one would assert
 -- nothing about attribution. The child is in both classes, which Wave 2 allows.
 INSERT INTO lesson_sessions (id, class_id, session_date, status)
-VALUES ('45000000-0000-0000-0000-000000000009','67000000-0000-0000-0000-000000000002','2026-08-08','completed');
+VALUES ('45000000-0000-0000-0000-000000000009','67000000-0000-0000-0000-000000000002',(SELECT x FROM td),'completed');
 INSERT INTO student_class_enrolments (student_id, class_id, is_active)
 VALUES ('56000000-0000-0000-0000-000000000001','67000000-0000-0000-0000-000000000002', TRUE);
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
@@ -328,14 +349,14 @@ SELECT is((SELECT amount FROM session_pay_amount('45000000-0000-0000-0000-000000
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"71000000-0000-0000-0000-000000000001","role":"authenticated"}';
 
-CREATE TEMP TABLE _aug AS
-  SELECT * FROM generate_coach_payouts('99999999-0000-0000-0000-000000000001','2026-08');
+CREATE TEMP TABLE _x_month AS
+  SELECT * FROM generate_coach_payouts('99999999-0000-0000-0000-000000000001',(SELECT x_ym FROM td));
 
-SELECT is((SELECT gross FROM _aug WHERE coach_name='Coach B'), 50.00::NUMERIC,
+SELECT is((SELECT gross FROM _x_month WHERE coach_name='Coach B'), 50.00::NUMERIC,
   'payroll pays the substitute for the lesson they covered');
-SELECT is((SELECT gross FROM _aug WHERE coach_name='Coach T'), 10.00::NUMERIC,
+SELECT is((SELECT gross FROM _x_month WHERE coach_name='Coach T'), 10.00::NUMERIC,
   'payroll pays the shadow at their own rate — one lesson, TWO payout rows');
-SELECT is((SELECT gross FROM _aug WHERE coach_name='Coach A'), 30.00::NUMERIC,
+SELECT is((SELECT gross FROM _x_month WHERE coach_name='Coach A'), 30.00::NUMERIC,
   'and pays the class''s own coach ONLY for the lesson nobody covered');
 
 
@@ -345,38 +366,38 @@ SELECT is((SELECT gross FROM _aug WHERE coach_name='Coach A'), 30.00::NUMERIC,
 -- no item and no payout at all — their money is invisible to it.
 RESET ROLE;
 INSERT INTO lesson_sessions (id, class_id, session_date, status)
-VALUES ('45000000-0000-0000-0000-000000000001','67000000-0000-0000-0000-000000000001','2026-07-04','completed');
+VALUES ('45000000-0000-0000-0000-000000000001','67000000-0000-0000-0000-000000000001',(SELECT j FROM td),'completed');
 INSERT INTO attendance (lesson_session_id, student_id, status, marked_by)
 VALUES ('45000000-0000-0000-0000-000000000001','56000000-0000-0000-0000-000000000001','present','71000000-0000-0000-0000-000000000002');
 
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"71000000-0000-0000-0000-000000000001","role":"authenticated"}';
-CREATE TEMP TABLE _jul AS
-  SELECT * FROM generate_coach_payouts('99999999-0000-0000-0000-000000000001','2026-07');
-SELECT is((SELECT gross FROM _jul WHERE coach_name='Coach A'), 30.00::NUMERIC,
-  'July pays Coach A, who taught it — no roster row exists yet');
+CREATE TEMP TABLE _j_month AS
+  SELECT * FROM generate_coach_payouts('99999999-0000-0000-0000-000000000001',(SELECT j_ym FROM td));
+SELECT is((SELECT gross FROM _j_month WHERE coach_name='Coach A'), 30.00::NUMERIC,
+  'the settled month pays Coach A, who taught it — no roster row exists yet');
 
 RESET ROLE;
 UPDATE coach_payouts SET status='paid', paid_at=now()
- WHERE period_month='2026-07' AND tenant_id='99999999-0000-0000-0000-000000000001';
+ WHERE period_month=(SELECT j_ym FROM td) AND tenant_id='99999999-0000-0000-0000-000000000001';
 
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"71000000-0000-0000-0000-000000000001","role":"authenticated"}';
 SELECT set_session_main_coach('45000000-0000-0000-0000-000000000001',
   (SELECT id FROM coaches WHERE profile_id='71000000-0000-0000-0000-000000000003'));
 
-CREATE TEMP TABLE _sep AS
-  SELECT * FROM generate_coach_payouts('99999999-0000-0000-0000-000000000001','2026-09');
-SELECT is((SELECT gross FROM _sep WHERE coach_name='Coach A'), -30.00::NUMERIC,
+CREATE TEMP TABLE _p1_month AS
+  SELECT * FROM generate_coach_payouts('99999999-0000-0000-0000-000000000001',(SELECT p1_ym FROM td));
+SELECT is((SELECT gross FROM _p1_month WHERE coach_name='Coach A'), -30.00::NUMERIC,
   'the replaced coach is CLAWED BACK on the next payout');
-SELECT is((SELECT gross FROM _sep WHERE coach_name='Coach B'), 50.00::NUMERIC,
+SELECT is((SELECT gross FROM _p1_month WHERE coach_name='Coach B'), 50.00::NUMERIC,
   'RISK 3 — and the substitute is PAID for a period they had no payout in at all');
 
 -- Re-run the same period twice more, then a later one. 20260719000900 exists
 -- because a first version re-emitted the difference every period, forever.
-SELECT generate_coach_payouts('99999999-0000-0000-0000-000000000001','2026-09');
-SELECT generate_coach_payouts('99999999-0000-0000-0000-000000000001','2026-09');
-SELECT generate_coach_payouts('99999999-0000-0000-0000-000000000001','2026-10');
+SELECT generate_coach_payouts('99999999-0000-0000-0000-000000000001',(SELECT p1_ym FROM td));
+SELECT generate_coach_payouts('99999999-0000-0000-0000-000000000001',(SELECT p1_ym FROM td));
+SELECT generate_coach_payouts('99999999-0000-0000-0000-000000000001',(SELECT p2_ym FROM td));
 
 RESET ROLE;
 SELECT is(

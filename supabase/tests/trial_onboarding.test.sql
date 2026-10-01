@@ -23,6 +23,20 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT plan(35);
 
+-- ⚠ BOOKING DATES ARE DERIVED FROM THE FLOOR, NEVER LITERAL (§7.303). book_trial
+-- refuses a date before markable_floor() — the 1st of LAST month for a business
+-- that has never billed. This file wrote '2026-08-01'…'2026-08-15' literally; they
+-- were inside the window until 2026-10-01 and refused after it, taking 10 of 35
+-- assertions down with them. `td` is the first Saturday on or after
+-- session_window_start(), so the file reads the same function the guard does
+-- and stays valid in every month — and under a pinned floor. Readable by
+-- `authenticated` because every probe below runs as that role.
+CREATE TEMP TABLE td AS
+SELECT sat AS sat1, sat + 7 AS sat2, sat + 14 AS sat3, sat + 3 AS tue
+  FROM (SELECT session_window_start()
+             + ((6 - EXTRACT(DOW FROM session_window_start())::int + 7) % 7) AS sat) f;
+GRANT SELECT ON td TO authenticated;
+
 -- ── Two businesses, so the tenant boundary can be probed ───────────────────
 INSERT INTO tenants (id, slug, display_name, join_code) VALUES
   ('66666666-0000-0000-0000-000000000001','trial-a','TRIAL Business A','SWIM-TRLA'),
@@ -130,7 +144,7 @@ SELECT throws_ok(
 -- 6. Nor may that coach create a trial — that arm always was admin-only.
 --    Schools arrange trials at the admin, and a private coach IS the admin.
 SELECT throws_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Coach Trial','trial','2026-08-01'::date) $$,
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Coach Trial','trial',(SELECT sat1 FROM td)) $$,
   'only this business''s admin may book a trial',
   'a COACH cannot book a trial');
 
@@ -155,10 +169,10 @@ SELECT is((SELECT e.is_active FROM student_class_enrolments e JOIN students s ON
 
 -- ══ TRIALS ARE BOOKINGS ═════════════════════════════════════════════════════
 
--- 12. The admin can also book a trial, and it books AHEAD — 2026-08-01 is in the future relative
---     to nothing in particular; what matters is that no attendance is asserted.
+-- 12. The admin can also book a trial. The date is the window's first Saturday; what
+--     matters is that no attendance is asserted.
 SELECT lives_ok(
-  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Trial Kid','trial','2026-08-01'::date) $$,
+  $$ SELECT add_unclaimed_student('66666666-1111-0000-0000-000000000001','Trial Kid','trial',(SELECT sat1 FROM td)) $$,
   'the ADMIN can create a child and book their trial');
 
 -- 13-16. A booking is NOT an enrolment, NOT attendance, and NOT a session.
@@ -189,7 +203,7 @@ SELECT is(
 --     non-class day is never on any roster, never marked, and blocks the month
 --     indefinitely with no visible cause.
 SELECT throws_like(
-  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-04'::date,
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001',(SELECT tue FROM td),
        (SELECT id FROM students WHERE full_name='Trial Kid')) $$,
   '%runs on a saturday%tuesday%',
   'a Tuesday cannot be booked into a Saturday class');
@@ -201,19 +215,19 @@ SELECT lives_ok(
        JOIN students s ON s.id=b.student_id WHERE s.full_name='Trial Kid')) $$,
   'the admin can cancel a booking');
 SELECT lives_ok(
-  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-01'::date,
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001',(SELECT sat1 FROM td),
        (SELECT id FROM students WHERE full_name='Trial Kid')) $$,
   'and the same slot can be RE-BOOKED — the unique index is partial');
 
 -- 20. Two LIVE bookings for one slot are still refused.
 SELECT throws_ok(
-  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-01'::date,
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001',(SELECT sat1 FROM td),
        (SELECT id FROM students WHERE full_name='Trial Kid')) $$,
   '23505', NULL, 'two live bookings for the same slot are refused');
 
 -- 21. An ACTIVE enrolment blocks a trial — a trial is for a child not yet in a class.
 SELECT throws_like(
-  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-08'::date,
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001',(SELECT sat2 FROM td),
        (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
   '%already enrolled%',
   'a child with an ACTIVE enrolment cannot be booked for a trial');
@@ -223,7 +237,7 @@ SELECT throws_like(
 UPDATE student_class_enrolments SET is_active = FALSE, unenrolled_at = NOW()
  WHERE student_id = (SELECT id FROM students WHERE full_name='Ongoing Kid');
 SELECT lives_ok(
-  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-08'::date,
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001',(SELECT sat2 FROM td),
        (SELECT id FROM students WHERE full_name='Ongoing Kid')) $$,
   'a CLOSED enrolment does NOT block — a returning family can trial');
 
@@ -238,7 +252,7 @@ VALUES ('66666666-2222-0000-0000-000000000001','B Kid','66666666-0000-0000-0000-
 SET LOCAL ROLE authenticated;
 SET LOCAL "request.jwt.claims" TO '{"sub":"66000000-0000-0000-0000-0000000000a1","role":"authenticated"}';
 SELECT throws_like(
-  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001','2026-08-15'::date,
+  $$ SELECT book_trial('66666666-1111-0000-0000-000000000001',(SELECT sat3 FROM td),
        '66666666-2222-0000-0000-000000000001') $$,
   '%another business%',
   'a child of ANOTHER business cannot be booked into this class');

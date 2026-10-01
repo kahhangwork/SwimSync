@@ -2458,3 +2458,16 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     with a trailing `// date-label-ok: <why>`). Proven: red on `main`'s drivers (21 lines), red with the old
     `orphan-report` line restored, green fixed. **The lesson beyond dates: a trap that recurs after being written
     down is a missing guard** — `check-driver-ports.sh` is the same move. (2026-10-01.)
+
+303. **A pgTAP file that writes a LITERAL date through a guarded path is a time bomb with a date on it.** On
+    2026-10-01 `main` CI went red on `trial_onboarding` (10/35), `session_coach_roster` (3/41) and
+    `class_shadow_coaches` (1/49) with no code change: each wrote `'2026-08-…'` as `authenticated` through
+    `book_trial` / an attendance insert, and `markable_floor()` — at most `session_window_start()`, the 1st of LAST
+    month — passed August that morning. The product was right; the tests had expired. CI runs on push only, so the
+    first push of the month found it. Fix: a `td` temp table at the top of each file derives every date from
+    `session_window_start()` (first Saturday on/after it, offsets for the rest, payroll months via `to_char`), with
+    `GRANT SELECT ON td TO authenticated` because the probes run as that role. Literal dates are still fine where
+    nothing guards them (superuser inserts, `trial_rate_on`, rate `effective_from`). ⚠ **Pinning
+    `session_window_start()` to a FUTURE month cannot validate a file whose lessons must also be in the past** —
+    `now()` does not move, so the dates land in the future and fail by construction (the `simulate-date.sh` caveat,
+    §7.226). A pinned PAST floor is a fair check. (2026-10-01.)
