@@ -73,10 +73,28 @@ FROM parents p WHERE p.profile_id = 'c9000000-0000-0000-0000-000000000001';
 -- least a week back (well inside the 30-day window). Every live-balance
 -- surface must therefore read 9 lessons remaining, while the STORED balance
 -- stays 250.00 — money moves at invoice time only.
-WITH sat AS (
-  SELECT (CURRENT_DATE
-          - ((EXTRACT(DOW FROM CURRENT_DATE)::int + 1) % 7)  -- most recent Saturday
-          - 7)::date AS d                                     -- ...a week before that
+--
+-- ⚠ NOT ANY SATURDAY — NEVER ONE OF fixtures-unmarked-lessons.sql's TWO (§7.304).
+-- That fixture owns the same seed class's last Saturday of LAST month (L, left
+-- deliberately unmarked) and L-7 (marked). This was "most recent Saturday - 7",
+-- which equals L-7 from the 1st until the month's first Saturday — a duplicate
+-- (class_id, session_date) that broke check-fixture-roundtrip's co-load pass on
+-- 2026-10-01 — and equals L for the week after, silently filling the lesson the
+-- other driver needs missing. 247 of 730 days in 2026-27. Now: the latest of
+-- recent-7/-14/-21 that is not L or L-7 — three consecutive Saturdays against
+-- two reserved, so one is always free; 7-27 days back, inside the 30-day
+-- window. Proven over every day of 2026-27. SGT, never CURRENT_DATE (§7.94).
+WITH t AS (
+  SELECT (now() AT TIME ZONE 'Asia/Singapore')::date AS today,
+         date_trunc('month', (now() AT TIME ZONE 'Asia/Singapore'))::date - 1 AS last_day_prev
+), r AS (
+  SELECT today - ((EXTRACT(DOW FROM today)::int + 1) % 7) AS recent_sat,           -- most recent Saturday
+         last_day_prev - ((EXTRACT(DOW FROM last_day_prev)::int + 1) % 7) AS l     -- unmarked-lessons' L
+    FROM t
+), sat AS (
+  SELECT (SELECT c FROM unnest(ARRAY[recent_sat - 7, recent_sat - 14, recent_sat - 21]) c
+           WHERE c NOT IN (l - 7, l) ORDER BY c DESC LIMIT 1) AS d
+    FROM r
 ), sess AS (
   INSERT INTO lesson_sessions (class_id, session_date, status)
   SELECT c.id, sat.d, 'completed'

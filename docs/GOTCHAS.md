@@ -2471,3 +2471,14 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `session_window_start()` to a FUTURE month cannot validate a file whose lessons must also be in the past** —
     `now()` does not move, so the dates land in the future and fail by construction (the `simulate-date.sh` caveat,
     §7.226). A pinned PAST floor is a fair check. (2026-10-01.)
+
+304. **Two fixtures that each derive "a Saturday" for the SAME seed class will land on the same one, some days of
+    every month.** `fixtures-packages.sql` used "most recent Saturday − 7"; `fixtures-unmarked-lessons.sql` owns L (last
+    Saturday of last month, left unmarked on purpose) and L−7. From the 1st to the month's first Saturday they are the
+    same date → duplicate `(class_id, session_date)` in `check-fixture-roundtrip.sh`'s co-load pass (red on 2026-10-01,
+    hidden until §7.303's pgTAP fix let the job reach that step). The week after, packages lands on L itself and
+    silently fills the lesson the other driver needs MISSING — no error at all. 247 of 730 days in 2026–27. The
+    nightly never sees it: it resets per driver. Fix: packages takes the latest of recent−7/−14/−21 not in {L−7, L},
+    proven over every day of 2026–27 by a one-off SQL sweep. **When a fixture writes into the SEED class, enumerate
+    the other fixtures that do (`grep -l "Saturday Beginners" fixtures-*.sql`) and check every day of the year, not
+    today.** (2026-10-01.)
