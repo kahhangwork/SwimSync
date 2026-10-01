@@ -45,6 +45,11 @@ jobs:
       - name: No UI driver builds a date label outside lib.mjs
         run: .claude/skills/run-ui-playwright/drivers/check-driver-dates.sh
 
+      # A literal test date the marking floor has not passed expires the 1st it does —
+      # main went red that way on 2026-10-01 (§7.303). Annotate or derive (§7.305).
+      - name: No pgTAP test or UI fixture holds an expiring literal date
+        run: scripts/check-test-dates.sh
+
   backend-tests:
     runs-on: ubuntu-latest
     steps:
