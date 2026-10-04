@@ -32,15 +32,15 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 
 | Area | Items |
 |---|---|
-| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310 |
+| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313 |
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307 |
-| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275 |
+| RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269 |
 | Source-scanning guards | 230, 231, 233, 241, 247, 248, 302, 305, 309 |
@@ -2522,3 +2522,28 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 310. **`TZ=Asia/Singapore date` silently means UTC when zoneinfo is missing** (bare containers: `ubuntu:24.04` has no
     tzdata). No error, just a date up to 8 hours — and on the 1st, a month — wrong. Any shell code computing an SGT date
     must assert `TZ=Asia/Singapore date +%z` = `+0800` and refuse otherwise. The fourth axis of §7.7. (2026-10-01.)
+
+311. **`git checkout <rev> -- <path>` STAGES the old file, so the usual restore and check both lie.** A red-first
+    proof against an old revision done this way puts the old content in the index too; `git checkout -- <path>`
+    then restores *from that index*, and `git diff --exit-code` (working tree vs index) reads clean — while the
+    regression sits staged for the next commit, and a push to `main` is the deploy. Write to the working tree only
+    (`git show <rev>:<path> > <path>`), restore with `git checkout HEAD -- <path>`, check with
+    `git diff HEAD --exit-code`. Better: a trap-restoring script — `docs/plans/ATTENDANCE_SAVE_TESTS_PLAN.md`
+    Step 0's `mutate.sh` (refuses a dirty file, restores from HEAD on EXIT, and demands the red output name the
+    expected test, so a passing `✓` line cannot satisfy it). Found by `/plan-review` before it ran. (2026-10-02.)
+
+312. **"Skip these ids" in a map-rebuilding helper can DELETE them — and `not.toBe(x)` cannot tell.**
+    `applyBulkStatus` (`SwimSyncApp/lib/attendanceBulk.ts`) took `current` but built its result from the listed ids
+    only; `useMarking` filtered the public-holiday void OUT of that list and replaced the whole map with the result,
+    so Set all erased the holiday row and Save refused the lesson ("Please mark attendance for <child>") until it
+    was reopened. Live 2026-08-19 → 2026-10-04 (`03b25e3` → fixed `d45e84d`). An assertion that passes when the
+    key is ABSENT (`expect(m[h]?.top).not.toBe("present")`, `?.top !== x`) cannot pin "preserved" — assert
+    `toEqual` on the whole entry. Any helper that filters some keys out of an update must carry the rest over
+    (`{ ...current }`). (2026-10-02.)
+
+313. **A jest test that renders through `useAttendanceLoad.load()` reads the REAL clock** — `todayInSg()` feeds
+    `checkMarkableDate`, so a literal `DATE` renders the blocked screen ("hasn't happened yet") before it and
+    expires into "That lesson is closed" after. `scripts/check-test-dates.sh` scans pgTAP and UI fixtures, NOT
+    jest, so nothing would flag it. Pin it: `jest.mock("@/lib/lessonDates", () => ({ ...jest.requireActual(...),
+    todayInSg: () => DATE }))` — not fake timers, which fight RNTL's `findBy`/`waitFor`
+    (`features/mark-attendance/MarkAttendanceScreen.test.tsx`). §7.303's lesson on a new surface. (2026-10-02.)

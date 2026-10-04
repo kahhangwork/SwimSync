@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-01 — filed *Inject the database clock* (L, Foundations; unranked — rank with the user) after 1 October turned CI red through four latent date bugs (§8.133). Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-05 — Wave 2 lane 2 (attendance save tests) shipped; the Pending charges two-tenant test moved to Wave 3 (§8.134). Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -281,16 +281,18 @@ _Supersedes every older ranking below, which is kept as history. Forced by: the 
    page by page for a view-only role*.
 2. ~~Crash-safe email claim~~ — live (PRD §7.7/§7.8, deploy #57).
 
-#### Wave 2 — packages — **lane 1 SHIPPED 2026-09-27** (§8.132, `docs/plans/PACKAGE_REVENUE_REFUNDS_PLAN.md`)
+#### Wave 2 — packages — **SHIPPED** (lane 1 2026-09-27, §8.132; lane 2 2026-10-04, §8.134)
 
 
 3. ~~**Package revenue on the accounting page** (S)~~ — **shipped 2026-09-27** (PRD §7.23).
 4. ~~**In-app package refunds** (S)~~ — **shipped 2026-09-27** (PRD §7.16, §7.23).
-   - **Lane 2:** *Deeper component-render tests* — **only** the attendance save flow, which Wave 2 does not touch.
+   - ~~**Lane 2:** the attendance save flow tests~~ — **shipped 2026-10-04** (`docs/TESTING.md` §5,
+     `docs/plans/ATTENDANCE_SAVE_TESTS_PLAN.md`); found and fixed the Set-all holiday bug on the way (§7.312).
 
 #### Wave 3 — cheaper by waiting
 
-5. *Deeper component-render tests* — the rest (invoice table, parent balances), after refunds reshapes them.
+5. *Deeper component-render tests* — the rest (invoice table, parent balances, the Pending charges two-tenant test),
+   after refunds reshapes them.
 6. *Generate real Supabase `Database` types* — always last (a schema snapshot).
 
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
@@ -1695,11 +1697,13 @@ start this while migrations are still landing (as of 2026-09-27: roles & permiss
 package revenue and refunds are the schema-touching items ahead of it). The natural trigger is "the schema is
 frozen and we want compiler-enforced safety before a big build."
 
-### Deeper component-render tests — **M** `[handover]` — _first pass DONE 2026-09-27_
+### Deeper component-render tests — **M** `[handover]` — _first pass 2026-09-27, attendance save 2026-10-04_
 RN screens with a mocked Supabase; admin table components. **First pass shipped:** the coach mark-attendance
 UI (5 components) and the admin Invoices GenerationPanel + Packages Awaiting/Who-holds-one, props-only, each
-mutation-proven (`docs/TESTING.md` §5). **What remains:** whole screens/pages with mocked dao modules — the
-invoice table, the attendance save flow, parent balances — **plus** the *Pending charges* panel's two-tenant test,
+mutation-proven (`docs/TESTING.md` §5). **Second pass shipped:** the attendance save flow, hooks + whole screen
+(`features/mark-attendance/testing/saveHarness.ts` is the dao-mock pattern to copy). **What remains (Wave 3):**
+the invoice table, parent balances — **plus** the *Pending charges* panel's two-tenant test (kept out of lane 2 by
+the user, 2026-10-01: it lives on the admin Invoices page Wave 3 renders),
 `PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md` RISK 6, deferred for want of a harness that now exists (plan audit, 2026-09-27).
 
 **Why:** frontend unit tests are still mostly `lib/**` pure functions — though the feature-tier

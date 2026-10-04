@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-01 — **§8.133: 1 October turned CI red with no code change; four date bugs fixed, two CI
-date guards added.** Driver labels "Sep"≠"Sept", expired pgTAP literals, a fixture Saturday collision; new
-`check-driver-dates.sh` + `scripts/check-test-dates.sh`. Tests/CI/docs only — no deploy. Injected clock → BACKLOG._
+_Last updated: 2026-10-05 — **§8.134: Wave 2 lane 2 shipped — the attendance save path is pinned (31 tests), and
+planning it found a live bug: Set all erased a public-holiday child, so Save refused the lesson. Fixed + deployed
+(#60).** App + tests; no migration. Gotchas §7.311–§7.313._
 
-_Previously (§8.132, 2026-09-27) — Wave 2 shipped: package revenue on Accounting, in-app refunds (deploy #59)._
+_Previously (§8.133, 2026-10-01) — 1 October turned CI red; four date bugs fixed, two CI date guards._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.310** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.313** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -348,6 +348,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.134 (2026-10-02 → 05) — Wave 2 lane 2: the attendance save path pinned; a live Set-all bug found and fixed
+
+**`/plan-with-confidence` (resumed) → `/plan-review` → build → deploy #60. The review read the code and found that
+Set all DELETED a public-holiday void from the map, so Save refused the lesson** — live since 2026-08-19 (§7.312).
+Commits `d45e84d` (fix) · `8f754ec` (tests) · `eac50f1` (load-test port).
+
+- **Shipped:** the fix (PRD §7.6 *Set all* corrected); 31 tests — save hook, `useMarking`, the whole screen — plus
+  `useAttendanceLoad.test` ported to `renderHook`, each mutation-proven (TESTING §5; plan `ATTENDANCE_SAVE_TESTS_PLAN.md`).
+- **Decided with the user:** fix lane first (option A), not `it.failing`; Pending charges two-tenant test → Wave 3;
+  the load test ported despite my keep-it recommendation (it re-proved red against `61426c8^`).
+- **Review caught before code:** the plan's own red-proof command would have staged the old bug (§7.311); the screen
+  test would have read the real clock (§7.313). The plan's M3 mutation was equivalent — replaced, noted in the plan.
+- **Not done:** nothing in lane 2. Pushed only after nightly `37159576387` read green (user asked to hold the deploy).
+
 ## 8.133 (2026-10-01) — the calendar turned CI red: four date bugs, two guards, the real fix filed
 
 **No code changed between green and red: the first run of October met four latent date assumptions. Each fixed,
@@ -364,22 +378,7 @@ proven red→green, and the two that recurred are now CI guards rather than pros
 - **Not done:** Wave 2 lane 2 (attendance-save tests) — `/plan-with-confidence` started, one answer recorded (both
   layers: hook + 2–3 screen tests), three questions open; no plan file.
 
-## 8.132 (2026-09-27) — Wave 2 planned, reviewed and shipped: package revenue + in-app refunds
-
-**One session: `/plan-with-confidence` (7 questions to the user) → `/plan-review` (11 risks, all inlined) → U1 then
-U2, each migration → prod before its app; apps pushed after the nightly read green.** Commits `8f039b7` … `96fa216`.
-
-- **Shipped:** package revenue on Accounting, cash basis (PRD §7.23, ARCHITECTURE §6ac); in-app refunds — admin types
-  any amount up to what was paid, no closed month, one live refund, reverse to correct (PRD §7.16). Deploy #59.
-- **Review caught before code:** refunds would all have failed on `audit_log_tenant_of` (§7.297); net repeated the
-  revenue sum (§7.298). Five gotchas filed, §7.297–§7.301.
-- **Prod census was not 0|0:** Little Orcas held 2 paid packages (open month, so no closed figure moved). The owner
-  confirmed PKG-2026-0001 was a test → the user cleared its confirmation in the SQL Editor (my write was blocked by
-  the permission classifier); verified read-only: Sept package revenue S$700. Record: DEPLOYMENT #59.
-- **Not done:** parent visibility of refunds (BACKLOG *Show package refunds to the parent*); Wave 2 lane 2
-  (attendance component tests) untouched.
-
-_(§8.131 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.132 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -422,12 +421,10 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-01: last nightly `36791874903` RED 67/69, on `6502d95`** — `invoice-admin` + `orphan-report`, a
-driver "Sep"≠"Sept" bug, fixed in `d419151` (§7.302; both green locally). The run dispatched 2026-09-27
-(`36321271139`, first over Wave 2) and the two scheduled after it were GREEN, so Wave 2 is cleared. **The next one is
-the first over §8.133** (`23cb423`: 11 drivers moved onto `lib.mjs` `sgLabel()`, `fixtures-packages` date rule) and
-CI's first real check of "Sept" on its Node. A red on a label → `sgLabel()` vs the screen; on `verify-packages` /
-`verify-unmarked-lessons` → §7.304's date rule.
+**State on 2026-10-05: the last three nightlies are GREEN 69/69** (`36942714020`, `37078537176`, `37159576387`, all
+on `40d590a`) — §8.133's "Sept"/date fixes are cleared on CI. **The next one is the first over `eac50f1`** (deploy
+#60: Set all keeps a holiday void; jest-only tests). No driver changed, so a red there is not this push's tests —
+but `verify-coach-marking` exercises the marking screen the fix touched; read that one first.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -437,13 +434,14 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read the next nightly** (never dispatch it unasked) — the first over §8.133's driver changes. Red → fix first.
-2. **Bill September now (early October):** Little Orcas's Accounting should show *Packages sold S$700*
-   (PKG-2026-0002); PKG-2026-0001 was a test and counts nowhere (DEPLOYMENT #59). `INVOICE_RUNBOOK.md`.
-3. **Next build** (`BACKLOG.md` → *Current build order*): Wave 2 lane 2 (attendance-save tests) — resume
-   `/plan-with-confidence`: decided "both layers" (hook tests via `renderHook` + 2–3 whole-screen tests); still open:
-   which save behaviours to pin, Pending charges' two-tenant test in or out, port `useAttendanceLoad.test.ts` or not.
-   Then Wave 3. **Unranked, new:** *Inject the database clock* (L) — rank it with the user; not mid-billing.
+1. **Read the next nightly** (never dispatch it unasked) — the first over deploy #60. Red → fix first.
+2. **Bill September now (early October — overdue as of 2026-10-05):** Little Orcas's Accounting should show
+   *Packages sold S$700* (PKG-2026-0002); PKG-2026-0001 was a test and counts nowhere (DEPLOYMENT #59).
+   `INVOICE_RUNBOOK.md`.
+3. **Next build** (`BACKLOG.md` → *Current build order*): **Wave 3** — the rest of the component-render tests
+   (invoice table, parent balances, the Pending charges two-tenant test); copy `features/mark-attendance/testing/
+   saveHarness.ts`'s pattern (TESTING §5). **Unranked:** *Inject the database clock* (L) — rank it with the user;
+   not mid-billing.
 
 - **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127).
 - **A new test/fixture date:** derive it from `session_window_start()` or CI refuses it (§7.305).

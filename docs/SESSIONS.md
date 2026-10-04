@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.132** | 2026-09-27 | Wave 2: package revenue on Accounting, in-app refunds | PRD §7.16/§7.23 · ARCHITECTURE §6ac · §7.297–§7.301 · DEPLOYMENT #59 |
 | **8.131** | 2026-09-27 | Wave 1: roles & permissions, crash-safe email claim; sign-up role escalation closed | PRD §4.3/§7.7 · ARCHITECTURE §6aa/§6ab · §7.289–7.294 · DEPLOYMENT #56–58 |
 | **8.130** | 2026-09-27 | Build order re-ranked; Wave 1 planned + reviewed; plans indexed | BACKLOG *Current build order* · docs/plans/README.md · §7.287–§7.288 |
 | **8.129** | 2026-09-27 | Admin sees a childless family's name; a refused run-day save is loud; component tests | PRD §5.1, §7.7 · TESTING §5 · §7.283–§7.286 · DEPLOYMENT #55 |

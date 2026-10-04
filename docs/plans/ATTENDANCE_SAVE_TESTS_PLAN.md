@@ -1,5 +1,8 @@
 # Attendance save tests — Wave 2 lane 2
 
+> **STATUS: DONE 2026-10-04** (§8.134, DEPLOYMENT #60). D7 fix `d45e84d`, tests `8f754ec`, port `eac50f1`. jest
+> 58/642. D8's gotchas are §7.311–§7.313. Every DoD box below holds; the boxes are left as written.
+
 _Planned 2026-10-01 via `/plan-with-confidence` (resumed from §8.133). Decisions settled with the user the same
 day. Hardened by `/plan-review` 2026-10-02 — every `⚠ RISK n MITIGATION` is a finding folded into the step it
 governs. **Tests only — no app code, no migration, no deploy.**_

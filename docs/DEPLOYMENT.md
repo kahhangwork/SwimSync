@@ -1045,3 +1045,9 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     and cancelled 16 Sep, no money) — its `confirmed_at`/`confirmed_by` cleared by the user in the SQL Editor, with
     an `audit_log` row `package_marked_unpaid` (actor Site Admin) holding the old values and the reason; it now
     counts in no month. PKG-2026-0002 (S$700) is a real sale and untouched.
+60. **Deploy record (2026-10-04): Set all keeps a public-holiday void (+ attendance save tests).** App only — 0
+    migrations, 0 functions, so no backend gate (a decision, not an omission). `40d590a..eac50f1` → `main`
+    (`d45e84d` the fix in `SwimSyncApp/lib/attendanceBulk.ts`; `8f754ec`, `eac50f1` tests only) after nightly
+    `37159576387` read GREEN (69/69). Full jest 58/642 + tsc on the pushed tree; Vercel both `success`; CI green.
+    The fix has no new visible string, so the proof is the CODE SHAPE: the live swimsync.sg entry bundle's
+    `applyBulkStatus` now begins `Object.assign({},n)` (the old body began `{}`). Not verified by a coach on prod.

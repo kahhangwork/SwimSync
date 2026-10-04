@@ -345,8 +345,20 @@ Generate; unknown settings shown unknown and locked; run day saved on blur; each
 column; the phone check advises, never blocks), `packages/ui/PendingPanel` + `HeldTable` (reference and
 `amount_payable` per row; oldest request first; row actions act on THAT row and only on active packages; busy
 locks; live balance; three distinct empty states; the capped notice). All props-only — no Supabase mock. Each
-file records its mutation proofs in its header (§7.25). Traps: §7.285, §7.286. **Still to do:** whole screens
-and pages with mocked dao modules (the invoice table, the attendance save flow, parent balances).
+file records its mutation proofs in its header (§7.25). Traps: §7.285, §7.286.
+
+**The attendance SAVE flow — second pass 2026-10-02** (`docs/plans/ATTENDANCE_SAVE_TESTS_PLAN.md`), mocked at the dao
+seam via `features/mark-attendance/testing/saveHarness.ts` (one ordered call log; dao mocks typed over the dao
+modules' exports, so a new export without a default fails `tsc`; a tripwire throws if anything reaches the real
+client). `domain/useSaveAttendance.test.ts` — nothing written while a child is unmarked or lacks a sub-type; a holiday
+void never in the payload; uniform row keys (§7.67); a session resolved for another date never sent (§7.64);
+CN001 stops; a failed coaches-present write is named but the save stands; the credit-note call only when a lesson
+LEFT a billable status, and awaited before leaving; call order. `domain/useMarking.test.ts` — Set all confirms
+before overwriting and never re-marks or deletes a holiday void (§7.312). `MarkAttendanceScreen.test.tsx` — the
+route rendered whole: happy save, incomplete blocked, Set all → save; clock pinned (§7.313).
+`domain/useAttendanceLoad.test.ts` now runs under `renderHook` (re-proven red against `61426c8^`). Mutations M1–M13,
+U1–U3, S1–S4 in the file headers. **Still to do (Wave 3):** the invoice table, parent balances, and the *Pending
+charges* panel's two-tenant test (`PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md` RISK 6).
 
 Four of the app's suites exist because of bugs that reached production on 2026-07-26, and
 what each one *pins* is the point:
