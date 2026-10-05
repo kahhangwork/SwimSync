@@ -34,6 +34,27 @@ export function dateInTimeZone(now: Date, timeZone: string): string {
 }
 
 /** Day of the month (1..31) at `now` in `timeZone`. */
+/**
+ * The earliest enrolment of a class as a calendar date IN `timeZone` — the floor
+ * of the engine's expected-lesson window.
+ *
+ * ⚠ §7.7, third axis. This used to be `String(enrolled_at).slice(0, 10)`, which
+ * reads the UTC date: an enrolment written between 00:00 and 08:00 SGT (`NOW()`
+ * on an early add) read as the PREVIOUS day, while the per-child spans beside it
+ * used the SGT date. One function, one timestamp, two different days. It only
+ * widened the scan window by a day (nobody's SGT span covers that day, so nothing
+ * blocked or billed), but two readings of one value is the bug the next caller
+ * inherits. Both callers (core.ts, orderingGuard.ts) use this now.
+ */
+export function earliestEnrolmentDate(
+  enrolledAts: readonly unknown[],
+  timeZone: string
+): string | undefined {
+  return enrolledAts
+    .map((t) => dateInTimeZone(new Date(String(t)), timeZone))
+    .sort()[0];
+}
+
 export function dayOfMonthInTimeZone(
   now: Date = new Date(),
   timeZone: string = APP_TIMEZONE

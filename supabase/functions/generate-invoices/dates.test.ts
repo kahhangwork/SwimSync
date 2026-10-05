@@ -12,6 +12,7 @@ import {
   dateInTimeZone,
   dayOfMonthInTimeZone,
   DEFAULT_INVOICE_RUN_DAY,
+  earliestEnrolmentDate,
   previousBillingMonth,
 } from "./dates.ts";
 
@@ -82,4 +83,29 @@ Deno.test("dayOfMonthInTimeZone: SGT day, not the UTC day, at the boundary", () 
   const t = new Date("2026-07-31T17:30:00Z");
   assertEquals(dayOfMonthInTimeZone(t, "Asia/Singapore"), 1);
   assertEquals(dayOfMonthInTimeZone(t, "UTC"), 31);
+});
+
+// ── earliestEnrolmentDate — the engine's window floor (§7.7, third axis) ─────
+// Was `String(enrolled_at).slice(0, 10)` in core.ts and orderingGuard.ts: the
+// UTC date. A child added at 07:00 SGT on Tue 6 Oct is 23:00 UTC on Mon 5 Oct, so
+// the old slice read MONDAY while the per-child span beside it read Tuesday.
+
+Deno.test("earliestEnrolmentDate: an add at 07:00 SGT is THAT day, not the UTC day before (the bug)", () => {
+  // PostgREST's timestamptz shape. The old slice returned "2026-10-05".
+  assertEquals(earliestEnrolmentDate(["2026-10-05T23:00:00+00:00"], "Asia/Singapore"), "2026-10-06");
+});
+
+Deno.test("earliestEnrolmentDate: 08:00 SGT and later agree with the UTC date", () => {
+  assertEquals(earliestEnrolmentDate(["2026-10-06T00:00:00+00:00"], "Asia/Singapore"), "2026-10-06");
+  // A backdated start (stored at 12:00 SGT, 20261005000100) reads the same either way.
+  assertEquals(earliestEnrolmentDate(["2026-09-22T04:00:00+00:00"], "Asia/Singapore"), "2026-09-22");
+});
+
+Deno.test("earliestEnrolmentDate: the EARLIEST wins, compared as SGT dates", () => {
+  // 1 Oct 07:30 SGT (= 30 Sep 23:30 UTC) vs 30 Sep 12:00 SGT. In SGT 30 Sep is earlier.
+  assertEquals(
+    earliestEnrolmentDate(["2026-09-30T23:30:00+00:00", "2026-09-30T04:00:00+00:00"], "Asia/Singapore"),
+    "2026-09-30",
+  );
+  assertEquals(earliestEnrolmentDate([], "Asia/Singapore"), undefined);
 });

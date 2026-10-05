@@ -30,6 +30,7 @@ import {
   clampRunDay,
   dateInTimeZone,
   dayOfMonthInTimeZone,
+  earliestEnrolmentDate,
   expectedLessonDates,
   previousBillingMonth,
 } from "./dates.ts";
@@ -695,9 +696,11 @@ async function generateForTenant(
     // Floored at the earliest enrolment — including INACTIVE ones, because a
     // child who has since left still attended lessons that ran. Clamped to
     // today so future lessons in the current month are not counted as gaps.
-    const earliestEnrolment = (enrolments ?? [])
-      .map((e) => String(e.enrolled_at).slice(0, 10))
-      .sort()[0];
+    // SGT date, like the spans above — NOT the raw UTC slice (§7.7, dates.ts).
+    const earliestEnrolment = earliestEnrolmentDate(
+      (enrolments ?? []).map((e) => e.enrolled_at),
+      APP_TIMEZONE
+    );
     const windowFrom =
       earliestEnrolment && earliestEnrolment > monthStart
         ? earliestEnrolment

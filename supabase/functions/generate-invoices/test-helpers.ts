@@ -11,7 +11,12 @@ import {
   createClient,
   type SupabaseClient,
 } from "https://esm.sh/@supabase/supabase-js@2";
-import { APP_TIMEZONE, dateInTimeZone, expectedLessonDates } from "./dates.ts";
+import {
+  APP_TIMEZONE,
+  dateInTimeZone,
+  earliestEnrolmentDate,
+  expectedLessonDates,
+} from "./dates.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "http://127.0.0.1:54321";
 const SERVICE_ROLE_KEY = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
@@ -586,9 +591,11 @@ export async function newScenario(
       .from("student_class_enrolments")
       .select("enrolled_at")
       .eq("class_id", cid);
-    const earliest = (enrolRows ?? [])
-      .map((e) => String(e.enrolled_at).slice(0, 10))
-      .sort()[0];
+    // The engine's own helper — the SGT date, not a raw UTC slice (§7.7).
+    const earliest = earliestEnrolmentDate(
+      (enrolRows ?? []).map((e) => e.enrolled_at),
+      APP_TIMEZONE
+    );
 
     // MUST use the same clock the engine will run at. Completing the month
     // against a different clock derives a different set of expected lessons and

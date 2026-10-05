@@ -32,6 +32,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   APP_TIMEZONE,
   dateInTimeZone,
+  earliestEnrolmentDate,
   expectedLessonDates,
   previousBillingMonth,
 } from "./dates.ts";
@@ -377,12 +378,12 @@ export async function earliestBlockingEarlierMonth(
         set.add(e.student_id as string);
         activeByClass.set(cid, set);
       }
-      // earliestEnrolment mirrors core.ts:627 — raw enrolled_at date slice, over
-      // ALL enrolments (active or not), earliest wins.
-      const rawFrom = String(e.enrolled_at).slice(0, 10);
+      // earliestEnrolment mirrors core.ts — the SGT date (NOT a raw UTC slice,
+      // §7.7, dates.ts earliestEnrolmentDate), over ALL enrolments, earliest wins.
+      const sgFrom = earliestEnrolmentDate([e.enrolled_at], APP_TIMEZONE)!;
       const prev = earliestEnrolmentByClass.get(cid);
-      if (prev === undefined || rawFrom < prev) {
-        earliestEnrolmentByClass.set(cid, rawFrom);
+      if (prev === undefined || sgFrom < prev) {
+        earliestEnrolmentByClass.set(cid, sgFrom);
       }
     }
 
