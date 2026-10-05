@@ -3604,7 +3604,8 @@ The following section provides a screen-by-screen reference for each SwimSync us
   sorting is numeric-aware (`Sun 845am` before `Sun 930am`, `Level 2` before `Level 10`),
   weekdays sort in week order rather than alphabetically, and it is stable, so a second
   key keeps the first one's grouping. Columns sort by **what is on screen** — a status by
-  its label, an amount by its number — not by what the row stores underneath.
+  its label, an amount by its number — not by what the row stores underneath. The
+  **Classes** table opens sorted by **Time** (start time, ties in week order) *(2026-10-05)*.
 - **Scoped search on the high-traffic tables** *(implemented 2026-08-28)* — Students,
   Invoices, Credit Notes and Attendance carry a **field-scoped** search: a small dropdown
   picks the one column to search (Student / Parent / Reference), and the term is pushed

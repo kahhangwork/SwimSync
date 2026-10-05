@@ -33,7 +33,9 @@ export function ClassTable({
   onRestore: (cls: ClassRow) => void;
 }) {
   const sort = useTableSort<ClassRow>({
-    key: "title",
+    // Time of day first; the sort is stable, so classes at the same time keep
+    // the repo's day_of_week order (Sun→Sat).
+    key: "start_time",
     accessors: classSortAccessors,
   });
   const visible = sort.apply(filtered);
