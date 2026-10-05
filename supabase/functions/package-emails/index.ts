@@ -30,6 +30,7 @@ import {
   buildReferralRewardSubject,
   buildRequestedHtml,
   buildRequestedSubject,
+  sgDateOfStamp,
   type ReferralRewardEmailData,
   sendPackageEmail,
   type PackageEmailData,
@@ -130,8 +131,9 @@ Deno.serve(async (req) => {
           "percent" | "amount" | null) ?? null,
         discountValue: rTenant?.referral_discount_value != null
           ? Number(rTenant.referral_discount_value) : null,
+        // The SGT date, never a raw UTC slice (§7.7) — see sgDateOfStamp.
         expiresOn: reward.expires_at
-          ? String(reward.expires_at).slice(0, 10) : null,
+          ? sgDateOfStamp(String(reward.expires_at)) : null,
       };
       const result = await sendPackageEmail({
         apiKey: Deno.env.get("RESEND_API_KEY"),

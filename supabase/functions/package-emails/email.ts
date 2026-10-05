@@ -7,6 +7,8 @@
 //     never send. Delivery is best-effort and never fails the caller.
 //   • Builders are pure and unit-tested; all interpolated values are escaped.
 
+import { dateInTimeZone } from "../generate-invoices/dates.ts";
+
 export type PackageEmailData = {
   parentName: string;
   businessName: string;
@@ -101,6 +103,22 @@ function escapeHtml(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/**
+ * A timestamptz → its Singapore calendar date ("YYYY-MM-DD"), or null if
+ * unparseable. For referral_rewards.expires_at (now() + N days, any time of day).
+ *
+ * ⚠ §7.7: this was `String(expires_at).slice(0, 10)` — the UTC date, which is the
+ * PREVIOUS day for an instant between 00:00 and 08:00 SGT (a reward granted in
+ * that window). The admin's Referrals page shows the same value via
+ * formatSgStamp (the SGT date), so the email said one day and the screen another.
+ * Same conversion as the engine (generate-invoices/dates.ts).
+ */
+export function sgDateOfStamp(ts: string): string | null {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return null;
+  return dateInTimeZone(d, "Asia/Singapore");
 }
 
 // "2027-07-10" → "10 Jul 2027", no Date object → no timezone drift.

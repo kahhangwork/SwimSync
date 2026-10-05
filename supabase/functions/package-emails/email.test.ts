@@ -3,6 +3,7 @@
 
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
+  sgDateOfStamp,
   authorizePackageEmail,
   buildConfirmedHtml,
   buildConfirmedSubject,
@@ -212,4 +213,16 @@ Deno.test("sender refuses quietly with no recipient", async () => {
     fromName: "Test",
   });
   assertEquals(r, { sent: false, reason: "no recipient" });
+});
+
+// ── sgDateOfStamp — the referral reward's "Valid until" (§7.7) ─────────────
+// expires_at = now() + N days, so it carries the GRANT's time of day. A reward
+// granted at 06:30 SGT expires at 22:30 UTC the day before; the old
+// String(expires_at).slice(0, 10) printed that UTC day — one day early.
+Deno.test("sgDateOfStamp: an expiry at 06:30 SGT is that SGT day, not the UTC day before (the bug)", () => {
+  assertEquals(sgDateOfStamp("2026-11-14T22:30:00+00:00"), "2026-11-15");
+});
+Deno.test("sgDateOfStamp: from 08:00 SGT on, the UTC and SGT dates agree; junk is null", () => {
+  assertEquals(sgDateOfStamp("2026-11-15T00:00:00+00:00"), "2026-11-15");
+  assertEquals(sgDateOfStamp("not a date"), null);
 });
