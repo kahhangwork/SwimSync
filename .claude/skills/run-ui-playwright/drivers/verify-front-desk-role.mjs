@@ -32,8 +32,15 @@
 // class_rates rows (policy class_rates_admin_select needs pricing:view), so every "who taught"
 // reader resolves no paid coach. Fix: migration 20261005000200_who_taught_for_operations.
 //
-// MUTATION PROOFS (§7.25) — PENDING until that fix is on main (plan §2.2): persona on an
-// Operations = None role → checks 2–6 red; on a Billing = View role → check 1 red.
+// After the fix (main @ ccc0e4a): 11/11.
+//
+// MUTATION PROOFS (§7.25, plan §2.2) — the persona moved by SQL onto a temporary role after
+// the fixture loads, run, teardown, role dropped (2026-10-05):
+//
+//   | # | persona's role                                 | result | red checks                              |
+//   |---|------------------------------------------------|--------|-----------------------------------------|
+//   | 1 | Operations = None, every other area None       | 2/11   | PRECONDITION, 1a (no ops page), 2, 3a, 3b, 4a, 4b, 5, 6 — each with its own detail (1b stays green: still refused) |
+//   | 2 | Operations = Edit, Billing = View, rest None   | 8/11   | PRECONDITION, 1a (/invoices + /credit-notes + Billing group shown), 1b (/invoices renders) — 2–6 stay green |
 
 import { execFileSync } from "node:child_process";
 import { launch, loginAdmin, ADMIN } from "./lib.mjs";
