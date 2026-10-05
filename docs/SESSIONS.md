@@ -30,6 +30,7 @@ compressed after tracing each fact to a home. Measure CHARACTERS, not bytes:
 
 | # | Date | What shipped | Where its reasoning lives now |
 |---|---|---|---|
+| **8.135** | 2026-10-05 | Admin lesson page prev/next; Classes sorts by Time | PRD §7.6 · ARCHITECTURE §10 · TESTING §5 · DEPLOYMENT #61 |
 | **8.134** | 2026-10-02 → 05 | Wave 2 lane 2: attendance save path tested; Set all erased a holiday void — fixed | PRD §7.6 · §7.311–§7.313 · DEPLOYMENT #60 |
 | **8.133** | 2026-10-01 | October turned CI red: four date bugs fixed, two CI date guards | §7.302–§7.310 · BACKLOG *Inject the database clock* |
 | **8.132** | 2026-09-27 | Wave 2: package revenue on Accounting, in-app refunds | PRD §7.16/§7.23 · ARCHITECTURE §6ac · §7.297–§7.301 · DEPLOYMENT #59 |

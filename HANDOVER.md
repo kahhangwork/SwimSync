@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-05 — **§8.136: 04 Oct attendance verified complete on prod; a child assigned the day AFTER their
-first lesson was unmarkable, fixed by a one-row prod backdate (DEPLOYMENT #62) and filed as a backlog item. Prod reads now
-go through `scripts/prod-query-ro.sh`.** Ops + tooling; no app change, no migration._
+_Last updated: 2026-10-05 — **§8.137: Wave 3 SHIPPED in two lanes — admin invoice-table + Pending-charges tests (lane 1)
+and the parent money cards (lane 2), which found and fixed the child Balances card summing every business (deploy #63,
+nightly gate waived by the user).** 58 new mutation-proven tests; no migration._
 
-_Previously (§8.135, 2026-10-05) — admin lesson page prev/next + Classes sorts by Time (deploy #61)._
+_Previously (§8.136, 2026-10-05) — 04 Oct attendance verified on prod; a late-assigned child backdated (DEPLOYMENT #62)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.313** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.317** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -348,6 +348,20 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.137 (2026-10-05) — Wave 3: the money screens tested in two lanes; the child card fixed
+
+**`/plan-with-confidence` → `/plan-review` → two lanes run at once: this session (root, admin) coordinating a side
+session (worktree `wave3-app`, parent app) over `SendMessage`. The parent-app tests surfaced a real bug — the child
+profile's Balances card summed Outstanding + Credit across EVERY business — fixed and live (PRD §5.6, deploy #63).**
+Commits `74c882c` (plan) · `adbd429` `213d291` `864a6a8` `4e4e06d` (tests) · `5ce45bc` (fix) · `ed6529e` (handoff).
+
+- **Shipped:** TESTING §5 *The money screens*; admin vitest 998 → 1026, app jest 642 → 666; 58 mutation proofs.
+- **Decided with the user:** both parent cards; split by app; dao-mocked where the risk is the query; a bug stops the
+  lane and lands first; the child card is per-business, the home card stays family-wide.
+- **Gate waived by the user:** the fix shipped without waiting for the nightly; prod counts read first (all 0).
+- **Gotchas:** §7.314–§7.317, and §7.311's `mutate.sh` claim corrected (it accepted a red for the wrong test).
+- **Not done:** September billing (still §9). Nightly not dispatched.
+
 ## 8.136 (2026-10-05) — 04 Oct attendance checked on prod; a late-assigned child backdated
 
 **The owner asked two things: was 04 Oct marked correctly through the new lesson page, and why couldn't a new child be
@@ -363,22 +377,7 @@ the day after the record was made) — a roster starts on the add-to-class date,
   so before running it. The ask rule now gates it.
 - **Not done:** September billing (still §9 #2). Nightly not dispatched.
 
-## 8.135 (2026-10-05) — prev/next on the admin lesson page; Classes sorts by Time
-
-**`/plan-with-confidence` → `/plan-review` → build → deploy #61. The review's top risk was real: Next would have
-navigated in place, and one render could pair the new lesson's URL with the old lesson's roster and save marks onto
-the wrong lesson — so the page body is now keyed on `classId|date`** (§7.64's admin-side note). Commits `87ebce8`
-(Classes default sort → Time) · `6da66e6` (the strip).
-
-- **Shipped:** PRD §7.6 *Steps to the next lesson* and the admin table-sort bullet; files ARCHITECTURE §10; tests
-  TESTING §5 (`lessonNav` 14, `useLessonNav` 8, `page.test` 1, driver `verify-admin-lesson-nav` 23 — all proven red).
-- **Decided with the user:** same date only; teaching coach (a cover moves the lesson); every Calendar lesson; coaches
-  A→Z; ends disabled, no wrap; a confirm Modal over unsaved marks; a strip under the title.
-- **Filed, not fixed:** BACKLOG *A co-admin without pricing access may see NO teaching coach* — by policy reading,
-  unreproduced. Sort ties end on a unique id (comment + test); below the GOTCHAS bar, not filed there.
-- **Not done:** nothing. Nightly not dispatched.
-
-_(§8.134 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.135 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -421,10 +420,11 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-05: the last four nightlies are GREEN** (newest `37241823074`, on `cbf747b` — still BEFORE
-deploy #61). **The next one is the first over `6da66e6`** (deploy #61) and the first to run the NEW driver
-`verify-admin-lesson-nav` (23 checks; 23/23 locally, run three times) — so expect 70 drivers. Read that one, and
-`admin-lesson-detail` / `lesson-detail-guests` / `cancel-lesson` (the page they render was restructured), first.
+**State on 2026-10-05: the last four nightlies are GREEN** (newest `37241823074`, on `cbf747b` — BEFORE deploys
+#61 and #63). **The next one is the first over BOTH** — `6da66e6` (#61, admin lesson page; first run of the NEW driver
+`verify-admin-lesson-nav`, so expect 70 drivers) and `5ce45bc` (#63, the child Balances card — shipped with the gate
+WAIVED by the user). Read `admin-lesson-detail` / `lesson-detail-guests` / `cancel-lesson` / `verify-admin-lesson-nav`
+(#61) and `verify-edit-child` / `verify-smoke-app` (they open the child profile, #63) first.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -434,14 +434,13 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read the next nightly** (never dispatch it unasked) — the first over deploy #61 and its new driver. Red → fix first.
+1. **Read the next nightly** (never dispatch it unasked) — the first over deploys #61 AND #63. Red → fix first.
 2. **Bill September now (early October — overdue as of 2026-10-05):** Little Orcas's Accounting should show
    *Packages sold S$700* (PKG-2026-0002); PKG-2026-0001 was a test and counts nowhere (DEPLOYMENT #59).
    `INVOICE_RUNBOOK.md`.
-3. **Next build** (`BACKLOG.md` → *Current build order*): **Wave 3** — the rest of the component-render tests
-   (invoice table, parent balances, the Pending charges two-tenant test); copy `features/mark-attendance/testing/
-   saveHarness.ts`'s pattern (TESTING §5). **Unranked:** *Inject the database clock* (L) — rank it with the user;
-   not mid-billing.
+3. **Next build — re-rank first.** Wave 3 item 5 shipped (§8.137); the build order holds only item 6 (*Generate real
+   Supabase `Database` types*, "always last"). **Unranked:** *Inject the database clock* (L), *Choose a start date when
+   adding a child to a class* (§8.136). Run `/backlog-prioritisation` with the user; not mid-billing.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).

@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-05 — filed *Choose a start date when adding a child to a class* (§8.136, a real prod case). Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-05 — Wave 3 item 5 (component-render tests) SHIPPED and its item removed (§8.137); earlier the same day, filed *Choose a start date when adding a child to a class* (§8.136). Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -291,8 +291,8 @@ _Supersedes every older ranking below, which is kept as history. Forced by: the 
 
 #### Wave 3 — cheaper by waiting
 
-5. *Deeper component-render tests* — the rest (invoice table, parent balances, the Pending charges two-tenant test),
-   after refunds reshapes them.
+5. ~~*Deeper component-render tests* — the rest~~ — **shipped 2026-10-05** (§8.137, `docs/TESTING.md` §5,
+   `docs/plans/WAVE3_RENDER_TESTS_PLAN.md`); found and fixed the child Balances card summing every business (PRD §5.6).
 6. *Generate real Supabase `Database` types* — always last (a schema snapshot).
 
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
@@ -1725,23 +1725,6 @@ pragmatic `S`-sized fix to clear the baseline now; this is the thorough version 
 start this while migrations are still landing (as of 2026-09-27: roles & permissions, the email claim column,
 package revenue and refunds are the schema-touching items ahead of it). The natural trigger is "the schema is
 frozen and we want compiler-enforced safety before a big build."
-
-### Deeper component-render tests — **M** `[handover]` — _first pass 2026-09-27, attendance save 2026-10-04_
-RN screens with a mocked Supabase; admin table components. **First pass shipped:** the coach mark-attendance
-UI (5 components) and the admin Invoices GenerationPanel + Packages Awaiting/Who-holds-one, props-only, each
-mutation-proven (`docs/TESTING.md` §5). **Second pass shipped:** the attendance save flow, hooks + whole screen
-(`features/mark-attendance/testing/saveHarness.ts` is the dao-mock pattern to copy). **What remains (Wave 3):**
-the invoice table, parent balances — **plus** the *Pending charges* panel's two-tenant test (kept out of lane 2 by
-the user, 2026-10-01: it lives on the admin Invoices page Wave 3 renders),
-`PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md` RISK 6, deferred for want of a harness that now exists (plan audit, 2026-09-27).
-
-**Why:** frontend unit tests are still mostly `lib/**` pure functions — though the feature-tier
-refactor added hook and component tests (`components/AssessmentGrid.test.tsx` and ~80 other non-`lib`
-test files across both apps, counted 2026-09-26). Screens are otherwise covered by the Playwright drivers,
-which run nightly in CI (`ui-drivers.yml`), not by hand. Counts drift — the test runner is the fact.
-
-**Notes:** `docs/TESTING.md` §5 lists what the first pass pins. The `run-ui-playwright` drivers show
-what's worth pinning next.
 
 ### ~~Shared `lessonDates.ts` package~~ — **M** — **NOT DOING 2026-09-27** → *Deliberately not doing*
 The file is duplicated **byte-identical** in both apps.

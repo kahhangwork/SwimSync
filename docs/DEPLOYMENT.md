@@ -1066,3 +1066,12 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     sealed was touched. Enrolments have no audit trigger — **this entry is the only record**. Why SQL: BACKLOG
     *Choose a start date when adding a child to a class*. Local `.claude/settings.local.json` now allows
     `scripts/prod-query-ro.sh` and ASKS before any raw `supabase db query --linked`.
+
+63. **Deploy record (2026-10-05): the child profile's Balances card shows the child's business only (D5).** App only —
+    0 migrations, 0 functions. `5ce45bc` pushed to `main` (Wave 3 lane 2; its other six pushes were four test-only and two docs-only).
+    **The nightly gate was WAIVED by the user** — nothing dispatched; the next scheduled nightly is the first over
+    #61 and #63 together. Prod read-only counts first (`scripts/prod-query-ro.sh`, user-approved): parents with
+    balances / outstanding / children at >1 business = 0 / 0 / 0, outstanding invoices 0, credit rows 0 — so no
+    visible change today. Served bundle: `parent_tenant_balances.tenant_id` 0 hits in `entry-f9f93451…` → 1 in
+    `entry-bc4c10fb…` (re-checked from the root session); Vercel Production SHA = `5ce45bc`. The owner opened a live
+    child profile: Balances S$0.00 / S$0.00, coverage line intact.

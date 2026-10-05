@@ -23,6 +23,8 @@ Statuses: `NOT STARTED` · `IN PROGRESS` · `DONE` · `DONE (partly superseded)`
 | PACKAGE_REVENUE_REFUNDS_PLAN.md | DONE (§8.132, deploy #59) | Wave 2 — package revenue on Accounting (cash basis) + in-app refunds |
 | TEST_DATE_EXPIRY_ALARM_PLAN.md | DONE (2026-10-01; clock → BACKLOG) | CI alarm for literal test dates the marking floor will pass (§7.303); injected clock → BACKLOG |
 | WAVE_2_PACKAGES_BRIEF.md | SUPERSEDED by PACKAGE_REVENUE_REFUNDS_PLAN.md | Wave 2's decisions W1–W6 (still the source for those) |
+| ATTENDANCE_SAVE_TESTS_PLAN.md | DONE (§8.134, deploy #60) | Wave 2 lane 2 — the attendance save path's hook + screen tests |
+| WAVE3_RENDER_TESTS_PLAN.md | DONE (§8.137, deploy #63) | Wave 3 — two lanes: admin invoice/Pending-charges tests; parent money cards + the D5 child-card fix |
 
 ## Done
 
@@ -74,4 +76,5 @@ _Audited 2026-09-27 against SESSIONS / BACKLOG / git / migrations (every migrati
 
 **One loose end found by the audit:** PARTIAL_PAYMENT_FOLLOWUPS' RISK 6 (a two-tenant render test of the *Pending
 charges* panel) was deferred for lack of a component-render harness. The harness now exists (`2961999`); the test
-does not. It belongs to *Deeper component-render tests* (Wave 3).
+does not. It belongs to *Deeper component-render tests* (Wave 3). **Closed 2026-10-05** by
+WAVE3_RENDER_TESTS_PLAN (§8.137).

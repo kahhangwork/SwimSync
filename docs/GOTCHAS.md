@@ -32,17 +32,17 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 
 | Area | Items |
 |---|---|
-| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313 |
+| SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315 |
 | Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293 |
-| PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217 |
+| PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214 |
 | Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317 |
 | UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
-| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269 |
+| Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316 |
 | Source-scanning guards | 230, 231, 233, 241, 247, 248, 302, 305, 309 |
 
 **Promoted to checks** (these fire without anyone reading): §7.38 and §7.90 →
@@ -2539,6 +2539,11 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     `git diff HEAD --exit-code`. Better: a trap-restoring script — `docs/plans/ATTENDANCE_SAVE_TESTS_PLAN.md`
     Step 0's `mutate.sh` (refuses a dirty file, restores from HEAD on EXIT, and demands the red output name the
     expected test, so a passing `✓` line cannot satisfy it). Found by `/plan-review` before it ran. (2026-10-02.)
+    - **Hit again (2026-10-05, §8.137) — that last claim was FALSE.** The Wave 2 script's `grep -qF "$want"` scans
+      the whole output, and jest run on ONE file is verbose: it prints `✓ <name>` for every PASSING test. So a red
+      caused by a different test still printed "RED as required". Require the name in the FAILURE header —
+      jest: `grep -F "● " out | grep -qF "› $want"`; vitest: `grep -F " > $want" out | grep -q "^ *FAIL "` — and
+      self-test it with a mutation that reddens a DIFFERENT test (must be rejected). Caught by Wave 3 lane 2.
 
 312. **"Skip these ids" in a map-rebuilding helper can DELETE them — and `not.toBe(x)` cannot tell.**
     `applyBulkStatus` (`SwimSyncApp/lib/attendanceBulk.ts`) took `current` but built its result from the listed ids
@@ -2555,3 +2560,32 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     jest, so nothing would flag it. Pin it: `jest.mock("@/lib/lessonDates", () => ({ ...jest.requireActual(...),
     todayInSg: () => DATE }))` — not fake timers, which fight RNTL's `findBy`/`waitFor`
     (`features/mark-attendance/MarkAttendanceScreen.test.tsx`). §7.303's lesson on a new surface. (2026-10-02.)
+
+314. **A query change in a parent-app MONEY read is invisible to every mocked test, and fails as S$0.00, not as an
+    error.** `useChildProfile` / `useParentHome` read only `data`, and `outstandingOf(null)` / `creditOf(null)` /
+    `totalOutstandingOf(null)` are 0 — so a malformed filter, an `undefined` tenant id or a PostgREST 400 shows every
+    parent a clean S$0.00. A hook test with the dao mocked cannot see it, and cannot even see a filter added INSIDE
+    the dao (delete the dao's `.eq` and the hook test stays green). Two layers, both needed: (1) a **chain-recorder**
+    test of the repo function — mock `@/lib/supabase` with a proxy that logs `[method, ...args]`, assert `toEqual` on
+    the WHOLE log (`features/child-profile/dao/childProfile.repo.test.ts`, admin `invoices/dao/invoices.repo.test.ts`);
+    make the hook's fake filter by its arguments so a red comes from the missing argument (§7.110); (2) a
+    **real-PostgREST probe** before shipping — a parent JWT `curl` against local PostgREST over a fixture whose SQL
+    ground truth is > 0. No UI driver asserts these amounts. (Wave 3, 2026-10-05, §8.137.)
+
+315. **The dev Mac runs at +08 and CI at UTC, so a mutation proof against an SG-pinned formatter cannot go red
+    locally.** Swapping `formatSgStamp(x, DMY)` for viewer-local `toLocaleDateString` changes nothing at +08. Use a
+    fixture stamp that straddles SGT midnight (`2026-09-30T17:30:00Z` = 01/10 SGT, 30/09 UTC) and run the proof with
+    `TZ=UTC` (Wave 3's `mutate.sh` forces it). A proof recorded from a plain run on the Mac is not a proof. The
+    reverse of §7.227 (there a `TZ=UTC` run alone proved nothing for a driver). (2026-10-05, §8.137.)
+
+316. **When the ROOT checkout is on a feature branch, `git -C <root> merge --ff-only origin/main` (WORKTREES Phase 5,
+    `/commit-review` Step 5) advances THAT branch, not `main`.** And a worktree's `ExitWorktree remove` then flags the
+    worktree's merged commits as unmerged, because the root's local `main` ref is stale. While a root session is
+    live, a worktree never runs git in the root; the root session fast-forwards its own `main` (or
+    `git fetch origin main:main` updates the ref without a checkout). Hit by Wave 3's two lanes. (2026-10-05, §8.137.)
+
+317. **RNTL: `getByText(x).parent` is not the host `View`** — composite wrappers sit between, so `within(el.parent)`
+    scopes to the wrong node. Walk host ancestors (`typeof node.type === "string"`) to find the box to scope. And
+    `react-test-renderer` has no types here: type nodes as `ReturnType<typeof screen.getByText>`. (Wave 3 lane 2,
+    `features/child-profile/ui/BalancesCard.test.tsx`, 2026-10-05.)
+

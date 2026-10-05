@@ -731,6 +731,16 @@ there, which is what the one-invoice-per-parent-per-business rule requires.
 This reverses an earlier decision to pool credit per parent. That was correct while
 SwimSync served a single business and became wrong the moment it served two.
 
+**What the parent sees** *(implemented 2026-10-05)*: the **child profile's Balances card**
+shows what the family owes, and the credit it holds, **at that child's business only** —
+siblings at the same business included, because invoices are per parent per business.
+The **home screen's** Outstanding and Credit cards stay **family-wide across every
+business** ("Across all children"), deliberately: they are the family's total, and each
+invoice on the Billing tab shows what its own business's credit covered. *(Until
+2026-10-05 the child card also summed every business, so a child at one school showed
+credit only spendable at another. No live family was affected — none belonged to two
+businesses.)*
+
 #### Credit Note Flow
 
 1. Coach changes attendance from billable to non-billable on an already-invoiced lesson

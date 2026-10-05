@@ -357,8 +357,22 @@ LEFT a billable status, and awaited before leaving; call order. `domain/useMarki
 before overwriting and never re-marks or deletes a holiday void (§7.312). `MarkAttendanceScreen.test.tsx` — the
 route rendered whole: happy save, incomplete blocked, Set all → save; clock pinned (§7.313).
 `domain/useAttendanceLoad.test.ts` now runs under `renderHook` (re-proven red against `61426c8^`). Mutations M1–M13,
-U1–U3, S1–S4 in the file headers. **Still to do (Wave 3):** the invoice table, parent balances, and the *Pending
-charges* panel's two-tenant test (`PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md` RISK 6).
+U1–U3, S1–S4 in the file headers.
+
+**The money screens — third pass 2026-10-05** (`docs/plans/WAVE3_RENDER_TESTS_PLAN.md`, two lanes). Admin
+(vitest, `app/(admin)/invoices/`): `ui/InvoiceTable.test.tsx` — Package and Credit each a `−S$` deduction in its own
+column; Mark Paid only on outstanding rows and on THAT row; per-row busy; the "parent says paid" / "chat opened"
+stamps are SGT dates (proven under `TZ=UTC`, §7.315) and absent on paid rows; load-error / capped / no-number states.
+The *Pending charges* two-tenant test (`PARTIAL_PAYMENT_FOLLOWUPS_PLAN.md` RISK 6, deferred since 2026-08-22):
+`dao/invoices.repo.test.ts` pins `fetchPendingDebits`' whole query chain incl. the tenant filter (a chain recorder,
+§7.314); `domain/usePendingDebits.test.ts` — the RPC gets the ROW's tenant, the reload the HOOK's; cancel or a blank
+reason sends nothing; busy key `parent:tenant`; `ui/PendingDebits.test.tsx` — one parent at two businesses is two
+rows; `page.test.tsx` — the page loads debits for its own tenant, and none for no tenant. Parent app (jest,
+`features/`): `parent-home/ui/MoneySummary`, `child-profile/ui/BalancesCard` (incl. `describeCoverage`'s four
+verdicts), `parent-home/domain/useParentHome` (home stays family-wide), `child-profile/domain/useChildProfile` +
+`dao/childProfile.repo.test.ts` (the child card is THIS business only — PRD §5.6), on
+`child-profile/testing/profileHarness.ts` (saveHarness's shape; fakes filter by their arguments). The D5 fix was
+also probed against real local PostgREST (§7.314). 28 + 30 mutation proofs, recorded in the file headers.
 
 Four of the app's suites exist because of bugs that reached production on 2026-07-26, and
 what each one *pins* is the point:
