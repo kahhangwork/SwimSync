@@ -96,6 +96,9 @@ async function openLesson(page, classId, date) {
   await page.getByTestId("save-attendance").waitFor({ timeout: 15000 }).catch(() => {});
 }
 const bodyText = (page) => page.evaluate(() => document.body.innerText);
+// Run one section's UI actions; a failure becomes that section's FAIL detail, not an abort,
+// so a refused role still reports every check it breaks (the §2.2 red-proofs rely on it).
+const act = (fn) => fn().then(() => "", (e) => `action failed: ${String(e).split("\n")[0].slice(0, 120)}`);
 
 const { browser, page } = await launch({ headless: true });
 page.setDefaultTimeout(15000);
@@ -159,11 +162,13 @@ try {
     strip.startsWith(COACH) && !strip.includes("Unassigned"), strip);
 
   // ── 4. Mark both children; saved; read back ───────────────────────────────
-  await row(page, ALBA).locator('[data-status="present"]').click();
-  await row(page, BRUNO).locator('[data-status="absent"]').click();
-  await page.getByTestId("save-attendance").click();
-  const saveMsg = await page.getByTestId("save-message").innerText({ timeout: 15000 }).catch(() => "(no message)");
-  const marks = await dbUntil(marksQ, (v) => v.split(",").length === 2);
+  const err4 = await act(async () => {
+    await row(page, ALBA).locator('[data-status="present"]').click({ timeout: 8000 });
+    await row(page, BRUNO).locator('[data-status="absent"]').click({ timeout: 8000 });
+    await page.getByTestId("save-attendance").click({ timeout: 8000 });
+  });
+  const saveMsg = err4 || await page.getByTestId("save-message").innerText({ timeout: 15000 }).catch(() => "(no message)");
+  const marks = err4 ? sql(marksQ) : await dbUntil(marksQ, (v) => v.split(",").length === 2);
   await check("4a. Save reports two marks and the DB holds Alba present, Bruno absent",
     /Saved 2 marks/.test(saveMsg) && marks === `${ALBA}:present,${BRUNO}:absent`, `${saveMsg} · ${marks || "(none)"}`);
   await openLesson(page, CLASS1, LESSON);
@@ -172,27 +177,31 @@ try {
 
   // ── 5. A make-up into class 2 (Packages = None) ───────────────────────────
   await openLesson(page, CLASS2, NEXT);
-  await page.getByRole("button", { name: "Book a make-up into this lesson" }).click();
-  await modal(page).getByLabel("Child", { exact: true }).selectOption(ALBA);
-  await page.getByTestId("book-guest").click();
-  const booked = await dbUntil(makeupQ, (v) => v !== "");
+  const err5 = await act(async () => {
+    await page.getByRole("button", { name: "Book a make-up into this lesson" }).click({ timeout: 8000 });
+    await modal(page).getByLabel("Child", { exact: true }).selectOption(ALBA, { timeout: 8000 });
+    await page.getByTestId("book-guest").click({ timeout: 8000 });
+  });
+  const booked = err5 ? sql(makeupQ) : await dbUntil(makeupQ, (v) => v !== "");
   await row(page, ALBA).waitFor({ timeout: 10000 }).catch(() => {});
   const mkRow = await row(page, ALBA).innerText({ timeout: 3000 }).catch(() => "(no row)");
   await check("5. a make-up for Alba lands in FD Guest Lane (home FD Monday Squad) and is on its roster as a guest",
     booked === `${CLASS2}/${CLASS1}/${NEXT}` && /Make-up/i.test(mkRow),
-    `${booked || "(no booking)"} · ${mkRow.replace(/\s+/g, " ").slice(0, 60)}`);
+    `${err5 ? `${err5} · ` : ""}${booked || "(no booking)"} · ${mkRow.replace(/\s+/g, " ").slice(0, 60)}`);
 
   // ── 6. Students → add Cara to a class, today's start ──────────────────────
-  await page.goto(`${ADMIN}/students`, { waitUntil: "networkidle" });
-  const caraRow = page.locator("tr", { hasText: "FD Cara" }).first();
-  await caraRow.getByRole("button", { name: /^Actions$/ }).click();
-  await page.getByRole("button", { name: "+ Add class" }).click();
-  const addModal = modal(page).filter({ hasText: "Add a class for FD Cara" });
-  await addModal.getByRole("combobox", { name: /^Class/ }).selectOption({ label: "FD Monday Squad" });
-  await addModal.getByRole("button", { name: "Add class", exact: true }).click();
-  const cara = await dbUntil(caraQ, (v) => v !== "");
+  const err6 = await act(async () => {
+    await page.goto(`${ADMIN}/students`, { waitUntil: "networkidle" });
+    const caraRow = page.locator("tr", { hasText: "FD Cara" }).first();
+    await caraRow.getByRole("button", { name: /^Actions$/ }).click({ timeout: 8000 });
+    await page.getByRole("button", { name: "+ Add class" }).click({ timeout: 8000 });
+    const addModal = modal(page).filter({ hasText: "Add a class for FD Cara" });
+    await addModal.getByRole("combobox", { name: /^Class/ }).selectOption({ label: "FD Monday Squad" }, { timeout: 8000 });
+    await addModal.getByRole("button", { name: "Add class", exact: true }).click({ timeout: 8000 });
+  });
+  const cara = err6 ? sql(caraQ) : await dbUntil(caraQ, (v) => v !== "");
   await check("6. Add class enrols Cara in FD Monday Squad, active, starting today",
-    cara === `${CLASS1}/true/${TODAY}`, cara || "(no enrolment)");
+    cara === `${CLASS1}/true/${TODAY}`, err6 || cara || "(no enrolment)");
 
   await check("no uncaught page errors", pageErrors.length === 0, pageErrors.join(" || ").slice(0, 200));
 } catch (err) {
