@@ -60,13 +60,23 @@ export function useChildProfile() {
     let creditBalance = 0;
 
     if (parentStudentLink) {
-      const { data: invoices } = await fetchOutstandingInvoices(parentStudentLink.parent_id);
+      // This child belongs to ONE business, so both figures are that business's:
+      // what the family owes it (siblings there included) and the credit the
+      // family holds there. The home card is the family-wide total, on purpose.
+      const tenantId = (student as any).tenant_id;
+
+      const { data: invoices } = await fetchOutstandingInvoices(
+        parentStudentLink.parent_id,
+        tenantId
+      );
 
       outstandingAmount = outstandingOf(invoices);
 
-      const { data: parentRecord } = await fetchParentBalances(parentStudentLink.parent_id);
+      const { data: parentRecord } = await fetchParentBalances(
+        parentStudentLink.parent_id,
+        tenantId
+      );
 
-      // Summed across businesses — see the note in parent-home's homeRows.
       creditBalance = creditOf(parentRecord);
     }
 

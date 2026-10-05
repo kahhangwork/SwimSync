@@ -54,7 +54,9 @@ export function outstandingOf(invoices: any[] | null): number {
   );
 }
 
-// Summed across businesses — see the note in features/parent-home/domain/homeRows.
+// Sums whatever balance rows the read returned. The child profile's read is
+// already narrowed to the child's business, so this is that business's credit
+// (D5) — unlike Home's family-wide total (features/parent-home/domain/homeRows).
 export function creditOf(parentRecord: any): number {
   return ((parentRecord as any)?.parent_tenant_balances ?? []).reduce(
     (sum: number, b: any) => sum + Number(b.credit_balance ?? 0),

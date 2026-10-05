@@ -42,18 +42,26 @@ export const fetchParentLink = (id: string) =>
     .eq("student_id", id)
     .single();
 
-export const fetchOutstandingInvoices = (parentId: string) =>
+// Both money reads are scoped to ONE business — the child's. A family with
+// children at two businesses must not see business B's bill on a business-A
+// child's card (WAVE3_RENDER_TESTS_PLAN.md D5). Home's total stays family-wide.
+export const fetchOutstandingInvoices = (parentId: string, tenantId: string) =>
   supabase
     .from("invoices")
     .select("net_amount")
     .eq("parent_id", parentId)
-    .eq("status", "outstanding");
+    .eq("status", "outstanding")
+    .eq("tenant_id", tenantId);
 
-export const fetchParentBalances = (parentId: string) =>
+// The embed filter narrows the EMBEDDED balances, never the parents row, so
+// `.single()` still holds when the parent has no balance row at this business
+// (creditOf then reads 0).
+export const fetchParentBalances = (parentId: string, tenantId: string) =>
   supabase
     .from("parents")
     .select("parent_tenant_balances(credit_balance)")
     .eq("id", parentId)
+    .eq("parent_tenant_balances.tenant_id", tenantId)
     .single();
 
 export const fetchGradeScale = (tenantId: string) =>
