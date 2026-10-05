@@ -27,6 +27,14 @@
 //   testing/profileHarness.ts
 //   4. the invoice fake filters by tenant even when none is passed
 //      → RED: "no tenant → every business's rows; a tenant → only that business's"
+//   useChildProfile.ts (2.4)
+//   5. `if (parentStudentLink) {` → `if (parentStudentLink || true) {`
+//      → RED: "no parent link → 0 / 0 and no money read at all"
+//   6. `if (!student) {` → `if (false) {`
+//      → RED: "student not found → child is null and loading ends"
+//   childFormat.ts (2.4)
+//   7. outstandingOf `Number(inv.net_amount)` → `parseInt(inv.net_amount, 10)`
+//      → RED: "string net_amounts are summed to an exact number"
 // Deleting the dao's own tenant filter leaves THIS file green (the dao is mocked) —
 // dao/childProfile.repo.test.ts pins that.
 //
@@ -36,6 +44,7 @@ import {
   db,
   resetHarness,
   argsOf,
+  when,
   outstandingRows,
   balancesRecord,
 } from "../testing/profileHarness";
@@ -118,5 +127,35 @@ describe("useChildProfile — balances are the child's business's (D5)", () => {
     ];
     const result = await load();
     expect(result.current.child?.outstanding_amount).toEqual(62.25);
+  });
+});
+
+describe("useChildProfile — the load's other paths (plan 2.4)", () => {
+  it("no parent link → 0 / 0 and no money read at all", async () => {
+    twoBusinesses();
+    when("fetchParentLink", async () => ({ data: null, error: null }));
+    const result = await load();
+    expect(result.current.child?.outstanding_amount).toEqual(0);
+    expect(result.current.child?.credit_balance).toEqual(0);
+    expect(argsOf("fetchOutstandingInvoices")).toEqual([]);
+    expect(argsOf("fetchParentBalances")).toEqual([]);
+  });
+
+  it("string net_amounts are summed to an exact number", async () => {
+    db.invoices = [
+      { parent_id: "parent-1", tenant_id: "tA", net_amount: "12.25" },
+      { parent_id: "parent-1", tenant_id: "tA", net_amount: "7.50" },
+    ];
+    const result = await load();
+    expect(result.current.child?.outstanding_amount).toEqual(19.75);
+  });
+
+  it("student not found → child is null and loading ends", async () => {
+    twoBusinesses();
+    when("fetchStudentProfile", async () => ({ data: null, error: null }));
+    const result = await load();
+    expect(result.current.child).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(argsOf("fetchParentLink")).toEqual([]);
   });
 });
