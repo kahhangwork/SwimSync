@@ -1,7 +1,7 @@
 # Wave 4 — a start date on add-to-class, and the Front-desk role walked end to end (two lanes)
 
 _Planned 2026-10-05 with `/plan-with-confidence`. Build order: `BACKLOG.md` → *Build order* → Wave 4 (+ Wave 5,
-conditional). Status: **REVIEWED by `/plan-review` 2026-10-05 — mitigations inlined (⚠ RISK n).**_
+conditional). Status: **SHIPPED 2026-10-05/06** (§8.138; DEPLOYMENT #64–#68). Reviewed by `/plan-review` — mitigations inlined (⚠ RISK n)._
 
 ## What this builds, and why
 
@@ -468,3 +468,16 @@ driver + ship ½ day; +½ day if RISK 3 is included). Lane 2: ~1 day; +½–1 da
 4. **`markable_floor()` for a never-billed tenant reaches back to its creation date** (prod 2026-10-05: Little Orcas
    2026-08-03, Epic Swim 2026-07-21). A floor-based date picker must warn about unbilled months, not only sealed ones.
 5. **"No overlapping windows" rules: allow the start to equal the previous end date.** Span readers de-duplicate.
+
+## Known consequences — accepted when it shipped (2026-10-06)
+
+- **RISK 2 is unreachable from the UI, by construction.** Students → *Add class* lists only classes the child is NOT
+  in, so "add to a class they're already in" can only come from a direct RPC call; pgTAP 12 pins the refusal. The
+  driver's planned UI check for it was dropped.
+- **Moving a start LATER asks for no second press** (only an earlier start in an unbilled month does). The warning
+  text still describes the lessons from the new start — accepted; `dropped` lists what stops being expected.
+- **Change is shown to a View-only operations role**; pressing Save gets the RPC's refusal (P5's noisy-but-safe shape,
+  *Deliberately not doing → Hiding edit controls*).
+- **"Today" keeps `NOW()`.** Its UTC-date misreading in the engine was fixed separately (`41d9676`, engine v32, §7.7).
+- **The "zoneless timestamp" mutation cannot fail locally** — the test session runs in UTC; noon storage is what is pinned.
+

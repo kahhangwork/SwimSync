@@ -359,6 +359,17 @@ route rendered whole: happy save, incomplete blocked, Set all → save; clock pi
 `domain/useAttendanceLoad.test.ts` now runs under `renderHook` (re-proven red against `61426c8^`). Mutations M1–M13,
 U1–U3, S1–S4 in the file headers.
 
+**Starts on and who-taught — Wave 4, 2026-10-05/06** (`docs/plans/WAVE4_START_DATE_FRONT_DESK_PLAN.md`). pgTAP:
+`enrolment_start_date.test.sql` (41 — explicit add/change mode, no coach arm, SGT=UTC noon storage, floor/future/
+previous-window bounds with equality allowed, a later move refused past a mark + `dropped_dates`, `add_unclaimed_
+student`'s old call shape; 13 mutations listed in its header) and `class_coach_terms.test.sql` (11 — operations:view
+sees who taught, never a price; `class_rates` stays closed). Admin vitest: `lib/enrolmentStart.test.ts` (sealed /
+unbilled / this-month buckets at both boundaries, the second press, today-only fallback, dropped dates),
+`components/StartsOnField.test.tsx` (RISK 14 fallback; note §7.320 — no spy clearing), `students/domain/
+useAddClass.test.ts`, `trials/domain/useTrialsConvert.test.ts` (RISK 13: the future-trial guard precedes the RPC),
+`classes/ui/ChangeStartModal.test.tsx`, `lib/whoTaught.drift.test.ts` (no direct `class_rates` read, §7.318). Deno:
+`dates.test.ts` `earliestEnrolmentDate` (07:00 SGT is that day); `package-emails/email.test.ts` `sgDateOfStamp`.
+
 **The money screens — third pass 2026-10-05** (`docs/plans/WAVE3_RENDER_TESTS_PLAN.md`, two lanes). Admin
 (vitest, `app/(admin)/invoices/`): `ui/InvoiceTable.test.tsx` — Package and Credit each a `−S$` deduction in its own
 column; Mark Paid only on outstanding rows and on THAT row; per-row busy; the "parent says paid" / "chat opened"

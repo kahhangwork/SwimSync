@@ -1075,3 +1075,30 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     visible change today. Served bundle: `parent_tenant_balances.tenant_id` 0 hits in `entry-f9f93451…` → 1 in
     `entry-bc4c10fb…` (re-checked from the root session); Vercel Production SHA = `5ce45bc`. The owner opened a live
     child profile: Balances S$0.00 / S$0.00, coverage line intact.
+
+64. **Deploy record (2026-10-05): migration `20261005000100` — enrolment start date (Wave 4 lane 1).** Backend only,
+    ahead of its app (#67). Adds `set_enrolment_start` / `enrolment_start_bounds` / internal `enrolment_start_at`;
+    `add_unclaimed_student` gains a trailing `p_starts_on` (old 9-arg signature DROPPED first — §7.124 — and prod's
+    body diffed identical to local before the push, §7.40); email-claim COMMENTs corrected. `migration list --linked`
+    0 pending; prod `has_function_privilege`: anon EXECUTE false on all four, authenticated true on the three client
+    functions, false on the helper; one `add_unclaimed_student`. Rollback (`supabase/rollback/…_DOWN.sql`, APPS FIRST)
+    rehearsed locally.
+
+65. **Deploy record (2026-10-05): migration `20261005000200` `class_coach_terms` + the who-taught readers (`ccc0e4a`).**
+    A Front-desk co-admin (pricing none) saw no teaching coach anywhere (§7.318). Migration pushed, 0 pending, anon
+    EXECUTE false; then the app: Calendar, lesson page + nav strip, Attendance Coach column switched. **Nightly gate
+    WAIVED by the user.** Served bundle: `class_coach_terms` in chunk `9532-fd4698ab…` ~2 min after the push.
+
+66. **Deploy record (2026-10-06): `generate-invoices` v32 — earliest enrolment as an SGT date (§7.7).** Engine only
+    (`41d9676`). Deno 282 green twice. Verified by `supabase functions download`: `earliestEnrolmentDate` in core.ts /
+    orderingGuard.ts / dates.ts, no raw `enrolled_at` slice left. No billing-visible change expected (the wrong date
+    only widened a scan window by a day).
+
+67. **Deploy record (2026-10-06): *Starts on* + *Change start date* (`91627f0`, `0b3cb65`).** App only; its backend is
+    #64 (0 pending at push). **Nightly gate WAIVED by the user.** vitest 1062; `verify-enrolment-start` 10/10 and
+    `verify-front-desk-role` 11/11 against the build. Served bundle: "Change start date" in
+    `app/(admin)/classes/page-505475fe…`.
+
+68. **Deploy record (2026-10-06): `package-emails` — referral reward *Valid until* is the SGT date (`aec2076`).**
+    Function only. Was `String(expires_at).slice(0, 10)` (§7.7). Verified by download: `sgDateOfStamp` present; the
+    only remaining slice text is the explanatory comment.

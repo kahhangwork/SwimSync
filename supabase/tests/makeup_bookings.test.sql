@@ -314,8 +314,11 @@ RESET ROLE;
 
 -- Counted as superuser — the role that sees everything (§7.59). Exactly the
 -- two live + one cancelled bookings the admin made above, nothing more.
+-- Scoped to THIS file's classes (cf000000-…), never global: a sibling's driver
+-- fixture left loaded in the shared DB holds its own make-ups and used to turn
+-- this red (§7.272, third shape — 2026-10-05).
 SELECT is(
-  (SELECT count(*)::int FROM makeup_bookings),
+  (SELECT count(*)::int FROM makeup_bookings WHERE class_id::text LIKE 'cf000000-%'),
   3,
   'the refused calls added no rows (mutation-testing the gate)');
 

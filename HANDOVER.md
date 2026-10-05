@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-05 — **§8.137: Wave 3 SHIPPED in two lanes — admin invoice-table + Pending-charges tests (lane 1)
-and the parent money cards (lane 2), which found and fixed the child Balances card summing every business (deploy #63,
-nightly gate waived by the user).** 58 new mutation-proven tests; no migration._
+_Last updated: 2026-10-06 — **§8.138: Wave 4 SHIPPED in two lanes — *Starts on* + *Change start date* on every
+add-to-class (lane 1), and the Front-desk walkthrough, which found the co-admin hire would see no teaching coach — fixed
+the same day. Plus two §7.7 UTC-date slices fixed (engine v32, referral email).** Deploys #64–#68, gates waived by the user._
 
-_Previously (§8.136, 2026-10-05) — 04 Oct attendance verified on prod; a late-assigned child backdated (DEPLOYMENT #62)._
+_Previously (§8.137, 2026-10-05) — Wave 3: money-screen tests in two lanes; the child Balances card per-business (#63)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -27,7 +27,7 @@ there is no second index to go through.
 | What the product does today | `PRD.md` | — |
 | What's queued but unbuilt, and why | `BACKLOG.md` | — |
 | How to run and test it; seed logins | `LOCAL_DEV_GUIDE.md` | *(was §4)* |
-| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.317** |
+| **Traps that already cost real time** | **`docs/GOTCHAS.md`** | **§7.1–§7.322** |
 | What shipped in every older session | `docs/SESSIONS.md` | §8 ledger |
 | Why the system is shaped this way | `docs/ARCHITECTURE.md` | §6, §10, §12 |
 | What each test suite and UI driver covers | `docs/TESTING.md` | §5 |
@@ -348,6 +348,25 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.138 (2026-10-05 → 06) — Wave 4: a start date on add-to-class; the Front-desk hire's blind spot fixed
+
+**Re-ranked the backlog with the user into Waves 4–8, billed September (Coach Kah Hang only — Little Orcas is the
+owner's, §9), then `/plan-with-confidence` → `/plan-review` → two lanes: this session (root) shipped the start-date
+feature end to end; a side session (worktree `wave4-frontdesk`, now removed) drove the Front-desk role and found that an
+operations-only co-admin saw NO teaching coach anywhere — fixed and live before its driver merged.**
+Commits `8d73d3b` `06d4811` (backlog) · `48b61ce` (plan) · `1069aa4` `0984b0c` (migrations) · `ccc0e4a` `91627f0`
+`0b3cb65` (apps) · `41d9676` `aec2076` (functions) · `993bc87`…`d9f5f42` (lane 2).
+
+- **Shipped:** PRD §7.4 (*Starts on*, *Change start date*), PRD §4.3 (who taught is readable to operations roles);
+  ARCHITECTURE §6ad; DEPLOYMENT #64–#68. pgTAP +52, vitest 1028 → 1062, Deno +3, two drivers (TESTING §5).
+- **Decided with the user:** backlog Waves 4–8 (hire = Front desk; refund display and hide-edit-controls → *Deliberately
+  not doing*); NEW *Package-funded lessons need no monthly run* ranked ahead of the DB clock; all four add paths; edit
+  after the add; both nightly gates WAIVED.
+- **Found by asking "is this on purpose?":** the user challenged a quirk I had filed as intended — it was a §7.7 bug
+  (engine's UTC date slice), and a second one turned up in `package-emails`. Both fixed; the check is BACKLOG S.
+- **Gotchas:** §7.318–§7.322; §7.7 and §7.272 *Hit again* (#19 now scoped — promoted to a fix).
+- **Not done:** Little Orcas September (owner, WhatsApp sent); Wave 6 unplanned. Nightly not dispatched.
+
 ## 8.137 (2026-10-05) — Wave 3: the money screens tested in two lanes; the child card fixed
 
 **`/plan-with-confidence` → `/plan-review` → two lanes run at once: this session (root, admin) coordinating a side
@@ -362,22 +381,7 @@ Commits `74c882c` (plan) · `adbd429` `213d291` `864a6a8` `4e4e06d` (tests) · `
 - **Gotchas:** §7.314–§7.317, and §7.311's `mutate.sh` claim corrected (it accepted a red for the wrong test).
 - **Not done:** September billing (still §9). Nightly not dispatched.
 
-## 8.136 (2026-10-05) — 04 Oct attendance checked on prod; a late-assigned child backdated
-
-**The owner asked two things: was 04 Oct marked correctly through the new lesson page, and why couldn't a new child be
-marked on 04 Oct? Answers: yes, every expected child has a mark; and the child's ENROLMENT was dated 05 Oct (assigned
-the day after the record was made) — a roster starts on the add-to-class date, not the record's.** Commit `811449a`.
-
-- **Done on prod:** one enrolment moved to 04 Oct on the owner's word, then the owner marked the lesson — DEPLOYMENT #62
-  (the only record; enrolments have no audit trigger). Nothing billed was touched.
-- **Tooling:** `scripts/prod-query-ro.sh` (proven: a write returns 25006). DEPLOYMENT #47's "read-only" claim for raw
-  `db query --linked` was false — corrected there. Local allow rule for the wrapper; an ASK rule for the raw command.
-- **Filed:** BACKLOG *Choose a start date when adding a child to a class*.
-- **Process slip, owned:** the prod `UPDATE` ran on the classifier's judgement with no rule covering it, and I didn't say
-  so before running it. The ask rule now gates it.
-- **Not done:** September billing (still §9 #2). Nightly not dispatched.
-
-_(§8.135 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.136 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -420,11 +424,12 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-05: the last four nightlies are GREEN** (newest `37241823074`, on `cbf747b` — BEFORE deploys
-#61 and #63). **The next one is the first over BOTH** — `6da66e6` (#61, admin lesson page; first run of the NEW driver
-`verify-admin-lesson-nav`, so expect 70 drivers) and `5ce45bc` (#63, the child Balances card — shipped with the gate
-WAIVED by the user). Read `admin-lesson-detail` / `lesson-detail-guests` / `cancel-lesson` / `verify-admin-lesson-nav`
-(#61) and `verify-edit-child` / `verify-smoke-app` (they open the child profile, #63) first.
+**State on 2026-10-06: the last nightly is GREEN** (`37241823074`, on `cbf747b` — BEFORE deploys #61, #63, #65, #67).
+**The next one is the first over all four, and the first run of TWO new drivers** — `verify-front-desk-role` (11) and
+`verify-enrolment-start` (10), so expect 72 drivers. #65/#67 shipped with the gate WAIVED by the user. Read first:
+those two, then `verify-class-students` (the roster drawer gained *Change*), `verify-trial-visibility` /
+`verify-grading-admin` (Assign / Convert gained *Starts on*), `verify-contact-details` (*Add student*),
+`admin-lesson-detail` / `verify-admin-lesson-nav` (#61, who-taught readers), `verify-edit-child` (#63).
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -434,14 +439,13 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read the next nightly** (never dispatch it unasked) — the first over deploys #61 AND #63. Red → fix first.
-2. **September: Coach Kah Hang BILLED AND SEALED 2026-10-05** (9 invoices, S$965, all 26 present marks invoiced).
-   **Little Orcas NOT billed — the owner's job, never run there:** *Generate Sep 2026* (draws PKG-2026-0002 for its
-   one in-app family), then *Record it as settled* for the 15 pilot children whose packages are sold outside
-   SwimSync (PRD §7.17; 50 of its 60 present marks). Until then its September stays open.
-3. **Next build — Wave 4, after September is billed** (re-ranked with the user 2026-10-05, `BACKLOG.md` → *Build
-   order*). Lane 1: *Choose a start date when adding a child* + the COMMENT fix, one migration. Lane 2: walk the
-   **Front-desk** role (the co-admin hire's role, `pricing:none`) — fixes land before the hire. Then *Package-funded lessons need no monthly run* (plan first), then the DB clock.
+1. **Read the next nightly** (never dispatch it unasked) — the first over #61, #63, #65, #67. Red → fix first.
+2. **Little Orcas September is the OWNER's** (WhatsApp sent 2026-10-05): *Generate Sep 2026*, then *Record it as
+   settled* for the 15 pilot children whose packages are sold outside SwimSync (PRD §7.17). Until then its September
+   stays open. Coach Kah Hang's September is billed and sealed.
+3. **Next build — Wave 6, *Package-funded lessons need no monthly run* (L) — `/plan-with-confidence` first**
+   (`BACKLOG.md` → *Build order*; the item's Notes list six questions the plan must settle). Not mid-billing. Then
+   Wave 7, the DB clock (with the §7.7 check folded in).
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).
@@ -454,8 +458,8 @@ which mutate shared seed state — are in the same section.
 
 **GATE (§7.1): read the next nightly before the next APP unit merges.** Driver-only units need no gate.
 
-**No migration is HELD or in flight.** Latest applied is `20260928000200` (package refunds), on prod, 0 pending
-(169/169 on 2026-09-27); both Wave 2 rollbacks rehearsed (U2's refuses while refunds exist).
+**No migration is HELD or in flight.** Latest applied is `20261005000200` (`class_coach_terms`), on prod, 0 pending
+(2026-10-06); both Wave 4 rollbacks rehearsed (APPS FIRST — their headers).
 **`supabase migration list --linked` is the fact; a prose status is a hint.**
 
 > **Cron-gated follow-ups stay parked** (reminders remain manual): reward-expiry nudge, unprompted

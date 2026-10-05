@@ -33,13 +33,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
 | Area | Items |
 |---|---|
 | SGT dates, clocks, date literals | 7, 12, 94, 95, 100, 121, 122, 128, 175, 177, 194↪, 195, 215, 227, 229, 260, 302, 303, 304, 305, 306, 308, 310, 313, 315 |
-| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292 |
+| Grants, function privileges | 35, 39, 78, 82, 85, 87, 89, 150, 168↪, 172, 255, 287, 289, 292, 318 |
 | `SECURITY DEFINER`, triggers under RLS | 38, 42, 57, 104↪, 120, 125, 149, 156↪, 158, 160, 164, 165, 167, 288, 290, 293 |
 | PostgREST / supabase-js query traps | 28, 52, 70, 76, 90, 106, 114, 176↪, 212, 216, 217, 314 |
 | Changing schema breaks something far away | 21, 29, 40, 83↪, 115↪, 123, 124, 127, 145, 185, 189, 211, 213, 214 |
-| Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266 |
-| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317 |
-| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307 |
+| Billing engine, completeness, seals | 8, 13, 17, 18, 32, 68, 97, 103, 109, 203, 208, 219, 257, 259, 265, 266, 319 |
+| A test green for the wrong reason | 15, 16, 25, 33, 59, 105, 110, 111, 112, 117, 147, 153, 220, 231, 294, 295, 309, 311, 312, 314, 315, 317, 319, 320, 321 |
+| UI drivers and fixtures | 62, 63, 73, 75, 79, 98, 101, 102, 107, 113, 118, 163, 196, 224↪, 225, 226, 234, 244, 246, 263, 272, 276–282, 291, 302, 304, 307, 321, 322 |
 | RN-web / Expo screens, deep links | 9, 10, 58, 64, 65, 74, 80, 81, 99, 141, 146, 237, 252↪, 254, 270, 274, 275, 312 |
 | Deploying; proving what is served | 23, 27↪, 30, 31, 49, 51, 60, 72, 187, 238, 253, 271 |
 | Worktrees, the shared local stack | 44, 55, 56, 84, 135, 136, 239, 261, 268, 269, 316 |
@@ -82,6 +82,13 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
    `nowMinutes: number`. **Extend the audit:**
    `grep -rn "getHours()\|getMinutes()\|getDay()" SwimSyncApp/app SwimSyncAdmin/app`
    — every hit is either a bug or needs a comment saying why not.
+   - **Hit again (2026-10-06, §8.138) — in the EDGE FUNCTIONS, which the audit above never scans.**
+     `String(<timestamptz>).slice(0, 10)` is the same UTC date: the engine floored its expected-lesson window with
+     `enrolled_at` sliced (core.ts, orderingGuard.ts) while the per-child spans beside it used the SGT date (fixed →
+     `dates.ts earliestEnrolmentDate`, engine v32), and `package-emails` printed a referral reward's *Valid until* a
+     day early (→ `sgDateOfStamp`). Audit: `grep -rn "slice(0, *10)" supabase/functions --include=*.ts | grep -v test`
+     — only UTC-midnight date arithmetic may remain. **Bitten in a new place again → promote to a check:** BACKLOG
+     *Promote §7.7 to a check over supabase/functions*.
 
 8. **~~The engine's completeness gate never fires on the admin path.~~ FIXED 2026-07-18
    (§8a).** `SwimSyncAdmin/app/api/generate-invoices/route.ts` hardcoded `force: true`,
@@ -2261,6 +2268,10 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
       did before this was noticed). **Fixed 2026-09-27:** #18 now counts only its own two tenants. Also note `run-all-drivers.sh --only X`
       leaves X's fixture AND its writes loaded — the next full `check-fixture-roundtrip.sh` then reports X as a
       leftover ("loaded but changed no rows"); run X's teardown and re-run.
+    - **Hit again, third shape (2026-10-05, §8.138):** `makeup_bookings.test.sql` #19 counted EVERY make-up, so a
+      sibling lane's `fixtures-front-desk-role` booking turned it red mid-session. **Fixed** the way #18 was: it now
+      counts only its own classes (`cf000000-%`) — proven: with a sibling make-up loaded the scoped count passes and
+      the old one fails. **Rule for any new pgTAP count: scope it to the file's own ids.**
 
 273. **To simulate a slow cold hydrate in a driver, never rewrite the Expo bundle, and don't delay it with
     `page.route` alone.** `domcontentloaded` absorbs it, so the helper never sees it; `setTimeout`-wrapping
@@ -2588,4 +2599,41 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     scopes to the wrong node. Walk host ancestors (`typeof node.type === "string"`) to find the box to scope. And
     `react-test-renderer` has no types here: type nodes as `ReturnType<typeof screen.getByText>`. (Wave 3 lane 2,
     `features/child-profile/ui/BalancesCard.test.tsx`, 2026-10-05.)
+
+318. **A MONEY table can carry an OPERATIONS fact — gate the table and the fact disappears for operations roles,
+    silently.** `class_rates` holds `price_per_lesson` AND `paid_coach_id` (who taught). `class_rates_admin_select`
+    needs `pricing:view` (20260927000500), so a Front-desk co-admin (pricing none) read ZERO rows and the Calendar,
+    lesson page, nav strip and Attendance Coach column all named nobody — RLS filters, it never errors. Found by
+    `verify-front-desk-role` before the hire, 2026-10-05. **Fix shape:** a narrow `SECURITY DEFINER` read of the
+    non-money columns gated on `operations:view` (`class_coach_terms`, 20261005000200) — never loosen the money
+    policy. `SwimSyncAdmin/lib/whoTaught.drift.test.ts` fails on any direct `.from("class_rates")`. **Before gating a
+    table to a money area, list its non-money columns and who reads them.** (§8.138.)
+
+319. **`markable_floor()` for a business that has NEVER billed is its CREATION date — months back, not the 1st of
+    last month.** It is `LEAST(session_window_start(), <month after last seal, else created_at SGT>)`. Prod
+    2026-10-05: Little Orcas 2026-08-03, Epic Swim 2026-07-21. A pgTAP case assuming "below the floor = the day before
+    `session_window_start()`" passed nothing (Wave 4); a date picker built on the floor reaches into months that are
+    unbilled, not sealed, where a backdate creates unmarked lessons that block that month and — via the ordering
+    guard — every later one. Read the floor from `markable_floor()`/`enrolment_start_bounds()`; warn for EVERY past
+    month, not only sealed ones (`lib/enrolmentStart.ts bucketStart`). (§8.138.)
+
+320. **vitest 4: clearing a spy re-raises a promise rejection it already returned — even one the code handled.**
+    `beforeEach(() => spy.mockReset())` (or `mockClear()`) on a `vi.fn` whose earlier call returned
+    `Promise.reject(...)` failed the NEXT test with that rejection, stack pointing at the mock line, while the hook's
+    `.then(ok, err)` had handled it. Bisected 2026-10-06: no clear → green. **Don't clear such spies; count calls as a
+    delta** (`const n = spy.mock.calls.length` … `slice(n)`), as `components/StartsOnField.test.tsx` and the Wave 4
+    hook tests do. (§8.138.)
+
+321. **A mutation proof run against files a LIVE dev server is serving hot-reloads the mutant into the app.** The
+    Wave 4 UI mutation script edited `useAddClass.ts` (Add sends "change") while `next dev` served :3000; the very next
+    driver run hit the mutant and went red ("FD Cara is not in FD Monday Squad" — change mode's refusal), reading as
+    a product regression. **Run source mutations with no driver aimed at that server, and after restoring, `touch` the
+    file and confirm the served build before trusting a driver result.** Prefer a copy-and-restore over `git stash`
+    when a sibling session shares the stash stack. (§8.138.)
+
+322. **Two ways a role driver's red-proof lies.** (1) The admin sidebar renders NO links inside a collapsed group,
+    so "no money page in the sidebar" passes vacuously — open every `navgroup-*` first. (2) Under a refused role the
+    FIRST failing click times out and aborts the run, hiding every later check — wrap each section's UI actions so a
+    failure becomes that section's FAIL detail (`act()` in `verify-front-desk-role.mjs`), then a red-proof reports
+    every check it breaks. (Wave 4 lane 2, 2026-10-05, §8.138.)
 

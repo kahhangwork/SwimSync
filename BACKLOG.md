@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-05 — **re-ranked with the user: Waves 4–8** (start date on add-to-class + the COMMENT fix; a Front-desk role walkthrough → fixes before the co-admin hire; NEW *Package-funded lessons need no monthly run*, then the DB clock; types last). *Show package refunds to the parent* and *Hide edit controls* → *Deliberately not doing*. Earlier the same day: Wave 3 item 5 (component-render tests) SHIPPED and its item removed (§8.137); earlier the same day, filed *Choose a start date when adding a child to a class* (§8.136). Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-06 — **Waves 4–5 SHIPPED** (§8.138): start date on add-to-class, *Change start date*, the COMMENT fix, and the Front-desk coachless-lesson bug (confirmed + fixed). Filed *Promote §7.7 to a check over supabase/functions* (S, folded into Wave 7). Next: Wave 6 *Package-funded lessons need no monthly run*, plan first. Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -271,22 +271,12 @@ _Supersedes every older ranking below, which is kept as history. Forced by: Wave
 | When does *Inject the database clock* run? | ~~Mid-October, after September is billed~~ → **after *Package-funded lessons need no monthly run*** (user, later the same day) | Wave 7. Not mid-billing (it touches the guards the monthly run depends on) |
 | Should package lessons still need the monthly run? | **No** — rethought by the user after September's billing check: the package purchase IS the invoice; only ad-hoc lessons need generation | New item *Package-funded lessons need no monthly run* (L), ranked **ahead of the DB clock** — both rewrite the billing guards, and the clock first would convert functions this rewrites |
 
-#### Wave 4 — live pain + the Front-desk check — **after September billing, two lanes**
+#### ~~Waves 4–5~~ — **SHIPPED 2026-10-05/06** (§8.138, plan `docs/plans/WAVE4_START_DATE_FRONT_DESK_PLAN.md`)
 
-1. **Lane 1 (root — migration):** *Choose a start date when adding a child to a class* (S/M). It already forced a
-   prod SQL write (DEPLOYMENT #62) and any new child can hit it again. **The *Correct the "new key" COMMENTs* item
-   (S) rides in the same migration** — its own note says not to deploy it alone.
-2. **Lane 2 (worktree — fixtures only, no migration):** **walk the Front-desk role end to end.** Seed a Front-desk
-   persona (`pricing:none`, every money area None) and do the hire's job: mark attendance, book a make-up, open the
-   Calendar and a lesson page. Confirms or clears *A co-admin without pricing access may see NO teaching coach*,
-   and catches any other ops page that silently needs a money area (make-ups touch packages; Packages = None).
+Start date on add-to-class + *Change start date* (PRD §7.4) and the COMMENT fix; the Front-desk walkthrough
+confirmed the coachless-lesson bug and its fix shipped the same day (PRD §4.3). Next is Wave 6.
 
-#### Wave 5 — fix what Wave 4 lane 2 finds — **before the hire (~late December)**
-
-3. The backend fix(es) — likely a narrow SECURITY DEFINER read of who-taught for `operations:view`. A migration, so
-   it lands from the root **after** Wave 4 lane 1's (one schema change in flight). Empty if lane 2 finds nothing.
-
-#### Wave 6 — *Package-funded lessons need no monthly run* (L) — **plan first (`/plan-with-confidence`)**
+#### Wave 6 — *Package-funded lessons need no monthly run* (L) — **NEXT; plan first (`/plan-with-confidence`)**
 
 4. Changes WHEN money moves for every package family on both live businesses, so it is planned before it is built.
    **Precedes the DB clock** (rework edge): both rewrite the engine's guards and the package draw-down; clock-first
@@ -294,8 +284,9 @@ _Supersedes every older ranking below, which is kept as history. Forced by: Wave
 
 #### Wave 7 — *Inject the database clock* (L) — **a quiet stretch after Wave 6**
 
-5. Starts once Wave 4 lane 1's and Wave 6's migrations have landed — the start-date RPC and the new draw-down then go
-   on its conversion list rather than being converted twice. Billing guards last; Deno twice.
+5. Starts once Wave 6's migrations have landed — the start-date RPC (`set_enrolment_start`, live) and the new
+   draw-down then go on its conversion list rather than being converted twice. Billing guards last; Deno twice.
+   **Fold in:** *Promote §7.7 to a check over supabase/functions* (S, below) — the same clock/date family.
 
 #### Wave 8 — cheaper by waiting
 
@@ -1644,6 +1635,16 @@ real tenant asks — that is the one honest reason, and nobody has.
 
 These aren't features; they're the things that will make future features cost more, or
 that are quietly waiting to break something.
+
+### Promote §7.7 to a check over supabase/functions — **S** — _filed 2026-10-06 (§8.138)_
+A CI scan (`check-*.sh` or a Deno test reading the sources) that fails on `slice(0, 10)` / `split("T")[0]` over a
+timestamptz in `supabase/functions/**` (non-test), with an allowlist for UTC-midnight date arithmetic
+(`dates.ts formatDate`, `public-package validUntilPreview`).
+
+**Why:** §7.7 bit a THIRD place on 2026-10-06 — the engine's earliest-enrolment floor and the referral email's
+*Valid until* both read a UTC date — and its written audit greps only the two app folders, so nothing looked at the
+edge functions. GOTCHAS' rule: a trap that bit again is promoted to a check. **Notes:** model on
+`drivers/check-driver-dates.sh` (§7.302); prove it red against `41d9676^` (the engine slice). Rides Wave 7.
 
 ### Inject the database clock — **L** — _filed 2026-10-01_
 **Make every date-sensitive test choose its own "today", so no test can ever expire.** Today the database has no

@@ -806,6 +806,7 @@ Memory files (Claude project memory dir) also capture project state + backend
 | `SwimSyncAdmin/lib/adminManagementGate.ts` | The shared route gate (caller's tenant from their OWN profile, owner check against `tenants.owner_profile_id`) — five routes, one boundary | **Since roles:** `requireArea(req, area, level)` (asks `has_admin_area` as the caller) and `refuseOwnerTarget()` before any auth side effect (§7.293).
 | `SwimSyncAdmin/lib/permissions.ts` (+ test) · `components/PermissionsProvider.tsx` | The role model the panel reads: 8 areas, `can()`, `gridProblem()` (mirrors `set_role_grid`), `isWithin()`; the provider loads `my_admin_permissions` once (§6ab) |
 | `SwimSyncAdmin/app/(admin)/roles/` | The Roles page — roles, holders, the 8×3 grid; owner-only writes (D9) |
+| `SwimSyncAdmin/lib/enrolmentStart.ts` (+ rpc, test) · `components/StartsOnField.tsx` | *Starts on*: bounds → today-only fallback, sealed / unbilled / this-month warnings, the second press, dropped dates (§6ad) |
 | `SwimSyncAdmin/lib/staffInvitation.ts` | `mintStaffInvitation()` — every staff-creating route calls it before `generateLink`/`createUser` (§6aa) |
 | `SwimSyncAdmin/app/api/resend-invoice-email/route.ts` | Per-invoice email resend (lane 2): `billing:edit` as the caller, then a CRON_SECRET proxy to `generate-invoices`' `{resend_invoice_email}` branch |
 | `supabase/tests/http/signup_trust.sh` | The GoTrue-path sign-up trust test, in CI (§7.295) |
@@ -926,6 +927,22 @@ closed month, one live refund). **Standing prohibitions:** no override for a clo
 and no revenue arithmetic outside the single `v_revenue` assignment (§7.298). A test purchase that was confirmed by
 mistake is corrected by clearing `confirmed_at` with an audit row (DEPLOYMENT #59), not by a fake refund.
 Plan: `docs/plans/PACKAGE_REVENUE_REFUNDS_PLAN.md`.
+
+### 6ad. Enrolling is ONE audited RPC with an explicit mode; who-taught is read without the price (2026-10-05)
+
+**Enrolment writes.** Every add-to-class path (Students *Add class* / *Add student*, Unassigned *Assign*, Trials
+*Convert*) and the roster's *Change start date* go through `set_enrolment_start(student, class, starts_on, mode)` —
+or `add_unclaimed_student(…, p_starts_on)` for a brand-new child — never a client `insert` into
+`student_class_enrolments`. The mode is **explicit** (`add` | `change`): `add` on an existing enrolment is refused,
+never turned into an edit. A past start is stored at **12:00 SGT** so the UTC and SGT dates agree; "today" keeps
+`NOW()`. **Prohibitions:** no coach arm (§7.202); no "move the start" shortcut on any billing or unmarked-lessons
+surface — a lesson that didn't run is marked *cancelled*; a later start is refused past a mark. Audit rows use
+`entity_type 'Student'` (§7.297).
+
+**Who taught.** Surfaces that name a lesson's teaching coach read `class_coach_terms()` — `class_rates`' three
+non-money columns for `operations:view` — never `class_rates` itself, which stays behind `pricing:view` (§7.318;
+`lib/whoTaught.drift.test.ts` enforces it). **Do not loosen `class_rates_admin_select` to fix a coachless screen.**
+Plan: `docs/plans/WAVE4_START_DATE_FRONT_DESK_PLAN.md`.
 
 ### 12a. `Alert.alert` is a no-op on the web build (known pattern)
 
