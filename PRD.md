@@ -2307,8 +2307,8 @@ cash paid always equals value granted — nothing to reconcile.
   right one recorded. Declined requests (never paid) and active packages cannot be refunded.
   Recording and reversing need the *Packages & referrals* area at **edit** (Full admin by
   default); a view-only role sees the refund but no buttons. A refund comes **off Revenue in
-  the month it was paid out** (§7.23). The family is not notified in-app — see `BACKLOG.md`
-  *Show package refunds to the parent*.
+  the month it was paid out** (§7.23). The family is not notified in-app — deliberately (`BACKLOG.md` → *Deliberately not
+  doing*, 2026-10-05).
 
 *(Deliberately not built: arbitrary-amount top-ups — buying another
 package is the top-up; and the UNPROMPTED parent low-balance nudge — the admin now sends a

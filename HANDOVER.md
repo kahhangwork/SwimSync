@@ -438,9 +438,9 @@ which mutate shared seed state — are in the same section.
 2. **Bill September now (early October — overdue as of 2026-10-05):** Little Orcas's Accounting should show
    *Packages sold S$700* (PKG-2026-0002); PKG-2026-0001 was a test and counts nowhere (DEPLOYMENT #59).
    `INVOICE_RUNBOOK.md`.
-3. **Next build — re-rank first.** Wave 3 item 5 shipped (§8.137); the build order holds only item 6 (*Generate real
-   Supabase `Database` types*, "always last"). **Unranked:** *Inject the database clock* (L), *Choose a start date when
-   adding a child to a class* (§8.136). Run `/backlog-prioritisation` with the user; not mid-billing.
+3. **Next build — Wave 4, after September is billed** (re-ranked with the user 2026-10-05, `BACKLOG.md` → *Build
+   order*). Lane 1: *Choose a start date when adding a child* + the COMMENT fix, one migration. Lane 2: walk the
+   **Front-desk** role (the co-admin hire's role, `pricing:none`) — fixes land before the hire. DB clock mid-October.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).

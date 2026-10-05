@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-05 — Wave 3 item 5 (component-render tests) SHIPPED and its item removed (§8.137); earlier the same day, filed *Choose a start date when adding a child to a class* (§8.136). Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-05 — **re-ranked with the user: Waves 4–7** (start date on add-to-class + the COMMENT fix; a Front-desk role walkthrough → fixes before the co-admin hire; the DB clock mid-October; types last). *Show package refunds to the parent* and *Hide edit controls* → *Deliberately not doing*. Earlier the same day: Wave 3 item 5 (component-render tests) SHIPPED and its item removed (§8.137); earlier the same day, filed *Choose a start date when adding a child to a class* (§8.136). Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -257,9 +257,52 @@ theme.
 > someone picking work actually reads. **When you strike an item through, grep this
 > document for its name before you close the file.**
 
-### Current build order — re-ranked 2026-09-27 with the user
+### Current build order — re-ranked 2026-10-05 with the user
 
-_Supersedes every older ranking below, which is kept as history. Forced by: the Foundations driver backlog and
+_Supersedes every older ranking below, which is kept as history. Forced by: Wave 3 shipped (§8.137), leaving only
+*Generated types* ranked while six items filed since 2026-09-27 sat unranked._
+
+#### Decisions settled 2026-10-05
+
+| Decision | Answer | Consequence for the order |
+|---|---|---|
+| What role will the co-admin hire hold? | **Front desk** (standard role): attendance, make-ups, ops — *"nothing finance related"* (user) | Operations = Edit, every money area = None. *A co-admin without pricing access may see NO teaching coach* now hits **exactly this hire** → must be confirmed and fixed before they start. No area at View → *Hide edit controls* → *Deliberately not doing* |
+| Show package refunds to the parent? | **No** — 2026-09-27's "nothing in-app for now" stands | → *Deliberately not doing* |
+| When does *Inject the database clock* run? | **Mid-October, after September is billed** | Wave 6. Not mid-billing (it touches the guards the monthly run depends on) |
+
+#### Wave 4 — live pain + the Front-desk check — **after September billing, two lanes**
+
+1. **Lane 1 (root — migration):** *Choose a start date when adding a child to a class* (S/M). It already forced a
+   prod SQL write (DEPLOYMENT #62) and any new child can hit it again. **The *Correct the "new key" COMMENTs* item
+   (S) rides in the same migration** — its own note says not to deploy it alone.
+2. **Lane 2 (worktree — fixtures only, no migration):** **walk the Front-desk role end to end.** Seed a Front-desk
+   persona (`pricing:none`, every money area None) and do the hire's job: mark attendance, book a make-up, open the
+   Calendar and a lesson page. Confirms or clears *A co-admin without pricing access may see NO teaching coach*,
+   and catches any other ops page that silently needs a money area (make-ups touch packages; Packages = None).
+
+#### Wave 5 — fix what Wave 4 lane 2 finds — **before the hire (~late December)**
+
+3. The backend fix(es) — likely a narrow SECURITY DEFINER read of who-taught for `operations:view`. A migration, so
+   it lands from the root **after** Wave 4 lane 1's (one schema change in flight). Empty if lane 2 finds nothing.
+
+#### Wave 6 — *Inject the database clock* (L) — **mid-October, a quiet stretch**
+
+4. Starts once Wave 4 lane 1's migration has landed — the new start-date RPC then goes on its conversion list (one
+   function; cheap) rather than the live start-date bug waiting weeks behind an L. Billing guards last; Deno twice.
+
+#### Wave 7 — cheaper by waiting
+
+5. *Generate real Supabase `Database` types* — always last. After Wave 6, which rewrites dozens of functions.
+
+**Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
+(low-balance nudge, automated reminders), Native builds → Push → Logo check, Bulk WhatsApp, In-app payment gateway.
+
+**Moved to *Deliberately not doing* 2026-10-05:** *Show package refunds to the parent*, *Hide edit controls page by
+page for a view-only role*.
+
+### Build order of 2026-09-27 — Waves 1–3 (history; all shipped bar *Generated types*, now Wave 7 above)
+
+_Superseded 2026-10-05. Forced by: the Foundations driver backlog and
 §8.129 emptied the previous pick-now list, and the user settled the decisions below in one Q&A session._
 
 #### Decisions settled 2026-09-27
@@ -1075,7 +1118,7 @@ if a late-added holiday inside an old nominal window can still resurrect an expi
 which is exactly why the event-driven replacement is correct: extension now happens at the
 holiday mark, not on a scan that would have to be un-bounded to catch it. (Fable review #9.)
 
-### Show package refunds to the parent — **S** — _filed 2026-09-27_
+### ~~Show package refunds to the parent~~ — **S** — **NOT DOING 2026-10-05** → *Deliberately not doing*
 Show a recorded package refund on the parent's Billing card (*"Refunded S$X on <date>"*), and email them when one is
 recorded.
 
@@ -1380,6 +1423,9 @@ update fires `enrolment_tenant_guard` and `trg_enrolment_schedule` (overlap) —
 `update`.
 
 ### A co-admin without pricing access may see NO teaching coach anywhere — **S** — _filed 2026-10-05, unconfirmed_
+**Ranked 2026-10-05 (Wave 4 lane 2 → Wave 5):** the co-admin being hired holds *Front desk* — `pricing:none` — so
+this is exactly their view. Confirm and fix before they start.
+
 Since `20260927000500`, reading `class_rates` needs `pricing:view` (`class_rates_admin_select`). The teaching coach of a
 lesson is resolved from the class rate in force (`termsCoachOn`, `lib/lessonAttribution.ts`) unless a substitute is
 named. So an operations-only co-admin likely reads **zero** rates, and every surface that names who taught shows
@@ -1490,7 +1536,7 @@ email, reused — `CRASH_SAFE_EMAIL_CLAIM_PLAN.md` §2), and the code follows th
 immutable — a new root migration re-issues the two `COMMENT ON FUNCTION` lines only (no behaviour). Ride it on
 the next migration rather than deploying it alone.
 
-### Hide edit controls page by page for a view-only role — **M** — _filed 2026-09-27 (roles step 6)_
+### ~~Hide edit controls page by page for a view-only role~~ — **M** — **NOT DOING 2026-10-05** → *Deliberately not doing*
 Roles' P5 said a View-only area shows its pages with the edit controls **hidden**, not disabled. What shipped is the
 page-level half: `RequiresTenant` renders a one-line *"View only — your role can't change this."* notice above the
 page. The buttons themselves still render; pressing one gets the server's refusal (RLS / `has_admin_area`), shown as
@@ -1804,6 +1850,8 @@ Kept so the reasoning doesn't get re-litigated.
 |---|---|
 | **A per-child make-up for a child in every class of their kind** | Refused 2026-09-27 with the user: no child is enrolled in every group class of their kind, so the gap (nowhere to guest them, `book_makeup()` rightly refusing the own-class silent void) never arises. Workarounds stand: mark the miss non-billable, or a whole-class extra lesson. **Never "fix" it by relaxing the own-class refusal** (pinned by `multi_class.test.sql`). **Revisit if** a child really is enrolled in every class of a kind; the design sketch is in the struck item. |
 | **A different-coach private make-up** | Refused 2026-09-27 with the user: no requester. A private make-up stays an extra lesson of the child's own class (same coach). **Revisit if** a private coach's cover is actually requested; the struck item names the two shapes (a one-off class, or a per-lesson coach override). |
+| **Showing a package refund to the parent** (Billing card line + email) | Refused 2026-10-05 with the user, confirming 2026-09-27's "nothing in-app for now": the family hears about a refund from the business directly. Refunds stay admin-only (`package_refunds` has no parent SELECT). **Revisit if** a parent disputes a refund they could not see; the struck item names the shape (parent-scoped SELECT, `package-emails` with the crash-safe claim). |
+| **Hiding edit controls page by page for a View-only role** | Refused 2026-10-05 with the user. It only bites a role with an area at **View**; the co-admin being hired holds *Front desk* (Operations Edit, money None), and every standard role is Edit or None. A View-only area still works — a page notice plus the server's refusal on press, safe if noisy. **Revisit if** the owner creates a custom role with any area at View. |
 | **Child identification by NRIC last 4** | Declined 2026-07-19 and formally moved here 2026-09-27. Name + date of birth solved the duplicate-name problem with no new personal data; partial NRIC is still PDPC-regulated personal data and would sit on every coach's roster. **Revisit only if** two children share a name *and* a birthday at one business. |
 | **A shared `lessonDates.ts` package** (or splitting the apps into separate repos with a shared-code repo/API) | Refused 2026-09-27 with the user. The file is duplicated byte-identical in both apps (only the twin-file header differs); sharing it needs workspaces + Metro `watchFolders` + `transpilePackages` across two projects with different React majors, bundlers and test runners — days of work to save a `diff`. Splitting into repos was raised the same day and also refused: the apps already share one API (Supabase — schema, RLS, RPCs, one migrations folder), features cut across all three layers, and a published shared package or an API for pure date maths is worse than two copies. **Revisit if** npm workspaces arrive for another reason — then this comes free. Until then: **edit both.** |
 | **A `data-tenant-id` attribute on the platform table row** | Refused 2026-08-30 while fixing `verify-tenant-provisioning` (§7.228). Its dead fallback read this attribute to mint a fresh invite link over `/api/resend-invite`; the obvious repair is to add the attribute. **Don't** — it is product markup existing solely for a test, to restore a path that only matters when `RESEND_API_KEY` is set, which neither CI nor a local stack does. A named precondition plus a loud skip notice buys the same safety for no product surface. |
