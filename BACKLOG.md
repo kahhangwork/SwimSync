@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-05 — **re-ranked with the user: Waves 4–7** (start date on add-to-class + the COMMENT fix; a Front-desk role walkthrough → fixes before the co-admin hire; the DB clock mid-October; types last). *Show package refunds to the parent* and *Hide edit controls* → *Deliberately not doing*. Earlier the same day: Wave 3 item 5 (component-render tests) SHIPPED and its item removed (§8.137); earlier the same day, filed *Choose a start date when adding a child to a class* (§8.136). Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-05 — **re-ranked with the user: Waves 4–8** (start date on add-to-class + the COMMENT fix; a Front-desk role walkthrough → fixes before the co-admin hire; NEW *Package-funded lessons need no monthly run*, then the DB clock; types last). *Show package refunds to the parent* and *Hide edit controls* → *Deliberately not doing*. Earlier the same day: Wave 3 item 5 (component-render tests) SHIPPED and its item removed (§8.137); earlier the same day, filed *Choose a start date when adding a child to a class* (§8.136). Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -268,7 +268,8 @@ _Supersedes every older ranking below, which is kept as history. Forced by: Wave
 |---|---|---|
 | What role will the co-admin hire hold? | **Front desk** (standard role): attendance, make-ups, ops — *"nothing finance related"* (user) | Operations = Edit, every money area = None. *A co-admin without pricing access may see NO teaching coach* now hits **exactly this hire** → must be confirmed and fixed before they start. No area at View → *Hide edit controls* → *Deliberately not doing* |
 | Show package refunds to the parent? | **No** — 2026-09-27's "nothing in-app for now" stands | → *Deliberately not doing* |
-| When does *Inject the database clock* run? | **Mid-October, after September is billed** | Wave 6. Not mid-billing (it touches the guards the monthly run depends on) |
+| When does *Inject the database clock* run? | ~~Mid-October, after September is billed~~ → **after *Package-funded lessons need no monthly run*** (user, later the same day) | Wave 7. Not mid-billing (it touches the guards the monthly run depends on) |
+| Should package lessons still need the monthly run? | **No** — rethought by the user after September's billing check: the package purchase IS the invoice; only ad-hoc lessons need generation | New item *Package-funded lessons need no monthly run* (L), ranked **ahead of the DB clock** — both rewrite the billing guards, and the clock first would convert functions this rewrites |
 
 #### Wave 4 — live pain + the Front-desk check — **after September billing, two lanes**
 
@@ -285,14 +286,20 @@ _Supersedes every older ranking below, which is kept as history. Forced by: Wave
 3. The backend fix(es) — likely a narrow SECURITY DEFINER read of who-taught for `operations:view`. A migration, so
    it lands from the root **after** Wave 4 lane 1's (one schema change in flight). Empty if lane 2 finds nothing.
 
-#### Wave 6 — *Inject the database clock* (L) — **mid-October, a quiet stretch**
+#### Wave 6 — *Package-funded lessons need no monthly run* (L) — **plan first (`/plan-with-confidence`)**
 
-4. Starts once Wave 4 lane 1's migration has landed — the new start-date RPC then goes on its conversion list (one
-   function; cheap) rather than the live start-date bug waiting weeks behind an L. Billing guards last; Deno twice.
+4. Changes WHEN money moves for every package family on both live businesses, so it is planned before it is built.
+   **Precedes the DB clock** (rework edge): both rewrite the engine's guards and the package draw-down; clock-first
+   would inject `app_today()` into functions this item then rewrites. Not mid-billing.
 
-#### Wave 7 — cheaper by waiting
+#### Wave 7 — *Inject the database clock* (L) — **a quiet stretch after Wave 6**
 
-5. *Generate real Supabase `Database` types* — always last. After Wave 6, which rewrites dozens of functions.
+5. Starts once Wave 4 lane 1's and Wave 6's migrations have landed — the start-date RPC and the new draw-down then go
+   on its conversion list rather than being converted twice. Billing guards last; Deno twice.
+
+#### Wave 8 — cheaper by waiting
+
+6. *Generate real Supabase `Database` types* — always last. After Waves 6–7, which rewrite dozens of functions.
 
 **Parked, unchanged:** PayNow statement import (user: not yet), Household split billing, Maps, the cron tail
 (low-balance nudge, automated reminders), Native builds → Push → Logo check, Bulk WhatsApp, In-app payment gateway.
@@ -300,7 +307,7 @@ _Supersedes every older ranking below, which is kept as history. Forced by: Wave
 **Moved to *Deliberately not doing* 2026-10-05:** *Show package refunds to the parent*, *Hide edit controls page by
 page for a view-only role*.
 
-### Build order of 2026-09-27 — Waves 1–3 (history; all shipped bar *Generated types*, now Wave 7 above)
+### Build order of 2026-09-27 — Waves 1–3 (history; all shipped bar *Generated types*, now Wave 8 above)
 
 _Superseded 2026-10-05. Forced by: the Foundations driver backlog and
 §8.129 emptied the previous pick-now list, and the user settled the decisions below in one Q&A session._
@@ -1092,6 +1099,34 @@ admin Referrals page (grant/void/disable), same-household guard, referrer earn-e
 modifier in the system — changes `amount_payable`, never `total_value`. **LIVE on prod 2026-08-15**
 (`docs/DEPLOYMENT.md` §11.23), DORMANT until a business enables it. Two follow-ups filed below: the
 "your reward expires soon" nudge and any unprompted low-balance email (both cron-gated).
+
+### Package-funded lessons need no monthly run — **L** — _filed 2026-10-05 (the user, after checking September)_
+**The package purchase IS the invoice.** Only ad-hoc lessons should need the monthly *Generate*; a lesson a package
+covers draws the package down on its own, and a family whose month is fully covered never needs a run at all.
+
+**Why:** September 2026's check found Little Orcas (a package business, piloting) with **no billing run ever** — its
+owner would have to run *Generate* each month only to move a package balance and receive an invoice that arrives
+already **Paid** (PRD §7.16). Today the stored balance moves **only at the monthly run**; the "lessons remaining"
+counter is derived live. The run is ceremony for a family that prepaid.
+
+**Notes — what the plan must settle:**
+- **When the draw-down happens:** at marking (an attendance trigger/RPC), or derived at read time and committed later.
+  Either way the stored balance and the live counter must keep agreeing (§7.16's invariant).
+- **Mixed families:** a lesson outside the package's categories, or after it is exhausted or expired, is still
+  **ad-hoc** → still invoiced. The monthly run keeps existing; it just skips covered lessons.
+- **Corrections:** present → absent on a package lesson returns value to the **package**, not a credit note. The
+  credit-note path (§7.8) stays for invoiced lessons. Holiday/cancel extensions (event-driven since §8.70) interact.
+- **The guards are load-bearing:** the completeness gate and month seal (CLAUDE.md "Billing") must still hold for the
+  ad-hoc lessons. Does a package-only month still need to be *closed*? Never weaken a guard to make this fit.
+- **Accounting:** package revenue is already counted when the package is PAID (2026-09-27, PRD §7.23) — unchanged.
+- **Migration of in-flight balances:** lessons marked before the switch but not yet billed (e.g. Little Orcas's
+  September) must be drawn exactly once — not by both the old run and the new trigger.
+- **Not this item:** children whose packages are sold OUTSIDE SwimSync (Little Orcas's 15 pilot children, Sept 2026)
+  are ad-hoc to the engine under either model; their route is inviting the parent + recording the package, or the
+  monthly *Record it as settled* (PRD §7.17).
+
+**Ranked** ahead of *Inject the database clock* (Build order, Wave 6). Precedent to reuse: the Deno engine's
+`BillingScenario` (package scenarios) and `package_applications` as the draw-down ledger.
 
 ### The UNPROMPTED parent low-balance nudge — **S**
 Automatically email/notify the parent when their package runs low or nears expiry, WITHOUT

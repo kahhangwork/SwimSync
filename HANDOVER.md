@@ -435,12 +435,13 @@ which mutate shared seed state — are in the same section.
 ### THE NEXT BUILD — pick from BACKLOG
 
 1. **Read the next nightly** (never dispatch it unasked) — the first over deploys #61 AND #63. Red → fix first.
-2. **Bill September now (early October — overdue as of 2026-10-05):** Little Orcas's Accounting should show
-   *Packages sold S$700* (PKG-2026-0002); PKG-2026-0001 was a test and counts nowhere (DEPLOYMENT #59).
-   `INVOICE_RUNBOOK.md`.
+2. **September: Coach Kah Hang BILLED AND SEALED 2026-10-05** (9 invoices, S$965, all 26 present marks invoiced).
+   **Little Orcas NOT billed — the owner's job, never run there:** *Generate Sep 2026* (draws PKG-2026-0002 for its
+   one in-app family), then *Record it as settled* for the 15 pilot children whose packages are sold outside
+   SwimSync (PRD §7.17; 50 of its 60 present marks). Until then its September stays open.
 3. **Next build — Wave 4, after September is billed** (re-ranked with the user 2026-10-05, `BACKLOG.md` → *Build
    order*). Lane 1: *Choose a start date when adding a child* + the COMMENT fix, one migration. Lane 2: walk the
-   **Front-desk** role (the co-admin hire's role, `pricing:none`) — fixes land before the hire. DB clock mid-October.
+   **Front-desk** role (the co-admin hire's role, `pricing:none`) — fixes land before the hire. Then *Package-funded lessons need no monthly run* (plan first), then the DB clock.
 
 - **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
   Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).
