@@ -1363,6 +1363,19 @@ Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). Both foll
 Cosmetic, not filed separately: the coach Schedule's collapsed COMING UP day summary still counts a
 cancelled lesson in its "N lessons"; the card inside is struck.
 
+### A co-admin without pricing access may see NO teaching coach anywhere — **S** — _filed 2026-10-05, unconfirmed_
+Since `20260927000500`, reading `class_rates` needs `pricing:view` (`class_rates_admin_select`). The teaching coach of a
+lesson is resolved from the class rate in force (`termsCoachOn`, `lib/lessonAttribution.ts`) unless a substitute is
+named. So an operations-only co-admin likely reads **zero** rates, and every surface that names who taught shows
+nobody: the Calendar's coach, the lesson page's *Teaching: —*, and the lesson page's prev/next strip, which would
+group the whole day under **Unassigned**. RLS filters rather than errors, so it fails silently.
+
+**Why filed, not fixed:** found by reading the policy while building the prev/next strip (2026-10-05); no seed or
+fixture persona has `pricing:none`, so it is **not reproduced**. **First step:** make a `pricing:none` co-admin persona
+and open the Calendar. If confirmed, the fix is backend: probably a narrow SECURITY DEFINER read of
+`(class_id, effective_from, paid_coach_id)` for anyone with `operations:view`, so who-taught stays visible without
+exposing prices.
+
 ### ~~A location entity (venue)~~ — **M** — **SHIPPED + DEPLOYED 2026-08-24** (PRD §7.24, §8.88/§8.89, `20260824000100`+`…200`)
 Promoted `classes.location_name` (free text) to a per-tenant `locations` table (name/address/notes)
 the class references by FK. Admin → **Locations** CRUD (owner/co-admin), the class form picks from it,

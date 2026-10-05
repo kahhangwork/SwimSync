@@ -1335,6 +1335,19 @@ session id — the row may not exist yet). There the admin:
   have overwritten the real statuses (a billed *present* changed that way issues a credit note).
   A signed-out admin sees *"Your sign-in has expired…"* rather than a Save that silently does
   nothing.
+- *(implemented 2026-10-05)* **Steps to the next lesson without going back to the Calendar.**
+  A strip under the title reads *Lesson 2 of 4* with **Prev lesson / Next lesson**: the same
+  coach's lessons **on the same date**, in start-time order. "Coach" means **who is teaching
+  that lesson**, so a lesson a substitute covers sits in the substitute's sequence, and
+  assigning or removing a substitute on the page regroups the strip to match. The strip includes every lesson
+  the Calendar's day view shows (cancelled, holiday and no-student lessons included).
+  **Prev coach / Next coach** (*Kah Hang (2 of 3)*) step through the coaches teaching that
+  date, A→Z, and land on that coach's **earliest** lesson. Every button is disabled at its end
+  — no rolling to another day, no wrap-around. With **unsaved marks**, any step asks *"Leave
+  without saving?"* (Stay / Leave anyway); during a save, cancel, substitute change or booking
+  the buttons are disabled, so a refusal is never hidden by navigating away. The strip is hidden
+  on a *not a lesson* date, and reads *Lesson navigation unavailable* if the day's lessons cannot
+  be loaded.
 
 #### Bulk "Set all to…" *(implemented)*
 
