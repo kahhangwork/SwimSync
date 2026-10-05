@@ -1,6 +1,6 @@
 # SwimSync — Backlog
 
-_Last updated: 2026-10-05 — Wave 2 lane 2 (attendance save tests) shipped; the Pending charges two-tenant test moved to Wave 3 (§8.134). Earlier datelines: `git log -p -- BACKLOG.md`._
+_Last updated: 2026-10-05 — filed *Choose a start date when adding a child to a class* (§8.136, a real prod case). Earlier datelines: `git log -p -- BACKLOG.md`._
 
 _Previously, 2026-08-28 — **Wave C S-pool Pieces 1–3 SHIPPED**: scoped DB search on the high-traffic admin
 tables (Piece 1), the family-status search pushdown (Piece 2), and the move-student RPC's two loose ends —
@@ -1362,6 +1362,22 @@ Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). Both foll
 
 Cosmetic, not filed separately: the coach Schedule's collapsed COMING UP day summary still counts a
 cancelled lesson in its "N lessons"; the card inside is struck.
+
+### Choose a start date when adding a child to a class — **S/M** — _filed 2026-10-05 (§8.136)_
+Adding a child to a class stamps the enrolment `enrolled_at = NOW()` (`insertEnrolment`,
+`app/(admin)/students/dao/students.repo.ts`), and every roster — lesson page, coach app, billing gate — starts on that
+SGT date. So a child who swam BEFORE the admin got round to assigning them is unmarkable for that lesson, and unbilled.
+
+**Why:** it happened on prod. A new child swam Sun 04 Oct; their student record was made 04 Oct but the class was
+assigned 05 Oct, so 04 Oct had no lesson to mark. The only fix was a one-row SQL `UPDATE` on production
+(DEPLOYMENT #62) — no screen can move an enrolment's start, and the July backdate (HANDOVER §3) was SQL too.
+
+**Notes:** an optional *Starts on* date on add-to-class, default today. Bound it below by `markable_floor()` — earlier
+is unmarkable anyway — and above by today (a future start is a different feature). A start inside a SEALED month
+cannot be billed and lands on the orphan-lesson report (PRD §7.17) — say so in the dialog rather than refusing. The
+update fires `enrolment_tenant_guard` and `trg_enrolment_schedule` (overlap) — both must still pass. Enrolments carry
+**no audit trigger**, so the SQL backdate left no trail; an RPC that writes `audit_log` is the shape, not a client
+`update`.
 
 ### A co-admin without pricing access may see NO teaching coach anywhere — **S** — _filed 2026-10-05, unconfirmed_
 Since `20260927000500`, reading `class_rates` needs `pricing:view` (`class_rates_admin_select`). The teaching coach of a

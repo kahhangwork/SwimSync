@@ -946,9 +946,10 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     (4) apps → `main` (`6c0a5ab`); the `/invoices` chunks carry `Closed on` and the RISK 6 copy, `/dashboard`'s
     carry `billing-alert`. **Verified by the owner in the live UI on 2026-09-23:** the card reads *Aug 2026 ·
     Closed on 22 Sep* — the §7.259 fix, on real data. CI went red once on §7.260 (the midnight test) and was green on re-run.
-    **Reading prod without a dump:** `supabase db query --linked "<sql>"` runs read-only SQL against prod and
-    returns JSON (the last statement's rows only) — far cheaper than §8.107's offline data dump for a one-row
-    question. **Rollback cover:** `supabase/rollback/20260922000100_billing_runs_DOWN.sql`, rehearsed; roll back
+    **Reading prod without a dump:** `scripts/prod-query-ro.sh "<one statement>"` (2026-10-05) — returns JSON (the
+    last statement's rows only), far cheaper than §8.107's offline data dump. *(Corrected 2026-10-05: this line
+    once called raw `supabase db query --linked` read-only. **It is not** — it ran a production `UPDATE`, #62. The
+    wrapper wraps the query in `SET TRANSACTION READ ONLY`; why not the session-level form is in its header.)* **Rollback cover:** `supabase/rollback/20260922000100_billing_runs_DOWN.sql`, rehearsed; roll back
     apps + engine first (the engine's write is best-effort, the card's read is not).
 
 48. **Deploy record (2026-09-24): App L-F/G/H + the app fence — APP-ONLY.** `/deploy` classified it: 0
@@ -1057,3 +1058,11 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     strip + `LessonBody` remount key; live chunk `app/(admin)/lessons/[classId]/[date]/page-*.js` holds "You have
     unsaved marks"). Admin vitest 104/998 + tsc on the pushed tree; CI green on both; Vercel admin `success`. The
     nightly was NOT waited on or dispatched — the next scheduled one is the first to run `verify-admin-lesson-nav`.
+
+62. **Production data fix (2026-10-05): one enrolment backdated — no deploy.** A new child swam Sun 04 Oct but was
+    added to their class on 05 Oct, so 04 Oct was unmarkable. On the owner's instruction, one row of
+    `student_class_enrolments` was moved to 04 Oct 12:00 SGT, matched on student + class + the old timestamp
+    (`RETURNING` showed 1 row). The owner then marked the lesson (verified read-only). October is unbilled, so nothing
+    sealed was touched. Enrolments have no audit trigger — **this entry is the only record**. Why SQL: BACKLOG
+    *Choose a start date when adding a child to a class*. Local `.claude/settings.local.json` now allows
+    `scripts/prod-query-ro.sh` and ASKS before any raw `supabase db query --linked`.

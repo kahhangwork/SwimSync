@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-05 — **§8.135: the admin lesson page gained prev/next lesson + prev/next coach (deploy #61),
-behind a remount key that stops in-place navigation saving one lesson's marks onto another; Classes now sorts by Time.**
-App + tests + a new driver; no migration._
+_Last updated: 2026-10-05 — **§8.136: 04 Oct attendance verified complete on prod; a child assigned the day AFTER their
+first lesson was unmarkable, fixed by a one-row prod backdate (DEPLOYMENT #62) and filed as a backlog item. Prod reads now
+go through `scripts/prod-query-ro.sh`.** Ops + tooling; no app change, no migration._
 
-_Previously (§8.134, 2026-10-05) — Wave 2 lane 2 shipped; Set all erased a holiday void — fixed (#60)._
+_Previously (§8.135, 2026-10-05) — admin lesson page prev/next + Classes sorts by Time (deploy #61)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -348,6 +348,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.136 (2026-10-05) — 04 Oct attendance checked on prod; a late-assigned child backdated
+
+**The owner asked two things: was 04 Oct marked correctly through the new lesson page, and why couldn't a new child be
+marked on 04 Oct? Answers: yes, every expected child has a mark; and the child's ENROLMENT was dated 05 Oct (assigned
+the day after the record was made) — a roster starts on the add-to-class date, not the record's.** Commit `811449a`.
+
+- **Done on prod:** one enrolment moved to 04 Oct on the owner's word, then the owner marked the lesson — DEPLOYMENT #62
+  (the only record; enrolments have no audit trigger). Nothing billed was touched.
+- **Tooling:** `scripts/prod-query-ro.sh` (proven: a write returns 25006). DEPLOYMENT #47's "read-only" claim for raw
+  `db query --linked` was false — corrected there. Local allow rule for the wrapper; an ASK rule for the raw command.
+- **Filed:** BACKLOG *Choose a start date when adding a child to a class*.
+- **Process slip, owned:** the prod `UPDATE` ran on the classifier's judgement with no rule covering it, and I didn't say
+  so before running it. The ask rule now gates it.
+- **Not done:** September billing (still §9 #2). Nightly not dispatched.
+
 ## 8.135 (2026-10-05) — prev/next on the admin lesson page; Classes sorts by Time
 
 **`/plan-with-confidence` → `/plan-review` → build → deploy #61. The review's top risk was real: Next would have
@@ -363,21 +378,7 @@ the wrong lesson — so the page body is now keyed on `classId|date`** (§7.64's
   unreproduced. Sort ties end on a unique id (comment + test); below the GOTCHAS bar, not filed there.
 - **Not done:** nothing. Nightly not dispatched.
 
-## 8.134 (2026-10-02 → 05) — Wave 2 lane 2: the attendance save path pinned; a live Set-all bug found and fixed
-
-**`/plan-with-confidence` (resumed) → `/plan-review` → build → deploy #60. The review read the code and found that
-Set all DELETED a public-holiday void from the map, so Save refused the lesson** — live since 2026-08-19 (§7.312).
-Commits `d45e84d` (fix) · `8f754ec` (tests) · `eac50f1` (load-test port).
-
-- **Shipped:** the fix (PRD §7.6 *Set all* corrected); 31 tests — save hook, `useMarking`, the whole screen — plus
-  `useAttendanceLoad.test` ported to `renderHook`, each mutation-proven (TESTING §5; plan `ATTENDANCE_SAVE_TESTS_PLAN.md`).
-- **Decided with the user:** fix lane first (option A), not `it.failing`; Pending charges two-tenant test → Wave 3;
-  the load test ported despite my keep-it recommendation (it re-proved red against `61426c8^`).
-- **Review caught before code:** the plan's own red-proof command would have staged the old bug (§7.311); the screen
-  test would have read the real clock (§7.313). The plan's M3 mutation was equivalent — replaced, noted in the plan.
-- **Not done:** nothing in lane 2. Pushed only after nightly `37159576387` read green (user asked to hold the deploy).
-
-_(§8.133 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.134 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -420,8 +421,8 @@ for one marked inactive.
 > rot issue's own state are the fact. This section once read *"✅ NO RED SIGNALS"* for a
 > full day after the sweep had gone red beneath it.
 
-**State on 2026-10-05: the last three nightlies are GREEN 69/69** (`36942714020`, `37078537176`, `37159576387`, all
-on `40d590a`). **The next one is the first over `6da66e6`** (deploy #61) and the first to run the NEW driver
+**State on 2026-10-05: the last four nightlies are GREEN** (newest `37241823074`, on `cbf747b` — still BEFORE
+deploy #61). **The next one is the first over `6da66e6`** (deploy #61) and the first to run the NEW driver
 `verify-admin-lesson-nav` (23 checks; 23/23 locally, run three times) — so expect 70 drivers. Read that one, and
 `admin-lesson-detail` / `lesson-detail-guests` / `cancel-lesson` (the page they render was restructured), first.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
@@ -442,6 +443,8 @@ which mutate shared seed state — are in the same section.
    saveHarness.ts`'s pattern (TESTING §5). **Unranked:** *Inject the database clock* (L) — rank it with the user;
    not mid-billing.
 
+- **Reading prod:** `scripts/prod-query-ro.sh "<one statement>"` — read-only by Postgres, allowed without a prompt.
+  Raw `supabase db query --linked` can WRITE and asks first (DEPLOYMENT #47, #62).
 - **Before picking any BACKLOG item, check it has not already shipped** (`git log -S'<key symbol>'`, §8.127).
 - **A new test/fixture date:** derive it from `session_window_start()` or CI refuses it (§7.305).
 - **Before any local driver run:** start Expo WITHOUT `CI=1` and grep the served bundle for a symbol only the
