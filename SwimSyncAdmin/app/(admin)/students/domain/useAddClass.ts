@@ -11,6 +11,8 @@
 
 import { useState } from "react";
 import * as repo from "../dao/students.repo";
+import { setEnrolmentStart } from "@/lib/enrolmentStart.rpc";
+import { useStartsOn } from "@/components/StartsOnField";
 import type { StudentRow } from "../types";
 
 export function useAddClass(reload: () => Promise<void>) {
@@ -19,6 +21,8 @@ export function useAddClass(reload: () => Promise<void>) {
   const [addClassBusy, setAddClassBusy] = useState(false);
   const [addClassError, setAddClassError] = useState<string | null>(null);
   const [classOptions, setClassOptions] = useState<{ id: string; title: string }[]>([]);
+  // Wave 4: an optional start date before today (set_enrolment_start).
+  const start = useStartsOn(addClassChoice || null);
 
   async function loadClasses() {
     const { data } = await repo.fetchActiveClasses();
@@ -29,21 +33,26 @@ export function useAddClass(reload: () => Promise<void>) {
     setAddClassFor(student);
     setAddClassChoice("");
     setAddClassError(null);
+    start.reset();
     loadClasses();
   }
 
   async function handleAddClass() {
     if (!addClassFor || !addClassChoice) return;
+    // RISK 1: a start in an earlier, unbilled month needs a second press.
+    if (start.holdForConfirmation()) return;
     setAddClassBusy(true);
     setAddClassError(null);
 
-    const { error } = await repo.insertEnrolment(addClassFor.id, addClassChoice);
-
-    if (!error) {
-      // Only ever moves TOWARD assigned. close_student_enrolment() owns the
-      // other direction, and only when the last class goes.
-      await repo.markAssigned(addClassFor.id);
-    }
+    // ONE atomic call: the enrolment, the move toward 'assigned', and the audit
+    // row (set_enrolment_start, 20261005000100). Mode 'add' is refused for a
+    // class the child is already in — never a silent start-date rewrite.
+    const { error } = await setEnrolmentStart(
+      addClassFor.id,
+      addClassChoice,
+      start.startsOnParam(),
+      "add"
+    );
 
     setAddClassBusy(false);
     if (error) {
@@ -61,6 +70,7 @@ export function useAddClass(reload: () => Promise<void>) {
     addClassBusy,
     addClassError,
     classOptions,
+    start,
     loadClasses,
     openAddClass,
     close: () => setAddClassFor(null),

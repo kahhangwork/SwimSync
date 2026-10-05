@@ -16,8 +16,13 @@ type OpenRoster = ReturnType<typeof buildClassRoster>;
  * might reach for here is putting a trial child onto the class roster, and that
  * is precisely the action that breaks billing (PRD §7.17). No button here may
  * add, drop, or move a child, and this drawer takes no class-list refresh prop —
- * the shadow Add/End are payroll facts, not roster edits, and are the only
- * writes it performs.
+ * the shadow Add/End are payroll facts, not roster edits.
+ *
+ * ONE roster write, deliberately (Wave 4, 20261005000100): *Change* beside
+ * "Joined" moves WHEN an enrolled child started — it adds, drops and moves
+ * nobody. It exists because the 04 Oct 2026 case (a child who swam before
+ * being assigned) was found after the add, and the only fix was SQL on
+ * production. set_enrolment_start owns its rules and audits it.
  */
 export function RosterDrawer({
   drawerClass,
@@ -35,9 +40,12 @@ export function RosterDrawer({
   coaches,
   openRoster,
   covMap,
+  onChangeStart,
 }: {
   drawerClass: ClassRow | null;
   onClose: () => void;
+  /** Open "Change start date" for an enrolled child of the open class. */
+  onChangeStart: (s: { student_id: string; full_name: string; enrolled_at: string }) => void;
   rosterError: string | null;
   shadows: ShadowAssignment[];
   shadowError: string | null;
@@ -217,6 +225,15 @@ export function RosterDrawer({
                         month: "short",
                         year: "numeric",
                       })}
+                      {" · "}
+                      <button
+                        type="button"
+                        onClick={() => onChangeStart(s)}
+                        aria-label={`Change start date for ${s.full_name}`}
+                        className="font-medium text-sky-600 hover:underline"
+                      >
+                        Change
+                      </button>
                     </p>
                   </li>
                 ))}

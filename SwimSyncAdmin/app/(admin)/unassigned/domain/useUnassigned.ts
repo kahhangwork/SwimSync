@@ -5,6 +5,8 @@ import { coverageByStudent, type StudentCoverage } from "@/lib/packageCoverage";
 import type { ClassOption, Coach, Student } from "../types";
 import * as repo from "../dao/unassigned.repo";
 import { loadCoverage } from "../dao/unassigned.rpc";
+import { setEnrolmentStart } from "@/lib/enrolmentStart.rpc";
+import { useStartsOn } from "@/components/StartsOnField";
 import {
   filterStudents,
   toClassOptions,
@@ -28,6 +30,8 @@ export function useUnassigned() {
   // Two-press confirm for the one case that can silently block a billing
   // month. Reset whenever the modal closes or a different child is chosen.
   const [confirmedTrialEnrol, setConfirmedTrialEnrol] = useState(false);
+  // Wave 4: an optional start date before today (set_enrolment_start).
+  const start = useStartsOn(selectedClassId || null);
 
   useEffect(() => {
     loadStudents();
@@ -60,6 +64,8 @@ export function useUnassigned() {
 
   async function handleAssign() {
     if (!assignModal || !selectedClassId) return;
+    // RISK 1: a start in an earlier, unbilled month needs a second press.
+    if (start.holdForConfirmation()) return;
     setAssigning(true);
     setAssignError(null);
 
@@ -87,9 +93,13 @@ export function useUnassigned() {
       return;
     }
 
-    const { error: enrolError } = await repo.insertEnrolment(
+    // ⚠ RISK 13: the live-trial read and its two-press guard above stay BEFORE
+    // this call. Then ONE atomic RPC: enrolment + 'assigned' + audit row.
+    const { error: enrolError } = await setEnrolmentStart(
       assignModal.id,
-      selectedClassId
+      selectedClassId,
+      start.startsOnParam(),
+      "add"
     );
 
     if (enrolError) {
@@ -97,8 +107,6 @@ export function useUnassigned() {
       setAssigning(false);
       return;
     }
-
-    await repo.markAssigned(assignModal.id);
 
     setAssignModal(null);
     setSelectedCoachId("");
@@ -113,6 +121,7 @@ export function useUnassigned() {
     setSelectedCoachId("");
     setSelectedClassId("");
     setAssignError(null);
+    start.reset();
   }
 
   function closeAssign() {
@@ -141,6 +150,7 @@ export function useUnassigned() {
     selectedCoachId,
     selectedClassId,
     setSelectedClassId,
+    start,
     assigning,
     assignError,
     handleAssign,

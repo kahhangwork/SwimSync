@@ -8,6 +8,7 @@
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
 import { ContactHint } from "@/components/ContactHint";
+import { StartsOnField } from "@/components/StartsOnField";
 import { checkSgPhone, checkEmail } from "@/lib/sgPhone";
 import type { AddStudentState } from "../domain/useAddStudent";
 import {
@@ -57,6 +58,14 @@ export function AddStudentModal(p: {
             ))}
           </select>
         </label>
+
+        {add.addClassId && (
+          <StartsOnField
+            start={add.start}
+            childName={add.addName.trim()}
+            saveLabel="Add student"
+          />
+        )}
 
         <label className="block">
           <span className="text-xs font-semibold text-gray-600">

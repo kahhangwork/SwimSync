@@ -75,18 +75,8 @@ export function loadFutureLiveTrial(studentId: string, todaySg: string) {
     .limit(1);
 }
 
-export function insertEnrolment(studentId: string, classId: string) {
-  return supabase
-    .from("student_class_enrolments")
-    .insert({ student_id: studentId, class_id: classId, is_active: true });
-}
-
-export function markAssigned(studentId: string) {
-  return supabase
-    .from("students")
-    .update({ assignment_status: "assigned" })
-    .eq("id", studentId);
-}
+// Enrolling goes through set_enrolment_start (lib/enrolmentStart.rpc.ts) —
+// one atomic, audited call (20261005000100). No direct insert here.
 
 // ── Rates ───────────────────────────────────────────────────────────────────
 

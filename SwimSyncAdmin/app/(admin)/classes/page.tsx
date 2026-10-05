@@ -15,6 +15,8 @@ import { useClassForm } from "./domain/useClassForm";
 import { ClassToolbar } from "./ui/ClassToolbar";
 import { ClassTable } from "./ui/ClassTable";
 import { RosterDrawer } from "./ui/RosterDrawer";
+import { ChangeStartModal } from "./ui/ChangeStartModal";
+import { useChangeStart } from "./domain/useChangeStart";
 import { ExtraLessonModal } from "./ui/ExtraLessonModal";
 import { CancelLessonModal } from "./ui/CancelLessonModal";
 import { RetireModal } from "./ui/RetireModal";
@@ -24,6 +26,7 @@ import { NewClassButton } from "./ui/NewClassButton";
 export default function ClassesPage() {
   const list = useClassList();
   const roster = useRoster(list.classes);
+  const changeStart = useChangeStart(() => roster.loadRoster());
   const drawer = useClassDrawer(list.coaches);
   const extra = useExtraLesson();
   const cancel = useCancelLesson();
@@ -150,7 +153,19 @@ export default function ClassesPage() {
         coaches={list.coaches}
         openRoster={openRoster}
         covMap={roster.covMap}
+        onChangeStart={(s) =>
+          drawer.drawerClass &&
+          changeStart.open({
+            studentId: s.student_id,
+            fullName: s.full_name,
+            classId: drawer.drawerClass.id,
+            classTitle: drawer.drawerClass.title,
+            enrolledAt: s.enrolled_at,
+          })
+        }
       />
+
+      <ChangeStartModal c={changeStart} />
 
       <ClassFormModal form={form} coaches={list.coaches} />
     </div>

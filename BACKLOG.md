@@ -1441,7 +1441,9 @@ Advance-cancel itself SHIPPED 2026-08-21 (PRD §7.6, §7.203/§7.204). Both foll
 Cosmetic, not filed separately: the coach Schedule's collapsed COMING UP day summary still counts a
 cancelled lesson in its "N lessons"; the card inside is struck.
 
-### Choose a start date when adding a child to a class — **S/M** — _filed 2026-10-05 (§8.136)_
+### ~~Choose a start date when adding a child to a class~~ — **S/M** — **SHIPPED 2026-10-06** (PRD §7.4, `20261005000100`)
+All four add paths + *Change start date* on the roster, via `set_enrolment_start` (audited, explicit add/change mode).
+Plan: `docs/plans/WAVE4_START_DATE_FRONT_DESK_PLAN.md`. Original entry, kept for the reasoning:
 Adding a child to a class stamps the enrolment `enrolled_at = NOW()` (`insertEnrolment`,
 `app/(admin)/students/dao/students.repo.ts`), and every roster — lesson page, coach app, billing gate — starts on that
 SGT date. So a child who swam BEFORE the admin got round to assigning them is unmarkable for that lesson, and unbilled.
@@ -1563,7 +1565,9 @@ standing instruction was "delete if a real question ever replaces it", and none 
 specific pain behind it. Moved to *Deliberately not doing*; the concrete money question
 ("how much am I owed / did I earn?") is served by *An owner-only accounting page* instead.
 
-### Correct the "new key" COMMENTs on the email claim functions — **S** — _filed 2026-09-27 (lane 2 handoff)_
+### ~~Correct the "new key" COMMENTs on the email claim functions~~ — **S** — **SHIPPED 2026-10-05** (`20261005000100`)
+**Premise corrected:** the catalogue COMMENTs never said "new key" — that text is only a `--` line in applied migration
+`20260927000100`. The fix appended "REUSES the Idempotency-Key" to both COMMENTs (pgTAP pins it). Original entry:
 The applied migration `20260927000100` documents `claim_invoice_email` / `claim_credit_note_email` with "a
 MAY_HAVE_SENT resend uses a NEW Idempotency-Key". The user decided the opposite during lane 2's review (one key per
 email, reused — `CRASH_SAFE_EMAIL_CLAIM_PLAN.md` §2), and the code follows the decision.

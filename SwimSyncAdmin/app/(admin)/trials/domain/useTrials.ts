@@ -6,6 +6,8 @@ import * as repo from "../dao/trials.repo";
 import * as rpc from "../dao/trials.rpc";
 import { datesForClass, toBookings, toCategories, toEligible } from "./trialRows";
 import { needsConvertConfirmation } from "./trialConvert";
+import { setEnrolmentStart } from "@/lib/enrolmentStart.rpc";
+import { useStartsOn } from "@/components/StartsOnField";
 import type { Booking, Category, ClassRow } from "../types";
 
 // All Trials state, loads and writes (Admin L-D, BATCH_D_PLAN.md).
@@ -17,8 +19,9 @@ import type { Booking, Category, ClassRow } from "../types";
 // below the early return, so a ui/-held sort would reset after every write.
 //
 // ⚠ RISK 2: handleConvert's await boundaries are the two-press guard. The
-// future-trial read, the enrolment insert and the status update stay three
-// separate dao calls, in this order, awaited here.
+// future-trial read, then ONE atomic RPC (set_enrolment_start: the enrolment,
+// the move to 'assigned' and the audit row together — Wave 4, 20261005000100).
+// The read stays BEFORE the RPC, awaited here.
 export function useTrials() {
   const [upcoming, setUpcoming] = useState<Booking[]>([]);
   const [past, setPast] = useState<Booking[]>([]);
@@ -168,11 +171,14 @@ export function useTrials() {
   const [convertBusy, setConvertBusy] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
   const [convertConfirmed, setConvertConfirmed] = useState(false);
+  // Wave 4: an optional start date before today.
+  const convertStart = useStartsOn(convertTarget?.class_id ?? null);
 
   function openConvert(b: Booking) {
     setConvertTarget(b);
     setConvertError(null);
     setConvertConfirmed(false);
+    convertStart.reset();
   }
 
   async function handleConvert() {
@@ -186,6 +192,8 @@ export function useTrials() {
       );
       return;
     }
+    // RISK 1: a start in an earlier, unbilled month needs a second press.
+    if (convertStart.holdForConfirmation()) return;
     setConvertBusy(true);
     setConvertError(null);
 
@@ -213,25 +221,18 @@ export function useTrials() {
       return;
     }
 
-    const { error: enrolError } = await repo.insertEnrolment(kid, classId);
+    const { error: enrolError } = await setEnrolmentStart(
+      kid,
+      classId,
+      convertStart.startsOnParam(),
+      "add",
+    );
+    setConvertBusy(false);
     if (enrolError) {
       // The enrolment-overlap trigger (§8.43) and any other refusal come back
-      // as a plain message — show it as-is rather than assume success.
+      // as a plain message — show it as-is rather than assume success. The RPC
+      // is atomic, so there is no half-success (enrolled but still unassigned).
       setConvertError(enrolError.message);
-      setConvertBusy(false);
-      return;
-    }
-
-    const { error: statusError } = await repo.markAssigned(kid);
-    setConvertBusy(false);
-    if (statusError) {
-      // Enrolment DID succeed — say so rather than swallow it (the Unassigned
-      // page ignores this error; we do not). Reload so the new enrolment shows.
-      setConvertError(
-        `Enrolled, but their status could not be updated (${statusError.message}). ` +
-          `They may still appear under Unassigned Children.`,
-      );
-      await loadAll();
       return;
     }
 
@@ -322,6 +323,7 @@ export function useTrials() {
     convertBusy,
     convertError,
     convertConfirmed,
+    convertStart,
     openConvert,
     handleConvert,
     handleSaveRate,

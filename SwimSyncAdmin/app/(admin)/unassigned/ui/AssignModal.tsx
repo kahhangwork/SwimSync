@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
+import { StartsOnField, type StartsOnState } from "@/components/StartsOnField";
 import type { ClassOption, Coach, Student } from "../types";
 import { capitalize, formatTime } from "../domain/unassignedRows";
 
@@ -14,6 +15,7 @@ type Props = {
   selectCoach: (coachId: string) => void;
   selectedClassId: string;
   setSelectedClassId: (v: string) => void;
+  start: StartsOnState;
   assigning: boolean;
   assignError: string | null;
   handleAssign: () => void;
@@ -72,6 +74,14 @@ export function AssignModal(p: Props) {
             ))}
           </select>
         </div>
+
+        {p.selectedClassId && assignModal && (
+          <StartsOnField
+            start={p.start}
+            childName={assignModal.full_name}
+            saveLabel="Confirm Assignment"
+          />
+        )}
 
         {p.assignError && (
           <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">

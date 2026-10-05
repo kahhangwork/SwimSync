@@ -34,6 +34,7 @@ export default function UnassignedPage() {
         selectCoach={p.selectCoach}
         selectedClassId={p.selectedClassId}
         setSelectedClassId={p.setSelectedClassId}
+        start={p.start}
         assigning={p.assigning}
         assignError={p.assignError}
         handleAssign={p.handleAssign}

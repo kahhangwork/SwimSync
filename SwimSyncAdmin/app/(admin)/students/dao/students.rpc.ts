@@ -65,7 +65,8 @@ export const findRosterDuplicates = (args: {
 }) => supabase.rpc("find_roster_duplicates", args);
 
 /** Creates a child with no parent yet, and an OPEN 'ongoing' enrolment dated
- *  from now — so the completeness gate expects them from today, not before. */
+ *  from `p_starts_on` (null = now) — the completeness gate expects them from
+ *  that date (20261005000100). */
 export const addUnclaimedStudent = (args: {
   p_class_id: string;
   p_full_name: string;
@@ -73,4 +74,5 @@ export const addUnclaimedStudent = (args: {
   p_date_of_birth: string | null;
   p_contact_phone: string | null;
   p_contact_email: string | null;
+  p_starts_on: string | null;
 }) => supabase.rpc("add_unclaimed_student", args);

@@ -1030,6 +1030,20 @@ SwimSync shall allow **parents to create student profiles** and **superadmin to 
 - Newly created profiles default to **Unassigned**
 - Superadmin can view all unassigned profiles in the **Unassigned Children** section
 - Superadmin can assign or reassign a student to a class
+- **A start date on every add-to-class** *(implemented 2026-10-06)*. Adding a child to a class —
+  Students → *Add class*, Students → *Add student*, Unassigned → *Assign*, Trials → *Convert* —
+  offers an optional **Starts on** date, default **today**, for a child who swam before the
+  admin got round to it. The child is expected at every lesson of the class from that date.
+  The earliest allowed date is the business's **marking floor** (§7.6); never a future date.
+  The dialog says what a backdate creates: lessons in an **already-billed** month land on the
+  *Unbilled lessons* report for the owner to settle; lessons in an earlier month **not yet
+  billed** must be marked before that month can bill — that case asks for a **second press**.
+  **Change start date** on the class roster (*Joined <date> · Change*) moves an existing
+  enrolment's start: earlier is allowed down to the floor; later is **refused past any marked
+  lesson**, and the dialog lists the lessons that stop being expected (a lesson that didn't
+  run is still marked *cancelled*, not removed this way). Adding to a class the child is
+  already in is refused, never turned into a date change. Every add and change is recorded
+  in the change history. One database function (`set_enrolment_start`) owns all of it.
 - **A student may attend MORE THAN ONE class a week** *(implemented 2026-08-11)*. The MVP
   rule was one active enrolment per student, enforced by a unique index; a keen swimmer
   taking two sessions a week is an ordinary case it could not represent, and the workaround

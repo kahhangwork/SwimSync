@@ -10,6 +10,7 @@
 
 import { Modal } from "@/components/Modal";
 import { Button } from "@/components/Button";
+import { StartsOnField } from "@/components/StartsOnField";
 import type { AddClassState } from "../domain/useAddClass";
 
 export function AddClassModal({ addClass }: { addClass: AddClassState }) {
@@ -50,6 +51,13 @@ export function AddClassModal({ addClass }: { addClass: AddClassState }) {
                 ))}
             </select>
           </label>
+          {addClass.addClassChoice && (
+            <StartsOnField
+              start={addClass.start}
+              childName={addClassFor.full_name}
+              saveLabel="Add class"
+            />
+          )}
           <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
             An enrolled child is expected at this class <strong>every week</strong>,
             and an unmarked lesson blocks invoicing for the whole business. For a

@@ -80,20 +80,8 @@ export const fetchAttendanceStudentIds = () =>
 
 // ── Enrolment ───────────────────────────────────────────────────────────────
 
-export const insertEnrolment = (studentId: string, classId: string) =>
-  supabase.from("student_class_enrolments").insert({
-    student_id: studentId,
-    class_id: classId,
-    is_active: true,
-  });
-
-/** Only ever moves TOWARD assigned. close_student_enrolment() owns the other
- *  direction, and only when the last class goes. */
-export const markAssigned = (studentId: string) =>
-  supabase
-    .from("students")
-    .update({ assignment_status: "assigned" })
-    .eq("id", studentId);
+// Enrolling goes through set_enrolment_start (lib/enrolmentStart.rpc.ts) —
+// one atomic, audited call (20261005000100). No direct insert here.
 
 /** RLS already scopes a tenant_admin to their own business's classes. */
 export const fetchActiveClasses = () =>

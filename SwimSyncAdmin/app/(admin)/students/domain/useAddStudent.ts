@@ -9,9 +9,12 @@
 // lifecycle differs.
 
 import { useEffect, useState } from "react";
+import { useStartsOn } from "@/components/StartsOnField";
 import * as rpc from "../dao/students.rpc";
 import type { RosterCandidate } from "./rosterDuplicates";
 
+// Wave 4 (20261005000100): add_unclaimed_student takes an optional p_starts_on
+// — a child who already swam before the admin added them.
 export function useAddStudent(tenantId: string | null, reload: () => Promise<void>) {
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
@@ -26,6 +29,7 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
   // `addConfirmed` arms the second, "Add anyway" click once they have been shown.
   const [addDupCandidates, setAddDupCandidates] = useState<RosterCandidate[]>([]);
   const [addConfirmed, setAddConfirmed] = useState(false);
+  const start = useStartsOn(addClassId || null);
 
   // ⚠ RISK 6: any edit to the identifying fields re-arms the check — a warning
   // the admin saw for "Anya / 9111 2222" must not carry over to a different
@@ -48,6 +52,7 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
     setAddDupCandidates([]);
     setAddConfirmed(false);
     setAddError(null);
+    start.reset();
   }
 
   function open() {
@@ -65,6 +70,8 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
     // Phone is required (the button enforces it too) — it is the strongest
     // duplicate signal, so never add without it.
     if (!name || !addClassId || !addPhone.trim()) return;
+    // RISK 1: a start in an earlier, unbilled month needs a second press.
+    if (start.holdForConfirmation()) return;
     setAddBusy(true);
     setAddError(null);
 
@@ -98,10 +105,10 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
     // from now on the coach must mark them, and a forgotten lesson blocks
     // billing rather than vanishing.
     //
-    // No session date and no attendance status: those belong to the coach's
-    // trial path. Enrolment is dated from now, so lessons taught BEFORE today
-    // are not expected of them (and so are neither blocked nor billed) — the
-    // coach back-dates on the attendance screen if those need capturing.
+    // No session date and no attendance status: those belong to the trial
+    // path. The enrolment starts TODAY unless the admin chose an earlier
+    // "Starts on" (a child who already swam) — then lessons from that date are
+    // expected, and must be marked before their month can bill.
     const { error } = await rpc.addUnclaimedStudent({
       p_class_id: addClassId,
       p_full_name: name,
@@ -109,6 +116,7 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
       p_date_of_birth: addDob || null,
       p_contact_phone: addPhone.trim() || null,
       p_contact_email: addEmail.trim() || null,
+      p_starts_on: start.startsOnParam(),
     });
 
     setAddBusy(false);
@@ -140,6 +148,7 @@ export function useAddStudent(tenantId: string | null, reload: () => Promise<voi
     addError,
     addDupCandidates,
     addConfirmed,
+    start,
     open,
     close,
     handleAddStudent,

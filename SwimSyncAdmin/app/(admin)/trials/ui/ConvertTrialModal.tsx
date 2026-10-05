@@ -1,5 +1,6 @@
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/Modal";
+import { StartsOnField } from "@/components/StartsOnField";
 import type { TrialsState } from "../domain/useTrials";
 
 // Convert a trial to an enrolment. The two-press guard lives in
@@ -23,6 +24,12 @@ export function ConvertTrialModal(p: { t: TrialsState }) {
             convert a child who is really joining. The trial lesson above still
             needs marking either way.
           </p>
+
+          <StartsOnField
+            start={p.t.convertStart}
+            childName={p.t.convertTarget.student_name}
+            saveLabel="Convert"
+          />
 
           {p.t.convertError && (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
