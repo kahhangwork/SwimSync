@@ -1051,3 +1051,9 @@ pick the month → **Generate Invoices** (no cron; a paused free project wouldn'
     `37159576387` read GREEN (69/69). Full jest 58/642 + tsc on the pushed tree; Vercel both `success`; CI green.
     The fix has no new visible string, so the proof is the CODE SHAPE: the live swimsync.sg entry bundle's
     `applyBulkStatus` now begins `Object.assign({},n)` (the old body began `{}`). Not verified by a coach on prod.
+61. **Deploy record (2026-10-05): admin lesson page prev/next + Classes sorts by Time.** App only — 0 migrations,
+    0 functions, so no backend gate. Two pushes to `main`: `87ebce8` (Classes table default sort `title` →
+    `start_time`; live chunk `app/(admin)/classes/page-*.js` holds `key:"start_time"`) and `6da66e6` (the prev/next
+    strip + `LessonBody` remount key; live chunk `app/(admin)/lessons/[classId]/[date]/page-*.js` holds "You have
+    unsaved marks"). Admin vitest 104/998 + tsc on the pushed tree; CI green on both; Vercel admin `success`. The
+    nightly was NOT waited on or dispatched — the next scheduled one is the first to run `verify-admin-lesson-nav`.

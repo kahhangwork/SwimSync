@@ -38,6 +38,8 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import { launch, loginAdmin, ADMIN } from "./lib.mjs";
 
+// A skipped or added check fails the run, not just a failed one.
+const EXPECTED_CHECKS = 23;
 const SHOT = process.env.SHOT_DIR ?? os.tmpdir();
 const shot = (n) => path.join(SHOT, n);
 const results = [];
@@ -334,5 +336,8 @@ try {
 }
 
 const failed = results.filter((r) => !r).length;
-console.log(`\n${results.length - failed}/${results.length} checks passed`);
-process.exit(failed ? 1 : 0);
+if (results.length !== EXPECTED_CHECKS) {
+  console.log(`\n✗ ran ${results.length} checks, expected ${EXPECTED_CHECKS} — a check was skipped or added`);
+}
+console.log(`\n${results.length - failed}/${EXPECTED_CHECKS} checks passed`);
+process.exit(failed || results.length !== EXPECTED_CHECKS ? 1 : 0);

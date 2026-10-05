@@ -1,10 +1,10 @@
 # SwimSync — Session Handover
 
-_Last updated: 2026-10-05 — **§8.134: Wave 2 lane 2 shipped — the attendance save path is pinned (31 tests), and
-planning it found a live bug: Set all erased a public-holiday child, so Save refused the lesson. Fixed + deployed
-(#60).** App + tests; no migration. Gotchas §7.311–§7.313._
+_Last updated: 2026-10-05 — **§8.135: the admin lesson page gained prev/next lesson + prev/next coach (deploy #61),
+behind a remount key that stops in-place navigation saving one lesson's marks onto another; Classes now sorts by Time.**
+App + tests + a new driver; no migration._
 
-_Previously (§8.133, 2026-10-01) — 1 October turned CI red; four date bugs fixed, two CI date guards._
+_Previously (§8.134, 2026-10-05) — Wave 2 lane 2 shipped; Set all erased a holiday void — fixed (#60)._
 
 _**One `_Previously,_` line, maximum, and this block is 3 lines + 1** — the rule as of
 2026-08-10, when it had stacked five sessions deep and 138 lines. A dateline is a *third*
@@ -348,6 +348,21 @@ instead of describing the shape. The table moved out on 2026-08-10 at 21.5 KB �
 trigger was "~100 rows", which at August's row sizes would have meant a **100 KB** ledger
 inside a file read at the start of every session.
 
+## 8.135 (2026-10-05) — prev/next on the admin lesson page; Classes sorts by Time
+
+**`/plan-with-confidence` → `/plan-review` → build → deploy #61. The review's top risk was real: Next would have
+navigated in place, and one render could pair the new lesson's URL with the old lesson's roster and save marks onto
+the wrong lesson — so the page body is now keyed on `classId|date`** (§7.64's admin-side note). Commits `87ebce8`
+(Classes default sort → Time) · `6da66e6` (the strip).
+
+- **Shipped:** PRD §7.6 *Steps to the next lesson* and the admin table-sort bullet; files ARCHITECTURE §10; tests
+  TESTING §5 (`lessonNav` 14, `useLessonNav` 8, `page.test` 1, driver `verify-admin-lesson-nav` 23 — all proven red).
+- **Decided with the user:** same date only; teaching coach (a cover moves the lesson); every Calendar lesson; coaches
+  A→Z; ends disabled, no wrap; a confirm Modal over unsaved marks; a strip under the title.
+- **Filed, not fixed:** BACKLOG *A co-admin without pricing access may see NO teaching coach* — by policy reading,
+  unreproduced. Sort ties end on a unique id (comment + test); below the GOTCHAS bar, not filed there.
+- **Not done:** nothing. Nightly not dispatched.
+
 ## 8.134 (2026-10-02 → 05) — Wave 2 lane 2: the attendance save path pinned; a live Set-all bug found and fixed
 
 **`/plan-with-confidence` (resumed) → `/plan-review` → build → deploy #60. The review read the code and found that
@@ -362,23 +377,7 @@ Commits `d45e84d` (fix) · `8f754ec` (tests) · `eac50f1` (load-test port).
   test would have read the real clock (§7.313). The plan's M3 mutation was equivalent — replaced, noted in the plan.
 - **Not done:** nothing in lane 2. Pushed only after nightly `37159576387` read green (user asked to hold the deploy).
 
-## 8.133 (2026-10-01) — the calendar turned CI red: four date bugs, two guards, the real fix filed
-
-**No code changed between green and red: the first run of October met four latent date assumptions. Each fixed,
-proven red→green, and the two that recurred are now CI guards rather than prose.** Commits `d419151` … `23cb423`.
-
-- **Drivers** `invoice-admin`/`orphan-report` built "Sep" in SQL vs the app's en-SG "Sept"; 5 more passed by
-  substring luck. All 11 now use `lib.mjs` `sgLabel()` + CI guard (§7.302).
-- **pgTAP** `trial_onboarding`/`session_coach_roster`/`class_shadow_coaches` wrote August literals the floor passed
-  → derived from `session_window_start()` (§7.303). Hidden behind it: a fixture Saturday collision (§7.304).
-- **Expiry alarm** `scripts/check-test-dates.sh` (§7.305, plan DONE): 47 future literals audited, all unguarded,
-  annotated. Gotchas §7.306–§7.310 from its review.
-- **Decided with the user:** the real fix is an injected DB clock → BACKLOG *Inject the database clock* (L, unranked);
-  the libfaketime "time machine" rejected (reasons there). pgTAP is kept — it guards RLS, grants, billing.
-- **Not done:** Wave 2 lane 2 (attendance-save tests) — `/plan-with-confidence` started, one answer recorded (both
-  layers: hook + 2–3 screen tests), three questions open; no plan file.
-
-_(§8.132 and older are ledger rows in `docs/SESSIONS.md`.)_
+_(§8.133 and older are ledger rows in `docs/SESSIONS.md`.)_
 
 ## 9. Next steps (pick with the user)
 
@@ -422,9 +421,9 @@ for one marked inactive.
 > full day after the sweep had gone red beneath it.
 
 **State on 2026-10-05: the last three nightlies are GREEN 69/69** (`36942714020`, `37078537176`, `37159576387`, all
-on `40d590a`) — §8.133's "Sept"/date fixes are cleared on CI. **The next one is the first over `eac50f1`** (deploy
-#60: Set all keeps a holiday void; jest-only tests). No driver changed, so a red there is not this push's tests —
-but `verify-coach-marking` exercises the marking screen the fix touched; read that one first.
+on `40d590a`). **The next one is the first over `6da66e6`** (deploy #61) and the first to run the NEW driver
+`verify-admin-lesson-nav` (23 checks; 23/23 locally, run three times) — so expect 70 drivers. Read that one, and
+`admin-lesson-detail` / `lesson-detail-guests` / `cancel-lesson` (the page they render was restructured), first.
 `CANNOT SAY` in tenant-suspension / coach-disable is a page that never loaded, not a verdict (TESTING §5).
 **The nightly is dispatched or re-run ONLY on the user's word** (CLAUDE.md).
 
@@ -434,7 +433,7 @@ which mutate shared seed state — are in the same section.
 
 ### THE NEXT BUILD — pick from BACKLOG
 
-1. **Read the next nightly** (never dispatch it unasked) — the first over deploy #60. Red → fix first.
+1. **Read the next nightly** (never dispatch it unasked) — the first over deploy #61 and its new driver. Red → fix first.
 2. **Bill September now (early October — overdue as of 2026-10-05):** Little Orcas's Accounting should show
    *Packages sold S$700* (PKG-2026-0002); PKG-2026-0001 was a test and counts nowhere (DEPLOYMENT #59).
    `INVOICE_RUNBOOK.md`.

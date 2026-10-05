@@ -504,6 +504,14 @@ into the item that carries the lesson. Built 2026-09-25 from the headlines; an i
     and the save re-resolves from `(class_id, date)`; a spinner covers the gap between param change and reload.
     **Only an in-app-navigation driver can catch this** — a deep link mounts fresh. `verify-stale-screen.mjs`
     clicks Today's card then the backlog row (with §7.65). (Fixed 2026-07-26.)
+    - **Same trap, admin side — caught at plan-review, before it shipped (2026-10-05, §8.135).** Next.js App Router
+      can reuse a page across a PATH-param change too. The admin lesson page's save reads `classId`/`date` from the
+      URL each render but `roster`/`draft` from state, and `saveAdminAttendance` resolves the session from
+      `(classId, date)` — so once the prev/next strip navigated in place, one render could write lesson A's marks
+      onto lesson B. **A page whose identity is a path param keys its stateful body on it:**
+      `<LessonBody key={`${classId}|${date}`} />` (`lessons/[classId]/[date]/page.tsx`), pinned by a mount-count
+      test (`page.test.tsx`) and the in-app driver `verify-admin-lesson-nav.mjs`. Do not rely on the router to
+      remount, and do not replace the key with per-slice reset effects.
 
 65. **`router.back()` ON THE ATTENDANCE SCREEN POPPED INTO A *DIFFERENT LESSON*, BECAUSE
     THE SCREEN LIVES IN A TAB IT IS NOT ALWAYS PUSHED FROM.**
