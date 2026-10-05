@@ -1457,9 +1457,11 @@ update fires `enrolment_tenant_guard` and `trg_enrolment_schedule` (overlap) —
 **no audit trigger**, so the SQL backdate left no trail; an RPC that writes `audit_log` is the shape, not a client
 `update`.
 
-### A co-admin without pricing access may see NO teaching coach anywhere — **S** — _filed 2026-10-05, unconfirmed_
-**Ranked 2026-10-05 (Wave 4 lane 2 → Wave 5):** the co-admin being hired holds *Front desk* — `pricing:none` — so
-this is exactly their view. Confirm and fix before they start.
+### ~~A co-admin without pricing access may see NO teaching coach anywhere~~ — **S** — **CONFIRMED + FIXED 2026-10-05**
+**Confirmed** by lane 2's `verify-front-desk-role` (checks 2, 3a, 3b red); **fixed** by `class_coach_terms()`
+(`20261005000200`, no price column) and the three readers switched to it (Calendar, lesson page + nav strip,
+Attendance Coach column); `lib/whoTaught.drift.test.ts` refuses a direct `class_rates` read. PRD §4.3.
+Original entry, kept for the reasoning:
 
 Since `20260927000500`, reading `class_rates` needs `pricing:view` (`class_rates_admin_select`). The teaching coach of a
 lesson is resolved from the class rate in force (`termsCoachOn`, `lib/lessonAttribution.ts`) unless a substitute is

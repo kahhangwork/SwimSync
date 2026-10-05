@@ -36,7 +36,8 @@ export function loadLessonReads(classId: string, date: string) {
       .eq("class_id", classId),
     supabase.from("trial_bookings").select("id, student_id, students(full_name)").eq("class_id", classId).eq("session_date", date).is("cancelled_at", null),
     supabase.from("makeup_bookings").select("id, student_id, students(full_name)").eq("class_id", classId).eq("session_date", date).is("cancelled_at", null),
-    supabase.from("class_rates").select("class_id, effective_from, paid_coach_id").eq("class_id", classId),
+    // class_coach_terms, not class_rates — see lib/calendarData.ts (20261005000200).
+    supabase.rpc("class_coach_terms", { p_class_ids: [classId] }),
     supabase.from("class_shadow_coaches").select("class_id, coach_id, effective_from, effective_to").eq("class_id", classId),
     supabase.from("tenants").select("holiday_extension_days").limit(1).maybeSingle(),
     supabase

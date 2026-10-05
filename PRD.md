@@ -277,7 +277,10 @@ and change. A role is a named grid of **8 areas × None / View / Edit**:
 Every area is either operations or money, never both. **None** hides the page and the
 server refuses its data; **View** shows it read-only (under a *"View only — your role can't
 change this"* notice); **Edit** allows changes. Reference data every staff member needs —
-class list, levels, locations, coach names — stays readable to all. Because every page shows
+class list, levels, locations, coach names — stays readable to all, and so does **who taught each
+lesson** *(2026-10-05)*: an operations role sees the teaching coach on the Calendar, the lesson page and
+the Attendance page without any pricing access — the coach comes through a read that never carries the
+price (`class_coach_terms`). Because every page shows
 student and class names, **a role with any access must hold Operations at least View**.
 
 **The owner holds no role and can always do everything.** Every business starts with four

@@ -89,7 +89,8 @@ export async function loadAttributionInputs(classIds: string[]): Promise<{
 }> {
   const [subsRes, ratesRes, shadowsRes] = await Promise.all([
     supabase.from("session_coaches").select("lesson_session_id, coach_id"),
-    supabase.from("class_rates").select("class_id, effective_from, paid_coach_id").in("class_id", classIds),
+    // class_coach_terms, not class_rates — see lib/calendarData.ts (20261005000200).
+    supabase.rpc("class_coach_terms", { p_class_ids: classIds }),
     supabase.from("class_shadow_coaches").select("class_id, coach_id, effective_from, effective_to"),
   ]);
   const error = (subsRes.error ?? ratesRes.error ?? shadowsRes.error)?.message ?? null;

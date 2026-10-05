@@ -42,7 +42,10 @@ export async function loadCalendarData(range: DateRange): Promise<CalendarLoad> 
           "id, title, day_of_week, start_time, end_time, location_id, locations(name), coach_id, colour, capacity, is_active, deactivated_at, class_categories(default_capacity)"
         ),
       supabase.from("coaches").select("id, profiles(full_name)"),
-      supabase.from("class_rates").select("class_id, effective_from, paid_coach_id"),
+      // Who-taught terms via class_coach_terms, NOT class_rates: an operations-only
+      // co-admin (Front desk) reads no class_rates rows, which left every lesson
+      // coachless (20261005000200). The RPC never returns the price.
+      supabase.rpc("class_coach_terms", { p_class_ids: null }),
       supabase
         .from("lesson_sessions")
         .select("id, class_id, session_date, off_schedule_reason, cancelled_at, cancellation_reason")
