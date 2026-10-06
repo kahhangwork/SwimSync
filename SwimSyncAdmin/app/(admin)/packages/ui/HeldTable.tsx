@@ -16,6 +16,14 @@ import type { LiveRefund, Purchase } from "../types";
 
 const DMY: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
 
+/** The row's * — lessons attended but not yet invoiced. Never true once the
+ *  business draws at marking (Wave 6: live = stored), which is what makes the
+ *  table show one figure there. */
+const liveDiffers = (p: Purchase) =>
+  p.status === "active" &&
+  p.live_lessons_remaining !== null &&
+  p.live_value_remaining !== p.value_remaining;
+
 export function HeldTable({
   held,
   heldMatches,
@@ -145,7 +153,7 @@ export function HeldTable({
                           {" "}
                           · {money(p.live_value_remaining ?? 0)}
                         </span>
-                        {p.live_value_remaining !== p.value_remaining && (
+                        {liveDiffers(p) && (
                           <span
                             className="ml-1 font-normal text-gray-400"
                             title="Includes lessons attended but not yet invoiced"
@@ -229,11 +237,13 @@ export function HeldTable({
           </Tbody>
         </Table>
       )}
-      <p className="mt-2 text-xs text-gray-500">
-        * Remaining balances are live: lessons attended but not yet invoiced
-        are already subtracted. The money itself moves when the month is
-        billed.
-      </p>
+      {visibleHeld.some(liveDiffers) && (
+        <p className="mt-2 text-xs text-gray-500">
+          * Remaining balances are live: lessons attended but not yet invoiced
+          are already subtracted. The money itself moves when the month is
+          billed.
+        </p>
+      )}
       {refunds === null && (
         <p className="mt-1 text-xs text-amber-700" data-testid="refunds-unavailable">
           Refund details couldn&rsquo;t load — reload the page before recording a refund.

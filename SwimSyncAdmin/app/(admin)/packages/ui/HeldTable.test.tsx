@@ -149,6 +149,19 @@ describe("HeldTable", () => {
     expect(row("Bob Lim").getByText("S$0.00")).toBeTruthy();
   });
 
+  // Wave 6: once a business draws at marking, live = stored by construction
+  // (package_live_balances stops simulating), so no row carries a * — and the
+  // footnote explaining a * must not hang under a table that shows one figure.
+  it("the * footnote shows only when some row's live balance differs from the stored one", () => {
+    const FOOT = /Remaining balances are live/;
+    const { unmount } = setup(); // ALICE differs
+    expect(screen.getByText(FOOT)).toBeTruthy();
+    unmount();
+
+    setup({ held: [BOB, CAROL] }); // CAROL equal, BOB not active
+    expect(screen.queryByText(FOOT)).toBeNull();
+  });
+
   it("an active package past its expiry says expired; a future one does not", () => {
     setup();
     expect(row("Carol Ng").getByText("expired")).toBeTruthy();
