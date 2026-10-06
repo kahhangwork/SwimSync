@@ -5,10 +5,34 @@
 // helpers only — never React, never ui/, never @/components.
 
 import { supabase } from "@/lib/supabase";
-import type { TablesInsert } from "@/lib/database.overrides";
+import type { DataOf, RlsNullable, TablesInsert } from "@/lib/database.overrides";
 import { ilikeContains } from "@/lib/tableSearch";
 import { ROW_LIMIT } from "../constants";
 import type { SearchField } from "../types";
+
+// ── The rows the mapped reads return ─────────────────────────────────────────
+// Every LEFT to-one embed is widened to `| null` — RLS nulls a hidden embed
+// whatever the generated type says (§7.344) — and domain/ keeps its `?.` / `??`
+// / normaliser on each. (fetchInvoices interpolates one of two literal parent
+// embeds, so supabase-js still parses it: a union of literals.)
+type InvoiceSelected = DataOf<typeof fetchInvoices>[number];
+type InvoiceParent = NonNullable<InvoiceSelected["parents"]>;
+type InvoiceItem = InvoiceSelected["invoice_items"][number];
+export type InvoiceSelectRow = Omit<InvoiceSelected, "parents" | "invoice_items"> & {
+  parents: RlsNullable<InvoiceParent, "profiles"> | null;
+  invoice_items: RlsNullable<InvoiceItem, "students">[];
+};
+type UndeliveredSelected = DataOf<typeof fetchMayNotHaveArrived>[number];
+type UndeliveredParent = NonNullable<UndeliveredSelected["parents"]>;
+type UndeliveredProfile = NonNullable<UndeliveredParent["profiles"]>;
+type UndeliveredParentEmbed = Omit<UndeliveredParent, "profiles"> & {
+  profiles: UndeliveredProfile | UndeliveredProfile[] | null;
+};
+/** `parents` / `profiles` also typed as arrays: toUndeliveredEmail keeps its
+ *  Array.isArray normalisers. */
+export type UndeliveredSelectRow = Omit<UndeliveredSelected, "parents"> & {
+  parents: UndeliveredParentEmbed | UndeliveredParentEmbed[] | null;
+};
 
 export const getUser = () => supabase.auth.getUser();
 export const getSession = () => supabase.auth.getSession();

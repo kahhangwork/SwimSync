@@ -5,6 +5,7 @@
 
 import { toWaNumber } from "@/lib/waMessage";
 import type { InvoiceRow, SearchField } from "../types";
+import type { InvoiceSelectRow } from "../dao/invoices.repo";
 
 export function formatBillingMonth(ym: string): string {
   const [year, month] = ym.split("-");
@@ -17,11 +18,11 @@ export function formatBillingMonth(ym: string): string {
 /** Map one PostgREST invoice row (with its `parents`/`invoice_items` embeds) to
  *  the flat InvoiceRow the UI renders. Student names are de-duplicated and
  *  preferred from the item's snapshot, falling back to the live student name. */
-export function mapInvoiceRow(inv: any): InvoiceRow {
+export function mapInvoiceRow(inv: InvoiceSelectRow): InvoiceRow {
   const nameList: string[] = [
     ...new Set(
       (inv.invoice_items ?? [])
-        .map((item: any) => item.student_name ?? item.students?.full_name)
+        .map((item) => item.student_name ?? item.students?.full_name)
         .filter(Boolean)
     ),
   ] as string[];

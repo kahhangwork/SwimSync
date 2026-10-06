@@ -28,7 +28,7 @@ describe("toUndeliveredEmail", () => {
   });
 
   it("a missing parent reads —, a missing reference is null", () => {
-    const u = toUndeliveredEmail({ id: "i", billing_month: "2026-08", invoice_email_claimed_at: "x", parents: null });
+    const u = toUndeliveredEmail({ id: "i", billing_month: "2026-08", invoice_email_claimed_at: "x", parents: null } as any); // no reference_number: pins `?? null`
     expect(u.parentName).toBe("—");
     expect(u.reference).toBeNull();
   });

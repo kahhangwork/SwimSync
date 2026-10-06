@@ -44,8 +44,10 @@ describe("formatBillingMonth", () => {
 });
 
 describe("mapInvoiceRow", () => {
+  // Loose rows (amounts as strings, embeds missing): pin Number() and the "—" fallbacks.
+  const mapLoose = (row: object) => mapInvoiceRow(row as any);
   it("flattens embeds, de-dupes student names, coerces amounts to Number", () => {
-    const mapped = mapInvoiceRow({
+    const mapped = mapLoose({
       id: "i9",
       billing_month: "2026-08",
       gross_amount: "80",
@@ -74,7 +76,7 @@ describe("mapInvoiceRow", () => {
   });
 
   it("falls back to em-dashes when embeds are missing", () => {
-    const mapped = mapInvoiceRow({
+    const mapped = mapLoose({
       id: "i0",
       billing_month: "2026-08",
       gross_amount: 0,

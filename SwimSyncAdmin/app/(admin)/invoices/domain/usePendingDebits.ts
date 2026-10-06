@@ -22,7 +22,7 @@ export function usePendingDebits(tenantId: string | null) {
     }
     setPendingDebitError(null);
     setPendingDebits(
-      (data ?? []).map((row: any) => ({
+      (data ?? []).map((row) => ({
         parent_id: row.parent_id,
         tenant_id: row.tenant_id,
         parent_name: row.parents?.profiles?.full_name ?? "—",

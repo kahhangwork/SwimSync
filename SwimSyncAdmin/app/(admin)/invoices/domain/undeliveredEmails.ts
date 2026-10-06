@@ -8,6 +8,8 @@
 // and the resend goes out under a new key. The state is computed in SQL; this
 // file only shapes and labels it.
 
+import type { UndeliveredSelectRow } from "../dao/invoices.repo";
+
 export type UndeliveredEmail = {
   invoiceId: string;
   billingMonth: string;
@@ -18,7 +20,7 @@ export type UndeliveredEmail = {
 };
 
 /** One fetchMayNotHaveArrived row → the list's entry. */
-export function toUndeliveredEmail(row: any): UndeliveredEmail {
+export function toUndeliveredEmail(row: UndeliveredSelectRow): UndeliveredEmail {
   const parent = Array.isArray(row.parents) ? row.parents[0] : row.parents;
   const profile = Array.isArray(parent?.profiles) ? parent.profiles[0] : parent?.profiles;
   return {
@@ -26,7 +28,10 @@ export function toUndeliveredEmail(row: any): UndeliveredEmail {
     billingMonth: row.billing_month,
     reference: row.reference_number ?? null,
     parentName: profile?.full_name ?? "—",
-    claimedAt: row.invoice_email_claimed_at,
+    // `!`: guarded by the dao's `.eq("invoice_email_state", "MAY_HAVE_SENT")` —
+    // email_delivery_state() returns MAY_HAVE_SENT only when the claim stamp IS
+    // NOT NULL (its `WHEN p_claimed_at IS NULL THEN 'UNSENT'` arm comes first).
+    claimedAt: row.invoice_email_claimed_at!,
   };
 }
 

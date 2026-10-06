@@ -20,6 +20,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 //      → RED: "reads one tenant's pending debits, and only debits"
 //   3. `.gt("debit_balance", 0)` → `.gte("debit_balance", 0)`
 //      → RED: "reads one tenant's pending debits, and only debits"
+//
+// Wave 8 (the invoice list + the may-not-have-arrived read, §7.314), each applied
+// by hand, seen red, reverted:
+//   4. `net_amount` deleted from fetchInvoices' select
+//      → RED: both "fetchInvoices — …" cases
+//   5. the parent search's `profiles!inner` → `profiles`
+//      → RED: "fetchInvoices — a parent search inner-joins and filters in the DB"
+//   6. `.eq("invoice_email_state", "MAY_HAVE_SENT")` deleted
+//      → RED: "fetchMayNotHaveArrived — one tenant's MAY_HAVE_SENT invoices, oldest claim first"
 
 const { log } = vi.hoisted(() => ({ log: [] as unknown[][] }));
 
@@ -40,7 +49,8 @@ vi.mock("@/lib/supabase", () => {
   return { supabase: chain };
 });
 
-import { fetchPendingDebits } from "./invoices.repo";
+import { fetchInvoices, fetchMayNotHaveArrived, fetchPendingDebits } from "./invoices.repo";
+import { ROW_LIMIT } from "../constants";
 
 beforeEach(() => {
   log.length = 0;
@@ -54,6 +64,42 @@ describe("fetchPendingDebits", () => {
       ["select", "parent_id, tenant_id, debit_balance, parents(profiles(full_name))"],
       ["eq", "tenant_id", "tenant-A"],
       ["gt", "debit_balance", 0],
+    ]);
+  });
+});
+
+describe("fetchInvoices — the invoice list (money)", () => {
+  it("fetchInvoices — no search reads every money column, LEFT-joined, newest first, capped", () => {
+    fetchInvoices("", "parent");
+    expect(log).toEqual([
+      ["from", "invoices"],
+      ["select", "id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, parents(profiles(full_name, phone)), invoice_items(student_name, students(full_name))"],
+      ["order", "generated_at", { ascending: false }],
+      ["limit", ROW_LIMIT],
+    ]);
+  });
+
+  it("fetchInvoices — a parent search inner-joins and filters in the DB", () => {
+    fetchInvoices("ann", "parent");
+    expect(log).toEqual([
+      ["from", "invoices"],
+      ["select", "id, billing_month, gross_amount, package_applied, credit_applied, balance_adjustment, net_amount, status, reference_number, public_token, reminded_at, paid_claimed_at, parents!inner(profiles!inner(full_name, phone)), invoice_items(student_name, students(full_name))"],
+      ["order", "generated_at", { ascending: false }],
+      ["limit", ROW_LIMIT],
+      ["ilike", "parents.profiles.full_name", "%ann%"],
+    ]);
+  });
+});
+
+describe("fetchMayNotHaveArrived", () => {
+  it("fetchMayNotHaveArrived — one tenant's MAY_HAVE_SENT invoices, oldest claim first", () => {
+    fetchMayNotHaveArrived("tenant-A");
+    expect(log).toEqual([
+      ["from", "invoices"],
+      ["select", "id, billing_month, reference_number, invoice_email_claimed_at, parents(profiles(full_name))"],
+      ["eq", "tenant_id", "tenant-A"],
+      ["eq", "invoice_email_state", "MAY_HAVE_SENT"],
+      ["order", "invoice_email_claimed_at", { ascending: true }],
     ]);
   });
 });
