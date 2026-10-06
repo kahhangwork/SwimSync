@@ -26,7 +26,7 @@ import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 
 const [root, base, head, ...paths] = process.argv.slice(2);
 if (!root || !base || !head) {
@@ -108,7 +108,16 @@ function serialise(ts, js, path, app) {
 
   // Local names bound to fromJson by an import from …database.overrides.
   const fromJsonNames = new Set();
-  const isOverrides = (s) => ts.isStringLiteral(s) && /(^|\/)database\.overrides$/.test(s.text);
+  // The specifier must RESOLVE to this app's lib/database.overrides — not merely end
+  // in that name (a sibling `./database.overrides` would carry its own fromJson).
+  const target = `${app}/lib/database.overrides`;
+  const isOverrides = (s) => {
+    if (!ts.isStringLiteral(s)) return false;
+    const spec = s.text.replace(/\.tsx?$/, "");
+    if (spec.startsWith("@/")) return `${app}/${spec.slice(2)}` === target;
+    if (spec.startsWith(".")) return posix.normalize(posix.join(posix.dirname(path), spec)) === target;
+    return false;
+  };
   for (const st of sf.statements) {
     if (!ts.isImportDeclaration(st) || !isOverrides(st.moduleSpecifier)) continue;
     const nb = st.importClause?.namedBindings;
@@ -118,13 +127,37 @@ function serialise(ts, js, path, app) {
       }
     }
   }
-  const normaliseFromJson = fromJsonNames.size > 0 && fromJsonIsIdentity(app);
+  // Any OTHER binding of the same name anywhere in the file (a local function, a
+  // parameter, a variable, a catch binding…) could shadow the import: no scope
+  // analysis here, so normalisation is simply off for that file.
+  let shadowed = false;
+  const isBindingName = (id) => {
+    const p = id.parent;
+    if (!p) return false;
+    if (ts.isImportSpecifier(p) || ts.isImportClause(p) || ts.isNamespaceImport(p)) {
+      return !(ts.isImportSpecifier(p) && ts.isImportDeclaration(p.parent.parent.parent) &&
+        isOverrides(p.parent.parent.parent.moduleSpecifier));
+    }
+    return (ts.isVariableDeclaration(p) || ts.isParameter(p) || ts.isBindingElement(p) ||
+        ts.isFunctionDeclaration(p) || ts.isFunctionExpression(p) || ts.isClassDeclaration(p) ||
+        ts.isClassExpression(p) || ts.isEnumDeclaration(p)) && p.name === id;
+  };
+  const scan = (n) => {
+    if (ts.isIdentifier(n) && fromJsonNames.has(n.text) && isBindingName(n)) shadowed = true;
+    ts.forEachChild(n, scan);
+  };
+  if (fromJsonNames.size > 0) scan(sf);
+  const normaliseFromJson = fromJsonNames.size > 0 && !shadowed && fromJsonIsIdentity(app);
 
   const FLAGS = ts.NodeFlags.Let | ts.NodeFlags.Const | ts.NodeFlags.OptionalChain |
     ts.NodeFlags.Using | ts.NodeFlags.AwaitUsing;
   const out = [];
   const walk = (node) => {
-    if (ts.isParenthesizedExpression(node)) return walk(node.expression);
+    // Unwrap parens, EXCEPT a whole expression statement: `("use client");` is not a
+    // directive, `"use client";` is.
+    if (ts.isParenthesizedExpression(node) && !ts.isExpressionStatement(node.parent)) {
+      return walk(node.expression);
+    }
     if (normaliseFromJson && ts.isCallExpression(node) && ts.isIdentifier(node.expression) &&
         fromJsonNames.has(node.expression.text) && node.arguments.length === 2 &&
         ts.isStringLiteralLike(node.arguments[1])) {
@@ -150,6 +183,7 @@ function serialise(ts, js, path, app) {
         ts.isTemplateLiteralLike?.(node) || ts.isTemplateMiddleOrTemplateTail?.(node) ||
         ts.isTemplateHead?.(node) || ts.isJsxText(node)) {
       out.push(JSON.stringify(node.text));
+      if (typeof node.rawText === "string") out.push(JSON.stringify(node.rawText)); // String.raw sees it
     }
     ts.forEachChild(node, walk);
     out.push(")");

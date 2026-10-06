@@ -17,9 +17,11 @@
 #     package files, assets…), an ADDED file under an app's `app/` (a route — no
 #     importer needed) or at an app's root (config, middleware), and any change under
 #     supabase/migrations/ or supabase/functions/ are runtime changes outright;
-#   - an ADDED module elsewhere is fine on its own: it runs only if something imports
-#     it, and that importer is a modified file, which is checked;
-#   - ignored: test files (*.test.ts[x], */testing/*), *.md, .db-any-allowance,
+#   - an ADDED non-test .ts/.tsx is a runtime change too (a `.web.ts` silently replaces
+#     its sibling on RN-web; `x.ts` beside `x/index.ts` changes what `./x` means),
+#     EXCEPT: lib/database.overrides.ts (allow-listed), or a pure-type module — it
+#     transpiles to nothing, has no platform extension, and shadows no sibling;
+#   - ignored: test files (*.test.ts[x]), *.md, .db-any-allowance,
 #     lib/database.types.ts (type-only by G6's `import type` rule; G5 checks it), and
 #     everything outside the two apps and supabase/.
 #
@@ -36,9 +38,9 @@ HEAD_REV=${2:-HEAD}
 git -C "$ROOT" rev-parse --verify --quiet "$BASE^{commit}" >/dev/null || { echo "✗ unknown base: $BASE" >&2; exit 2; }
 git -C "$ROOT" rev-parse --verify --quiet "$HEAD_REV^{commit}" >/dev/null || { echo "✗ unknown head: $HEAD_REV" >&2; exit 2; }
 
-is_test() { [[ "$1" =~ \.test\.tsx?$ || "$1" == */testing/* ]]; }
+is_test() { [[ "$1" =~ \.test\.tsx?$ ]]; }
 
-compare=(); runtime=(); added=()
+compare=(); runtime=(); added=(); added_check=()
 while IFS=$'\t' read -r status path; do
   case "$path" in
     SwimSyncApp/*|SwimSyncAdmin/*) ;;
@@ -54,7 +56,8 @@ while IFS=$'\t' read -r status path; do
   if [[ "$path" =~ \.tsx?$ ]]; then
     case "$status" in
       M) compare+=("$path") ;;
-      A) if [[ "$rel" == app/* || "$rel" != */* ]]; then runtime+=("A $path (route or app-root file)"); else added+=("$path"); fi ;;
+      A) if [[ "$rel" == lib/database.overrides.ts ]]; then added+=("$path (allow-listed)")
+         else added_check+=("$path"); fi ;;
       *) runtime+=("$status $path") ;;
     esac
   else
@@ -62,8 +65,32 @@ while IFS=$'\t' read -r status path; do
   fi
 done < <(git -C "$ROOT" diff --no-renames --name-status "$BASE" "$HEAD_REV")
 
+# An added file passes only as a pure-type module that cannot shadow anything.
+for a in ${added_check[@]+"${added_check[@]}"}; do
+  app=${a%%/*}; rel=${a#*/}; stem=${a%.*}
+  why=""
+  [[ "$rel" == app/* || "$rel" != */* ]] && why="route or app-root file"
+  [[ -z "$why" && "$stem" =~ \.(web|native|ios|android)$ ]] && why="platform extension (replaces its sibling)"
+  if [[ -z "$why" ]]; then
+    for sib in "$stem.ts" "$stem.tsx" "$stem.js" "$stem/index.ts" "$stem/index.tsx" "$stem/index.js"; do
+      [[ "$sib" != "$a" ]] && git -C "$ROOT" cat-file -e "$HEAD_REV:$sib" 2>/dev/null && { why="shadows/changes ./$(basename "$stem") ($sib exists)"; break; }
+    done
+  fi
+  if [[ -z "$why" ]]; then
+    emitted=$(git -C "$ROOT" show "$HEAD_REV:$a" | node -e '
+      const ts = require(require("path").join(process.argv[1], process.argv[2], "node_modules/typescript"));
+      let src = ""; process.stdin.on("data", (d) => (src += d)).on("end", () => {
+        const js = ts.transpileModule(src, { fileName: process.argv[3], compilerOptions: { removeComments: true,
+          jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
+        process.stdout.write(js.replace(/^\s*export\s*\{\s*\}\s*;?\s*$/m, "").trim());
+      });' "$ROOT" "$app" "$a") || exit 2
+    [[ -n "$emitted" ]] && why="new module with runtime code"
+  fi
+  if [[ -n "$why" ]]; then runtime+=("A $a ($why)"); else added+=("$a (pure types)"); fi
+done
+
 echo "runtime-identity: $BASE → $HEAD_REV"
-for a in ${added[@]+"${added[@]}"}; do echo "  · added module (runs only via a modified importer, which is checked): $a"; done
+for a in ${added[@]+"${added[@]}"}; do echo "  · added, no runtime effect: $a"; done
 
 rc=0
 if ((${#compare[@]})); then
