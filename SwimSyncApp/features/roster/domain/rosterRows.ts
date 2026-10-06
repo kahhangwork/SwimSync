@@ -9,8 +9,8 @@
 // screen reads TWO clocks at two different moments (`todayDate` at render,
 // `today` after the bookings await) and collapsing them is a behaviour change.
 //
-// The raw rows are `any` because the supabase client is untyped — the same
-// idiom the screen used inline.
+// The raw rows are typed from the dao's selects (Wave 8) — they were `any` while
+// the supabase client was untyped.
 import {
   toSgDate,
   type DayOfWeek,
@@ -27,27 +27,33 @@ import {
   type DbStatus,
 } from "@/lib/attendanceSummary";
 import type { Student, Session, ClassInfo, Guest, Extra } from "@/features/roster/types";
+import type {
+  GuestNameRow,
+  PastSessionRow,
+  RosterBookingRow,
+  RosterClassRow,
+  UpcomingExtraRow,
+} from "../dao/roster.repo";
 
-export function toClassInfo(cls: any): ClassInfo {
+export function toClassInfo(cls: RosterClassRow): ClassInfo {
   return {
     title: cls.title,
     day_of_week: cls.day_of_week,
     start_time: cls.start_time,
     end_time: cls.end_time,
-    // PostgREST returns a to-one embed as an object; the generated types widen
-    // it to an array, so cast rather than index.
-    location_name: (cls.locations as any)?.name ?? "—",
+    // PostgREST returns a to-one embed as an object (or null) — typed so since
+    // Wave 8; the old array-widening cast is gone.
+    location_name: cls.locations?.name ?? "—",
   };
 }
 
-export function toActiveStudents(cls: any): Student[] {
+export function toActiveStudents(cls: RosterClassRow): Student[] {
   return (cls.student_class_enrolments ?? [])
-    .filter((e: any) => e.is_active)
+    .filter((e) => e.is_active)
     // NOTE (§7.28): date_of_birth is read off `e.students`, NOT off the
-    // enrolment — both tables are in this nested select and the result is
-    // `any`, so the wrong nesting level would typecheck and render every
-    // child ageless.
-    .map((e: any) => ({
+    // enrolment — both tables are in this nested select. Typed since Wave 8, so
+    // reading it at the wrong nesting level is now a compile error.
+    .map((e) => ({
       id: e.students.id,
       full_name: e.students.full_name,
       date_of_birth: e.students.date_of_birth,
@@ -57,13 +63,13 @@ export function toActiveStudents(cls: any): Student[] {
       // Sorted here: PostgREST cannot order an embedded resource, so doing
       // it in the query would silently do nothing.
       level_skills: [...(e.students.tenant_levels?.tenant_level_skills ?? [])]
-        .sort((a: any, b: any) => a.sort_order - b.sort_order)
-        .map((sk: any) => sk.label),
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((sk) => sk.label),
     }));
 }
 
-export function toUpcomingExtras(extraData: any[] | null): Extra[] {
-  return (extraData ?? []).map((s: any) => ({
+export function toUpcomingExtras(extraData: UpcomingExtraRow[] | null): Extra[] {
+  return (extraData ?? []).map((s) => ({
     id: s.id as string,
     session_date: s.session_date as string,
     reason: s.off_schedule_reason as string,
@@ -75,10 +81,10 @@ export function toUpcomingExtras(extraData: any[] | null): Extra[] {
 // just the active ones): a child who has since left was still expected at
 // the lessons they were enrolled for, and their marked rows must keep
 // counting. See EnrolmentSpan in lib/attendanceCompleteness.ts.
-export function toEnrolmentSpans(cls: any): EnrolmentSpan[] {
+export function toEnrolmentSpans(cls: RosterClassRow): EnrolmentSpan[] {
   return (
     cls.student_class_enrolments ?? []
-  ).map((e: any) => ({
+  ).map((e) => ({
     studentId: (e.student_id ?? e.students?.id) as string,
     from: toSgDate(e.enrolled_at),
     until: e.unenrolled_at ? toSgDate(e.unenrolled_at) : null,
@@ -87,35 +93,35 @@ export function toEnrolmentSpans(cls: any): EnrolmentSpan[] {
 
 // The same rows, read the other way: who is coming, and when. `today` is the
 // clock the screen reads AFTER the bookings await — passed in, never read here.
-export function upcomingBookings(rows: any[] | null, today: string): any[] {
+export function upcomingBookings(rows: RosterBookingRow[] | null, today: string): RosterBookingRow[] {
   return (rows ?? [])
-    .filter((b: any) => (b.session_date as string) >= today)
-    .sort((a: any, b: any) =>
+    .filter((b) => (b.session_date as string) >= today)
+    .sort((a, b) =>
       (a.session_date as string).localeCompare(b.session_date as string)
     );
 }
 
-export function guestIdsOf(upcoming: any[], upcomingMk: any[]): string[] {
+export function guestIdsOf(upcoming: RosterBookingRow[], upcomingMk: RosterBookingRow[]): string[] {
   return [
     ...new Set([
-      ...upcoming.map((b: any) => b.student_id),
-      ...upcomingMk.map((b: any) => b.student_id),
+      ...upcoming.map((b) => b.student_id),
+      ...upcomingMk.map((b) => b.student_id),
     ]),
   ];
 }
 
-export function nameByIdOf(guestRows: any[] | null): Map<string, string> {
+export function nameByIdOf(guestRows: GuestNameRow[] | null): Map<string, string> {
   return new Map(
-    (guestRows ?? []).map((s: any) => [s.id as string, s.full_name as string])
+    (guestRows ?? []).map((s) => [s.id as string, s.full_name as string])
   );
 }
 
 export function namedGuests(
-  upcoming: any[],
+  upcoming: RosterBookingRow[],
   nameById: Map<string, string>,
   fallback: string
 ): Guest[] {
-  return upcoming.map((b: any) => ({
+  return upcoming.map((b) => ({
     id: b.student_id as string,
     full_name: nameById.get(b.student_id as string) ?? fallback,
     session_date: b.session_date as string,
@@ -125,8 +131,8 @@ export function namedGuests(
 // One merged map: both kinds of booking mean "expected at this lesson",
 // which is the contract expectedStudentsOn already has.
 export function bookedByDateOf(
-  bookingRows: any[] | null,
-  makeupBookingRows: any[] | null
+  bookingRows: RosterBookingRow[] | null,
+  makeupBookingRows: RosterBookingRow[] | null
 ): Map<string, string[]> {
   const bookedByDate = new Map<string, string[]>();
   for (const b of [...(bookingRows ?? []), ...(makeupBookingRows ?? [])]) {
@@ -144,7 +150,7 @@ export function bookedByDateOf(
  * functions that return separate arrays is how a date gets pushed twice.
  */
 export function buildSessions(args: {
-  sessionData: any[] | null;
+  sessionData: PastSessionRow[] | null;
   enrolmentSpans: EnrolmentSpan[];
   bookedByDate: Map<string, string[]>;
   dayOfWeek: DayOfWeek;
@@ -153,9 +159,9 @@ export function buildSessions(args: {
 }): { rows: Session[]; target: { date: string } | null } {
   const { sessionData, enrolmentSpans, bookedByDate, dayOfWeek, winStart, todayDate } = args;
 
-  const rows: Session[] = (sessionData ?? []).map((s: any) => {
+  const rows: Session[] = (sessionData ?? []).map((s) => {
     const markedIds = new Set<string>(
-      (s.attendance ?? []).map((a: any) => a.student_id)
+      (s.attendance ?? []).map((a) => a.student_id)
     );
     // Enrolled students PLUS anyone booked for a trial that day — the shared
     // rule, so this screen and the engine count the same people. A lesson
@@ -177,7 +183,7 @@ export function buildSessions(args: {
         summariseStatuses(
           expectedHere,
           new Map<string, DbStatus>(
-            (s.attendance ?? []).map((a: any) => [a.student_id, a.status])
+            (s.attendance ?? []).map((a) => [a.student_id, a.status])
           )
         )
       ),
@@ -221,14 +227,14 @@ export function buildSessions(args: {
   // class has ever held), and the loop below runs over every date in the
   // window, so a `.find()` per date is O(dates x sessions) on every open.
   const sessionIdByDate = new Map<string, string>(
-    (sessionData ?? []).map((s: any) => [s.session_date as string, s.id as string])
+    (sessionData ?? []).map((s) => [s.session_date as string, s.id as string])
   );
   // Dates the admin cancelled in advance: nobody enrolled is due, so such a
   // date must neither be synthesised as unmarked nor become the Mark target.
   const cancelledDates = new Set<string>(
     (sessionData ?? [])
-      .filter((s: any) => s.cancelled_at != null)
-      .map((s: any) => s.session_date as string)
+      .filter((s) => s.cancelled_at != null)
+      .map((s) => s.session_date as string)
   );
   const sessionDates = [...sessionIdByDate.keys()];
   const seen = new Set(rows.map((r) => r.session_date));

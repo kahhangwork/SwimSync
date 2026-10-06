@@ -4,19 +4,21 @@
 // move. Each case is named for the plan's §6 Stage 2 assertion it pins (1-11);
 // the billing-gate cases (1-6) are the ones that matter: this list is what the
 // coach sees as unmarked, and it must agree with what generate-invoices blocks on.
-import {
-  toActiveStudents,
-  toEnrolmentSpans,
-  toClassInfo,
-  toUpcomingExtras,
-  upcomingBookings,
-  guestIdsOf,
-  nameByIdOf,
-  namedGuests,
-  bookedByDateOf,
-  buildSessions,
-  duplicateNameKeys,
-} from "./rosterRows";
+import { duplicateNameKeys } from "./rosterRows";
+import * as F from "./rosterRows";
+
+// Loose fixtures on purpose (Wave 8): partial rows pin the fallbacks the typed rows no longer admit.
+const loose = <A extends unknown[], R>(fn: (...a: A) => R) => fn as unknown as (...a: any[]) => R;
+const toActiveStudents = loose(F.toActiveStudents);
+const toEnrolmentSpans = loose(F.toEnrolmentSpans);
+const toClassInfo = loose(F.toClassInfo);
+const toUpcomingExtras = loose(F.toUpcomingExtras);
+const upcomingBookings = loose(F.upcomingBookings);
+const guestIdsOf = loose(F.guestIdsOf);
+const nameByIdOf = loose(F.nameByIdOf);
+const namedGuests = loose(F.namedGuests);
+const bookedByDateOf = loose(F.bookedByDateOf);
+const buildSessions = loose(F.buildSessions);
 import type { EnrolmentSpan } from "@/lib/attendanceCompleteness";
 
 // A Saturday class; the window holds four Saturdays: 1, 8, 15, 22 Aug 2026.

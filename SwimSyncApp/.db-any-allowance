@@ -10,7 +10,6 @@ features/coach-settings/ui/MenuItem.tsx 1
 features/coach-settings/ui/Row.tsx 1
 features/parent-attendance/ui/HistoryList.tsx 1
 features/paynow/domain/embeddedTenant.ts 1
-features/roster/domain/rosterRows.ts 34
 features/schedule/ui/ProgressChip.tsx 1
 lib/coachRoster.ts 1
 lib/payoutBreakdown.ts 1

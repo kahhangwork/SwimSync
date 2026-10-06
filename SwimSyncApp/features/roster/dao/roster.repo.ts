@@ -13,6 +13,7 @@
 // no @/components (fence check 2).
 
 import { supabase } from "@/lib/supabase";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
 
 // Load class info + enrolled students
 export function loadClass(id: string) {
@@ -94,3 +95,23 @@ export function loadGuestNames(guestIds: string[]) {
         .select("id, full_name")
         .in("id", guestIds);
 }
+
+// ── Row types, derived from the selects above (Wave 8) ──────────────────────
+// An enrolment's `students` is NON-null by a policy proof (as in mark-attendance):
+// since 20261006000600, students_select admits a coach via coach_taught_student()
+// for exactly the classes enrolments_select admits them to. `locations` and a
+// student's `tenant_levels` are LEFT to-one embeds RLS can null (§7.344).
+type ClassData = DataOf<typeof loadClass>;
+type EnrolmentData = ClassData["student_class_enrolments"][number];
+export type RosterEnrolmentRow = Omit<EnrolmentData, "students"> & {
+  students: RlsNullable<EnrolmentData["students"], "tenant_levels">;
+};
+export type RosterClassRow = Omit<RlsNullable<ClassData, "locations">, "student_class_enrolments"> & {
+  student_class_enrolments: RosterEnrolmentRow[];
+};
+export type PastSessionRow = DataOf<typeof loadPastSessions>[number];
+export type UpcomingExtraRow = DataOf<typeof loadUpcomingExtras>[number];
+export type RosterBookingRow =
+  | DataOf<typeof loadTrialBookings>[number]
+  | DataOf<typeof loadMakeupBookings>[number];
+export type GuestNameRow = DataOf<typeof loadGuestNames>[number];
