@@ -1,5 +1,6 @@
 import type { CsvColumn } from "@/lib/csv";
-import type { CreditNoteRow } from "../types";
+import type { CreditNoteRow, EmailDeliveryState } from "../types";
+import type { NoteSelectRow } from "../dao/creditNotes.repo";
 
 // A note voided by an un-correction (status 'reversed', 20260818000100) must NOT
 // read as "Available" — it is no longer live credit. One helper so the label, the
@@ -26,7 +27,7 @@ export const CREDIT_NOTE_CSV_COLUMNS: CsvColumn<CreditNoteRow>[] = [
 ];
 
 /** One credit_notes row (with its embeds) -> the table's row. */
-export function toCreditNoteRow(cn: any): CreditNoteRow {
+export function toCreditNoteRow(cn: NoteSelectRow): CreditNoteRow {
   return {
     id: cn.id,
     reference_number: cn.reference_number,
@@ -41,7 +42,11 @@ export function toCreditNoteRow(cn: any): CreditNoteRow {
     email_sent_at: cn.email_sent_at ?? null,
     // The computed column is always selected; the fallback only guards a row
     // shaped by hand (tests, or a select that forgot it).
-    email_state: cn.credit_note_email_state ?? (cn.email_sent_at ? "SENT" : "UNSENT"),
+    email_state:
+      // census: ui-cast (Wave 8) — the computed column types as `string`; its SQL,
+      // email_delivery_state(), returns exactly the EmailDeliveryState values.
+      (cn.credit_note_email_state as EmailDeliveryState | null) ??
+      (cn.email_sent_at ? "SENT" : "UNSENT"),
     tenant_id: cn.tenant_id,
     applied_to_invoice_id: cn.applied_to_invoice_id ?? null,
     has_applications: (cn.credit_applications ?? []).some(

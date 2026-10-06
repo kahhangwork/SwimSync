@@ -26,7 +26,7 @@ describe("toCreditNoteRow", () => {
     student_name: null, email_sent_at: null, credit_note_email_state: "RETRYABLE", tenant_id: "t1",
     credit_applications: [], students: { id: "s1", full_name: "Kid" },
     parents: { profiles: { full_name: "Mum" } },
-  };
+  } as any; // amount as a string, fields set to null/undefined below: pin Number() and the fallbacks
 
   it("maps the embeds, the date prefix and the numeric amount", () => {
     expect(toCreditNoteRow(base)).toEqual({
@@ -71,7 +71,7 @@ describe("CREDIT_NOTE_CSV_COLUMNS", () => {
     expect(CREDIT_NOTE_CSV_COLUMNS.map((c) => c.header)).toEqual([
       "Reference", "Student", "Parent", "Amount", "Reason", "Linked Invoice", "Date", "Status", "Emailed",
     ]);
-    const row = toCreditNoteRow({ id: "x", status: "reversed", email_sent_at: "2026-09-01", amount: 1 });
+    const row = toCreditNoteRow({ id: "x", status: "reversed", email_sent_at: "2026-09-01", amount: 1 } as any); // partial row
     expect(CREDIT_NOTE_CSV_COLUMNS[7].value(row)).toBe("Reversed");
     expect(CREDIT_NOTE_CSV_COLUMNS[8].value(row)).toBe("yes");
   });

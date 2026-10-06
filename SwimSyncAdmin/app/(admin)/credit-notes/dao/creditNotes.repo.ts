@@ -6,6 +6,19 @@ import { supabase } from "@/lib/supabase";
 import { ilikeContains } from "@/lib/tableSearch";
 import { ROW_LIMIT } from "../constants";
 import type { SearchField } from "../types";
+import type { DataOf, RlsNullable } from "@/lib/database.overrides";
+
+// The row loadNotes returns. Every LEFT to-one embed is widened to `| null` — RLS
+// nulls a hidden embed whatever the generated type says (§7.344) — and
+// domain/creditNoteRows.ts keeps its `?.` / `??` on each. (The select
+// interpolates one of two literal parent embeds: a union of literals, so
+// supabase-js still parses it.)
+type NoteSelected = DataOf<typeof loadNotes>[number];
+type NoteParent = NonNullable<NoteSelected["parents"]>;
+export type NoteSelectRow = RlsNullable<
+  Omit<NoteSelected, "parents"> & { parents: RlsNullable<NoteParent, "profiles"> | null },
+  "students"
+>;
 
 export function getAuthUser() {
   return supabase.auth.getUser();
