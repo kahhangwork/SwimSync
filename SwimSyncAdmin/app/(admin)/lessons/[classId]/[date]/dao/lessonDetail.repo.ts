@@ -10,6 +10,7 @@
 // dao/ is transport only: no React, no ui/, no @/components (fence check 2).
 
 import { supabase } from "@/lib/supabase";
+import type { RlsNullable } from "@/lib/database.overrides";
 
 // Reads the markable window's floor itself (an RPC inside lib/markableFloor,
 // shared with the Lessons list's dao), so it is BOUND here rather than
@@ -46,6 +47,22 @@ export function loadLessonReads(classId: string, date: string) {
       .order("full_name"),
   ]);
 }
+
+// The rows each read returns, by its position in loadLessonReads. Every to-one
+// embed is widened to `| null` — RLS nulls a hidden embed whatever the generated
+// type says (§7.344) — and the domain keeps its `?.` / `??` / filter on each.
+type LessonReads = Awaited<ReturnType<typeof loadLessonReads>>;
+type DataAt<I extends 1 | 3 | 4 | 5 | 10> = NonNullable<LessonReads[I]["data"]>;
+export type ClassReadRow = RlsNullable<DataAt<1>, "locations" | "class_categories">;
+export type CoachReadRow = RlsNullable<DataAt<3>[number], "profiles">;
+export type EnrolmentReadRow = RlsNullable<DataAt<4>[number], "students">;
+/** A trial (position 5) or make-up (6) booking — the two selects are identical. */
+export type GuestReadRow = RlsNullable<DataAt<5>[number], "students">;
+type KidSelected = DataAt<10>[number];
+type KidEnrolment = KidSelected["student_class_enrolments"][number];
+export type KidReadRow = Omit<KidSelected, "student_class_enrolments"> & {
+  student_class_enrolments: RlsNullable<KidEnrolment, "classes">[];
+};
 
 /** Attendance + substitute only exist when the session does. */
 export function loadSessionReads(sid: string) {

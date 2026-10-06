@@ -87,7 +87,7 @@ describe("buildRoster", () => {
 });
 
 describe("classInfoFrom", () => {
-  const base = { id: "c1", title: "Rose", day_of_week: "saturday", start_time: "09:00", end_time: "10:00", coach_id: "k1", category_id: "cat" };
+  const base = { id: "c1", title: "Rose", day_of_week: "saturday", start_time: "09:00", end_time: "10:00", coach_id: "k1", category_id: "cat" } as any; // partial rows: pins the fallbacks for absent keys
 
   it("maps the row; capacity falls back to the category default, then null; is_active is `!== false`", () => {
     expect(classInfoFrom({ ...base, locations: { name: "Pool A" }, colour: "sky", capacity: 5, is_active: true, deactivated_at: null })).toEqual({
@@ -126,7 +126,7 @@ describe("eligibleKidsFrom / trialKidsFrom — two filters that look alike (RISK
     { id: "a", full_name: "Active two homes", is_active: true, student_class_enrolments: [{ is_active: true, classes: cls("c1", "Rose") }, { is_active: true, classes: cls("c2", "Lily") }] },
     { id: "b", full_name: "Inactive kid", is_active: false, student_class_enrolments: [{ is_active: true, classes: cls("c1", "Rose") }] },
     { id: "c", full_name: "Only ended enrolments", is_active: true, student_class_enrolments: [{ is_active: false, classes: cls("c1", "Rose") }] },
-    { id: "d", full_name: "No enrolments", is_active: true, student_class_enrolments: null },
+    { id: "d", full_name: "No enrolments", is_active: true, student_class_enrolments: null as any }, // pins the kept `?? []`
     { id: "e", full_name: "Hidden class", is_active: true, student_class_enrolments: [{ is_active: true, classes: null }] },
   ];
 

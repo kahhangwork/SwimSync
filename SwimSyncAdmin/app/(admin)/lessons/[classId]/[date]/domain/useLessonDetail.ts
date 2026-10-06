@@ -87,7 +87,7 @@ export function useLessonDetail(classId: string, date: string) {
         return;
       }
 
-      const c: any = clsRes.data;
+      const c = clsRes.data;
       const info: ClassInfo = classInfoFrom(c);
       setCls(info);
       setActorId(sess.session?.user.id ?? null);
@@ -97,7 +97,7 @@ export function useLessonDetail(classId: string, date: string) {
       const sessRow = sessionRes.data as { cancelled_at?: string | null; cancellation_reason?: string | null } | null;
       setCancelled(sessRow?.cancelled_at ? { reason: sessRow.cancellation_reason ?? null } : null);
 
-      const coachList: CoachOpt[] = coachListFrom((coachesRes.data ?? []) as any[]);
+      const coachList: CoachOpt[] = coachListFrom(coachesRes.data ?? []);
       setCoaches(coachList);
 
       // Attendance + substitute only exist when the session does.
@@ -117,18 +117,18 @@ export function useLessonDetail(classId: string, date: string) {
           setLoading(false);
           return;
         }
-        marks = new Map(((attRes.data ?? []) as any[]).map((a) => [a.student_id, a.status as DbStatus]));
-        subs = ((subRes.data ?? []) as any[]).map((s) => ({ lesson_session_id: s.lesson_session_id, coach_id: s.coach_id }));
-        subRowId = ((subRes.data ?? []) as any[])[0]?.id ?? null;
+        marks = new Map((attRes.data ?? []).map((a) => [a.student_id, a.status as DbStatus]));
+        subs = (subRes.data ?? []).map((s) => ({ lesson_session_id: s.lesson_session_id, coach_id: s.coach_id }));
+        subRowId = (subRes.data ?? [])[0]?.id ?? null;
         absences = (absRes.data ?? []) as AbsenceRow[];
       }
 
       // Who is expected: the SAME union the billing gate uses.
       const rows: RosterRow[] = buildRoster({
         date,
-        enrolments: (enrolRes.data ?? []) as any[],
-        trials: (trialsRes.data ?? []) as any[],
-        makeups: (makeupsRes.data ?? []) as any[],
+        enrolments: enrolRes.data ?? [],
+        trials: trialsRes.data ?? [],
+        makeups: makeupsRes.data ?? [],
         marks,
       });
       setRoster(rows);
@@ -144,7 +144,7 @@ export function useLessonDetail(classId: string, date: string) {
       setAttr({ mainId: a?.main_coach_id ?? null, isCover: a?.is_cover ?? false, subRowId, shadowIds: a?.shadow_coach_ids ?? [] });
       setTermsCoachId(termsCoachOn((ratesRes.data ?? []) as ClassRateRow[], classId, date));
 
-      const kidRows = (kidsRes.data ?? []) as any[];
+      const kidRows = kidsRes.data ?? [];
       setKids(eligibleKidsFrom(kidRows));
       setTrialKids(trialKidsFrom(kidRows));
 

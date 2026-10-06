@@ -28,7 +28,7 @@ export function supabaseSaveDeps(): SaveDeps {
         .select("id")
         .single();
       if (error || !data) {
-        return { error: { code: (error as any)?.code, message: error?.message ?? "Could not create the lesson record." } };
+        return { error: { code: error?.code, message: error?.message ?? "Could not create the lesson record." } };
       }
       return { id: data.id as string };
     },
@@ -36,11 +36,11 @@ export function supabaseSaveDeps(): SaveDeps {
       const { error } = await supabase
         .from("attendance")
         .upsert(rows, { onConflict: "lesson_session_id,student_id" });
-      return { error: error ? { code: (error as any).code, message: error.message } : null };
+      return { error: error ? { code: error.code, message: error.message } : null };
     },
     async insertAudit(row) {
       const { error } = await supabase.from("audit_log").insert(row);
-      return { error: error ? { code: (error as any).code, message: error.message } : null };
+      return { error: error ? { code: error.code, message: error.message } : null };
     },
     async notifyCreditNote(sessionId) {
       await notifyCreditNoteEmails(supabase, sessionId);

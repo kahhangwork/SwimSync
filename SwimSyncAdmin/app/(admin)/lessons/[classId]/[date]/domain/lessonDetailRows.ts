@@ -7,9 +7,10 @@ import { toSgDate } from "@/lib/lessonDates";
 import { expectedStudentsOn, studentsEnrolledOn, type EnrolmentSpan } from "@/lib/attendanceCompleteness";
 import type { DbStatus, RosterKind } from "./lessonMarking";
 import type { ClassInfo, CoachOpt, EligibleKid, RosterRow } from "../types";
+import type { ClassReadRow, CoachReadRow, EnrolmentReadRow, GuestReadRow, KidReadRow } from "../dao/lessonDetail.repo";
 
 /** The class row → ClassInfo (capacity falls back to its category's default). */
-export function classInfoFrom(c: any): ClassInfo {
+export function classInfoFrom(c: ClassReadRow): ClassInfo {
   return {
     id: c.id,
     title: c.title,
@@ -26,7 +27,7 @@ export function classInfoFrom(c: any): ClassInfo {
   };
 }
 
-export function coachListFrom(rows: any[]): CoachOpt[] {
+export function coachListFrom(rows: CoachReadRow[]): CoachOpt[] {
   return rows
     .map((x) => ({ id: x.id, name: x.profiles?.full_name ?? "Unknown coach" }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -39,9 +40,9 @@ export function coachListFrom(rows: any[]): CoachOpt[] {
  */
 export function buildRoster(input: {
   date: string;
-  enrolments: any[];
-  trials: any[];
-  makeups: any[];
+  enrolments: EnrolmentReadRow[];
+  trials: GuestReadRow[];
+  makeups: GuestReadRow[];
   marks: Map<string, DbStatus>;
 }): RosterRow[] {
   const { date, marks } = input;
@@ -81,15 +82,16 @@ export function buildRoster(input: {
 }
 
 /** Make-up candidates' pool: active children with ≥1 active enrolment in a real class. */
-export function eligibleKidsFrom(kidRows: any[]): EligibleKid[] {
+export function eligibleKidsFrom(kidRows: KidReadRow[]): EligibleKid[] {
   return kidRows
     .filter((k) => k.is_active)
     .map((k) => {
       const enrolled = (k.student_class_enrolments ?? [])
-        .filter((e: any) => e.is_active && e.classes)
-        .map((e: any) => ({ id: e.classes.id, title: e.classes.title, category_id: e.classes.category_id }));
+        .filter((e) => e.is_active && e.classes)
+        // `!`: guarded by the filter above, which drops every enrolment whose class is hidden.
+        .map((e) => ({ id: e.classes!.id, title: e.classes!.title, category_id: e.classes!.category_id }));
       if (enrolled.length === 0) return null;
-      return { id: k.id, full_name: k.full_name, home_classes: enrolled, home_class_titles: enrolled.map((e: any) => e.title) };
+      return { id: k.id, full_name: k.full_name, home_classes: enrolled, home_class_titles: enrolled.map((e) => e.title) };
     })
     .filter(Boolean) as EligibleKid[];
 }
@@ -99,8 +101,8 @@ export function eligibleKidsFrom(kidRows: any[]): EligibleKid[] {
  * eligibleKidsFrom, the `classes` join is NOT consulted — an active enrolment
  * whose class is hidden still disqualifies (plan §5 RISK 4).
  */
-export function trialKidsFrom(kidRows: any[]): { id: string; full_name: string }[] {
+export function trialKidsFrom(kidRows: KidReadRow[]): { id: string; full_name: string }[] {
   return kidRows
-    .filter((k) => k.is_active && !(k.student_class_enrolments ?? []).some((e: any) => e.is_active))
+    .filter((k) => k.is_active && !(k.student_class_enrolments ?? []).some((e) => e.is_active))
     .map((k) => ({ id: k.id, full_name: k.full_name }));
 }

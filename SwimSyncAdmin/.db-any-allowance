@@ -16,9 +16,6 @@ app/(admin)/holidays/dao/holidays.repo.ts 1
 app/(admin)/invoices/domain/invoiceRows.ts 2
 app/(admin)/invoices/domain/undeliveredEmails.ts 1
 app/(admin)/invoices/domain/usePendingDebits.ts 1
-app/(admin)/lessons/[classId]/[date]/dao/lessonDetail.save.ts 3
-app/(admin)/lessons/[classId]/[date]/domain/lessonDetailRows.ts 11
-app/(admin)/lessons/[classId]/[date]/domain/useLessonDetail.ts 9
 app/(admin)/levels/domain/levelRows.ts 4
 app/(admin)/locations/domain/useLocations.ts 3
 app/(admin)/makeups/domain/makeupRows.ts 13
