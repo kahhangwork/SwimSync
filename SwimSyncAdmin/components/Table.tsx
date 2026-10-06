@@ -101,7 +101,7 @@ export function Th({
   /** Prose column: hugs short values, caps at 20rem and wraps beyond. */
   wrap?: boolean;
   /** The `useTableSort` handle. Pass with `sortKey` to make the column sortable. */
-  sort?: TableSort<any>;
+  sort?: TableSort<any>; // db-any-ok: generic
   /** Key into the row (or into `accessors`) this column sorts by. */
   sortKey?: string;
   /** Direction the FIRST click applies. `desc` suits dates and amounts. */

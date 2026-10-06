@@ -12,7 +12,7 @@ export function getSession() {
 export function onAuthStateChange(
   cb: (event: string, session: unknown) => void
 ) {
-  return supabase.auth.onAuthStateChange(cb as any);
+  return supabase.auth.onAuthStateChange(cb as any); // db-any-ok: auth-callback
 }
 
 export function updatePassword(password: string) {
