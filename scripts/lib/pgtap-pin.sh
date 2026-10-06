@@ -32,8 +32,9 @@
 
 # Raw clock tokens, case-insensitive. Same list as G2 and the pgTAP clock census.
 # `now()` and `current_time` carry word boundaries so app_now() and
-# current_timestamp do not double-count.
-PGTAP_RAW_CLOCK_RE="(^|[^a-z0-9_])now[[:space:]]*\([[:space:]]*\)|(^|[^a-z0-9_])current_date([^a-z0-9_]|$)|(^|[^a-z0-9_])current_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])current_time([^a-z0-9_]|$)|(^|[^a-z0-9_])localtimestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])clock_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])statement_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])transaction_timestamp([^a-z0-9_]|$)|'now'|'today'"
+# current_timestamp do not double-count. A quoted 'now'/'today' right after
+# -> / ->> is a JSON key (enrolment_start_bounds(…)->>'today'), not a clock.
+PGTAP_RAW_CLOCK_RE="(^|[^a-z0-9_])now[[:space:]]*\([[:space:]]*\)|(^|[^a-z0-9_])current_date([^a-z0-9_]|$)|(^|[^a-z0-9_])current_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])current_time([^a-z0-9_]|$)|(^|[^a-z0-9_])localtimestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])clock_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])statement_timestamp([^a-z0-9_]|$)|(^|[^a-z0-9_])transaction_timestamp([^a-z0-9_]|$)|(^|[^>[:space:]])[[:space:]]*'(now|today)'"
 # session_window_start() with + or - on either side.
 PGTAP_SWS_ARITH_RE="session_window_start[[:space:]]*\([[:space:]]*\)[[:space:]]*[-+]|[-+][[:space:]]*session_window_start[[:space:]]*\("
 # What makes a file need the pin: any date literal, raw clock, or clock-reading helper.
